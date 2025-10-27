@@ -105,12 +105,15 @@ pub struct E3Router {
     bus: Addr<EventBus<EnclaveEvent>>,
     /// A repository for storing snapshots
     store: Repository<E3RouterSnapshot>,
+    /// Root data store for creating E3 contexts
+    root_store: DataStore,
 }
 
 pub struct E3RouterParams {
     extensions: Arc<Vec<Box<dyn E3Extension>>>,
     bus: Addr<EventBus<EnclaveEvent>>,
     store: Repository<E3RouterSnapshot>,
+    root_store: DataStore,
 }
 
 impl E3Router {
@@ -120,6 +123,7 @@ impl E3Router {
             bus: bus.clone(),
             extensions: vec![],
             store: repositories.router(),
+            root_store: store,
         };
 
         // Everything needs the committe meta factory so adding it here by default
@@ -131,6 +135,7 @@ impl E3Router {
             extensions: params.extensions,
             bus: params.bus.clone(),
             store: params.store.clone(),
+            root_store: params.root_store.clone(),
             completed: HashSet::new(),
             contexts: HashMap::new(),
             buffer: EventBuffer {
@@ -164,12 +169,13 @@ impl Handler<EnclaveEvent> for E3Router {
             return;
         }
 
-        let repositories = self.repository().repositories();
+        let repositories = self.root_store.repositories();
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
             E3Context::from_params(E3ContextParams {
                 e3_id: e3_id.clone(),
                 repository: repositories.context(&e3_id),
                 extensions: self.extensions.clone(),
+                root_store: self.root_store.clone(),
             })
         });
 
@@ -246,7 +252,7 @@ impl FromSnapshotWithParams for E3Router {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut contexts = HashMap::new();
 
-        let repositories = params.store.repositories();
+        let repositories = params.root_store.repositories();
         for e3_id in snapshot.contexts {
             let Some(ctx_snapshot) = repositories.context(&e3_id).read().await? else {
                 continue;
@@ -259,6 +265,7 @@ impl FromSnapshotWithParams for E3Router {
                         repository: repositories.context(&e3_id),
                         e3_id: e3_id.clone(),
                         extensions: params.extensions.clone(),
+                        root_store: params.root_store.clone(),
                     },
                     ctx_snapshot,
                 )
@@ -273,6 +280,7 @@ impl FromSnapshotWithParams for E3Router {
             buffer: EventBuffer::default(),
             bus: params.bus,
             store: repositories.router(),
+            root_store: params.root_store,
         })
     }
 }
@@ -282,6 +290,7 @@ pub struct E3RouterBuilder {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub extensions: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
+    pub root_store: DataStore,
 }
 
 impl E3RouterBuilder {
@@ -297,8 +306,8 @@ impl E3RouterBuilder {
         let params = E3RouterParams {
             extensions: self.extensions.into(),
             bus: self.bus.clone(),
-
             store: router_repo,
+            root_store: self.root_store,
         };
 
         let e3r = match snapshot {

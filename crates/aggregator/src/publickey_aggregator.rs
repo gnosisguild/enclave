@@ -11,7 +11,7 @@ use e3_events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
+use e3_sortition::{GetNodeIndex, GetNodesForE3, Sortition};
 use e3_utils::ArcBytes;
 use std::sync::Arc;
 use tracing::{error, trace};
@@ -228,8 +228,8 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
     fn handle(&mut self, msg: NotifyNetwork, _: &mut Self::Context) -> Self::Result {
         Box::pin(
             self.sortition
-                .send(GetNodes {
-                    chain_id: msg.e3_id.chain_id(),
+                .send(GetNodesForE3 {
+                    e3_id: msg.e3_id.clone(),
                 })
                 .into_actor(self)
                 .map(move |res, act, _| {

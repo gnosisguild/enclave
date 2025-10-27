@@ -74,16 +74,18 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
             .expect("System time should be after UNIX_EPOCH")
             .as_secs();
 
+        const FINALIZATION_BUFFER_SECONDS: u64 = 5;
+
         let seconds_until_deadline = if submission_deadline > current_timestamp {
-            submission_deadline - current_timestamp
+            (submission_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
         } else {
             info!(
                 e3_id = %e3_id,
                 submission_deadline = submission_deadline,
                 current_timestamp = current_timestamp,
-                "Submission deadline already passed, finalizing immediately"
+                "Submission deadline already passed, finalizing with buffer"
             );
-            0
+            FINALIZATION_BUFFER_SECONDS
         };
 
         info!(

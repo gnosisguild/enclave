@@ -9,8 +9,9 @@ use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    BusError, CommitteePublished, ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, EventBus,
-    OperatorActivationChanged, PlaintextOutputPublished, Subscribe, TicketBalanceUpdated,
+    BusError, CiphernodeAdded, CiphernodeRemoved, CommitteePublished, ConfigurationUpdated,
+    EnclaveErrorType, EnclaveEvent, EventBus, OperatorActivationChanged, PlaintextOutputPublished,
+    Subscribe, TicketBalanceUpdated,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -112,6 +113,10 @@ impl NodeStateManager {
 
         let addr = NodeStateManager::new(state, bus.clone()).start();
 
+        bus.send(Subscribe::new("CiphernodeAdded", addr.clone().into()))
+            .await?;
+        bus.send(Subscribe::new("CiphernodeRemoved", addr.clone().into()))
+            .await?;
         bus.send(Subscribe::new("TicketBalanceUpdated", addr.clone().into()))
             .await?;
         bus.send(Subscribe::new(
@@ -151,6 +156,12 @@ impl Handler<EnclaveEvent> for NodeStateManager {
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
+            EnclaveEvent::CiphernodeAdded { data, .. } => {
+                ctx.notify(data);
+            }
+            EnclaveEvent::CiphernodeRemoved { data, .. } => {
+                ctx.notify(data);
+            }
             EnclaveEvent::TicketBalanceUpdated { data, .. } => {
                 ctx.notify(data);
             }
@@ -317,6 +328,51 @@ impl Handler<PlaintextOutputPublished> for NodeStateManager {
                     "PlaintextOutputPublished - no committee found (might have been completed already)"
                 );
             }
+
+            Ok(state)
+        }) {
+            Ok(_) => (),
+            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
+        }
+    }
+}
+
+impl Handler<CiphernodeAdded> for NodeStateManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: CiphernodeAdded, _: &mut Self::Context) -> Self::Result {
+        match self.state.try_mutate(|mut state| {
+            let key = (msg.chain_id, msg.address.clone());
+            // Only create entry if it doesn't exist - preserve existing state
+            state.nodes.entry(key).or_insert_with(NodeState::default);
+
+            info!(
+                operator = %msg.address,
+                chain_id = msg.chain_id,
+                "Node registered in NodeStateManager"
+            );
+
+            Ok(state)
+        }) {
+            Ok(_) => (),
+            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
+        }
+    }
+}
+
+impl Handler<CiphernodeRemoved> for NodeStateManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: CiphernodeRemoved, _: &mut Self::Context) -> Self::Result {
+        match self.state.try_mutate(|mut state| {
+            let key = (msg.chain_id, msg.address.clone());
+            state.nodes.remove(&key);
+
+            info!(
+                operator = %msg.address,
+                chain_id = msg.chain_id,
+                "Node removed from NodeStateManager"
+            );
 
             Ok(state)
         }) {

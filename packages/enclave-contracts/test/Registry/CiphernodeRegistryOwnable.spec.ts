@@ -25,7 +25,7 @@ const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.keccak256(data);
-const SORTITION_SUBMISSION_WINDOW = 300;
+const SORTITION_SUBMISSION_WINDOW = 10;
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);

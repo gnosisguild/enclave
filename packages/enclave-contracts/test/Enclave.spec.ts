@@ -34,7 +34,7 @@ const { loadFixture, time, mine } = networkHelpers;
 
 describe("Enclave", function () {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
-  const SORTITION_SUBMISSION_WINDOW = 300;
+  const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
   const AddressTwo = "0x0000000000000000000000000000000000000002";
 

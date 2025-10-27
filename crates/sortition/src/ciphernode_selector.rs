@@ -76,7 +76,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
 impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, data: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();

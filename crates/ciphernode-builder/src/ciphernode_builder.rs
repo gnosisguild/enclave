@@ -31,7 +31,8 @@ use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{
-    CiphernodeSelector, NodeStateRepositoryFactory, Sortition, SortitionRepositoryFactory,
+    CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
+    Sortition, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
@@ -282,6 +283,7 @@ impl CiphernodeBuilder {
         let sortition = Sortition::attach_with_node_state(
             &local_bus,
             repositories.sortition(),
+            repositories.finalized_committees(),
             node_state_manager,
         )
         .await?;
@@ -362,6 +364,7 @@ impl CiphernodeBuilder {
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
+                            self.pubkey_agg, // is_aggregator flag
                         )
                         .await?;
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");

@@ -68,4 +68,8 @@ impl StoreKeys {
     pub fn node_state() -> String {
         String::from("//node_state")
     }
+
+    pub fn finalized_committees() -> String {
+        String::from("//finalized_committees")
+    }
 }

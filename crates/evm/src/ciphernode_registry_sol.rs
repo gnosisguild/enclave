@@ -19,7 +19,6 @@ use e3_events::{
     BusError, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet,
     PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
 };
-use std::collections::HashMap;
 use tracing::{error, info, trace};
 
 sol!(
@@ -247,9 +246,6 @@ pub struct CiphernodeRegistrySolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
     bus: Addr<EventBus<EnclaveEvent>>,
-    /// Store finalized committees for score sortition
-    /// Maps E3id to the finalized committee nodes
-    finalized_committees: HashMap<E3id, Vec<String>>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
@@ -262,7 +258,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             provider,
             contract_address,
             bus: bus.clone(),
-            finalized_committees: HashMap::new(),
         })
     }
 
@@ -270,19 +265,17 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
+        is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
         let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address.parse()?)
             .await?
             .start();
 
-        let _ = bus
-            .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
-            .await;
-
-        // Subscribe to CommitteeFinalized for score sortition
-        let _ = bus
-            .send(Subscribe::new("CommitteeFinalized", addr.clone().into()))
-            .await;
+        if is_aggregator {
+            let _ = bus
+                .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
+                .await;
+        }
 
         // Subscribe to TicketGenerated for ticket submission
         let _ = bus
@@ -315,12 +308,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::CommitteeFinalized { data, .. } => {
-                // Only store if chain matches
-                if self.provider.chain_id() == data.e3_id.chain_id() {
-                    ctx.notify(data);
-                }
-            }
             EnclaveEvent::TicketGenerated { data, .. } => {
                 // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
@@ -330,21 +317,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
             EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
-    }
-}
-
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalized>
-    for CiphernodeRegistrySolWriter<P>
-{
-    type Result = ();
-
-    fn handle(&mut self, msg: CommitteeFinalized, _: &mut Self::Context) -> Self::Result {
-        info!(
-            "Storing finalized committee for E3 {:?} (score sortition)",
-            msg.e3_id
-        );
-        self.finalized_committees
-            .insert(msg.e3_id.clone(), msg.committee);
     }
 }
 
@@ -421,26 +393,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let pubkey = msg.pubkey.clone();
+        let nodes = msg.nodes.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
-
-        // Check if we have a finalized committee for this E3 (score sortition)
-        // Otherwise use the nodes from PublicKeyAggregated (distance sortition)
-        let nodes = if let Some(finalized_nodes) = self.finalized_committees.remove(&e3_id) {
-            info!(
-                "Using finalized committee nodes for E3 {:?} (score sortition)",
-                e3_id
-            );
-            // Convert Vec<String> to OrderedSet<String>
-            OrderedSet::from_iter(finalized_nodes)
-        } else {
-            info!(
-                "Using aggregated nodes for E3 {:?} (distance sortition)",
-                e3_id
-            );
-            msg.nodes.clone()
-        };
 
         Box::pin(async move {
             let result =
@@ -564,11 +520,14 @@ impl CiphernodeRegistrySol {
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
+        is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>
     where
         P: Provider + WalletProvider + Clone + 'static,
     {
-        let writer = CiphernodeRegistrySolWriter::attach(bus, provider, contract_address).await?;
+        let writer =
+            CiphernodeRegistrySolWriter::attach(bus, provider, contract_address, is_aggregator)
+                .await?;
         Ok(writer)
     }
 }

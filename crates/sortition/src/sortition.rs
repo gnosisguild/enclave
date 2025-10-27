@@ -13,8 +13,8 @@ use alloy::primitives::Address;
 use anyhow::{anyhow, Context, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
-    Subscribe,
+    BusError, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, EnclaveErrorType,
+    EnclaveEvent, EventBus, Seed, Subscribe,
 };
 use num::BigInt;
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,14 @@ pub struct GetNodeIndex {
 pub struct GetNodes {
     /// Target chain.
     pub chain_id: u64,
+}
+
+/// Message to get the finalized committee nodes for a specific E3.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Vec<String>")]
+pub struct GetNodesForE3 {
+    /// E3 ID to get nodes for.
+    pub e3_id: e3_events::E3id,
 }
 
 /// Minimal interface that all sortition backends must implement.
@@ -475,6 +483,8 @@ pub struct Sortition {
     bus: Addr<EventBus<EnclaveEvent>>,
     /// Optional reference to NodeStateManager for score-based sortition
     node_state_manager: Option<Addr<NodeStateManager>>,
+    /// Persistent map of finalized committees per E3
+    finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
 }
 
 /// Parameters for constructing a `Sortition` actor.
@@ -486,6 +496,8 @@ pub struct SortitionParams {
     pub list: Persistable<HashMap<u64, SortitionBackend>>,
     /// Optional NodeStateManager for score-based sortition
     pub node_state_manager: Option<Addr<NodeStateManager>>,
+    /// Persistent map of finalized committees per E3
+    pub finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
 }
 
 impl Sortition {
@@ -495,6 +507,7 @@ impl Sortition {
             list: params.list,
             bus: params.bus,
             node_state_manager: params.node_state_manager,
+            finalized_committees: params.finalized_committees,
         }
     }
 
@@ -505,16 +518,20 @@ impl Sortition {
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<HashMap<u64, SortitionBackend>>,
+        committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(HashMap::new()).await?;
+        let finalized_committees = committees_store.load_or_default(HashMap::new()).await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
             node_state_manager: None, // Legacy attach without node state
+            finalized_committees,
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
         bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
+        bus.do_send(Subscribe::new("CommitteeFinalized", addr.clone().into()));
         Ok(addr)
     }
 
@@ -525,17 +542,21 @@ impl Sortition {
     pub async fn attach_with_node_state(
         bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<HashMap<u64, SortitionBackend>>,
+        committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
         node_state_manager: Addr<NodeStateManager>,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(HashMap::new()).await?;
+        let finalized_committees = committees_store.load_or_default(HashMap::new()).await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
             node_state_manager: Some(node_state_manager),
+            finalized_committees,
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
         bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
+        bus.do_send(Subscribe::new("CommitteeFinalized", addr.clone().into()));
         Ok(addr)
     }
 
@@ -567,6 +588,7 @@ impl Handler<EnclaveEvent> for Sortition {
         match msg {
             EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
             EnclaveEvent::CiphernodeRemoved { data, .. } => ctx.notify(data.clone()),
+            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data.clone()),
             _ => (),
         }
     }
@@ -673,5 +695,38 @@ impl Handler<GetNodes> for Sortition {
             tracing::warn!("Failed to get nodes for chain {}: {}", msg.chain_id, err);
             Vec::new()
         })
+    }
+}
+
+impl Handler<CommitteeFinalized> for Sortition {
+    type Result = ();
+
+    fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
+        info!(
+            e3_id = %msg.e3_id,
+            committee_size = msg.committee.len(),
+            "Storing finalized committee"
+        );
+
+        if let Err(err) = self.finalized_committees.try_mutate(|mut committees| {
+            committees.insert(msg.e3_id.clone(), msg.committee.clone());
+            Ok(committees)
+        }) {
+            self.bus.err(EnclaveErrorType::Sortition, err);
+        }
+    }
+}
+
+impl Handler<GetNodesForE3> for Sortition {
+    type Result = Vec<String>;
+
+    fn handle(&mut self, msg: GetNodesForE3, _ctx: &mut Self::Context) -> Self::Result {
+        self.finalized_committees
+            .get()
+            .and_then(|committees| committees.get(&msg.e3_id).cloned())
+            .unwrap_or_else(|| {
+                tracing::warn!("No finalized committee found for E3 {}", msg.e3_id);
+                Vec::new()
+            })
     }
 }

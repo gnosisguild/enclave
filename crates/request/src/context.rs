@@ -9,7 +9,8 @@ use actix::Recipient;
 use anyhow::Result;
 use async_trait::async_trait;
 use e3_data::{
-    Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
+    Checkpoint, DataStore, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository,
+    Snapshot,
 };
 use e3_events::{E3id, EnclaveEvent};
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,8 @@ pub struct E3Context {
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
     pub repository: Repository<E3ContextSnapshot>,
+    /// Root data store for accessing global repositories
+    root_store: DataStore,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -57,6 +60,7 @@ pub struct E3ContextParams {
     pub repository: Repository<E3ContextSnapshot>,
     pub e3_id: E3id,
     pub extensions: Arc<Vec<Box<dyn E3Extension>>>,
+    pub root_store: DataStore,
 }
 
 impl E3Context {
@@ -66,6 +70,7 @@ impl E3Context {
             repository: params.repository,
             recipients: init_recipients(),
             dependencies: HetrogenousMap::new(),
+            root_store: params.root_store,
         }
     }
 
@@ -132,7 +137,7 @@ impl E3Context {
 
 impl RepositoriesFactory for E3Context {
     fn repositories(&self) -> Repositories {
-        self.repository().clone().into()
+        self.root_store.repositories()
     }
 }
 
@@ -158,6 +163,7 @@ impl FromSnapshotWithParams for E3Context {
             repository: params.repository,
             recipients: init_recipients(),
             dependencies: HetrogenousMap::new(),
+            root_store: params.root_store,
         };
 
         for extension in params.extensions.iter() {

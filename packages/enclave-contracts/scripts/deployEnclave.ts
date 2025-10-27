@@ -40,7 +40,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
-  const SORTITION_SUBMISSION_WINDOW = 300;
+  const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });
@@ -141,6 +141,11 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   console.log("Setting BondingRegistry address in CiphernodeRegistry...");
   await ciphernodeRegistry.setBondingRegistry(bondingRegistryAddress);
+
+  console.log("Setting Submission Window in CiphernodeRegistry...");
+  await ciphernodeRegistry.setSortitionSubmissionWindow(
+    SORTITION_SUBMISSION_WINDOW,
+  );
 
   console.log("Setting BondingRegistry address in EnclaveTicketToken...");
   await enclaveTicketToken.setRegistry(bondingRegistryAddress);
