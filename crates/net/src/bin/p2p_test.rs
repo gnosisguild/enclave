@@ -19,17 +19,10 @@ use tokio::time::{sleep, timeout};
 use tracing::info;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
-// So this is a test to test our networking interface
-//
-// Here we ensure we can send a gossipsub message to all connected nodes by running a sync_nodes
-// operation.
-//
-// We have a docker test harness that runs the nodes
 async fn test_dht(peer: &mut TestPeer) -> Result<()> {
     let value = b"I am he as you are he, as you are me and we are all together";
     let key = Cid::from_content(value);
     peer.sync_nodes().await?;
-
     if peer.is_lead() {
         // PUT RECORD
         peer.tx
@@ -40,7 +33,6 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
                 expires: None,
             })
             .await?;
-
         receive_until_collect(
             &mut peer.rx,
             |e| match e {
@@ -51,7 +43,6 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
         )
         .await?;
     }
-
     // GET RECORD
     peer.tx
         .send(NetCommand::DhtGetRecord {
@@ -59,7 +50,6 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
             key,
         })
         .await?;
-
     let events = receive_until_collect(
         &mut peer.rx,
         |e| match e {
@@ -69,21 +59,17 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
         Duration::from_secs(15),
     )
     .await?;
-
     let Some(NetEvent::DhtGetRecordSucceeded { value: actual, .. }) = events.last() else {
         return Err(anyhow::anyhow!(
             "Failed to receive success from GET RECORD!"
         ));
     };
-
     assert_eq!(
         value.to_vec(),
         actual.extract_bytes(),
         "Value does not match!"
     );
-
     peer.sync_nodes().await?;
-
     Ok(())
 }
 
