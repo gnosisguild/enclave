@@ -118,7 +118,7 @@ describe('Vote', () => {
 
     let zkInputsGenerator = ZKInputsGenerator.withDefaults()
     let publicKey = zkInputsGenerator.generatePublicKey()
-    const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigUint64Array([0n]))
+    const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
 
     it('should encrypt a vote and generate the circuit inputs', async () => {
       const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
