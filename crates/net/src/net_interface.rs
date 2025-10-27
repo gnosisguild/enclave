@@ -207,8 +207,6 @@ async fn process_swarm_event(
         } => {
             info!("Connected to {peer_id}");
             let remote_addr = endpoint.get_remote_address().clone();
-
-            // add address to kademlia
             swarm
                 .behaviour_mut()
                 .kademlia
@@ -317,11 +315,9 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
-
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
         }
-
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
             topic,
@@ -330,7 +326,6 @@ async fn process_swarm_event(
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
-
         _ => {}
     };
     Ok(())
@@ -454,7 +449,6 @@ fn handle_put_record(
             })?;
         }
     }
-
     Ok(())
 }
 
@@ -471,12 +465,10 @@ fn handle_get_record(
 
     // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
     correlator.track(query_id, correlation_id);
-
     info!(
         "GET RECORD CORRELATED! query_id={:?} correlation_id={}",
         query_id, correlation_id
     );
-
     Ok(())
 }
 
