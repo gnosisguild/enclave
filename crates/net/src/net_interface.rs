@@ -276,12 +276,10 @@ async fn process_swarm_event(
                     value: ArcBytes::from_bytes(record_bytes),
                 })?;
             }
-            Ok(GetRecordOk::FinishedWithNoAdditionalRecord { cache_candidates }) => {
-                trace!(
-                    "FinishedWithNoAdditionalRecord!! cache={:?} step={:?}",
-                    cache_candidates,
-                    step
-                );
+            Ok(GetRecordOk::FinishedWithNoAdditionalRecord {
+                cache_candidates: c,
+            }) => {
+                trace!("Finished cache={:?} step={:?}", c, step);
             }
             Err(e) => {
                 error!("step={:?} error={}", step, e);
