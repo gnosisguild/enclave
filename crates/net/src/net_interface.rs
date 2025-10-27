@@ -303,11 +303,6 @@ async fn process_swarm_event(
             match record {
                 Ok(record) => {
                     let key = Cid(record.key.to_vec());
-                    info!(
-                        "Put DHT record for key={} correlation_id={}",
-                        key.to_string(),
-                        correlation_id
-                    );
                     event_tx.send(NetEvent::DhtPutRecordSucceeded {
                         key,
                         correlation_id,
