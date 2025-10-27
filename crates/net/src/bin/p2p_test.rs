@@ -206,16 +206,20 @@ impl TestPeer {
 
     async fn setup() -> Result<TestPeer> {
         let name = env::args().nth(1).expect("need name");
+
         let udp_port = env::var("QUIC_PORT")
             .ok()
             .and_then(|p| p.parse::<u16>().ok());
+
         let dial_to = env::var("DIAL_TO")
             .ok()
             .and_then(|p| p.parse::<String>().ok());
+
         let sync_threshold = env::var("SYNC_THRESHOLD")
             .ok()
             .and_then(|p| p.parse::<usize>().ok())
             .unwrap_or(3);
+
         let topic = IdentTopic::new("test");
         let peers: Vec<String> = dial_to.iter().cloned().collect();
         let id = libp2p::identity::Keypair::generate_ed25519();
@@ -224,7 +228,7 @@ impl TestPeer {
         let tx = peer.tx();
         let mut rx = peer.rx();
 
-        let _router_task = tokio::spawn({
+        tokio::spawn({
             let name = name.clone();
             async move {
                 println!("{} starting router task", name);
@@ -241,6 +245,7 @@ impl TestPeer {
 
         // Give network time to initialize
         sleep(Duration::from_secs(3)).await;
+
         Ok(TestPeer {
             tx,
             rx,
