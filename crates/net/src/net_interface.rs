@@ -474,12 +474,11 @@ fn handle_get_record(
         .kademlia
         .get_record(RecordKey::new(&key));
 
-    // So because of the API above the contract here must
-    // be that this will only ever return after some amount of time
-    // I could not see a way to specify your own QueryId so we have to
-    // track with the correlator
-
+    // I could not see a way to specify your own QueryId so we have to corelate like this.
+    // QueryId is returned synchronously and we immediately add it to the correlator so this should
+    // not be an issue.
     correlator.track(query_id, correlation_id);
+
     info!(
         "GET RECORD CORRELATED! query_id={:?} correlation_id={}",
         query_id, correlation_id
