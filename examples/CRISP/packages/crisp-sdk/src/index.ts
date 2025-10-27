@@ -10,12 +10,4 @@ export * from './constants'
 export * from './utils'
 
 export { VotingMode } from './types'
-export type {
-  IRoundDetails,
-  IRoundDetailsResponse,
-  ITokenDetails,
-  IMerkleProof,
-  IVote,
-  CRISPCircuitInputs,
-  CRISPVoteAndInputs,
-} from './types'
+export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof, IVote, CRISPCircuitInputs } from './types'
