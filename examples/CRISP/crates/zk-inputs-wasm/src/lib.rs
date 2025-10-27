@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! JavaScript library with WASM bindings for CRISP ZK inputs generation.
 //!
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
