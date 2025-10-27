@@ -189,15 +189,15 @@ export const encryptVoteAndGenerateCRISPInputs = async (
  * @todo Add the merkle tree inputs too
  * @param partialInputs The partial CRISP circuit inputs
  * @param signature The voter's signature
- * @param signedMessage The signed message
+ * @param message The signed message
  * @returns The complete CRISP circuit inputs
  */
 export const generateCRISPInputs = async (
   partialInputs: CRISPCircuitInputs,
   signature: `0x${string}`,
-  signedMessage: string,
+  message: string,
 ): Promise<CRISPCircuitInputs> => {
-  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(signedMessage, signature)
+  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(message, signature)
 
   return {
     ...partialInputs,
