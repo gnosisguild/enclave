@@ -13,6 +13,7 @@ services:
       - cargo-bin:/home/ubuntu/.cargo/bin
       - cargo-registry:/home/ubuntu/.cargo/registry
       - server-target:/app/examples/CRISP/server/target
+      - generator-target:/app/examples/CRISP/crates/generator/target
       - evm-node-modules:/app/packages/enclave-contracts/node_modules
       - root-node-modules:/app/node_modules
       - client-node-modules:/app/examples/CRISP/client/node_modules
@@ -40,6 +41,7 @@ volumes:
   cargo-bin:
   cargo-registry:
   server-target:
+  generator-target:
   evm-node-modules:
   root-node-modules:
   client-node-modules:
