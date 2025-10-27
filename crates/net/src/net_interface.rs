@@ -20,16 +20,13 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
+use std::sync::atomic::AtomicBool;
 use std::{
     collections::HashMap,
     sync::{atomic::Ordering, Arc},
     time::Instant,
 };
-use std::{hash::DefaultHasher, io::Error, time::Duration};
-use std::{
-    hash::{Hash, Hasher},
-    sync::atomic::AtomicBool,
-};
+use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
@@ -363,15 +360,7 @@ async fn process_swarm_command(
             key,
             expires,
             value,
-        } => handle_put_record(
-            swarm,
-            event_tx,
-            correlator,
-            correlation_id,
-            key,
-            expires,
-            value,
-        ),
+        } => handle_put_record(swarm, correlator, correlation_id, key, expires, value),
         NetCommand::DhtGetRecord {
             correlation_id,
             key,
@@ -426,7 +415,6 @@ fn handle_dial(
 
 fn handle_put_record(
     swarm: &mut Swarm<NodeBehaviour>,
-    event_tx: &broadcast::Sender<NetEvent>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
     key: Cid,
@@ -441,28 +429,19 @@ fn handle_put_record(
         expires,
     };
 
-    match swarm
+    let query_id = swarm
         .behaviour_mut()
         .kademlia
-        .put_record(record, Quorum::One)
-    {
-        Ok(query_id) => {
-            info!(
-                "PUT RECORD OK query_id={:?} correlation_id={}",
-                query_id, correlation_id
-            );
-            correlator.track(query_id, correlation_id);
-        }
-        Err(error) => {
-            error!("PUT RECORD ERROR: {:?}", error);
-            let err_evt = NetEvent::DhtPutRecordError {
-                correlation_id,
-                error: error.into(),
-            };
+        .put_record(record, Quorum::One)?;
 
-            event_tx.send(err_evt)?;
-        }
-    };
+    // QueryId is returned synchronously and we immediately add it to the correlator so this should not be an issue.
+    correlator.track(query_id, correlation_id);
+
+    info!(
+        "PUT RECORD OK query_id={:?} correlation_id={}",
+        query_id, correlation_id
+    );
+
     Ok(())
 }
 
@@ -477,9 +456,7 @@ fn handle_get_record(
         .kademlia
         .get_record(RecordKey::new(&key));
 
-    // I could not see a way to specify your own QueryId so we have to corelate like this.
-    // QueryId is returned synchronously and we immediately add it to the correlator so this should
-    // not be an issue.
+    // QueryId is returned synchronously and we immediately add it to the correlator so this should not be an issue.
     correlator.track(query_id, correlation_id);
 
     info!(
