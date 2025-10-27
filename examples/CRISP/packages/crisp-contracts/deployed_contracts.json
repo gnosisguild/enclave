@@ -165,7 +165,7 @@
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "enclaveAddress": "0x0000000000000000000000000000000000000001",
-        "submissionWindow": "10"
+        "submissionWindow": "3"
       },
       "blockNumber": 8,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"

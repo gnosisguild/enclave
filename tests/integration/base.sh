@@ -50,9 +50,8 @@ ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 -
 sleep 4
 
 pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
-echo "Waiting for pubkey.bin"
+
 waiton "$SCRIPT_DIR/output/pubkey.bin"
-echo "Pubkey.bin found"
 PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 heading "Mock encrypted plaintext"

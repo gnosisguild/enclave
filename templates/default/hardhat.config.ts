@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import {
+  ciphernodeAdd,
+  ciphernodeAdminAdd,
+} from "@enclave-e3/contracts/tasks/ciphernode";
 import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
 import dotenv from "dotenv";
 
@@ -65,7 +68,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
 }
 
 const config: HardhatUserConfig = {
-  tasks: [ciphernodeAdd, cleanDeploymentsTask],
+  tasks: [ciphernodeAdd, ciphernodeAdminAdd, cleanDeploymentsTask],
   plugins: [
     hardhatTypechainPlugin,
     hardhatEthersChaiMatchers,
@@ -119,13 +122,15 @@ const config: HardhatUserConfig = {
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
       "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",
       "@enclave-e3/contracts/contracts/slashing/SlashingManager.sol",
-      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveToken.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol",
       "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
-      "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
       "@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
     ],
     compilers: [
       {
