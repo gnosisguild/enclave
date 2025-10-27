@@ -74,7 +74,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
             .expect("System time should be after UNIX_EPOCH")
             .as_secs();
 
-        const FINALIZATION_BUFFER_SECONDS: u64 = 5;
+        const FINALIZATION_BUFFER_SECONDS: u64 = 3;
 
         let seconds_until_deadline = if submission_deadline > current_timestamp {
             (submission_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS

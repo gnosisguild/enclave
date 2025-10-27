@@ -20,7 +20,10 @@ pnpm evm:clean
 pnpm evm:deploy --network localhost
 
 # set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY"
+enclave_wallet_set ag "$PRIVATE_KEY_AG"
+enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
+enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
+enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
 
 # start swarm
 enclave_nodes_up
@@ -40,9 +43,6 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localho
 heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
 
-heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
-
 heading "Request Committee"
 
 ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
@@ -50,8 +50,9 @@ ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 -
 sleep 4
 
 pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
-
+echo "Waiting for pubkey.bin"
 waiton "$SCRIPT_DIR/output/pubkey.bin"
+echo "Pubkey.bin found"
 PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 heading "Mock encrypted plaintext"

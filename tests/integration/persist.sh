@@ -20,7 +20,10 @@ pnpm evm:clean
 pnpm evm:deploy --network localhost
 
 # set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY"
+enclave_wallet_set ag "$PRIVATE_KEY_AG"
+enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
+enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
+enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
 
 # start swarm
 enclave_nodes_up
@@ -35,9 +38,6 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localho
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
-
-heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
 
 heading "Request Committee"
 

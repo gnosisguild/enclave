@@ -280,11 +280,6 @@ impl ScoreBackend {
                     return None;
                 }
 
-                info!(
-                    address = %addr_str,
-                    available_tickets = count,
-                    "Node eligible for score sortition"
-                );
                 let tickets = (1..=count).map(|i| Ticket { ticket_id: i }).collect();
                 Some(RegisteredNode {
                     address: n.address,
