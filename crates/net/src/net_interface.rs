@@ -30,8 +30,8 @@ use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::events::NetEvent;
 use crate::events::{GossipData, NetCommand};
+use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
 
 #[derive(NetworkBehaviour)]
@@ -302,7 +302,7 @@ async fn process_swarm_event(
                     error!("PUT RECORD FAILED: {}", error);
                     event_tx.send(NetEvent::DhtPutRecordError {
                         correlation_id,
-                        error,
+                        error: PutOrStoreError::PutRecordError(error),
                     })?;
                 }
             }
@@ -360,7 +360,15 @@ async fn process_swarm_command(
             key,
             expires,
             value,
-        } => handle_put_record(swarm, correlator, correlation_id, key, expires, value),
+        } => handle_put_record(
+            swarm,
+            event_tx,
+            correlator,
+            correlation_id,
+            key,
+            expires,
+            value,
+        ),
         NetCommand::DhtGetRecord {
             correlation_id,
             key,
@@ -415,6 +423,7 @@ fn handle_dial(
 
 fn handle_put_record(
     swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
     key: Cid,
@@ -428,19 +437,23 @@ fn handle_put_record(
         publisher: None, // Will be set automatically to local peer ID
         expires,
     };
-
-    let query_id = swarm
+    match swarm
         .behaviour_mut()
         .kademlia
-        .put_record(record, Quorum::One)?;
-
-    // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
-    correlator.track(query_id, correlation_id);
-
-    info!(
-        "PUT RECORD OK query_id={:?} correlation_id={}",
-        query_id, correlation_id
-    );
+        .put_record(record, Quorum::One)
+    {
+        Ok(qid) => {
+            // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
+            correlator.track(qid, correlation_id);
+            info!("PUT RECORD OK qid={:?} cid={}", qid, correlation_id);
+        }
+        Err(error) => {
+            event_tx.send(NetEvent::DhtPutRecordError {
+                correlation_id,
+                error: PutOrStoreError::StoreError(error),
+            })?;
+        }
+    }
 
     Ok(())
 }

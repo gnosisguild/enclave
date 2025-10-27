@@ -387,7 +387,7 @@ mod tests {
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
         EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
-    use libp2p::kad::{store, GetRecordError, PutRecordError, RecordKey};
+    use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use tokio::{
         sync::{broadcast, mpsc},
         time::{sleep, timeout},
@@ -593,11 +593,13 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtPutRecordError {
                 correlation_id,
-                error: PutRecordError::QuorumFailed {
-                    key: RecordKey::new(b"I got the secret"),
-                    success: vec![],
-                    quorum: NonZero::new(1).unwrap(),
-                },
+                error: crate::events::PutOrStoreError::PutRecordError(
+                    PutRecordError::QuorumFailed {
+                        key: RecordKey::new(b"I got the secret"),
+                        success: vec![],
+                        quorum: NonZero::new(1).unwrap(),
+                    },
+                ),
             })?;
         }
 
@@ -606,7 +608,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT put record failed: QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 }"
+            "Operation failed after 4 attempts. Last error: DHT put record failed: PutRecordError(QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 })"
         );
 
         Ok(())
