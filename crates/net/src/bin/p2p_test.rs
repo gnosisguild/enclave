@@ -205,9 +205,7 @@ impl TestPeer {
     }
 
     async fn setup() -> Result<TestPeer> {
-        println!("Running with args {:?}", env::args());
         let name = env::args().nth(1).expect("need name");
-        println!("{} starting up", name);
         let udp_port = env::var("QUIC_PORT")
             .ok()
             .and_then(|p| p.parse::<u16>().ok());
@@ -221,10 +219,11 @@ impl TestPeer {
         let topic = IdentTopic::new("test");
         let peers: Vec<String> = dial_to.iter().cloned().collect();
         let id = libp2p::identity::Keypair::generate_ed25519();
+
         let mut peer = NetInterface::new(&id, peers, udp_port, &topic.to_string())?;
-        // Extract input and outputs
         let tx = peer.tx();
         let mut rx = peer.rx();
+
         let _router_task = tokio::spawn({
             let name = name.clone();
             async move {
@@ -235,9 +234,11 @@ impl TestPeer {
                 println!("{} router task finished", name);
             }
         });
+
         println!("WAIT FOR MESH READY...");
         wait_for_mesh_ready(60, 3, &mut rx, &topic).await?;
         println!("MESH READY!");
+
         // Give network time to initialize
         sleep(Duration::from_secs(3)).await;
         Ok(TestPeer {
