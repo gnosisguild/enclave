@@ -332,7 +332,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// that will be used to evaluate polynomials for the Schwartz-Zippel lemma.
     ///
     /// # Returns
-    /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
+    /// Vector of challenge values [gamma, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
         let inputs = self.payload();
 
@@ -365,15 +365,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn check_encryption_constraints(self, gammas: Vec<Field>) {
         let crypto_params = self.params.crypto_params();
-        let u_at_gamma = self.u.eval(gammas.get(0));
-        let e0_at_gamma = self.e0.eval(gammas.get(0));
-        let k1_at_gamma = self.k1.eval(gammas.get(0));
-        let e1_at_gamma = self.e1.eval(gammas.get(0));
+        let gamma = gammas.get(0);
+        let u_at_gamma = self.u.eval(gamma);
+        let e0_at_gamma = self.e0.eval(gamma);
+        let k1_at_gamma = self.k1.eval(gamma);
+        let e1_at_gamma = self.e1.eval(gamma);
 
         // First equation with
         let mut ct0_sum = self.check_ct0_constraint(
             0,
-            gammas.get(0),
+            gamma,
             crypto_params,
             u_at_gamma,
             e0_at_gamma,
@@ -381,13 +382,13 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         );
 
         let mut ct1_sum =
-            self.check_ct1_constraint(0, gammas.get(0), crypto_params, u_at_gamma, e1_at_gamma);
+            self.check_ct1_constraint(0, gamma, crypto_params, u_at_gamma, e1_at_gamma);
 
         for i in 1..L {
             // First equation: ct0i = pk0i * u + e0 + k1 * k0i + r1i * qi + r2i * cyclo
             let (lhs, rhs) = self.check_ct0_constraint(
                 i,
-                gammas.get(0),
+                gamma,
                 crypto_params,
                 u_at_gamma,
                 e0_at_gamma,
@@ -397,7 +398,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
             // Second equation: ct1i = pk1i * u + e1 + p1i * qi + p2i * cyclo
             let (lhs, rhs) =
-                self.check_ct1_constraint(i, gammas.get(0), crypto_params, u_at_gamma, e1_at_gamma);
+                self.check_ct1_constraint(i, gamma, crypto_params, u_at_gamma, e1_at_gamma);
             ct1_sum = (ct1_sum.0 + lhs * gammas.get(i), ct1_sum.1 + rhs * gammas.get(i));
         }
 
