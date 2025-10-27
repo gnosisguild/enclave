@@ -249,27 +249,21 @@ async fn process_swarm_event(
                 let record_bytes = record.record.value;
                 let check_key = Cid::from_content(&record_bytes);
                 if check_key != key {
-                    // Perhaps we do something else here too? maybe this logic should be handled
-                    // upstream? Not sure...
+                    // Perhaps we do something else here too? maybe this logic should be handled upstream? Not sure...
                     return Err(anyhow::anyhow!(format!(
                         "Received record from peer {:?} but record was invalid ignoring.",
                         record.peer
                     )));
                 }
-
-                // As soon as we have a valid record we cancel the query because the record will be
-                // large and we can validate the value by hashing the content.
+                // As soon as we have a valid record we cancel the query because the record will be large and we can validate the value by hashing the content.
                 if let Some(mut query) = swarm.behaviour_mut().kademlia.query_mut(&id) {
                     query.finish();
                 }
-
                 let correlation_id = correlator.expire(&id)?;
                 debug!(
-                    "Received valid DHT record for key={} correlation_id={}",
-                    key.to_string(),
-                    correlation_id
+                    "Received valid DHT record for key={:?} correlation_id={}",
+                    key, correlation_id
                 );
-
                 event_tx.send(NetEvent::DhtGetRecordSucceeded {
                     key,
                     correlation_id,
