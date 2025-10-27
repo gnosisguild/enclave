@@ -12,4 +12,12 @@ export * from './vote'
 export * from './signature'
 
 export { VotingMode } from './types'
-export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof, IVote, CRISPCircuitInputs, NoirSignatureInputs } from './types'
+export type {
+  IRoundDetails,
+  IRoundDetailsResponse,
+  ITokenDetails,
+  IMerkleProof,
+  IVote,
+  CRISPCircuitInputs,
+  NoirSignatureInputs,
+} from './types'
