@@ -377,7 +377,7 @@ async fn broadcast_document_published_notification(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
+    use std::{collections::HashMap, num::NonZero, time::Duration};
 
     use super::*;
     use crate::events::NetCommand;
@@ -387,7 +387,7 @@ mod tests {
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
         EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
-    use libp2p::kad::{store, GetRecordError, RecordKey};
+    use libp2p::kad::{store, GetRecordError, PutRecordError, RecordKey};
     use tokio::{
         sync::{broadcast, mpsc},
         time::{sleep, timeout},
@@ -593,7 +593,11 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtPutRecordError {
                 correlation_id,
-                error: store::Error::ValueTooLarge,
+                error: PutRecordError::Timeout {
+                    key: RecordKey::new(b"I got the secret"),
+                    success: vec![],
+                    quorum: NonZero::new(1).unwrap(),
+                },
             })?;
         }
 
@@ -602,7 +606,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT put record failed: ValueTooLarge"
+            "Operation failed after 4 attempts. Last error: DHT put record failed: Timeout { key: Key(b\"I got the secret\"), success: [], quorum: 1 }"
         );
 
         Ok(())
