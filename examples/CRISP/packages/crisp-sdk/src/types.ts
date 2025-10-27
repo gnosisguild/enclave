@@ -88,21 +88,76 @@ export interface IVote {
 }
 
 /**
+ * Interface representing a vector with coefficients
+ */
+export interface Polynomial {
+  coefficients: string[]
+}
+
+/**
+ * Interface representing cryptographic parameters
+ */
+export interface GrecoCryptographicParams {
+  q_mod_t: string
+  qis: string[]
+  k0is: string[]
+}
+
+/**
+ * Interface representing Greco bounds
+ */
+export interface GrecoBoundParams {
+  e_bound: string
+  u_bound: string
+  k1_low_bound: string
+  k1_up_bound: string
+  p1_bounds: string[]
+  p2_bounds: string[]
+  pk_bounds: string[]
+  r1_low_bounds: string[]
+  r1_up_bounds: string[]
+  r2_bounds: string[]
+}
+
+/**
+ * Interface representing ciphertext addition inputs
+ */
+export interface CiphertextAdditionInputs {
+  prev_ct0is: Polynomial[]
+  prev_ct1is: Polynomial[]
+  sum_ct0is: Polynomial[]
+  sum_ct1is: Polynomial[]
+  r0is: Polynomial[]
+  r1is: Polynomial[]
+  r_bound: number
+}
+
+/**
+ * Interface representing Greco parameters
+ */
+export interface GrecoParams {
+  crypto: GrecoCryptographicParams
+  bounds: GrecoBoundParams
+}
+
+/**
  * The inputs required for the CRISP circuit
  */
 export interface CRISPCircuitInputs {
-  pk0is: string[][]
-  pk1is: string[][]
-  ct0is: string[][]
-  ct1is: string[][]
-  u: string[]
-  e0: string[]
-  e1: string[]
-  k1: string[]
-  r1is: string[][]
-  r2is: string[][]
-  p1is: string[][]
-  p2is: string[][]
+  ct_add: CiphertextAdditionInputs
+  params: GrecoParams
+  ct0is: Polynomial[]
+  ct1is: Polynomial[]
+  pk0is: Polynomial[]
+  pk1is: Polynomial[]
+  r1is: Polynomial[]
+  r2is: Polynomial[]
+  p1is: Polynomial[]
+  p2is: Polynomial[]
+  u: Polynomial
+  e0: Polynomial
+  e1: Polynomial
+  k1: Polynomial
   public_key_x: string[]
   public_key_y: string[]
   signature: string[]
@@ -114,9 +169,10 @@ export interface CRISPCircuitInputs {
 }
 
 /**
- * The result of encrypting a vote and generating CRISP circuit inputs
+ * Interface representing the BFV parameters
  */
-export interface CRISPVoteAndInputs {
-  encryptedVote: Uint8Array
-  circuitInputs: CRISPCircuitInputs
+export interface BFVParams {
+  degree: number
+  plaintextModulus: bigint
+  moduli: bigint[]
 }

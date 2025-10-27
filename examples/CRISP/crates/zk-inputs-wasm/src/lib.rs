@@ -51,7 +51,7 @@ impl ZKInputsGenerator {
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
-        vote: u8,
+        vote: Vec<u64>,
     ) -> Result<JsValue, JsValue> {
         match self
             .generator
@@ -79,11 +79,34 @@ impl ZKInputsGenerator {
 
     /// Encrypt a vote from JavaScript.
     #[wasm_bindgen(js_name = "encryptVote")]
-    pub fn encrypt_vote(&self, public_key: &[u8], vote: u8) -> Result<Vec<u8>, JsValue> {
+    pub fn encrypt_vote(&self, public_key: &[u8], vote: Vec<u64>) -> Result<Vec<u8>, JsValue> {
         match self.generator.encrypt_vote(public_key, vote) {
             Ok(ciphertext_bytes) => Ok(ciphertext_bytes),
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
+    }
+
+    /// Get the BFV parameters used by the generator.
+    #[wasm_bindgen(js_name = "getBFVParams")]
+    pub fn get_bfv_params(&self) -> Result<JsValue, JsValue> {
+        let bfv_params = self.generator.get_bfv_params();
+        let params_json = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &params_json,
+            &"degree".into(),
+            &JsValue::from(bfv_params.degree() as u32),
+        )?;
+        js_sys::Reflect::set(
+            &params_json,
+            &"plaintext_modulus".into(),
+            &JsValue::from(bfv_params.plaintext() as f64),
+        )?;
+        let moduli_array = js_sys::Array::new();
+        for modulus in bfv_params.moduli() {
+            moduli_array.push(&JsValue::from(*modulus as f64));
+        }
+        js_sys::Reflect::set(&params_json, &"moduli".into(), &moduli_array.into())?;
+        Ok(JsValue::from(params_json))
     }
 
     /// Get the version of the library.
@@ -97,16 +120,23 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
+    use zk_inputs::DEFAULT_DEGREE;
 
     wasm_bindgen_test_configure!(run_in_browser);
+
+    /// Helper function to create a vote vector with alternating 0s and 1s (deterministic).
+    fn create_vote_vector() -> Vec<u64> {
+        (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect()
+    }
 
     #[wasm_bindgen_test]
     fn test_js_inputs_generation_with_defaults() {
         // Create generator with default parameters.
         let generator = ZKInputsGenerator::with_defaults().unwrap();
         let public_key = generator.generate_public_key().unwrap();
-        let old_ciphertext = generator.encrypt_vote(&public_key, 1).unwrap();
-        let result = generator.generate_inputs(&old_ciphertext, &public_key, 1);
+        let vote = create_vote_vector();
+        let old_ciphertext = generator.encrypt_vote(&public_key, vote.clone()).unwrap();
+        let result = generator.generate_inputs(&old_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
 
@@ -130,8 +160,9 @@ mod tests {
         // Create generator with custom parameters.
         let generator = ZKInputsGenerator::new(degree, plaintext_modulus, moduli).unwrap();
         let public_key = generator.generate_public_key().unwrap();
-        let old_ciphertext = generator.encrypt_vote(&public_key, 1).unwrap();
-        let result = generator.generate_inputs(&old_ciphertext, &public_key, 1);
+        let vote = create_vote_vector();
+        let old_ciphertext = generator.encrypt_vote(&public_key, vote.clone()).unwrap();
+        let result = generator.generate_inputs(&old_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
 

@@ -26,7 +26,7 @@ use crate::ciphertext_addition::CiphertextAdditionInputs;
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
 
-// Default BFV parameters constants
+// Default BFV parameters constants for testing purposes.
 pub const DEFAULT_DEGREE: usize = 2048;
 pub const DEFAULT_PLAINTEXT_MODULUS: u64 = 1032193;
 pub const DEFAULT_MODULI: [u64; 1] = [0x3FFFFFFF000001];
@@ -47,7 +47,13 @@ impl ZKInputsGenerator {
         Ok(Self { bfv_params })
     }
 
-    /// Creates a generator with default BFV parameters.
+    /// Creates a generator with default BFV parameters for testing purposes.
+    ///
+    /// # Notes
+    /// - This is for testing purposes only.
+    /// - The default parameters are not suitable for production.
+    /// # Returns
+    /// A new ZKInputsGenerator instance with default BFV parameters
     pub fn with_defaults() -> Result<Self> {
         Self::new(DEFAULT_DEGREE, DEFAULT_PLAINTEXT_MODULUS, &DEFAULT_MODULI)
     }
@@ -57,7 +63,7 @@ impl ZKInputsGenerator {
     /// # Arguments
     /// * `prev_ciphertext` - Previous ciphertext bytes to add to
     /// * `public_key` - Public key bytes for encryption
-    /// * `vote` - Vote value (0 or 1)
+    /// * `vote` - Vote value as a vector of coefficients
     ///
     /// # Returns
     /// JSON string containing the CRISP ZK inputs
@@ -65,20 +71,14 @@ impl ZKInputsGenerator {
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
-        vote: u8,
+        vote: Vec<u64>,
     ) -> Result<String> {
         // Deserialize the provided public key.
         let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
             .with_context(|| "Failed to deserialize public key")?;
 
-        // Create a sample plaintext consistent with the GRECO sample generator.
-        // All coefficients are 3, and the first coefficient represents the vote.
-        let mut message_data = vec![3u64; self.bfv_params.degree()];
-        // Set vote value (0 or 1) in the first coefficient.
-        message_data[0] = if vote == 1 { 1 } else { 0 };
-
         // Encode the plaintext into a polynomial.
-        let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
+        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
         // Encrypt using the provided public key to ensure ciphertext matches the key.
@@ -122,19 +122,15 @@ impl ZKInputsGenerator {
     ///
     /// # Arguments
     /// * `public_key` - Public key bytes for encryption
-    /// * `vote` - Vote value (0 or 1)
+    /// * `vote` - Vote data as a vector of coefficients
     ///
     /// # Returns
     /// Ciphertext bytes
-    pub fn encrypt_vote(&self, public_key: &[u8], vote: u8) -> Result<Vec<u8>> {
+    pub fn encrypt_vote(&self, public_key: &[u8], vote: Vec<u64>) -> Result<Vec<u8>> {
         let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
             .with_context(|| "Failed to deserialize public key")?;
 
-        let mut message_data = vec![3u64; self.bfv_params.degree()];
-        // Set vote value (0 or 1) in the first coefficient.
-        message_data[0] = if vote == 1 { 1 } else { 0 };
-
-        let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
+        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
         let (ct, _u_rns, _e0_rns, _e1_rns) = pk
@@ -167,16 +163,22 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
 
+    /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
+    fn create_vote_vector() -> Vec<u64> {
+        (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect()
+    }
+
     #[test]
     fn test_inputs_generation_with_defaults() {
         let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
+        let vote = create_vote_vector();
         let prev_ciphertext = generator
-            .encrypt_vote(&public_key, 1)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to generate previous ciphertext");
-        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 0);
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
@@ -193,10 +195,11 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
+        let vote = create_vote_vector();
         let prev_ciphertext = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to generate previous ciphertext");
-        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
@@ -212,10 +215,11 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
+        let vote = create_vote_vector();
         let prev_ciphertext = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to generate previous ciphertext");
-        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
@@ -244,13 +248,14 @@ mod tests {
             .generate_public_key()
             .expect("failed to generate public key");
         assert!(!public_key.is_empty());
+        let vote = create_vote_vector();
 
         let ciphertext = generator
-            .encrypt_vote(&public_key, 1)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to encrypt vote");
         assert!(!ciphertext.is_empty());
 
-        let result = generator.generate_inputs(&ciphertext, &public_key, 0);
+        let result = generator.generate_inputs(&ciphertext, &public_key, vote.clone());
         assert!(result.is_ok());
         let json_output = result.unwrap();
         assert!(json_output.contains("params"));
@@ -262,17 +267,18 @@ mod tests {
     #[test]
     fn test_invalid_inputs() {
         let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let vote = create_vote_vector();
 
         // Test invalid byte inputs.
-        let result = generator.generate_inputs(&[1, 2, 3], &[4, 5, 6], 0);
+        let result = generator.generate_inputs(&[1, 2, 3], &[4, 5, 6], vote.clone());
         assert!(result.is_err());
 
         // Test empty slices.
-        let result = generator.generate_inputs(&[], &[], 0);
+        let result = generator.generate_inputs(&[], &[], vote.clone());
         assert!(result.is_err());
 
         // Test invalid public key for encryption.
-        let result = generator.encrypt_vote(&[1, 2, 3], 0);
+        let result = generator.encrypt_vote(&[1, 2, 3], vote.clone());
         assert!(result.is_err());
     }
 
@@ -283,16 +289,17 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
+        let vote = create_vote_vector();
         let prev_ciphertext = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to encrypt vote");
 
         // Test vote = 0.
-        let result_0 = generator.generate_inputs(&prev_ciphertext, &public_key, 0);
+        let result_0 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_0.is_ok());
 
         // Test vote = 1.
-        let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+        let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_1.is_ok());
     }
 
@@ -313,10 +320,11 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
+        let vote = create_vote_vector();
         let prev_ciphertext = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("failed to encrypt vote");
-        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
@@ -340,20 +348,21 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("Failed to generate public key");
+        let vote = create_vote_vector();
 
         // Test that different votes produce different ciphertexts.
         let ct0 = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("Failed to encrypt vote 0");
         let ct1 = generator
-            .encrypt_vote(&public_key, 1)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("Failed to encrypt vote 1");
 
         assert_ne!(ct0, ct1);
 
         // Test that same vote produces different ciphertexts (due to randomness).
         let ct0_2 = generator
-            .encrypt_vote(&public_key, 0)
+            .encrypt_vote(&public_key, vote.clone())
             .expect("Failed to encrypt vote 0 again");
         assert_ne!(ct0, ct0_2);
 
