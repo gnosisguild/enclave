@@ -170,15 +170,13 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 return;
             };
 
-            let party_id = (party_id + 1) as u64;
-
             info!(
                 node = address,
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
             bus.do_send(EnclaveEvent::from(CiphernodeSelected {
-                party_id,
+                party_id: party_id as u64,
                 e3_id,
                 threshold_m: e3_meta.threshold_m,
                 threshold_n: e3_meta.threshold_n,

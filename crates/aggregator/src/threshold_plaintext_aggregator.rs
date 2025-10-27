@@ -14,7 +14,7 @@ use e3_events::{
     Seed,
 };
 use e3_multithread::Multithread;
-use e3_sortition::{GetNodeIndex, Sortition};
+use e3_sortition::Sortition;
 use e3_trbfv::{
     calculate_threshold_decryption::{
         CalculateThresholdDecryptionRequest, CalculateThresholdDecryptionResponse,
@@ -244,81 +244,46 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
 }
 
 impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
 
-    fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
         info!(event=?event, "Processing DecryptionShareCreated...");
-        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting {
-            threshold_n,
-            seed,
-            ..
-        })) = self.state.get()
+        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { threshold_n, .. })) =
+            self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting.");
-            return Box::pin(fut::ready(Ok(())));
+            return Ok(());
         };
 
-        let size = threshold_n as usize;
-        let address = event.node;
         let party_id = event.party_id;
-        let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
         let decryption_share = event.decryption_share.clone();
 
-        // Why do we need to get the node index when the event contains the party_id? I guess we
-        // don't trust the event. Maybe that is fine.
-        Box::pin(
-            self.sortition
-                .send(GetNodeIndex {
-                    chain_id,
-                    address: address.clone(),
-                    size,
-                    seed,
-                })
-                .into_actor(self)
-                .map(move |res, act, ctx| {
-                    let maybe_found_index = res?;
-                    let Some((party, _ticket_number)) = maybe_found_index else {
-                        error!("Attempting to aggregate share but party not found in committee");
-                        return Ok(());
-                    };
+        // Trust the party_id from the event - it's based on CommitteeFinalized order
+        // which is the authoritative source of truth for party IDs
+        if e3_id != self.e3_id {
+            error!("Wrong e3_id sent to aggregator. This should not happen.");
+            return Ok(());
+        }
+        self.add_share(party_id, decryption_share)?;
 
-                    if party != party_id {
-                        error!(
-                            "Bad aggregation state! Address {} not found at index {} instead it was found at {}",
-                            address, party_id, party
-                        );
-                        return Ok(());
-                    }
+        if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
+            threshold_m,
+            threshold_n,
+            shares,
+            ciphertext_output,
+            ..
+        })) = self.state.get()
+        {
+            ctx.notify(ComputeAggregate {
+                shares: shares.clone(),
+                ciphertext_output: ciphertext_output.clone(),
+                threshold_m,
+                threshold_n,
+            })
+        }
 
-                    if e3_id != act.e3_id {
-                        error!("Wrong e3_id sent to aggregator. This should not happen.");
-                        return Ok(());
-                    }
-
-                    // add the keyshare and
-                    act.add_share(party_id, decryption_share)?;
-
-                    // Check the state and if it has changed to the computing
-                    if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
-                        threshold_m,
-                        threshold_n,
-                        shares,
-                        ciphertext_output,
-                        ..
-                    })) = act.state.get()
-                    {
-                        ctx.notify(ComputeAggregate {
-                            shares: shares.clone(),
-                            ciphertext_output: ciphertext_output.clone(),
-                            threshold_m,
-                            threshold_n,
-                        })
-                    }
-
-                    Ok(())
-                }),
-        )
+        Ok(())
     }
 }
 
