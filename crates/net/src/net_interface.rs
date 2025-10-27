@@ -254,14 +254,11 @@ async fn process_swarm_event(
                 if let Some(mut query) = swarm.behaviour_mut().kademlia.query_mut(&id) {
                     query.finish();
                 }
-                let correlation_id = correlator.expire(&id)?;
-                debug!(
-                    "Received valid DHT record for key={:?} correlation_id={}",
-                    key, correlation_id
-                );
+                let cid = correlator.expire(&id)?;
+                debug!("Received valid DHT record for key={:?} cid={}", key, cid);
                 event_tx.send(NetEvent::DhtGetRecordSucceeded {
                     key,
-                    correlation_id,
+                    correlation_id: cid,
                     value: ArcBytes::from_bytes(record_bytes),
                 })?;
             }
