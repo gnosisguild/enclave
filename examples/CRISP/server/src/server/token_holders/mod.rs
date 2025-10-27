@@ -7,7 +7,9 @@
 pub mod bitquery;
 pub mod hashes;
 pub mod merkle_tree;
+pub mod etherscan;
 
 pub use bitquery::*;
 pub use hashes::*;
 pub use merkle_tree::*;
+pub use etherscan::*;
