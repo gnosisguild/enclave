@@ -5,21 +5,25 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use e3_events::CorrelationId;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
-    kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
-    swarm::{NetworkBehaviour, SwarmEvent},
+    kad::{self, store::MemoryStore, Behaviour as KademliaBehaviour},
+    swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
+use std::{
+    hash::{Hash, Hasher},
+    sync::atomic::AtomicBool,
+};
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::dialer::dial_peers;
 use crate::events::NetEvent;
@@ -65,7 +69,7 @@ impl NetInterface {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_kad_behaviour(key))?
+            .with_behaviour(|key| create_behaviour(key))?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -94,6 +98,7 @@ impl NetInterface {
         let event_tx = self.event_tx.clone();
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
+        let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         // Subscribe to topic
         self.swarm
@@ -125,39 +130,17 @@ impl NetInterface {
             select! {
                  // Process commands
                 Some(command) = cmd_rx.recv() => {
-                    match command {
-                        NetCommand::GossipPublish { data, topic, correlation_id } => {
-                            // let serialized = data.to_bytes()
-                            let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
-                            match gossipsub_behaviour
-                                .publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
-                                Ok(message_id) => {
-                                    event_tx.send(NetEvent::GossipPublished { correlation_id, message_id })?;
-                                },
-                                Err(e) => {
-                                    warn!(error=?e, "Could not publish to swarm. Retrying...");
-                                    event_tx.send(NetEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
-                                }
-                            }
-                        },
-                        NetCommand::Dial(multi) => {
-                            trace!("DIAL: {:?}", multi);
-                            match self.swarm.dial(multi) {
-                                Ok(v) => trace!("Dial returned {:?}", v),
-                                Err(error) => {
-                                    warn!("Dialing error! {}", error);
-                                    event_tx.send(NetEvent::DialError { error: error.into() })?;
-                                }
-                            }
-                        },
-                        NetCommand::DhtPutRecord { .. } => todo!(),
-                        NetCommand::DhtGetRecord { .. } => todo!(),
-
+                    match process_swarm_command(&mut self.swarm, &event_tx, &shutdown_flag, command).await {
+                        Ok(_) => (),
+                        Err(e) => error!("Error processing NetCommand: {e}")
                     }
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &event_tx, event).await?
+                    match process_swarm_event(&mut self.swarm, &event_tx, &shutdown_flag, event).await {
+                        Ok(_) => (),
+                        Err(e) => error!("Error processing NetEvent: {e}")
+                    }
                 }
             }
         }
@@ -165,25 +148,19 @@ impl NetInterface {
 }
 
 /// Create the libp2p behaviour
-fn create_kad_behaviour(
+fn create_behaviour(
     key: &Keypair,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/kad/0.1.0".into(), key.public())
+        identify::Config::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
-
-    let message_id_fn = |message: &gossipsub::Message| {
-        let mut s = DefaultHasher::new();
-        message.data.hash(&mut s);
-        gossipsub::MessageId::from(s.finish().to_string())
-    };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
-        .message_id_fn(message_id_fn)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
 
@@ -192,12 +169,13 @@ fn create_kad_behaviour(
         gossipsub_config,
     )?;
 
+    // Setup Kademlia as server so that it responds to events correctly
+    let mut kademlia = KademliaBehaviour::new(peer_id, MemoryStore::new(peer_id));
+    kademlia.set_mode(Some(kad::Mode::Server));
+
     Ok(NodeBehaviour {
         gossipsub,
-        kademlia: KademliaBehaviour::new(
-            key.public().to_peer_id(),
-            MemoryStore::new(key.public().to_peer_id()),
-        ),
+        kademlia,
         connection_limits,
         identify: identify_config,
     })
@@ -207,8 +185,12 @@ fn create_kad_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    shutdown_flag: &Arc<AtomicBool>,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
+    if shutdown_flag.load(Ordering::Relaxed) {
+        return Ok(()); // Skip processing during shutdown
+    }
     match event {
         SwarmEvent::ConnectionEstablished {
             peer_id,
@@ -263,5 +245,93 @@ async fn process_swarm_event(
         }
         _ => {}
     };
+    Ok(())
+}
+
+/// Process all swarm commands
+async fn process_swarm_command(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    shutdown_flag: &Arc<AtomicBool>,
+    command: NetCommand,
+) -> Result<()> {
+    if shutdown_flag.load(Ordering::Relaxed) {
+        return Ok(()); // Skip processing during shutdown
+    }
+
+    match command {
+        NetCommand::GossipPublish {
+            data,
+            topic,
+            correlation_id,
+        } => handle_gossip_publish(swarm, &event_tx, data, topic, correlation_id),
+        NetCommand::Dial(multi) => handle_dial(swarm, &event_tx, multi),
+        NetCommand::DhtPutRecord { .. } => todo!(),
+        NetCommand::DhtGetRecord { .. } => todo!(),
+        NetCommand::Shutdown => handle_shutdown(swarm, &shutdown_flag),
+    }
+}
+
+fn handle_gossip_publish(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    data: GossipData,
+    topic: String,
+    correlation_id: CorrelationId,
+) -> Result<()> {
+    let gossipsub_behaviour = &mut swarm.behaviour_mut().gossipsub;
+    match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
+        Ok(message_id) => {
+            event_tx.send(NetEvent::GossipPublished {
+                correlation_id,
+                message_id,
+            })?;
+        }
+        Err(e) => {
+            warn!(error=?e, "Could not publish to swarm. Retrying...");
+            event_tx.send(NetEvent::GossipPublishError {
+                correlation_id,
+                error: Arc::new(e),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_dial(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    dial_opts: DialOpts,
+) -> Result<()> {
+    trace!("DIAL: {:?}", dial_opts);
+    match swarm.dial(dial_opts) {
+        Ok(v) => trace!("Dial returned {:?}", v),
+        Err(error) => {
+            warn!("Dialing error! {}", error);
+            event_tx.send(NetEvent::DialError {
+                error: error.into(),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_shutdown(
+    swarm: &mut Swarm<NodeBehaviour>,
+    shutdown_flag: &Arc<AtomicBool>,
+) -> Result<()> {
+    info!("Starting graceful shutdown");
+
+    // Set the shutdown flag
+    shutdown_flag.store(true, Ordering::Relaxed);
+
+    // Disconnect all peers
+    let peers: Vec<_> = swarm.connected_peers().copied().collect();
+    for peer in peers {
+        info!("Disconnecting from peer: {}", peer);
+        let _ = swarm.disconnect_peer_id(peer);
+    }
+
+    info!("Graceful shutdown complete");
     Ok(())
 }

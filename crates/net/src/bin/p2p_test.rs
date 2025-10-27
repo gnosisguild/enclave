@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let name = env::args().nth(2).expect("need name");
+    let name = env::args().nth(1).expect("need name");
     let topic = "test-topic";
     println!("{} starting up", name);
 

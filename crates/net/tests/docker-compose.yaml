@@ -1,36 +1,27 @@
 services:
   alice:
-    build:
-      dockerfile: crates/net/tests/Dockerfile
-      context: ../../..
+    image: p2p_test:latest
     command: ["/app/p2p_test", "alice"]
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/dns4/charlie/udp/9091/quic-v1"
-      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     networks:
       - p2p_test_net
 
   bob:
-    build:
-      dockerfile: crates/net/tests/Dockerfile
-      context: ../../..
+    image: p2p_test:latest
     command: ["/app/p2p_test", "bob"]
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/dns4/charlie/udp/9091/quic-v1"
-      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     networks:
       - p2p_test_net
 
   charlie:
-    build:
-      dockerfile: crates/net/tests/Dockerfile
-      context: ../../..
+    image: p2p_test:latest
     command: ["/app/p2p_test", "charlie"]
     environment:
       QUIC_PORT: 9091
-      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     networks:
       - p2p_test_net
 
