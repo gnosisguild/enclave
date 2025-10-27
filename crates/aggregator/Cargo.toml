@@ -8,6 +8,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/aggregator"
 
 [dependencies]
 actix = { workspace = true }
+alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }

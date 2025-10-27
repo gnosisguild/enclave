@@ -11,7 +11,7 @@ use alloy::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        Identity, Provider, ProviderBuilder, RootProvider, WalletProvider,
+        Identity, Provider, ProviderBuilder, RootProvider,
     },
     signers::local::PrivateKeySigner,
     transports::{
@@ -195,6 +195,16 @@ pub async fn load_signer_from_repository(
     let private_key = String::from_utf8(decrypted)?;
 
     private_key.parse().map_err(Into::into)
+}
+
+pub async fn get_current_timestamp<P: Provider>(provider: &P) -> Result<u64> {
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await
+        .context("Failed to get latest block")?
+        .ok_or_else(|| anyhow::anyhow!("Latest block not found"))?;
+
+    Ok(block.header.timestamp)
 }
 
 #[cfg(test)]

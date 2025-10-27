@@ -187,7 +187,7 @@ describe("Integration", () => {
       DEFAULT_E3_CONFIG.threshold_max,
     ];
     const startWindow = calculateStartWindow(100);
-    const duration = BigInt(10);
+    const duration = BigInt(15);
     const e3ProgramParams = encodeBfvParams();
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,

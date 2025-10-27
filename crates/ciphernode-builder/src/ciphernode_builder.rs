@@ -364,17 +364,17 @@ impl CiphernodeBuilder {
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
-                            self.pubkey_agg, // is_aggregator flag
+                            self.pubkey_agg,
                         )
                         .await?;
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
-                        // Attach CommitteeFinalizer if aggregator mode is enabled
                         if self.pubkey_agg {
                             info!("Attaching CommitteeFinalizer for score sortition");
                             e3_aggregator::CommitteeFinalizer::attach(
                                 &local_bus,
                                 writer.recipient(),
+                                read_provider.provider().clone(),
                             );
                         }
                     }
