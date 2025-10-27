@@ -9,6 +9,8 @@
 # Allow all other workspace members
 !crates/*/Cargo.toml
 !crates/*/src/**/*.rs
+!crates/*/build.rs
+!crates/*.sh
 
 # Allow packages
 !crates/*/package.json
