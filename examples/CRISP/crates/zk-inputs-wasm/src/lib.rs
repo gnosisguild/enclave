@@ -32,15 +32,17 @@ impl ZKInputsGenerator {
         plaintext_modulus: u64,
         moduli: Vec<u64>,
     ) -> Result<ZKInputsGenerator, JsValue> {
-        let generator = CoreZKInputsGenerator::new(degree, plaintext_modulus, &moduli);
+        let generator = CoreZKInputsGenerator::new(degree, plaintext_modulus, &moduli)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(ZKInputsGenerator { generator })
     }
 
     /// Create a new JavaScript CRISP ZK inputs generator with default BFV parameters.
     #[wasm_bindgen(js_name = "withDefaults")]
-    pub fn with_defaults() -> ZKInputsGenerator {
-        let generator = CoreZKInputsGenerator::with_defaults();
-        ZKInputsGenerator { generator }
+    pub fn with_defaults() -> Result<ZKInputsGenerator, JsValue> {
+        let generator = CoreZKInputsGenerator::with_defaults()
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(ZKInputsGenerator { generator })
     }
 
     /// Generate a CRISP ZK inputs from JavaScript.
@@ -101,7 +103,7 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_js_inputs_generation_with_defaults() {
         // Create generator with default parameters.
-        let generator = ZKInputsGenerator::with_defaults();
+        let generator = ZKInputsGenerator::with_defaults().unwrap();
         let public_key = generator.generate_public_key().unwrap();
         let old_ciphertext = generator.encrypt_vote(&public_key, 1).unwrap();
         let result = generator.generate_inputs(&old_ciphertext, &public_key, 1);
