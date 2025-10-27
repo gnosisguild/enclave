@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ProtocolParams, EnclaveSDK, FheProtocol } from '@enclave-e3/sdk'
-import { type CRISPVoteAndInputs, type IVote, VotingMode } from './types'
+import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
+import { BFVParams, type CRISPCircuitInputs, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE } from './constants'
+import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -52,17 +52,17 @@ export const calculateValidIndicesForPlaintext = (totalVotingPower: bigint, degr
  * Encode a vote based on the voting mode
  * @param vote The vote to encode
  * @param votingMode The voting mode to use for encoding
- * @param bfvConfig The BFV protocol parameters to use for encoding
  * @param votingPower The voting power of the voter
+ * @param bfvParams The BFV parameters to use for encoding
  * @returns The encoded vote as a string
  */
-export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: ProtocolParams, votingPower: bigint): string[] => {
+export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: bigint, bfvParams?: BFVParams): string[] => {
   validateVote(votingMode, vote, votingPower)
 
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
       const voteArray = []
-      const length = bfvConfig.degree
+      const length = bfvParams?.degree || DEFAULT_BFV_PARAMS.degree
       const halfLength = length / 2
       const yesBinary = toBinary(vote.yes).split('')
       const noBinary = toBinary(vote.no).split('')
@@ -88,7 +88,6 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: Proto
  * Given an encoded tally, decode it into its decimal representation
  * @param tally The encoded tally to decode
  * @param votingMode The voting mode
- * @param bfvConfig The BFV protocol parameters used for encryption
  */
 export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
   switch (votingMode) {
@@ -147,41 +146,37 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * input values which generic Greco do not need.
  * @param encodedVote The encoded vote as string array
  * @param publicKey The public key to use for encryption
+ * @param previousCiphertext The previous ciphertext to use for addition operation
+ * @param bfvParams The BFV parameters to use for encryption
+ * @returns The CRISP circuit inputs
  */
-export const encryptVoteAndGenerateCRISPInputs = async (encodedVote: string[], publicKey: Uint8Array): Promise<CRISPVoteAndInputs> => {
-  // @todo The SDK need refactoring
-  const enclaveSDK = EnclaveSDK.create({
-    protocol: FheProtocol.BFV,
-    chainId: 31337,
-    contracts: {
-      enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
-      ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
-    },
-    // local node
-    rpcUrl: 'http://localhost:8545',
-    // default Anvil private key
-    privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-  })
+export const encryptVoteAndGenerateCRISPInputs = async (
+  encodedVote: string[],
+  publicKey: Uint8Array,
+  previousCiphertext: Uint8Array,
+  bfvParams: BFVParams = DEFAULT_BFV_PARAMS,
+): Promise<CRISPCircuitInputs> => {
+  if (encodedVote.length !== bfvParams.degree) {
+    throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
+  }
 
-  // Convert string[] to BigUint64Array
-  const bigUint64Array = new BigUint64Array(encodedVote.map((str) => BigInt(str)))
+  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(bfvParams.degree, bfvParams.plaintextModulus, bfvParams.moduli)
 
-  const encryptedData = await enclaveSDK.encryptVectorAndGenInputs(bigUint64Array, publicKey)
+  const vote = BigInt64Array.from(encodedVote.map(BigInt))
+
+  const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
 
   // the rest of the public and private inputs will need to be generated before calling the circuit to generate the CRISP proof
   return {
-    encryptedVote: encryptedData.encryptedData,
-    circuitInputs: {
-      ...encryptedData.publicInputs,
-      // @todo fill the rest of the inputs needed for CRISP
-      public_key_x: [],
-      public_key_y: [],
-      signature: [],
-      hashed_message: [],
-      balance: '0',
-      merkle_proof_length: '0',
-      merkle_proof_indices: [],
-      merkle_proof_siblings: [],
-    },
+    ...crispInputs,
+    // @todo fill the rest of the inputs needed for CRISP
+    public_key_x: [],
+    public_key_y: [],
+    signature: [],
+    hashed_message: [],
+    balance: '0',
+    merkle_proof_length: '0',
+    merkle_proof_indices: [],
+    merkle_proof_siblings: [],
   }
 }

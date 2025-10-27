@@ -339,9 +339,6 @@ importers:
 
   examples/CRISP/packages/crisp-sdk:
     dependencies:
-      '@enclave-e3/sdk':
-        specifier: workspace:*
-        version: link:../../../../packages/enclave-sdk
       '@enclave/crisp-zk-inputs':
         specifier: workspace:*
         version: link:../crisp-zk-inputs

@@ -4,32 +4,29 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import fs from 'fs/promises'
-import path from 'path'
-import { describe, it, expect, beforeAll } from 'vitest'
-import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
+import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 
 import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, validateVote } from '../src/vote'
-import { VotingMode } from '../src/types'
-import { MAXIMUM_VOTE_VALUE } from '../src'
+import { BFVParams, VotingMode } from '../src/types'
+import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
 
 describe('Vote', () => {
   const votingPower = 10n
   describe('encodeVote', () => {
     const vote = { yes: 10n, no: 0n }
     it('should work for valid votes', () => {
-      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, BfvProtocolParams.BFV_NORMAL, votingPower)
-      expect(encoded.length).toBe(BfvProtocolParams.BFV_NORMAL.degree)
+      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
+      expect(encoded.length).toBe(DEFAULT_BFV_PARAMS.degree)
     })
     it('should work with small moduli', () => {
-      const params: ProtocolParams = {
+      const params: BFVParams = {
         degree: 10,
-        // irrelevant
+        // Irrelevant for this test.
         plaintextModulus: 0n,
-        moduli: 0n,
+        moduli: [0n],
       }
-      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, params, votingPower)
+      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, votingPower, params)
       expect(encoded.length).toBe(params.degree)
 
       // 01010 = 10
@@ -121,13 +118,21 @@ describe('Vote', () => {
 
     let zkInputsGenerator = ZKInputsGenerator.withDefaults()
     let publicKey = zkInputsGenerator.generatePublicKey()
+    const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
 
     it('should encrypt a vote and generate the circuit inputs', async () => {
-      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, BfvProtocolParams.BFV_NORMAL, votingPower)
-      const encryptedData = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey)
+      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
+      const crispInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
 
-      expect(encryptedData.encryptedVote).toBeInstanceOf(Uint8Array)
-      expect(encryptedData.circuitInputs).toBeInstanceOf(Object)
+      expect(crispInputs.ct_add).toBeInstanceOf(Object)
+      expect(crispInputs.params).toBeInstanceOf(Object)
+      expect(crispInputs.ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.pk0is).toBeInstanceOf(Array)
+      expect(crispInputs.pk1is).toBeInstanceOf(Array)
+      expect(crispInputs.r1is).toBeInstanceOf(Array)
+      expect(crispInputs.r2is).toBeInstanceOf(Array)
+      expect(crispInputs.p1is).toBeInstanceOf(Array)
     })
   })
 })
