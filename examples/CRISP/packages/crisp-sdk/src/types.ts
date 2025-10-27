@@ -174,5 +174,5 @@ export interface CRISPCircuitInputs {
 export interface BFVParams {
   degree: number
   plaintextModulus: bigint
-  moduli: bigint[]
+  moduli: BigUint64Array
 }

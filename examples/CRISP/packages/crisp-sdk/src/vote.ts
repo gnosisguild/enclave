@@ -152,8 +152,15 @@ export const encryptVoteAndGenerateCRISPInputs = async (
   encodedVote: string[],
   publicKey: Uint8Array,
   previousCiphertext: Uint8Array,
+  bfvParams?: BFVParams,
 ): Promise<CRISPCircuitInputs> => {
-  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  let zkInputsGenerator: ZKInputsGenerator
+
+  if (bfvParams) {
+    zkInputsGenerator = new ZKInputsGenerator(bfvParams.degree, bfvParams.plaintextModulus, bfvParams.moduli)
+  } else {
+    zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  }
 
   const vote = BigUint64Array.from(encodedVote.map(BigInt))
 
