@@ -434,7 +434,7 @@ fn handle_put_record(
         .kademlia
         .put_record(record, Quorum::One)?;
 
-    // QueryId is returned synchronously and we immediately add it to the correlator so this should not be an issue.
+    // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
     correlator.track(query_id, correlation_id);
 
     info!(
@@ -456,7 +456,7 @@ fn handle_get_record(
         .kademlia
         .get_record(RecordKey::new(&key));
 
-    // QueryId is returned synchronously and we immediately add it to the correlator so this should not be an issue.
+    // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
     correlator.track(query_id, correlation_id);
 
     info!(
