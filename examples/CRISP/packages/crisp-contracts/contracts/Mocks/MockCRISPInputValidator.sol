@@ -28,7 +28,7 @@ contract MockCRISPInputValidator is IInputValidator, Clone {
     function validate(address sender, bytes memory data) external returns (bytes memory input) {
         if (data.length == 0) revert EmptyInputData();
 
-        (,,, bytes memory vote) = abi.decode(data, (bytes, bytes, bytes32[], bytes));
+        (,,bytes memory vote,) = abi.decode(data, (bytes, bytes32[], bytes, address));
 
         input = vote;
     }

@@ -61,6 +61,8 @@ pub enum NetCommand {
         correlation_id: CorrelationId,
         key: Cid,
     },
+    /// Shutdown signal
+    Shutdown,
 }
 
 impl NetCommand {

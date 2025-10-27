@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
+import { BFVParams } from './types'
+
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
 
@@ -13,3 +16,9 @@ export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
  * If you change this value, make sure to update the circuit too.
  */
 export const MAXIMUM_VOTE_VALUE = 268435456n
+
+/**
+ * Default BFV parameters for the CRISP ZK inputs generator.
+ * These are the parameters used for the default testing purposes only.
+ */
+export const DEFAULT_BFV_PARAMS = ZKInputsGenerator.withDefaults().getBFVParams() as BFVParams

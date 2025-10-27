@@ -75,7 +75,7 @@ pub async fn register_e3_requested(
                     .await?;
 
                 // Get token holders from Bitquery API or mocked data.
-                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
+                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337 | 11155111) {
                     info!(
                         "Using mocked token holders for local network (chain_id: {})",
                         CONFIG.chain_id
@@ -290,6 +290,28 @@ pub async fn register_committee_published(
                     info!("E3 already activated '{}'", event.e3Id);
                     return Ok(());
                 }
+
+                // Convert milliseconds to seconds for comparison with block.timestamp
+                let start_time = UNIX_EPOCH + Duration::from_secs(e3.startWindow[0].to::<u64>());
+
+                // Get current time
+                let now = SystemTime::now();
+
+                // Calculate wait duration
+                let wait_duration = match start_time.duration_since(now) {
+                    Ok(duration) => {
+                        info!("Need to wait {:?} ({}s) until activation", duration, duration.as_secs());
+                        duration
+                    }
+                    Err(_) => {
+                        info!("Activating E3");
+                        Duration::ZERO
+                    }
+                };
+
+                // Sleep until start time
+                let start_instant = Instant::now() + wait_duration;
+                sleep_until(start_instant).await;
 
                 // If not activated activate
                 let tx = contract.activate(event.e3Id, event.publicKey).await?;
