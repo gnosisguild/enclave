@@ -52,8 +52,8 @@ export const calculateValidIndicesForPlaintext = (totalVotingPower: bigint, degr
  * Encode a vote based on the voting mode
  * @param vote The vote to encode
  * @param votingMode The voting mode to use for encoding
- * @param bfvDegree The degree of the BFV polynomial to use for encoding
  * @param votingPower The voting power of the voter
+ * @param bfvParams The BFV parameters to use for encoding
  * @returns The encoded vote as a string
  */
 export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: bigint, bfvParams?: BFVParams): string[] => {
@@ -147,6 +147,8 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param encodedVote The encoded vote as string array
  * @param publicKey The public key to use for encryption
  * @param previousCiphertext The previous ciphertext to use for addition operation
+ * @param bfvParams The BFV parameters to use for encryption
+ * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async (
   encodedVote: string[],
