@@ -165,7 +165,7 @@
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "enclaveAddress": "0x0000000000000000000000000000000000000001",
-        "submissionWindow": "300"
+        "submissionWindow": "10"
       },
       "blockNumber": 8,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
@@ -185,46 +185,46 @@
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "MockComputeProvider": {
-      "blockNumber": 17,
-      "address": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1"
-    },
-    "MockDecryptionVerifier": {
       "blockNumber": 18,
       "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
     },
-    "MockInputValidator": {
+    "MockDecryptionVerifier": {
       "blockNumber": 19,
       "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
     },
-    "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
-      },
+    "MockInputValidator": {
       "blockNumber": 20,
       "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
     },
-    "RiscZeroGroth16Verifier": {
-      "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+    "MockE3Program": {
+      "constructorArgs": {
+        "mockInputValidator": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+      },
+      "blockNumber": 21,
+      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
     },
-    "CRISPInputValidator": {
+    "RiscZeroGroth16Verifier": {
       "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
     },
+    "CRISPInputValidator": {
+      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
+    },
     "CRISPInputValidatorFactory": {
-      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+      "address": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319",
       "constructorArgs": {
-        "inputValidator": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
+        "inputValidator": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
       }
     },
     "HonkVerifier": {
-      "address": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319"
+      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F"
     },
     "CRISPProgram": {
-      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+      "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
       "constructorArgs": {
         "enclave": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "verifierAddress": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
-        "inputValidatorAddress": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44",
-        "honkVerifierAddress": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319",
+        "verifierAddress": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44",
+        "inputValidatorAddress": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "honkVerifierAddress": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     }

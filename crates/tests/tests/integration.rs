@@ -5,12 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Actor;
+use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Context, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
-    CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
-    PlaintextAggregated,
+    CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated, E3Requested, E3id,
+    EnclaveEvent, EventBus, EventBusConfig, OperatorActivationChanged, PlaintextAggregated,
+    TicketBalanceUpdated,
 };
 use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
@@ -138,8 +140,35 @@ async fn test_trbfv_actor() -> Result<()> {
         .build()
         .await?;
 
+    let chain_id = 1u64;
+    bus.send(EnclaveEvent::from(ConfigurationUpdated {
+        parameter: "ticketPrice".to_string(),
+        old_value: U256::ZERO,
+        new_value: U256::from(10_000_000u64),
+        chain_id,
+    }))
+    .await?;
+
     for node in nodes.iter() {
-        adder.add(&node.address()).await?;
+        let addr = node.address();
+        adder.add(&addr).await?;
+
+        // TODO: is a 100 tickets worth of tokens enough?
+        bus.send(EnclaveEvent::from(TicketBalanceUpdated {
+            operator: addr.clone(),
+            delta: I256::try_from(1_000_000_000u64).unwrap(),
+            new_balance: U256::from(1_000_000_000u64),
+            reason: FixedBytes::ZERO,
+            chain_id,
+        }))
+        .await?;
+
+        bus.send(EnclaveEvent::from(OperatorActivationChanged {
+            operator: addr.clone(),
+            active: true,
+            chain_id,
+        }))
+        .await?;
     }
 
     // Flush all events
@@ -173,10 +202,40 @@ async fn test_trbfv_actor() -> Result<()> {
 
     bus.do_send(event);
 
-    // NOTE: We are using node 0 as the aggregator but it is not selected in this seed which is why
-    // there is no CiphernodeSelected event
+    // For score sortition, we need to wait for nodes to process E3Requested and run sortition
+    // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
+    // we need to manually construct the committee that sortition would select
+    println!("Waiting for nodes to process E3Requested...");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    // For seed=123, these 5 nodes get selected by sortition:
+    // 0x8f32E487328F04927f20c4B14399e4F3123763df (ticket 6)
+    // 0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba (ticket 68)
+    // 0x8966a013047aef67Cac52Bc96eB77bC11B5D2572 (ticket 95)
+    // 0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479 (ticket 15)
+    // 0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB (ticket 12)
+    let committee: Vec<String> = vec![
+        "0x8f32E487328F04927f20c4B14399e4F3123763df".to_string(),
+        "0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba".to_string(),
+        "0x8966a013047aef67Cac52Bc96eB77bC11B5D2572".to_string(),
+        "0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479".to_string(),
+        "0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB".to_string(),
+    ];
+
+    println!("Emitting CommitteeFinalized with {} nodes", committee.len());
+
+    bus.send(EnclaveEvent::from(CommitteeFinalized {
+        e3_id: e3_id.clone(),
+        committee,
+        chain_id,
+    }))
+    .await?;
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
     let expected = vec![
         "E3Requested",
+        "CommitteeFinalized",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
@@ -195,7 +254,6 @@ async fn test_trbfv_actor() -> Result<()> {
         .await?;
 
     assert_eq!(h.event_types(), expected);
-
     // Aggregate decryption
 
     // First we get the public key
