@@ -31,7 +31,7 @@ COPY examples/CRISP/program/Cargo.toml examples/CRISP/program/
 COPY examples/CRISP/program/client/Cargo.toml examples/CRISP/program/client/
 COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
 COPY examples/CRISP/Cargo.toml examples/CRISP/
-COPY examples/CRISP/crates/generator/Cargo.toml examples/CRISP/crates/generator/
+COPY examples/CRISP/crates/zk-inputs/Cargo.toml examples/CRISP/crates/zk-inputs/
 
 COPY crates/sdk/Cargo.toml crates/sdk/
 COPY Cargo.toml Cargo.lock ./
@@ -52,7 +52,7 @@ COPY --from=chef /app/examples/CRISP/server/recipe.json \
 
 COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/Cargo.lock examples/CRISP/server/
 COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
-COPY examples/CRISP/crates/generator/Cargo.toml examples/CRISP/crates/generator/
+COPY examples/CRISP/crates/zk-inputs/Cargo.toml examples/CRISP/crates/zk-inputs/
 
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
