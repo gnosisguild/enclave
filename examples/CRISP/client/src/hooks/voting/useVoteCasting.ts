@@ -52,7 +52,7 @@ export const useVoteCasting = () => {
         console.log("Processing vote...");
 
         // For now just sign and do not do nothing with the signature
-        await signMessageAsync({ message: `Vote for round ${roundState.id}` });
+        // await signMessageAsync({ message: `Vote for round ${roundState.id}` });
 
         try {
             const voteEncrypted = await handleVoteEncryption(pollSelected);
