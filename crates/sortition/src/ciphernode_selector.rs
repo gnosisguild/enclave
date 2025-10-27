@@ -142,7 +142,6 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
     fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
         let address = self.address.clone();
         let bus = self.bus.clone();
-        let sortition = self.sortition.clone();
         let repositories = self.data_store.repositories();
         let e3_id = msg.e3_id.clone();
 
@@ -163,30 +162,31 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 return;
             };
 
-            if let Ok(Some((party_id, _ticket_id))) = sortition
-                .send(GetNodeIndex {
-                    chain_id: e3_id.chain_id(),
-                    seed: e3_meta.seed,
-                    address: address.clone(),
-                    size: e3_meta.threshold_n,
-                })
-                .await
-            {
+            let Some(party_id) = msg.committee.iter().position(|addr| addr == &address) else {
                 info!(
                     node = address,
-                    "Node is in finalized committee, emitting CiphernodeSelected"
+                    "Node address not found in committee list (should not happen)"
                 );
-                bus.do_send(EnclaveEvent::from(CiphernodeSelected {
-                    party_id,
-                    e3_id,
-                    threshold_m: e3_meta.threshold_m,
-                    threshold_n: e3_meta.threshold_n,
-                    esi_per_ct: e3_meta.esi_per_ct,
-                    error_size: e3_meta.error_size,
-                    params: e3_meta.params,
-                    seed: e3_meta.seed,
-                }));
-            }
+                return;
+            };
+
+            let party_id = (party_id + 1) as u64;
+
+            info!(
+                node = address,
+                party_id = party_id,
+                "Node is in finalized committee, emitting CiphernodeSelected"
+            );
+            bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+                party_id,
+                e3_id,
+                threshold_m: e3_meta.threshold_m,
+                threshold_n: e3_meta.threshold_n,
+                esi_per_ct: e3_meta.esi_per_ct,
+                error_size: e3_meta.error_size,
+                params: e3_meta.params,
+                seed: e3_meta.seed,
+            }));
         })
     }
 }
