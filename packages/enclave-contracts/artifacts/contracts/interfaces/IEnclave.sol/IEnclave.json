@@ -479,6 +479,25 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
+        }
+      ],
+      "name": "getInputsLength",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "length",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
         },
         {
           "internalType": "bytes",
@@ -724,5 +743,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-5c8e4a4cdd9ec90fb8a4640bf873c02f6e1ad388"
+  "buildInfoId": "solc-0_8_28-7cfe8fb65ebb805121d5f67e8fe6de2aae01d9ec"
 }
