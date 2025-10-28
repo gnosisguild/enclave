@@ -7,14 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 
-import {
-  calculateValidIndicesForPlaintext,
-  decodeTally,
-  encodeVote,
-  encryptVoteAndGenerateCRISPInputs,
-  generateCRISPInputs,
-  validateVote,
-} from '../src/vote'
+import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, generateMaskVote, validateVote } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, generateMerkleProof, MAXIMUM_VOTE_VALUE } from '../src'
 
@@ -126,29 +119,20 @@ describe('Vote', () => {
   })
 
   describe('encryptVoteAndGenerateCRISPInputs', () => {
-    it('should encrypt a vote and generate the circuit inputs', async () => {
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-      const crispInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
-
-      expect(crispInputs.ct_add).toBeInstanceOf(Object)
-      expect(crispInputs.params).toBeInstanceOf(Object)
-      expect(crispInputs.ct0is).toBeInstanceOf(Array)
-      expect(crispInputs.ct1is).toBeInstanceOf(Array)
-      expect(crispInputs.pk0is).toBeInstanceOf(Array)
-      expect(crispInputs.pk1is).toBeInstanceOf(Array)
-      expect(crispInputs.r1is).toBeInstanceOf(Array)
-      expect(crispInputs.r2is).toBeInstanceOf(Array)
-      expect(crispInputs.p1is).toBeInstanceOf(Array)
-    })
-  })
-
-  describe('generateCRISPInputs', () => {
     const votingPowerLeaf = 1000n
     const merkleProof = generateMerkleProof(0n, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH)
-    it('should add the remaining inputs to the CRISP inputs object', async () => {
+
+    it('should encrypt a vote and generate the circuit inputs', async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-      const partialInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
-      const crispInputs = await generateCRISPInputs(partialInputs, SIGNATURE, MESSAGE, merkleProof, votingPowerLeaf)
+      const crispInputs = await encryptVoteAndGenerateCRISPInputs({
+        encodedVote,
+        publicKey,
+        previousCiphertext,
+        signature: SIGNATURE,
+        message: MESSAGE,
+        merkleData: merkleProof,
+        balance: votingPowerLeaf,
+      })
 
       expect(crispInputs.ct_add).toBeInstanceOf(Object)
       expect(crispInputs.params).toBeInstanceOf(Object)
@@ -170,4 +154,29 @@ describe('Vote', () => {
       expect(crispInputs.balance).toBe(votingPowerLeaf.toString())
     })
   })
+
+  describe("generateMaskVote", () => {
+    it('should generate a mask vote and its inputs', async () => {
+      const crispInputs = await generateMaskVote(publicKey, previousCiphertext)
+
+      expect(crispInputs.ct_add).toBeInstanceOf(Object)
+      expect(crispInputs.params).toBeInstanceOf(Object)
+      expect(crispInputs.ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.pk0is).toBeInstanceOf(Array)
+      expect(crispInputs.pk1is).toBeInstanceOf(Array)
+      expect(crispInputs.r1is).toBeInstanceOf(Array)
+      expect(crispInputs.r2is).toBeInstanceOf(Array)
+      expect(crispInputs.p1is).toBeInstanceOf(Array)
+      expect(crispInputs.hashed_message).toBeInstanceOf(Array)
+      expect(crispInputs.public_key_x).toBeInstanceOf(Array)
+      expect(crispInputs.public_key_y).toBeInstanceOf(Array)
+      expect(crispInputs.signature).toBeInstanceOf(Array)
+      expect(crispInputs.merkle_proof_indices).toBeDefined()
+      expect(crispInputs.merkle_proof_siblings).toBeDefined()
+      expect(crispInputs.merkle_proof_length).toBeDefined()
+      expect(crispInputs.merkle_root).toBeDefined()
+      expect(crispInputs.balance).toBeDefined()
+    });
+  });
 })
