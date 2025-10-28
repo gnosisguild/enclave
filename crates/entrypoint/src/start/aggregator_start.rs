@@ -38,6 +38,7 @@ pub async fn execute(
         .with_source_bus(&bus)
         .with_datastore(store)
         .with_chains(&config.chains())
+        .with_sortition_score()
         .with_contract_enclave_full()
         .with_contract_bonding_registry()
         .with_contract_ciphernode_registry()

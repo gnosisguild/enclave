@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{GetNodeIndex, Sortition};
+use crate::{GetCommittee, GetNodeIndex, Sortition};
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// forwards a CiphernodeSelected event (distance sortition) or TicketGenerated event (score sortition) to the event bus
 use actix::prelude::*;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
     CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EventBus, Shutdown,
-    Subscribe, TicketGenerated,
+    Subscribe, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
@@ -100,7 +100,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 })
                 .await
             {
-                let Some((party_id, ticket_id)) = found_result else {
+                let Some((_party_id, ticket_id)) = found_result else {
                     info!(node = address, "Ciphernode was not selected");
                     return;
                 };
@@ -113,21 +113,44 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     );
                     bus.do_send(EnclaveEvent::from(TicketGenerated {
                         e3_id: data.e3_id.clone(),
-                        ticket_id: tid,
+                        ticket_id: TicketId::Score(tid),
                         node: address.clone(),
                     }));
                 } else {
                     info!(node = address, "Ciphernode selected via distance sortition");
-                    bus.do_send(EnclaveEvent::from(CiphernodeSelected {
-                        party_id,
-                        e3_id: data.e3_id,
-                        threshold_m: data.threshold_m,
-                        threshold_n: data.threshold_n,
-                        esi_per_ct: data.esi_per_ct,
-                        error_size: data.error_size,
-                        params: data.params.clone(),
-                        seed: data.seed.clone(),
+                    // This is a quick workaround to make distance sortition work until we remove it?
+                    bus.do_send(EnclaveEvent::from(TicketGenerated {
+                        e3_id: data.e3_id.clone(),
+                        ticket_id: TicketId::Distance,
+                        node: address.clone(),
                     }));
+
+                    let committee_fut = sortition.send(GetCommittee {
+                        seed,
+                        size,
+                        chain_id,
+                    });
+
+                    match committee_fut.await {
+                        Ok(Ok(committee)) => {
+                            info!(
+                                node = address,
+                                committee_size = committee.len(),
+                                "Emitting CommitteeFinalized for distance sortition"
+                            );
+                            bus.do_send(EnclaveEvent::from(CommitteeFinalized {
+                                e3_id: data.e3_id.clone(),
+                                committee,
+                                chain_id: data.e3_id.chain_id(),
+                            }));
+                        }
+                        Ok(Err(e)) => {
+                            info!("Failed to get committee: {}", e);
+                        }
+                        Err(e) => {
+                            info!("Failed to send GetCommittee: {}", e);
+                        }
+                    }
                 }
             } else {
                 info!("This node is not selected");

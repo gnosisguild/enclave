@@ -17,7 +17,7 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
     BusError, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet,
-    PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
+    PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -109,7 +109,7 @@ impl From<CommitteeRequestedWithChainId> for EnclaveEvent {
 
 struct CommitteeFinalizedWithChainId(pub ICiphernodeRegistry::CommitteeFinalized, pub u64);
 
-impl From<CommitteeFinalizedWithChainId> for e3_events::CommitteeFinalized {
+impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
     fn from(value: CommitteeFinalizedWithChainId) -> Self {
         e3_events::CommitteeFinalized {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
@@ -326,27 +326,40 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: TicketGenerated, _: &mut Self::Context) -> Self::Result {
-        let e3_id = msg.e3_id.clone();
-        let ticket_id = msg.ticket_id;
-        let contract_address = self.contract_address;
-        let provider = self.provider.clone();
-        let bus = self.bus.clone();
-
-        Box::pin(async move {
-            info!("Submitting ticket {} for E3 {:?}", ticket_id, e3_id);
-
-            let result =
-                submit_ticket_to_registry(provider, contract_address, e3_id, ticket_id).await;
-            match result {
-                Ok(receipt) => {
-                    info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
-                }
-                Err(err) => {
-                    error!("Failed to submit ticket: {:?}", err);
-                    bus.err(EnclaveErrorType::Evm, err);
-                }
+        match msg.ticket_id {
+            TicketId::Distance => {
+                info!("Distance sortition ticket generated for E3 {:?}, no contract submission needed", msg.e3_id);
+                return Box::pin(async move {});
             }
-        })
+            TicketId::Score(ticket_id) => {
+                info!(
+                    "Score sortition ticket generated for E3 {:?}, submitting to contract",
+                    msg.e3_id
+                );
+
+                let e3_id = msg.e3_id.clone();
+                let contract_address = self.contract_address;
+                let provider = self.provider.clone();
+                let bus = self.bus.clone();
+
+                Box::pin(async move {
+                    info!("Submitting ticket {} for E3 {:?}", ticket_id, e3_id);
+
+                    let result =
+                        submit_ticket_to_registry(provider, contract_address, e3_id, ticket_id)
+                            .await;
+                    match result {
+                        Ok(receipt) => {
+                            info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
+                        }
+                        Err(err) => {
+                            error!("Failed to submit ticket: {:?}", err);
+                            bus.err(EnclaveErrorType::Evm, err);
+                        }
+                    }
+                })
+            }
+        }
     }
 }
 

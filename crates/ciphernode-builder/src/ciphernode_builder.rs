@@ -32,7 +32,7 @@ use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
-    Sortition, SortitionRepositoryFactory,
+    Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
@@ -58,6 +58,7 @@ pub struct CiphernodeBuilder {
     pubkey_agg: bool,
     rng: SharedRng,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
+    sortition_backend: SortitionBackend,
     testmode_errors: bool,
     testmode_history: bool,
     threads: Option<usize>,
@@ -99,6 +100,7 @@ impl CiphernodeBuilder {
             pubkey_agg: false,
             rng,
             source_bus: None,
+            sortition_backend: SortitionBackend::score(),
             testmode_errors: false,
             testmode_history: false,
             threads: None,
@@ -202,6 +204,25 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Use distance-based sortition (DEPRECATED)
+    ///
+    /// # Deprecation Notice
+    /// Distance sortition is deprecated and does not work with on-chain contracts.
+    /// Use `with_sortition_score()` instead.
+    #[deprecated(
+        note = "Distance sortition is deprecated and does not work with on-chain contracts. Use with_sortition_score() instead."
+    )]
+    pub fn with_sortition_distance(mut self) -> Self {
+        self.sortition_backend = SortitionBackend::distance();
+        self
+    }
+
+    /// Use score-based sortition (recommended)
+    pub fn with_sortition_score(mut self) -> Self {
+        self.sortition_backend = SortitionBackend::score();
+        self
+    }
+
     /// Setup an Enclave contract reader for every evm chain provided
     pub fn with_contract_enclave_reader(mut self) -> Self {
         self.contract_components.enclave_reader = true;
@@ -280,11 +301,16 @@ impl CiphernodeBuilder {
 
         let node_state_manager =
             e3_sortition::NodeStateManager::attach(&local_bus, &repositories.node_state()).await?;
-        let sortition = Sortition::attach_with_node_state(
+
+        // Use the configured backend directly
+        let default_backend = self.sortition_backend.clone();
+
+        let sortition = Sortition::attach_with_backend(
             &local_bus,
             repositories.sortition(),
             repositories.finalized_committees(),
             node_state_manager,
+            default_backend,
         )
         .await?;
 
@@ -369,7 +395,7 @@ impl CiphernodeBuilder {
                         .await?;
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
-                        if self.pubkey_agg {
+                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
                             info!("Attaching CommitteeFinalizer for score sortition");
                             e3_aggregator::CommitteeFinalizer::attach(
                                 &local_bus,

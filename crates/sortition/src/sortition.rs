@@ -55,6 +55,20 @@ pub struct GetNodes {
 pub struct GetNodesForE3 {
     /// E3 ID to get nodes for.
     pub e3_id: e3_events::E3id,
+    /// Chain ID
+    pub chain_id: u64,
+}
+
+/// Message to get the full committee for a specific sortition.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "anyhow::Result<Vec<String>>")]
+pub struct GetCommittee {
+    /// Round seed / randomness used by the sortition algorithm
+    pub seed: Seed,
+    /// Committee size (top-N)
+    pub size: usize,
+    /// Target chain
+    pub chain_id: u64,
 }
 
 /// Minimal interface that all sortition backends must implement.
@@ -99,6 +113,19 @@ pub trait SortitionList<T> {
 
     /// Return all registered node addresses as hex strings.
     fn nodes(&self) -> Vec<String>;
+
+    /// Return the full committee for a specific sortition.
+    ///
+    /// Implementations should return an error if the backend has no nodes
+    /// or if `size == 0`. For backends that don't support this operation,
+    /// they should return an appropriate error.
+    fn get_committee(
+        &self,
+        seed: Seed,
+        size: usize,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<Vec<String>>;
 }
 
 /// Distance-sortition backend.
@@ -186,6 +213,25 @@ impl SortitionList<String> for DistanceBackend {
     /// Return all node addresses as hex strings.
     fn nodes(&self) -> Vec<String> {
         self.nodes.iter().cloned().collect()
+    }
+
+    /// Return the full committee for distance sortition.
+    fn get_committee(
+        &self,
+        seed: Seed,
+        size: usize,
+        _node_state: Option<&NodeStateStore>,
+        _chain_id: u64,
+    ) -> anyhow::Result<Vec<String>> {
+        if size == 0 {
+            return Err(anyhow!("Size cannot be 0"));
+        }
+        if self.nodes.len() == 0 {
+            return Err(anyhow!("No nodes registered!"));
+        }
+
+        let committee = get_committee(seed, size, self.nodes.clone())?;
+        Ok(committee.iter().map(|(_, addr)| addr.to_string()).collect())
     }
 }
 
@@ -390,6 +436,22 @@ impl SortitionList<String> for ScoreBackend {
             .map(|n| n.address.to_string())
             .collect()
     }
+
+    /// Return the full committee for score sortition.
+    ///
+    /// Note: This is not supported for score sortition as the committee
+    /// is determined by the contract after ticket submission.
+    fn get_committee(
+        &self,
+        _seed: Seed,
+        _size: usize,
+        _node_state: Option<&NodeStateStore>,
+        _chain_id: u64,
+    ) -> anyhow::Result<Vec<String>> {
+        Err(anyhow!(
+            "get_committee not supported for ScoreBackend - committee is determined by contract"
+        ))
+    }
 }
 
 /// Enum wrapper around the supported backends.
@@ -397,18 +459,44 @@ impl SortitionList<String> for ScoreBackend {
 /// New chains default to `Score` sortition. If a chain is intended to
 /// use distance selection, construct it as `SortitionBackend::Distance(DistanceBackend::default())`
 /// explicitly.
+///
+/// # Deprecation Notice
+/// Distance sortition is deprecated and does not work with on-chain contracts.
+/// Use Score sortition for all new implementations.
+/// Distance sortition will be removed in a future release.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SortitionBackend {
     /// Distance-based selection (stores a simple set of addresses).
+    #[deprecated(
+        note = "Distance sortition is deprecated and does not work with on-chain contracts. Use Score sortition instead."
+    )]
     Distance(DistanceBackend),
     /// Score-based selection (stores `RegisteredNode`s with tickets).
     Score(ScoreBackend),
 }
 
+impl Default for SortitionBackend {
+    fn default() -> Self {
+        SortitionBackend::Distance(DistanceBackend::default())
+    }
+}
+
 impl SortitionBackend {
-    /// Construct a backend preconfigured with a default `ScoreBackend`.
-    pub fn default() -> Self {
+    /// Use score-based sortition (recommended)
+    pub fn score() -> Self {
         SortitionBackend::Score(ScoreBackend::default())
+    }
+
+    /// Use distance-based sortition (DEPRECATED)
+    ///
+    /// # Deprecation Notice
+    /// Distance sortition is deprecated and does not work with on-chain contracts.
+    /// Use `SortitionBackend::score()` instead.
+    #[deprecated(
+        note = "Distance sortition is deprecated and does not work with on-chain contracts. Use score() instead."
+    )]
+    pub fn distance() -> Self {
+        SortitionBackend::Distance(DistanceBackend::default())
     }
 }
 
@@ -459,6 +547,23 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.nodes(),
             SortitionBackend::Score(backend) => backend.nodes(),
+        }
+    }
+
+    fn get_committee(
+        &self,
+        seed: Seed,
+        size: usize,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<Vec<String>> {
+        match self {
+            SortitionBackend::Distance(backend) => {
+                backend.get_committee(seed, size, node_state, chain_id)
+            }
+            SortitionBackend::Score(backend) => {
+                backend.get_committee(seed, size, node_state, chain_id)
+            }
         }
     }
 }
@@ -530,18 +635,26 @@ impl Sortition {
         Ok(addr)
     }
 
-    /// Load persisted state with node state support for score-based sortition.
+    /// Load persisted state with node state support and configurable default backend.
     ///
-    /// This version allows score-based backends to query ticket availability.
-    #[instrument(name = "sortition_attach_with_node_state", skip_all)]
-    pub async fn attach_with_node_state(
+    /// This version allows score-based backends to query ticket availability and
+    /// configures the default backend type for new chains.
+    #[instrument(name = "sortition_attach_with_backend", skip_all)]
+    pub async fn attach_with_backend(
         bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<HashMap<u64, SortitionBackend>>,
         committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
         node_state_manager: Addr<NodeStateManager>,
+        default_backend: SortitionBackend,
     ) -> Result<Addr<Sortition>> {
-        let list = store.load_or_default(HashMap::new()).await?;
+        let mut list = store.load_or_default(HashMap::new()).await?;
         let finalized_committees = committees_store.load_or_default(HashMap::new()).await?;
+
+        list.try_mutate(|mut list| {
+            list.insert(u64::MAX, default_backend);
+            Ok(list)
+        })?;
+
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
@@ -604,9 +717,15 @@ impl Handler<CiphernodeAdded> for Sortition {
         let addr = msg.address.clone();
 
         if let Err(err) = self.list.try_mutate(move |mut list_map| {
+            // Use the configured default backend if available, otherwise fall back to Distance
+            let default_backend = list_map
+                .get(&u64::MAX)
+                .cloned()
+                .unwrap_or_else(|| SortitionBackend::distance());
+
             list_map
                 .entry(chain_id)
-                .or_insert_with(SortitionBackend::default)
+                .or_insert_with(|| default_backend)
                 .add(addr);
             Ok(list_map)
         }) {
@@ -716,6 +835,15 @@ impl Handler<GetNodesForE3> for Sortition {
     type Result = Vec<String>;
 
     fn handle(&mut self, msg: GetNodesForE3, _ctx: &mut Self::Context) -> Self::Result {
+        if msg.e3_id.chain_id() != msg.chain_id {
+            tracing::warn!(
+                "Chain ID mismatch: e3_id has chain_id {}, but requested chain_id {}",
+                msg.e3_id.chain_id(),
+                msg.chain_id
+            );
+            return Vec::new();
+        }
+
         self.finalized_committees
             .get()
             .and_then(|committees| committees.get(&msg.e3_id).cloned())
@@ -723,5 +851,35 @@ impl Handler<GetNodesForE3> for Sortition {
                 tracing::warn!("No finalized committee found for E3 {}", msg.e3_id);
                 Vec::new()
             })
+    }
+}
+
+impl Handler<GetCommittee> for Sortition {
+    type Result = ResponseFuture<anyhow::Result<Vec<String>>>;
+
+    fn handle(&mut self, msg: GetCommittee, _ctx: &mut Self::Context) -> Self::Result {
+        let backends_snapshot = self.list.get();
+
+        Box::pin(async move {
+            if let Some(map) = backends_snapshot {
+                if let Some(backend) = map.get(&msg.chain_id) {
+                    // Get node state for score backend
+                    let node_state = if matches!(backend, SortitionBackend::Score(_)) {
+                        // For score backend, we need node state
+                        // This is a limitation - we'd need to pass node_state_manager
+                        // For now, we'll return an error for score backend
+                        return Err(anyhow!("GetCommittee not supported for ScoreBackend - use GetNodesForE3 instead"));
+                    } else {
+                        None
+                    };
+
+                    backend.get_committee(msg.seed, msg.size, node_state, msg.chain_id)
+                } else {
+                    Err(anyhow!("No backend found for chain_id {}", msg.chain_id))
+                }
+            } else {
+                Err(anyhow!("Could not get sortition's list cache"))
+            }
+        })
     }
 }

@@ -14,7 +14,7 @@ use e3_events::{
     Seed,
 };
 use e3_multithread::Multithread;
-use e3_sortition::Sortition;
+use e3_sortition::{GetNodesForE3, Sortition};
 use e3_trbfv::{
     calculate_threshold_decryption::{
         CalculateThresholdDecryptionRequest, CalculateThresholdDecryptionResponse,
@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -244,46 +244,58 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
 }
 
 impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
-    type Result = Result<()>;
+    type Result = ResponseActFuture<Self, Result<()>>;
 
-    fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
         info!(event=?event, "Processing DecryptionShareCreated...");
-        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { threshold_n, .. })) =
-            self.state.get()
-        else {
-            error!(state=?self.state, "Aggregator has been closed for collecting.");
-            return Ok(());
-        };
-
+        let address = event.node.clone();
         let party_id = event.party_id;
         let e3_id = event.e3_id.clone();
         let decryption_share = event.decryption_share.clone();
 
-        // Trust the party_id from the event - it's based on CommitteeFinalized order
-        // which is the authoritative source of truth for party IDs
-        if e3_id != self.e3_id {
-            error!("Wrong e3_id sent to aggregator. This should not happen.");
-            return Ok(());
-        }
-        self.add_share(party_id, decryption_share)?;
+        Box::pin(
+            self.sortition
+                .send(GetNodesForE3 {
+                    e3_id: e3_id.clone(),
+                    chain_id: e3_id.chain_id(),
+                })
+                .into_actor(self)
+                .map(move |res, act, ctx| {
+                    let nodes = res?;
 
-        if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
-            threshold_m,
-            threshold_n,
-            shares,
-            ciphertext_output,
-            ..
-        })) = self.state.get()
-        {
-            ctx.notify(ComputeAggregate {
-                shares: shares.clone(),
-                ciphertext_output: ciphertext_output.clone(),
-                threshold_m,
-                threshold_n,
-            })
-        }
+                    if !nodes.contains(&address) {
+                        trace!("Node {} not found in finalized committee", address);
+                        return Ok(());
+                    }
 
-        Ok(())
+                    if e3_id != act.e3_id {
+                        error!("Wrong e3_id sent to aggregator. This should not happen.");
+                        return Ok(());
+                    }
+
+                    // Trust the party_id from the event - it's based on CommitteeFinalized order
+                    // which is the authoritative source of truth for party IDs
+                    act.add_share(party_id, decryption_share)?;
+
+                    if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
+                        threshold_m,
+                        threshold_n,
+                        shares,
+                        ciphertext_output,
+                        ..
+                    })) = act.state.get()
+                    {
+                        ctx.notify(ComputeAggregate {
+                            shares: shares.clone(),
+                            ciphertext_output: ciphertext_output.clone(),
+                            threshold_m,
+                            threshold_n,
+                        })
+                    }
+
+                    Ok(())
+                }),
+        )
     }
 }
 

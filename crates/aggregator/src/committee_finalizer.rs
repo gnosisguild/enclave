@@ -76,7 +76,7 @@ impl<P: Provider + Clone + Unpin + 'static> Handler<CommitteeRequested> for Comm
         let submission_deadline = msg.submission_deadline;
         let provider = self.provider.clone();
 
-        const FINALIZATION_BUFFER_SECONDS: u64 = 3;
+        const FINALIZATION_BUFFER_SECONDS: u64 = 1;
 
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
