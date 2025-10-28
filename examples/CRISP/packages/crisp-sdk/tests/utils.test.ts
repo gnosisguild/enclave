@@ -9,7 +9,6 @@ import { generateMerkleProof, generateMerkleTree, hashLeaf } from '../src/utils'
 import { LEAVES, MAX_DEPTH } from './constants'
 
 describe('Utils', () => {
-
   describe('hashLeaf', () => {
     it('should return a bigint hash of the two values', () => {
       const leaf = hashLeaf('0x1234567890123456789012345678901234567890', '1000')
@@ -26,7 +25,7 @@ describe('Utils', () => {
 
   describe('generateMerkleProof', () => {
     const address = '0x1234567890123456789012345678901234567890'
-    const balance = 1000
+    const balance = 1000n
     it('should generate a merkle proof for a leaf', () => {
       const proof = generateMerkleProof(0, balance, address, LEAVES, MAX_DEPTH)
       expect(proof.leaf).toBe(hashLeaf(address, balance.toString()))
@@ -36,7 +35,7 @@ describe('Utils', () => {
     })
     it('should throw if the leaf does not exist in the tree', () => {
       expect(() => generateMerkleProof(0, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')
-      expect(() => generateMerkleProof(0, 999, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0, 999n, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
     })
   })
 })

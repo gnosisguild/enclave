@@ -60,7 +60,7 @@ export interface IMerkleProof {
   leaf: bigint
   index: number
   proof: LeanIMTMerkleProof<bigint>
-  length: number 
+  length: number
   indices: number[]
 }
 

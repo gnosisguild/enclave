@@ -196,7 +196,7 @@ export const generateCRISPInputs = async (
   signature: `0x${string}`,
   message: string,
   merkleData: IMerkleProof,
-  balance: number,
+  balance: bigint,
 ): Promise<CRISPCircuitInputs> => {
   const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(message, signature)
 

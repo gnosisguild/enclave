@@ -36,7 +36,13 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
  * @param leaves The leaves of the Merkle tree
  * @param maxDepth The maximum depth of the Merkle tree
  */
-export const generateMerkleProof = (threshold: number, balance: number, address: string, leaves: bigint[], maxDepth: number): IMerkleProof => {
+export const generateMerkleProof = (
+  threshold: number,
+  balance: bigint,
+  address: string,
+  leaves: bigint[],
+  maxDepth: number,
+): IMerkleProof => {
   if (balance < threshold) {
     throw new Error('Balance is below the threshold')
   }
@@ -54,17 +60,11 @@ export const generateMerkleProof = (threshold: number, balance: number, address:
   const proof = tree.generateProof(index)
 
   // Pad siblings with zeros
-  const paddedSiblings = [
-    ...proof.siblings,
-    ...Array(maxDepth - proof.siblings.length).fill(0n)
-  ]
+  const paddedSiblings = [...proof.siblings, ...Array(maxDepth - proof.siblings.length).fill(0n)]
 
   // Pad indices with zeros
   const indices = proof.siblings.map((_, i) => (index >> i) & 1)
-  const paddedIndices = [
-    ...indices,
-    ...Array(maxDepth - indices.length).fill(0)
-  ]
+  const paddedIndices = [...indices, ...Array(maxDepth - indices.length).fill(0)]
 
   return {
     leaf,
@@ -74,7 +74,7 @@ export const generateMerkleProof = (threshold: number, balance: number, address:
       siblings: paddedSiblings,
     },
     // Original length before padding
-    length: proof.siblings.length, 
+    length: proof.siblings.length,
     indices: paddedIndices,
   }
 }
