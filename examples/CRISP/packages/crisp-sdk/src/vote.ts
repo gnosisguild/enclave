@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
-import { BFVParams, type CRISPCircuitInputs, type IVote, VotingMode } from './types'
+import { BFVParams, type CRISPCircuitInputs, type IMerkleProof, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
 import { extractSignature } from './signature'
@@ -170,12 +170,12 @@ export const encryptVoteAndGenerateCRISPInputs = async (
   // the rest of the public and private inputs will need to be generated before calling the circuit to generate the CRISP proof
   return {
     ...crispInputs,
-    // @todo fill the rest of the inputs needed for CRISP
     public_key_x: [],
     public_key_y: [],
     signature: [],
     hashed_message: [],
     balance: '0',
+    merkle_root: '0',
     merkle_proof_length: '0',
     merkle_proof_indices: [],
     merkle_proof_siblings: [],
@@ -184,16 +184,19 @@ export const encryptVoteAndGenerateCRISPInputs = async (
 
 /**
  * Generate the CRISP circuit inputs by extracting signature components and adding them to the partial inputs
- * @todo Add the merkle tree inputs too
  * @param partialInputs The partial CRISP circuit inputs
  * @param signature The voter's signature
  * @param message The signed message
+ * @param merkleData The voter's Merkle proof data
+ * @param balance The voter's balance
  * @returns The complete CRISP circuit inputs
  */
 export const generateCRISPInputs = async (
   partialInputs: CRISPCircuitInputs,
   signature: `0x${string}`,
   message: string,
+  merkleData: IMerkleProof,
+  balance: bigint,
 ): Promise<CRISPCircuitInputs> => {
   const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(message, signature)
 
@@ -203,5 +206,10 @@ export const generateCRISPInputs = async (
     public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
     public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
     signature: Array.from(extractedSignature).map((b) => b.toString()),
+    merkle_proof_length: merkleData.length.toString(),
+    merkle_proof_indices: merkleData.indices.map((i) => i.toString()),
+    merkle_proof_siblings: merkleData.proof.siblings.map((s) => s.toString()),
+    merkle_root: merkleData.proof.root.toString(),
+    balance: balance.toString(),
   }
 }

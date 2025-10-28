@@ -60,6 +60,8 @@ export interface IMerkleProof {
   leaf: bigint
   index: number
   proof: LeanIMTMerkleProof<bigint>
+  length: number
+  indices: number[]
 }
 
 /**
@@ -163,6 +165,7 @@ export interface CRISPCircuitInputs {
   signature: string[]
   hashed_message: string[]
   balance: string
+  merkle_root: string
   merkle_proof_length: string
   merkle_proof_indices: string[]
   merkle_proof_siblings: string[]
