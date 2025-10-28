@@ -198,6 +198,7 @@ export const generateMaskVote = async (
   publicKey: Uint8Array,
   previousCiphertext: Uint8Array,
   bfvParams = DEFAULT_BFV_PARAMS,
+  merkleRoot: bigint,
 ): Promise<CRISPCircuitInputs> => {
   const plaintextVote: IVote = {
     yes: 0n,
@@ -221,7 +222,7 @@ export const generateMaskVote = async (
     merkle_proof_indices: Array.from({ length: 4 }, () => '0'),
     merkle_proof_siblings: Array.from({ length: 4 }, () => '0'),
     merkle_proof_length: '1',
-    merkle_root: '0',
+    merkle_root: merkleRoot.toString(),
     balance: '0',
   }
 }

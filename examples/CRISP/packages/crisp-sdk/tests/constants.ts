@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { generateMerkleProof } from "../src"
+
 export const CRISP_SERVER_URL = 'http://localhost:4000'
 
 export const MESSAGE = 'Vote for round 0'
@@ -25,3 +27,6 @@ export const LEAVES = [
 ]
 
 export const MAX_DEPTH = 20
+
+export const votingPowerLeaf = 1000n
+export const merkleProof = generateMerkleProof(0n, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH)

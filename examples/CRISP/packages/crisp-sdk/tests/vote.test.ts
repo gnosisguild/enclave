@@ -11,7 +11,7 @@ import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVote
 import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, generateMerkleProof, MAXIMUM_VOTE_VALUE } from '../src'
 
-import { LEAVES, MAX_DEPTH, MESSAGE, SIGNATURE, VOTE } from './constants'
+import { LEAVES, MAX_DEPTH, merkleProof, MESSAGE, SIGNATURE, VOTE } from './constants'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -157,7 +157,7 @@ describe('Vote', () => {
 
   describe("generateMaskVote", () => {
     it('should generate a mask vote and its inputs', async () => {
-      const crispInputs = await generateMaskVote(publicKey, previousCiphertext)
+      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
 
       expect(crispInputs.ct_add).toBeInstanceOf(Object)
       expect(crispInputs.params).toBeInstanceOf(Object)
