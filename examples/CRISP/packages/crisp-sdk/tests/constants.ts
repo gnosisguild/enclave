@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { generateMerkleProof } from "../src"
+import { generateMerkleProof } from '../src'
 
 export const CRISP_SERVER_URL = 'http://localhost:4000'
 

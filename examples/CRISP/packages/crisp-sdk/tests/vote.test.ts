@@ -7,11 +7,18 @@
 import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 
-import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, generateMaskVote, validateVote } from '../src/vote'
+import {
+  calculateValidIndicesForPlaintext,
+  decodeTally,
+  encodeVote,
+  encryptVoteAndGenerateCRISPInputs,
+  generateMaskVote,
+  validateVote,
+} from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
-import { DEFAULT_BFV_PARAMS, generateMerkleProof, MAXIMUM_VOTE_VALUE } from '../src'
+import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
 
-import { LEAVES, MAX_DEPTH, merkleProof, MESSAGE, SIGNATURE, VOTE } from './constants'
+import { merkleProof, MESSAGE, SIGNATURE, VOTE, votingPowerLeaf } from './constants'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -119,9 +126,6 @@ describe('Vote', () => {
   })
 
   describe('encryptVoteAndGenerateCRISPInputs', () => {
-    const votingPowerLeaf = 1000n
-    const merkleProof = generateMerkleProof(0n, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH)
-
     it('should encrypt a vote and generate the circuit inputs', async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const crispInputs = await encryptVoteAndGenerateCRISPInputs({
@@ -155,7 +159,7 @@ describe('Vote', () => {
     })
   })
 
-  describe("generateMaskVote", () => {
+  describe('generateMaskVote', () => {
     it('should generate a mask vote and its inputs', async () => {
       const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
 
@@ -177,6 +181,6 @@ describe('Vote', () => {
       expect(crispInputs.merkle_proof_length).toBeDefined()
       expect(crispInputs.merkle_root).toBeDefined()
       expect(crispInputs.balance).toBeDefined()
-    });
-  });
+    })
+  })
 })
