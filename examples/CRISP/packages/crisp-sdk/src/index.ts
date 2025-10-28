@@ -8,6 +8,16 @@ export * from './token'
 export * from './state'
 export * from './constants'
 export * from './utils'
+export * from './vote'
+export * from './signature'
 
 export { VotingMode } from './types'
-export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof, IVote, CRISPCircuitInputs } from './types'
+export type {
+  IRoundDetails,
+  IRoundDetailsResponse,
+  ITokenDetails,
+  IMerkleProof,
+  IVote,
+  CRISPCircuitInputs,
+  NoirSignatureInputs,
+} from './types'
