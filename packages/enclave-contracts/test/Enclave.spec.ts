@@ -1260,6 +1260,29 @@ describe("Enclave", function () {
         .to.emit(enclave, "InputPublished")
         .withArgs(e3Id, inputData, expectedHash, 0);
     });
+    it("increases the input count", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
+        },
+        { value: 10 },
+      );
+
+      await enclave.activate(0, ethers.ZeroHash);
+      await enclave.publishInput(0, inputData);
+
+      expect(await enclave.getInputsLength(0)).to.equal(1n);
+    });
   });
 
   describe("publishCiphertextOutput()", function () {
@@ -1447,6 +1470,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(e3Id);
     });
+
     it("reverts if E3 has not been activated", async function () {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;

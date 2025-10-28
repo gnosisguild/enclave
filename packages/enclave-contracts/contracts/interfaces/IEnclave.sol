@@ -223,4 +223,12 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @return root The root of the input merkle tree.
     function getInputRoot(uint256 e3Id) external view returns (uint256 root);
+
+    /// @notice This function returns the number of inputs published for a given E3.
+    /// @dev This function MUST revert if the E3 does not exist.
+    /// @param e3Id ID of the E3.
+    /// @return length The number of inputs published.
+    function getInputsLength(
+        uint256 e3Id
+    ) external view returns (uint256 length);
 }

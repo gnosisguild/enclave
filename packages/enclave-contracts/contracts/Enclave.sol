@@ -126,6 +126,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc IEnclave
     function request(
         E3RequestParams calldata requestParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
@@ -216,6 +217,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
     }
 
+    /// @inheritdoc IEnclave
     function activate(
         uint256 e3Id,
         bytes calldata publicKey
@@ -241,6 +243,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return true;
     }
 
+    /// @inheritdoc IEnclave
     function publishInput(
         uint256 e3Id,
         bytes calldata data
@@ -269,6 +272,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit InputPublished(e3Id, input, inputHash, inputIndex);
     }
 
+    /// @inheritdoc IEnclave
     function publishCiphertextOutput(
         uint256 e3Id,
         bytes calldata ciphertextOutput,
@@ -298,6 +302,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
 
+    /// @inheritdoc IEnclave
     function publishPlaintextOutput(
         uint256 e3Id,
         bytes calldata plaintextOutput,
@@ -425,11 +430,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc IEnclave
     function getE3(uint256 e3Id) public view returns (E3 memory e3) {
         e3 = e3s[e3Id];
         require(e3.e3Program != IE3Program(address(0)), E3DoesNotExist(e3Id));
     }
 
+    /// @inheritdoc IEnclave
     function getInputRoot(uint256 e3Id) public view returns (uint256) {
         require(
             e3s[e3Id].e3Program != IE3Program(address(0)),
@@ -442,5 +449,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes32 encryptionSchemeId
     ) public view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
+    }
+
+    /// @inheritdoc IEnclave
+    function getInputsLength(uint256 e3Id) public view returns (uint256) {
+        require(
+            e3s[e3Id].e3Program != IE3Program(address(0)),
+            E3DoesNotExist(e3Id)
+        );
+        return inputCounts[e3Id];
     }
 }
