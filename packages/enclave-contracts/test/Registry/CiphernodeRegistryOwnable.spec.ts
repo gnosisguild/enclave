@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
+import type { Signer } from "ethers";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -14,7 +15,10 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
-import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  CiphernodeRegistryOwnable,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -32,7 +36,7 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("CiphernodeRegistryOwnable", function () {
   async function finalizeCommitteeAfterWindow(
-    registry: any,
+    registry: CiphernodeRegistryOwnable,
     e3Id: number,
   ): Promise<void> {
     await networkHelpers.time.increase(SORTITION_SUBMISSION_WINDOW + 1);
@@ -40,11 +44,16 @@ describe("CiphernodeRegistryOwnable", function () {
   }
 
   async function setupOperatorForSortition(
-    operator: any,
+    operator: Signer,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bondingRegistry: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     licenseToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     usdcToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ticketToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
   ): Promise<void> {
     const operatorAddress = await operator.getAddress();
@@ -78,7 +87,6 @@ describe("CiphernodeRegistryOwnable", function () {
       await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
 
-    // Deploy token contracts
     const usdcContract = await ignition.deploy(MockStableTokenModule, {
       parameters: {
         MockUSDC: {

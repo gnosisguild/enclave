@@ -22,6 +22,7 @@ import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
+  CiphernodeRegistryOwnable,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
@@ -62,12 +63,12 @@ describe("Enclave", function () {
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
   const setupAndPublishCommittee = async (
-    registry: any,
+    registry: CiphernodeRegistryOwnable,
     e3Id: number,
     nodes: string[],
     publicKey: string,
-    operator1: any,
-    operator2: any,
+    operator1: Signer,
+    operator2: Signer,
   ): Promise<void> => {
     await registry.connect(operator1).submitTicket(e3Id, 1);
     await registry.connect(operator2).submitTicket(e3Id, 1);
@@ -92,11 +93,16 @@ describe("Enclave", function () {
   };
 
   async function setupOperatorForSortition(
-    operator: any,
+    operator: Signer,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bondingRegistry: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     licenseToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     usdcToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ticketToken: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
   ): Promise<void> {
     const operatorAddress = await operator.getAddress();
