@@ -4,17 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { expect, describe, it, beforeAll } from 'vitest'
+import { expect, describe, it } from 'vitest'
 import { generateMerkleProof, generateMerkleTree, hashLeaf } from '../src/utils'
-import { getTreeData } from '../src'
-import { CRISP_SERVER_URL } from './constants'
+import { LEAVES, MAX_DEPTH } from './constants'
 
 describe('Utils', () => {
-  let leaves: bigint[]
-
-  beforeAll(async () => {
-    leaves = await getTreeData(CRISP_SERVER_URL, 0)
-  })
 
   describe('hashLeaf', () => {
     it('should return a bigint hash of the two values', () => {
@@ -25,7 +19,7 @@ describe('Utils', () => {
 
   describe('generateMerkleTree', () => {
     it('should generate a merkle tree', () => {
-      const tree = generateMerkleTree(leaves)
+      const tree = generateMerkleTree(LEAVES)
       expect(tree.root).toBeDefined()
     })
   })
@@ -34,12 +28,15 @@ describe('Utils', () => {
     const address = '0x1234567890123456789012345678901234567890'
     const balance = 1000
     it('should generate a merkle proof for a leaf', () => {
-      const proof = generateMerkleProof(0, balance, address, leaves)
+      const proof = generateMerkleProof(0, balance, address, LEAVES, MAX_DEPTH)
       expect(proof.leaf).toBe(hashLeaf(address, balance.toString()))
+
+      expect(proof.length).toBe(4)
+      expect(proof.indices.length).toBe(MAX_DEPTH)
     })
     it('should throw if the leaf does not exist in the tree', () => {
-      expect(() => generateMerkleProof(0, balance, address, [])).toThrow('Leaf not found in the tree')
-      expect(() => generateMerkleProof(0, 999, address, leaves)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0, 999, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
     })
   })
 })

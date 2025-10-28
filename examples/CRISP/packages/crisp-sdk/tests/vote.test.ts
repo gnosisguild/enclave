@@ -16,9 +16,10 @@ import {
   validateVote,
 } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
-import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
+import { DEFAULT_BFV_PARAMS, generateMerkleProof, MAXIMUM_VOTE_VALUE } from '../src'
 
-import { MESSAGE, SIGNATURE, VOTE } from './constants'
+import { LEAVES, MAX_DEPTH, MESSAGE, SIGNATURE, VOTE } from './constants'
+import exp from 'constants'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -143,10 +144,12 @@ describe('Vote', () => {
   })
 
   describe('generateCRISPInputs', () => {
+    const votingPowerLeaf = 1000;
+    const merkleProof = generateMerkleProof(0, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH);
     it('should add the remaining inputs to the CRISP inputs object', async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const partialInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
-      const crispInputs = await generateCRISPInputs(partialInputs, SIGNATURE, MESSAGE)
+      const crispInputs = await generateCRISPInputs(partialInputs, SIGNATURE, MESSAGE, merkleProof, votingPowerLeaf)
 
       expect(crispInputs.ct_add).toBeInstanceOf(Object)
       expect(crispInputs.params).toBeInstanceOf(Object)
@@ -161,6 +164,11 @@ describe('Vote', () => {
       expect(crispInputs.public_key_x).toBeInstanceOf(Array)
       expect(crispInputs.public_key_y).toBeInstanceOf(Array)
       expect(crispInputs.signature).toBeInstanceOf(Array)
+      expect(crispInputs.merkle_proof_indices).toBeDefined()
+      expect(crispInputs.merkle_proof_siblings).toBeDefined()
+      expect(crispInputs.merkle_proof_length).toBeDefined() 
+      expect(crispInputs.merkle_root).toBeDefined()
+      expect(crispInputs.balance).toBe(votingPowerLeaf.toString())
     })
   })
 })

@@ -33,6 +33,7 @@ fn main(
     signature: [u8; 64],
     hashed_message: [u8; 32],
     balance: Field,
+    merkle_root: pub Field,
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],
@@ -44,13 +45,20 @@ fn main(
     let address = address_to_field(derive_address(public_key_x, public_key_y));
 
     // Then get Merkle root.
-    let merkle_root = get_merkle_root(
+    let merkle_root_calculated = get_merkle_root(
         address,
         balance,
         merkle_proof_length,
         merkle_proof_indices,
         merkle_proof_siblings,
     );
+
+    // compare the merkle root with the param to confirm whether it's the voter
+    // or a masker
+    let mut is_voter = false;
+    if (merkle_root_calculated == merkle_root) {
+        is_voter = true;
+    }
 
     // then verify that the vote was encrypted correctly
     let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
