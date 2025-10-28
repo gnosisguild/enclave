@@ -7,16 +7,29 @@
 import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 
-import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, validateVote } from '../src/vote'
+import {
+  calculateValidIndicesForPlaintext,
+  decodeTally,
+  encodeVote,
+  encryptVoteAndGenerateCRISPInputs,
+  generateCRISPInputs,
+  validateVote,
+} from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
 
+import { MESSAGE, SIGNATURE, VOTE } from './constants'
+
 describe('Vote', () => {
   const votingPower = 10n
+
+  let zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  let publicKey = zkInputsGenerator.generatePublicKey()
+  const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
+
   describe('encodeVote', () => {
-    const vote = { yes: 10n, no: 0n }
     it('should work for valid votes', () => {
-      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
+      const encoded = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       expect(encoded.length).toBe(DEFAULT_BFV_PARAMS.degree)
     })
     it('should work with small moduli', () => {
@@ -24,9 +37,9 @@ describe('Vote', () => {
         degree: 10,
         // Irrelevant for this test.
         plaintextModulus: 0n,
-        moduli: [0n],
+        moduli: new BigInt64Array([0n]),
       }
-      const encoded = encodeVote(vote, VotingMode.GOVERNANCE, votingPower, params)
+      const encoded = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower, params)
       expect(encoded.length).toBe(params.degree)
 
       // 01010 = 10
@@ -113,15 +126,8 @@ describe('Vote', () => {
   })
 
   describe('encryptVoteAndGenerateCRISPInputs', () => {
-    const vote = { yes: 10n, no: 0n }
-    const votingPower = 10n
-
-    let zkInputsGenerator = ZKInputsGenerator.withDefaults()
-    let publicKey = zkInputsGenerator.generatePublicKey()
-    const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
-
     it('should encrypt a vote and generate the circuit inputs', async () => {
-      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const crispInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
 
       expect(crispInputs.ct_add).toBeInstanceOf(Object)
@@ -133,6 +139,28 @@ describe('Vote', () => {
       expect(crispInputs.r1is).toBeInstanceOf(Array)
       expect(crispInputs.r2is).toBeInstanceOf(Array)
       expect(crispInputs.p1is).toBeInstanceOf(Array)
+    })
+  })
+
+  describe('generateCRISPInputs', () => {
+    it('should add the remaining inputs to the CRISP inputs object', async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const partialInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)
+      const crispInputs = await generateCRISPInputs(partialInputs, SIGNATURE, MESSAGE)
+
+      expect(crispInputs.ct_add).toBeInstanceOf(Object)
+      expect(crispInputs.params).toBeInstanceOf(Object)
+      expect(crispInputs.ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.pk0is).toBeInstanceOf(Array)
+      expect(crispInputs.pk1is).toBeInstanceOf(Array)
+      expect(crispInputs.r1is).toBeInstanceOf(Array)
+      expect(crispInputs.r2is).toBeInstanceOf(Array)
+      expect(crispInputs.p1is).toBeInstanceOf(Array)
+      expect(crispInputs.hashed_message).toBeInstanceOf(Array)
+      expect(crispInputs.public_key_x).toBeInstanceOf(Array)
+      expect(crispInputs.public_key_y).toBeInstanceOf(Array)
+      expect(crispInputs.signature).toBeInstanceOf(Array)
     })
   })
 })

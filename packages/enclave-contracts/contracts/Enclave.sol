@@ -655,4 +655,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) public view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
     }
+
+    /// @inheritdoc IEnclave
+    function getInputsLength(uint256 e3Id) public view returns (uint256) {
+        require(
+            e3s[e3Id].e3Program != IE3Program(address(0)),
+            E3DoesNotExist(e3Id)
+        );
+        return inputCounts[e3Id];
+    }
 }
