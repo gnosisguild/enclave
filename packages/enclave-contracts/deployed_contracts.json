@@ -116,7 +116,7 @@
   },
   "localhost": {
     "PoseidonT3": {
-      "blockNumber": 55,
+      "blockNumber": 3,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
     },
     "MockUSDC": {
@@ -164,48 +164,6 @@
       },
       "blockNumber": 9,
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-    },
-    "CiphernodeRegistryOwnable": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "enclaveAddress": "0x0000000000000000000000000000000000000001",
-        "submissionWindow": "3"
-      },
-      "blockNumber": 10,
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-    },
-    "Enclave": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "registry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "bondingRegistry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "feeToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "maxDuration": "2592000",
-        "params": [
-          "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
-        ]
-      },
-      "blockNumber": 11,
-      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
-    },
-    "MockComputeProvider": {
-      "blockNumber": 20,
-      "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
-    },
-    "MockDecryptionVerifier": {
-      "blockNumber": 21,
-      "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
-    },
-    "MockInputValidator": {
-      "blockNumber": 22,
-      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
-    },
-    "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
-      },
-      "blockNumber": 23,
-      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
     }
   }
 }

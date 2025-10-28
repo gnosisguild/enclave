@@ -233,7 +233,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Publishes a committee for an E3 computation
-    /// @dev Only callable by owner. Stores committee data and emits event
+    /// @dev Only callable by owner. Verifies committee is finalized and matches provided nodes.
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
@@ -243,13 +243,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey
     ) external onlyOwner {
         Committee storage c = committees[e3Id];
+
+        require(c.initialized, CommitteeNotRequested());
+        require(c.finalized, CommitteeNotFinalized());
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
-
-        // Store the nodes in the committee array
-        for (uint256 i = 0; i < nodes.length; i++) {
-            c.committee.push(nodes[i]);
-        }
-
+        require(nodes.length == c.committee.length, "Node count mismatch");
+        
+        // TODO: Currently we trust the owner to publish the correct committee.
+        // TODO: Need a Proof that the public key is generated from the committee
         bytes32 publicKeyHash = keccak256(publicKey);
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
