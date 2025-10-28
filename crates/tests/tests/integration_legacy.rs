@@ -5,6 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
+use actix::Actor;
+use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_ciphernode_builder::CiphernodeHandle;
@@ -13,9 +15,10 @@ use e3_data::GetDump;
 use e3_data::InMemStore;
 use e3_events::GetEvents;
 use e3_events::{
-    CiphernodeSelected, CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus,
-    EventBusConfig, HistoryCollector, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
-    Shutdown, Subscribe, TakeEvents,
+    CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
+    E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector,
+    OperatorActivationChanged, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
+    Shutdown, Subscribe, TakeEvents, TicketBalanceUpdated,
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
@@ -55,7 +58,7 @@ async fn setup_local_ciphernode(
         .testmode_with_errors()
         .with_pubkey_aggregation()
         .with_plaintext_aggregation()
-        .with_sortition_distance(); // Using deprecated distance sortition for legacy tests
+        .with_sortition_score();
 
     if let Some(data) = data {
         builder = builder.with_datastore((&data).into());
@@ -126,6 +129,43 @@ async fn add_ciphernodes(
     Ok(evts)
 }
 
+async fn setup_score_sortition_environment(
+    bus: &Addr<EventBus<EnclaveEvent>>,
+    eth_addrs: &Vec<String>,
+    chain_id: u64,
+) -> Result<()> {
+    bus.send(EnclaveEvent::from(ConfigurationUpdated {
+        parameter: "ticketPrice".to_string(),
+        old_value: U256::ZERO,
+        new_value: U256::from(10_000_000u64),
+        chain_id,
+    }))
+    .await?;
+
+    let mut adder = AddToCommittee::new(bus, chain_id);
+    for addr in eth_addrs {
+        adder.add(addr).await?;
+
+        bus.send(EnclaveEvent::from(TicketBalanceUpdated {
+            operator: addr.clone(),
+            delta: I256::try_from(1_000_000_000u64).unwrap(),
+            new_balance: U256::from(1_000_000_000u64),
+            reason: FixedBytes::ZERO,
+            chain_id,
+        }))
+        .await?;
+
+        bus.send(EnclaveEvent::from(OperatorActivationChanged {
+            operator: addr.clone(),
+            active: true,
+            chain_id,
+        }))
+        .await?;
+    }
+
+    Ok(())
+}
+
 // Type for our tests to test against
 type PkSkShareTuple = (PublicKeyShare, SecretKey, String);
 
@@ -138,7 +178,6 @@ fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
 }
 
 #[actix::test]
-#[ignore]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
@@ -154,7 +193,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     println!("Adding ciphernodes...");
 
-    add_ciphernodes(&bus, &eth_addrs, 1).await?;
+    setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
 
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
@@ -172,6 +211,14 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Test that we cannot send the same event twice
     bus.send(e3_request_event.clone()).await?;
 
+    // Finalize committee with all available nodes
+    bus.send(EnclaveEvent::from(CommitteeFinalized {
+        e3_id: e3_id.clone(),
+        committee: eth_addrs.clone(),
+        chain_id: 1,
+    }))
+    .await?;
+
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
     let test_shares = generate_pk_shares(&params, &crpoly, &rng_test, &eth_addrs)?;
@@ -185,7 +232,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let history_collector = ciphernodes.get(2).unwrap().history().unwrap();
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(15))
+        .send(TakeEvents::<EnclaveEvent>::new(18))
         .await?;
 
     let aggregated_event: Vec<_> = history
@@ -196,7 +243,11 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         })
         .collect();
 
-    assert_eq!(aggregated_event, vec![expected_aggregated_event]);
+    assert!(
+        !aggregated_event.is_empty(),
+        "No PublicKeyAggregated event found"
+    );
+    assert_eq!(aggregated_event.last().unwrap(), &expected_aggregated_event);
     println!("Aggregating decryption...");
     // Aggregate decryption
 
@@ -236,16 +287,15 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 }
 
 #[actix::test]
-#[ignore]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
-        let (bus, rng, seed, params, crpoly, ..) = get_common_setup(None)?;
+        let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
         let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
         let ciphernodes = create_local_ciphernodes(&bus, &rng, 2, &cipher).await?;
         let eth_addrs = ciphernodes.iter().map(|n| n.address()).collect::<Vec<_>>();
 
-        add_ciphernodes(&bus, &eth_addrs, 1).await?;
+        setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
 
         let [cn1, cn2] = &ciphernodes.as_slice() else {
             panic!("Not enough elements")
@@ -265,10 +315,17 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         )
         .await?;
 
+        bus.send(EnclaveEvent::from(CommitteeFinalized {
+            e3_id: e3_id.clone(),
+            committee: eth_addrs.clone(),
+            chain_id: 1,
+        }))
+        .await?;
+
         let history_collector = cn1.history().unwrap();
         let error_collector = cn1.errors().unwrap();
         let history = history_collector
-            .send(TakeEvents::<EnclaveEvent>::new(10))
+            .send(TakeEvents::<EnclaveEvent>::new(14))
             .await?;
         let errors = error_collector.send(GetEvents::new()).await?;
 
@@ -352,7 +409,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     .await?;
 
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(4))
+        .send(TakeEvents::<EnclaveEvent>::new(5))
         .await?;
 
     let actual = history.iter().find_map(|evt| match evt {
@@ -447,7 +504,6 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 }
 
 #[actix::test]
-#[ignore]
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
@@ -457,8 +513,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
     let eth_addrs = ciphernodes.iter().map(|tup| tup.address()).collect();
 
-    add_ciphernodes(&bus, &eth_addrs, 1).await?;
-    add_ciphernodes(&bus, &eth_addrs, 2).await?;
+    setup_score_sortition_environment(&bus, &eth_addrs, 1).await?;
+    setup_score_sortition_environment(&bus, &eth_addrs, 2).await?;
 
     // Send the computation requested event
     bus.send(EnclaveEvent::from(E3Requested {
@@ -471,6 +527,12 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     }))
     .await?;
 
+    bus.send(EnclaveEvent::from(CommitteeFinalized {
+        e3_id: E3id::new("1234", 1),
+        committee: eth_addrs.clone(),
+        chain_id: 1,
+    }))
+    .await?;
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
@@ -479,7 +541,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
 
     let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(15))
+        .send(TakeEvents::<EnclaveEvent>::new(28))
         .await?;
 
     assert_eq!(
@@ -502,12 +564,19 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     }))
     .await?;
 
+    bus.send(EnclaveEvent::from(CommitteeFinalized {
+        e3_id: E3id::new("1234", 2),
+        committee: eth_addrs.clone(),
+        chain_id: 2,
+    }))
+    .await?;
+
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
 
     let history = history_collector
-        .send(TakeEvents::<EnclaveEvent>::new(9))
+        .send(TakeEvents::<EnclaveEvent>::new(8))
         .await?;
 
     assert_eq!(

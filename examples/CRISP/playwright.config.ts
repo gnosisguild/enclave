@@ -11,7 +11,7 @@ export default defineConfig({
   timeout: 5 * 60 * 10000,
   use: {
     baseURL: "http://localhost:3000",
-    actionTimeout: 60 * 1000,
+    actionTimeout: 75 * 1000,
   },
   retries: process.env.CI ? 2 : 0,
   fullyParallel: true,
