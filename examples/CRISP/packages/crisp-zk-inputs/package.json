@@ -1,0 +1,23 @@
+{
+  "name": "@enclave/crisp-zk-inputs",
+  "type": "module",
+  "description": "Core logic to pre-compute CRISP ZK inputs (WASM/JavaScript bindings).",
+  "version": "0.1.0",
+  "license": "LGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave"
+  },
+  "files": [
+    "pkg/index_bg.wasm",
+    "pkg/index.js",
+    "pkg/index_bg.js",
+    "pkg/index.d.ts"
+  ],
+  "main": "pkg/index.js",
+  "types": "pkg/index.d.ts",
+  "sideEffects": [
+    "./pkg/index.js",
+    "./pkg/snippets/*"
+  ]
+}
