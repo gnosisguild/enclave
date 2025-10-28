@@ -61,6 +61,21 @@ describe("Enclave", function () {
   // Hash function used to compute the tree nodes.
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
+  const setupAndPublishCommittee = async (
+    registry: any,
+    e3Id: number,
+    nodes: string[],
+    publicKey: string,
+    operator1: any,
+    operator2: any,
+  ): Promise<void> => {
+    await registry.connect(operator1).submitTicket(e3Id, 1);
+    await registry.connect(operator2).submitTicket(e3Id, 1);
+    await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+    await registry.finalizeCommittee(e3Id);
+    await registry.publishCommittee(e3Id, nodes, publicKey);
+  };
+
   // Helper function to approve USDC and make request
   const makeRequest = async (
     enclave: Enclave,
@@ -76,8 +91,43 @@ describe("Enclave", function () {
     return enclaveContract.request(requestParams);
   };
 
+  async function setupOperatorForSortition(
+    operator: any,
+    bondingRegistry: any,
+    licenseToken: any,
+    usdcToken: any,
+    ticketToken: any,
+    registry: any,
+  ): Promise<void> {
+    const operatorAddress = await operator.getAddress();
+
+    await licenseToken.mintAllocation(
+      operatorAddress,
+      ethers.parseEther("10000"),
+      "Test allocation",
+    );
+    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
+
+    await licenseToken
+      .connect(operator)
+      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
+    await bondingRegistry
+      .connect(operator)
+      .bondLicense(ethers.parseEther("1000"));
+    await bondingRegistry.connect(operator).registerOperator();
+
+    const ticketAmount = ethers.parseUnits("100", 6);
+    await usdcToken
+      .connect(operator)
+      .approve(await ticketToken.getAddress(), ticketAmount);
+    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
+
+    await registry.addCiphernode(operatorAddress);
+  }
+
   const setup = async () => {
-    const [owner, notTheOwner] = await ethers.getSigners();
+    const [owner, notTheOwner, operator1, operator2] =
+      await ethers.getSigners();
 
     const ownerAddress = await owner.getAddress();
 
@@ -138,7 +188,7 @@ describe("Enclave", function () {
             licenseToken: await enclTokenContract.enclaveToken.getAddress(),
             registry: addressOne,
             slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseEther("10"),
+            ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
             minTicketBalance: 5,
             exitDelay: 7 * 24 * 60 * 60,
@@ -210,11 +260,32 @@ describe("Enclave", function () {
 
     const tree = new LeanIMT(hash);
 
-    const testCiphernodes = [addressOne, AddressTwo];
-    for (const ciphernodeAddress of testCiphernodes) {
-      await ciphernodeRegistryContract.addCiphernode(ciphernodeAddress);
-      tree.insert(BigInt(ciphernodeAddress));
-    }
+    const licenseToken = enclTokenContract.enclaveToken;
+    const ticketToken = ticketTokenContract.enclaveTicketToken;
+
+    await licenseToken.setTransferRestriction(false);
+
+    await setupOperatorForSortition(
+      operator1,
+      bondingRegistryContract.bondingRegistry,
+      licenseToken,
+      usdcToken,
+      ticketToken,
+      ciphernodeRegistryContract,
+    );
+    tree.insert(BigInt(await operator1.getAddress()));
+
+    await setupOperatorForSortition(
+      operator2,
+      bondingRegistryContract.bondingRegistry,
+      licenseToken,
+      usdcToken,
+      ticketToken,
+      ciphernodeRegistryContract,
+    );
+    tree.insert(BigInt(await operator2.getAddress()));
+
+    await mine(1);
 
     const mockComputeProvider = await ignition.deploy(
       mockComputeProviderModule,
@@ -266,23 +337,13 @@ describe("Enclave", function () {
       await notTheOwner.getAddress(),
       ethers.parseUnits("1000000", 6),
     );
-    await enclTokenContract.enclaveToken.mintAllocation(
-      ownerAddress,
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
-    await enclTokenContract.enclaveToken.mintAllocation(
-      await notTheOwner.getAddress(),
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
 
     return {
       enclave,
       ciphernodeRegistryContract,
       bondingRegistry: bondingRegistryContract.bondingRegistry,
       ticketToken: ticketTokenContract.enclaveTicketToken,
-      licenseToken: enclTokenContract.enclaveToken,
+      licenseToken: licenseToken,
       usdcToken,
       slashingManager: slashingManagerContract.slashingManager,
       tree,
@@ -295,6 +356,8 @@ describe("Enclave", function () {
       request,
       owner,
       notTheOwner,
+      operator1,
+      operator2,
     };
   };
 
@@ -894,8 +957,14 @@ describe("Enclave", function () {
         .withArgs(0);
     });
     it("reverts if E3 has already been activated", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -907,10 +976,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       await expect(enclave.getE3(0)).to.not.be.revert(ethers);
@@ -941,8 +1013,14 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
       const currentTime = await time.latest();
       const startTime = [currentTime + 10, currentTime + 100] as [
@@ -955,10 +1033,13 @@ describe("Enclave", function () {
         startWindow: startTime,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       await mine(2, { interval: 2000 });
@@ -990,8 +1071,14 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
       const currentTime = await time.latest();
       const startTime = [currentTime + 5, currentTime + 50] as [number, number];
@@ -1001,10 +1088,13 @@ describe("Enclave", function () {
         startWindow: startTime,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       await time.increaseTo(currentTime + request.duration + 100);
@@ -1015,8 +1105,14 @@ describe("Enclave", function () {
       );
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        ciphernodeRegistryContract,
+        usdcToken,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, request);
 
@@ -1034,18 +1130,27 @@ describe("Enclave", function () {
 
       await enclave.setCiphernodeRegistry(prevRegistry);
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       await expect(enclave.activate(0, data)).not.to.be.revert(ethers);
     });
 
     it("sets committeePublicKey correctly", async () => {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        ciphernodeRegistryContract,
+        usdcToken,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1059,10 +1164,13 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       const publicKey =
@@ -1077,8 +1185,14 @@ describe("Enclave", function () {
       expect(e3.committeePublicKey).to.equal(publicKey);
     });
     it("returns true if E3 is activated successfully", async () => {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1092,17 +1206,26 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       expect(await enclave.activate.staticCall(e3Id, data)).to.be.equal(true);
     });
     it("emits E3Activated event", async () => {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1116,10 +1239,13 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
 
       await expect(enclave.activate(e3Id, data)).to.emit(
@@ -1160,8 +1286,14 @@ describe("Enclave", function () {
     });
 
     it("reverts if input is not valid", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1173,10 +1305,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(0, data);
       await expect(
@@ -1185,8 +1320,14 @@ describe("Enclave", function () {
     });
 
     it("reverts if outside of input window", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1198,10 +1339,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(0, data);
 
@@ -1215,8 +1359,14 @@ describe("Enclave", function () {
     it("it allows publishing input to different requests", async function () {
       const fixtureSetup = () => setup();
 
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(fixtureSetup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(fixtureSetup);
       const inputData = "0x12345678";
 
       await makeRequest(enclave, usdcToken, {
@@ -1229,10 +1379,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(0, data);
       await enclave.publishInput(0, inputData);
@@ -1247,17 +1400,26 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         1,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(1, data);
       await enclave.publishInput(1, inputData);
     });
     it("returns true if input is published successfully", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const inputData = "0x12345678";
 
       await makeRequest(enclave, usdcToken, {
@@ -1270,10 +1432,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         0,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(0, data);
 
@@ -1283,8 +1448,14 @@ describe("Enclave", function () {
     });
 
     it("adds inputHash to merkle tree", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
       const tree = new LeanIMT(hash);
@@ -1301,10 +1472,13 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
 
@@ -1319,8 +1493,14 @@ describe("Enclave", function () {
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
     });
     it("emits InputPublished event", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -1335,10 +1515,13 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       const expectedHash = hash(BigInt(ethers.keccak256(inputData)), BigInt(0));
@@ -1375,8 +1558,14 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if input deadline has not passed", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const currentTime = await time.latest();
       await makeRequest(enclave, usdcToken, {
         ...request,
@@ -1384,10 +1573,13 @@ describe("Enclave", function () {
       });
       const e3Id = 0;
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
 
@@ -1396,8 +1588,14 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InputDeadlineNotPassed");
     });
     it("reverts if output has already been published", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1410,10 +1608,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1426,8 +1627,14 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if output is not valid", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1440,10 +1647,13 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1452,8 +1662,14 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InvalidOutput");
     });
     it("sets ciphertextOutput correctly", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1461,10 +1677,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1473,8 +1692,14 @@ describe("Enclave", function () {
       expect(e3.ciphertextOutput).to.equal(dataHash);
     });
     it("returns true if output is published successfully", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1482,10 +1707,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1494,8 +1722,14 @@ describe("Enclave", function () {
       ).to.equal(true);
     });
     it("emits CiphertextOutputPublished event", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1503,10 +1737,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1538,8 +1775,14 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if ciphertextOutput has not been published", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1547,10 +1790,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
@@ -1558,8 +1804,14 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if plaintextOutput has already been published", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1567,10 +1819,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1584,8 +1839,14 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if output is not valid", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1593,10 +1854,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1606,8 +1870,14 @@ describe("Enclave", function () {
         .withArgs(data);
     });
     it("sets plaintextOutput correctly", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1615,10 +1885,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1629,8 +1902,14 @@ describe("Enclave", function () {
       expect(e3.plaintextOutput).to.equal(data);
     });
     it("returns true if output is published successfully", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1638,10 +1917,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });
@@ -1651,8 +1933,14 @@ describe("Enclave", function () {
       ).to.equal(true);
     });
     it("emits PlaintextOutputPublished event", async function () {
-      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
@@ -1660,10 +1948,13 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await ciphernodeRegistryContract.publishCommittee(
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
         e3Id,
-        [addressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        operator1,
+        operator2,
       );
       await enclave.activate(e3Id, data);
       await mine(2, { interval: request.duration });

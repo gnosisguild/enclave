@@ -136,6 +136,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Submission window not closed yet
     error SubmissionWindowNotClosed();
 
+    /// @notice Threshold not met for this E3
+    error ThresholdNotMet();
+
     /// @notice Caller is not authorized
     error Unauthorized();
 
@@ -248,7 +251,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(c.finalized, CommitteeNotFinalized());
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
         require(nodes.length == c.committee.length, "Node count mismatch");
-        
+
         // TODO: Currently we trust the owner to publish the correct committee.
         // TODO: Need a Proof that the public key is generated from the committee
         bytes32 publicKeyHash = keccak256(publicKey);
@@ -340,7 +343,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             block.timestamp >= c.submissionDeadline,
             SubmissionWindowNotClosed()
         );
-        require(c.topNodes.length >= c.threshold[0], NodeNotEligible());
+        require(c.topNodes.length >= c.threshold[0], ThresholdNotMet());
 
         c.finalized = true;
         c.committee = c.topNodes;

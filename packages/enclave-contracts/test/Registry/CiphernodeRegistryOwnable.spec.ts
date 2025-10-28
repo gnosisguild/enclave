@@ -25,14 +25,57 @@ const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.keccak256(data);
-const SORTITION_SUBMISSION_WINDOW = 10;
+const SORTITION_SUBMISSION_WINDOW = 3;
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("CiphernodeRegistryOwnable", function () {
+  async function finalizeCommitteeAfterWindow(
+    registry: any,
+    e3Id: number,
+  ): Promise<void> {
+    await networkHelpers.time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+    await registry.finalizeCommittee(e3Id);
+  }
+
+  async function setupOperatorForSortition(
+    operator: any,
+    bondingRegistry: any,
+    licenseToken: any,
+    usdcToken: any,
+    ticketToken: any,
+    registry: any,
+  ): Promise<void> {
+    const operatorAddress = await operator.getAddress();
+
+    await licenseToken.mintAllocation(
+      operatorAddress,
+      ethers.parseEther("10000"),
+      "Test allocation",
+    );
+    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
+
+    await licenseToken
+      .connect(operator)
+      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
+    await bondingRegistry
+      .connect(operator)
+      .bondLicense(ethers.parseEther("1000"));
+    await bondingRegistry.connect(operator).registerOperator();
+
+    const ticketAmount = ethers.parseUnits("100", 6);
+    await usdcToken
+      .connect(operator)
+      .approve(await ticketToken.getAddress(), ticketAmount);
+    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
+
+    await registry.addCiphernode(operatorAddress);
+  }
+
   async function setup() {
-    const [owner, notTheOwner] = await ethers.getSigners();
+    const [owner, notTheOwner, operator1, operator2] =
+      await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
 
     // Deploy token contracts
@@ -88,7 +131,7 @@ describe("CiphernodeRegistryOwnable", function () {
             licenseToken: await enclTokenContract.enclaveToken.getAddress(),
             registry: AddressOne,
             slashedFundsTreasury: ownerAddress,
-            ticketPrice: ethers.parseEther("10"),
+            ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
             minTicketBalance: 5,
             exitDelay: 7 * 24 * 60 * 60,
@@ -111,33 +154,58 @@ describe("CiphernodeRegistryOwnable", function () {
       await registryContract.cipherNodeRegistry.getAddress();
 
     const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
+    const bondingRegistry = bondingRegistryContract.bondingRegistry;
 
-    // Set up cross-contract dependencies
     await ticketTokenContract.enclaveTicketToken.setRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistry.getAddress(),
     );
-    await bondingRegistryContract.bondingRegistry.setRegistry(registryAddress);
-    await bondingRegistryContract.bondingRegistry.setSlashingManager(
+    await bondingRegistry.setRegistry(registryAddress);
+    await bondingRegistry.setSlashingManager(
       await slashingManagerContract.slashingManager.getAddress(),
     );
     await slashingManagerContract.slashingManager.setBondingRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistry.getAddress(),
     );
 
-    await registry.setBondingRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
-    );
+    await registry.setBondingRegistry(await bondingRegistry.getAddress());
 
     const tree = new LeanIMT(hash);
-    await registry.addCiphernode(AddressOne);
-    tree.insert(BigInt(AddressOne));
-    await registry.addCiphernode(AddressTwo);
-    tree.insert(BigInt(AddressTwo));
+    const licenseToken = enclTokenContract.enclaveToken;
+    const ticketToken = ticketTokenContract.enclaveTicketToken;
+    const usdcToken = usdcContract.mockUSDC;
+
+    await licenseToken.setTransferRestriction(false);
+    await setupOperatorForSortition(
+      operator1,
+      bondingRegistry,
+      licenseToken,
+      usdcToken,
+      ticketToken,
+      registry,
+    );
+    tree.insert(BigInt(await operator1.getAddress()));
+
+    await setupOperatorForSortition(
+      operator2,
+      bondingRegistry,
+      licenseToken,
+      usdcToken,
+      ticketToken,
+      registry,
+    );
+    tree.insert(BigInt(await operator2.getAddress()));
+    await networkHelpers.mine(1);
 
     return {
       owner,
       notTheOwner,
+      operator1,
+      operator2,
       registry,
+      bondingRegistry,
+      licenseToken,
+      ticketToken,
+      usdcToken,
       tree,
       request: {
         e3Id: 1,
@@ -230,21 +298,38 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("publishCommittee()", function () {
     it("reverts if the caller is not the owner", async function () {
-      const { registry, request, notTheOwner } = await loadFixture(setup);
+      const { registry, request, notTheOwner, operator1, operator2 } =
+        await loadFixture(setup);
       await registry.requestCommittee(request.e3Id, 0, request.threshold);
+
+      await registry.connect(operator1).submitTicket(request.e3Id, 1);
+      await registry.connect(operator2).submitTicket(request.e3Id, 1);
+      await finalizeCommitteeAfterWindow(registry, request.e3Id);
 
       await expect(
         registry
           .connect(notTheOwner)
-          .publishCommittee(request.e3Id, [AddressOne, AddressTwo], data),
+          .publishCommittee(
+            request.e3Id,
+            [await operator1.getAddress(), await operator2.getAddress()],
+            data,
+          ),
       ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
     });
     it("stores the public key of the committee", async function () {
-      const { registry, request } = await loadFixture(setup);
+      const { registry, request, operator1, operator2 } =
+        await loadFixture(setup);
       await registry.requestCommittee(request.e3Id, 0, request.threshold);
+
+      await networkHelpers.mine(1);
+
+      await registry.connect(operator1).submitTicket(request.e3Id, 1);
+      await registry.connect(operator2).submitTicket(request.e3Id, 1);
+      await finalizeCommitteeAfterWindow(registry, request.e3Id);
+
       await registry.publishCommittee(
         request.e3Id,
-        [AddressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
@@ -252,17 +337,28 @@ describe("CiphernodeRegistryOwnable", function () {
       );
     });
     it("emits a CommitteePublished event", async function () {
-      const { registry, request } = await loadFixture(setup);
+      const { registry, request, operator1, operator2 } =
+        await loadFixture(setup);
       await registry.requestCommittee(request.e3Id, 0, request.threshold);
+
+      // Submit tickets from both operators and finalize
+      await registry.connect(operator1).submitTicket(request.e3Id, 1);
+      await registry.connect(operator2).submitTicket(request.e3Id, 1);
+      await finalizeCommitteeAfterWindow(registry, request.e3Id);
+
       await expect(
         await registry.publishCommittee(
           request.e3Id,
-          [AddressOne, AddressTwo],
+          [await operator1.getAddress(), await operator2.getAddress()],
           data,
         ),
       )
         .to.emit(registry, "CommitteePublished")
-        .withArgs(request.e3Id, [AddressOne, AddressTwo], data);
+        .withArgs(
+          request.e3Id,
+          [await operator1.getAddress(), await operator2.getAddress()],
+          data,
+        );
     });
   });
 
@@ -309,37 +405,41 @@ describe("CiphernodeRegistryOwnable", function () {
       ).to.be.revertedWithCustomError(registry, "NotOwnerOrBondingRegistry");
     });
     it("removes the ciphernode from the registry", async function () {
-      const { registry } = await loadFixture(setup);
-      const tree = new LeanIMT(hash);
-      tree.insert(BigInt(AddressOne));
-      tree.insert(BigInt(AddressTwo));
-      const index = tree.indexOf(BigInt(AddressOne));
-      const proof = tree.generateProof(index);
-      tree.update(index, BigInt(0));
-      expect(await registry.isEnabled(AddressOne)).to.be.true;
-      expect(await registry.removeCiphernode(AddressOne, proof.siblings));
-      expect(await registry.isEnabled(AddressOne)).to.be.false;
-      expect(await registry.root()).to.equal(tree.root);
+      const { registry, operator1, tree } = await loadFixture(setup);
+      const operator1Address = await operator1.getAddress();
+      const localTree = new LeanIMT(hash);
+      for (let i = 0; i < tree.size; i++) {
+        localTree.insert(tree.leaves[i]);
+      }
+      const index = localTree.indexOf(BigInt(operator1Address));
+      const proof = localTree.generateProof(index);
+      localTree.update(index, BigInt(0));
+      expect(await registry.isEnabled(operator1Address)).to.be.true;
+      expect(await registry.removeCiphernode(operator1Address, proof.siblings));
+      expect(await registry.isEnabled(operator1Address)).to.be.false;
+      expect(await registry.root()).to.equal(localTree.root);
     });
     it("decrements numCiphernodes", async function () {
-      const { registry, tree } = await loadFixture(setup);
+      const { registry, operator1, tree } = await loadFixture(setup);
+      const operator1Address = await operator1.getAddress();
       const numCiphernodes = await registry.numCiphernodes();
-      const index = tree.indexOf(BigInt(AddressOne));
+      const index = tree.indexOf(BigInt(operator1Address));
       const proof = tree.generateProof(index);
-      expect(await registry.removeCiphernode(AddressOne, proof.siblings));
+      expect(await registry.removeCiphernode(operator1Address, proof.siblings));
       expect(await registry.numCiphernodes()).to.equal(
         numCiphernodes - BigInt(1),
       );
     });
     it("emits a CiphernodeRemoved event", async function () {
-      const { registry, tree } = await loadFixture(setup);
+      const { registry, operator1, tree } = await loadFixture(setup);
+      const operator1Address = await operator1.getAddress();
       const numCiphernodes = await registry.numCiphernodes();
       const size = await registry.treeSize();
-      const index = tree.indexOf(BigInt(AddressOne));
+      const index = tree.indexOf(BigInt(operator1Address));
       const proof = tree.generateProof(index);
-      await expect(registry.removeCiphernode(AddressOne, proof.siblings))
+      await expect(registry.removeCiphernode(operator1Address, proof.siblings))
         .to.emit(registry, "CiphernodeRemoved")
-        .withArgs(AddressOne, index, numCiphernodes - BigInt(1), size);
+        .withArgs(operator1Address, index, numCiphernodes - BigInt(1), size);
     });
   });
 
@@ -365,11 +465,17 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("committeePublicKey()", function () {
     it("returns the public key of the committee for the given e3Id", async function () {
-      const { registry, request } = await loadFixture(setup);
+      const { registry, request, operator1, operator2 } =
+        await loadFixture(setup);
       await registry.requestCommittee(request.e3Id, 0, request.threshold);
+
+      await registry.connect(operator1).submitTicket(request.e3Id, 1);
+      await registry.connect(operator2).submitTicket(request.e3Id, 1);
+      await finalizeCommitteeAfterWindow(registry, request.e3Id);
+
       await registry.publishCommittee(
         request.e3Id,
-        [AddressOne, AddressTwo],
+        [await operator1.getAddress(), await operator2.getAddress()],
         data,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
@@ -387,8 +493,8 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("isCiphernodeEligible()", function () {
     it("returns true if the ciphernode is in the registry", async function () {
-      const { registry } = await loadFixture(setup);
-      expect(await registry.isEnabled(AddressOne)).to.be.true;
+      const { registry, operator1 } = await loadFixture(setup);
+      expect(await registry.isEnabled(await operator1.getAddress())).to.be.true;
     });
     it("returns false if the ciphernode is not in the registry", async function () {
       const { registry } = await loadFixture(setup);
@@ -398,8 +504,8 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("isEnabled()", function () {
     it("returns true if the ciphernode is currently enabled", async function () {
-      const { registry } = await loadFixture(setup);
-      expect(await registry.isEnabled(AddressOne)).to.be.true;
+      const { registry, operator1 } = await loadFixture(setup);
+      expect(await registry.isEnabled(await operator1.getAddress())).to.be.true;
     });
     it("returns false if the ciphernode is not currently enabled", async function () {
       const { registry } = await loadFixture(setup);
