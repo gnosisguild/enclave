@@ -15,10 +15,7 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
-import {
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
-  CiphernodeRegistryOwnable,
-} from "../../types";
+import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -36,7 +33,8 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("CiphernodeRegistryOwnable", function () {
   async function finalizeCommitteeAfterWindow(
-    registry: CiphernodeRegistryOwnable,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registry: any,
     e3Id: number,
   ): Promise<void> {
     await networkHelpers.time.increase(SORTITION_SUBMISSION_WINDOW + 1);

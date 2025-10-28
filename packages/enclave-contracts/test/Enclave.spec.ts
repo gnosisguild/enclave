@@ -22,7 +22,6 @@ import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
-  CiphernodeRegistryOwnable,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
@@ -63,7 +62,8 @@ describe("Enclave", function () {
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
   const setupAndPublishCommittee = async (
-    registry: CiphernodeRegistryOwnable,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registry: any,
     e3Id: number,
     nodes: string[],
     publicKey: string,
@@ -1537,24 +1537,35 @@ describe("Enclave", function () {
         .withArgs(e3Id, inputData, expectedHash, 0);
     });
     it("increases the input count", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const inputData = "0x12345678";
 
-      await enclave.request(
-        {
-          filter: request.filter,
-          threshold: request.threshold,
-          startWindow: request.startTime,
-          duration: request.duration,
-          e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
-          computeProviderParams: request.computeProviderParams,
-          customParams: request.customParams,
-        },
-        { value: 10 },
-      );
+      await makeRequest(enclave, usdcToken, {
+        threshold: request.threshold,
+        startWindow: request.startWindow,
+        duration: request.duration,
+        e3Program: request.e3Program,
+        e3ProgramParams: request.e3ProgramParams,
+        computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
+      });
 
-      await enclave.activate(0, ethers.ZeroHash);
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        0,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
+      await enclave.activate(0, data);
       await enclave.publishInput(0, inputData);
 
       expect(await enclave.getInputsLength(0)).to.equal(1n);
