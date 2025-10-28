@@ -19,7 +19,6 @@ import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, generateMerkleProof, MAXIMUM_VOTE_VALUE } from '../src'
 
 import { LEAVES, MAX_DEPTH, MESSAGE, SIGNATURE, VOTE } from './constants'
-import exp from 'constants'
 
 describe('Vote', () => {
   const votingPower = 10n
