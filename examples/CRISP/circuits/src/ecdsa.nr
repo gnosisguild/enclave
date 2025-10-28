@@ -12,10 +12,8 @@ pub fn verify_signature(
     pub_key_x: [u8; 32],
     pub_key_y: [u8; 32],
     signature: [u8; 64],
-) {
-    let valid_signature =
-        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
-    assert(valid_signature);
+) -> bool {
+    std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message)
 }
 
 /// Given a public key, derive the Ethereum address
@@ -89,7 +87,7 @@ fn test_verify_signature() {
         124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
         171, 163, 213, 62, 223, 152,
     ];
-    verify_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == true);
 }
 
 #[test]
@@ -114,7 +112,7 @@ fn test_verify_signature_sdk_input() {
         236, 18,
     ];
 
-    verify_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == true);
 }
 
 #[test]
@@ -137,9 +135,8 @@ fn test_fail_verify_signature() {
         124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
         171, 163, 213, 62, 223, 151,
     ];
-    let valid_signature =
-        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
-    assert(!valid_signature);
+
+    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == false);
 }
 
 #[test]
