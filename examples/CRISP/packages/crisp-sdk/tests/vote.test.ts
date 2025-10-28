@@ -144,7 +144,7 @@ describe('Vote', () => {
 
   describe('generateCRISPInputs', () => {
     const votingPowerLeaf = 1000n
-    const merkleProof = generateMerkleProof(0, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH)
+    const merkleProof = generateMerkleProof(0n, votingPowerLeaf, '0x1234567890123456789012345678901234567890', LEAVES, MAX_DEPTH)
     it('should add the remaining inputs to the CRISP inputs object', async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const partialInputs = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey, previousCiphertext)

@@ -26,16 +26,25 @@ describe('Utils', () => {
   describe('generateMerkleProof', () => {
     const address = '0x1234567890123456789012345678901234567890'
     const balance = 1000n
-    it('should generate a merkle proof for a leaf', () => {
-      const proof = generateMerkleProof(0, balance, address, LEAVES, MAX_DEPTH)
+    it('should generate a valid merkle proof for a leaf', () => {
+      const tree = generateMerkleTree(LEAVES);
+
+      const proof = generateMerkleProof(0n, balance, address, LEAVES, MAX_DEPTH)
       expect(proof.leaf).toBe(hashLeaf(address, balance.toString()))
 
       expect(proof.length).toBe(4)
       expect(proof.indices.length).toBe(MAX_DEPTH)
+      // Unpad the proof for verification
+      const unpaddedProof = {
+        ...proof.proof,
+        siblings: proof.proof.siblings.slice(0, proof.length)
+      };
+
+      expect(tree.verifyProof(unpaddedProof)).toBe(true);
     })
     it('should throw if the leaf does not exist in the tree', () => {
-      expect(() => generateMerkleProof(0, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')
-      expect(() => generateMerkleProof(0, 999n, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0n, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0n, 999n, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
     })
   })
 })
