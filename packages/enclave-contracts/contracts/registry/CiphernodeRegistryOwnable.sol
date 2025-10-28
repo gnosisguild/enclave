@@ -310,6 +310,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             SubmissionDeadlineReached()
         );
         require(!c.submitted[msg.sender], NodeAlreadySubmitted());
+        require(isCiphernodeEligible(msg.sender), NodeNotEligible());
 
         // Validate node eligibility and ticket number
         _validateNodeEligibility(msg.sender, ticketNumber, e3Id);
@@ -408,7 +409,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function isCiphernodeEligible(address node) external view returns (bool) {
+    function isCiphernodeEligible(address node) public view returns (bool) {
         if (!isEnabled(node)) return false;
 
         require(bondingRegistry != address(0), BondingRegistryNotSet());

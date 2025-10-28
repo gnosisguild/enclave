@@ -158,7 +158,7 @@ pub async fn initialize_crisp_round(
     info!("Debug - start_window: {:?}", start_window);
     info!("Debug - duration: {}", duration);
     info!("Debug - e3_program: {}", e3_program);
-    info!("Debug - current timestamp: {}", Utc::now().timestamp());
+    info!("Debug - current timestamp: {:?}", current_timestamp);
 
     info!(
         "Debug - Checking ciphernode registry at: {}",
