@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::approve;
 use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
+use alloy::providers::{Provider, ProviderBuilder};
 use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
@@ -55,6 +56,17 @@ struct PKRequest {
 struct CTRequest {
     round_id: u64,
     ct_bytes: Vec<u8>,
+}
+
+pub async fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    let provider = ProviderBuilder::new().connect(&CONFIG.http_rpc_url).await?;
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await
+        .unwrap()
+        .ok_or_else(|| anyhow::anyhow!("Latest block not found"))?;
+
+    Ok(block.header.timestamp)
 }
 
 pub async fn initialize_crisp_round(
@@ -103,9 +115,10 @@ pub async fn initialize_crisp_round(
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
+    let current_timestamp = get_current_timestamp().await?;
     let start_window: [U256; 2] = [
-        U256::from(Utc::now().timestamp()),
-        U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
+        U256::from(current_timestamp),
+        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
     ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));

@@ -343,6 +343,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             block.timestamp >= c.submissionDeadline,
             SubmissionWindowNotClosed()
         );
+        // TODO: Handle what happens if the threshold is not met.
         require(c.topNodes.length >= c.threshold[0], ThresholdNotMet());
 
         c.finalized = true;
@@ -492,20 +493,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         Committee storage c = committees[e3Id];
 
-        // Get ticket balance at the time E3 was requested (snapshot)
         uint256 ticketBalance = IBondingRegistry(bondingRegistry)
             .getTicketBalanceAtBlock(node, c.requestBlock);
         uint256 ticketPrice = IBondingRegistry(bondingRegistry).ticketPrice();
 
         require(ticketPrice > 0, InvalidTicketNumber());
-
-        // Calculate available tickets at snapshot
         uint256 availableTickets = ticketBalance / ticketPrice;
 
-        // Check node is eligible (has tickets at snapshot)
         require(availableTickets > 0, NodeNotEligible());
-
-        // Check ticket number is valid
         require(ticketNumber <= availableTickets, InvalidTicketNumber());
     }
 
@@ -530,7 +525,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         // If list is full, only add if score is better than worst
         uint256 worstScore = c.scoreOf[topNodes[topNodes.length - 1]];
         if (score < worstScore) {
-            topNodes.pop(); // Remove worst
+            topNodes.pop();
             _insertSorted(c, node, score);
         }
     }
@@ -557,7 +552,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         }
 
         // Insert at position
-        topNodes.push(address(0)); // Extend array
+        topNodes.push(address(0));
         for (uint256 i = topNodes.length - 1; i > insertPos; i--) {
             topNodes[i] = topNodes[i - 1];
         }
