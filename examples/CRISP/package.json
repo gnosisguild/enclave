@@ -21,7 +21,7 @@
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report",
-    "build:wasm": "wasm-pack build ./crates/zk-inputs-wasm --out-dir ../../packages/crisp-zk-inputs/pkg --out-name index"
+    "build:wasm": "wasm-pack build ./crates/zk-inputs-wasm --no-pack --out-dir ../../packages/crisp-zk-inputs/pkg --out-name index"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
