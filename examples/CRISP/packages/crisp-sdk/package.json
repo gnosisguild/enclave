@@ -41,7 +41,6 @@
   },
   "dependencies": {
     "@enclave/crisp-zk-inputs": "workspace:*",
-    "@enclave-e3/sdk": "workspace:*",
     "@zk-kit/lean-imt": "^2.2.4",
     "poseidon-lite": "^0.3.0",
     "viem": "2.30.6"
