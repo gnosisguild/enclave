@@ -48,15 +48,12 @@ test("CRISP smoke test", async ({
   );
 
   await runCliInit();
-  // Wait 4 seconds for Committee to be published
-  await page.waitForTimeout(4000);
   await page.goto("/");
   await ensureHomePageLoaded(page);
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await metamask.connectToDapp();
   await page.locator('button:has-text("Try Demo")').click();
-  await page.reload();
   await page
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
