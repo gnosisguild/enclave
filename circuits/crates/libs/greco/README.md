@@ -29,7 +29,7 @@ In your _Nargo.toml_ file, add this library as a dependency:
 greco = { tag = "v0.1.5", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/greco"}
 ```
 
-nb. the `tag` corresponds to the latest tag release of Enclave (`v0.1.5`).
+nb. the `tag` corresponds to the latest tag release of Enclave (`v0.1.5`). From `v0.1.6` you should remove `packages/` from `directory` field (ie., `circuits/crates/...`).
 
 ## API Reference
 
