@@ -201,3 +201,17 @@ export interface NoirSignatureInputs {
    */
   hashed_message: Uint8Array
 }
+
+/**
+ * Parameters for encryptVoteAndGenerateCRISPInputs function
+ */
+export interface EncryptVoteAndGenerateCRISPInputsParams {
+  encodedVote: string[]
+  publicKey: Uint8Array
+  previousCiphertext: Uint8Array
+  signature: `0x${string}`
+  message: string
+  merkleData: IMerkleProof
+  balance: bigint
+  bfvParams?: BFVParams
+}

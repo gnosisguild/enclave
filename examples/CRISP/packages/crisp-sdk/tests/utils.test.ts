@@ -27,7 +27,7 @@ describe('Utils', () => {
     const address = '0x1234567890123456789012345678901234567890'
     const balance = 1000n
     it('should generate a valid merkle proof for a leaf', () => {
-      const tree = generateMerkleTree(LEAVES);
+      const tree = generateMerkleTree(LEAVES)
 
       const proof = generateMerkleProof(0n, balance, address, LEAVES, MAX_DEPTH)
       expect(proof.leaf).toBe(hashLeaf(address, balance.toString()))
@@ -37,10 +37,10 @@ describe('Utils', () => {
       // Unpad the proof for verification
       const unpaddedProof = {
         ...proof.proof,
-        siblings: proof.proof.siblings.slice(0, proof.length)
-      };
+        siblings: proof.proof.siblings.slice(0, proof.length),
+      }
 
-      expect(tree.verifyProof(unpaddedProof)).toBe(true);
+      expect(tree.verifyProof(unpaddedProof)).toBe(true)
     })
     it('should throw if the leaf does not exist in the tree', () => {
       expect(() => generateMerkleProof(0n, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')

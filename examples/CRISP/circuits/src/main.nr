@@ -39,7 +39,8 @@ fn main(
     merkle_proof_siblings: [Field; 20],
 ) {
     // First verify the signature.
-    verify_signature(hashed_message, public_key_x, public_key_y, signature);
+    let is_signature_valid =
+        verify_signature(hashed_message, public_key_x, public_key_y, signature);
 
     // Then derive the address.
     let address = address_to_field(derive_address(public_key_x, public_key_y));
@@ -56,7 +57,7 @@ fn main(
     // compare the merkle root with the param to confirm whether it's the voter
     // or a masker
     let mut is_voter = false;
-    if (merkle_root_calculated == merkle_root) {
+    if ((merkle_root_calculated == merkle_root) & (is_signature_valid == true)) {
         is_voter = true;
     }
 
