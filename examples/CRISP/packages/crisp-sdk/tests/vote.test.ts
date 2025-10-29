@@ -200,7 +200,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it('should generate a proof and verify it', { timeout: 40000 }, async () => {
+    it('should generate a proof and verify it', { timeout: 60000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,

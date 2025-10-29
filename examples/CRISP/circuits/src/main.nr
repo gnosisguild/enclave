@@ -69,7 +69,6 @@ fn main(
         merkle_proof_siblings,
     );
 
-    // Verify the correct ciphertext encryption.
     let greco: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
@@ -85,7 +84,25 @@ fn main(
         p1is,
         p2is,
     );
-    greco.verify_correct_ciphertext_encryption();
+    let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
+        params.crypto_params(),
+        ct0is,
+        ct1is,
+        prev_ct0is,
+        prev_ct1is,
+        sum_ct0is,
+        sum_ct1is,
+        sum_r0is,
+        sum_r1is,
+    );
+
+    // Verify the correct ciphertext encryption.
+    let is_greco_valid = greco.verify();
+
+    assert(is_greco_valid == true);
+
+    // Verify the correct ciphertext addition.
+    let is_ct_add_valid = ct_add.verify();
 
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
@@ -103,20 +120,10 @@ fn main(
     } else {
         // @todo: need to check if vote == 0.
 
-        // Verify the correct ciphertext addition.
-        let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
-            params.crypto_params(),
-            ct0is,
-            ct1is,
-            prev_ct0is,
-            prev_ct1is,
-            sum_ct0is,
-            sum_ct1is,
-            sum_r0is,
-            sum_r1is,
-        );
+        // @todo: need to check if slot is empty (no previous ciphertext).
+        // If so, (ct0is, ct1is) should be returned.
 
-        ct_add.verify_correct_ciphertext_addition();
+        assert(is_ct_add_valid == true);
 
         (sum_ct0is, sum_ct1is)
     }
