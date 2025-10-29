@@ -11,6 +11,9 @@ use safe::SafeSponge;
 /// # Arguments
 /// * `N` - Polynomial degree.
 /// * `L` - Number of CRT bases.
+/// * `BIT_ZERO_CT` - Bit length of the zero ciphertext polynomials.
+/// * `BIT_PREV_CT` - Bit length of the previous ciphertext polynomials.
+/// * `BIT_SUM_CT` - Bit length of the sum ciphertext polynomials.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
     crypto_params: CryptographicParams<L>,
     zero_ct0is: [Polynomial<N>; L],
