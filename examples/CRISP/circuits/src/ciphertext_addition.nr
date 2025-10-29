@@ -123,8 +123,8 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// Verifies range constraints on r0is and r1is.
     fn check_range_bounds(self) {
         for i in 0..L {
-            self.r0is[i].range_check_1bound::<1>(self.r_bound);
-            self.r1is[i].range_check_1bound::<1>(self.r_bound);
+            self.r0is[i].range_check_1bound::<BIT_R>(self.r_bound);
+            self.r1is[i].range_check_1bound::<BIT_R>(self.r_bound);
         }
     }
 
