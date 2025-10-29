@@ -775,7 +775,6 @@ impl Handler<CiphernodeSelected> for ThresholdKeyshare {
         self.pending_selections
             .insert(msg.e3_id.clone(), msg.clone());
 
-        // Start keygen immediately (for distance sortition or if no CommitteeFinalized comes)
         // If CommitteeFinalized arrives later, it will verify committee membership
         match self.handle_ciphernode_selected(msg, ctx.address()) {
             Err(e) => error!("{e}"),

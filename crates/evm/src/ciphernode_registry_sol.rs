@@ -327,10 +327,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
 
     fn handle(&mut self, msg: TicketGenerated, _: &mut Self::Context) -> Self::Result {
         match msg.ticket_id {
-            TicketId::Distance => {
-                info!("Distance sortition ticket generated for E3 {:?}, no contract submission needed", msg.e3_id);
-                return Box::pin(async move {});
-            }
             TicketId::Score(ticket_id) => {
                 info!(
                     "Score sortition ticket generated for E3 {:?}, submitting to contract",

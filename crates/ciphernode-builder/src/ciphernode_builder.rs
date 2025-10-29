@@ -204,19 +204,6 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use distance-based sortition (DEPRECATED)
-    ///
-    /// # Deprecation Notice
-    /// Distance sortition is deprecated and does not work with on-chain contracts.
-    /// Use `with_sortition_score()` instead.
-    #[deprecated(
-        note = "Distance sortition is deprecated and does not work with on-chain contracts. Use with_sortition_score() instead."
-    )]
-    pub fn with_sortition_distance(mut self) -> Self {
-        self.sortition_backend = SortitionBackend::distance();
-        self
-    }
-
     /// Use score-based sortition (recommended)
     pub fn with_sortition_score(mut self) -> Self {
         self.sortition_backend = SortitionBackend::score();
@@ -299,17 +286,14 @@ impl CiphernodeBuilder {
 
         let repositories = store.repositories();
 
-        let node_state_manager =
-            e3_sortition::NodeStateManager::attach(&local_bus, &repositories.node_state()).await?;
-
         // Use the configured backend directly
         let default_backend = self.sortition_backend.clone();
 
-        let sortition = Sortition::attach_with_backend(
+        let sortition = Sortition::attach(
             &local_bus,
             repositories.sortition(),
+            repositories.node_state(),
             repositories.finalized_committees(),
-            node_state_manager,
             default_backend,
         )
         .await?;
@@ -400,7 +384,6 @@ impl CiphernodeBuilder {
                             e3_aggregator::CommitteeFinalizer::attach(
                                 &local_bus,
                                 writer.recipient(),
-                                read_provider.provider().clone(),
                             );
                         }
                     }

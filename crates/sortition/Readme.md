@@ -188,18 +188,14 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[TicketGenerated] --> B{ticket_id == 0?}
-    B -->|Yes| C[Distance Sortition - Skip Contract]
-    B -->|No| D[Score Sortition - Submit to Contract]
+    A[TicketGenerated] --> D[Score Sortition - Submit to Contract]
     D --> E[Contract: Collect Tickets]
     E --> F{Threshold Met?}
     F -->|No| E
     F -->|Yes| G[Contract: finalizeCommittee]
     G --> H[Freeze Committee List]
     H --> I[Emit CommitteeFinalized Event]
-    C --> J[Manual CommitteeFinalized Emission]
     I --> K[All Nodes: Store Committee]
-    J --> K
     K --> L[CiphernodeSelector: Process]
 ```
 
@@ -215,12 +211,6 @@ flowchart LR
   - Generate unique ticket IDs for selected nodes
 - **On-Chain Integration**: Tickets submitted to contract for verification
 - **Committee Finalization**: Contract finalizes committee when threshold tickets received
-
-### 2. Distance Sortition (Deprecated)
-
-- **Purpose**: Select committee based on cryptographic distance
-- **Status**: Deprecated - does not work with on-chain contracts
-- **Indicator**: Uses `ticket_id = 0` to prevent contract submission
 
 ### 3. NodeStateManager
 

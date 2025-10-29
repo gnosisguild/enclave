@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use alloy::providers::Provider;
 use e3_events::{CommitteeRequested, EnclaveEvent, EventBus, Shutdown, Subscribe};
 use e3_evm::FinalizeCommittee;
 use std::collections::HashMap;
@@ -14,24 +13,21 @@ use tracing::{error, info};
 
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and calls
 /// finalizeCommittee on the registry after the submission deadline has passed.
-pub struct CommitteeFinalizer<P: Provider + Clone + Unpin + 'static> {
+pub struct CommitteeFinalizer {
     #[allow(dead_code)]
     bus: Addr<EventBus<EnclaveEvent>>,
     registry_writer: Recipient<FinalizeCommittee>,
-    provider: P,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
-impl<P: Provider + Clone + Unpin + 'static> CommitteeFinalizer<P> {
+impl CommitteeFinalizer {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
         registry_writer: Recipient<FinalizeCommittee>,
-        provider: P,
     ) -> Self {
         Self {
             bus: bus.clone(),
             registry_writer,
-            provider,
             pending_committees: HashMap::new(),
         }
     }
@@ -39,9 +35,8 @@ impl<P: Provider + Clone + Unpin + 'static> CommitteeFinalizer<P> {
     pub fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
         registry_writer: Recipient<FinalizeCommittee>,
-        provider: P,
     ) -> Addr<Self> {
-        let addr = CommitteeFinalizer::new(bus, registry_writer, provider).start();
+        let addr = CommitteeFinalizer::new(bus, registry_writer).start();
 
         bus.do_send(Subscribe::new(
             "CommitteeRequested",
@@ -53,11 +48,11 @@ impl<P: Provider + Clone + Unpin + 'static> CommitteeFinalizer<P> {
     }
 }
 
-impl<P: Provider + Clone + Unpin + 'static> Actor for CommitteeFinalizer<P> {
+impl Actor for CommitteeFinalizer {
     type Context = Context<Self>;
 }
 
-impl<P: Provider + Clone + Unpin + 'static> Handler<EnclaveEvent> for CommitteeFinalizer<P> {
+impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
@@ -68,19 +63,18 @@ impl<P: Provider + Clone + Unpin + 'static> Handler<EnclaveEvent> for CommitteeF
     }
 }
 
-impl<P: Provider + Clone + Unpin + 'static> Handler<CommitteeRequested> for CommitteeFinalizer<P> {
+impl Handler<CommitteeRequested> for CommitteeFinalizer {
     type Result = ();
 
     fn handle(&mut self, msg: CommitteeRequested, ctx: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let submission_deadline = msg.submission_deadline;
-        let provider = self.provider.clone();
 
         const FINALIZATION_BUFFER_SECONDS: u64 = 1;
 
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
-            match e3_evm::helpers::get_current_timestamp(&provider).await {
+            match e3_evm::helpers::get_current_timestamp().await {
                 Ok(timestamp) => Some(timestamp),
                 Err(e) => {
                     error!(
@@ -149,7 +143,7 @@ impl<P: Provider + Clone + Unpin + 'static> Handler<CommitteeRequested> for Comm
     }
 }
 
-impl<P: Provider + Clone + Unpin + 'static> Handler<Shutdown> for CommitteeFinalizer<P> {
+impl Handler<Shutdown> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         info!("Killing CommitteeFinalizer");

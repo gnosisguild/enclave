@@ -11,7 +11,6 @@ use std::fmt::{self, Display};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TicketId {
-    Distance,
     Score(u64),
 }
 

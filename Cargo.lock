@@ -2646,7 +2646,6 @@ name = "e3-aggregator"
 version = "0.1.5"
 dependencies = [
  "actix",
- "alloy",
  "anyhow",
  "async-trait",
  "bincode",
