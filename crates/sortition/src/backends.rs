@@ -108,9 +108,13 @@ impl ScoreBackend {
                 }
 
                 let count = node_state.available_tickets(&addr_str) as u64;
-                let total_tickets = (ns.ticket_balance / node_state.ticket_price)
-                    .try_into()
-                    .unwrap_or(0u64);
+                let total_tickets = if node_state.ticket_price.is_zero() {
+                    0u64
+                } else {
+                    (ns.ticket_balance / node_state.ticket_price)
+                        .try_into()
+                        .unwrap_or(0u64)
+                };
 
                 if count == 0 {
                     info!(
@@ -162,7 +166,7 @@ impl SortitionList<String> for ScoreBackend {
 
     /// Compute score-based winners (`ScoreSortition`) and check if `address` is included.
     ///
-    /// Returns `Ok(false)` if there are no nodes or `size == 0`.
+    /// Returns `Ok(None)` if there are no nodes or `size == 0`.
     fn get_index(
         &self,
         seed: Seed,

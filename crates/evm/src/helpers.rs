@@ -197,12 +197,12 @@ pub async fn load_signer_from_repository(
     private_key.parse().map_err(Into::into)
 }
 
-pub async fn get_current_timestamp() -> Result<u64> {
+pub async fn get_current_timestamp(chain_id: u64) -> Result<u64> {
     let config = e3_config::load_config("_default", None, None)?;
     let chain = config
         .chains()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("No chains configured"))?;
+        .get(chain_id as usize)
+        .ok_or_else(|| anyhow::anyhow!("Chain {} not found", chain_id))?;
 
     let rpc_url = chain.rpc_url()?;
     let provider = ProviderConfig::new(rpc_url, chain.rpc_auth.clone())

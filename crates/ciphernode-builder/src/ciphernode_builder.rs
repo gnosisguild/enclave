@@ -222,7 +222,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Setup a writable RegistryFilter for every evm chain provided
+    /// Setup a writable BondingRegistry for every evm chain provided
     pub fn with_contract_bonding_registry(mut self) -> Self {
         self.contract_components.bonding_registry = true;
         self

@@ -218,7 +218,7 @@ flowchart LR
 - **State Per Node**:
   - `ticket_balance`: Current ticket balance
   - `active`: Whether node is active (has min ticket balance)
-  - `num_jobs`: Number of active E3 jobs
+  - `active_jobs`: Number of active E3 jobs
 - **Persistence**: State survives node restarts
 - **Events**:
   - `CiphernodeAdded` / `CiphernodeRemoved`
