@@ -54,7 +54,6 @@ test("CRISP smoke test", async ({
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await page.waitForTimeout(1000);
-  await page.waitForLoadState("networkidle");
   await metamask.connectToDapp();
   await page.locator('button:has-text("Try Demo")').click();
   await page

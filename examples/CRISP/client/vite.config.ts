@@ -52,6 +52,6 @@ export default defineConfig({
     open: true,
     // this sets a default port to 3000
     port: 3000,
-    hmr: !!process.env.NO_HOT,
+    hmr: !process.env.NO_HOT,
   },
 })
