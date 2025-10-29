@@ -13,4 +13,5 @@ else
   fi
 fi
 
-concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on http://localhost:3000 && ${PLAYWRIGHT_CMD} && sleep 3"
+echo "TEST E2E SCRIPT STARTING..."
+pnpm concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on tcp:3000 && ${PLAYWRIGHT_CMD} && sleep 3"

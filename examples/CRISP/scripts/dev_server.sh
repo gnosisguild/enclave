@@ -4,4 +4,4 @@ set -e
 
 export CARGO_INCREMENTAL=1
 
-(cd ./server && cargo build --bin server && cargo build --bin cli && cargo run --bin server)
+(cd ./server && cargo run --bin server)

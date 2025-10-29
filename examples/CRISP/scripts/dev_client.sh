@@ -2,6 +2,6 @@
 
 set -euo pipefail
 
-sleep 4
+echo "CLIENT SCRIPT RUNNING..."
 
 (cd ./client && pnpm dev-static)
