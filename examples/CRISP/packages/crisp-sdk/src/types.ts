@@ -60,6 +60,8 @@ export interface IMerkleProof {
   leaf: bigint
   index: number
   proof: LeanIMTMerkleProof<bigint>
+  length: number
+  indices: number[]
 }
 
 /**
@@ -120,19 +122,6 @@ export interface GrecoBoundParams {
 }
 
 /**
- * Interface representing ciphertext addition inputs
- */
-export interface CiphertextAdditionInputs {
-  prev_ct0is: Polynomial[]
-  prev_ct1is: Polynomial[]
-  sum_ct0is: Polynomial[]
-  sum_ct1is: Polynomial[]
-  r0is: Polynomial[]
-  r1is: Polynomial[]
-  r_bound: number
-}
-
-/**
  * Interface representing Greco parameters
  */
 export interface GrecoParams {
@@ -144,7 +133,14 @@ export interface GrecoParams {
  * The inputs required for the CRISP circuit
  */
 export interface CRISPCircuitInputs {
-  ct_add: CiphertextAdditionInputs
+  // Ciphertext Addition Section.
+  prev_ct0is: Polynomial[]
+  prev_ct1is: Polynomial[]
+  sum_ct0is: Polynomial[]
+  sum_ct1is: Polynomial[]
+  sum_r0is: Polynomial[]
+  sum_r1is: Polynomial[]
+  // Greco Section.
   params: GrecoParams
   ct0is: Polynomial[]
   ct1is: Polynomial[]
@@ -158,14 +154,18 @@ export interface CRISPCircuitInputs {
   e0: Polynomial
   e1: Polynomial
   k1: Polynomial
+  // ECDSA Section.
   public_key_x: string[]
   public_key_y: string[]
   signature: string[]
   hashed_message: string[]
-  balance: string
+  // Merkle Tree Section.
+  merkle_root: string
   merkle_proof_length: string
   merkle_proof_indices: string[]
   merkle_proof_siblings: string[]
+  // Balance Section.
+  balance: string
 }
 
 /**
@@ -197,4 +197,18 @@ export interface NoirSignatureInputs {
    * The hashed message that was signed
    */
   hashed_message: Uint8Array
+}
+
+/**
+ * Parameters for encryptVoteAndGenerateCRISPInputs function
+ */
+export interface EncryptVoteAndGenerateCRISPInputsParams {
+  encodedVote: string[]
+  publicKey: Uint8Array
+  previousCiphertext: Uint8Array
+  signature: `0x${string}`
+  message: string
+  merkleData: IMerkleProof
+  balance: bigint
+  bfvParams?: BFVParams
 }

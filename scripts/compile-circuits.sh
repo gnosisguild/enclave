@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Ensure we're in the right directory
-cd packages/circuits
+cd circuits
 
 # Checking circuit format
 echo "Checking circuit format..."
