@@ -29,7 +29,7 @@ cleanup() {
 
 trap cleanup INT TERM
 
-concurrently \
+pnpm concurrently \
   -ks first \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
