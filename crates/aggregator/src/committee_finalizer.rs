@@ -74,7 +74,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
-            match e3_evm::helpers::get_current_timestamp(msg.chain_id).await {
+            match e3_evm::helpers::get_current_timestamp().await {
                 Ok(timestamp) => Some(timestamp),
                 Err(e) => {
                     error!(
