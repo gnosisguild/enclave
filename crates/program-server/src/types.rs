@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,12 +24,15 @@ pub struct ComputeRequest {
     pub callback_url: Option<String>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Derivative, Serialize)]
+#[derivative(Debug)]
 pub struct WebhookPayload {
     pub e3_id: u64,
     #[serde(serialize_with = "serialize_as_hex")]
+    #[derivative(Debug = "ignore")]
     pub ciphertext: Vec<u8>,
     #[serde(serialize_with = "serialize_as_hex")]
+    #[derivative(Debug = "ignore")]
     pub proof: Vec<u8>,
 }
 

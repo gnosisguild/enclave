@@ -11,6 +11,7 @@
   "scripts": {
     "cli": "pnpm sh ./scripts/cli.sh",
     "dev": "vite --no-open --host",
+    "dev-static": "NO_HOT=1 vite --no-open --host",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
