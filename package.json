@@ -70,7 +70,9 @@
       "tsup": "8.5.0",
       "typescript": "5.8.3",
       "undici-types": "6.19.8",
-      "viem": "2.30.6"
+      "viem": "2.30.6",
+      "hardhat-deploy": "1.0.4",
+      "@nomicfoundation/hardhat-ignition-ethers": "3.0.0"
     }
   }
 }
