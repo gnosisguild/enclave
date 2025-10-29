@@ -9,6 +9,9 @@ import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInp
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
 import { extractSignature } from './signature'
+import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
+import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import circuit from '../../../circuits/target/crisp_circuit.json'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -183,6 +186,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
     merkle_proof_indices: merkleData.indices.map((i) => i.toString()),
     merkle_proof_siblings: merkleData.proof.siblings.map((s) => s.toString()),
     merkle_root: merkleData.proof.root.toString(),
+    slot_address: merkleData.proof.root.toString(), // temporary, will be replaced with the actual slot address.
     balance: balance.toString(),
   }
 }
@@ -223,6 +227,23 @@ export const generateMaskVote = async (
     merkle_proof_siblings: Array.from({ length: 4 }, () => '0'),
     merkle_proof_length: '1',
     merkle_root: merkleRoot.toString(),
+    slot_address: merkleRoot.toString(), // temporary, will be replaced with the actual slot address.
     balance: '0',
   }
+}
+
+export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
+  const noir = new Noir(circuit as CompiledCircuit)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+
+  const { witness } = await noir.execute(crispInputs as any)
+  const proof = await backend.generateProof(witness)
+
+  return proof
+}
+
+export const verifyProof = async (proof: ProofData): Promise<boolean> => {
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+
+  return await backend.verifyProof(proof)
 }
