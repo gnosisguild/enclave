@@ -13,10 +13,15 @@ import {
   encodeVote,
   encryptVoteAndGenerateCRISPInputs,
   generateMaskVote,
+  generateProof,
   validateVote,
+  verifyProof,
 } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
+import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
+import circuit from '../../../circuits/target/crisp_circuit.json'
 
 import { merkleProof, MESSAGE, SIGNATURE, VOTE, votingPowerLeaf } from './constants'
 
@@ -165,7 +170,7 @@ describe('Vote', () => {
   })
 
   describe('generateMaskVote', () => {
-    it('should generate a mask vote and its inputs', async () => {
+    it('should generate a mask vote and the right circuit inputs', async () => {
       const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
@@ -191,6 +196,26 @@ describe('Vote', () => {
       expect(crispInputs.merkle_proof_length).toBeDefined()
       expect(crispInputs.merkle_root).toBeDefined()
       expect(crispInputs.balance).toBeDefined()
+    })
+  })
+
+  describe('generateProof/verifyProof', () => {
+    it('should generate a proof and verify it', { timeout: 60000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const inputs = await encryptVoteAndGenerateCRISPInputs({
+        encodedVote,
+        publicKey,
+        previousCiphertext,
+        signature: SIGNATURE,
+        message: MESSAGE,
+        merkleData: merkleProof,
+        balance: votingPowerLeaf,
+      })
+
+      const proof = await generateProof(inputs)
+      const isValid = await verifyProof(proof)
+
+      expect(isValid).toBe(true)
     })
   })
 })

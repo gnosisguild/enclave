@@ -108,7 +108,10 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// Where:
     /// * qi are constants from the cryptographic parameters
     /// * r0i, r1i are the correction terms for each i-th CRT basis.
-    pub fn verify_correct_ciphertext_addition(self) {
+    ///
+    /// # Returns
+    /// True if the ciphertext addition constraints are satisfied, false otherwise.
+    pub fn verify(self) -> bool {
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 
@@ -116,7 +119,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         let gammas = self.generate_challenge();
 
         // Step 3: Verify ciphertext addition constraints using challenges
-        self.check_ciphertext_addition_constraints(gammas);
+        self.verify_evaluations(gammas)
     }
 
     /// Verifies range constraints on r0is and r1is.
@@ -163,7 +166,12 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     ///
     /// # Arguments
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
-    fn check_ciphertext_addition_constraints(self, gammas: Vec<Field>) {
+    ///
+    /// # Returns
+    /// True if the ciphertext addition constraints are satisfied, false otherwise.
+    fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
+        let mut result = true;
+
         for i in 0..L {
             let gamma_i = gammas.get(i);
 
@@ -181,8 +189,10 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
             let radd0 = self.r0is[i].eval(gamma_i);
             let radd1 = self.r1is[i].eval(gamma_i);
 
-            assert(sum0 == ct0 + old0 + radd0 * q_i);
-            assert(sum1 == ct1 + old1 + radd1 * q_i);
+            result = result & (sum0 == ct0 + old0 + radd0 * q_i);
+            result = result & (sum1 == ct1 + old1 + radd1 * q_i);
         }
+
+        result
     }
 }

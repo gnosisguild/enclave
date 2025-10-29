@@ -164,6 +164,8 @@ export interface CRISPCircuitInputs {
   merkle_proof_length: string
   merkle_proof_indices: string[]
   merkle_proof_siblings: string[]
+  // Slot Address Section.
+  slot_address: string
   // Balance Section.
   balance: string
 }
