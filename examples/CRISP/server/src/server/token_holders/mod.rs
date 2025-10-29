@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod bitquery;
+pub mod etherscan;
 pub mod hashes;
 pub mod merkle_tree;
-pub mod etherscan;
 
 pub use bitquery::*;
+pub use etherscan::*;
 pub use hashes::*;
 pub use merkle_tree::*;
-pub use etherscan::*;
