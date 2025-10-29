@@ -377,16 +377,17 @@ async fn broadcast_document_published_notification(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
+    use std::{collections::HashMap, num::NonZero, time::Duration};
 
     use super::*;
-    use crate::events::{DhtGetRecordError, DhtPutRecordError, NetCommand};
+    use crate::events::NetCommand;
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
         EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
+    use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use tokio::{
         sync::{broadcast, mpsc},
         time::{sleep, timeout},
@@ -539,7 +540,9 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtGetRecordError {
                 correlation_id,
-                error: DhtGetRecordError::Timeout,
+                error: GetRecordError::Timeout {
+                    key: RecordKey::new(&cid),
+                },
             })?;
         }
 
@@ -548,7 +551,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout"
+            "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout { key: Key(b\"\\xda-\\xe1\\xc0T\\x11$X\\x05\\xd1\\xd4\\xa6C\\x86\\x96\\xb7e\\xd9j\\x96\\x1bD\\xc8P#\\x0f\\\"\\xea A@b\") }"
         );
 
         Ok(())
@@ -590,7 +593,13 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtPutRecordError {
                 correlation_id,
-                error: DhtPutRecordError::Timeout,
+                error: crate::events::PutOrStoreError::PutRecordError(
+                    PutRecordError::QuorumFailed {
+                        key: RecordKey::new(b"I got the secret"),
+                        success: vec![],
+                        quorum: NonZero::new(1).unwrap(),
+                    },
+                ),
             })?;
         }
 
@@ -599,7 +608,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT put record failed: Timeout"
+            "Operation failed after 4 attempts. Last error: DHT put record failed: PutRecordError(QuorumFailed { key: Key(b\"I got the secret\"), success: [], quorum: 1 })"
         );
 
         Ok(())

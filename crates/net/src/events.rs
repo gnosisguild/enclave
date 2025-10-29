@@ -10,7 +10,8 @@ use anyhow::{Context, Result};
 use e3_events::{CorrelationId, DocumentMeta};
 use e3_utils::ArcBytes;
 use libp2p::{
-    gossipsub::{MessageId, PublishError},
+    gossipsub::{MessageId, PublishError, TopicHash},
+    kad::{store, GetRecordError, PutRecordError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -116,13 +117,21 @@ pub enum NetEvent {
     /// There was an error receiving the document
     DhtGetRecordError {
         correlation_id: CorrelationId,
-        error: DhtGetRecordError,
+        error: GetRecordError,
     },
     /// There was an error putting the document
     DhtPutRecordError {
         correlation_id: CorrelationId,
-        error: DhtPutRecordError,
+        error: PutOrStoreError,
     },
+    /// GossipSubscribed
+    GossipSubscribed { count: usize, topic: TopicHash },
+}
+
+#[derive(Clone, Debug)]
+pub enum PutOrStoreError {
+    PutRecordError(PutRecordError),
+    StoreError(store::Error),
 }
 
 impl NetEvent {
@@ -136,19 +145,6 @@ impl NetEvent {
             _ => None,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum DhtGetRecordError {
-    NotFound,
-    QuorumFailed,
-    Timeout,
-}
-
-#[derive(Clone, Debug)]
-pub enum DhtPutRecordError {
-    QuorumFailed,
-    Timeout,
 }
 
 /// Payload that is dispatched as a net -> net gossip event from Kademlia. This event signals that

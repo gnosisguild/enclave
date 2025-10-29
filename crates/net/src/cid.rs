@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Cid(Vec<u8>);
+pub struct Cid(pub Vec<u8>);
 
 impl Cid {
     pub fn from_content(content: &[u8]) -> Self {
@@ -35,5 +35,17 @@ impl Deref for Cid {
 impl DerefMut for Cid {
     fn deref_mut(&mut self) -> &mut [u8] {
         &mut self.0
+    }
+}
+
+impl AsRef<[u8]> for Cid {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl ToString for Cid {
+    fn to_string(&self) -> String {
+        hex::encode(&self.0)
     }
 }
