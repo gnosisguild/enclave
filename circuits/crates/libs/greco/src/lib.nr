@@ -283,7 +283,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * cyclo(gamma) = gamma^N + 1 (cyclotomic polynomial)
     /// * qi, k0i are constants from the cryptographic parameters
     /// * r1i, r2i, p1i, p2i are randomness polynomials for each i-th CRT basis.
-    pub fn verify_correct_ciphertext_encryption(self) -> Vec<Field> {
+    pub fn verify_correct_ciphertext_encryption(self) {
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 
@@ -292,8 +292,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
         // Step 3: Verify encryption constraints using challenges
         self.check_encryption_constraints(gammas);
-
-        gammas
     }
 
     /// Performs range checks on all polynomial coefficients
