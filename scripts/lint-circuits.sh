@@ -8,7 +8,7 @@ if ! command -v nargo >/dev/null 2>&1; then
 fi
 
 # Ensure we're in the right directory
-cd packages/circuits
+cd circuits
 
 # Checking circuit format
 echo "Checking circuit format..."

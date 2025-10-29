@@ -6,8 +6,8 @@ authors = ["Gnosis Guild / Enclave"]
 license = "MIT"
 
 [dependencies]
-greco = { path = "../../../packages/circuits/crates/libs/greco" }
-polynomial = { path = "../../../packages/circuits/crates/libs/polynomial" }
+greco = { path = "../../../circuits/crates/libs/greco" }
+polynomial = { path = "../../../circuits/crates/libs/polynomial" }
 keccak256 = { tag = "v0.1.0", git = "https://github.com/noir-lang/keccak256" }
 poseidon = { tag = "v0.1.1", git = "https://github.com/noir-lang/poseidon" }
 binary_merkle_root = { git = "https://github.com/zk-kit/zk-kit.noir", tag = "binary-merkle-root-v0.0.1", directory = "packages/binary-merkle-root" }
