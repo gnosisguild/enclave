@@ -24,7 +24,6 @@ fn main(
     sum_ct1is: [Polynomial<2048>; 1],
     sum_r0is: [Polynomial<2048>; 1],
     sum_r1is: [Polynomial<2048>; 1],
-    sum_r_bound: pub u64,
     // Greco Section.
     params: pub Params<2048, 1>,
     pk0is: pub [Polynomial<2048>; 1],
@@ -91,7 +90,7 @@ fn main(
         p2is,
     );
 
-    let ct_add: CiphertextAddition<2048, 1, 54, 54, 54, 1> = CiphertextAddition::new(
+    let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
         ct1is,
@@ -101,7 +100,6 @@ fn main(
         sum_ct1is,
         sum_r0is,
         sum_r1is,
-        sum_r_bound,
     );
 
     greco.verify_correct_ciphertext_encryption();

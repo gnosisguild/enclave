@@ -335,11 +335,17 @@ mod tests {
 
         // Check required top-level fields.
         assert!(parsed.get("params").is_some());
+        assert!(parsed.get("prev_ct0is").is_some());
+        assert!(parsed.get("prev_ct1is").is_some());
+        assert!(parsed.get("sum_ct0is").is_some());
+        assert!(parsed.get("sum_ct1is").is_some());
+        assert!(parsed.get("sum_r0is").is_some());
+        assert!(parsed.get("sum_r1is").is_some());
+        assert!(parsed.get("sum_r_bound").is_some());
         assert!(parsed.get("ct0is").is_some());
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());
         assert!(parsed.get("pk1is").is_some());
-        assert!(parsed.get("ct_add").is_some());
     }
 
     #[test]

@@ -11,7 +11,7 @@ use safe::SafeSponge;
 /// # Arguments
 /// * `N` - Polynomial degree.
 /// * `L` - Number of CRT bases.
-pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32, let BIT_R: u32> {
+pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
     crypto_params: CryptographicParams<L>,
     zero_ct0is: [Polynomial<N>; L],
     zero_ct1is: [Polynomial<N>; L],
@@ -21,10 +21,9 @@ pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let 
     sum_ct1is: [Polynomial<N>; L],
     r0is: [Polynomial<N>; L],
     r1is: [Polynomial<N>; L],
-    r_bound: u64,
 }
 
-impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32, let BIT_R: u32> CiphertextAddition<N, L, BIT_ZERO_CT, BIT_PREV_CT, BIT_SUM_CT, BIT_R> {
+impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> CiphertextAddition<N, L, BIT_ZERO_CT, BIT_PREV_CT, BIT_SUM_CT> {
     /// Creates a new CiphertextAddition instance.
     ///
     /// # Arguments
@@ -33,7 +32,6 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// * `prev_ct0is`, `prev_ct1is` - Previous ciphertext polynomials.
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Randomness polynomials.
-    /// * `r_bound` - Range bound for the randomness polynomials.
     pub fn new(
         crypto_params: CryptographicParams<L>,
         zero_ct0is: [Polynomial<N>; L],
@@ -44,7 +42,6 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         sum_ct1is: [Polynomial<N>; L],
         r0is: [Polynomial<N>; L],
         r1is: [Polynomial<N>; L],
-        r_bound: u64,
     ) -> Self {
         Self {
             crypto_params,
@@ -56,7 +53,6 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
             sum_ct1is,
             r0is,
             r1is,
-            r_bound,
         }
     }
 
@@ -85,8 +81,8 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         inputs = flatten::<_, _, BIT_SUM_CT>(inputs, self.sum_ct1is);
 
         // Flatten randomness polynomials
-        inputs = flatten::<_, _, BIT_R>(inputs, self.r0is);
-        inputs = flatten::<_, _, BIT_R>(inputs, self.r1is);
+        inputs = flatten::<_, _, 1>(inputs, self.r0is);
+        inputs = flatten::<_, _, 1>(inputs, self.r1is);
 
         inputs
     }
@@ -123,8 +119,10 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// Verifies range constraints on r0is and r1is.
     fn check_range_bounds(self) {
         for i in 0..L {
-            self.r0is[i].range_check_1bound::<BIT_R>(self.r_bound);
-            self.r1is[i].range_check_1bound::<BIT_R>(self.r_bound);
+            // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial.
+            // must be in {-1, 0, 1}, so the bound will always be 1 for all CRT moduli.
+            self.r0is[i].range_check_1bound::<1>(1);
+            self.r1is[i].range_check_1bound::<1>(1);
         }
     }
 
