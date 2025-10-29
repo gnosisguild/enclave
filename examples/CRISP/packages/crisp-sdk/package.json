@@ -20,8 +20,9 @@
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
     "build:wasm": "pnpm -C ../../ build:wasm",
-    "build": "pnpm build:wasm && tsc",
-    "test": "vitest --run",
+    "compile:circuit": "pnpm -C ../../ compile:circuit",
+    "build": "pnpm compile:circuit && pnpm build:wasm && tsc",
+    "test": "pnpm compile:circuit && vitest --run",
     "prettier:fix": "pnpm prettier --write .",
     "prettier:check": "pnpm prettier --check .",
     "release": "pnpm build && pnpm publish --access public"
