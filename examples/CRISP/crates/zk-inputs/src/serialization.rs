@@ -18,7 +18,12 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct ZKInputs {
-    ct_add: serde_json::Value,
+    prev_ct0is: Vec<serde_json::Value>,
+    prev_ct1is: Vec<serde_json::Value>,
+    sum_ct0is: Vec<serde_json::Value>,
+    sum_ct1is: Vec<serde_json::Value>,
+    sum_r0is: Vec<serde_json::Value>,
+    sum_r1is: Vec<serde_json::Value>,
     params: serde_json::Value,
     ct0is: Vec<serde_json::Value>,
     ct1is: Vec<serde_json::Value>,
@@ -80,10 +85,8 @@ pub fn construct_inputs(
     });
     params_json.insert("bounds".to_string(), bounds_json);
 
-    let mut ciphertext_addition_params_json = serde_json::Map::new();
-    ciphertext_addition_params_json.insert(
-        "prev_ct0is".to_string(),
-        ciphertext_addition_inputs_standard
+    ZKInputs {
+        prev_ct0is: ciphertext_addition_inputs_standard
             .prev_ct0is
             .iter()
             .map(|v| {
@@ -92,10 +95,7 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "prev_ct1is".to_string(),
-        ciphertext_addition_inputs_standard
+        prev_ct1is: ciphertext_addition_inputs_standard
             .prev_ct1is
             .iter()
             .map(|v| {
@@ -104,10 +104,7 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "sum_ct0is".to_string(),
-        ciphertext_addition_inputs_standard
+        sum_ct0is: ciphertext_addition_inputs_standard
             .sum_ct0is
             .iter()
             .map(|v| {
@@ -116,10 +113,7 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "sum_ct1is".to_string(),
-        ciphertext_addition_inputs_standard
+        sum_ct1is: ciphertext_addition_inputs_standard
             .sum_ct1is
             .iter()
             .map(|v| {
@@ -128,10 +122,7 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "r0is".to_string(),
-        ciphertext_addition_inputs_standard
+        sum_r0is: ciphertext_addition_inputs_standard
             .r0is
             .iter()
             .map(|v| {
@@ -140,10 +131,7 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "r1is".to_string(),
-        ciphertext_addition_inputs_standard
+        sum_r1is: ciphertext_addition_inputs_standard
             .r1is
             .iter()
             .map(|v| {
@@ -152,14 +140,6 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-    );
-    ciphertext_addition_params_json.insert(
-        "r_bound".to_string(),
-        serde_json::json!(ciphertext_addition_inputs_standard.r_bound),
-    );
-
-    ZKInputs {
-        ct_add: serde_json::Value::Object(ciphertext_addition_params_json),
         params: serde_json::Value::Object(params_json),
         ct0is: vectors_standard
             .ct0is
@@ -338,7 +318,6 @@ mod tests {
             sum_ct1is: vec![vec![BigInt::from(7), BigInt::from(8)]],
             r0is: vec![vec![BigInt::from(9), BigInt::from(10)]],
             r1is: vec![vec![BigInt::from(11), BigInt::from(12)]],
-            r_bound: 1,
         }
     }
 
@@ -358,7 +337,12 @@ mod tests {
 
         // Verify basic structure.
         assert!(inputs.params.is_object());
-        assert!(inputs.ct_add.is_object());
+        assert_eq!(inputs.prev_ct0is.len(), 1);
+        assert_eq!(inputs.prev_ct1is.len(), 1);
+        assert_eq!(inputs.sum_ct0is.len(), 1);
+        assert_eq!(inputs.sum_ct1is.len(), 1);
+        assert_eq!(inputs.sum_r0is.len(), 1);
+        assert_eq!(inputs.sum_r1is.len(), 1);
         assert_eq!(inputs.ct0is.len(), 2);
         assert_eq!(inputs.ct1is.len(), 2);
         assert_eq!(inputs.pk0is.len(), 2);
@@ -395,7 +379,12 @@ mod tests {
 
         // Verify required fields exist.
         assert!(parsed.get("params").is_some());
-        assert!(parsed.get("ct_add").is_some());
+        assert!(parsed.get("prev_ct0is").is_some());
+        assert!(parsed.get("prev_ct1is").is_some());
+        assert!(parsed.get("sum_ct0is").is_some());
+        assert!(parsed.get("sum_ct1is").is_some());
+        assert!(parsed.get("sum_r0is").is_some());
+        assert!(parsed.get("sum_r1is").is_some());
         assert!(parsed.get("ct0is").is_some());
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());

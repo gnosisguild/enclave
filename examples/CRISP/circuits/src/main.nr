@@ -7,6 +7,8 @@
 use greco::{Greco, Params};
 use polynomial::Polynomial;
 
+mod ciphertext_addition;
+use ciphertext_addition::CiphertextAddition;
 mod ecdsa;
 use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
@@ -15,6 +17,14 @@ mod utils;
 use utils::check_coefficient_values;
 
 fn main(
+    // Ciphertext Addition Section.
+    prev_ct0is: pub [Polynomial<2048>; 1],
+    prev_ct1is: pub [Polynomial<2048>; 1],
+    sum_ct0is: [Polynomial<2048>; 1],
+    sum_ct1is: [Polynomial<2048>; 1],
+    sum_r0is: [Polynomial<2048>; 1],
+    sum_r1is: [Polynomial<2048>; 1],
+    // Greco Section.
     params: pub Params<2048, 1>,
     pk0is: pub [Polynomial<2048>; 1],
     pk1is: pub [Polynomial<2048>; 1],
@@ -28,15 +38,18 @@ fn main(
     r2is: [Polynomial<2047>; 1],
     p1is: [Polynomial<4095>; 1],
     p2is: [Polynomial<2047>; 1],
+    // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
     signature: [u8; 64],
     hashed_message: [u8; 32],
-    balance: Field,
+    // Merkle Tree Section.
     merkle_root: pub Field,
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],
+    // Balance Section.
+    balance: Field,
 ) {
     // First verify the signature.
     let is_signature_valid =
@@ -61,8 +74,7 @@ fn main(
         is_voter = true;
     }
 
-    // then verify that the vote was encrypted correctly
-    let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
+    let greco: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
         pk1is,
@@ -78,7 +90,20 @@ fn main(
         p2is,
     );
 
-    check_coefficient_values(k1, params.crypto_params().q_mod_t);
+    let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
+        params.crypto_params(),
+        ct0is,
+        ct1is,
+        prev_ct0is,
+        prev_ct1is,
+        sum_ct0is,
+        sum_ct1is,
+        sum_r0is,
+        sum_r1is,
+    );
 
-    circuit.verify_correct_ciphertext_encryption();
+    greco.verify_correct_ciphertext_encryption();
+    ct_add.verify_correct_ciphertext_addition();
+
+    check_coefficient_values(k1, params.crypto_params().q_mod_t);
 }

@@ -138,7 +138,12 @@ describe('Vote', () => {
         balance: votingPowerLeaf,
       })
 
-      expect(crispInputs.ct_add).toBeInstanceOf(Object)
+      expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.prev_ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_r0is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_r1is).toBeInstanceOf(Array)
       expect(crispInputs.params).toBeInstanceOf(Object)
       expect(crispInputs.ct0is).toBeInstanceOf(Array)
       expect(crispInputs.ct1is).toBeInstanceOf(Array)
@@ -163,7 +168,12 @@ describe('Vote', () => {
     it('should generate a mask vote and its inputs', async () => {
       const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
 
-      expect(crispInputs.ct_add).toBeInstanceOf(Object)
+      expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.prev_ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_ct0is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_ct1is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_r0is).toBeInstanceOf(Array)
+      expect(crispInputs.sum_r1is).toBeInstanceOf(Array)
       expect(crispInputs.params).toBeInstanceOf(Object)
       expect(crispInputs.ct0is).toBeInstanceOf(Array)
       expect(crispInputs.ct1is).toBeInstanceOf(Array)
