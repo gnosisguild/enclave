@@ -7,7 +7,7 @@ if [ "$1" == "--ui" ]; then
 else
   # Use xvfb-run only on Linux systems
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run pnpm playwright test"
+    PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run --auto-servernum --server-args=\"-screen 0 1280x960x24\" pnpm playwright test"
   else
     PLAYWRIGHT_CMD="pnpm synpress --headless && pnpm playwright test"
   fi
