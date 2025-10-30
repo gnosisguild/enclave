@@ -13,8 +13,8 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
+process.env.NO_HOT && console.log('Running without HMR')
 // const development: boolean = !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
-
 export default defineConfig({
   base: '/',
   define: {
@@ -52,5 +52,6 @@ export default defineConfig({
     open: true,
     // this sets a default port to 3000
     port: 3000,
+    hmr: !process.env.NO_HOT,
   },
 })

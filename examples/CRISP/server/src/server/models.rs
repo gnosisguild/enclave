@@ -5,14 +5,18 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Derivative, Deserialize)]
+#[derivative(Debug)]
 pub struct WebhookPayload {
     pub e3_id: u64,
     #[serde(deserialize_with = "deserialize_hex_string")]
+    #[derivative(Debug = "ignore")]
     pub ciphertext: Vec<u8>,
     #[serde(deserialize_with = "deserialize_hex_string")]
+    #[derivative(Debug = "ignore")]
     pub proof: Vec<u8>,
 }
 
@@ -131,7 +135,6 @@ pub struct E3StateLite {
     pub token_address: String,
     pub balance_threshold: String,
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct E3 {

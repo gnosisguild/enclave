@@ -3059,6 +3059,7 @@ version = "0.1.5"
 dependencies = [
  "actix-web",
  "anyhow",
+ "derivative",
  "e3-compute-provider",
  "hex",
  "reqwest",

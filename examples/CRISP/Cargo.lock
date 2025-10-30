@@ -1963,6 +1963,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "derivative",
  "dialoguer",
  "dotenvy",
  "e3-compute-provider 0.1.5",
