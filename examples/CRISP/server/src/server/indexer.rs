@@ -12,8 +12,8 @@ use crate::server::{
     token_holders::{build_tree, compute_token_holder_hashes},
     CONFIG,
 };
+use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
-
 use alloy_primitives::Address;
 use e3_sdk::{
     evm_helpers::{
@@ -32,8 +32,8 @@ use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
 use std::error::Error;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::time::{sleep_until, Instant};
+use std::time::Duration;
+use tokio::time::sleep;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -154,13 +154,18 @@ pub async fn register_e3_activated(
                     .await?;
 
                 // Calculate expiration time to sleep until
-                let expiration = Instant::now()
-                    + (UNIX_EPOCH + Duration::from_secs(expiration))
-                        .duration_since(SystemTime::now())
-                        .unwrap_or_else(|_| Duration::ZERO);
-
-                sleep_until(expiration).await;
-
+                let now = get_current_timestamp_rpc().await?;
+                let wait_duration = if expiration > now {
+                    let secs = expiration - now;
+                    info!("Need to wait {} seconds until expiration", secs);
+                    Duration::from_secs(secs)
+                } else {
+                    info!("Expired E3");
+                    Duration::ZERO
+                };
+                if !wait_duration.is_zero() {
+                    sleep(wait_duration).await;
+                }
                 let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
                 repo.update_status("Expired").await?;
 
@@ -291,27 +296,27 @@ pub async fn register_committee_published(
                     return Ok(());
                 }
 
-                // Convert milliseconds to seconds for comparison with block.timestamp
-                let start_time = UNIX_EPOCH + Duration::from_secs(e3.startWindow[0].to::<u64>());
+                // Read Start time in Seconds
+                let start_time = e3.startWindow[0].to::<u64>();
+                info!("Start time: {}", start_time);
 
                 // Get current time
-                let now = SystemTime::now();
-
+                let now = get_current_timestamp_rpc().await?;
+                info!("Current time: {}", now);
                 // Calculate wait duration
-                let wait_duration = match start_time.duration_since(now) {
-                    Ok(duration) => {
-                        info!("Need to wait {:?} ({}s) until activation", duration, duration.as_secs());
-                        duration
-                    }
-                    Err(_) => {
-                        info!("Activating E3");
-                        Duration::ZERO
-                    }
+                let wait_duration = if start_time > now {
+                    let secs = start_time - now;
+                    info!("Need to wait {} seconds until activation", secs);
+                    Duration::from_secs(secs)
+                } else {
+                    info!("Activating E3");
+                    Duration::ZERO
                 };
-
+                info!("Wait duration: {:?}", wait_duration);
                 // Sleep until start time
-                let start_instant = Instant::now() + wait_duration;
-                sleep_until(start_instant).await;
+                if !wait_duration.is_zero() {
+                    sleep(wait_duration).await;
+                }
 
                 // If not activated activate
                 let tx = contract.activate(event.e3Id, event.publicKey).await?;
@@ -321,6 +326,16 @@ pub async fn register_committee_published(
         })
         .await;
     Ok(listener)
+}
+
+pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
+    let provider = ProviderBuilder::new().connect(&CONFIG.http_rpc_url).await?;
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await?
+        .ok_or_else(|| eyre::eyre!("Latest block not found"))?;
+
+    Ok(block.header.timestamp)
 }
 
 pub async fn start_indexer(
