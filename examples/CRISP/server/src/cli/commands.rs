@@ -115,8 +115,8 @@ pub async fn initialize_crisp_round(
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let current_timestamp = get_current_timestamp().await?;
-    let start_window: [U256; 2] = [
+    let mut current_timestamp = get_current_timestamp().await?;
+    let mut start_window: [U256; 2] = [
         U256::from(current_timestamp),
         U256::from(current_timestamp + CONFIG.e3_window_size as u64),
     ];
@@ -129,6 +129,11 @@ pub async fn initialize_crisp_round(
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
+    info!("Debug Before Fee Quote - start_window: {:?}", start_window);
+    info!(
+        "Debug Before Fee Quote - current timestamp: {:?}",
+        current_timestamp
+    );
     info!("Getting fee quote...");
     let fee_amount = contract
         .get_e3_quote(
@@ -152,13 +157,19 @@ pub async fn initialize_crisp_round(
     )
     .await?;
 
+    current_timestamp = get_current_timestamp().await?;
+    start_window = [
+        U256::from(current_timestamp),
+        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
+    ];
+
     info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
 
     info!("Debug - threshold: {:?}", threshold);
     info!("Debug - start_window: {:?}", start_window);
+    info!("Debug - current timestamp: {:?}", current_timestamp);
     info!("Debug - duration: {}", duration);
     info!("Debug - e3_program: {}", e3_program);
-    info!("Debug - current timestamp: {:?}", current_timestamp);
 
     info!(
         "Debug - Checking ciphernode registry at: {}",
