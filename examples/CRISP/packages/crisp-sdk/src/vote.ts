@@ -223,8 +223,8 @@ export const generateMaskVote = async (
     public_key_y: Array.from({ length: 32 }, () => '0'),
     signature: Array.from({ length: 64 }, () => '0'),
     hashed_message: Array.from({ length: 32 }, () => '0'),
-    merkle_proof_indices: Array.from({ length: 4 }, () => '0'),
-    merkle_proof_siblings: Array.from({ length: 4 }, () => '0'),
+    merkle_proof_indices: Array.from({ length: 20 }, () => '0'),
+    merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
     merkle_proof_length: '1',
     merkle_root: merkleRoot.toString(),
     slot_address: merkleRoot.toString(), // temporary, will be replaced with the actual slot address.

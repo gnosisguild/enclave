@@ -14,7 +14,7 @@ use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
 use merkle_tree::get_merkle_root;
 mod utils;
-use utils::check_coefficient_values;
+use utils::{check_coefficient_values, check_coefficient_zero};
 
 fn main(
     // Ciphertext Addition Section.
@@ -84,6 +84,7 @@ fn main(
         p1is,
         p2is,
     );
+    
     let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
@@ -106,11 +107,11 @@ fn main(
 
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
-    if (
+    if 
         (is_signature_valid == true)
             & (merkle_root_calculated == merkle_root)
             & (slot_address == address)
-    ) {
+    {
         // @todo: need to check if vote <= balance.
 
         // Verify the correct coefficient values.
@@ -118,7 +119,8 @@ fn main(
 
         (ct0is, ct1is)
     } else {
-        // @todo: need to check if vote == 0.
+        // check if vote == 0.
+        check_coefficient_zero(k1);
 
         // @todo: need to check if slot is empty (no previous ciphertext).
         // If so, (ct0is, ct1is) should be returned.

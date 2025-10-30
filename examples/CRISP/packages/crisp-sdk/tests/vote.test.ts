@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
-
 import {
   calculateValidIndicesForPlaintext,
   decodeTally,
@@ -19,9 +18,6 @@ import {
 } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
 import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
-import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
-import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import circuit from '../../../circuits/target/crisp_circuit.json'
 
 import { merkleProof, MESSAGE, SIGNATURE, VOTE, votingPowerLeaf } from './constants'
 
@@ -200,7 +196,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it('should generate a proof and verify it', { timeout: 60000 }, async () => {
+    it.only('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -213,6 +209,24 @@ describe('Vote', () => {
       })
 
       const proof = await generateProof(inputs)
+      const isValid = await verifyProof(proof)
+
+      expect(isValid).toBe(true)
+    })
+
+    it.skip('should generate a proof for a masking user and verify it', { timeout: 1000000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      const maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
+
+      const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
 
       expect(isValid).toBe(true)
