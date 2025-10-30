@@ -7,10 +7,11 @@ if [ "$1" == "--ui" ]; then
 else
   # Use xvfb-run only on Linux systems
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run pnpm playwright test"
+    PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run --auto-servernum --server-args=\"-screen 0 1280x960x24\" pnpm playwright test"
   else
     PLAYWRIGHT_CMD="pnpm synpress --headless && pnpm playwright test"
   fi
 fi
 
-concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on http://localhost:3000 && ${PLAYWRIGHT_CMD} && sleep 3"
+echo "TEST E2E SCRIPT STARTING..."
+pnpm concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on tcp:3000 && sleep 20 && ${PLAYWRIGHT_CMD} && sleep 3"

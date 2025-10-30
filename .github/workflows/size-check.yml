@@ -3,7 +3,7 @@ on:
   pull_request:
 jobs:
   check-size:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
     env:
       MAX_LINES: 700
     steps:
@@ -16,20 +16,21 @@ jobs:
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      
+
       - uses: actions/checkout@v4
         if: steps.should_skip.outputs.skip == 'false'
         with:
           fetch-depth: 0
-      
+
       - name: Check PR size
         if: steps.should_skip.outputs.skip == 'false'
         run: |
           git fetch origin ${{ github.base_ref }}
-          CHANGED_LINES=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | awk '{print $4+$6}')
-          echo "Changed lines: ${CHANGED_LINES:-0}"
+          # Count changed lines excluding lock files
+          CHANGED_LINES=$(git diff --numstat origin/${{ github.base_ref }}...HEAD | grep -v -E '(\.lock$|lock\.yaml$)' | awk '{sum += $1 + $2} END {print sum+0}')
+          echo "Changed lines (excluding lock files): ${CHANGED_LINES}"
           echo "Maximum allowed: $MAX_LINES"
-          if [ "${CHANGED_LINES:-0}" -gt "$MAX_LINES" ]; then
+          if [ "${CHANGED_LINES}" -gt "$MAX_LINES" ]; then
             echo "::error::PR is too large ($CHANGED_LINES lines). Max: $MAX_LINES lines."
             exit 1
           fi

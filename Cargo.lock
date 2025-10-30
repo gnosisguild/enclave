@@ -3044,6 +3044,7 @@ dependencies = [
  "e3-events",
  "e3-utils",
  "futures",
+ "hex",
  "libp2p",
  "serde",
  "sha2",
@@ -3059,6 +3060,7 @@ version = "0.1.5"
 dependencies = [
  "actix-web",
  "anyhow",
+ "derivative",
  "e3-compute-provider",
  "hex",
  "reqwest",

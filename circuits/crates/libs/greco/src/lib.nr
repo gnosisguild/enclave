@@ -283,7 +283,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * cyclo(gamma) = gamma^N + 1 (cyclotomic polynomial)
     /// * qi, k0i are constants from the cryptographic parameters
     /// * r1i, r2i, p1i, p2i are randomness polynomials for each i-th CRT basis.
-    pub fn verify_correct_ciphertext_encryption(self) {
+    ///
+    /// # Returns
+    /// True if the encryption constraints are satisfied, false otherwise.
+    pub fn verify(self) -> bool {
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 
@@ -291,13 +294,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let gammas = self.generate_challenge();
 
         // Step 3: Verify encryption constraints using challenges
-        self.check_encryption_constraints(gammas);
+        self.verify_evaluations(gammas)
     }
 
     /// Performs range checks on all polynomial coefficients
     ///
     /// Checks that all polynomial coefficients are within their expected bounds.
     /// This prevents attacks where coefficients are outside the valid range.
+    ///
+    /// # Returns
+    /// True if the range bounds are satisfied, false otherwise.
     fn check_range_bounds(self) {
         let bound_params = self.params.bound_params();
 
@@ -363,16 +369,19 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ///
     /// # Arguments
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
-    fn check_encryption_constraints(self, gammas: Vec<Field>) {
+    fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
         let crypto_params = self.params.crypto_params();
+        let mut result = true;
 
         for i in 0..L {
             // Verify first equation: ct0i = pk0i * u + e0 + k1 * k0i + r1i * qi + r2i * cyclo
-            self.check_ct0_constraint(i, gammas.get(i), crypto_params);
+            result = result & self.check_ct0_constraint(i, gammas.get(i), crypto_params);
 
             // Verify second equation: ct1i = pk1i * u + e1 + p1i * qi + p2i * cyclo
-            self.check_ct1_constraint(i, gammas.get(i + L), crypto_params);
+            result = result & self.check_ct1_constraint(i, gammas.get(i + L), crypto_params);
         }
+
+        result
     }
 
     /// Verifies the ct0 constraint for a specific CRT basis
@@ -383,7 +392,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * `i` - CRT basis index
     /// * `gamma` - Challenge value for this constraint
     /// * `crypto_params` - Cryptographic parameters
-    fn check_ct0_constraint(self, i: u32, gamma: Field, crypto_params: CryptographicParams<L>) {
+    ///
+    /// # Returns
+    /// True if the ct0 constraint is satisfied, false otherwise.
+    fn check_ct0_constraint(
+        self,
+        i: u32,
+        gamma: Field,
+        crypto_params: CryptographicParams<L>,
+    ) -> bool {
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
 
@@ -412,7 +429,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let lhs = self.ct0is[i].eval(gamma);
 
         // Enforce equality: LHS(gamma) = RHS(gamma)
-        assert_eq(lhs, rhs);
+        lhs == rhs
     }
 
     /// Verifies the ct1 constraint for a specific CRT basis
@@ -423,7 +440,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * `i` - CRT basis index
     /// * `gamma` - Challenge value for this constraint
     /// * `crypto_params` - Cryptographic parameters
-    fn check_ct1_constraint(self, i: u32, gamma: Field, crypto_params: CryptographicParams<L>) {
+    ///
+    /// # Returns
+    /// True if the ct1 constraint is satisfied, false otherwise.
+    fn check_ct1_constraint(
+        self,
+        i: u32,
+        gamma: Field,
+        crypto_params: CryptographicParams<L>,
+    ) -> bool {
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
 
@@ -448,6 +473,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let lhs = self.ct1is[i].eval(gamma);
 
         // Enforce equality: LHS(gamma) = RHS(gamma)
-        assert_eq(lhs, rhs);
+        lhs == rhs
     }
 }
