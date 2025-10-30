@@ -207,8 +207,6 @@ async fn test_trbfv_actor() -> Result<()> {
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
     // we need to manually construct the committee that sortition would select
-    println!("Waiting for nodes to process E3Requested...");
-    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // For seed=123, these 5 nodes get selected by sortition:
     // 0x8f32E487328F04927f20c4B14399e4F3123763df (ticket 6)
@@ -232,8 +230,6 @@ async fn test_trbfv_actor() -> Result<()> {
         chain_id,
     }))
     .await?;
-
-    tokio::time::sleep(Duration::from_millis(200)).await;
 
     let expected = vec![
         "E3Requested",

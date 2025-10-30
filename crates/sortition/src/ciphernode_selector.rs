@@ -8,6 +8,7 @@ use crate::sortition::{GetNodeIndex, Sortition};
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// emits a TicketGenerated event (score sortition) to the event bus
 use actix::prelude::*;
+use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
     CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EventBus, Shutdown,
@@ -130,8 +131,12 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
     fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
         let address = self.address.clone();
         let bus = self.bus.clone();
-        let repositories = self.data_store.repositories();
         let e3_id = msg.e3_id.clone();
+        let repositories = self
+            .data_store
+            .scope(StoreKeys::router())
+            .scope(StoreKeys::context(&e3_id))
+            .repositories();
 
         // Check if this node is in the finalized committee
         if !msg.committee.contains(&address) {
