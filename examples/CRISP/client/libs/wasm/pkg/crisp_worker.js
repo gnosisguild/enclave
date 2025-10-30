@@ -20,6 +20,7 @@ self.onmessage = async function (event) {
           contracts: {
             enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
             ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+            feeToken: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
           },
           // local node
           rpcUrl: 'http://localhost:8545',

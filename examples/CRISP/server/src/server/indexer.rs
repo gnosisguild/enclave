@@ -303,6 +303,7 @@ pub async fn register_committee_published(
                 // Get current time
                 let now = get_current_timestamp_rpc().await?;
                 info!("Current time: {}", now);
+
                 // Calculate wait duration
                 let wait_duration = if start_time > now {
                     let secs = start_time - now;
@@ -313,6 +314,7 @@ pub async fn register_committee_published(
                     Duration::ZERO
                 };
                 info!("Wait duration: {:?}", wait_duration);
+
                 // Sleep until start time
                 if !wait_duration.is_zero() {
                     sleep(wait_duration).await;
