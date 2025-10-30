@@ -84,7 +84,11 @@ fn main(
         p1is,
         p2is,
     );
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> caabae5e (test: add masking test)
     let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
@@ -108,9 +112,11 @@ fn main(
 
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
-    if (is_signature_valid == true)
-        & (merkle_root_calculated == merkle_root)
-        & (slot_address == address) {
+    if 
+        (is_signature_valid == true)
+            & (merkle_root_calculated == merkle_root)
+            & (slot_address == address)
+    {
         // @todo: need to check if vote <= balance.
 
         // Verify the correct coefficient values.
