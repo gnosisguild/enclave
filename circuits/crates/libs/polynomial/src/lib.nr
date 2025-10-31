@@ -30,6 +30,57 @@ impl<let N: u32> Polynomial<N> {
         Polynomial { coefficients }
     }
 
+    /// Sums two polynomials.
+    ///
+    /// # Arguments
+    /// * `other` - The polynomial to add to the current polynomial.
+    ///
+    /// # Returns
+    /// A new polynomial with the coefficients summed.
+    pub fn sum(self, other: Self) -> Self {
+        let mut result = Self::new([0; N]);
+
+        for i in 0..N {
+            result.coefficients[i] = self.coefficients[i] + other.coefficients[i];
+        }
+
+        result
+    }
+
+    /// Subtracts two polynomials.
+    ///
+    /// # Arguments
+    /// * `other` - The polynomial to subtract from the current polynomial.
+    ///
+    /// # Returns
+    /// A new polynomial with the coefficients subtracted.
+    pub fn subtract(self, other: Self) -> Self {
+        let mut result = Self::new([0; N]);
+
+        for i in 0..N {
+            result.coefficients[i] = self.coefficients[i] - other.coefficients[i];
+        }
+
+        result
+    }
+
+    /// Multiplies a polynomial by a scalar.
+    ///
+    /// # Arguments
+    /// * `scalar` - The scalar to multiply the polynomial by.
+    ///
+    /// # Returns
+    /// A new polynomial with the coefficients multiplied by the scalar.
+    pub fn multiply_by_scalar(self, scalar: Field) -> Self {
+        let mut result = Self::new([0; N]);
+
+        for i in 0..N {
+            result.coefficients[i] = self.coefficients[i] * scalar;
+        }
+
+        result
+    }
+
     /// Evaluates the polynomial at a given point using Horner's method.
     ///
     /// Horner's method computes P(x) = a_{N-1} * x^{N-1} + ... + a_1 * x + a_0
