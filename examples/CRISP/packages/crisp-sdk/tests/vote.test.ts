@@ -22,6 +22,10 @@ import { DEFAULT_BFV_PARAMS, generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE }
 import { LEAVES, merkleProof, MESSAGE, SIGNATURE, testAddress, VOTE, votingPowerLeaf } from './constants'
 import { privateKeyToAccount } from 'viem/accounts'
 
+import merkleTreeCircuit from "./signature-merkle-circuit.json";
+import { CompiledCircuit, Noir } from '@noir-lang/noir_js'
+import { UltraHonkBackend } from '@aztec/bb.js'
+
 describe('Vote', () => {
   const votingPower = 10n
 
@@ -198,17 +202,15 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it.only('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
+    it('should generate a proof for ecdsa verification and merkle tree proof', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-
       // hardhat default private key 
       const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
       const account = privateKeyToAccount(privateKey)
-      const signature  = await account.signMessage({ message: MESSAGE})
-      const leaf = hashLeaf(account.address, votingPowerLeaf.toString())
+      const signature  = await account.signMessage({ message: MESSAGE })
+      const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address, leaves, 20)
-      console.log('Generated Merkle proof:', merkleProof);
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -219,6 +221,67 @@ describe('Vote', () => {
         merkleData: merkleProof,
         balance: votingPowerLeaf,
         slotAddress: account.address
+      })
+
+      /**
+       *  // ECDSA Section.
+          public_key_x: [u8; 32],
+          public_key_y: [u8; 32],
+          signature: [u8; 64],
+          hashed_message: [u8; 32],
+          // Merkle Tree Section.
+          merkle_root: pub Field,
+          merkle_proof_length: u32,
+          merkle_proof_indices: [u1; 20],
+          merkle_proof_siblings: [Field; 20],
+          // Slot Address Section.
+          slot_address: pub Field,
+          // Balance Section.
+          balance: Field,
+       */
+
+      const noir = new Noir(merkleTreeCircuit as CompiledCircuit)
+      const backend = new UltraHonkBackend((merkleTreeCircuit as CompiledCircuit).bytecode)
+    
+      const { witness, returnValue } = await noir.execute({
+        public_key_x: inputs.public_key_x,
+        public_key_y: inputs.public_key_y,
+        signature: inputs.signature,
+        hashed_message: inputs.hashed_message,
+        merkle_root: inputs.merkle_root,
+        merkle_proof_length: inputs.merkle_proof_length,
+        merkle_proof_indices: inputs.merkle_proof_indices,
+        merkle_proof_siblings: inputs.merkle_proof_siblings,
+        slot_address: inputs.slot_address,
+        balance: inputs.balance,
+      } as any)  
+      console.log("addr", inputs.slot_address);
+      console.log("Circuit return value:", returnValue)
+      console.log(inputs.slot_address.toLowerCase() === returnValue.toString());
+      const proof = await backend.generateProof(witness)
+      expect(await backend.verifyProof(proof)).toBe(true)
+    });
+    it.only('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+
+      // hardhat default private key 
+      const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      const account = privateKeyToAccount(privateKey)
+      const signature  = await account.signMessage({ message: MESSAGE })
+      const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
+      const leaves = [...LEAVES, leaf]
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      console.log('Generated Merkle proof:', merkleProof);
+
+      const inputs = await encryptVoteAndGenerateCRISPInputs({
+        encodedVote,
+        publicKey,
+        previousCiphertext,
+        signature,
+        message: MESSAGE,
+        merkleData: merkleProof,
+        balance: votingPowerLeaf,
+        slotAddress: account.address.toLowerCase()
       })
 
       // console.log('Generated circuit inputs, generating proof...', merkleProof);

@@ -12,7 +12,7 @@ import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-import fs from "fs"
+
 /**
  * This utility function calculates the first valid index for vote options
  * based on the total voting power and degree.
