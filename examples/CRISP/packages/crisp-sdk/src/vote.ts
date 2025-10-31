@@ -7,11 +7,12 @@
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
+import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, MESSAGE } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
+import { privateKeyToAccount } from 'viem/accounts'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -227,12 +228,18 @@ export const generateMaskVote = async (
 
   const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
 
+  // hardhat default private key 
+  const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  const account = privateKeyToAccount(privateKey)
+  const signature  = await account.signMessage({ message: MESSAGE })
+  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(MESSAGE, signature)
+
   return {
     ...crispInputs,
-    public_key_x: Array.from({ length: 32 }, () => '0'),
-    public_key_y: Array.from({ length: 32 }, () => '0'),
-    signature: Array.from({ length: 64 }, () => '0'),
-    hashed_message: Array.from({ length: 32 }, () => '0'),
+    hashed_message: Array.from(hashed_message).map((b) => b.toString()),
+    public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
+    public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
+    signature: Array.from(extractedSignature).map((b) => b.toString()),
     merkle_proof_indices: Array.from({ length: 20 }, () => '0'),
     merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
     merkle_proof_length: '1',
@@ -246,8 +253,7 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const noir = new Noir(circuit as CompiledCircuit)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  const { witness, returnValue } = await noir.execute(crispInputs as any)  
-  console.log("Circuit return value:", returnValue)
+  const { witness } = await noir.execute(crispInputs as any)  
   const proof = await backend.generateProof(witness)
 
   return proof

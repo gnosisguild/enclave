@@ -52,8 +52,7 @@ fn main(
     slot_address: pub Field,
     // Balance Section.
     balance: Field,
-// ) -> pub ([Polynomial<2048>; 1], [Polynomial<2048>; 1]) {
-) -> pub bool {
+) -> pub ([Polynomial<2048>; 1], [Polynomial<2048>; 1]) {
     // Verify the ECDSA signature.
     let is_signature_valid =
         verify_signature(hashed_message, public_key_x, public_key_y, signature);
@@ -87,7 +86,7 @@ fn main(
         p1is,
         p2is,
     );
-    
+
     let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
@@ -108,22 +107,20 @@ fn main(
     // Verify the correct ciphertext addition.
     let is_ct_add_valid = ct_add.verify();
 
+    // Ensure that the ciphertext is valid
+    assert(is_greco_valid);
+
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
-
-    // assert(merkle_root_calculated == merkle_root);
-    if 
-        // (is_signature_valid == true) 
-            (merkle_root_calculated == merkle_root)
-        // (slot_address == address)
-    {
+    if (is_signature_valid == true)
+        & (merkle_root_calculated == merkle_root)
+        & (slot_address == address) {
         // @todo: need to check if vote <= balance.
 
         // Verify the correct coefficient values.
         check_coefficient_values(k1, params.crypto_params().q_mod_t);
 
-        // (ct0is, ct1is)
-        true 
+        (ct0is, ct1is)
     } else {
         // check if vote == 0.
         check_coefficient_zero(k1);
@@ -131,9 +128,9 @@ fn main(
         // @todo: need to check if slot is empty (no previous ciphertext).
         // If so, (ct0is, ct1is) should be returned.
 
-        assert(is_ct_add_valid == true);
+        // as well as the sum
+        assert(is_ct_add_valid);
 
-        // (sum_ct0is, sum_ct1is)
-        false 
+        (sum_ct0is, sum_ct1is)
     }
 }

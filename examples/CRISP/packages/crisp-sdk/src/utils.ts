@@ -48,7 +48,6 @@ export const generateMerkleProof = (
   }
 
   const leaf = hashLeaf(address, balance.toString())
-  console.log("leaf hash", leaf);
 
   const index = leaves.findIndex((l) => l === leaf)
 
@@ -62,9 +61,8 @@ export const generateMerkleProof = (
 
   // Pad siblings with zeros
   const paddedSiblings = [...proof.siblings, ...Array(maxDepth - proof.siblings.length).fill(0n)]
-
   // Pad indices with zeros
-  const indices = proof.siblings.map((_, i) => Number((BigInt(index) >> BigInt(i)) & 1n))
+  const indices = proof.siblings.map((_, i) => Number((BigInt(proof.index) >> BigInt(i)) & 1n))
   const paddedIndices = [...indices, ...Array(maxDepth - indices.length).fill(0)]
 
   return {
