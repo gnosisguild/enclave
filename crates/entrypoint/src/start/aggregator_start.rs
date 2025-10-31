@@ -27,6 +27,7 @@ pub async fn execute(
     config: &AppConfig,
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
+    experimental_trbfv: bool,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let bus = get_enclave_event_bus();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
@@ -34,17 +35,22 @@ pub async fn execute(
     let repositories = store.repositories();
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
 
-    CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_source_bus(&bus)
         .with_datastore(store)
         .with_chains(&config.chains())
         .with_contract_enclave_full()
         .with_contract_registry_filter()
         .with_contract_ciphernode_registry()
-        .with_plaintext_aggregation()
-        .with_pubkey_aggregation()
-        .build()
-        .await?;
+        .with_pubkey_aggregation();
+
+    if experimental_trbfv {
+        builder = builder.with_threshold_plaintext_aggregation();
+    } else {
+        builder = builder.with_plaintext_aggregation()
+    }
+
+    builder.build().await?;
 
     let (_, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),

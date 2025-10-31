@@ -15,6 +15,16 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
     otel: Option<String>,
+    experimental_trbfv: bool,
 ) -> Result<()> {
-    up::execute(config, detach, exclude, verbose, config_string, otel).await
+    up::execute(
+        config,
+        detach,
+        exclude,
+        verbose,
+        config_string,
+        otel,
+        experimental_trbfv,
+    )
+    .await
 }
