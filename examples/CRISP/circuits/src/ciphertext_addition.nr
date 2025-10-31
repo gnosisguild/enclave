@@ -177,10 +177,10 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         // First L equalities: p == sum_ct0i - (zero_ct0i + prev_ct0i + r0i * q_i)
         for i in 0..L {
             let mut p = self.zero_ct0is[i];
+            let r0i_scaled = self.r0is[i].multiply_by_scalar(self.crypto_params.qis[i]);
 
             p = p.sum(self.prev_ct0is[i]);
-            p = p.sum(self.r0is[i]);
-            p = p.multiply_by_scalar(self.crypto_params.qis[i]);
+            p = p.sum(r0i_scaled);
 
             p = self.sum_ct0is[i].subtract(p);
 
@@ -191,10 +191,10 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         // Next L equalities: p == sum_ct1i - (zero_ct1i + prev_ct1i + r1i * q_i)
         for i in 0..L {
             let mut p = self.zero_ct1is[i];
+            let r1i_scaled = self.r1is[i].multiply_by_scalar(self.crypto_params.qis[i]);
 
             p = p.sum(self.prev_ct1is[i]);
-            p = p.sum(self.r1is[i]);
-            p = p.multiply_by_scalar(self.crypto_params.qis[i]);
+            p = p.sum(r1i_scaled);
 
             p = self.sum_ct1is[i].subtract(p);
 
