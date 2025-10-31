@@ -30,6 +30,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       libs: path.resolve(__dirname, './libs'),
     },
+    conditions: ['import', 'module', 'browser', 'default'],
   },
   worker: {
     format: 'es',
