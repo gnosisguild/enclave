@@ -40,7 +40,7 @@ pub fn bfv_encrypt<T>(
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
 {
-    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key:{e}"))?;
@@ -91,7 +91,7 @@ pub fn bfv_verifiable_encrypt<T>(
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
 {
-    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
@@ -135,7 +135,7 @@ mod tests {
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -156,7 +156,7 @@ mod tests {
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -184,7 +184,7 @@ mod tests {
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -205,7 +205,7 @@ mod tests {
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);

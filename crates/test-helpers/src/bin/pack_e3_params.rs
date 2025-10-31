@@ -34,7 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let params = build_bfv_params_arc(args.degree as usize, args.plaintext_modulus, &args.moduli);
+    let params = build_bfv_params_arc(
+        args.degree as usize,
+        args.plaintext_modulus,
+        &args.moduli,
+        None,
+    );
     let encoded = encode_bfv_params(&params);
 
     for byte in encoded {

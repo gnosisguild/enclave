@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Decode the base64 string
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
 
     let raw_plaintext = args.plaintext;
