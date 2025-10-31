@@ -465,13 +465,13 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
 
         // Step 2: rhs = pk0_u + k1(gamma) * k0i
-        let rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
+        let mut rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
 
         // Step 3: rhs = rhs + r1i(gamma) * qi
-        let rhs = rhs + (r1i_at_gamma * crypto_params.qis[i]);
+        rhs += r1i_at_gamma * crypto_params.qis[i];
 
         // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
-        let rhs = rhs + r2i_at_gamma * cyclo_at_gamma;
+        rhs += r2i_at_gamma * cyclo_at_gamma;
 
         // Left-hand side: ct0i(gamma)
         let lhs = self.ct0is[i].eval(gamma);
@@ -512,10 +512,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
 
         // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
-        let rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
+        let mut rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
 
         // Step 3: rhs = rhs + p1i(gamma) * qi
-        let rhs = rhs + (p1is_at_gamma * crypto_params.qis[i]);
+        rhs += p1is_at_gamma * crypto_params.qis[i];
 
         // Left-hand side: ct1i(gamma)
         let lhs = self.ct1is[i].eval(gamma);
