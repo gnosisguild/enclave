@@ -379,29 +379,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let k1_at_gamma = self.k1.eval(gamma);
         let e1_at_gamma = self.e1.eval(gamma);
 
-        // Check first constraints
-        let mut ct0_sum = self.check_ct0_constraint(
-            0,
-            gamma,
-            crypto_params,
-            cyclo_at_gamma,
-            u_at_gamma,
-            e0_at_gamma,
-            k1_at_gamma,
-        );
-
-        let mut ct1_sum = self.check_ct1_constraint(
-            0,
-            gamma,
-            crypto_params,
-            cyclo_at_gamma,
-            u_at_gamma,
-            e1_at_gamma,
-        );
-
-        for i in 1..L {
+        let mut sum = (0, 0);
+        for i in 0..L {
             // First equation: ct0i = pk0i * u + e0 + k1 * k0i + r1i * qi + r2i * cyclo
-            let (lhs, rhs) = self.check_ct0_constraint(
+            let (lhs_ct0, rhs_ct0) = self.check_ct0_constraint(
                 i,
                 gamma,
                 crypto_params,
@@ -410,10 +391,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 e0_at_gamma,
                 k1_at_gamma,
             );
-            ct0_sum = (ct0_sum.0 + lhs * gammas.get(i), ct0_sum.1 + rhs * gammas.get(i));
+            sum = (sum.0 + lhs_ct0 * gammas.get(i), sum.1 + rhs_ct0 * gammas.get(i));
 
             // Second equation: ct1i = pk1i * u + e1 + p1i * qi + p2i * cyclo
-            let (lhs, rhs) = self.check_ct1_constraint(
+            let (lhs_ct1, rhs_ct1) = self.check_ct1_constraint(
                 i,
                 gamma,
                 crypto_params,
@@ -421,13 +402,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 u_at_gamma,
                 e1_at_gamma,
             );
-            ct1_sum =
-                (ct1_sum.0 + lhs * gammas.get(i + L - 1), ct1_sum.1 + rhs * gammas.get(i + L - 1));
+            sum = (sum.0 + lhs_ct1 * gammas.get(i + L), sum.1 + rhs_ct1 * gammas.get(i + L));
         }
 
-        let unused_gamma = gammas.get(2 * L - 1);
-        // Return equality result for sum of lhs and rhs of ct0 and ct1 with unused Gamma at the index 2 * L - 1
-        ct0_sum.0 + (unused_gamma * ct1_sum.0) == ct0_sum.1 + (unused_gamma * ct1_sum.1)
+        sum.0 == sum.1
     }
 
     /// Verifies the ct0 constraint for a specific CRT basis
