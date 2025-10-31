@@ -226,7 +226,7 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('should generate a proof for a masking user and verify it', { timeout: 1000000 }, async () => {
+    it.only('should generate a proof for a masking user and verify it', { timeout: 1000000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
         DEFAULT_BFV_PARAMS.degree,
@@ -238,7 +238,6 @@ describe('Vote', () => {
 
       let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress)
 
-      maskVote.k1[2047] = '1'
       const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
 

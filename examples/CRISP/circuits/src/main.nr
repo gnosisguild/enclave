@@ -69,8 +69,6 @@ fn main(
         merkle_proof_siblings,
     );
 
-    println(merkle_root_calculated);
-
     let greco: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
@@ -101,8 +99,6 @@ fn main(
 
     // Verify the correct ciphertext encryption.
     let is_greco_valid = greco.verify();
-
-    // assert(is_greco_valid == true);
 
     // Verify the correct ciphertext addition.
     let is_ct_add_valid = ct_add.verify();
