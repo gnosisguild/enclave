@@ -16,7 +16,6 @@ mod repo;
 pub use bonding_registry_sol::{BondingRegistrySol, BondingRegistrySolReader};
 pub use ciphernode_registry_sol::{
     CiphernodeRegistrySol, CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
-    FinalizeCommittee,
 };
 pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;

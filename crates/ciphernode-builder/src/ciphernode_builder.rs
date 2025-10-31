@@ -381,10 +381,7 @@ impl CiphernodeBuilder {
 
                         if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
                             info!("Attaching CommitteeFinalizer for score sortition");
-                            e3_aggregator::CommitteeFinalizer::attach(
-                                &local_bus,
-                                writer.recipient(),
-                            );
+                            e3_aggregator::CommitteeFinalizer::attach(&local_bus);
                         }
                     }
                     Err(e) => error!(

@@ -115,20 +115,6 @@ async fn create_local_ciphernodes(
     Ok(result)
 }
 
-async fn add_ciphernodes(
-    bus: &Addr<EventBus<EnclaveEvent>>,
-    addrs: &Vec<String>,
-    chain_id: u64,
-) -> Result<Vec<EnclaveEvent>> {
-    let mut committee = AddToCommittee::new(&bus, chain_id);
-    let mut evts: Vec<EnclaveEvent> = vec![];
-
-    for addr in addrs {
-        evts.push(committee.add(addr).await?);
-    }
-    Ok(evts)
-}
-
 async fn setup_score_sortition_environment(
     bus: &Addr<EventBus<EnclaveEvent>>,
     eth_addrs: &Vec<String>,

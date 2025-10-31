@@ -32,6 +32,43 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
 }
 
+async fn setup_score_sortition_environment(
+    bus: &actix::Addr<EventBus<EnclaveEvent>>,
+    eth_addrs: &Vec<String>,
+    chain_id: u64,
+) -> Result<()> {
+    bus.send(EnclaveEvent::from(ConfigurationUpdated {
+        parameter: "ticketPrice".to_string(),
+        old_value: U256::ZERO,
+        new_value: U256::from(10_000_000u64),
+        chain_id,
+    }))
+    .await?;
+
+    let mut adder = AddToCommittee::new(bus, chain_id);
+    for addr in eth_addrs {
+        adder.add(addr).await?;
+
+        bus.send(EnclaveEvent::from(TicketBalanceUpdated {
+            operator: addr.clone(),
+            delta: I256::try_from(1_000_000_000u64).unwrap(),
+            new_balance: U256::from(1_000_000_000u64),
+            reason: FixedBytes::ZERO,
+            chain_id,
+        }))
+        .await?;
+
+        bus.send(EnclaveEvent::from(OperatorActivationChanged {
+            operator: addr.clone(),
+            active: true,
+            chain_id,
+        }))
+        .await?;
+    }
+
+    Ok(())
+}
+
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
@@ -96,7 +133,6 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Cipher
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
-    let mut adder = AddToCommittee::new(&bus, 1);
 
     // Actor system setup
     let multithread = Multithread::attach(
@@ -143,35 +179,8 @@ async fn test_trbfv_actor() -> Result<()> {
         .await?;
 
     let chain_id = 1u64;
-    bus.send(EnclaveEvent::from(ConfigurationUpdated {
-        parameter: "ticketPrice".to_string(),
-        old_value: U256::ZERO,
-        new_value: U256::from(10_000_000u64),
-        chain_id,
-    }))
-    .await?;
-
-    for node in nodes.iter() {
-        let addr = node.address();
-        adder.add(&addr).await?;
-
-        // TODO: is a 100 tickets worth of tokens enough?
-        bus.send(EnclaveEvent::from(TicketBalanceUpdated {
-            operator: addr.clone(),
-            delta: I256::try_from(1_000_000_000u64).unwrap(),
-            new_balance: U256::from(1_000_000_000u64),
-            reason: FixedBytes::ZERO,
-            chain_id,
-        }))
-        .await?;
-
-        bus.send(EnclaveEvent::from(OperatorActivationChanged {
-            operator: addr.clone(),
-            active: true,
-            chain_id,
-        }))
-        .await?;
-    }
+    let eth_addrs: Vec<String> = nodes.iter().map(|n| n.address()).collect();
+    setup_score_sortition_environment(&bus, &eth_addrs, chain_id).await?;
 
     // Flush all events
     nodes.flush_all_history(100).await?;

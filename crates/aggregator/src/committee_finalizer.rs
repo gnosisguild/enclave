@@ -5,38 +5,30 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use e3_events::{CommitteeRequested, EnclaveEvent, EventBus, Shutdown, Subscribe};
-use e3_evm::FinalizeCommittee;
+use e3_events::{
+    CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EventBus, Shutdown, Subscribe,
+};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
 
-/// CommitteeFinalizer is an actor that listens to CommitteeRequested events and calls
-/// finalizeCommittee on the registry after the submission deadline has passed.
+/// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
+/// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
-    #[allow(dead_code)]
     bus: Addr<EventBus<EnclaveEvent>>,
-    registry_writer: Recipient<FinalizeCommittee>,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
-        registry_writer: Recipient<FinalizeCommittee>,
-    ) -> Self {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         Self {
             bus: bus.clone(),
-            registry_writer,
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
-        registry_writer: Recipient<FinalizeCommittee>,
-    ) -> Addr<Self> {
-        let addr = CommitteeFinalizer::new(bus, registry_writer).start();
+    pub fn attach(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+        let addr = CommitteeFinalizer::new(bus).start();
 
         bus.do_send(Subscribe::new(
             "CommitteeRequested",
@@ -112,17 +104,17 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             "Scheduling committee finalization"
                         );
 
-                        let registry_writer = act.registry_writer.clone();
+                        let bus = act.bus.clone();
                         let e3_id_clone = e3_id_for_async.clone();
 
                         let handle = ctx.run_later(
                             Duration::from_secs(seconds_until_deadline),
                             move |act, _ctx| {
-                                info!(e3_id = %e3_id_clone, "Calling finalizeCommittee");
+                                info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                registry_writer.do_send(FinalizeCommittee {
+                                bus.do_send(EnclaveEvent::from(CommitteeFinalizeRequested {
                                     e3_id: e3_id_clone.clone(),
-                                });
+                                }));
 
                                 act.pending_committees.remove(&e3_id_clone.to_string());
                             },

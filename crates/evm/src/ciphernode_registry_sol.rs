@@ -16,8 +16,9 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    BusError, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet,
-    PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated, TicketId,
+    BusError, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
+    EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
+    TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -275,6 +276,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             let _ = bus
                 .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
                 .await;
+            let _ = bus
+                .send(Subscribe::new(
+                    "CommitteeFinalizeRequested",
+                    addr.clone().into(),
+                ))
+                .await;
         }
 
         // Subscribe to TicketGenerated for ticket submission
@@ -304,6 +311,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
         match msg {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 // Only publish if the src and destination chains match
+                if self.provider.chain_id() == data.e3_id.chain_id() {
+                    ctx.notify(data);
+                }
+            }
+            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => {
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
@@ -359,19 +371,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
     }
 }
 
-/// Message to trigger committee finalization (called by aggregator)
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "()")]
-pub struct FinalizeCommittee {
-    pub e3_id: E3id,
-}
-
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<FinalizeCommittee>
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRequested>
     for CiphernodeRegistrySolWriter<P>
 {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: FinalizeCommittee, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CommitteeFinalizeRequested, _: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
