@@ -185,7 +185,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
             p = self.sum_ct0is[i].sub(p);
 
             let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
-            accumulator = accumulator + gamma_i * p.eval(gamma);
+            accumulator += gamma_i * p.eval(gamma);
         }
 
         // Next L equalities: p == sum_ct1i - (zero_ct1i + prev_ct1i + r1i * q_i)
@@ -199,7 +199,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
             p = self.sum_ct1is[i].sub(p);
 
             let gamma_i = gammas.get(L + i);
-            accumulator = accumulator + gamma_i * p.eval(gamma);
+            accumulator += gamma_i * p.eval(gamma);
         }
 
         accumulator == 0
