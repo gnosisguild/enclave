@@ -196,7 +196,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it.only('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
+    it('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -214,7 +214,7 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it.skip('should generate a proof for a masking user and verify it', { timeout: 1000000 }, async () => {
+    it.only('should generate a proof for a masking user and verify it', { timeout: 1000000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
         DEFAULT_BFV_PARAMS.degree,

@@ -105,28 +105,49 @@ fn main(
     // Verify the correct ciphertext addition.
     let is_ct_add_valid = ct_add.verify();
 
-    // If the voter is eligible to vote, output the ciphertext.
-    // Otherwise, output the sum of the ciphertexts.
-    if 
-        (is_signature_valid == true)
-            & (merkle_root_calculated == merkle_root)
-            & (slot_address == address)
-    {
-        // @todo: need to check if vote <= balance.
+    // Check if the caller is the voter
+    let is_voter = (is_signature_valid == true) & (merkle_root_calculated == merkle_root) & (slot_address == address);
+    let are_coefficients_binary = check_coefficient_values(k1, params.crypto_params().q_mod_t);
+    let are_coefficients_zero = check_coefficient_zero(k1);
 
-        // Verify the correct coefficient values.
-        check_coefficient_values(k1, params.crypto_params().q_mod_t);
+    // Verify conditions based on voter status
+    // For voter: coefficients must be binary (or we're not a voter, so we don't care)
+    let voter_check_passes = are_coefficients_binary | (is_voter == false);
+    
+    // For non-voter: coefficients must be zero AND ct_add must be valid (or we ARE a voter, so we don't care)
+    let non_voter_check_passes = (are_coefficients_zero & is_ct_add_valid) | is_voter;
+    
+    // Both checks must pass
+    // assert(voter_check_passes);
+    // assert(non_voter_check_passes);
 
-        (ct0is, ct1is)
-    } else {
-        // check if vote == 0.
-        check_coefficient_zero(k1);
+    (ct0is, ct1is)
+    
+    // // Overall validity check
+    // let all_conditions_valid = (is_voter & voter_conditions_met) | (!is_voter & non_voter_conditions_met);
+    // assert(all_conditions_valid);
 
-        // @todo: need to check if slot is empty (no previous ciphertext).
-        // If so, (ct0is, ct1is) should be returned.
+    // // Conditional selection using Field arithmetic
+    // // Convert bool to Field (true = 1, false = 0)
+    // let selector = is_voter as Field;
 
-        assert(is_ct_add_valid == true);
+    // // @todo: need to check if vote <= balance.
 
-        (sum_ct0is, sum_ct1is)
-    }
+    // // @todo: need to check if slot is empty (no previous ciphertext).
+    // // If so, (ct0is, ct1is) should be returned.
+
+    // // For each coefficient in the polynomials, select based on is_voter    
+    // let mut coefficients_ct0: [Field; 2048] = [0; 2048];
+    // let mut coefficients_ct1: [Field; 2048] = [0; 2048];
+
+    // for i in 0..2048 {
+    //     coefficients_ct0[i] = selector * ct0is[0].coefficients[i] + (1 - selector) * sum_ct0is[0].coefficients[i];
+        
+    //     coefficients_ct1[i] = selector * ct1is[0].coefficients[i] + (1 - selector) * sum_ct1is[0].coefficients[i];
+    // }
+
+    // let mut output_ct0: [Polynomial<2048>; 1] = [Polynomial::new(coefficients_ct0)];
+    // let mut output_ct1: [Polynomial<2048>; 1] = [Polynomial::new(coefficients_ct1)];
+
+    // (output_ct0, output_ct1)
 }

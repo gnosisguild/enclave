@@ -7,7 +7,7 @@
 use polynomial::Polynomial;
 
 // Check that all valid coefficients are either 0 or 1
-pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
+pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) -> bool {
     // This value would allow to fit
     // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
@@ -17,22 +17,28 @@ pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
     let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
     let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
 
+    let mut all_valid = true;
+
     // Loop through all coefficients in the space where we could have a vote
     // yes part
     for i in START_INDEX_Y..HALF_D {
         let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));
+        let is_valid = (0 == coeff * (q_mod_t - coeff));
+        all_valid = all_valid & is_valid;
     }
 
     // no part
     for i in START_INDEX_N..D {
         let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));
+        let is_valid = (0 == coeff * (q_mod_t - coeff));
+        all_valid = all_valid & is_valid;
     }
+
+    all_valid
 }
 
 // Check that the polynomial has 0 for all relevant coefficients
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
     // This value would allow to fit
     // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
@@ -55,7 +61,7 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
         sum += k1.coefficients[i];
     }
 
-    assert(sum == 0);
+    sum == 0
 }
 
 #[test]
@@ -69,10 +75,10 @@ fn test_check_coefficient_values_pass() {
         ],
     };
 
-    check_coefficient_values(pol, 1);
+    assert(check_coefficient_values(pol, 1) == true);
 }
 
-#[test(should_fail)]
+#[test]
 fn test_check_coefficient_values_fail() {
     let pol = Polynomial {
         coefficients: [
@@ -83,10 +89,10 @@ fn test_check_coefficient_values_fail() {
         ],
     };
 
-    check_coefficient_values(pol, 1);
+    assert(check_coefficient_values(pol, 1) == false);
 }
 
-#[test(should_fail)]
+#[test]
 fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
@@ -97,7 +103,7 @@ fn test_check_coefficient_zero_fail() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol) == false);
 }
 
 #[test]
@@ -111,5 +117,5 @@ fn test_check_coefficient_zero() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol) == true);
 }
