@@ -363,7 +363,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ///
     /// # Arguments
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
-    fn check_encryption_constraints(self, gammas: Vec<Field>) {
+    fn check_encryption_constraints(self, gammas: Vec<Field>) -> bool {
         let crypto_params = self.params.crypto_params();
         let gamma = gammas.get(0);
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
@@ -373,7 +373,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let k1_at_gamma = self.k1.eval(gamma);
         let e1_at_gamma = self.e1.eval(gamma);
 
-        // First equation with
+        // Check first constraints
         let mut ct0_sum = self.check_ct0_constraint(
             0,
             gamma,
@@ -415,12 +415,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 u_at_gamma,
                 e1_at_gamma,
             );
-            ct1_sum = (ct1_sum.0 + lhs * gammas.get(i + L - 1), ct1_sum.1 + rhs * gammas.get(i));
+            ct1_sum = (ct1_sum.0 + lhs * gammas.get(i + L), ct1_sum.1 + rhs * gammas.get(i));
         }
 
-        let unused_gamma = gammas.get(2 * L);
-        // Assert sum of lhs and rhs of ct0 and ct1 with unused Gamma at the index 2 * L
-        assert_eq(ct0_sum.0 + unused_gamma * ct1_sum.0, ct0_sum.1 + unused_gamma * ct1_sum.1);
+        let unused_gamma = gammas.get(2 * L - 1);
+        // Return equality result for sum of lhs and rhs of ct0 and ct1 with unused Gamma at the index 2 * L - 1
+        ct0_sum.0 + unused_gamma * ct1_sum.0 == ct0_sum.1 + unused_gamma * ct1_sum.1
     }
 
     /// Verifies the ct0 constraint for a specific CRT basis
