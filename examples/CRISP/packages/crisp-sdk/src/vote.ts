@@ -253,7 +253,7 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const noir = new Noir(circuit as CompiledCircuit)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  const { witness } = await noir.execute(crispInputs as any)  
+  const { witness } = await noir.execute(crispInputs as any)
   const proof = await backend.generateProof(witness)
 
   return proof
