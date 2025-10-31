@@ -30,14 +30,14 @@ impl<let N: u32> Polynomial<N> {
         Polynomial { coefficients }
     }
 
-    /// Sums two polynomials.
+    /// Adds two polynomials.
     ///
     /// # Arguments
     /// * `other` - The polynomial to add to the current polynomial.
     ///
     /// # Returns
     /// A new polynomial with the coefficients summed.
-    pub fn sum(self, other: Self) -> Self {
+    pub fn add(self, other: Self) -> Self {
         let mut result = Self::new([0; N]);
 
         for i in 0..N {
@@ -54,7 +54,7 @@ impl<let N: u32> Polynomial<N> {
     ///
     /// # Returns
     /// A new polynomial with the coefficients subtracted.
-    pub fn subtract(self, other: Self) -> Self {
+    pub fn sub(self, other: Self) -> Self {
         let mut result = Self::new([0; N]);
 
         for i in 0..N {
@@ -71,7 +71,7 @@ impl<let N: u32> Polynomial<N> {
     ///
     /// # Returns
     /// A new polynomial with the coefficients multiplied by the scalar.
-    pub fn multiply_by_scalar(self, scalar: Field) -> Self {
+    pub fn mul_scalar(self, scalar: Field) -> Self {
         let mut result = Self::new([0; N]);
 
         for i in 0..N {
