@@ -48,6 +48,7 @@ export const generateMerkleProof = (
   }
 
   const leaf = hashLeaf(address, balance.toString())
+  console.log("leaf hash", leaf);
 
   const index = leaves.findIndex((l) => l === leaf)
 
