@@ -12,7 +12,7 @@ import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-
+import fs from "fs"
 /**
  * This utility function calculates the first valid index for vote options
  * based on the total voting power and degree.
@@ -152,6 +152,11 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param publicKey The public key to use for encryption
  * @param previousCiphertext The previous ciphertext to use for addition operation
  * @param bfvParams The BFV parameters to use for encryption
+ * @param merkleData The merkle proof data
+ * @param message The message that was signed
+ * @param signature The signature of the message
+ * @param balance The voter's balance
+ * @param slotAddress The voter's slot address
  * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async ({
@@ -163,6 +168,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   message,
   signature,
   balance,
+  slotAddress,
 }: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
   if (encodedVote.length !== bfvParams.degree) {
     throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
@@ -186,7 +192,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
     merkle_proof_indices: merkleData.indices.map((i) => i.toString()),
     merkle_proof_siblings: merkleData.proof.siblings.map((s) => s.toString()),
     merkle_root: merkleData.proof.root.toString(),
-    slot_address: merkleData.proof.root.toString(), // temporary, will be replaced with the actual slot address.
+    slot_address: slotAddress,
     balance: balance.toString(),
   }
 }
@@ -196,6 +202,9 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
  * @param voter The voter's address
  * @param publicKey The voter's public key
  * @param previousCiphertext The previous ciphertext
+ * @param bfvParams The BFV parameters
+ * @param merkleRoot The merkle root of the census tree
+ * @param slotAddress The voter's slot address
  * @returns The CRISP circuit inputs for a mask vote
  */
 export const generateMaskVote = async (
@@ -203,6 +212,7 @@ export const generateMaskVote = async (
   previousCiphertext: Uint8Array,
   bfvParams = DEFAULT_BFV_PARAMS,
   merkleRoot: bigint,
+  slotAddress: string,
 ): Promise<CRISPCircuitInputs> => {
   const plaintextVote: IVote = {
     yes: 0n,
@@ -227,7 +237,7 @@ export const generateMaskVote = async (
     merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
     merkle_proof_length: '1',
     merkle_root: merkleRoot.toString(),
-    slot_address: merkleRoot.toString(), // temporary, will be replaced with the actual slot address.
+    slot_address: slotAddress, 
     balance: '0',
   }
 }
@@ -236,7 +246,8 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const noir = new Noir(circuit as CompiledCircuit)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  const { witness } = await noir.execute(crispInputs as any)
+  const { witness, returnValue } = await noir.execute(crispInputs as any)  
+  console.log("Circuit return value:", returnValue)
   const proof = await backend.generateProof(witness)
 
   return proof
