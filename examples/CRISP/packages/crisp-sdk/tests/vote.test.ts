@@ -220,6 +220,8 @@ describe('Vote', () => {
         slotAddress: account.address.toLowerCase(),
       })
 
+      // console.log('Generated circuit inputs, generating proof...', merkleProof);
+
       const proof = await generateProof(inputs)
       const isValid = await verifyProof(proof)
 
@@ -238,6 +240,7 @@ describe('Vote', () => {
 
       let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress)
 
+      maskVote.k1[0] = '1'
       const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
 
