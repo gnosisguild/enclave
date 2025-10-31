@@ -5,12 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+/**
+ * @title IInputValidator
+ * @notice Interface for validating computation inputs
+ * @dev Input validators enforce access control and validation rules for E3 computation inputs
+ */
 interface IInputValidator {
-    /// @notice This function should be called by the Enclave contract to validate the
-    /// input of a computation.
-    /// @param sender The account that is submitting the input.
-    /// @param data The input to be verified.
-    /// @return input The decoded, policy-approved application payload.
+    /// @notice Validate and process input data for a computation
+    /// @dev This function is called by the Enclave contract when input is published
+    /// @param sender The account that is submitting the input
+    /// @param data The input data to be validated
+    /// @return input The decoded, policy-approved application payload
     function validate(
         address sender,
         bytes memory data

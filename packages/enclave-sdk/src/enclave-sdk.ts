@@ -75,6 +75,13 @@ export class EnclaveSDK {
       );
     }
 
+    if (!isValidAddress(config.contracts.feeToken)) {
+      throw new SDKError(
+        "Invalid FeeToken contract address",
+        "INVALID_ADDRESS"
+      );
+    }
+
     this.eventListener = new EventListener(config.publicClient);
     this.contractClient = new ContractClient(
       config.publicClient,
@@ -166,7 +173,7 @@ export class EnclaveSDK {
   }
 
   /**
-   * This function encrypts a number using the configured FHE protocol 
+   * This function encrypts a number using the configured FHE protocol
    * and generates the necessary public inputs for a zk-SNARK proof.
    * @param data The number to encrypt
    * @param publicKey The public key to use for encryption
@@ -174,7 +181,7 @@ export class EnclaveSDK {
    */
   public async encryptNumberAndGenInputs(
     data: bigint,
-    publicKey: Uint8Array,
+    publicKey: Uint8Array
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     switch (this.protocol) {
@@ -190,7 +197,7 @@ export class EnclaveSDK {
         const publicInputs = JSON.parse(circuitInputs);
         return {
           encryptedData,
-          publicInputs
+          publicInputs,
         };
       default:
         throw new Error("Protocol not supported");
@@ -209,13 +216,14 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
     circuit: CompiledCircuit
   ): Promise<VerifiableEncryptionResult> {
-    const { publicInputs, encryptedData } = await this.encryptNumberAndGenInputs(data, publicKey);
-        const proof = await generateProof(publicInputs, circuit);
+    const { publicInputs, encryptedData } =
+      await this.encryptNumberAndGenInputs(data, publicKey);
+    const proof = await generateProof(publicInputs, circuit);
 
-        return {
-          encryptedData,
-          proof,
-        };
+    return {
+      encryptedData,
+      proof,
+    };
   }
 
   /**
@@ -226,7 +234,7 @@ export class EnclaveSDK {
    */
   public async encryptVectorAndGenInputs(
     data: BigUint64Array,
-    publicKey: Uint8Array,
+    publicKey: Uint8Array
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     switch (this.protocol) {
@@ -242,7 +250,7 @@ export class EnclaveSDK {
         const publicInputs = JSON.parse(circuitInputs);
         return {
           encryptedData,
-          publicInputs
+          publicInputs,
         };
       default:
         throw new Error("Protocol not supported");
@@ -261,7 +269,8 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
     circuit: CompiledCircuit
   ): Promise<VerifiableEncryptionResult> {
-    const { publicInputs, encryptedData } = await this.encryptVectorAndGenInputs(data, publicKey);
+    const { publicInputs, encryptedData } =
+      await this.encryptVectorAndGenInputs(data, publicKey);
 
     const proof = await generateProof(publicInputs, circuit);
 
@@ -272,10 +281,24 @@ export class EnclaveSDK {
   }
 
   /**
+   * Approve the fee token for the Enclave
+   * @param amount - The amount to approve
+   * @returns The approval transaction hash
+   */
+  public async approveFeeToken(amount: bigint): Promise<Hash> {
+    console.log(">>> APPROVE FEE TOKEN");
+
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    return this.contractClient.approveFeeToken(amount);
+  }
+
+  /**
    * Request a new E3 computation
    */
   public async requestE3(params: {
-    filter: `0x${string}`;
     threshold: [number, number];
     startWindow: [bigint, bigint];
     duration: bigint;
@@ -283,7 +306,6 @@ export class EnclaveSDK {
     e3ProgramParams: `0x${string}`;
     computeProviderParams: `0x${string}`;
     customParams?: `0x${string}`;
-    value?: bigint;
     gasLimit?: bigint;
   }): Promise<Hash> {
     console.log(">>> REQUEST");
@@ -293,7 +315,6 @@ export class EnclaveSDK {
     }
 
     return this.contractClient.requestE3(
-      params.filter,
       params.threshold,
       params.startWindow,
       params.duration,
@@ -301,7 +322,6 @@ export class EnclaveSDK {
       params.e3ProgramParams,
       params.computeProviderParams,
       params.customParams,
-      params.value,
       params.gasLimit
     );
   }
@@ -551,6 +571,7 @@ export class EnclaveSDK {
     contracts: {
       enclave: `0x${string}`;
       ciphernodeRegistry: `0x${string}`;
+      feeToken: `0x${string}`;
     };
     privateKey?: `0x${string}`;
     chainId: keyof typeof EnclaveSDK.chains;

@@ -81,8 +81,8 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
 
 // Default E3 configuration
 export const DEFAULT_E3_CONFIG = {
-  threshold_min: 2,
-  threshold_max: 3,
+  threshold_min: 1,
+  threshold_max: 2,
   window_size: 120, // 2 minutes in seconds
   duration: 1800, // 30 minutes in seconds
   payment_amount: "0", // 0 ETH in wei
@@ -120,11 +120,17 @@ export function encodeBfvParams(
 }
 
 /**
- * Encode compute provider parameters for the smart contract
+ * Encode compute provider parameters for the smart contract'
+ * If mock is true, the compute provider parameters will return 32 bytes of 0x00
  */
 export function encodeComputeProviderParams(
-  params: ComputeProviderParams
+  params: ComputeProviderParams,
+  mock: boolean = false
 ): `0x${string}` {
+  if (mock) {
+    return `0x${"0".repeat(32)}` as `0x${string}`;
+  }
+
   const jsonString = JSON.stringify(params);
   const encoder = new TextEncoder();
   const bytes = encoder.encode(jsonString);

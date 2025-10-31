@@ -34,7 +34,7 @@ This is a Rust-based server implementation for CRISP, which is built on top of t
    ENCLAVE_ADDRESS=your_enclave_contract_address
    E3_PROGRAM_ADDRESS=your_e3_program_address
    CIPHERNODE_REGISTRY_ADDRESS=your_ciphernode_registry_address
-   NAIVE_REGISTRY_FILTER_ADDRESS=your_naive_registry_filter_address
+   FEE_TOKEN_ADDRESS=free_token_address
    CHAIN_ID=your_chain_id
    CRON_API_KEY=your_cron_api_key
    ```

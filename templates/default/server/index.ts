@@ -33,6 +33,7 @@ async function createPrivateSDK() {
     PRIVATE_KEY,
     CIPHERNODE_REGISTRY_CONTRACT,
     ENCLAVE_CONTRACT,
+    FEE_TOKEN_CONTRACT,
     RPC_URL,
   } = getCheckedEnvVars();
 
@@ -46,6 +47,7 @@ async function createPrivateSDK() {
     contracts: {
       enclave: ENCLAVE_CONTRACT as `0x${string}`,
       ciphernodeRegistry: CIPHERNODE_REGISTRY_CONTRACT as `0x${string}`,
+      feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
     chainId: CHAIN_ID,
     protocol: FheProtocol.BFV,

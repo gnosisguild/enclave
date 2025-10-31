@@ -35,7 +35,7 @@ Providers, or other network participant.
       IE3Program e3Program,
       bytes memory e3ProgramParams,
       bytes memory computeProviderParams
-   ) external payable returns (uint256 e3Id, E3 memory e3)
+   ) external returns (uint256 e3Id, E3 memory e3)
    ```
 
 ### Phase 2: Node Selection
@@ -57,9 +57,9 @@ During this phase, Data Providers — who may include individual users, applicat
    ensure they are valid for the requested E3. Some of these proofs are generic (e.g., proof of
    valid encryption) while others will be specific to your application.
 3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to the Enclave contract, which will
-   call the `validate` function on your E3P InputValidator smart contract. The input hash is then added to a Merkle
-   tree, the root of which can later be used to anchor proofs of correct execution of your E3
-   Program.
+   call the `validate` function on your E3P InputValidator smart contract. The input hash is then
+   added to a Merkle tree, the root of which can later be used to anchor proofs of correct execution
+   of your E3 Program.
 
    ```solidity
    function validate(

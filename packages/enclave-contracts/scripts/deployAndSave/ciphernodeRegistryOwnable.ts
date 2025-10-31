@@ -17,6 +17,7 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 export interface CiphernodeRegistryOwnableArgs {
   enclaveAddress?: string;
   owner?: string;
+  submissionWindow?: number;
   poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
@@ -29,6 +30,7 @@ export interface CiphernodeRegistryOwnableArgs {
 export const deployAndSaveCiphernodeRegistryOwnable = async ({
   enclaveAddress,
   owner,
+  submissionWindow,
   poseidonT3Address,
   hre,
 }: CiphernodeRegistryOwnableArgs): Promise<{
@@ -46,8 +48,11 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   if (
     !enclaveAddress ||
     !owner ||
+    !submissionWindow ||
     (preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
-      preDeployedArgs?.constructorArgs?.owner === owner)
+      preDeployedArgs?.constructorArgs?.owner === owner &&
+      preDeployedArgs?.constructorArgs?.submissionWindow ===
+        submissionWindow.toString())
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error(
@@ -73,6 +78,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
     owner,
     enclaveAddress,
+    submissionWindow,
   );
 
   await ciphernodeRegistry.waitForDeployment();
@@ -83,7 +89,11 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
   storeDeploymentArgs(
     {
-      constructorArgs: { owner, enclaveAddress: enclaveAddress },
+      constructorArgs: {
+        owner,
+        enclaveAddress: enclaveAddress,
+        submissionWindow: submissionWindow.toString(),
+      },
       blockNumber,
       address: ciphernodeRegistryAddress,
     },
@@ -93,6 +103,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
   const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
     ciphernodeRegistryAddress,
+    signer,
   );
 
   return { ciphernodeRegistry: ciphernodeRegistryContract };

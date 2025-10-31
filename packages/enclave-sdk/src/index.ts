@@ -32,6 +32,7 @@ export type {
   CiphernodeRemovedData,
   CommitteeRequestedData,
   CommitteePublishedData,
+  CommitteeFinalizedData,
   EnclaveEventData,
   RegistryEventData,
   ProtocolParams,
@@ -71,4 +72,9 @@ export {
   type ComputeProviderParams,
 } from "./utils";
 
-export { generateProof, type Polynomial, convertToPolynomial, convertToPolynomialArray } from "./greco";
+export {
+  generateProof,
+  type Polynomial,
+  convertToPolynomial,
+  convertToPolynomialArray,
+} from "./greco";
