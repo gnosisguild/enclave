@@ -421,12 +421,13 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 u_at_gamma,
                 e1_at_gamma,
             );
-            ct1_sum = (ct1_sum.0 + lhs * gammas.get(i + L), ct1_sum.1 + rhs * gammas.get(i));
+            ct1_sum =
+                (ct1_sum.0 + lhs * gammas.get(i + L - 1), ct1_sum.1 + rhs * gammas.get(i + L - 1));
         }
 
         let unused_gamma = gammas.get(2 * L - 1);
         // Return equality result for sum of lhs and rhs of ct0 and ct1 with unused Gamma at the index 2 * L - 1
-        ct0_sum.0 + unused_gamma * ct1_sum.0 == ct0_sum.1 + unused_gamma * ct1_sum.1
+        ct0_sum.0 + (unused_gamma * ct1_sum.0) == ct0_sum.1 + (unused_gamma * ct1_sum.1)
     }
 
     /// Verifies the ct0 constraint for a specific CRT basis
