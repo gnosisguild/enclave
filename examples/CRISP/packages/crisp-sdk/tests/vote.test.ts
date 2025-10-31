@@ -279,7 +279,6 @@ describe('Vote', () => {
 
       let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress)
 
-      maskVote.k1[2047] = '1'
       const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
 

@@ -69,8 +69,6 @@ fn main(
         merkle_proof_siblings,
     );
 
-    println(merkle_root_calculated);
-
     let greco: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
