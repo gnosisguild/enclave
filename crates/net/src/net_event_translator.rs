@@ -117,7 +117,12 @@ impl NetEventTranslator {
         quic_port: u16,
         repository: Repository<Vec<u8>>,
         experimental_trbfv: bool,
-    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
+    ) -> Result<(
+        Addr<Self>,
+        Option<Addr<DocumentPublisher>>,
+        tokio::task::JoinHandle<Result<()>>,
+        String,
+    )> {
         let topic = "tmp-enclave-gossip-topic";
         // Get existing keypair or generate a new one
         let mut bytes = match repository.read().await? {
@@ -136,12 +141,25 @@ impl NetEventTranslator {
         // Setup and start net event translator
         let rx = &Arc::new(interface.rx());
         let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
-        if experimental_trbfv {
-            DocumentPublisher::setup(&bus, &interface.tx(), rx, topic);
-        }
+
+        // NOTE:
+        // This is a little rough but having the trbfv switch is short term
+        // Once we setup permenantly we should refactor to
+        // We should separate NetInterface from NetEventTranslator
+        let maybe_publisher = if experimental_trbfv {
+            Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic))
+        } else {
+            None
+        };
+
         let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
-        Ok((addr, handle, keypair.public().to_peer_id().to_string()))
+        Ok((
+            addr,
+            maybe_publisher,
+            handle,
+            keypair.public().to_peer_id().to_string(),
+        ))
     }
 }
 

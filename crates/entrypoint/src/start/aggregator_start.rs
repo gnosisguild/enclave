@@ -52,7 +52,7 @@ pub async fn execute(
 
     builder.build().await?;
 
-    let (_, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
+    let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
         &cipher,
