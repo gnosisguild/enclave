@@ -7,6 +7,7 @@
 use crate::events::GossipData;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
+use crate::DocumentPublisher;
 use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -59,11 +60,12 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         tx: &mpsc::Sender<NetCommand>,
-        mut rx: broadcast::Receiver<NetEvent>,
+        rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
     ) -> Addr<Self> {
+        let mut rx = rx.resubscribe();
         let addr = NetEventTranslator::new(bus.clone(), tx, topic).start();
 
         // Listen on all events
@@ -114,6 +116,7 @@ impl NetEventTranslator {
         cipher: &Arc<Cipher>,
         quic_port: u16,
         repository: Repository<Vec<u8>>,
+        experimental_trbfv: bool,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
         let topic = "tmp-enclave-gossip-topic";
         // Get existing keypair or generate a new one
@@ -131,8 +134,11 @@ impl NetEventTranslator {
         let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
 
         // Setup and start net event translator
-        let rx = interface.rx();
-        let addr = NetEventTranslator::setup(bus, &interface.tx(), rx, topic);
+        let rx = &Arc::new(interface.rx());
+        let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
+        if experimental_trbfv {
+            DocumentPublisher::setup(&bus, &interface.tx(), rx, topic);
+        }
         let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
         Ok((addr, handle, keypair.public().to_peer_id().to_string()))

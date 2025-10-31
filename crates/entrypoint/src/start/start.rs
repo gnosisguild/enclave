@@ -57,6 +57,7 @@ pub async fn execute(
         &cipher,
         config.quic_port(),
         repositories.libp2p_keypair(),
+        experimental_trbfv,
     )
     .await?;
 
