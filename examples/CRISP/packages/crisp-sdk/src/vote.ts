@@ -228,10 +228,10 @@ export const generateMaskVote = async (
 
   const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
 
-  // hardhat default private key 
-  const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  // hardhat default private key
+  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
   const account = privateKeyToAccount(privateKey)
-  const signature  = await account.signMessage({ message: MESSAGE })
+  const signature = await account.signMessage({ message: MESSAGE })
   const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(MESSAGE, signature)
 
   return {
@@ -244,7 +244,7 @@ export const generateMaskVote = async (
     merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
     merkle_proof_length: '1',
     merkle_root: merkleRoot.toString(),
-    slot_address: slotAddress, 
+    slot_address: slotAddress,
     balance: '0',
   }
 }
@@ -253,7 +253,7 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const noir = new Noir(circuit as CompiledCircuit)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  const { witness } = await noir.execute(crispInputs as any)  
+  const { witness } = await noir.execute(crispInputs as any)
   const proof = await backend.generateProof(witness)
 
   return proof

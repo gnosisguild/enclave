@@ -29,5 +29,5 @@ export const LEAVES = [
 export const MAX_DEPTH = 20
 
 export const votingPowerLeaf = 1000n
-export const testAddress = "0x1234567890123456789012345678901234567890" 
+export const testAddress = '0x1234567890123456789012345678901234567890'
 export const merkleProof = generateMerkleProof(0n, votingPowerLeaf, testAddress, LEAVES, MAX_DEPTH)
