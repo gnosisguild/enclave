@@ -29,10 +29,12 @@ cleanup() {
 
 trap cleanup INT TERM
 
-concurrently \
+echo "DEV SCRIPT STARTING..."
+
+pnpm concurrently \
   -ks first \
-  --names "ANVIL,DEPLOY,NODES" \
-  --prefix-colors "blue,green,yellow" \
+  --names "HARDHAT,DEPLOY" \
+  --prefix-colors "blue,green" \
   "cd packages/crisp-contracts && pnpm hardhat node" \
   "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 

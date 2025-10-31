@@ -16,8 +16,10 @@ In your _Nargo.toml_ file, add this library as a dependency:
 
 ```toml
 [dependencies]
-safe = { tag = "v0.1.0", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/safe"}
+safe = { tag = "v0.1.5", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/safe"}
 ```
+
+nb. the `tag` corresponds to the latest tag release of Enclave (`v0.1.5`). From `v0.1.6` you should remove `packages/` from `directory` field (ie., `circuits/crates/...`).
 
 ## API Reference
 

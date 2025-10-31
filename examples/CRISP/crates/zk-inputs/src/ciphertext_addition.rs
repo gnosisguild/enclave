@@ -30,7 +30,6 @@ pub struct CiphertextAdditionInputs {
     pub sum_ct1is: Vec<Vec<BigInt>>,
     pub r0is: Vec<Vec<BigInt>>,
     pub r1is: Vec<Vec<BigInt>>,
-    pub r_bound: u64,
 }
 
 impl CiphertextAdditionInputs {
@@ -47,7 +46,6 @@ impl CiphertextAdditionInputs {
             sum_ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
             r0is: vec![vec![BigInt::zero(); degree]; num_moduli],
             r1is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            r_bound: 0,
         }
     }
 
@@ -92,10 +90,6 @@ impl CiphertextAdditionInputs {
 
         // Initialize matrices to store results.
         let mut res = CiphertextAdditionInputs::new(params.moduli().len(), n as usize);
-
-        // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial.
-        // must be in {-1, 0, 1}, so the bound is 1 for all CRT moduli.
-        let r_bound = 1u64;
 
         let prev_ct0_coeffs = prev_ct0.coefficients();
         let prev_ct1_coeffs = prev_ct1.coefficients();
@@ -232,9 +226,6 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
-        // Set the bound for the quotient polynomials.
-        res.r_bound = r_bound;
-
         Ok(res)
     }
 
@@ -251,7 +242,6 @@ impl CiphertextAdditionInputs {
             sum_ct1is: reduce_coefficients_2d(&self.sum_ct1is, zkp_modulus),
             r0is: reduce_coefficients_2d(&self.r0is, zkp_modulus),
             r1is: reduce_coefficients_2d(&self.r1is, zkp_modulus),
-            r_bound: self.r_bound,
         }
     }
 }
@@ -294,7 +284,6 @@ mod tests {
         assert_eq!(inputs.sum_ct1is.len(), 2);
         assert_eq!(inputs.r0is.len(), 2);
         assert_eq!(inputs.r1is.len(), 2);
-        assert_eq!(inputs.r_bound, 0);
     }
 
     #[test]
@@ -326,7 +315,6 @@ mod tests {
         assert_eq!(inputs.sum_ct1is.len(), 1);
         assert_eq!(inputs.r0is.len(), 1);
         assert_eq!(inputs.r1is.len(), 1);
-        assert_eq!(inputs.r_bound, 1);
     }
 
     #[test]
@@ -345,6 +333,5 @@ mod tests {
 
         // Verify structure is preserved.
         assert_eq!(standard_form.prev_ct0is.len(), inputs.prev_ct0is.len());
-        assert_eq!(standard_form.r_bound, inputs.r_bound);
     }
 }
