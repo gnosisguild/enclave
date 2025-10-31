@@ -5,12 +5,9 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
       "require": "./dist/index.cjs",
-      "browser": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
+      "import": "./dist/index.js",
+      "browser": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
