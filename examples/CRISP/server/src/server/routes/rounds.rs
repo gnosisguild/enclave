@@ -180,7 +180,12 @@ pub async fn initialize_crisp_round(
 
     info!("Generating parameters...");
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-    let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
+    let params = encode_bfv_params(&build_bfv_params_arc(
+        degree,
+        plaintext_modulus,
+        &moduli,
+        None,
+    ));
 
     let token_address: Address = token_address.parse()?;
     let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)

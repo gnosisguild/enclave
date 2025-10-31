@@ -257,7 +257,7 @@ pub async fn decrypt_and_publish_result(
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-    build_bfv_params_arc(degree, plaintext_modulus, &moduli)
+    build_bfv_params_arc(degree, plaintext_modulus, &moduli, None)
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
