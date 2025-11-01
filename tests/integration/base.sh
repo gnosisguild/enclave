@@ -43,6 +43,9 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localho
 heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
 
+heading "Add ciphernode $CIPHERNODE_ADDRESS_5"
+pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_5 --network localhost
+
 heading "Request Committee"
 
 ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
