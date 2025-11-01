@@ -21,13 +21,14 @@ use e3_events::{
 };
 use e3_utils::ArcBytes;
 use futures::TryFutureExt;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
@@ -83,6 +84,10 @@ impl DocumentPublisher {
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
         let addr = Self::new(bus, tx, rx, topic).start();
+
+        // Convert events
+        EventConverter::setup(bus);
+
         // Listen on all events
         bus.do_send(Subscribe::new("*", addr.clone().recipient()));
 
@@ -374,6 +379,92 @@ async fn broadcast_document_published_notification(
         Duration::from_secs(3),
     )
     .await
+}
+
+/// Convert between ThresholdShareCreated and DocumentPublished events
+pub struct EventConverter {
+    bus: Addr<EventBus<EnclaveEvent>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+enum ReceivableDocument {
+    ThresholdShareCreated(ThresholdShareCreated),
+}
+
+impl ReceivableDocument {
+    pub fn get_e3_id(&self) -> E3id {
+        match self {
+            ReceivableDocument::ThresholdShareCreated(ref d) => d.e3_id,
+        }
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
+        bincode::serialize(self)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::Error> {
+        bincode::deserialize(bytes)
+    }
+}
+
+impl EventConverter {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+        Self { bus: bus.clone() }
+    }
+
+    pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+        let addr = Self::new(bus).start();
+        bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
+        addr
+    }
+
+    pub fn handle_threshold_share_created(&self, msg: ReceivableDocument) -> Result<()> {
+        let value = ArcBytes::from_bytes(msg.to_bytes()?);
+        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
+        self.bus
+            .do_send(EnclaveEvent::from(PublishDocumentRequested { value, meta }));
+        Ok(())
+    }
+
+    pub fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
+        let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
+        let event = EnclaveEvent::from(match receivable {
+            ReceivableDocument::ThresholdShareCreated(evt) => evt,
+        });
+        self.bus.do_send(event);
+        Ok(())
+    }
+}
+
+impl Actor for EventConverter {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<EnclaveEvent> for EventConverter {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::ThresholdShareCreated { data, .. } => ctx.notify(data),
+            _ => (),
+        }
+    }
+}
+
+impl Handler<ThresholdShareCreated> for EventConverter {
+    type Result = ();
+    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_threshold_share_created(msg) {
+            Ok(_) => (),
+            Err(err) => error!("{err}"),
+        }
+    }
+}
+
+impl Handler<DocumentReceived> for EventConverter {
+    type Result = ();
+    fn handle(&mut self, msg: DocumentReceived, ctx: &mut Self::Context) -> Self::Result {
+        self.handle_document_received(msg);
+    }
 }
 
 #[cfg(test)]
@@ -712,65 +803,5 @@ mod tests {
 
     pub fn days_from_now(days: u64) -> Instant {
         Instant::now() + Duration::from_secs(60 * 60 * 24 * days)
-    }
-}
-
-/// Convert between ThresholdShareCreated and DocumentPublished events
-pub struct PublishThresholdShareCreatedEvents {
-    bus: Addr<EventBus<EnclaveEvent>>,
-}
-
-impl PublishThresholdShareCreatedEvents {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
-        Self { bus: bus.clone() }
-    }
-    pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
-        let addr = Self::new(bus).start();
-        bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
-        addr
-    }
-    pub fn handle_threshold_share_created(&mut self, msg: ThresholdShareCreated) -> Result<()> {
-        // Convert to PublishDocumentRequested
-        let value = ArcBytes::from_bytes(msg.to_bytes()?);
-        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
-        self.bus
-            .do_send(EnclaveEvent::from(PublishDocumentRequested { value, meta }));
-        Ok(())
-    }
-    pub fn handle_document_received(&mut self, msg: DocumentReceived) -> Result<()> {
-        // Convert to ThresholdShareCreated if possible
-        let evt = ThresholdShareCreated::from_bytes(&msg.value.extract_bytes())?;
-        Ok(())
-    }
-}
-
-impl Actor for PublishThresholdShareCreatedEvents {
-    type Context = actix::Context<Self>;
-}
-
-impl Handler<EnclaveEvent> for PublishThresholdShareCreatedEvents {
-    type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::ThresholdShareCreated { id, data } => ctx.notify(data),
-            _ => (),
-        }
-    }
-}
-
-impl Handler<ThresholdShareCreated> for PublishThresholdShareCreatedEvents {
-    type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_threshold_share_created(msg) {
-            Ok(_) => (),
-            Err(err) => error!("{err}"),
-        }
-    }
-}
-
-impl Handler<DocumentReceived> for PublishThresholdShareCreatedEvents {
-    type Result = ();
-    fn handle(&mut self, msg: DocumentReceived, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_document_received(msg);
     }
 }

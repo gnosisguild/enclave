@@ -40,16 +40,6 @@ pub struct ThresholdShareCreated {
     pub share: Arc<ThresholdShare>,
 }
 
-impl ThresholdShareCreated {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
-        bincode::serialize(self)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::Error> {
-        bincode::deserialize(bytes)
-    }
-}
-
 impl Display for ThresholdShareCreated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
