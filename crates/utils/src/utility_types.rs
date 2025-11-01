@@ -29,6 +29,10 @@ impl ArcBytes {
     pub fn extract_bytes(&self) -> Vec<u8> {
         (*self.0).clone()
     }
+
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl Deref for ArcBytes {

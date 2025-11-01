@@ -28,7 +28,11 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error};
+use tracing::{debug, error, info, warn};
+
+const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
+const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
+const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
@@ -243,18 +247,8 @@ pub async fn handle_publish_document_requested(
         1000,
     )
     .await?;
-
-    broadcast_document_published_notification(
-        tx,
-        rx,
-        DocumentPublishedNotification {
-            meta: event.meta,
-            key,
-        },
-        topic,
-    )
-    .await?;
-
+    let notification = DocumentPublishedNotification::new(event.meta, key);
+    broadcast_document_published_notification(tx, rx, notification, topic).await?;
     Ok(())
 }
 
@@ -322,7 +316,7 @@ async fn put_record(
             }
             _ => None,
         },
-        Duration::from_secs(3),
+        KADEMLIA_PUT_TIMEOUT,
     )
     .await
 }
@@ -348,7 +342,7 @@ async fn get_record(
             }
             _ => None,
         },
-        Duration::from_secs(3),
+        KADEMLIA_GET_TIMEOUT,
     )
     .await
 }
@@ -376,7 +370,7 @@ async fn broadcast_document_published_notification(
             }
             _ => None,
         },
-        Duration::from_secs(3),
+        KADEMLIA_BROADCAST_TIMEOUT,
     )
     .await
 }
@@ -428,8 +422,11 @@ impl EventConverter {
             vec![],
             None,
         );
+
         self.bus
-            .do_send(EnclaveEvent::from(PublishDocumentRequested { value, meta }));
+            .do_send(EnclaveEvent::from(PublishDocumentRequested::new(
+                meta, value,
+            )));
         Ok(())
     }
     /// Received document externally

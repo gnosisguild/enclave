@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+use tracing::warn;
 use tracing::{error, info, instrument, trace};
 
 // TODO: store event filtering here on this actor instead of is_local_only() on the event. We
@@ -103,7 +104,6 @@ impl NetEventTranslator {
             EnclaveEvent::KeyshareCreated { .. } => true,
             EnclaveEvent::PlaintextAggregated { .. } => true,
             EnclaveEvent::PublicKeyAggregated { .. } => true,
-            EnclaveEvent::ThresholdShareCreated { .. } => true,
             _ => false,
         }
     }
@@ -199,7 +199,7 @@ impl Handler<EnclaveEvent> for NetEventTranslator {
                 trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
                 return;
             }
-
+            warn!("GossipPublish event: {}", event.event_type());
             match evt.to_bytes() {
                 Ok(data) => {
                     if let Err(e) = tx
