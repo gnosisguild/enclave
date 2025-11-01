@@ -40,7 +40,7 @@ pub use shutdown::*;
 pub use test_event::*;
 pub use threshold_share_created::*;
 
-use crate::{E3id, ErrorEvent, Event, EventId, HasE3id};
+use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{

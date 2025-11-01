@@ -28,7 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
@@ -392,9 +392,9 @@ enum ReceivableDocument {
 }
 
 impl ReceivableDocument {
-    pub fn get_e3_id(&self) -> E3id {
+    pub fn get_e3_id(&self) -> &E3id {
         match self {
-            ReceivableDocument::ThresholdShareCreated(ref d) => d.e3_id,
+            ReceivableDocument::ThresholdShareCreated(d) => &d.e3_id,
         }
     }
 
@@ -418,14 +418,21 @@ impl EventConverter {
         addr
     }
 
-    pub fn handle_threshold_share_created(&self, msg: ReceivableDocument) -> Result<()> {
-        let value = ArcBytes::from_bytes(msg.to_bytes()?);
-        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
+    /// Local node created a threshold share. Send it as a published document
+    pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
+        let receivable = ReceivableDocument::ThresholdShareCreated(msg);
+        let value = ArcBytes::from_bytes(receivable.to_bytes()?);
+        let meta = DocumentMeta::new(
+            receivable.get_e3_id().clone(),
+            DocumentKind::TrBFV,
+            vec![],
+            None,
+        );
         self.bus
             .do_send(EnclaveEvent::from(PublishDocumentRequested { value, meta }));
         Ok(())
     }
-
+    /// Received document externally
     pub fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
         let event = EnclaveEvent::from(match receivable {
@@ -463,7 +470,10 @@ impl Handler<ThresholdShareCreated> for EventConverter {
 impl Handler<DocumentReceived> for EventConverter {
     type Result = ();
     fn handle(&mut self, msg: DocumentReceived, ctx: &mut Self::Context) -> Self::Result {
-        self.handle_document_received(msg);
+        match self.handle_document_received(msg) {
+            Ok(_) => (),
+            Err(err) => error!("{err}"),
+        }
     }
 }
 
