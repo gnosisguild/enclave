@@ -409,6 +409,7 @@ impl EventConverter {
     pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
+        bus.do_send(Subscribe::new("DocumentReceived", addr.clone().into()));
         addr
     }
 
@@ -431,10 +432,13 @@ impl EventConverter {
     }
     /// Received document externally
     pub fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
+        warn!("Converting DocumentReceived...");
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
         let event = EnclaveEvent::from(match receivable {
             ReceivableDocument::ThresholdShareCreated(evt) => evt,
         });
+
+        warn!("Sending {:?}", event);
         self.bus.do_send(event);
         Ok(())
     }
@@ -449,6 +453,7 @@ impl Handler<EnclaveEvent> for EventConverter {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::ThresholdShareCreated { data, .. } => ctx.notify(data),
+            EnclaveEvent::DocumentReceived { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
