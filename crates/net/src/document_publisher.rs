@@ -15,8 +15,9 @@ use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    BusError, CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id,
-    EnclaveErrorType, EnclaveEvent, EventBus, PartyId, PublishDocumentRequested, Subscribe,
+    BusError, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
+    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EventBus, PartyId,
+    PublishDocumentRequested, Subscribe, ThresholdShareCreated,
 };
 use e3_utils::ArcBytes;
 use futures::TryFutureExt;
@@ -435,7 +436,7 @@ mod tests {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, _, _) =
             setup_test();
         let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
-        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
 
         // 1. Send a request to publish
@@ -508,7 +509,7 @@ mod tests {
             setup_test();
 
         let value = b"I am a special document".to_vec();
-        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
         let cid = Cid::from_content(&value);
 
@@ -571,7 +572,7 @@ mod tests {
             _,
         ) = setup_test();
         let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
-        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
 
         // Send a request to publish
@@ -640,7 +641,7 @@ mod tests {
                     E3id::new("1111", 1),
                     DocumentKind::TrBFV,
                     vec![],
-                    expires_at,
+                    Some(expires_at),
                 ),
             }),
         ))?;
@@ -654,7 +655,7 @@ mod tests {
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: cid.clone(),
-                meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
+                meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], Some(expires_at)),
             }),
         ))?;
 
@@ -711,5 +712,65 @@ mod tests {
 
     pub fn days_from_now(days: u64) -> Instant {
         Instant::now() + Duration::from_secs(60 * 60 * 24 * days)
+    }
+}
+
+/// Convert between ThresholdShareCreated and DocumentPublished events
+pub struct PublishThresholdShareCreatedEvents {
+    bus: Addr<EventBus<EnclaveEvent>>,
+}
+
+impl PublishThresholdShareCreatedEvents {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+        Self { bus: bus.clone() }
+    }
+    pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+        let addr = Self::new(bus).start();
+        bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
+        addr
+    }
+    pub fn handle_threshold_share_created(&mut self, msg: ThresholdShareCreated) -> Result<()> {
+        // Convert to PublishDocumentRequested
+        let value = ArcBytes::from_bytes(msg.to_bytes()?);
+        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
+        self.bus
+            .do_send(EnclaveEvent::from(PublishDocumentRequested { value, meta }));
+        Ok(())
+    }
+    pub fn handle_document_received(&mut self, msg: DocumentReceived) -> Result<()> {
+        // Convert to ThresholdShareCreated if possible
+        let evt = ThresholdShareCreated::from_bytes(&msg.value.extract_bytes())?;
+        Ok(())
+    }
+}
+
+impl Actor for PublishThresholdShareCreatedEvents {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<EnclaveEvent> for PublishThresholdShareCreatedEvents {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::ThresholdShareCreated { id, data } => ctx.notify(data),
+            _ => (),
+        }
+    }
+}
+
+impl Handler<ThresholdShareCreated> for PublishThresholdShareCreatedEvents {
+    type Result = ();
+    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_threshold_share_created(msg) {
+            Ok(_) => (),
+            Err(err) => error!("{err}"),
+        }
+    }
+}
+
+impl Handler<DocumentReceived> for PublishThresholdShareCreatedEvents {
+    type Result = ();
+    fn handle(&mut self, msg: DocumentReceived, ctx: &mut Self::Context) -> Self::Result {
+        self.handle_document_received(msg);
     }
 }

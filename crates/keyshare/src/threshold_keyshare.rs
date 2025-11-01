@@ -519,6 +519,7 @@ impl ThresholdKeyshare {
             bail!("Invalid state!");
         };
 
+        // TODO: Encrypt using BFV here
         let decrypted = sk_sss.decrypt(&self.cipher)?;
         let sk_sss: PvwEncrypted<SharedSecret> = PvwEncrypted::new(decrypted)?;
         let esi_sss = esi_sss
