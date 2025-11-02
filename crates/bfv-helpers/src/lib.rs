@@ -229,24 +229,16 @@ pub fn encode_ciphertexts(ciphertext: &[Ciphertext]) -> Vec<u8> {
 /// Returns a `Result` containing either:
 /// - `Ok(Vec<Ciphertext>)` - Successfully decoded ciphertexts
 /// - `Err(String)` - An error message if decoding fails
-///
-/// # Errors
-///
-/// This function will return an error if:
-/// - The ABI decoding fails
-/// - The decoded value is not an array
-/// - Array elements are not bytes
-/// - Ciphertext deserialization fails
 pub fn decode_ciphertexts(
     encoded: &[u8],
     params: &Arc<BfvParameters>,
-) -> anyhow::Result<Vec<Ciphertext>> {
+) -> Result<Vec<Ciphertext>, String> {
     let byte_arrays = decode_byte_array(encoded)?;
 
     let mut ciphertexts = Vec::with_capacity(byte_arrays.len());
     for (i, bytes) in byte_arrays.into_iter().enumerate() {
         let ciphertext = Ciphertext::from_bytes(&bytes, params)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize ciphertext {}: {}", i, e))?;
+            .map_err(|e| format!("Failed to deserialize ciphertext {}: {}", i, e))?;
         ciphertexts.push(ciphertext);
     }
 
@@ -254,20 +246,22 @@ pub fn decode_ciphertexts(
 }
 
 /// Decodes ABI-encoded bytes into a vector of byte arrays.
-pub fn decode_byte_array(encoded: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
-    let ty: DynSolType = "bytes[]".parse()?;
-    let decoded = ty.abi_decode(encoded)?;
+pub fn decode_byte_array(encoded: &[u8]) -> Result<Vec<Vec<u8>>, String> {
+    let ty: DynSolType = "bytes[]"
+        .parse()
+        .map_err(|e: alloy_dyn_abi::Error| e.to_string())?;
+    let decoded = ty.abi_decode(encoded).map_err(|e| e.to_string())?;
 
     let array = match decoded {
         DynSolValue::Array(arr) => arr,
-        _ => return Err(anyhow::anyhow!("Decoded value is not an array")),
+        _ => return Err("Decoded value is not an array".to_string()),
     };
 
     let mut byte_arrays = Vec::with_capacity(array.len());
     for (i, element) in array.into_iter().enumerate() {
         let bytes = match element {
             DynSolValue::Bytes(b) => b,
-            _ => return Err(anyhow::anyhow!("Array element {} is not bytes", i)),
+            _ => return Err(format!("Array element {} is not bytes", i)),
         };
         byte_arrays.push(bytes);
     }
