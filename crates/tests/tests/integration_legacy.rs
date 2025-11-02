@@ -20,6 +20,7 @@ use e3_events::{
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_sdk::bfv_helpers::encode_bfv_params;
+use e3_sdk::bfv_helpers::encode_ciphertexts;
 use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
@@ -205,7 +206,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: vec![ArcBytes::from_bytes(ciphertext.to_bytes())],
+        ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&[(*ciphertext).clone()])),
         e3_id: e3_id.clone(),
     });
 
@@ -339,7 +340,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: vec![ArcBytes::from_bytes(ciphertext.to_bytes())],
+            ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&[(*ciphertext).clone()])),
             e3_id: e3_id.clone(),
         })
         .clone(),

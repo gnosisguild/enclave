@@ -14,7 +14,7 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
-    pub ciphertext_output: Vec<ArcBytes>,
+    pub ciphertext_output: ArcBytes,
 }
 
 impl Display for CiphertextOutputPublished {

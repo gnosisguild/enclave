@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
+use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params, encode_ciphertexts};
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
@@ -26,7 +26,6 @@ use e3_trbfv::{
     TrBFVConfig,
 };
 use e3_utils::{to_ordered_vec, ArcBytes};
-use fhe_traits::Serialize;
 use num_bigint::BigUint;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -104,10 +103,7 @@ async fn test_trbfv_isolation() -> Result<()> {
         e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
 
     // Encrypt the plaintext
-    let ciphertexts = outputs
-        .into_iter()
-        .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
-        .collect::<Vec<ArcBytes>>();
+    let ciphertexts = ArcBytes::from_bytes(encode_ciphertexts(&outputs));
 
     let mut decryption_shares = HashMap::new();
     // for party_id in 0..=threshold_m as usize {

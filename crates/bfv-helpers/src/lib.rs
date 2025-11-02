@@ -9,8 +9,9 @@ mod util;
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder};
-use std::sync::Arc;
+use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext};
+use fhe_traits::{DeserializeParametrized, Serialize};
+use std::{error::Error, sync::Arc};
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
@@ -191,6 +192,89 @@ pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
     }
 }
 
+/// Encodes BFV ciphertexts into ABI-encoded bytes.
+///
+/// This function converts a slice of BFV ciphertexts into an array of byte arrays
+/// and then ABI-encodes it using Solidity ABI format. The resulting bytes represent
+/// a bytes[] array that can be used in smart contracts or for cross-platform serialization.
+///
+/// # Arguments
+///
+/// * `ciphertexts` - A slice of ciphertext objects to encode
+///
+/// # Returns
+///
+/// Returns a `Vec<u8>` containing the ABI-encoded ciphertexts as a bytes[] array.
+pub fn encode_ciphertexts(ciphertext: &[Ciphertext]) -> Vec<u8> {
+    let value = DynSolValue::Array(
+        ciphertext
+            .iter()
+            .map(|ct| DynSolValue::Bytes(ct.to_bytes()))
+            .collect(),
+    );
+    value.abi_encode()
+}
+
+/// Decodes ABI-encoded bytes back into BFV ciphertexts.
+///
+/// This function takes ABI-encoded bytes representing a bytes[] array and converts
+/// them back into a vector of BFV ciphertext objects.
+///
+/// # Arguments
+///
+/// * `encoded` - The ABI-encoded bytes to decode
+///
+/// # Returns
+///
+/// Returns a `Result` containing either:
+/// - `Ok(Vec<Ciphertext>)` - Successfully decoded ciphertexts
+/// - `Err(String)` - An error message if decoding fails
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The ABI decoding fails
+/// - The decoded value is not an array
+/// - Array elements are not bytes
+/// - Ciphertext deserialization fails
+pub fn decode_ciphertexts(
+    encoded: &[u8],
+    params: &Arc<BfvParameters>,
+) -> anyhow::Result<Vec<Ciphertext>> {
+    let byte_arrays = decode_byte_array(encoded)?;
+
+    let mut ciphertexts = Vec::with_capacity(byte_arrays.len());
+    for (i, bytes) in byte_arrays.into_iter().enumerate() {
+        let ciphertext = Ciphertext::from_bytes(&bytes, params)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize ciphertext {}: {}", i, e))?;
+        ciphertexts.push(ciphertext);
+    }
+
+    Ok(ciphertexts)
+}
+
+/// Decodes ABI-encoded bytes into a vector of byte arrays.
+pub fn decode_byte_array(encoded: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
+    let ty: DynSolType = "bytes[]".parse()?;
+    let decoded = ty.abi_decode(encoded)?;
+
+    let array = match decoded {
+        DynSolValue::Array(arr) => arr,
+        _ => return Err(anyhow::anyhow!("Decoded value is not an array")),
+    };
+
+    let mut byte_arrays = Vec::with_capacity(array.len());
+    for (i, element) in array.into_iter().enumerate() {
+        let bytes = match element {
+            DynSolValue::Bytes(b) => b,
+            _ => return Err(anyhow::anyhow!("Array element {} is not bytes", i)),
+        };
+        byte_arrays.push(bytes);
+    }
+
+    Ok(byte_arrays)
+}
+
 /// Decodes BFV parameters from ABI-encoded bytes and wraps them in an `Arc`.
 ///
 /// This is a convenience function that combines `decode_bfv_params` with `Arc::new`
@@ -217,6 +301,7 @@ pub fn decode_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use fhe::bfv::{Encoding, Plaintext};
 
     #[test]
     fn test_build_bfv_params() {
@@ -373,6 +458,59 @@ mod tests {
 
             let params = decode_bfv_params_arc(&bytes);
             assert_eq!(params.plaintext(), 1032193);
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod ciphertext_tests {
+        use super::*;
+        use anyhow::*;
+        use fhe::bfv::{PublicKey, SecretKey};
+        use fhe_traits::{FheEncoder, FheEncrypter};
+        use rand::{thread_rng, Rng};
+
+        #[test]
+        fn test_ciphertext_encoding() -> Result<()> {
+            let number = 31415u64;
+            let mut rng = thread_rng();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = Arc::new(build_bfv_params(degree, plaintext_modulus, &moduli));
+            let sk = SecretKey::random(&params, &mut rng);
+            let pk = PublicKey::new(&sk, &mut rng);
+            let pt = Plaintext::try_encode(&[number], Encoding::poly(), &params)?;
+            let ct = pk.try_encrypt(&pt, &mut rng)?;
+            let encoded = encode_ciphertexts(&[ct.clone()]);
+            let decoded = decode_ciphertexts(&encoded, &params)?;
+            assert_eq!(decoded, vec![ct]);
+            Ok(())
+        }
+
+        #[test]
+        fn test_ciphertext_encoding_fuzz_multiple() -> Result<()> {
+            let mut rng = thread_rng();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = Arc::new(build_bfv_params(degree, plaintext_modulus, &moduli));
+            let sk = SecretKey::random(&params, &mut rng);
+            let pk = PublicKey::new(&sk, &mut rng);
+
+            // Test with 100 iterations, each with 1-10 random ciphertexts
+            for _ in 0..100 {
+                let count = rng.gen_range(1..=10);
+                let mut ciphertexts = Vec::new();
+
+                for _ in 0..count {
+                    let number = rng.gen::<u32>() as u64; // XXX: generating a u64 fails with assertion failed: *x < 4 * self.p.p
+                    let pt = Plaintext::try_encode(&[number], Encoding::poly(), &params)?;
+                    let ct = pk.try_encrypt(&pt, &mut rng)?;
+                    ciphertexts.push(ct);
+                }
+
+                let encoded = encode_ciphertexts(&ciphertexts);
+                let decoded = decode_ciphertexts(&encoded, &params)?;
+                assert_eq!(decoded, ciphertexts);
+            }
+
             Ok(())
         }
     }

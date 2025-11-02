@@ -68,7 +68,7 @@ pub async fn execute(
     }
 
     if let Some(path) = plaintext_write_path {
-        PlaintextWriter::attach(&path, bus.clone());
+        PlaintextWriter::attach(&path, bus.clone(), experimental_trbfv);
     }
 
     Ok((bus, join_handle, peer_id))

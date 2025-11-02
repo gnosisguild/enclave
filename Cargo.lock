@@ -2981,6 +2981,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "e3-bfv-helpers",
  "e3-config",
  "e3-crypto",
  "e3-data",

@@ -51,13 +51,12 @@ impl From<E3RequestedWithChainId> for EnclaveEvent {
 
 struct CiphertextOutputPublishedWithChainId(pub IEnclave::CiphertextOutputPublished, pub u64);
 
+// TODO: This is to be changed to accept a vector of bytes
 impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputPublished {
     fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
         e3_events::CiphertextOutputPublished {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
-            // XXX: Ciphertext is an array of bytes this needs to be coordinated with enclave
-            // contract
-            ciphertext_output: vec![ArcBytes::from_bytes(value.0.ciphertextOutput.to_vec())],
+            ciphertext_output: ArcBytes::from_bytes(value.0.ciphertextOutput.to_vec()),
         }
     }
 }

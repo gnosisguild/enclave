@@ -88,7 +88,7 @@ impl PublishDocumentRequested {
 
 impl Display for PublishDocumentRequested {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.meta) // XXX:: apply ArcBytes and rely on debug once trbfv is merged
+        write!(f, "{:?}", self)
     }
 }
 

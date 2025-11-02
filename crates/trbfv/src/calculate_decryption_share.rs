@@ -11,11 +11,11 @@ use crate::helpers::{try_poly_from_sensitive_bytes, try_polys_from_sensitive_byt
 /// This module defines event payloads that will generate a decryption share for the given ciphertext for this node
 use crate::TrBFVConfig;
 use anyhow::*;
+use e3_bfv_helpers::decode_ciphertexts;
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_utils::utility_types::ArcBytes;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
-use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
 use tracing::info;
 
@@ -26,7 +26,7 @@ pub struct CalculateDecryptionShareRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// One or more Ciphertexts to decrypt
-    pub ciphertexts: Vec<ArcBytes>,
+    pub ciphertexts: ArcBytes,
     /// A single summed polynomial for this nodes secret key.
     pub sk_poly_sum: SensitiveBytes,
     /// A vector of summed polynomials for this parties smudging noise
@@ -50,15 +50,7 @@ impl TryFrom<(&Cipher, CalculateDecryptionShareRequest)> for InnerRequest {
         value: (&Cipher, CalculateDecryptionShareRequest),
     ) -> std::result::Result<InnerRequest, Self::Error> {
         let trbfv_config = value.1.trbfv_config.clone();
-        let ciphertexts = value
-            .1
-            .ciphertexts
-            .into_iter()
-            .map(|ciphertext| {
-                Ciphertext::from_bytes(&ciphertext, &trbfv_config.params())
-                    .context("Could not parse ciphertext")
-            })
-            .collect::<Result<Vec<Ciphertext>>>()?;
+        let ciphertexts = decode_ciphertexts(&value.1.ciphertexts, &trbfv_config.params())?;
 
         let sk_poly_sum =
             try_poly_from_sensitive_bytes(value.1.sk_poly_sum, trbfv_config.params(), value.0)?;

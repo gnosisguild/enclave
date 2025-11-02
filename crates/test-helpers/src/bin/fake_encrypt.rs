@@ -5,8 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // This is a test script designed to encrypt some fixed data to a fhe public key
+use anyhow::Result;
 use clap::Parser;
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
+use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_ciphertexts, params::SET_2048_1032193_1};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
@@ -26,7 +27,7 @@ struct Args {
     plaintext: Vec<u64>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let args = Args::parse();
 
     // Read the base64 encoded string from the input file
@@ -40,11 +41,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let raw_plaintext = args.plaintext;
     println!("Encrypting plaintext: {:?}", raw_plaintext);
+    let mut rng = ChaCha20Rng::seed_from_u64(42);
+    let ciphertexts = raw_plaintext
+        .into_iter()
+        .map(|num| {
+            let pt = Plaintext::try_encode(&[num], Encoding::poly(), &params)?;
+            Ok(pubkey.try_encrypt(&pt, &mut rng)?)
+        })
+        .collect::<Result<Vec<_>>>()?;
 
-    let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
-    let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
-    let ciphertext_bytes = ciphertext.clone().to_bytes();
-
+    let ciphertext_bytes = encode_ciphertexts(&ciphertexts);
     fs::write(&args.output, &ciphertext_bytes)?;
     println!("Created {}", args.output);
 

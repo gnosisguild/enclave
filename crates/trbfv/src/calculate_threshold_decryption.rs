@@ -9,6 +9,7 @@ use std::sync::Arc;
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
+use e3_bfv_helpers::decode_ciphertexts;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
@@ -32,7 +33,7 @@ pub struct CalculateThresholdDecryptionRequest {
     /// Each party's ID (0 based) unordered and their Shamir shares for decrypting the ciphertext batch.
     pub d_share_polys: Vec<(PartyId, SinglePartysDecryptionShares)>,
     /// A vector of Ciphertexts to decrypt
-    pub ciphertexts: Vec<ArcBytes>,
+    pub ciphertexts: ArcBytes,
 }
 
 struct InnerRequest {
@@ -56,14 +57,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         let trbfv_config = value.trbfv_config.clone();
 
         let params = value.trbfv_config.params();
-        let ciphertexts = value
-            .ciphertexts
-            .into_iter()
-            .map(|ciphertext| {
-                Ciphertext::from_bytes(&ciphertext, &trbfv_config.params())
-                    .context("cannot deserialize ciphertext")
-            })
-            .collect::<Result<Vec<_>>>()?;
+        let ciphertexts = decode_ciphertexts(&value.ciphertexts, &trbfv_config.params())?;
 
         // NOTE: Ensure the polys are ordered by party_id
         let mut ordered_polys = value.d_share_polys;

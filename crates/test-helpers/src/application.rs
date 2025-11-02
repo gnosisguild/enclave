@@ -57,7 +57,7 @@ pub fn run_application(
     ciphertexts: &[Vec<Ciphertext>],
     params: Arc<bfv::BfvParameters>,
     num_votes_per_voter: usize,
-) -> Vec<Arc<Ciphertext>> {
+) -> Vec<Ciphertext> {
     println!("Running application");
     if ciphertexts.is_empty() {
         return Vec::new();
@@ -72,5 +72,5 @@ pub fn run_application(
             sums[j] += ciphertext;
         }
     }
-    sums.into_iter().map(Arc::new).collect()
+    sums.into_iter().collect()
 }

@@ -85,6 +85,8 @@ ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
  
 
 # Assume plaintext is shorter
+echo "ACTUAL:"
+echo $ACTUAL
 
 if [[ "$ACTUAL" != "$PLAINTEXT"* ]]; then
   echo "Invalid plaintext decrypted: actual='$ACTUAL' expected='$PLAINTEXT'"

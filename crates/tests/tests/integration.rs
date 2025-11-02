@@ -13,7 +13,7 @@ use e3_events::{
     PlaintextAggregated,
 };
 use e3_multithread::Multithread;
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
+use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, encode_ciphertexts};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
@@ -228,10 +228,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
 
     println!("Have outputs. Creating ciphertexts...");
-    let ciphertexts = outputs
-        .into_iter()
-        .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
-        .collect::<Vec<ArcBytes>>();
+    let ciphertexts = ArcBytes::from_bytes(encode_ciphertexts(&outputs));
 
     // Created the event
     println!("Publishing CiphertextOutputPublished...");
@@ -273,20 +270,21 @@ async fn test_trbfv_actor() -> Result<()> {
         bail!("bad event")
     };
 
+    // Each bytes in plaintext is a [u64] corresponding to the ciphertext
+    // That is the output of the program here we decrypt extracting the first u64
     let results = plaintext
         .into_iter()
         .map(|a| {
-            bincode::deserialize(&a.extract_bytes()).context("Could not deserialize plaintext")
+            bincode::deserialize::<Vec<u64>>(&a.extract_bytes())
+                .context("Could not deserialize plaintext")?
+                .first()
+                .copied()
+                .context("Vector was empty")
         })
-        .collect::<Result<Vec<Vec<u64>>>>()?;
-
-    let results: Vec<u64> = results
-        .into_iter()
-        .map(|r| r.first().unwrap().clone())
-        .collect();
+        .collect::<Result<Vec<u64>>>()?;
 
     // Show summation result
-    let mut expected_result = vec![0u64; 3];
+    let mut expected_result = vec![0u64; num_votes_per_voter];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
             expected_result[j] += vals[j];

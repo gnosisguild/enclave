@@ -6,6 +6,7 @@
 
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
+use e3_bfv_helpers::{decode_byte_array, decode_ciphertexts};
 use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
@@ -139,16 +140,22 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
-        let Some(ciphertext) = ciphertext_output.first() else {
+        let Ok(ciphertext_vec) = decode_byte_array(&ciphertext_output.extract_bytes()) else {
+            self.bus.err(
+                EnclaveErrorType::Decryption,
+                anyhow!("Failed to decode ciphernode"),
+            );
+            return;
+        };
+        let Some(ciphertext) = ciphertext_vec.first() else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
                 anyhow!("Ciphernode output array is empty!"),
             );
             return;
         };
-
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext.extract_bytes(),
+            ciphertext: ciphertext.clone(),
             unsafe_secret: secret,
         }) else {
             self.bus.err(
@@ -157,7 +164,6 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             );
             return;
         };
-
         self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
             party_id: 0, // Not used
             e3_id,
