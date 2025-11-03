@@ -12,6 +12,7 @@ alloy-primitives = { workspace = true }
 fhe-traits.workspace = true
 fhe.workspace = true
 rand.workspace = true
+bincode.workspace = true
 anyhow.workspace = true
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator", version = "0.1.0"}

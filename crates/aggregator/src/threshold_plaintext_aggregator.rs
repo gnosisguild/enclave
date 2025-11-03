@@ -45,7 +45,7 @@ pub struct Computing {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Complete {
-    decrypted: Vec<ArcBytes>,
+    decrypted: ArcBytes,
     shares: Vec<(u64, Vec<ArcBytes>)>,
 }
 
@@ -185,7 +185,7 @@ impl ThresholdPlaintextAggregator {
         })
     }
 
-    pub fn set_decryption(&mut self, decrypted: Vec<ArcBytes>) -> Result<()> {
+    pub fn set_decryption(&mut self, decrypted: ArcBytes) -> Result<()> {
         self.state.try_mutate(|mut state| {
             let ThresholdPlaintextAggregatorState::Computing(Computing { shares, .. }) = &mut state
             else {

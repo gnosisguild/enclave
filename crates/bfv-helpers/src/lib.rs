@@ -9,8 +9,8 @@ mod util;
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext};
-use fhe_traits::{DeserializeParametrized, Serialize};
+use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext};
+use fhe_traits::{DeserializeParametrized, FheDecoder, Serialize};
 use std::sync::Arc;
 
 /// Predefined BFV parameters for common use cases
@@ -269,6 +269,38 @@ pub fn decode_byte_array(encoded: &[u8]) -> Result<Vec<Vec<u8>>, String> {
     Ok(byte_arrays)
 }
 
+/// Encodes an array of Plaintext to an ABI encoded array of u64
+pub fn encode_plaintexts(plaintext: &[Plaintext]) -> Result<Vec<u8>, String> {
+    let value = DynSolValue::Array(
+        plaintext
+            .iter()
+            .map(|pt| {
+                Vec::<u64>::try_decode(pt, Encoding::poly())
+                    .map(|v| DynSolValue::Uint(U256::from(v[0]), 64))
+                    .map_err(|e| e.to_string())
+            })
+            .collect::<Result<_, String>>()?,
+    );
+    Ok(value.abi_encode())
+}
+
+/// Decodes an ABI encoded array of u64.
+pub fn decode_plaintexts(encoded: &[u8]) -> Result<Vec<u64>, String> {
+    let array_type = DynSolType::Array(Box::new(DynSolType::Uint(64)));
+    let value = array_type.abi_decode(encoded).map_err(|e| e.to_string())?;
+
+    match value {
+        DynSolValue::Array(arr) => arr
+            .into_iter()
+            .map(|dyn_val| match dyn_val {
+                DynSolValue::Uint(u256, 64) => Ok(u256.to::<u64>()),
+                _ => Err("Expected Uint(64)".to_string()),
+            })
+            .collect(),
+        _ => Err("Expected Array".to_string()),
+    }
+}
+
 /// Decodes BFV parameters from ABI-encoded bytes and wraps them in an `Arc`.
 ///
 /// This is a convenience function that combines `decode_bfv_params` with `Arc::new`
@@ -505,6 +537,27 @@ mod tests {
                 assert_eq!(decoded, ciphertexts);
             }
 
+            Ok(())
+        }
+
+        #[test]
+        fn test_plaintext_encoding_roundtrip() -> Result<()> {
+            let raw = vec![1243u64, 567890u64];
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = Arc::new(build_bfv_params(degree, plaintext_modulus, &moduli));
+
+            let plaintexts = raw
+                .clone()
+                .into_iter()
+                .map(|r| {
+                    Plaintext::try_encode(&[r], Encoding::poly(), &params)
+                        .map_err(|e| anyhow!("{e}"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let encoded = encode_plaintexts(&plaintexts).map_err(|e| anyhow!("{e}"))?;
+            let decoded = decode_plaintexts(&encoded).map_err(|e| anyhow!("{e}"))?;
+            assert_eq!(raw, decoded);
             Ok(())
         }
     }

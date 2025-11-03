@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Actor;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
@@ -13,14 +13,16 @@ use e3_events::{
     PlaintextAggregated,
 };
 use e3_multithread::Multithread;
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, encode_ciphertexts};
+use e3_sdk::bfv_helpers::{
+    build_bfv_params_arc, decode_plaintexts, encode_bfv_params, encode_ciphertexts,
+};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
-use fhe_traits::{DeserializeParametrized, Serialize};
+use fhe_traits::DeserializeParametrized;
 use num_bigint::BigUint;
 use std::time::Duration;
 use std::{fs, sync::Arc};
@@ -272,16 +274,8 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Each bytes in plaintext is a [u64] corresponding to the ciphertext
     // That is the output of the program here we decrypt extracting the first u64
-    let results = plaintext
-        .into_iter()
-        .map(|a| {
-            bincode::deserialize::<Vec<u64>>(&a.extract_bytes())
-                .context("Could not deserialize plaintext")?
-                .first()
-                .copied()
-                .context("Vector was empty")
-        })
-        .collect::<Result<Vec<u64>>>()?;
+    let results =
+        decode_plaintexts(&plaintext.extract_bytes()).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     // Show summation result
     let mut expected_result = vec![0u64; num_votes_per_voter];

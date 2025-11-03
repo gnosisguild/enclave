@@ -7,15 +7,17 @@
 use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc, decode_ciphertexts};
+use e3_bfv_helpers::{
+    build_bfv_params_arc, decode_bfv_params_arc, decode_ciphertexts, encode_plaintexts,
+};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
 use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
-    bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
+    bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::{Deserialize, DeserializeParametrized, FheDecoder, Serialize};
+use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
@@ -126,12 +128,7 @@ impl Fhe {
             .iter()
             .map(|k| DecryptionShare::deserialize(k, &self.params, arc_ct.clone()))
             .aggregate()?;
-        let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
-        let mut bytes = Vec::with_capacity(decoded.len() * 8);
-        for value in decoded {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
-
+        let bytes = encode_plaintexts(&[plaintext]).map_err(|e| anyhow!("{e}"))?;
         Ok(bytes)
     }
 }

@@ -16,7 +16,7 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
-    pub decrypted_output: Vec<ArcBytes>,
+    pub decrypted_output: ArcBytes,
 }
 
 impl Display for PlaintextAggregated {

@@ -19,8 +19,10 @@ use e3_events::{
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
+use e3_sdk::bfv_helpers::decode_plaintexts;
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_sdk::bfv_helpers::encode_ciphertexts;
+use e3_sdk::bfv_helpers::encode_plaintexts;
 use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
@@ -209,19 +211,21 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // TODO:
     // Making these values large (especially the yes value) requires changing
     // the params we use here - as we tune the FHE we need to take care
-    let raw_plaintext = vec![1234u64, 873827u64];
+    let raw_plaintext = vec![1234, 873827];
     let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&[(*ciphertext).clone()])),
+        ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&ciphertext)),
         e3_id: e3_id.clone(),
     });
 
     bus.send(ciphertext_published_event.clone()).await?;
     let expected_plaintext_agg_event = PlaintextAggregated {
         e3_id: e3_id.clone(),
-        decrypted_output: vec![ArcBytes::from_bytes(expected.clone())],
+        decrypted_output: ArcBytes::from_bytes(
+            encode_plaintexts(&expected).map_err(|e| anyhow!("{e}"))?,
+        ),
     };
 
     let history = history_collector
@@ -234,9 +238,13 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
             _ => None,
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()[0]
+        .clone();
 
-    assert_eq!(aggregated_event, vec![expected_plaintext_agg_event]);
+    assert_eq!(
+        decode_plaintexts(&aggregated_event.decrypted_output),
+        decode_plaintexts(&expected_plaintext_agg_event.decrypted_output)
+    );
 
     Ok(())
 }
@@ -348,7 +356,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&[(*ciphertext).clone()])),
+            ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&ciphertext)),
             e3_id: e3_id.clone(),
         })
         .clone(),
@@ -363,7 +371,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
         _ => None,
     });
-    assert_eq!(actual, Some(vec![ArcBytes::from_bytes(expected)]));
+    assert_eq!(
+        actual,
+        Some(ArcBytes::from_bytes(
+            encode_plaintexts(&expected).map_err(|e| anyhow!("{e}"))?
+        ))
+    );
 
     Ok(())
 }
@@ -407,12 +420,12 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
-        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
+        decrypted_output: ArcBytes::from_bytes(vec![1, 2, 3, 4]),
     });
 
     let evt_2 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
-        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
+        decrypted_output: ArcBytes::from_bytes(vec![1, 2, 3, 4]),
     });
 
     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {

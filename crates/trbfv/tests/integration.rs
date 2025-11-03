@@ -9,7 +9,9 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params, encode_ciphertexts};
+use e3_bfv_helpers::{
+    build_bfv_params_arc, decode_plaintexts, encode_bfv_params, encode_ciphertexts,
+};
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
@@ -136,17 +138,7 @@ async fn test_trbfv_isolation() -> Result<()> {
             d_share_polys,
         })?;
 
-    let results = plaintext
-        .into_iter()
-        .map(|a| {
-            bincode::deserialize(&a.extract_bytes()).context("Could not deserialize plaintext")
-        })
-        .collect::<Result<Vec<Vec<u64>>>>()?;
-
-    let results: Vec<u64> = results
-        .into_iter()
-        .map(|r| r.first().unwrap().clone())
-        .collect();
+    let results = decode_plaintexts(&plaintext).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     // Show summation result
     let mut expected_result = vec![0u64; 3];

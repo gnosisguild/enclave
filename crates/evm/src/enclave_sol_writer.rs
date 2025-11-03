@@ -99,20 +99,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
             let provider = self.provider.clone();
             let bus = self.bus.clone();
             async move {
-                // HACK: plaintext format is now a Vec of ArcBytes for legacy tests for now we are extracting
-                // the first entry and writing this will change once we make our legacy tests catch up
-                let Some(decrypted) = decrypted_output.first() else {
-                    bus.err(
-                        EnclaveErrorType::Evm,
-                        anyhow::anyhow!("Decrypted output was empty!"),
-                    );
-                    return;
-                };
                 let result = publish_plaintext_output(
                     provider,
                     contract_address,
                     e3_id,
-                    decrypted.extract_bytes(),
+                    decrypted_output.extract_bytes(),
                 )
                 .await;
                 match result {

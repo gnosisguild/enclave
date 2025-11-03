@@ -9,12 +9,11 @@ use std::sync::Arc;
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
-use e3_bfv_helpers::decode_ciphertexts;
+use e3_bfv_helpers::{decode_ciphertexts, encode_plaintexts};
 use e3_utils::utility_types::ArcBytes;
-use fhe::bfv::{Encoding, Plaintext};
+use fhe::bfv::Plaintext;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
-use fhe_traits::FheDecoder;
 use tracing::info;
 
 /// Shamir shares for a single party to decrypt a batch of ciphertexts.
@@ -93,7 +92,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateThresholdDecryptionResponse {
     /// The resultant plaintext vector corresponding to the ciphertext vector
-    pub plaintext: Vec<ArcBytes>,
+    pub plaintext: ArcBytes,
 }
 
 struct InnerResponse {
@@ -104,16 +103,9 @@ impl TryFrom<InnerResponse> for CalculateThresholdDecryptionResponse {
     type Error = anyhow::Error;
     fn try_from(value: InnerResponse) -> std::result::Result<Self, Self::Error> {
         Ok(CalculateThresholdDecryptionResponse {
-            plaintext: value
-                .plaintext
-                .into_iter()
-                .map(|open_result| -> Result<_> {
-                    let vec_64 = Vec::<u64>::try_decode(&open_result, Encoding::poly())
-                        .context("could not decode plaintext")?;
-                    let bytes = bincode::serialize(&vec_64)?;
-                    Ok(ArcBytes::from_bytes(bytes))
-                })
-                .collect::<Result<_>>()?,
+            plaintext: ArcBytes::from_bytes(
+                encode_plaintexts(&value.plaintext).map_err(|e| anyhow!("{e}"))?,
+            ),
         })
     }
 }
