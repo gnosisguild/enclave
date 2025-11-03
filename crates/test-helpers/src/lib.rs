@@ -188,12 +188,12 @@ impl AddToCommittee {
 pub fn encrypt_ciphertext(
     params: &Arc<BfvParameters>,
     pubkey: PublicKey,
-    raw_plaintext: Vec<u64>,
+    raw_plaintext: Vec<Vec<u64>>,
 ) -> Result<(Vec<Ciphertext>, Vec<Plaintext>)> {
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let plaintext = raw_plaintext
         .into_iter()
-        .map(|raw| Ok(Plaintext::try_encode(&[raw], Encoding::poly(), &params)?))
+        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), &params)?))
         .collect::<Result<Vec<Plaintext>>>()?;
 
     let ciphertext = plaintext

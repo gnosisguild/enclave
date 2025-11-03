@@ -208,9 +208,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     println!("Aggregating decryption...");
     // Aggregate decryption
 
-    let raw_plaintext = vec![12345]; // cannot do an array in the non trbfv setup because of the
-                                     // way we are encoding now
-    let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
+    let raw_plaintext: Vec<Vec<u64>> = vec![vec![1234, 567890]];
+    let (ciphertext, _) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext.clone())?;
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
@@ -219,12 +218,6 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     });
 
     bus.send(ciphertext_published_event.clone()).await?;
-    let expected_plaintext_agg_event = PlaintextAggregated {
-        e3_id: e3_id.clone(),
-        decrypted_output: ArcBytes::from_bytes(
-            encode_plaintexts(&expected).map_err(|e| anyhow!("{e}"))?,
-        ),
-    };
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(6))
@@ -239,10 +232,12 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .collect::<Vec<_>>()[0]
         .clone();
 
-    assert_eq!(
-        decode_plaintexts(&aggregated_event.decrypted_output),
-        decode_plaintexts(&expected_plaintext_agg_event.decrypted_output)
-    );
+    let decoded = decode_plaintexts(&aggregated_event.decrypted_output).unwrap();
+
+    let actual: Vec<u64> = decoded[0][..2].try_into().unwrap();
+    let expected = raw_plaintext[0].clone();
+
+    assert_eq!(actual, expected);
 
     Ok(())
 }
@@ -350,8 +345,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .aggregate()?;
 
     // Publish the ciphertext
-    let raw_plaintext = vec![1234u64];
-    let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
+    let raw_plaintext = vec![vec![1234u64, 567890u64]];
+    let (ciphertext, _) = encrypt_ciphertext(&params, pubkey, raw_plaintext.clone())?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
             ciphertext_output: ArcBytes::from_bytes(encode_ciphertexts(&ciphertext)),
@@ -365,16 +360,20 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(4))
         .await?;
 
-    let actual = history.iter().find_map(|evt| match evt {
-        EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
-        _ => None,
-    });
-    assert_eq!(
-        actual,
-        Some(ArcBytes::from_bytes(
-            encode_plaintexts(&expected).map_err(|e| anyhow!("{e}"))?
-        ))
-    );
+    let aggregated_event = history
+        .into_iter()
+        .filter_map(|e| match e {
+            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
+            _ => None,
+        })
+        .collect::<Vec<_>>()[0]
+        .clone();
+
+    let decoded = decode_plaintexts(&aggregated_event.decrypted_output).unwrap();
+    let actual: Vec<u64> = decoded[0][..2].try_into().unwrap();
+    let expected = raw_plaintext[0].clone();
+
+    assert_eq!(actual, expected);
 
     Ok(())
 }

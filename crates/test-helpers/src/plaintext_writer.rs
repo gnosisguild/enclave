@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Handler};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use e3_events::{EnclaveEvent, EventBus, PlaintextAggregated, Subscribe};
 use e3_sdk::bfv_helpers::decode_plaintexts;
 use tracing::{error, info};
@@ -32,11 +32,9 @@ impl PlaintextWriter {
 
     pub fn handle_plaintext_aggregated(&mut self, msg: PlaintextAggregated) -> Result<()> {
         let output = decode_plaintexts(&msg.decrypted_output).map_err(|e| anyhow!("{e}"))?;
-        let contents: Vec<String> = output.iter().map(|num| num.to_string()).collect();
-
+        let string = serde_json::to_string(&output).unwrap();
         info!(path = ?&self.path, "Writing Plaintext To Path");
-        write_file_with_dirs(&self.path, format!("{}", contents.join(",")).as_bytes()).unwrap();
-
+        write_file_with_dirs(&self.path, string.as_bytes())?;
         Ok(())
     }
 }

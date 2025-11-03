@@ -11,7 +11,7 @@ use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext};
 use fhe_traits::{DeserializeParametrized, FheDecoder, Serialize};
-use std::sync::Arc;
+use std::{array::TryFromSliceError, sync::Arc};
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
@@ -247,36 +247,31 @@ pub fn decode_ciphertexts(
 
 /// Decodes ABI-encoded bytes into a vector of byte arrays.
 pub fn decode_byte_array(encoded: &[u8]) -> Result<Vec<Vec<u8>>, String> {
-    let ty: DynSolType = "bytes[]"
-        .parse()
-        .map_err(|e: alloy_dyn_abi::Error| e.to_string())?;
-    let decoded = ty.abi_decode(encoded).map_err(|e| e.to_string())?;
-
-    let array = match decoded {
-        DynSolValue::Array(arr) => arr,
-        _ => return Err("Decoded value is not an array".to_string()),
-    };
-
-    let mut byte_arrays = Vec::with_capacity(array.len());
-    for (i, element) in array.into_iter().enumerate() {
-        let bytes = match element {
-            DynSolValue::Bytes(b) => b,
-            _ => return Err(format!("Array element {} is not bytes", i)),
-        };
-        byte_arrays.push(bytes);
+    match DynSolType::Array(Box::new(DynSolType::Bytes)).abi_decode(encoded) {
+        Ok(DynSolValue::Array(arr)) => arr
+            .into_iter()
+            .map(|item| match item {
+                DynSolValue::Bytes(bytes) => Ok(bytes),
+                _ => Err("Expected bytes".to_string()),
+            })
+            .collect(),
+        _ => Err("Decode failed".to_string()),
     }
-
-    Ok(byte_arrays)
 }
 
-/// Encodes an array of Plaintext to an ABI encoded array of u64
+/// Encodes an array of Plaintext to an ABI encoded array of bytes
+/// where each bytes field is a byte encoded Vec<u64>
 pub fn encode_plaintexts(plaintext: &[Plaintext]) -> Result<Vec<u8>, String> {
     let value = DynSolValue::Array(
         plaintext
             .iter()
             .map(|pt| {
                 Vec::<u64>::try_decode(pt, Encoding::poly())
-                    .map(|v| DynSolValue::Uint(U256::from(v[0]), 64))
+                    .map(|v| {
+                        // Convert Vec<u64> to bytes by concatenating each u64's bytes
+                        let bytes: Vec<u8> = v.iter().flat_map(|&num| num.to_be_bytes()).collect();
+                        DynSolValue::Bytes(bytes)
+                    })
                     .map_err(|e| e.to_string())
             })
             .collect::<Result<_, String>>()?,
@@ -284,21 +279,21 @@ pub fn encode_plaintexts(plaintext: &[Plaintext]) -> Result<Vec<u8>, String> {
     Ok(value.abi_encode())
 }
 
-/// Decodes an ABI encoded array of u64.
-pub fn decode_plaintexts(encoded: &[u8]) -> Result<Vec<u64>, String> {
-    let array_type = DynSolType::Array(Box::new(DynSolType::Uint(64)));
-    let value = array_type.abi_decode(encoded).map_err(|e| e.to_string())?;
-
-    match value {
-        DynSolValue::Array(arr) => arr
-            .into_iter()
-            .map(|dyn_val| match dyn_val {
-                DynSolValue::Uint(u256, 64) => Ok(u256.to::<u64>()),
-                _ => Err("Expected Uint(64)".to_string()),
-            })
-            .collect(),
-        _ => Err("Expected Array".to_string()),
-    }
+/// Decodes ABI encoded bytes[] where each bytes is an encoded Plaintext to Vec<Vec<u64>>
+pub fn decode_plaintexts(encoded: &[u8]) -> Result<Vec<Vec<u64>>, String> {
+    decode_byte_array(encoded)?
+        .into_iter()
+        .map(|bytes| {
+            bytes
+                .chunks_exact(8)
+                .map(|c| {
+                    c.try_into()
+                        .map(u64::from_be_bytes)
+                        .map_err(|e: TryFromSliceError| e.to_string())
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// Decodes BFV parameters from ABI-encoded bytes and wraps them in an `Arc`.
@@ -542,7 +537,7 @@ mod tests {
 
         #[test]
         fn test_plaintext_encoding_roundtrip() -> Result<()> {
-            let raw = vec![1243u64, 567890u64];
+            let mut raw: Vec<Vec<u64>> = vec![vec![1243, 567890], vec![31415, 926535]];
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
             let params = Arc::new(build_bfv_params(degree, plaintext_modulus, &moduli));
 
@@ -550,13 +545,15 @@ mod tests {
                 .clone()
                 .into_iter()
                 .map(|r| {
-                    Plaintext::try_encode(&[r], Encoding::poly(), &params)
-                        .map_err(|e| anyhow!("{e}"))
+                    Plaintext::try_encode(&r, Encoding::poly(), &params).map_err(|e| anyhow!("{e}"))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
             let encoded = encode_plaintexts(&plaintexts).map_err(|e| anyhow!("{e}"))?;
+            println!("encoded length = {}", encoded.len());
             let decoded = decode_plaintexts(&encoded).map_err(|e| anyhow!("{e}"))?;
+            // resize the original vec to account for padding.
+            raw.iter_mut().for_each(|v| v.resize(degree, 0));
             assert_eq!(raw, decoded);
             Ok(())
         }

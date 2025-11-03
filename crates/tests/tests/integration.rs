@@ -285,7 +285,12 @@ async fn test_trbfv_actor() -> Result<()> {
         }
     }
 
-    for (i, (res, exp)) in results.iter().zip(expected_result.iter()).enumerate() {
+    for (i, (res, exp)) in results
+        .into_iter()
+        .map(|r| r[0])
+        .zip(expected_result.into_iter())
+        .enumerate()
+    {
         println!("Tally {i} result = {res} / {exp}");
         assert_eq!(res, exp);
     }

@@ -2252,6 +2252,7 @@ dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
+ "bincode",
  "fhe",
  "fhe-traits",
  "fhe-util",
