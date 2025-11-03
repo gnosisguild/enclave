@@ -158,6 +158,7 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param signature The signature of the message
  * @param balance The voter's balance
  * @param slotAddress The voter's slot address
+ * @param isFirstVote Whether this is the first vote for this slot
  * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async ({
@@ -170,6 +171,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   signature,
   balance,
   slotAddress,
+  isFirstVote,
 }: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
   if (encodedVote.length !== bfvParams.degree) {
     throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
@@ -195,6 +197,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
     merkle_root: merkleData.proof.root.toString(),
     slot_address: slotAddress,
     balance: balance.toString(),
+    is_first_vote: isFirstVote,
   }
 }
 
@@ -206,6 +209,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
  * @param bfvParams The BFV parameters
  * @param merkleRoot The merkle root of the census tree
  * @param slotAddress The voter's slot address
+ * @param isFirstVote Whether this is the first vote for this slot
  * @returns The CRISP circuit inputs for a mask vote
  */
 export const generateMaskVote = async (
@@ -214,6 +218,7 @@ export const generateMaskVote = async (
   bfvParams = DEFAULT_BFV_PARAMS,
   merkleRoot: bigint,
   slotAddress: string,
+  isFirstVote: boolean,
 ): Promise<CRISPCircuitInputs> => {
   const plaintextVote: IVote = {
     yes: 0n,
@@ -246,6 +251,7 @@ export const generateMaskVote = async (
     merkle_root: merkleRoot.toString(),
     slot_address: slotAddress,
     balance: '0',
+    is_first_vote: isFirstVote,
   }
 }
 
@@ -257,6 +263,16 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const proof = await backend.generateProof(witness)
 
   return proof
+}
+
+export const generateProofWithReturnValue = async (crispInputs: CRISPCircuitInputs): Promise<{ returnValue: unknown, proof:ProofData }> => {
+  const noir = new Noir(circuit as CompiledCircuit)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+
+  const { witness, returnValue } = await noir.execute(crispInputs as any)
+  // const proof = await backend.generateProof(witness)
+
+  return { returnValue, proof: {} as any }
 }
 
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {

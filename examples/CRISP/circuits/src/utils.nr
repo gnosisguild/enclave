@@ -32,7 +32,7 @@ pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
 }
 
 // Check that the polynomial has 0 for all relevant coefficients
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
     // This value would allow to fit
     // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
@@ -55,7 +55,7 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
         sum += k1.coefficients[i];
     }
 
-    assert(sum == 0);
+   sum == 0
 }
 
 #[test]

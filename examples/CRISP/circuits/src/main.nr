@@ -52,6 +52,8 @@ fn main(
     slot_address: pub Field,
     // Balance Section.
     balance: Field,
+    // Whether this is the first vote for this slot.
+    is_first_vote: pub bool,
 ) -> pub ([Polynomial<2048>; 1], [Polynomial<2048>; 1]) {
     // Verify the ECDSA signature.
     let is_signature_valid =
@@ -124,11 +126,19 @@ fn main(
         (ct0is, ct1is)
     } else {
         // check if vote == 0.
-        check_coefficient_zero(k1);
+        let is_vote_zero = check_coefficient_zero(k1);
+        assert(is_vote_zero);
 
         // as well as the sum
         assert(is_ct_add_valid);
 
-        (sum_ct0is, sum_ct1is)
+        // need to check if slot is empty (no previous ciphertext).
+        // If so, (ct0is, ct1is) should be returned.
+
+        if is_first_vote {
+            (ct0is, ct1is)
+        } else {
+            (sum_ct0is, sum_ct1is)
+        }
     }
 }
