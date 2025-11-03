@@ -1,26 +1,23 @@
 # !/bin/bash
 
 # Install the enclave binary
-cargo install --locked --path ./crates/cli --bin enclave -f
-
-# Deploy Contacts
-(cd packages/enclave-contracts && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
+# cargo install --locked --path ./crates/cli --bin enclave -f
 
 # Deploy CRISP Contracts
-(cd examples/CRISP/packages/crisp-contracts && ETH_WALLET_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 FOUNDRY_PROFILE=local forge script --rpc-url http://localhost:8545 --broadcast deploy/Deploy.s.sol)
+(cd examples/CRISP/packages/crisp-contracts && USE_MOCK_VERIFIER=true pnpm deploy:contracts:full --network localhost)
 
 # Add Ciphernodes to Enclave
 sleep 2 # wait for enclave to start
 
 # Get the addresses of the ciphernodes
-CN1=0xbDA5747bFD65F08deb54cb465eB87D40e51B197E
-CN2=0xdD2FD4581271e230360230F9337D5c0430Bf44C0
-CN3=0x2546BcD3c84621e976D8185a91A922aE77ECEc30
+CN1=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+CN2=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+CN3=0x90F79bf6EB2c4f870365E785982E1f101E93b906
 
 # Add the ciphernodes to the enclave
-pnpm ciphernode:add --ciphernode-address "$CN1" --network "localhost"
-pnpm ciphernode:add --ciphernode-address "$CN2" --network "localhost"
-pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost"
+(cd examples/CRISP/packages/crisp-contracts && pnpm ciphernode:add --ciphernode-address "$CN1" --network "localhost")
+(cd examples/CRISP/packages/crisp-contracts && pnpm ciphernode:add --ciphernode-address "$CN2" --network "localhost")
+(cd examples/CRISP/packages/crisp-contracts && pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost")
 
 
 # Delete local DB

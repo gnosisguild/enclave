@@ -60,4 +60,16 @@ impl StoreKeys {
     pub fn ciphernode_registry_reader(chain_id: u64) -> String {
         format!("//evm_readers/ciphernode_registry/{chain_id}")
     }
+
+    pub fn bonding_registry_reader(chain_id: u64) -> String {
+        format!("//evm_readers/bonding_registry/{chain_id}")
+    }
+
+    pub fn node_state() -> String {
+        String::from("//node_state")
+    }
+
+    pub fn finalized_committees() -> String {
+        String::from("//finalized_committees")
+    }
 }

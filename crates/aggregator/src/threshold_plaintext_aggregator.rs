@@ -14,7 +14,7 @@ use e3_events::{
     Seed,
 };
 use e3_multithread::Multithread;
-use e3_sortition::{GetNodeIndex, Sortition};
+use e3_sortition::{GetNodesForE3, Sortition};
 use e3_trbfv::{
     calculate_threshold_decryption::{
         CalculateThresholdDecryptionRequest, CalculateThresholdDecryptionResponse,
@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -248,46 +248,23 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
         info!(event=?event, "Processing DecryptionShareCreated...");
-        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting {
-            threshold_n,
-            seed,
-            ..
-        })) = self.state.get()
-        else {
-            error!(state=?self.state, "Aggregator has been closed for collecting.");
-            return Box::pin(fut::ready(Ok(())));
-        };
-
-        let size = threshold_n as usize;
-        let address = event.node;
+        let address = event.node.clone();
         let party_id = event.party_id;
-        let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
         let decryption_share = event.decryption_share.clone();
 
-        // Why do we need to get the node index when the event contains the party_id? I guess we
-        // don't trust the event. Maybe that is fine.
         Box::pin(
             self.sortition
-                .send(GetNodeIndex {
-                    chain_id,
-                    address: address.clone(),
-                    size,
-                    seed,
+                .send(GetNodesForE3 {
+                    e3_id: e3_id.clone(),
+                    chain_id: e3_id.chain_id(),
                 })
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let maybe_found_index = res?;
-                    let Some(party) = maybe_found_index else {
-                        error!("Attempting to aggregate share but party not found in committee");
-                        return Ok(());
-                    };
+                    let nodes = res?;
 
-                    if party != party_id {
-                        error!(
-                            "Bad aggregation state! Address {} not found at index {} instead it was found at {}",
-                            address, party_id, party
-                        );
+                    if !nodes.contains(&address) {
+                        trace!("Node {} not found in finalized committee", address);
                         return Ok(());
                     }
 
@@ -296,10 +273,10 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                         return Ok(());
                     }
 
-                    // add the keyshare and
+                    // Trust the party_id from the event - it's based on CommitteeFinalized order
+                    // which is the authoritative source of truth for party IDs
                     act.add_share(party_id, decryption_share)?;
 
-                    // Check the state and if it has changed to the computing
                     if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
                         threshold_m,
                         threshold_n,

@@ -52,7 +52,7 @@ function request(
     IE3Program e3Program,
     bytes memory e3ProgramParams,
     bytes memory computeProviderParams
-) external payable
+) external
 ```
 
 2. Contract validates request parameters
@@ -238,18 +238,15 @@ the finality of the outcome and to appropriately handle re-orgs.
 ## Best Practices
 
 1. **Request Management**
-
    - Set appropriate thresholds
    - Choose realistic time windows
 
 2. **Input Handling**
-
    - Encrypt inputs properly
    - Include necessary ZKPs
    - Submit within time windows
 
 3. **Result Processing**
-
    - Listen for all relevant events
    - Implement timeout handling
    - Verify result integrity

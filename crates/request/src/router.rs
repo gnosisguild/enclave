@@ -272,7 +272,7 @@ impl FromSnapshotWithParams for E3Router {
             extensions: params.extensions.into(),
             buffer: EventBuffer::default(),
             bus: params.bus,
-            store: repositories.router(),
+            store: params.store,
         })
     }
 }
@@ -291,14 +291,11 @@ impl E3RouterBuilder {
     }
 
     pub async fn build(self) -> Result<Addr<E3Router>> {
-        let repositories = self.store.repositories();
-        let router_repo = repositories.router();
-        let snapshot: Option<E3RouterSnapshot> = router_repo.read().await?;
+        let snapshot: Option<E3RouterSnapshot> = self.store.read().await?;
         let params = E3RouterParams {
             extensions: self.extensions.into(),
             bus: self.bus.clone(),
-
-            store: router_repo,
+            store: self.store.clone(),
         };
 
         let e3r = match snapshot {

@@ -27,8 +27,9 @@ export function getContractAddresses() {
   return {
     enclave: process.env.ENCLAVE_ADDRESS as `0x${string}`,
     ciphernodeRegistry: process.env.REGISTRY_ADDRESS as `0x${string}`,
-    filterRegistry: process.env.FILTER_REGISTRY_ADDRESS as `0x${string}`,
+    bondingRegistry: process.env.BONDING_REGISTRY_ADDRESS as `0x${string}`,
     e3Program: process.env.E3_PROGRAM_ADDRESS as `0x${string}`,
+    feeToken: process.env.FEE_TOKEN_ADDRESS as `0x${string}`,
   };
 }
 
@@ -42,7 +43,6 @@ type E3Shared = {
   e3Id: bigint;
   e3Program: string;
   e3: E3;
-  filter: string;
 };
 
 type E3StateRequested = E3Shared & {
@@ -171,13 +171,14 @@ describe("Integration", () => {
     contracts: {
       enclave: contracts.enclave,
       ciphernodeRegistry: contracts.ciphernodeRegistry,
+      feeToken: contracts.feeToken,
     },
     rpcUrl: "ws://localhost:8545",
     privateKey:
       "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
     protocol: FheProtocol.BFV,
   });
-  
+
   it("should run an integration test", async () => {
     const { waitForEvent } = await setupEventListeners(sdk, store);
 
@@ -185,82 +186,91 @@ describe("Integration", () => {
       DEFAULT_E3_CONFIG.threshold_min,
       DEFAULT_E3_CONFIG.threshold_max,
     ];
-    const startWindow = calculateStartWindow(60);
-    const duration = BigInt(10);
+    const startWindow = calculateStartWindow(100);
+    const duration = BigInt(15);
     const e3ProgramParams = encodeBfvParams();
     const computeProviderParams = encodeComputeProviderParams(
-      DEFAULT_COMPUTE_PROVIDER_PARAMS
+      DEFAULT_COMPUTE_PROVIDER_PARAMS,
+      true // Mock the compute provider parameters, return 32 bytes of 0x00
     );
-  
+
     let state;
     let event;
-  
+
+    // Approve fee token
+    console.log("Approving fee token...");
+    const hash = await sdk.approveFeeToken(100000000000n);
+    console.log("Fee token approved:", hash);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // REQUEST phase
     await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
       console.log("Requested E3...");
       await sdk.requestE3({
-        filter: contracts.filterRegistry,
         threshold,
         startWindow,
         duration,
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,
-        value: BigInt("1000000000000000"), // 0.001 ETH
       });
     });
-  
+
     state = store.get(0n);
     assert(state);
     assert.strictEqual(state.e3Id, 0n);
-    assert.strictEqual(state.filter, contracts.filterRegistry);
     assert.strictEqual(state.type, "requested");
-  
+
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
     event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED);
-  
+
     state = store.get(0n);
     assert(state);
     assert.strictEqual(state.type, "committee_published");
     assert.strictEqual(state.publicKey, event.data.publicKey);
-  
+
     let { e3Id, publicKey } = state;
-  
+
     // ACTIVATION phase
     event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
       await sdk.activateE3(e3Id, publicKey);
     });
-  
+
     state = store.get(0n);
     assert(state);
     assert.strictEqual(state.type, "activated");
-  
+
     // INPUT PUBLISHING phase
     const num1 = 12n;
     const num2 = 21n;
     const publicKeyBytes = hexToBytes(state.publicKey);
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes);
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes);
-  
+
     await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
       await sdk.publishInput(
         e3Id,
-        `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
+        `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join(
+          ""
+        )}` as `0x${string}`
       );
     });
     await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
       await sdk.publishInput(
         e3Id,
-        `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
+        `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join(
+          ""
+        )}` as `0x${string}`
       );
     });
-  
+
     const plaintextEvent = await waitForEvent(
       EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED
     );
-  
+
     const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput);
-  
+
     expect(BigInt(parsed[0])).toBe(num1 + num2);
-  }, 9999999)
-})
+  }, 9999999);
+});

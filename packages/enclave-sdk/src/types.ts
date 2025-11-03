@@ -10,6 +10,8 @@ import type {
   CiphernodeRegistryOwnable,
   Enclave,
   MockCiphernodeRegistry,
+  MockUSDC,
+  EnclaveToken,
 } from "@enclave-e3/contracts/types";
 
 import type { CircuitInputs } from "./greco";
@@ -29,7 +31,7 @@ export interface SDKConfig {
   walletClient?: WalletClient;
 
   /**
-   * The Enclave contracts 
+   * The Enclave contracts
    */
   contracts: {
     /**
@@ -41,6 +43,11 @@ export interface SDKConfig {
      * The CiphernodeRegistry contract address
      */
     ciphernodeRegistry: `0x${string}`;
+
+    /**
+     * The FeeToken contract address
+     */
+    feeToken: `0x${string}`;
   };
 
   /**
@@ -69,6 +76,7 @@ export interface EventListenerConfig {
 export interface ContractInstances {
   enclave: Enclave;
   ciphernodeRegistry: CiphernodeRegistryOwnable | MockCiphernodeRegistry;
+  feeToken: EnclaveToken | MockUSDC;
 }
 
 // Unified Event System
@@ -102,6 +110,7 @@ export enum RegistryEventType {
   // Committee Management
   COMMITTEE_REQUESTED = "CommitteeRequested",
   COMMITTEE_PUBLISHED = "CommitteePublished",
+  COMMITTEE_FINALIZED = "CommitteeFinalized",
 
   // Configuration
   ENCLAVE_SET = "EnclaveSet",
@@ -178,13 +187,20 @@ export interface CiphernodeRemovedData {
 
 export interface CommitteeRequestedData {
   e3Id: bigint;
-  filter: string;
+  seed: bigint;
   threshold: [bigint, bigint];
+  requestBlock: bigint;
+  submissionDeadline: bigint;
 }
 
 export interface CommitteePublishedData {
   e3Id: bigint;
   publicKey: string;
+}
+
+export interface CommitteeFinalizedData {
+  e3Id: bigint;
+  nodes: string[];
 }
 
 // Event data mapping
@@ -213,6 +229,7 @@ export interface EnclaveEventData {
 export interface RegistryEventData {
   [RegistryEventType.COMMITTEE_REQUESTED]: CommitteeRequestedData;
   [RegistryEventType.COMMITTEE_PUBLISHED]: CommitteePublishedData;
+  [RegistryEventType.COMMITTEE_FINALIZED]: CommitteeFinalizedData;
   [RegistryEventType.ENCLAVE_SET]: { enclave: string };
   [RegistryEventType.OWNERSHIP_TRANSFERRED]: {
     previousOwner: string;
@@ -225,10 +242,10 @@ export interface RegistryEventData {
 export interface EnclaveEvent<T extends AllEventTypes> {
   type: T;
   data: T extends EnclaveEventType
-  ? EnclaveEventData[T]
-  : T extends RegistryEventType
-  ? RegistryEventData[T]
-  : unknown;
+    ? EnclaveEventData[T]
+    : T extends RegistryEventType
+    ? RegistryEventData[T]
+    : unknown;
   log: Log;
   timestamp: Date;
   blockNumber: bigint;
@@ -236,7 +253,7 @@ export interface EnclaveEvent<T extends AllEventTypes> {
 }
 
 export type EventCallback<T extends AllEventTypes = AllEventTypes> = (
-  event: EnclaveEvent<T>,
+  event: EnclaveEvent<T>
 ) => void | Promise<void>;
 
 export interface EventFilter<T = unknown> {
@@ -287,7 +304,7 @@ export interface ProtocolParams {
   /**
    * The degree of the polynomial
    */
-  degree: number; 
+  degree: number;
   /**
    * The plaintext modulus
    */
@@ -299,21 +316,21 @@ export interface ProtocolParams {
 }
 
 /**
- * Parameters for the BFV protocol 
+ * Parameters for the BFV protocol
  */
 export const BfvProtocolParams = {
   /**
-	 * Recommended parameters for BFV protocol
-	 * - Degree: 2048 
-	 * - Plaintext modulus: 1032193 
-	 * - Moduli:0x3FFFFFFF000001
-	 */
+   * Recommended parameters for BFV protocol
+   * - Degree: 2048
+   * - Plaintext modulus: 1032193
+   * - Moduli:0x3FFFFFFF000001
+   */
   BFV_NORMAL: {
     degree: 2048,
     plaintextModulus: 1032193n,
-    moduli: 0x3FFFFFFF000001n,
+    moduli: 0x3fffffff000001n,
   } as const satisfies ProtocolParams,
-}
+};
 
 /**
  * The result of encrypting a value and generating a proof

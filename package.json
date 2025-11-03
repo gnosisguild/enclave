@@ -21,7 +21,7 @@
     "prepare": "husky",
     "enclave": "cd crates && ./scripts/launch.sh",
     "ciphernode:lint": "cargo fmt -- --check",
-    "ciphernode:add": "cd packages/enclave-contracts && pnpm ciphernode:add",
+    "ciphernode:add": "cd packages/enclave-contracts && pnpm ciphernode:admin-add",
     "ciphernode:remove": "cd packages/enclave-contracts && pnpm ciphernode:remove",
     "ciphernode:test": "cd crates && ./scripts/test.sh",
     "ciphernode:build": "cargo build --locked --release",
