@@ -208,10 +208,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     println!("Aggregating decryption...");
     // Aggregate decryption
 
-    // TODO:
-    // Making these values large (especially the yes value) requires changing
-    // the params we use here - as we tune the FHE we need to take care
-    let raw_plaintext = vec![1234, 873827];
+    let raw_plaintext = vec![12345]; // cannot do an array in the non trbfv setup because of the
+                                     // way we are encoding now
     let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
 
     // Setup Ciphertext Published Event
@@ -352,7 +350,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .aggregate()?;
 
     // Publish the ciphertext
-    let raw_plaintext = vec![1234u64, 873827u64];
+    let raw_plaintext = vec![1234u64];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
