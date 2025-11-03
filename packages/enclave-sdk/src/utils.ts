@@ -63,6 +63,7 @@ export const BFV_PARAMS_SET = {
   degree: 2048,
   plaintext_modulus: 1032193,
   moduli: [0x3fffffff000001n], // BigInt for the modulus
+  error2_variance: "10",
 } as const;
 
 // Compute provider parameters structure
@@ -95,7 +96,8 @@ export const DEFAULT_E3_CONFIG = {
 export function encodeBfvParams(
   degree: number = BFV_PARAMS_SET.degree,
   plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
-  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli
+  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli,
+  error2_variance: string = BFV_PARAMS_SET.error2_variance
 ): `0x${string}` {
   return encodeAbiParameters(
     [
@@ -106,6 +108,7 @@ export function encodeBfvParams(
           { name: "degree", type: "uint256" },
           { name: "plaintext_modulus", type: "uint256" },
           { name: "moduli", type: "uint256[]" },
+          { name: "error2_variance", type: "string" },
         ],
       },
     ],
@@ -114,6 +117,7 @@ export function encodeBfvParams(
         degree: BigInt(degree),
         plaintext_modulus: BigInt(plaintext_modulus),
         moduli: [...moduli],
+        error2_variance,
       },
     ]
   );

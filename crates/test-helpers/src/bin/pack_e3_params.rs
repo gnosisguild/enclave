@@ -24,22 +24,36 @@ struct Args {
 
     #[arg(short, long = "plaintext-modulus")]
     plaintext_modulus: u64,
+
+    #[arg(short, long = "error2-variance")]
+    error2_variance: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    let params: std::sync::Arc<fhe::bfv::BfvParameters>;
 
     if args.moduli.len() == 0 {
         println!("Parameter `--moduli` must include at least one value");
         process::exit(1);
     }
 
-    let params = build_bfv_params_arc(
-        args.degree as usize,
-        args.plaintext_modulus,
-        &args.moduli,
-        None,
-    );
+    if let Some(error2_variance) = args.error2_variance {
+        params = build_bfv_params_arc(
+            args.degree as usize,
+            args.plaintext_modulus,
+            &args.moduli,
+            Some(&error2_variance),
+        );
+    } else {
+        params = build_bfv_params_arc(
+            args.degree as usize,
+            args.plaintext_modulus,
+            &args.moduli,
+            None,
+        );
+    }
+
     let encoded = encode_bfv_params(&params);
 
     for byte in encoded {
