@@ -5,13 +5,16 @@ description: 'Build your first E3 program from scratch with step-by-step explana
 
 # Hello World Tutorial
 
-This tutorial walks you through building your first E3 program from scratch. You'll learn how each component works and how they interact to create a secure, encrypted computation.
+This tutorial walks you through building your first E3 program from scratch. You'll learn how each
+component works and how they interact to create a secure, encrypted computation.
 
-> Make sure to complete the [Quick Start](/quick-start) guide first to get familiar with the basic workflow before diving into this detailed tutorial.
+> Make sure to complete the [Quick Start](/quick-start) guide first to get familiar with the basic
+> workflow before diving into this detailed tutorial.
 
 ## What We're Building
 
 We'll create a simple E3 program that:
+
 1. **Accepts** two encrypted numbers from users
 2. **Computes** their sum using Fully Homomorphic Encryption
 3. **Returns** the encrypted result without ever decrypting the inputs
@@ -19,6 +22,7 @@ We'll create a simple E3 program that:
 ## Prerequisites
 
 Before starting, ensure you have:
+
 - [Enclave CLI installed](/installation)
 - Basic knowledge of Rust and TypeScript
 - Rust, Docker, Node.js, and pnpm installed
@@ -61,7 +65,7 @@ pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
 
     // Start with zero (encrypted)
     let mut sum = Ciphertext::zero(&params);
-    
+
     // Add each encrypted input to the sum
     for ciphertext_bytes in &fhe_inputs.ciphertexts {
         let ciphertext = Ciphertext::from_bytes(&ciphertext_bytes.0, &params).unwrap();
@@ -116,15 +120,15 @@ The `enclave.config.yaml` file configures your development environment:
 
 ```yaml
 chains:
-  - name: "hardhat"
-    rpc_url: "ws://localhost:8545"
+  - name: 'hardhat'
+    rpc_url: 'ws://localhost:8545'
     contracts:
-      e3_program: "0x9A676e781A523b5d0C0e43731313A708CB607508"
+      e3_program: '0x9A676e781A523b5d0C0e43731313A708CB607508'
       # ... other contract addresses
 
 nodes:
-  cn1:  # Ciphernode 1
-    address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+  cn1: # Ciphernode 1
+    address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
     quic_port: 9201
     autonetkey: true
     autopassword: true
@@ -189,7 +193,7 @@ Modify your program to accept 3 or more encrypted inputs.
 
 Customize the client application in `./client/src/` to match your computation.
 
-Happy building with Enclave! 🚀 
+Happy building with Enclave! 🚀
 
 ## Next Steps
 

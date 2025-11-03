@@ -14,16 +14,19 @@ pub fn extract_env_vars_vite(config: &AppConfig, chain: &str) -> String {
     if let Some(chain) = config.chains().iter().find(|c| c.name == chain.to_string()) {
         let enclave_addr = &chain.contracts.enclave;
         let registry_addr = &chain.contracts.ciphernode_registry;
-        let filter_addr = &chain.contracts.filter_registry;
+        let bonding_registry_addr = &chain.contracts.bonding_registry;
         env_vars.push(format!("VITE_ENCLAVE_ADDRESS={}", enclave_addr.address()));
         env_vars.push(format!("VITE_REGISTRY_ADDRESS={}", registry_addr.address()));
         env_vars.push(format!("VITE_RPC_URL={}", chain.rpc_url));
         env_vars.push(format!(
-            "VITE_FILTER_REGISTRY_ADDRESS={}",
-            filter_addr.address()
+            "VITE_BONDING_REGISTRY_ADDRESS={}",
+            bonding_registry_addr.address()
         ));
         if let Some(e3_program) = &chain.contracts.e3_program {
             env_vars.push(format!("VITE_E3_PROGRAM_ADDRESS={}", e3_program.address()));
+        }
+        if let Some(fee_token) = &chain.contracts.fee_token {
+            env_vars.push(format!("VITE_FEE_TOKEN_ADDRESS={}", fee_token.address()));
         }
     }
 
@@ -37,13 +40,19 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
     if let Some(chain) = config.chains().iter().find(|c| c.name == chain.to_string()) {
         let enclave_addr = &chain.contracts.enclave;
         let registry_addr = &chain.contracts.ciphernode_registry;
-        let filter_addr = &chain.contracts.filter_registry;
+        let bonding_registry_addr = &chain.contracts.bonding_registry;
         env_vars.push(format!("ENCLAVE_ADDRESS={}", enclave_addr.address()));
         env_vars.push(format!("RPC_URL={}", chain.rpc_url));
         env_vars.push(format!("REGISTRY_ADDRESS={}", registry_addr.address()));
-        env_vars.push(format!("FILTER_REGISTRY_ADDRESS={}", filter_addr.address()));
+        env_vars.push(format!(
+            "BONDING_REGISTRY_ADDRESS={}",
+            bonding_registry_addr.address()
+        ));
         if let Some(e3_program) = &chain.contracts.e3_program {
             env_vars.push(format!("E3_PROGRAM_ADDRESS={}", e3_program.address()));
+        }
+        if let Some(fee_token) = &chain.contracts.fee_token {
+            env_vars.push(format!("FEE_TOKEN_ADDRESS={}", fee_token.address()));
         }
     }
 

@@ -11,7 +11,7 @@
   },
   "scripts": {
     "compile": "hardhat compile",
-    "ciphernode:add": "hardhat ciphernode:add",
+    "ciphernode:add": "hardhat ciphernode:admin-add",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy:contracts": "hardhat run deploy/deploy.ts",
     "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",

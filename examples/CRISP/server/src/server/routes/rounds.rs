@@ -195,7 +195,6 @@ pub async fn initialize_crisp_round(
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     info!("Requesting E3...");
-    let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let start_window: [U256; 2] = [
         U256::from(Utc::now().timestamp()),
@@ -211,7 +210,6 @@ pub async fn initialize_crisp_round(
     let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let res = contract
         .request_e3(
-            filter,
             threshold,
             start_window,
             duration,

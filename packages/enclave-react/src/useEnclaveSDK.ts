@@ -22,6 +22,7 @@ export interface UseEnclaveSDKConfig {
   contracts?: {
     enclave: `0x${string}`;
     ciphernodeRegistry: `0x${string}`;
+    feeToken: `0x${string}`;
   };
   chainId?: number;
   autoConnect?: boolean;
@@ -40,11 +41,11 @@ export interface UseEnclaveSDKReturn {
   // Event handling
   onEnclaveEvent: <T extends AllEventTypes>(
     eventType: T,
-    callback: EventCallback<T>,
+    callback: EventCallback<T>
   ) => void;
   off: <T extends AllEventTypes>(
     eventType: T,
-    callback: EventCallback<T>,
+    callback: EventCallback<T>
   ) => void;
   // Event types for convenience
   EnclaveEventType: typeof EnclaveEventType;
@@ -87,7 +88,7 @@ export interface UseEnclaveSDKReturn {
  * ```
  */
 export const useEnclaveSDK = (
-  config: UseEnclaveSDKConfig,
+  config: UseEnclaveSDKConfig
 ): UseEnclaveSDKReturn => {
   const [sdk, setSdk] = useState<EnclaveSDK | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -115,6 +116,7 @@ export const useEnclaveSDK = (
         contracts: config.contracts || {
           enclave: "0x0000000000000000000000000000000000000000",
           ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
+          feeToken: "0x0000000000000000000000000000000000000000",
         },
         chainId: config.chainId,
         protocol: config.protocol,
@@ -165,7 +167,7 @@ export const useEnclaveSDK = (
       if (!sdk) throw new Error("SDK not initialized");
       return sdk.requestE3(...args);
     },
-    [sdk],
+    [sdk]
   );
 
   const activateE3 = useCallback(
@@ -173,7 +175,7 @@ export const useEnclaveSDK = (
       if (!sdk) throw new Error("SDK not initialized");
       return sdk.activateE3(...args);
     },
-    [sdk],
+    [sdk]
   );
 
   const publishInput = useCallback(
@@ -181,7 +183,7 @@ export const useEnclaveSDK = (
       if (!sdk) throw new Error("SDK not initialized");
       return sdk.publishInput(...args);
     },
-    [sdk],
+    [sdk]
   );
 
   // Event handling methods
@@ -190,7 +192,7 @@ export const useEnclaveSDK = (
       if (!sdk) throw new Error("SDK not initialized");
       return sdk.onEnclaveEvent(eventType, callback);
     },
-    [sdk],
+    [sdk]
   );
 
   const off = useCallback(
@@ -198,7 +200,7 @@ export const useEnclaveSDK = (
       if (!sdk) throw new Error("SDK not initialized");
       return sdk.off(eventType, callback);
     },
-    [sdk],
+    [sdk]
   );
 
   return {

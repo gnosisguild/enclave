@@ -482,7 +482,7 @@ chains:
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
-      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      bonding_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 
 node:
   config_dir: "/myconfig/override"
@@ -651,7 +651,7 @@ chains:
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
-      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      bonding_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
 
@@ -693,7 +693,7 @@ chains:
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
-      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      bonding_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
             config = load_config("_default", None, None).map_err(|err| err.to_string())?;
@@ -715,7 +715,7 @@ chains:
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
-      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      bonding_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
 
@@ -760,7 +760,7 @@ chains:
       ciphernode_registry:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
-      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      bonding_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
 

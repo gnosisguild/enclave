@@ -8,37 +8,57 @@ mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
 mod ciphertext_output_published;
+mod committee_finalize_requested;
+mod committee_finalized;
+mod committee_published;
+mod committee_requested;
 mod compute_request;
+mod configuration_updated;
 mod decryptionshare_created;
 mod die;
 mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
 mod keyshare_created;
+mod operator_activation_changed;
 mod plaintext_aggregated;
+mod plaintext_output_published;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
 mod test_event;
 mod threshold_share_created;
+mod ticket_balance_updated;
+mod ticket_generated;
+mod ticket_submitted;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
 pub use ciphertext_output_published::*;
+pub use committee_finalize_requested::*;
+pub use committee_finalized::*;
+pub use committee_published::*;
+pub use committee_requested::*;
 pub use compute_request::*;
+pub use configuration_updated::*;
 pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use enclave_error::*;
 pub use keyshare_created::*;
+pub use operator_activation_changed::*;
 pub use plaintext_aggregated::*;
+pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
 pub use threshold_share_created::*;
+pub use ticket_balance_updated::*;
+pub use ticket_generated::*;
+pub use ticket_submitted::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
@@ -106,6 +126,46 @@ pub enum EnclaveEvent {
     CiphernodeRemoved {
         id: EventId,
         data: CiphernodeRemoved,
+    },
+    TicketBalanceUpdated {
+        id: EventId,
+        data: TicketBalanceUpdated,
+    },
+    ConfigurationUpdated {
+        id: EventId,
+        data: ConfigurationUpdated,
+    },
+    OperatorActivationChanged {
+        id: EventId,
+        data: OperatorActivationChanged,
+    },
+    CommitteePublished {
+        id: EventId,
+        data: CommitteePublished,
+    },
+    CommitteeRequested {
+        id: EventId,
+        data: CommitteeRequested,
+    },
+    CommitteeFinalizeRequested {
+        id: EventId,
+        data: CommitteeFinalizeRequested,
+    },
+    CommitteeFinalized {
+        id: EventId,
+        data: CommitteeFinalized,
+    },
+    TicketGenerated {
+        id: EventId,
+        data: TicketGenerated,
+    },
+    TicketSubmitted {
+        id: EventId,
+        data: TicketSubmitted,
+    },
+    PlaintextOutputPublished {
+        id: EventId,
+        data: PlaintextOutputPublished,
     },
     EnclaveError {
         id: EventId,
@@ -189,12 +249,22 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
+            EnclaveEvent::TicketBalanceUpdated { id, .. } => id,
+            EnclaveEvent::ConfigurationUpdated { id, .. } => id,
+            EnclaveEvent::OperatorActivationChanged { id, .. } => id,
+            EnclaveEvent::CommitteePublished { id, .. } => id,
+            EnclaveEvent::CommitteeRequested { id, .. } => id,
+            EnclaveEvent::CommitteeFinalizeRequested { id, .. } => id,
+            EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
             EnclaveEvent::DocumentReceived { id, .. } => id,
             EnclaveEvent::ThresholdShareCreated { id, .. } => id,
+            EnclaveEvent::CommitteeFinalized { id, .. } => id,
+            EnclaveEvent::TicketGenerated { id, .. } => id,
+            EnclaveEvent::TicketSubmitted { id, .. } => id,
         }
     }
 }
@@ -210,6 +280,13 @@ impl EnclaveEvent {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
             EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => Some(data.e3_id),
+            EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeFinalized { data, .. } => Some(data.e3_id),
+            EnclaveEvent::TicketGenerated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::TicketSubmitted { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
@@ -225,12 +302,22 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeSelected { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
+            EnclaveEvent::TicketBalanceUpdated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ConfigurationUpdated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteeRequested { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => format!("{:?}", data),
+            EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             EnclaveEvent::DocumentReceived { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteeFinalized { data, .. } => format!("{:?}", data),
+            EnclaveEvent::TicketGenerated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::TicketSubmitted { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -248,6 +335,16 @@ impl_from_event!(
     CiphernodeSelected,
     CiphernodeAdded,
     CiphernodeRemoved,
+    TicketBalanceUpdated,
+    ConfigurationUpdated,
+    OperatorActivationChanged,
+    CommitteePublished,
+    CommitteeRequested,
+    CommitteeFinalizeRequested,
+    CommitteeFinalized,
+    TicketGenerated,
+    TicketSubmitted,
+    PlaintextOutputPublished,
     EnclaveError,
     Shutdown,
     TestEvent,

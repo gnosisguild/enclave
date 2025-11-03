@@ -14,6 +14,7 @@ bincode = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
 e3-events = { workspace = true }
+e3-evm = { workspace = true }
 e3-fhe = { workspace = true }
 e3-multithread = { workspace = true }
 e3-trbfv = { workspace = true }
