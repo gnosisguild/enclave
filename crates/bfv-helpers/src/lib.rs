@@ -11,7 +11,7 @@ use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder, Ciphertext};
 use fhe_traits::{DeserializeParametrized, Serialize};
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
@@ -475,7 +475,7 @@ mod tests {
             let pt = Plaintext::try_encode(&[number], Encoding::poly(), &params)?;
             let ct = pk.try_encrypt(&pt, &mut rng)?;
             let encoded = encode_ciphertexts(&[ct.clone()]);
-            let decoded = decode_ciphertexts(&encoded, &params)?;
+            let decoded = decode_ciphertexts(&encoded, &params).map_err(|e| anyhow!("{e}"))?;
             assert_eq!(decoded, vec![ct]);
             Ok(())
         }
@@ -501,7 +501,7 @@ mod tests {
                 }
 
                 let encoded = encode_ciphertexts(&ciphertexts);
-                let decoded = decode_ciphertexts(&encoded, &params)?;
+                let decoded = decode_ciphertexts(&encoded, &params).map_err(|e| anyhow!("{e}"))?;
                 assert_eq!(decoded, ciphertexts);
             }
 

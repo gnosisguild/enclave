@@ -14,7 +14,6 @@ use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
-use fhe_traits::DeserializeParametrized;
 use fhe_traits::FheDecoder;
 use tracing::info;
 
@@ -57,7 +56,8 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         let trbfv_config = value.trbfv_config.clone();
 
         let params = value.trbfv_config.params();
-        let ciphertexts = decode_ciphertexts(&value.ciphertexts, &trbfv_config.params())?;
+        let ciphertexts = decode_ciphertexts(&value.ciphertexts, &trbfv_config.params())
+            .map_err(|e| anyhow!("{e}"))?;
 
         // NOTE: Ensure the polys are ordered by party_id
         let mut ordered_polys = value.d_share_polys;

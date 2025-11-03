@@ -139,6 +139,14 @@ fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
 
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    let subscriber = fmt()
+        .with_env_filter(EnvFilter::new("info"))
+        .with_test_writer()
+        .finish();
+
+    let _guard = tracing::subscriber::set_default(subscriber);
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let e3_id = E3id::new("1234", 1);

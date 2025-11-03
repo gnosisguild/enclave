@@ -312,9 +312,9 @@ impl ThresholdKeyshare {
             "Setting up key collector for addr: {} and {} nodes",
             state.address, state.threshold_n
         );
-        let addr = self
-            .decryption_key_collector
-            .get_or_insert_with(|| ThresholdShareCollector::setup(self_addr, state.threshold_n));
+        let addr = self.decryption_key_collector.get_or_insert_with(|| {
+            ThresholdShareCollector::setup(self_addr, state.threshold_n, &state.address)
+        });
         Ok(addr.clone())
     }
 

@@ -75,6 +75,7 @@ impl DocumentPublisher {
         // Add a list of events with paylods for the DHT
         match event {
             EnclaveEvent::PublishDocumentRequested { .. } => true,
+            EnclaveEvent::ThresholdShareCreated { .. } => true,
             _ => false,
         }
     }

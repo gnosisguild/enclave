@@ -15,7 +15,7 @@ use e3_fhe::{Fhe, GetAggregatePlaintext};
 use e3_sortition::{GetNodeIndex, Sortition};
 use e3_utils::ArcBytes;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PlaintextAggregatorState {
@@ -232,7 +232,6 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
 
         // Update the local state
         self.set_decryption(decrypted_output.clone())?;
-
         // Dispatch the PlaintextAggregated event
         let event = EnclaveEvent::from(PlaintextAggregated {
             decrypted_output: vec![ArcBytes::from_bytes(decrypted_output)],

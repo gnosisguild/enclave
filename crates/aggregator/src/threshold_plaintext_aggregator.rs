@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {

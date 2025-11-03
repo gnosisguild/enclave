@@ -50,7 +50,8 @@ impl TryFrom<(&Cipher, CalculateDecryptionShareRequest)> for InnerRequest {
         value: (&Cipher, CalculateDecryptionShareRequest),
     ) -> std::result::Result<InnerRequest, Self::Error> {
         let trbfv_config = value.1.trbfv_config.clone();
-        let ciphertexts = decode_ciphertexts(&value.1.ciphertexts, &trbfv_config.params())?;
+        let ciphertexts = decode_ciphertexts(&value.1.ciphertexts, &trbfv_config.params())
+            .map_err(|e| anyhow!("{e}"))?;
 
         let sk_poly_sum =
             try_poly_from_sensitive_bytes(value.1.sk_poly_sum, trbfv_config.params(), value.0)?;

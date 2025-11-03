@@ -24,15 +24,17 @@ pub enum CollectorState {
 
 pub struct ThresholdShareCollector {
     todo: HashSet<PartyId>,
+    address: String,
     parent: Addr<ThresholdKeyshare>,
     state: CollectorState,
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
 }
 
 impl ThresholdShareCollector {
-    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64) -> Addr<Self> {
+    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, address: &str) -> Addr<Self> {
         let addr = Self {
             todo: (0..total).collect(),
+            address: address.to_string(),
             parent,
             state: CollectorState::Collecting,
             shares: HashMap::new(),
@@ -57,7 +59,10 @@ impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
         };
 
         let pid = msg.share.party_id;
-        info!("ThresholdShareCollector party id: {}", pid);
+        info!(
+            "ThresholdShareCollector party id: {} for address: {}",
+            pid, self.address
+        );
         let Some(_) = self.todo.take(&pid) else {
             info!(
                 "Error: {} was not in decryption key collectors ID list",

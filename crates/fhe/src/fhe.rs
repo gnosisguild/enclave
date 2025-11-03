@@ -7,7 +7,7 @@
 use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
+use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc, decode_ciphertexts};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
 use e3_utils::{ArcBytes, SharedRng};
@@ -111,10 +111,15 @@ impl Fhe {
     }
 
     pub fn get_aggregate_plaintext(&self, msg: GetAggregatePlaintext) -> Result<Vec<u8>> {
-        let arc_ct = Arc::new(Ciphertext::from_bytes(
-            &msg.ciphertext_output,
-            &self.params,
-        )?);
+        let Some(ct) = decode_ciphertexts(&msg.ciphertext_output, &self.params)
+            .map_err(|e| anyhow!("{e}"))?
+            .first()
+            .cloned()
+        else {
+            bail!("Could not decode Ciphertext");
+        };
+
+        let arc_ct = Arc::new(ct);
 
         let plaintext: Plaintext = msg
             .decryptions

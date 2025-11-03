@@ -18,7 +18,7 @@ use e3_events::{
     CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
-use e3_net::NetEventTranslator;
+use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
@@ -133,10 +133,8 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
                 EventBus::pipe_filter(
                     source,
                     move |e: &EnclaveEvent| {
-                        // TODO: Document publisher events need to be
-                        // converted to DocumentReceived events
-
                         NetEventTranslator::is_forwardable_event(e)
+                            || DocumentPublisher::is_document_publisher_event(e)
                     },
                     dest,
                 )
