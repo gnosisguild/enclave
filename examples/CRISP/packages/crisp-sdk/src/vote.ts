@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, MESSAGE } from './constants'
+import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, HALF_LARGEST_MINIMUM_DEGREE } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
@@ -97,31 +97,37 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
 export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
-      const halfLength = tally.length / 2
+      const HALF_D = tally.length / 2;
+      const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
+      const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
 
-      // Split the tally into two halves
-      const yesBinary = tally.slice(0, halfLength)
-      const noBinary = tally.slice(halfLength, tally.length)
+      // Extract only the relevant parts of the tally
+      const yesBinary = tally.slice(START_INDEX_Y, HALF_D);
+      const noBinary = tally.slice(START_INDEX_N, tally.length);
 
-      let yes = 0n
-      let no = 0n
+      let yes = 0n;
+      let no = 0n;
 
-      // Convert each half back to decimal
-      for (let i = 0; i < halfLength; i += 1) {
-        const weight = 2n ** BigInt(halfLength - 1 - i)
+      // Convert yes votes (from START_INDEX_Y to HALF_D)
+      for (let i = 0; i < yesBinary.length; i += 1) {
+        const weight = 2n ** BigInt(yesBinary.length - 1 - i);
+        yes += BigInt(yesBinary[i]) * weight;
+      }
 
-        yes += BigInt(yesBinary[i]) * weight
-        no += BigInt(noBinary[i]) * weight
+      // Convert no votes (from START_INDEX_N to D)
+      for (let i = 0; i < noBinary.length; i += 1) {
+        const weight = 2n ** BigInt(noBinary.length - 1 - i);
+        no += BigInt(noBinary[i]) * weight;
       }
 
       return {
         yes,
         no,
-      }
+      };
     default:
-      throw new Error('Unsupported voting mode')
+      throw new Error('Unsupported voting mode');
   }
-}
+};
 
 /**
  * Validate whether a vote is valid for a given voting mode
