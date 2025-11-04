@@ -29,40 +29,40 @@ impl<let L: u32> CryptographicParams<L> {
 /// Contains all the bounds used to validate polynomial coefficients.
 pub struct BoundParams<let L: u32> {
     /// Bounds for public key polynomials for each CRT basis
-    pub pk_bounds: [u64; L],
+    pub pk_bounds: [Field; L],
     /// Bound for error polynomials (e0, e1)
-    pub e_bound: u64,
+    pub e_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
-    pub u_bound: u64,
+    pub u_bound: Field,
     /// Lower bounds for r1 polynomials (modulus switching quotients)
-    pub r1_low_bounds: [i64; L],
+    pub r1_low_bounds: [Field; L],
     /// Upper bounds for r1 polynomials (modulus switching quotients)
-    pub r1_up_bounds: [u64; L],
+    pub r1_up_bounds: [Field; L],
     /// Bounds for r2 polynomials (cyclotomic reduction quotients)
-    pub r2_bounds: [u64; L],
+    pub r2_bounds: [Field; L],
     /// Bounds for p1 polynomials (modulus switching quotients)
-    pub p1_bounds: [u64; L],
+    pub p1_bounds: [Field; L],
     /// Bounds for p2 polynomials (cyclotomic reduction quotients)
-    pub p2_bounds: [u64; L],
+    pub p2_bounds: [Field; L],
     /// Lower bound for k1 polynomial (scaled message)
-    pub k1_low_bound: i64,
+    pub k1_low_bound: Field,
     /// Upper bound for k1 polynomial (scaled message)
-    pub k1_up_bound: u64,
+    pub k1_up_bound: Field,
 }
 
 impl<let L: u32> BoundParams<L> {
     /// Creates new bound parameters
     pub fn new(
-        pk_bounds: [u64; L],
-        e_bound: u64,
-        u_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
-        p1_bounds: [u64; L],
-        p2_bounds: [u64; L],
-        k1_low_bound: i64,
-        k1_up_bound: u64,
+        pk_bounds: [Field; L],
+        e_bound: Field,
+        u_bound: Field,
+        r1_low_bounds: [Field; L],
+        r1_up_bounds: [Field; L],
+        r2_bounds: [Field; L],
+        p1_bounds: [Field; L],
+        p2_bounds: [Field; L],
+        k1_low_bound: Field,
+        k1_up_bound: Field,
     ) -> Self {
         BoundParams {
             pk_bounds,
@@ -92,16 +92,16 @@ impl<let N: u32, let L: u32> Params<N, L> {
     /// Creates new complete parameters
     pub fn new(
         q_mod_t: Field,
-        pk_bounds: [u64; L],
-        e_bound: u64,
-        u_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
-        p1_bounds: [u64; L],
-        p2_bounds: [u64; L],
-        k1_low_bound: i64,
-        k1_up_bound: u64,
+        pk_bounds: [Field; L],
+        e_bound: Field,
+        u_bound: Field,
+        r1_low_bounds: [Field; L],
+        r1_up_bounds: [Field; L],
+        r2_bounds: [Field; L],
+        p1_bounds: [Field; L],
+        p2_bounds: [Field; L],
+        k1_low_bound: Field,
+        k1_up_bound: Field,
         qis: [Field; L],
         k0is: [Field; L],
     ) -> Self {

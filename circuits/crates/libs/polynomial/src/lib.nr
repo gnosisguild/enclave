@@ -117,11 +117,11 @@ impl<let N: u32> Polynomial<N> {
     /// # Arguments
     /// * `upper_bound` - The symmetric bound for coefficient range checking
     ///                   Coefficients must satisfy: -upper_bound <= c <= upper_bound
-    pub fn range_check_1bound<let BIT: u32>(self, upper_bound: u64) {
-        let shifted_bound = (upper_bound as Field) + (upper_bound as Field);
+    pub fn range_check_1bound<let BIT: u32>(self, upper_bound: Field) {
+        let shifted_bound = 2 * upper_bound;
 
         for i in 0..self.coefficients.len() {
-            let shifted_coefficient = self.coefficients[i] + upper_bound as Field;
+            let shifted_coefficient = self.coefficients[i] + upper_bound;
 
             shifted_coefficient.assert_max_bit_size::<BIT + 1>();
             (shifted_bound - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
@@ -145,9 +145,9 @@ impl<let N: u32> Polynomial<N> {
     /// * `upper_bound` - The upper bound for coefficient range checking
     /// * `lower_bound` - The lower bound for coefficient range checking (can be negative)
     ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
-    pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: u64, lower_bound: i64) {
-        let shifted_amount = (lower_bound * -1) as u64 as Field;
-        let range_size = shifted_amount + upper_bound as Field;
+    pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: Field, lower_bound: Field) {
+        let shifted_amount = lower_bound;
+        let range_size = shifted_amount + upper_bound;
 
         for i in 0..self.coefficients.len() {
             let shifted_coefficient = self.coefficients[i] + shifted_amount;
