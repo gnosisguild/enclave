@@ -36,7 +36,7 @@ impl<let N: u32> Polynomial<N> {
     /// * `other` - The polynomial to add to the current polynomial.
     ///
     /// # Returns
-    /// A new polynomial with the coefficients summed.
+    /// A new polynomial with the coefficients added.
     pub fn add(self, other: Self) -> Self {
         let mut result = Self::new([0; N]);
 
