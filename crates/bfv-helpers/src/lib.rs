@@ -14,9 +14,7 @@ use std::sync::Arc;
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
-    /// Standard BFV parameters sets
-    /// Each set is a tuple of (degree, plaintext_modulus, moduli).
-    /// Naming convention: SET_<degree>_<plaintext_modulus>_<moduli_count>
+    use super::BfvParamSet;
 
     /// Note that 10 is the default value for both error1 and error2 variance
     /// for both BFV and TRBFV (if not explicitly set).
@@ -25,34 +23,98 @@ pub mod params {
     /// - Degree: 2048 (polynomial ring size)
     /// - Plaintext modulus: 1032193
     /// - Moduli: [0x3FFFFFFF000001] (provides good security level)
-    pub const SET_2048_1032193_1: (usize, u64, [u64; 1]) = (2048, 1032193, [0x3FFFFFFF000001]);
+    pub const SET_2048_1032193_1: BfvParamSet = BfvParamSet {
+        degree: 2048,
+        plaintext_modulus: 1032193,
+        moduli: &[0x3FFFFFFF000001],
+        error2_variance: None,
+    };
 
     /// 128bits security TRBFV parameters set (PRODUCTION READY).
     /// - Degree: 8192
     /// - Plaintext modulus: 1000
     /// - Moduli: [0x00800000022a0001, 0x00800000021a0001, 0x0080000002120001, 0x0080000001f60001]
     /// - Error2 Variance: 52309181128222339698631578526730685514457152477762943514050560000
-    pub const SET_8192_1000_4: (usize, u64, [u64; 4], &str) = (
-        8192,
-        1000,
-        [
+    pub const SET_8192_1000_4: BfvParamSet = BfvParamSet {
+        degree: 8192,
+        plaintext_modulus: 1000,
+        moduli: &[
             0x00800000022a0001,
             0x00800000021a0001,
             0x0080000002120001,
             0x0080000001f60001,
         ],
-        "52309181128222339698631578526730685514457152477762943514050560000",
-    );
+        error2_variance: Some("52309181128222339698631578526730685514457152477762943514050560000"),
+    };
 
     /// 128bits security BFV parameters set (PRODUCTION READY).
     /// - Degree: 8192
     /// - Plaintext modulus: 144115188075855872
     /// - Moduli: [288230376173076481, 288230376167047169]
-    pub const SET_8192_144115188075855872_2: (usize, u64, [u64; 2]) = (
-        8192,
-        144115188075855872,
-        [288230376173076481, 288230376167047169],
-    );
+    pub const SET_8192_144115188075855872_2: BfvParamSet = BfvParamSet {
+        degree: 8192,
+        plaintext_modulus: 144115188075855872,
+        moduli: &[288230376173076481, 288230376167047169],
+        error2_variance: None,
+    };
+}
+
+/// A consistent type representing a BFV parameter set.
+///
+/// This struct provides a uniform way to represent BFV parameter sets,
+/// making it easy to consume them with functions like `build_bfv_params_from_set`.
+#[derive(Debug, Clone, Copy)]
+pub struct BfvParamSet {
+    /// The degree of the polynomial ring, must be a power of 2
+    pub degree: usize,
+    /// The modulus for the plaintext space
+    pub plaintext_modulus: u64,
+    /// The moduli for the ciphertext space
+    pub moduli: &'static [u64],
+    /// Optional error2 variance (as decimal string). If None, defaults to "10"
+    pub error2_variance: Option<&'static str>,
+}
+
+/// Builds BFV parameters from a `BfvParamSet`.
+///
+/// This is a convenience function that consumes a `BfvParamSet` struct
+/// and builds the corresponding `BfvParameters` instance.
+///
+/// # Arguments
+///
+/// * `param_set` - A `BfvParamSet` containing the degree, plaintext modulus, moduli, and optional error2 variance
+///
+/// # Returns
+///
+/// Returns a `BfvParameters` instance configured with the specified parameters.
+pub fn build_bfv_params_from_set(param_set: BfvParamSet) -> BfvParameters {
+    build_bfv_params(
+        param_set.degree,
+        param_set.plaintext_modulus,
+        param_set.moduli,
+        param_set.error2_variance,
+    )
+}
+
+/// Builds BFV parameters from a `BfvParamSet` wrapped in an `Arc`.
+///
+/// This is a convenience function that consumes a `BfvParamSet` struct
+/// and builds the corresponding `Arc<BfvParameters>` instance for thread-safe shared ownership.
+///
+/// # Arguments
+///
+/// * `param_set` - A `BfvParamSet` containing the degree, plaintext modulus, moduli, and optional error2 variance
+///
+/// # Returns
+///
+/// Returns an `Arc<BfvParameters>` instance configured with the specified parameters.
+pub fn build_bfv_params_from_set_arc(param_set: BfvParamSet) -> Arc<BfvParameters> {
+    build_bfv_params_arc(
+        param_set.degree,
+        param_set.plaintext_modulus,
+        param_set.moduli,
+        param_set.error2_variance,
+    )
 }
 
 /// Builds BFV (Brakerski-Fan-Vercauteren) encryption parameters.
@@ -444,77 +506,74 @@ mod tests {
 
         #[test]
         fn test_params_constant() {
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            assert_eq!(degree, 2048);
-            assert_eq!(plaintext_modulus, 1032193);
-            assert_eq!(moduli, [0x3FFFFFFF000001]);
+            let param_set = params::SET_2048_1032193_1;
+            assert_eq!(param_set.degree, 2048);
+            assert_eq!(param_set.plaintext_modulus, 1032193);
+            assert_eq!(param_set.moduli, &[0x3FFFFFFF000001]);
         }
 
         #[test]
         fn test_params_function() {
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            let params = build_bfv_params(degree, plaintext_modulus, &moduli, None);
+            let param_set = params::SET_2048_1032193_1;
+            let params = build_bfv_params_from_set(param_set);
 
-            assert_eq!(params.degree(), degree);
-            assert_eq!(params.plaintext(), plaintext_modulus);
-            assert_eq!(params.moduli(), moduli);
+            assert_eq!(params.degree(), param_set.degree);
+            assert_eq!(params.plaintext(), param_set.plaintext_modulus);
+            assert_eq!(params.moduli(), param_set.moduli);
         }
 
         #[test]
         fn test_params_arc_function() {
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+            let param_set = params::SET_2048_1032193_1;
+            let params = build_bfv_params_from_set_arc(param_set);
 
-            assert_eq!(params.degree(), degree);
-            assert_eq!(params.plaintext(), plaintext_modulus);
-            assert_eq!(params.moduli(), moduli);
+            assert_eq!(params.degree(), param_set.degree);
+            assert_eq!(params.plaintext(), param_set.plaintext_modulus);
+            assert_eq!(params.moduli(), param_set.moduli);
         }
 
         #[test]
         fn test_params_encoding_roundtrip() {
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            let params = build_bfv_params(degree, plaintext_modulus, &moduli, None);
+            let param_set = params::SET_2048_1032193_1;
+            let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);
 
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            assert_eq!(decoded.degree(), degree);
-            assert_eq!(decoded.plaintext(), plaintext_modulus);
-            assert_eq!(decoded.moduli(), moduli);
+            assert_eq!(decoded.degree(), param_set.degree);
+            assert_eq!(decoded.plaintext(), param_set.plaintext_modulus);
+            assert_eq!(decoded.moduli(), param_set.moduli);
             // Verify error2_variance is preserved
             assert_eq!(decoded.get_error2_variance(), params.get_error2_variance());
         }
 
         #[test]
         fn test_params_arc_encoding_roundtrip() {
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+            let param_set = params::SET_2048_1032193_1;
+            let params = build_bfv_params_from_set_arc(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params_arc(&encoded);
 
-            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            assert_eq!(decoded.degree(), degree);
-            assert_eq!(decoded.plaintext(), plaintext_modulus);
-            assert_eq!(decoded.moduli(), moduli);
+            assert_eq!(decoded.degree(), param_set.degree);
+            assert_eq!(decoded.plaintext(), param_set.plaintext_modulus);
+            assert_eq!(decoded.moduli(), param_set.moduli);
             // Verify error2_variance is preserved
             assert_eq!(decoded.get_error2_variance(), params.get_error2_variance());
         }
 
         #[test]
         fn test_params_trbfv_encoding_roundtrip() {
-            let (degree, plaintext_modulus, moduli, error2_variance) = params::SET_8192_1000_4;
-            let params =
-                build_bfv_params(degree, plaintext_modulus, &moduli, Some(error2_variance));
+            let param_set = params::SET_8192_1000_4;
+            let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);
 
-            assert_eq!(decoded.degree(), degree);
-            assert_eq!(decoded.plaintext(), plaintext_modulus);
-            assert_eq!(decoded.moduli(), moduli);
+            assert_eq!(decoded.degree(), param_set.degree);
+            assert_eq!(decoded.plaintext(), param_set.plaintext_modulus);
+            assert_eq!(decoded.moduli(), param_set.moduli);
             // Verify error2_variance is preserved for trBFV
             assert_eq!(
                 decoded.get_error2_variance(),
-                &BigUint::from_str(error2_variance).unwrap()
+                &BigUint::from_str(param_set.error2_variance.unwrap()).unwrap()
             );
         }
     }

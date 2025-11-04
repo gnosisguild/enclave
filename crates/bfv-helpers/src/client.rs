@@ -131,11 +131,15 @@ mod tests {
 
     #[test]
     fn test_bfv_encrypt_a64() {
+        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+        let param_set = SET_2048_1032193_1;
+        let params = build_bfv_params_from_set_arc(param_set);
+        let degree = param_set.degree;
+        let plaintext_modulus = param_set.plaintext_modulus;
+        let moduli = [param_set.moduli[0]];
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -152,11 +156,15 @@ mod tests {
 
     #[test]
     fn test_bfv_encrypt_v64() {
+        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+        let param_set = SET_2048_1032193_1;
+        let params = build_bfv_params_from_set_arc(param_set);
+        let degree = param_set.degree;
+        let plaintext_modulus = param_set.plaintext_modulus;
+        let moduli = [param_set.moduli[0]];
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -180,11 +188,15 @@ mod tests {
 
     #[test]
     fn test_bfv_verifiable_encrypt_a64() {
+        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+        let param_set = SET_2048_1032193_1;
+        let params = build_bfv_params_from_set_arc(param_set);
+        let degree = param_set.degree;
+        let plaintext_modulus = param_set.plaintext_modulus;
+        let moduli = [param_set.moduli[0]];
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -201,11 +213,15 @@ mod tests {
 
     #[test]
     fn test_bfv_verifiable_encrypt_v64() {
+        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+        let param_set = SET_2048_1032193_1;
+        let params = build_bfv_params_from_set_arc(param_set);
+        let degree = param_set.degree;
+        let plaintext_modulus = param_set.plaintext_modulus;
+        let moduli = [param_set.moduli[0]];
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
