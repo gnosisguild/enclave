@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, HALF_LARGEST_MINIMUM_DEGREE } from './constants'
+import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
