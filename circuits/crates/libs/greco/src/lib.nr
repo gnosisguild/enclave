@@ -371,108 +371,63 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
         let crypto_params = self.params.crypto_params();
-        let mut result = true;
-
-        for i in 0..L {
-            // Verify first equation: ct0i = pk0i * u + e0 + k1 * k0i + r1i * qi + r2i * cyclo
-            result = result & self.check_ct0_constraint(i, gammas.get(i), crypto_params);
-
-            // Verify second equation: ct1i = pk1i * u + e1 + p1i * qi + p2i * cyclo
-            result = result & self.check_ct1_constraint(i, gammas.get(i + L), crypto_params);
-        }
-
-        result
-    }
-
-    /// Verifies the ct0 constraint for a specific CRT basis
-    ///
-    /// Checks that ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo(gamma)
-    ///
-    /// # Arguments
-    /// * `i` - CRT basis index
-    /// * `gamma` - Challenge value for this constraint
-    /// * `crypto_params` - Cryptographic parameters
-    ///
-    /// # Returns
-    /// True if the ct0 constraint is satisfied, false otherwise.
-    fn check_ct0_constraint(
-        self,
-        i: u32,
-        gamma: Field,
-        crypto_params: CryptographicParams<L>,
-    ) -> bool {
+        let gamma = gammas.get(0);
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
-
-        // Evaluate all polynomials at gamma
         let u_at_gamma = self.u.eval(gamma);
         let e0_at_gamma = self.e0.eval(gamma);
         let k1_at_gamma = self.k1.eval(gamma);
-        let pk0is_at_gamma = self.pk0is[i].eval(gamma);
-        let r1i_at_gamma = self.r1is[i].eval(gamma);
-        let r2i_at_gamma = self.r2is[i].eval(gamma);
-
-        // Compute right-hand side step by step
-        // Step 1: pk0_u = pk0i(gamma) * u(gamma) + e0(gamma)
-        let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
-
-        // Step 2: rhs = pk0_u + k1(gamma) * k0i
-        let rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
-
-        // Step 3: rhs = rhs + r1i(gamma) * qi
-        let rhs = rhs + (r1i_at_gamma * crypto_params.qis[i]);
-
-        // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
-        let rhs = rhs + r2i_at_gamma * cyclo_at_gamma;
-
-        // Left-hand side: ct0i(gamma)
-        let lhs = self.ct0is[i].eval(gamma);
-
-        // Enforce equality: LHS(gamma) = RHS(gamma)
-        lhs == rhs
-    }
-
-    /// Verifies the ct1 constraint for a specific CRT basis
-    ///
-    /// Checks that ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo(gamma)
-    ///
-    /// # Arguments
-    /// * `i` - CRT basis index
-    /// * `gamma` - Challenge value for this constraint
-    /// * `crypto_params` - Cryptographic parameters
-    ///
-    /// # Returns
-    /// True if the ct1 constraint is satisfied, false otherwise.
-    fn check_ct1_constraint(
-        self,
-        i: u32,
-        gamma: Field,
-        crypto_params: CryptographicParams<L>,
-    ) -> bool {
-        // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
-        let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
-
-        // Evaluate all polynomials at gamma
-        let u_at_gamma = self.u.eval(gamma);
         let e1_at_gamma = self.e1.eval(gamma);
-        let pk1is_at_gamma = self.pk1is[i].eval(gamma);
-        let p1is_at_gamma = self.p1is[i].eval(gamma);
-        let p2is_at_gamma = self.p2is[i].eval(gamma);
 
-        // Compute right-hand side step by step
-        // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
-        let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
+        let mut sum = (0, 0);
+        for i in 0..L {
+            // Check ct0i(gamma) = pk0i(gamma) * u(gamma) + e0(gamma) + k1(gamma) * k0i + r1i(gamma) * qi + r2i(gamma) * cyclo(gamma)
+            // Evaluate polynomials at gamma for ct0
+            let pk0is_at_gamma = self.pk0is[i].eval(gamma);
+            let r1i_at_gamma = self.r1is[i].eval(gamma);
+            let r2i_at_gamma = self.r2is[i].eval(gamma);
 
-        // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
-        let rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
+            // Step 1: pk0_u = pk0i(gamma) * u(gamma) + e0(gamma)
+            let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
 
-        // Step 3: rhs = rhs + p1i(gamma) * qi
-        let rhs = rhs + (p1is_at_gamma * crypto_params.qis[i]);
+            // Step 2: rhs = pk0_u + k1(gamma) * k0i
+            let mut ct0_rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
 
-        // Left-hand side: ct1i(gamma)
-        let lhs = self.ct1is[i].eval(gamma);
+            // Step 3: rhs = rhs + r1i(gamma) * qi
+            ct0_rhs += r1i_at_gamma * crypto_params.qis[i];
 
-        // Enforce equality: LHS(gamma) = RHS(gamma)
-        lhs == rhs
+            // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
+            ct0_rhs += r2i_at_gamma * cyclo_at_gamma;
+
+            // Left-hand side: ct0i(gamma)
+            let ct0_lhs = self.ct0is[i].eval(gamma);
+
+            // Checks that ct1i(gamma) = pk1i(gamma) * u(gamma) + e1(gamma) + p1i(gamma) * qi + p2i(gamma) * cyclo(gamma)
+            // Evaluate polynomials at gamma for ct1
+            let pk1is_at_gamma = self.pk1is[i].eval(gamma);
+            let p1is_at_gamma = self.p1is[i].eval(gamma);
+            let p2is_at_gamma = self.p2is[i].eval(gamma);
+
+            // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
+            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
+
+            // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
+            let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
+
+            // Step 3: rhs = rhs + p1i(gamma) * qi
+            ct1_rhs += p1is_at_gamma * crypto_params.qis[i];
+
+            // Left-hand side: ct1i(gamma)
+            let ct1_lhs = self.ct1is[i].eval(gamma);
+
+            let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
+
+            sum = (
+                sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),
+                sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L),
+            );
+        }
+
+        sum.0 == sum.1
     }
 }

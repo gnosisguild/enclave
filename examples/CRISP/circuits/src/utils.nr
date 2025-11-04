@@ -32,7 +32,7 @@ pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
 }
 
 // Check that the polynomial has 0 for all relevant coefficients
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
     // This value would allow to fit
     // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
@@ -42,20 +42,24 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
     let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
     let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
 
-    let mut sum = 0;
+    let mut res = true;
 
     // Loop through all coefficients in the space where we could have a vote
     // yes part
     for i in START_INDEX_Y..HALF_D {
-        sum += k1.coefficients[i];
+        if k1.coefficients[i] != 0 {
+            res = false;
+        }
     }
 
     // no part
     for i in START_INDEX_N..D {
-        sum += k1.coefficients[i];
+        if k1.coefficients[i] != 0 {
+            res = false;
+        }
     }
 
-    assert(sum == 0);
+    res 
 }
 
 #[test]
@@ -86,7 +90,7 @@ fn test_check_coefficient_values_fail() {
     check_coefficient_values(pol, 1);
 }
 
-#[test(should_fail)]
+#[test]
 fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
@@ -97,7 +101,7 @@ fn test_check_coefficient_zero_fail() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol) == false);
 }
 
 #[test]
@@ -111,5 +115,5 @@ fn test_check_coefficient_zero() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol) == true);
 }

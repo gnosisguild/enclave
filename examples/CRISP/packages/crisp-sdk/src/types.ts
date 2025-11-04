@@ -168,6 +168,8 @@ export interface CRISPCircuitInputs {
   slot_address: string
   // Balance Section.
   balance: string
+  // Whether this is the first vote for this slot.
+  is_first_vote: boolean
 }
 
 /**
@@ -214,4 +216,5 @@ export interface EncryptVoteAndGenerateCRISPInputsParams {
   balance: bigint
   bfvParams?: BFVParams
   slotAddress: string
+  isFirstVote: boolean
 }
