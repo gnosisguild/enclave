@@ -16,15 +16,19 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{fs, sync::Arc};
 
-fn parse_hex(s: &str) -> Result<Vec<u8>, String> {
+#[derive(Debug, Clone)]
+struct HexBytes(pub Vec<u8>);
+
+fn parse_hex(s: &str) -> Result<HexBytes, String> {
     // Remove "0x" or "0X" prefix if present
     let s = s
         .strip_prefix("0x")
         .or_else(|| s.strip_prefix("0X"))
         .unwrap_or(s);
-
     // Decode hex string to bytes
-    hex::decode(s).map_err(|e| format!("Invalid hex string: {}", e))
+    hex::decode(s)
+        .map(HexBytes)
+        .map_err(|e| format!("Invalid hex string: {}", e))
 }
 
 #[derive(Parser, Debug)]
@@ -40,7 +44,7 @@ struct Args {
     plaintext: Vec<u64>,
 
     #[arg(long, value_parser = parse_hex)]
-    params: Option<Vec<u8>>,
+    params: Option<HexBytes>,
 }
 
 fn main() -> Result<()> {
@@ -50,7 +54,7 @@ fn main() -> Result<()> {
 
     let bytes = fs::read(&args.input)?;
     let params = if let Some(params_bytes) = args.params {
-        Arc::new(decode_bfv_params(&params_bytes))
+        Arc::new(decode_bfv_params(&params_bytes.0))
     } else {
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
         build_bfv_params_arc(degree, plaintext_modulus, &moduli)

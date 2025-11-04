@@ -299,8 +299,21 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     defaultValue: "",
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "publicKeyFile",
+    description: "path to file containing the public key",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
-    default: async ({ e3Id, publicKey }, hre) => {
+    default: async ({ e3Id, publicKey: publicKeyArg, publicKeyFile }, hre) => {
+      const publicKey =
+        publicKeyArg ||
+        (publicKeyFile ? fs.readFileSync(publicKeyFile, "utf8").trim() : "") ||
+        process.env.PUBLIC_KEY;
+
+      if (!publicKey) throw new Error("No public key provided!");
+
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
