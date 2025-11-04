@@ -25,6 +25,10 @@ contract CRISPProgram is IE3Program, Ownable {
     HonkVerifier private immutable HONK_VERIFIER;
     bytes32 public imageId;
 
+    /// @notice Half of the largest minimum degree used to fit votes
+    /// inside the plaintext polynomial
+    uint256 public constant HALF_LARGEST_MINIMUM_DEGREE = 28;
+
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
@@ -56,10 +60,7 @@ contract CRISPProgram is IE3Program, Ownable {
     ) Ownable(msg.sender) {
         require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
-        require(
-            address(_inputValidatorFactory) != address(0),
-            InvalidInputValidatorFactory()
-        );
+        require(address(_inputValidatorFactory) != address(0), InvalidInputValidatorFactory());
         require(address(_honkVerifier) != address(0), InvalidHonkVerifier());
 
         enclave = _enclave;
@@ -92,56 +93,55 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @notice Validate the E3 program parameters
     /// @param e3Id The E3 program ID
     /// @param e3ProgramParams The E3 program parameters
-    function validate(
-        uint256 e3Id,
-        uint256,
-        bytes calldata e3ProgramParams,
-        bytes calldata
-    ) external returns (bytes32, IInputValidator inputValidator) {
-        require(
-            authorizedContracts[msg.sender] || msg.sender == owner(),
-            CallerNotAuthorized()
-        );
+    function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata)
+        external
+        returns (bytes32, IInputValidator inputValidator)
+    {
+        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
         // Deploy a new input validator
-        inputValidator = IInputValidator(
-            INPUT_VALIDATOR_FACTORY.deploy(address(HONK_VERIFIER), owner())
-        );
+        inputValidator = IInputValidator(INPUT_VALIDATOR_FACTORY.deploy(address(HONK_VERIFIER), owner()));
 
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
 
     /// @notice Decode the tally from the plaintext output
-    function decodeTally(uint256 e3Id) public returns (uint256 yes, uint256 no) {
-        // fetch from enclave 
+    /// @param e3Id The E3 program ID
+    /// @return yes The number of yes votes
+    /// @return no The number of no votes
+    function decodeTally(uint256 e3Id) public view returns (uint256 yes, uint256 no) {
+        // fetch from enclave
         E3 memory e3 = enclave.getE3(e3Id);
 
+        // abi decode it into an array of uint256
         uint256[] memory tally = abi.decode(e3.plaintextOutput, (uint256[]));
 
-        uint256 HALF_LARGEST_MINIMUM_DEGREE = 28;
-        uint256 HALF_D = tally.length / 2;
-        uint256 START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
+        /// @notice We want to completely ignore anything outside of the coefficients
+        /// we agreed to store out votes on.
+        uint256 halfD = tally.length / 2;
+        uint256 START_INDEX_Y = halfD - HALF_LARGEST_MINIMUM_DEGREE;
         uint256 START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
-    
+
+        // first weight (we are converting back from bits to integer)
         uint256 weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
-        
+
         // Convert yes votes
-        for (uint256 i = START_INDEX_Y; i < HALF_D; i++) {
+        for (uint256 i = START_INDEX_Y; i < halfD; i++) {
             yes += tally[i] * weight;
             weight /= 2; // Right shift equivalent
         }
-    
+
         // Reset weight for no votes
         weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
-        
+
         // Convert no votes
         for (uint256 i = START_INDEX_N; i < tally.length; i++) {
             no += tally[i] * weight;
             weight /= 2;
         }
-    
+
         return (yes, no);
     }
 
@@ -149,11 +149,12 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param e3Id The E3 program ID
     /// @param ciphertextOutputHash The hash of the ciphertext output
     /// @param proof The proof to verify
-    function verify(
-        uint256 e3Id,
-        bytes32 ciphertextOutputHash,
-        bytes memory proof
-    ) external view override returns (bool) {
+    function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof)
+        external
+        view
+        override
+        returns (bool)
+    {
         require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
         bytes32 inputRoot = bytes32(enclave.getInputRoot(e3Id));
         bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
@@ -170,11 +171,7 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param journal The journal to encode into
     /// @param startIndex The start index in the journal
     /// @param hashVal The hash value to encode
-    function encodeLengthPrefixAndHash(
-        bytes memory journal,
-        uint256 startIndex,
-        bytes32 hashVal
-    ) internal pure {
+    function encodeLengthPrefixAndHash(bytes memory journal, uint256 startIndex, bytes32 hashVal) internal pure {
         journal[startIndex] = 0x20;
         startIndex += 4;
         for (uint256 i = 0; i < 32; i++) {
