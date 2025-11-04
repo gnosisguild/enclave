@@ -126,15 +126,14 @@ fn main(
         let is_vote_zero = check_coefficient_zero(k1);
         assert(is_vote_zero);
 
-        // as well as the sum
-        assert(is_ct_add_valid);
-
         // need to check if slot is empty (no previous ciphertext).
         // If so, (ct0is, ct1is) should be returned.
 
         if is_first_vote {
             (ct0is, ct1is)
         } else {
+            // check if the sum is valid
+            assert(is_ct_add_valid);
             (sum_ct0is, sum_ct1is)
         }
     }
