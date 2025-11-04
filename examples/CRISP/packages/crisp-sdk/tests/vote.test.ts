@@ -201,49 +201,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it('should generate a proof for a voter and verify it', { timeout: 180000 }, async () => {
-      const encodedVote = encodeVote({ yes: 0n, no: 0n }, VotingMode.GOVERNANCE, votingPower)
-
-      // hardhat default private key
-      const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
-      const account = privateKeyToAccount(privateKey)
-      const signature = await account.signMessage({ message: MESSAGE })
-      const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
-      const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
-
-      const inputs = await encryptVoteAndGenerateCRISPInputs({
-        encodedVote,
-        publicKey,
-        previousCiphertext,
-        signature,
-        message: MESSAGE,
-        merkleData: merkleProof,
-        balance: votingPowerLeaf,
-        slotAddress: account.address.toLowerCase(),
-        isFirstVote: false,
-      })
-
-      /**
-       *  // ECDSA Section.
-          public_key_x: [u8; 32],
-          public_key_y: [u8; 32],
-          signature: [u8; 64],
-          hashed_message: [u8; 32],
-          // Merkle Tree Section.
-          merkle_root: pub Field,
-          merkle_proof_length: u32,
-          merkle_proof_indices: [u1; 20],
-          merkle_proof_siblings: [Field; 20],
-          // Slot Address Section.
-          slot_address: pub Field,
-          // Balance Section.
-          balance: Field,
-       */
-
-
-    });
-    it.only('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
+    it('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
@@ -263,6 +221,7 @@ describe('Vote', () => {
         merkleData: merkleProof,
         balance: votingPowerLeaf,
         slotAddress: account.address.toLowerCase(),
+        isFirstVote: false,
       })
 
       const proof = await generateProof(inputs)

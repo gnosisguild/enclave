@@ -117,9 +117,6 @@ fn main(
     {
         // @todo: need to check if vote <= balance.
 
-    {
-        // @todo: need to check if vote <= balance.
-
         // Verify the correct coefficient values.
         check_coefficient_values(k1, params.crypto_params().q_mod_t);
 
