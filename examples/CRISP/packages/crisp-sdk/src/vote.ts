@@ -7,11 +7,12 @@
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
+import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, MESSAGE } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
+import { privateKeyToAccount } from 'viem/accounts'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -152,6 +153,11 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param publicKey The public key to use for encryption
  * @param previousCiphertext The previous ciphertext to use for addition operation
  * @param bfvParams The BFV parameters to use for encryption
+ * @param merkleData The merkle proof data
+ * @param message The message that was signed
+ * @param signature The signature of the message
+ * @param balance The voter's balance
+ * @param slotAddress The voter's slot address
  * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async ({
@@ -163,6 +169,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   message,
   signature,
   balance,
+  slotAddress,
 }: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
   if (encodedVote.length !== bfvParams.degree) {
     throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
@@ -186,7 +193,7 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
     merkle_proof_indices: merkleData.indices.map((i) => i.toString()),
     merkle_proof_siblings: merkleData.proof.siblings.map((s) => s.toString()),
     merkle_root: merkleData.proof.root.toString(),
-    slot_address: merkleData.proof.root.toString(), // temporary, will be replaced with the actual slot address.
+    slot_address: slotAddress,
     balance: balance.toString(),
   }
 }
@@ -196,6 +203,9 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
  * @param voter The voter's address
  * @param publicKey The voter's public key
  * @param previousCiphertext The previous ciphertext
+ * @param bfvParams The BFV parameters
+ * @param merkleRoot The merkle root of the census tree
+ * @param slotAddress The voter's slot address
  * @returns The CRISP circuit inputs for a mask vote
  */
 export const generateMaskVote = async (
@@ -203,6 +213,7 @@ export const generateMaskVote = async (
   previousCiphertext: Uint8Array,
   bfvParams = DEFAULT_BFV_PARAMS,
   merkleRoot: bigint,
+  slotAddress: string,
 ): Promise<CRISPCircuitInputs> => {
   const plaintextVote: IVote = {
     yes: 0n,
@@ -217,17 +228,23 @@ export const generateMaskVote = async (
 
   const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
 
+  // hardhat default private key
+  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+  const account = privateKeyToAccount(privateKey)
+  const signature = await account.signMessage({ message: MESSAGE })
+  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(MESSAGE, signature)
+
   return {
     ...crispInputs,
-    public_key_x: Array.from({ length: 32 }, () => '0'),
-    public_key_y: Array.from({ length: 32 }, () => '0'),
-    signature: Array.from({ length: 64 }, () => '0'),
-    hashed_message: Array.from({ length: 32 }, () => '0'),
-    merkle_proof_indices: Array.from({ length: 4 }, () => '0'),
-    merkle_proof_siblings: Array.from({ length: 4 }, () => '0'),
+    hashed_message: Array.from(hashed_message).map((b) => b.toString()),
+    public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
+    public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
+    signature: Array.from(extractedSignature).map((b) => b.toString()),
+    merkle_proof_indices: Array.from({ length: 20 }, () => '0'),
+    merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
     merkle_proof_length: '1',
     merkle_root: merkleRoot.toString(),
-    slot_address: merkleRoot.toString(), // temporary, will be replaced with the actual slot address.
+    slot_address: slotAddress,
     balance: '0',
   }
 }

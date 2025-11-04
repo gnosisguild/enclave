@@ -22,3 +22,8 @@ export const MAXIMUM_VOTE_VALUE = 268435456n
  * These are the parameters used for the default testing purposes only.
  */
 export const DEFAULT_BFV_PARAMS = ZKInputsGenerator.withDefaults().getBFVParams() as BFVParams
+
+/**
+ * Mock message for masking signature
+ */
+export const MESSAGE = 'Vote for round 0'
