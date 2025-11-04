@@ -72,7 +72,7 @@ waiton "$SCRIPT_DIR/output/pubkey.bin"
 PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 heading "Mock encrypted plaintext"
-$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
+$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
 heading "Mock activate e3-id"
 # NOTE: using -s to avoid key spamming output
