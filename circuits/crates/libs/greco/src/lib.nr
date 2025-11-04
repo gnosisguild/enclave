@@ -420,9 +420,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             // Left-hand side: ct1i(gamma)
             let ct1_lhs = self.ct1is[i].eval(gamma);
 
+            let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
+
             sum = (
-                sum.0 + ct0_lhs * gammas.get(i) + ct1_lhs * gammas.get(i + L),
-                sum.1 + ct0_rhs * gammas.get(i) + ct1_rhs * gammas.get(i + L),
+                sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),
+                sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L),
             );
         }
 
