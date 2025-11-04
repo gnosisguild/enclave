@@ -123,6 +123,11 @@ enclave_nodes_up() {
      --config "$SCRIPT_DIR/enclave.config.yaml" --experimental-trbfv & 
 }
 
+# enclave_nodes_up() {
+#    $ENCLAVE_BIN nodes up -v \
+#      --config "$SCRIPT_DIR/enclave.config.yaml" & 
+# }
+
 enclave_nodes_down() {
   $ENCLAVE_BIN nodes down  
 }

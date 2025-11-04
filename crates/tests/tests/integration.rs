@@ -88,12 +88,11 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_n = 5;
     let esi_per_ct = 3;
     let seed = create_seed_from_u64(123);
-    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
-        params_raw.clone(),
-        threshold_n,
-        threshold_m,
-    )?));
 
+    let error_size_int = calculate_error_size(params_raw.clone(), threshold_n, threshold_m)?;
+    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&error_size_int));
+
+    println!("\n\nERROR_SIZE: {}\n\n", error_size_int);
     // Cipher
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
     let mut adder = AddToCommittee::new(&bus, 1);

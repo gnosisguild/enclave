@@ -13,7 +13,7 @@ use e3_aggregator::ext::{
     PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
     ThresholdPlaintextAggregatorExtension,
 };
-use e3_config::chain_config::ChainConfig;
+use e3_config::{chain_config::ChainConfig, RpcAuth};
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
@@ -53,6 +53,7 @@ pub struct CiphernodeBuilder {
     plaintext_agg: bool,
     pubkey_agg: bool,
     rng: SharedRng,
+    report: bool,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     testmode_errors: bool,
     testmode_history: bool,
@@ -94,6 +95,7 @@ impl CiphernodeBuilder {
             plaintext_agg: false,
             pubkey_agg: false,
             rng,
+            report: false,
             source_bus: None,
             testmode_errors: false,
             testmode_history: false,

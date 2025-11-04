@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use e3_events::{EnclaveEvent, EventBus, Subscribe};
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct PublicKeyWriter {
     path: PathBuf,
@@ -37,6 +37,7 @@ impl Handler<EnclaveEvent> for PublicKeyWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::PublicKeyAggregated { data, .. } = msg.clone() {
+            warn!("WRITING PUBLIC KEY =====================================");
             info!(path = ?&self.path, "Writing Pubkey To Path");
             write_file_with_dirs(&self.path, &data.pubkey).unwrap();
         }

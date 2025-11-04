@@ -12,9 +12,10 @@ use e3_events::{
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
+use e3_trbfv::helpers::hash_bytes;
 use e3_utils::ArcBytes;
-use std::sync::Arc;
-use tracing::{error, trace};
+use std::{hash::Hash, sync::Arc};
+use tracing::{error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -103,6 +104,12 @@ impl PublicKeyAggregator {
             };
 
             keyshares.insert(keyshare);
+
+            info!(
+                "PublicKeyAggregator: Have {} keyshares waiting for {}",
+                keyshares.len(),
+                threshold_n
+            );
             if keyshares.len() == *threshold_n {
                 return Ok(PublicKeyAggregatorState::Computing {
                     keyshares: keyshares.clone(),

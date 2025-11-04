@@ -32,9 +32,19 @@ impl PlaintextWriter {
 
     pub fn handle_plaintext_aggregated(&mut self, msg: PlaintextAggregated) -> Result<()> {
         let output = decode_plaintexts(&msg.decrypted_output).map_err(|e| anyhow!("{e}"))?;
-        let string = serde_json::to_string(&output).unwrap();
+        // This is connected to the plaintext we use in the integration test.
+        // We are expecting two values from the first plaintext
+        let special_output = [output[0][0], output[0][1]];
         info!(path = ?&self.path, "Writing Plaintext To Path");
-        write_file_with_dirs(&self.path, string.as_bytes())?;
+        write_file_with_dirs(
+            &self.path,
+            special_output
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+                .as_bytes(),
+        )?;
         Ok(())
     }
 }

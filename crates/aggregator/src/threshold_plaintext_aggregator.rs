@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -254,7 +254,7 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
             ..
         })) = self.state.get()
         else {
-            error!(state=?self.state, "Aggregator has been closed for collecting.");
+            info!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
             return Box::pin(fut::ready(Ok(())));
         };
 

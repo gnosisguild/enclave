@@ -535,6 +535,7 @@ impl ThresholdKeyshare {
                 pk_share,
                 sk_sss,
             }),
+            external: false,
         }));
 
         Ok(())

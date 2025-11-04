@@ -39,13 +39,13 @@ fn main() -> Result<()> {
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
 
-    let raw_plaintext = args.plaintext;
+    let raw_plaintext = vec![args.plaintext];
     println!("Encrypting plaintext: {:?}", raw_plaintext);
     let mut rng = ChaCha20Rng::seed_from_u64(42);
     let ciphertexts = raw_plaintext
         .into_iter()
-        .map(|num| {
-            let pt = Plaintext::try_encode(&[num], Encoding::poly(), &params)?;
+        .map(|vec| {
+            let pt = Plaintext::try_encode(&vec, Encoding::poly(), &params)?;
             Ok(pubkey.try_encrypt(&pt, &mut rng)?)
         })
         .collect::<Result<Vec<_>>>()?;

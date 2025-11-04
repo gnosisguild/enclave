@@ -66,7 +66,11 @@ where
                         delay_ms *= 2; // Exponential backoff
                     }
                     RetryError::Failure(e) => {
-                        error!("FAILURE!: returning to caller.");
+                        error!("------------------------------------------------");
+                        error!("================================================");
+                        error!(">>>> FAILURE!: returning to caller.");
+                        error!("================================================");
+                        error!("------------------------------------------------");
                         return Err(e);
                     }
                 }

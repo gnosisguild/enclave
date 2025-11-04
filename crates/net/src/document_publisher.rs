@@ -416,6 +416,10 @@ impl EventConverter {
 
     /// Local node created a threshold share. Send it as a published document
     pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
+        // If this is received from elsewhere
+        if msg.external {
+            return Ok(());
+        }
         let receivable = ReceivableDocument::ThresholdShareCreated(msg);
         let value = ArcBytes::from_bytes(receivable.to_bytes()?);
         let meta = DocumentMeta::new(
@@ -436,10 +440,13 @@ impl EventConverter {
         warn!("Converting DocumentReceived...");
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
         let event = EnclaveEvent::from(match receivable {
-            ReceivableDocument::ThresholdShareCreated(evt) => evt,
+            ReceivableDocument::ThresholdShareCreated(evt) => ThresholdShareCreated {
+                external: true,
+                e3_id: evt.e3_id,
+                share: evt.share,
+            },
         });
 
-        warn!("Sending {:?}", event);
         self.bus.do_send(event);
         Ok(())
     }
