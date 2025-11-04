@@ -170,29 +170,38 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// # Returns
     /// True if the ciphertext addition constraints are satisfied, false otherwise.
     fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
-        let mut result = true;
+        let gamma = gammas.get(0);
 
+        let mut accumulator: Field = 0;
+
+        // First L equalities: p == sum_ct0i - (zero_ct0i + prev_ct0i + r0i * q_i)
         for i in 0..L {
-            let gamma_i = gammas.get(i);
+            let mut p = self.zero_ct0is[i];
+            let r0i_scaled = self.r0is[i].mul_scalar(self.crypto_params.qis[i]);
 
-            let sum0 = self.sum_ct0is[i].eval(gamma_i);
-            let sum1 = self.sum_ct1is[i].eval(gamma_i);
+            p = p.add(self.prev_ct0is[i]);
+            p = p.add(r0i_scaled);
 
-            let ct0 = self.zero_ct0is[i].eval(gamma_i);
-            let ct1 = self.zero_ct1is[i].eval(gamma_i);
+            p = self.sum_ct0is[i].sub(p);
 
-            let old0 = self.prev_ct0is[i].eval(gamma_i);
-            let old1 = self.prev_ct1is[i].eval(gamma_i);
-
-            let q_i = self.crypto_params.qis[i];
-
-            let radd0 = self.r0is[i].eval(gamma_i);
-            let radd1 = self.r1is[i].eval(gamma_i);
-
-            result = result & (sum0 == ct0 + old0 + radd0 * q_i);
-            result = result & (sum1 == ct1 + old1 + radd1 * q_i);
+            let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
+            accumulator += gamma_i * p.eval(gamma);
         }
 
-        result
+        // Next L equalities: p == sum_ct1i - (zero_ct1i + prev_ct1i + r1i * q_i)
+        for i in 0..L {
+            let mut p = self.zero_ct1is[i];
+            let r1i_scaled = self.r1is[i].mul_scalar(self.crypto_params.qis[i]);
+
+            p = p.add(self.prev_ct1is[i]);
+            p = p.add(r1i_scaled);
+
+            p = self.sum_ct1is[i].sub(p);
+
+            let gamma_i = gammas.get(L + i);
+            accumulator += gamma_i * p.eval(gamma);
+        }
+
+        accumulator == 0
     }
 }
