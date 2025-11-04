@@ -6,38 +6,44 @@
 
 use polynomial::Polynomial;
 
-// Check that a vote is not greater than the available balance
-// This assumes that the vote is encoded inside the polynomial
-// coefficients and that they are checked to be either 0 or 1
-pub fn check_vote_is_within_balance<let D: u32>(k1: Polynomial<D>, balance: Field) {
+// Check that all valid coefficients are either 0 or 1 and that the vote is <= balance
+pub fn check_coefficient_values_with_balance<let D: u32>(
+    k1: Polynomial<D>,
+    q_mod_t: Field,
+    balance: Field,
+) {
     // This value would allow to fit
     // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
-    let HALF_LARGEST_MINIMUM_DEGREE: u32 = 28;
+    let HALF_LARGEST_MINIMUM_DEGREE = 28;
     let HALF_D = D / 2;
     let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
     let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
 
-    // we assume that a check that the coefficients are either 0 or 1 was done already
     let mut sum_yes: u64 = 0;
     let mut sum_no: u64 = 0;
 
+    // Loop through all coefficients in the space where we could have a vote
     // yes part
     for i in START_INDEX_Y..HALF_D {
-        let coeff = k1.coefficients[i] as u64;
+        let coeff = k1.coefficients[i];
+        assert(0 == coeff * (q_mod_t - coeff));
+
         let position = i - START_INDEX_Y;
         let exponent = HALF_LARGEST_MINIMUM_DEGREE - 1 - position;
         let weight: u64 = (1 << exponent) as u64;
-        sum_yes += coeff * weight;
+        sum_yes += (coeff as u64) * weight;
     }
 
     // no part
     for i in START_INDEX_N..D {
-        let coeff = k1.coefficients[i] as u64;
+        let coeff = k1.coefficients[i];
+        assert(0 == coeff * (q_mod_t - coeff));
+
         let position = i - START_INDEX_N;
         let exponent = HALF_LARGEST_MINIMUM_DEGREE - 1 - position;
         let weight: u64 = (1 << exponent) as u64;
-        sum_no += coeff * weight;
+        sum_no += (coeff as u64) * weight;
     }
 
     if (sum_yes != 0) {
@@ -48,30 +54,6 @@ pub fn check_vote_is_within_balance<let D: u32>(k1: Polynomial<D>, balance: Fiel
     if (sum_no != 0) {
         assert(sum_yes == 0);
         assert(sum_no <= (balance as u64));
-    }
-}
-
-// Check that all valid coefficients are either 0 or 1
-pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
-    // This value would allow to fit
-    // 268435456 for yes and 268435456 for no
-    // which would fit the supply of most tokens really (imagining one user just holds all tokens)
-    let HALF_LARGEST_MINIMUM_DEGREE = 28;
-    let HALF_D = D / 2;
-    let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
-    let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
-
-    // Loop through all coefficients in the space where we could have a vote
-    // yes part
-    for i in START_INDEX_Y..HALF_D {
-        let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));
-    }
-
-    // no part
-    for i in START_INDEX_N..D {
-        let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));
     }
 }
 
@@ -116,7 +98,7 @@ fn test_check_vote_is_within_balance_pass() {
         ],
     };
 
-    check_vote_is_within_balance(pol, 1000);
+    check_coefficient_values_with_balance(pol, 1, 1000);
 }
 
 #[test(should_fail)]
@@ -130,7 +112,7 @@ fn test_check_vote_is_within_balance_yes_and_no_not_zero() {
         ],
     };
 
-    check_vote_is_within_balance(pol, 100);
+    check_coefficient_values_with_balance(pol, 1, 100);
 }
 
 #[test(should_fail)]
@@ -144,7 +126,7 @@ fn test_check_vote_is_within_balance_fail() {
         ],
     };
 
-    check_vote_is_within_balance(pol, 6);
+    check_coefficient_values_with_balance(pol, 1, 1);
 }
 
 #[test]
@@ -158,7 +140,7 @@ fn test_check_coefficient_values_pass() {
         ],
     };
 
-    check_coefficient_values(pol, 1);
+    check_coefficient_values_with_balance(pol, 1, 100000000000);
 }
 
 #[test(should_fail)]
@@ -172,7 +154,7 @@ fn test_check_coefficient_values_fail() {
         ],
     };
 
-    check_coefficient_values(pol, 1);
+    check_coefficient_values_with_balance(pol, 1, 100);
 }
 
 #[test]
