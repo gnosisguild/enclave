@@ -41,7 +41,13 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localho
 
 heading "Request Committee"
 
-ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
+ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh \
+  --moduli 0x800000022a0001 \
+  --moduli 0x800000021a0001 \
+  --moduli 0x80000002120001 \
+  --moduli 0x80000001f60001 \
+  --degree 8192 \
+  --plaintext-modulus 1032193)
 
 pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
 
@@ -63,7 +69,7 @@ heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
 heading "Mock activate e3-id"
-# NOTE using -s to avoid key spaming the output
+
 PUBLIC_KEY_FILE=/tmp/enclave-public-key.txt
 echo "0x${PUBLIC_KEY}" > $PUBLIC_KEY_FILE
 pnpm -s e3:activate --e3-id 0 --network localhost --public-key-file $PUBLIC_KEY_FILE
