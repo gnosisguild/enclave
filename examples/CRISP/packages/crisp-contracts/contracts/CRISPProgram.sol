@@ -10,6 +10,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
+import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "./CRISPVerifier.sol";
 
@@ -110,6 +111,38 @@ contract CRISPProgram is IE3Program, Ownable {
         );
 
         return (ENCRYPTION_SCHEME_ID, inputValidator);
+    }
+
+    /// @notice Decode the tally from the plaintext output
+    function decodeTally(uint256 e3Id) public returns (uint256 yes, uint256 no) {
+        // fetch from enclave 
+        E3 memory e3 = enclave.getE3(e3Id);
+
+        uint256[] memory tally = abi.decode(e3.plaintextOutput, (uint256[]));
+
+        uint256 HALF_LARGEST_MINIMUM_DEGREE = 28;
+        uint256 HALF_D = tally.length / 2;
+        uint256 START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
+        uint256 START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
+    
+        uint256 weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
+        
+        // Convert yes votes
+        for (uint256 i = START_INDEX_Y; i < HALF_D; i++) {
+            yes += tally[i] * weight;
+            weight /= 2; // Right shift equivalent
+        }
+    
+        // Reset weight for no votes
+        weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
+        
+        // Convert no votes
+        for (uint256 i = START_INDEX_N; i < tally.length; i++) {
+            no += tally[i] * weight;
+            weight /= 2;
+        }
+    
+        return (yes, no);
     }
 
     /// @notice Verify the proof
