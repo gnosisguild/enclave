@@ -8,6 +8,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "scripts": {
+    "compile": "forge compile",
     "cli": "bash ./scripts/cli.sh",
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:build": "bash ./scripts/build.sh",

@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import {
+  ciphernodeAdd,
+  ciphernodeAdminAdd,
+} from "@enclave-e3/contracts/tasks/ciphernode";
 import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
 import dotenv from "dotenv";
 
@@ -65,10 +68,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
 }
 
 const config: HardhatUserConfig = {
-  tasks: [
-    ciphernodeAdd,
-    cleanDeploymentsTask,
-  ],
+  tasks: [ciphernodeAdd, ciphernodeAdminAdd, cleanDeploymentsTask],
   plugins: [
     hardhatTypechainPlugin,
     hardhatEthersChaiMatchers,
@@ -95,38 +95,42 @@ const config: HardhatUserConfig = {
     },
     arbitrum: getChainConfig(
       "arbitrum-mainnet",
-      process.env.ARBISCAN_API_KEY || "",
+      process.env.ARBISCAN_API_KEY || ""
     ),
     avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
     bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
     mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
     optimism: getChainConfig(
       "optimism-mainnet",
-      process.env.OPTIMISM_API_KEY || "",
+      process.env.OPTIMISM_API_KEY || ""
     ),
     "polygon-mainnet": getChainConfig(
       "polygon-mainnet",
-      process.env.POLYGONSCAN_API_KEY || "",
+      process.env.POLYGONSCAN_API_KEY || ""
     ),
     "polygon-mumbai": getChainConfig(
       "polygon-mumbai",
-      process.env.POLYGONSCAN_API_KEY || "",
+      process.env.POLYGONSCAN_API_KEY || ""
     ),
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
   solidity: {
     npmFilesToBuild: [
-      "poseidon-solidity/PoseidonT3.sol", 
+      "poseidon-solidity/PoseidonT3.sol",
       "@enclave-e3/contracts/contracts/Enclave.sol",
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
-      "@enclave-e3/contracts/contracts/registry/NaiveRegistryFilter.sol",
-      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",
+      "@enclave-e3/contracts/contracts/slashing/SlashingManager.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveToken.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol",
       "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
-      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
     ],
     compilers: [
       {

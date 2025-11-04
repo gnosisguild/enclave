@@ -22,17 +22,21 @@ use e3_evm::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
         ProviderConfig,
     },
+    BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
-use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
+use e3_sortition::{
+    CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
+    Sortition, SortitionBackend, SortitionRepositoryFactory,
+};
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
-use tracing::info;
+use tracing::{error, info};
 
 /// Build a ciphernode configuration.
 // NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
@@ -55,6 +59,7 @@ pub struct CiphernodeBuilder {
     rng: SharedRng,
     report: bool,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
+    sortition_backend: SortitionBackend,
     testmode_errors: bool,
     testmode_history: bool,
     threads: Option<usize>,
@@ -65,8 +70,8 @@ pub struct CiphernodeBuilder {
 pub struct ContractComponents {
     enclave_reader: bool,
     enclave: bool,
-    registry_filter: bool,
     ciphernode_registry: bool,
+    bonding_registry: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -97,6 +102,7 @@ impl CiphernodeBuilder {
             rng,
             report: false,
             source_bus: None,
+            sortition_backend: SortitionBackend::score(),
             testmode_errors: false,
             testmode_history: false,
             threads: None,
@@ -200,6 +206,12 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Use score-based sortition (recommended)
+    pub fn with_sortition_score(mut self) -> Self {
+        self.sortition_backend = SortitionBackend::score();
+        self
+    }
+
     /// Setup an Enclave contract reader for every evm chain provided
     pub fn with_contract_enclave_reader(mut self) -> Self {
         self.contract_components.enclave_reader = true;
@@ -212,12 +224,11 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Setup a writable RegistryFilter for every evm chain provided
-    pub fn with_contract_registry_filter(mut self) -> Self {
-        self.contract_components.registry_filter = true;
+    /// Setup a writable BondingRegistry for every evm chain provided
+    pub fn with_contract_bonding_registry(mut self) -> Self {
+        self.contract_components.bonding_registry = true;
         self
     }
-
     /// Setup a CiphernodeRegistry listener for every evm chain provided
     pub fn with_contract_ciphernode_registry(mut self) -> Self {
         self.contract_components.ciphernode_registry = true;
@@ -276,10 +287,20 @@ impl CiphernodeBuilder {
             .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
 
         let repositories = store.repositories();
-        let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
 
-        // Ciphernode Selector
-        CiphernodeSelector::attach(&local_bus, &sortition, &addr);
+        // Use the configured backend directly
+        let default_backend = self.sortition_backend.clone();
+
+        let sortition = Sortition::attach(
+            &local_bus,
+            repositories.sortition(),
+            repositories.node_state(),
+            repositories.finalized_committees(),
+            default_backend,
+        )
+        .await?;
+
+        CiphernodeSelector::attach(&local_bus, &sortition, &addr, &store);
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
@@ -321,14 +342,15 @@ impl CiphernodeBuilder {
                 .await?;
             }
 
-            if self.contract_components.registry_filter {
-                let write_provider = provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await?;
-                RegistryFilterSol::attach(
+            if self.contract_components.bonding_registry {
+                let read_provider = provider_cache.ensure_read_provider(chain).await?;
+                BondingRegistrySol::attach(
                     &local_bus,
-                    write_provider.clone(),
-                    &chain.contracts.filter_registry.address(),
+                    read_provider.clone(),
+                    &chain.contracts.bonding_registry.address(),
+                    &repositories.bonding_registry_reader(read_provider.chain_id()),
+                    chain.contracts.bonding_registry.deploy_block(),
+                    chain.rpc_url.clone(),
                 )
                 .await?;
             }
@@ -344,6 +366,31 @@ impl CiphernodeBuilder {
                     chain.rpc_url.clone(),
                 )
                 .await?;
+
+                match provider_cache
+                    .ensure_write_provider(&repositories, chain, cipher)
+                    .await
+                {
+                    Ok(write_provider) => {
+                        let writer = CiphernodeRegistrySol::attach_writer(
+                            &local_bus,
+                            write_provider.clone(),
+                            &chain.contracts.ciphernode_registry.address(),
+                            self.pubkey_agg,
+                        )
+                        .await?;
+                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
+
+                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
+                            info!("Attaching CommitteeFinalizer for score sortition");
+                            e3_aggregator::CommitteeFinalizer::attach(&local_bus);
+                        }
+                    }
+                    Err(e) => error!(
+                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+                        e
+                    ),
+                }
             }
         }
 

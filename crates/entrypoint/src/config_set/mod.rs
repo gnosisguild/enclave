@@ -60,7 +60,7 @@ chains:
       ciphernode_registry:
         address: "{}"
         deploy_block: {}
-      filter_registry:
+      bonding_registry:
         address: "{}"
         deploy_block: {}
 "#,
@@ -73,8 +73,8 @@ chains:
         get_contract_info("Enclave")?.deploy_block,
         get_contract_info("CiphernodeRegistryOwnable")?.address,
         get_contract_info("CiphernodeRegistryOwnable")?.deploy_block,
-        get_contract_info("NaiveRegistryFilter")?.address,
-        get_contract_info("NaiveRegistryFilter")?.deploy_block,
+        get_contract_info("BondingRegistry")?.address,
+        get_contract_info("BondingRegistry")?.deploy_block,
     );
 
     fs::write(config_path.clone(), config_content)?;

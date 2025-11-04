@@ -4,11 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod committee_finalizer;
 pub mod ext;
 mod plaintext_aggregator;
 mod publickey_aggregator;
 mod repo;
 mod threshold_plaintext_aggregator;
+pub use committee_finalizer::CommitteeFinalizer;
 pub use plaintext_aggregator::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
 };

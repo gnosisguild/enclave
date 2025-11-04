@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest'
 import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
-
 import {
   calculateValidIndicesForPlaintext,
   decodeTally,
@@ -14,16 +13,16 @@ import {
   encryptVoteAndGenerateCRISPInputs,
   generateMaskVote,
   generateProof,
+  generateProofWithReturnValue,
   validateVote,
   verifyProof,
 } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
-import { DEFAULT_BFV_PARAMS, MAXIMUM_VOTE_VALUE } from '../src'
-import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
-import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import circuit from '../../../circuits/target/crisp_circuit.json'
+import { DEFAULT_BFV_PARAMS, generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE } from '../src'
 
-import { merkleProof, MESSAGE, SIGNATURE, VOTE, votingPowerLeaf } from './constants'
+import { LEAVES, merkleProof, MESSAGE, SIGNATURE, testAddress, VOTE, votingPowerLeaf } from './constants'
+import { privateKeyToAccount } from 'viem/accounts'
+import { compareCoefficientsArrays } from './utils'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -141,6 +140,8 @@ describe('Vote', () => {
         message: MESSAGE,
         merkleData: merkleProof,
         balance: votingPowerLeaf,
+        slotAddress: testAddress,
+        isFirstVote: false,
       })
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
@@ -171,7 +172,7 @@ describe('Vote', () => {
 
   describe('generateMaskVote', () => {
     it('should generate a mask vote and the right circuit inputs', async () => {
-      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root)
+      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
       expect(crispInputs.prev_ct1is).toBeInstanceOf(Array)
@@ -200,22 +201,87 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it('should generate a proof and verify it', { timeout: 60000 }, async () => {
+    it('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+
+      // hardhat default private key
+      const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+      const account = privateKeyToAccount(privateKey)
+      const signature = await account.signMessage({ message: MESSAGE })
+      const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
+      const leaves = [...LEAVES, leaf]
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
         publicKey,
         previousCiphertext,
-        signature: SIGNATURE,
+        signature,
         message: MESSAGE,
         merkleData: merkleProof,
         balance: votingPowerLeaf,
+        slotAddress: account.address.toLowerCase(),
+        isFirstVote: false,
       })
 
       const proof = await generateProof(inputs)
       const isValid = await verifyProof(proof)
 
       expect(isValid).toBe(true)
+    })
+
+    it('should generate a proof for a masking user and verify it', { timeout: 180000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
+
+      const proof = await generateProof(maskVote)
+      const isValid = await verifyProof(proof)
+
+      expect(isValid).toBe(true)
+    })
+
+    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 180000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, true)
+
+      const { returnValue } = await generateProofWithReturnValue(maskVote)
+
+      expect(compareCoefficientsArrays(maskVote.ct0is, (returnValue as any[])[0])).toBe(true);
+      expect(compareCoefficientsArrays(maskVote.ct1is, (returnValue as any[])[1])).toBe(true);
+    })
+
+    it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 180000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
+
+      const { returnValue } = await generateProofWithReturnValue(maskVote)
+
+      expect(compareCoefficientsArrays(maskVote.sum_ct0is, (returnValue as any[])[0])).toBe(true);
+      expect(compareCoefficientsArrays(maskVote.sum_ct1is, (returnValue as any[])[1])).toBe(true);
     })
   })
 })

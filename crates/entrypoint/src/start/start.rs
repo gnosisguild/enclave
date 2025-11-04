@@ -39,8 +39,10 @@ pub async fn execute(
         .with_address(&address.to_string())
         .with_source_bus(&bus)
         .with_datastore(store)
+        .with_sortition_score()
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
+        .with_contract_bonding_registry()
         .with_contract_ciphernode_registry();
 
     if experimental_trbfv {

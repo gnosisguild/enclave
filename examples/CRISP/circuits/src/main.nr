@@ -14,7 +14,7 @@ use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
 use merkle_tree::get_merkle_root;
 mod utils;
-use utils::check_coefficient_values;
+use utils::{check_coefficient_values, check_coefficient_zero};
 
 fn main(
     // Ciphertext Addition Section.
@@ -52,6 +52,8 @@ fn main(
     slot_address: pub Field,
     // Balance Section.
     balance: Field,
+    // Whether this is the first vote for this slot.
+    is_first_vote: pub bool,
 ) -> pub ([Polynomial<2048>; 1], [Polynomial<2048>; 1]) {
     // Verify the ECDSA signature.
     let is_signature_valid =
@@ -84,6 +86,7 @@ fn main(
         p1is,
         p2is,
     );
+
     let ct_add: CiphertextAddition<2048, 1, 54, 54, 54> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
@@ -99,18 +102,19 @@ fn main(
     // Verify the correct ciphertext encryption.
     let is_greco_valid = greco.verify();
 
-    assert(is_greco_valid == true);
-
     // Verify the correct ciphertext addition.
     let is_ct_add_valid = ct_add.verify();
 
+    // Ensure that the ciphertext is valid
+    assert(is_greco_valid);
+
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
-    if (
+    if 
         (is_signature_valid == true)
             & (merkle_root_calculated == merkle_root)
             & (slot_address == address)
-    ) {
+    {
         // @todo: need to check if vote <= balance.
 
         // Verify the correct coefficient values.
@@ -118,13 +122,19 @@ fn main(
 
         (ct0is, ct1is)
     } else {
-        // @todo: need to check if vote == 0.
+        // check if vote == 0.
+        let is_vote_zero = check_coefficient_zero(k1);
+        assert(is_vote_zero);
 
-        // @todo: need to check if slot is empty (no previous ciphertext).
+        // need to check if slot is empty (no previous ciphertext).
         // If so, (ct0is, ct1is) should be returned.
 
-        assert(is_ct_add_valid == true);
-
-        (sum_ct0is, sum_ct1is)
+        if is_first_vote {
+            (ct0is, ct1is)
+        } else {
+            // check if the sum is valid
+            assert(is_ct_add_valid);
+            (sum_ct0is, sum_ct1is)
+        }
     }
 }

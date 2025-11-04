@@ -77,7 +77,6 @@ export const requestCommittee = task(
   .setAction(async () => ({
     default: async (
       {
-        filter,
         thresholdQuorum,
         thresholdTotal,
         windowStart,
@@ -90,8 +89,14 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
+      const connection = await hre.network.connect();
+      const { ethers } = connection;
+
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
+      );
+      const { deployAndSaveMockStableToken } = await import(
+        "../scripts/deployAndSave/mockStableToken"
       );
 
       const { deployAndSavePoseidonT3 } = await import(
@@ -103,6 +108,14 @@ export const requestCommittee = task(
         hre,
         poseidonT3Address: poseidonT3,
       });
+
+      const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
+        hre,
+      });
+
+      const [signer] = await ethers.getSigners();
+      const enclaveContract = enclave.connect(signer);
+      const mockUSDCContract = mockUSDC.connect(signer);
 
       const enclaveArgs = readDeploymentArgs(
         "Enclave",
@@ -120,15 +133,6 @@ export const requestCommittee = task(
 
       if (!registryArgs) {
         throw new Error("CiphernodeRegistry deployment arguments not found");
-      }
-
-      const filterArgs = readDeploymentArgs(
-        "NaiveRegistryFilter",
-        hre.globalOptions.network,
-      );
-
-      if (!filterArgs) {
-        throw new Error("NaiveRegistryFilter deployment arguments not found");
       }
 
       const mockE3ProgramArgs = readDeploymentArgs(
@@ -166,31 +170,42 @@ export const requestCommittee = task(
         );
       }
 
-      console.log({
-        filter: filter === ZeroAddress ? filterArgs.address : filter,
-        threshold: [thresholdQuorum, thresholdTotal],
-        startWindow: [windowStart, windowEnd],
+      const requestParams = {
+        threshold: [thresholdQuorum, thresholdTotal] as [number, number],
+        startWindow: [windowStart, windowEnd] as [number, number],
         duration: duration,
         e3Program:
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
         computeProviderParams,
         customParams,
-      });
-      const tx = await enclave.request(
-        {
-          filter: filter === ZeroAddress ? filterArgs.address : filter,
-          threshold: [thresholdQuorum, thresholdTotal],
-          startWindow: [windowStart, windowEnd],
-          duration: duration,
-          e3Program:
-            e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
-          e3ProgramParams,
-          computeProviderParams,
-          customParams,
-        },
-        { value: "1000000000000000000" },
+      };
+
+      console.log("Request parameters:", requestParams);
+
+      const fee = await enclaveContract.getE3Quote(requestParams);
+      console.log(`E3 fee: ${ethers.formatUnits(fee, 6)} USDC`);
+
+      const usdcBalance = await mockUSDCContract.balanceOf(signer.address);
+      console.log(`USDC balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`);
+
+      if (usdcBalance < fee) {
+        const mintAmount = fee - usdcBalance + ethers.parseUnits("1000", 6);
+        console.log(`Minting ${ethers.formatUnits(mintAmount, 6)} USDC...`);
+        const mintTx = await mockUSDCContract.mint(signer.address, mintAmount);
+        await mintTx.wait();
+        console.log("USDC minted");
+      }
+
+      console.log("Approving USDC spending...");
+      const approveTx = await mockUSDCContract.approve(
+        await enclaveContract.getAddress(),
+        fee,
       );
+      await approveTx.wait();
+      console.log("USDC approved");
+
+      const tx = await enclaveContract.request(requestParams);
 
       console.log("Requesting committee... ", tx.hash);
       await tx.wait();
@@ -256,13 +271,20 @@ export const publishCommittee = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, nodes, publicKey }, hre) => {
-      const { deployAndSaveNaiveRegistryFilter } = await import(
-        "../scripts/deployAndSave/naiveRegistryFilter"
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
 
-      const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
-        hre,
-      });
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({
+          hre,
+          poseidonT3Address: poseidonT3,
+        });
 
       const nodesToSend = nodes
         .split(",")
@@ -273,7 +295,7 @@ export const publishCommittee = task(
         throw new Error("Invalid nodes format: no valid addresses found");
       }
 
-      const tx = await naiveRegistryFilter.publishCommittee(
+      const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,

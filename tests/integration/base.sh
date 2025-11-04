@@ -20,7 +20,12 @@ pnpm evm:clean
 pnpm evm:deploy --network localhost
 
 # set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY"
+enclave_wallet_set ag "$PRIVATE_KEY_AG"
+enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
+enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
+enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
+enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
+enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
 
 # start swarm
 enclave_nodes_up

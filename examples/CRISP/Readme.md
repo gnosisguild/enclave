@@ -200,7 +200,7 @@ After deployment, you will see the addresses for the following contracts:
 
 - Enclave
 - Ciphernode Registry
-- Naive Registry Filter
+- Bonding Registry Filter
 - Mock Input Validator
 - Mock E3 Program
 - Mock Decryption Verifier
@@ -258,11 +258,11 @@ BITQUERY_API_KEY=""
 # Cron-job API key to trigger new rounds
 CRON_API_KEY=1234567890
 
-# Based on Default Hardhat Deployments (Only for testing)
-ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
+# Based on Default Anvil Deployments (Only for testing)
+ENCLAVE_ADDRESS="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+CIPHERNODE_REGISTRY_ADDRESS="0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+E3_PROGRAM_ADDRESS="0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8" # CRISPProgram Contract Address
+FEE_TOKEN_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3" # Mock ERC20 Token Address
 
 # E3 Config
 E3_WINDOW_SIZE=40
@@ -274,6 +274,9 @@ E3_DURATION=160
 E3_COMPUTE_PROVIDER_NAME="RISC0"
 E3_COMPUTE_PROVIDER_PARALLEL=false
 E3_COMPUTE_PROVIDER_BATCH_SIZE=4 # Must be a power of 2
+
+# Bitquery API Key (optional, leave empty if not using)
+BITQUERY_API_KEY=""
 ```
 
 ## Running Ciphernodes

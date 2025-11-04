@@ -11,8 +11,10 @@ use num_bigint::BigUint;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+use super::approve;
 use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
+use alloy::providers::{Provider, ProviderBuilder};
 use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
@@ -56,6 +58,17 @@ struct CTRequest {
     ct_bytes: Vec<u8>,
 }
 
+pub async fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    let provider = ProviderBuilder::new().connect(&CONFIG.http_rpc_url).await?;
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await
+        .unwrap()
+        .ok_or_else(|| anyhow::anyhow!("Latest block not found"))?;
+
+    Ok(block.header.timestamp)
+}
+
 pub async fn initialize_crisp_round(
     token_address: &str,
     balance_threshold: &str,
@@ -73,10 +86,12 @@ pub async fn initialize_crisp_round(
     .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
 
-    info!("Enabling E3 Program...");
+    info!("Enabling E3 Program with address: {}", e3_program);
     match contract.is_e3_program_enabled(e3_program).await {
         Ok(enabled) => {
+            info!("Debug - E3 Program enabled status: {}", enabled);
             if !enabled {
+                info!("E3 Program not enabled, attempting to enable...");
                 match contract.enable_e3_program(e3_program).await {
                     Ok(res) => info!("E3 Program enabled. TxHash: {:?}", res.transaction_hash),
                     Err(e) => info!("Error enabling E3 Program: {:?}", e),
@@ -99,11 +114,11 @@ pub async fn initialize_crisp_round(
     // Serialize the custom parameters to bytes.
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
-    let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let start_window: [U256; 2] = [
-        U256::from(Utc::now().timestamp()),
-        U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
+    let mut current_timestamp = get_current_timestamp().await?;
+    let mut start_window: [U256; 2] = [
+        U256::from(current_timestamp),
+        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
     ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
@@ -114,9 +129,55 @@ pub async fn initialize_crisp_round(
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
+    info!("Debug Before Fee Quote - start_window: {:?}", start_window);
+    info!(
+        "Debug Before Fee Quote - current timestamp: {:?}",
+        current_timestamp
+    );
+    info!("Getting fee quote...");
+    let fee_amount = contract
+        .get_e3_quote(
+            threshold,
+            start_window,
+            duration,
+            e3_program,
+            e3_params.clone(),
+            compute_provider_params_bytes.clone(),
+        )
+        .await?;
+    info!("Fee required: {} tokens", fee_amount);
+
+    info!("Approving fee token...");
+    approve::approve_token(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.fee_token_address,
+        &CONFIG.enclave_address,
+        fee_amount,
+    )
+    .await?;
+
+    current_timestamp = get_current_timestamp().await?;
+    start_window = [
+        U256::from(current_timestamp),
+        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
+    ];
+
+    info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
+
+    info!("Debug - threshold: {:?}", threshold);
+    info!("Debug - start_window: {:?}", start_window);
+    info!("Debug - current timestamp: {:?}", current_timestamp);
+    info!("Debug - duration: {}", duration);
+    info!("Debug - e3_program: {}", e3_program);
+
+    info!(
+        "Debug - Checking ciphernode registry at: {}",
+        CONFIG.ciphernode_registry_address
+    );
+
     let res = contract
         .request_e3(
-            filter,
             threshold,
             start_window,
             duration,

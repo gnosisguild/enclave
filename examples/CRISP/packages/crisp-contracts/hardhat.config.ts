@@ -5,8 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import type { HardhatUserConfig } from "hardhat/config";
-import { cleanDeploymentsTask} from "@enclave-e3/contracts/tasks/utils";
-import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
+import {
+  ciphernodeAdd,
+  ciphernodeAdminAdd,
+} from "@enclave-e3/contracts/tasks/ciphernode";
 import dotenv from "dotenv";
 
 import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
@@ -71,14 +74,21 @@ const config: HardhatUserConfig = {
     hardhatToolboxMochaEthersPlugin,
     hardhatVerify,
   ],
-  tasks: [
-    cleanDeploymentsTask,
-    ciphernodeAdd,
-  ],
+  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd],
   networks: {
     hardhat: {
       type: "edr-simulated",
       chainType: "l1",
+    },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      url: "http://localhost:8545",
+      type: "http",
+      chainType: "l1",
+      timeout: 60000,
     },
     ganache: {
       accounts: {
@@ -87,25 +97,26 @@ const config: HardhatUserConfig = {
       chainId: chainIds.ganache,
       url: "http://localhost:8545",
       type: "http",
+      timeout: 60000,
     },
     arbitrum: getChainConfig(
       "arbitrum-mainnet",
-      process.env.ARBISCAN_API_KEY || "",
+      process.env.ARBISCAN_API_KEY || ""
     ),
     avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
     bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
     mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
     optimism: getChainConfig(
       "optimism-mainnet",
-      process.env.OPTIMISM_API_KEY || "",
+      process.env.OPTIMISM_API_KEY || ""
     ),
     "polygon-mainnet": getChainConfig(
       "polygon-mainnet",
-      process.env.POLYGONSCAN_API_KEY || "",
+      process.env.POLYGONSCAN_API_KEY || ""
     ),
     "polygon-mumbai": getChainConfig(
       "polygon-mumbai",
-      process.env.POLYGONSCAN_API_KEY || "",
+      process.env.POLYGONSCAN_API_KEY || ""
     ),
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
@@ -131,16 +142,20 @@ const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
     npmFilesToBuild: [
-      "poseidon-solidity/PoseidonT3.sol", 
+      "poseidon-solidity/PoseidonT3.sol",
       "@enclave-e3/contracts/contracts/Enclave.sol",
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
-      "@enclave-e3/contracts/contracts/registry/NaiveRegistryFilter.sol",
-      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",
+      "@enclave-e3/contracts/contracts/slashing/SlashingManager.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveToken.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol",
       "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
-      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
     ],
     settings: {
       optimizer: {

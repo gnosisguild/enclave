@@ -11,8 +11,7 @@ use e3_events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
-use e3_trbfv::helpers::hash_bytes;
+use e3_sortition::{GetNodesForE3, Sortition};
 use e3_utils::ArcBytes;
 use std::{hash::Hash, sync::Arc};
 use tracing::{error, info, trace};
@@ -155,47 +154,32 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
-        let Some(PublicKeyAggregatorState::Collecting {
-            threshold_n, seed, ..
-        }) = self.state.get()
-        else {
-            error!(state=?self.state, "Aggregator has been closed for collecting keyshares.");
-            return Box::pin(fut::ready(Ok(())));
-        };
-
-        let size = threshold_n;
-        let address = event.node;
-        let chain_id = event.e3_id.chain_id();
+        let address = event.node.clone();
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();
 
         Box::pin(
             self.sortition
-                .send(GetNodeIndex {
-                    chain_id,
-                    address,
-                    size,
-                    seed,
+                .send(GetNodesForE3 {
+                    e3_id: e3_id.clone(),
+                    chain_id: e3_id.chain_id(),
                 })
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    // NOTE: Returning Ok(()) on errors as we probably dont need a result type here since
-                    // we will not be doing a send
-                    let maybe_found_index = res?;
-                    let Some(_) = maybe_found_index else {
-                        trace!("Node not found in committee");
+                    let nodes = res?;
+
+                    if !nodes.contains(&address) {
+                        trace!("Node {} not found in finalized committee", address);
                         return Ok(());
-                    };
+                    }
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");
                         return Ok(());
                     }
 
-                    // add the keyshare and
                     act.add_keyshare(pubkey)?;
 
-                    // Check the state and if it has changed to the computing
                     if let Some(PublicKeyAggregatorState::Computing { keyshares }) =
                         &act.state.get()
                     {
@@ -235,7 +219,8 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
     fn handle(&mut self, msg: NotifyNetwork, _: &mut Self::Context) -> Self::Result {
         Box::pin(
             self.sortition
-                .send(GetNodes {
+                .send(GetNodesForE3 {
+                    e3_id: msg.e3_id.clone(),
                     chain_id: msg.e3_id.chain_id(),
                 })
                 .into_actor(self)

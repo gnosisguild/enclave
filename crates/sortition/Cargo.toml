@@ -16,7 +16,8 @@ async-trait = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
 e3-events = { workspace = true }
-num = { workspace = true }
+e3-request = { workspace = true }
+num = { workspace = true } 
 rand = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

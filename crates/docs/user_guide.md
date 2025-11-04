@@ -35,7 +35,7 @@ chains:
       ciphernode_registry:
         address: "0x0952388f6028a9Eda93a5041a3B216Ea331d97Ab"
         deploy_block: 7073318
-      filter_registry:
+      bonding_registry:
         address: "0xcBaCE7C360b606bb554345b20884A28e41436934"
         deploy_block: 7073319
 ```
@@ -99,7 +99,7 @@ Ciphernodes need a registration address to identify themselves within a committe
 
 ```
 # ~/.config/enclave/config.yaml
-address: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
+address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
 ```
 
 ## Setting your encryption password

@@ -15,6 +15,7 @@ import {
 import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
+  EnclaveToken__factory,
 } from "@enclave-e3/contracts/types";
 import { type E3 } from "./types";
 import { SDKError, isValidAddress } from "./utils";
@@ -23,6 +24,7 @@ export class ContractClient {
   private contractInfo: {
     enclave: { address: `0x${string}`; abi: Abi };
     ciphernodeRegistry: { address: `0x${string}`; abi: Abi };
+    feeToken: { address: `0x${string}`; abi: Abi };
   } | null = null;
 
   constructor(
@@ -31,9 +33,11 @@ export class ContractClient {
     private addresses: {
       enclave: `0x${string}`;
       ciphernodeRegistry: `0x${string}`;
+      feeToken: `0x${string}`;
     } = {
       enclave: "0x0000000000000000000000000000000000000000",
       ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
+      feeToken: "0x0000000000000000000000000000000000000000",
     }
   ) {
     if (!isValidAddress(addresses.enclave)) {
@@ -42,6 +46,12 @@ export class ContractClient {
     if (!isValidAddress(addresses.ciphernodeRegistry)) {
       throw new SDKError(
         "Invalid CiphernodeRegistry contract address",
+        "INVALID_ADDRESS"
+      );
+    }
+    if (!isValidAddress(addresses.feeToken)) {
+      throw new SDKError(
+        "Invalid FeeToken contract address",
         "INVALID_ADDRESS"
       );
     }
@@ -61,6 +71,10 @@ export class ContractClient {
           address: this.addresses.ciphernodeRegistry,
           abi: CiphernodeRegistryOwnable__factory.abi,
         },
+        feeToken: {
+          address: this.addresses.feeToken,
+          abi: EnclaveToken__factory.abi,
+        },
       };
     } catch (error) {
       throw new SDKError(
@@ -71,11 +85,51 @@ export class ContractClient {
   }
 
   /**
+   * Approve the fee token for the Enclave
+   * approve(address spender, uint256 amount)
+   */
+  public async approveFeeToken(amount: bigint): Promise<Hash> {
+    if (!this.walletClient) {
+      throw new SDKError(
+        "Wallet client required for write operations",
+        "NO_WALLET"
+      );
+    }
+
+    if (!this.contractInfo) {
+      await this.initialize();
+    }
+
+    try {
+      const account = this.walletClient.account;
+      if (!account) {
+        throw new SDKError("No account connected", "NO_ACCOUNT");
+      }
+
+      const { request } = await this.publicClient.simulateContract({
+        address: this.addresses.feeToken,
+        abi: EnclaveToken__factory.abi,
+        functionName: "approve",
+        args: [this.addresses.enclave, amount],
+        account,
+      });
+
+      const hash = await this.walletClient.writeContract(request);
+
+      return hash;
+    } catch (error) {
+      throw new SDKError(
+        `Failed to approve fee token: ${error}`,
+        "APPROVE_FEE_TOKEN_FAILED"
+      );
+    }
+  }
+
+  /**
    * Request a new E3 computation
    * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
-    filter: `0x${string}`,
     threshold: [number, number],
     startWindow: [bigint, bigint],
     duration: bigint,
@@ -83,7 +137,6 @@ export class ContractClient {
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
     customParams?: `0x${string}`,
-    value?: bigint,
     gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
@@ -110,7 +163,6 @@ export class ContractClient {
         functionName: "request",
         args: [
           {
-            filter,
             threshold,
             startWindow,
             duration,
@@ -121,7 +173,6 @@ export class ContractClient {
           },
         ],
         account,
-        value: value || BigInt(0),
         gas: gasLimit,
       });
 
@@ -301,7 +352,7 @@ export class ContractClient {
   /**
    * Get the public key for an E3 computation
    * Based on the contract: committeePublicKey(uint256 e3Id) returns (bytes32 publicKeyHash)
-   * @param e3Id 
+   * @param e3Id
    * @returns The public key
    */
   public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
@@ -319,7 +370,10 @@ export class ContractClient {
 
       return result;
     } catch (error) {
-      throw new SDKError(`Failed to get E3 public key: ${error}`, "GET_E3_PUBLIC_KEY_FAILED");
+      throw new SDKError(
+        `Failed to get E3 public key: ${error}`,
+        "GET_E3_PUBLIC_KEY_FAILED"
+      );
     }
   }
 
