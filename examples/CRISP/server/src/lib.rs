@@ -4,6 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod config;
 pub mod logger;
 pub mod server;
-pub mod config; 

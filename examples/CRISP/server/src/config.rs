@@ -30,7 +30,7 @@ pub struct Config {
     pub e3_compute_provider_name: String,
     pub e3_compute_provider_parallel: bool,
     pub e3_compute_provider_batch_size: u32,
-    pub bitquery_api_key: String,
+    pub etherscan_api_key: String,
 }
 
 impl Config {
