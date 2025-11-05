@@ -93,7 +93,7 @@ pub async fn register_e3_requested(
                     etherscan_client
                         .get_token_holders_with_voting_power(
                             token_address,
-                            9,
+                            event.e3.requestBlock.to::<u64>(),
                             &CONFIG.http_rpc_url,
                             U256::from_str_radix(&balance_threshold.to_string(), 10)
                                 .unwrap_or(U256::ZERO),
