@@ -20,6 +20,8 @@ use e3_events::{
     EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
     TicketId,
 };
+use e3_utils::{retry_with_backoff, to_retry};
+use futures::TryFutureExt;
 use tracing::{error, info, trace};
 
 sol!(
@@ -352,10 +354,13 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
 
                 Box::pin(async move {
                     info!("Submitting ticket {} for E3 {:?}", ticket_id, e3_id);
-
-                    let result =
-                        submit_ticket_to_registry(provider, contract_address, e3_id, ticket_id)
-                            .await;
+                    let result = submit_ticket_to_registry_with_retry(
+                        provider,
+                        contract_address,
+                        e3_id,
+                        ticket_id,
+                    )
+                    .await;
                     match result {
                         Ok(receipt) => {
                             info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
@@ -434,6 +439,29 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
+}
+
+pub async fn submit_ticket_to_registry_with_retry<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+    ticket_number: u64,
+) -> Result<TransactionReceipt> {
+    let t = retry_with_backoff(
+        || {
+            submit_ticket_to_registry(
+                provider.clone(),
+                contract_address,
+                e3_id.clone(),
+                ticket_number,
+            )
+            .map_err(to_retry)
+        },
+        4,
+        1000,
+    )
+    .await?;
+    Ok(t)
 }
 
 pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(

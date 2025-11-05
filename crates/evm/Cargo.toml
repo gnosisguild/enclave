@@ -20,6 +20,7 @@ e3-data = { workspace = true }
 e3-events = { workspace = true }
 e3-utils = { workspace = true }
 futures-util = { workspace = true }
+futures = { workspace = true }
 e3-sortition = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }

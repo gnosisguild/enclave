@@ -21,10 +21,8 @@ use tracing::info;
 use tracing::trace;
 use tracing::warn;
 
-use crate::{
-    events::{NetCommand, NetEvent},
-    retry::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES},
-};
+use crate::events::{NetCommand, NetEvent};
+use e3_utils::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES};
 
 /// Dial a single Multiaddr with retries and return an error should those retries not work
 async fn dial_multiaddr(

@@ -8,7 +8,6 @@ use crate::{
     events::{
         call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
     },
-    retry::{retry_with_backoff, to_retry},
     Cid,
 };
 use actix::prelude::*;
@@ -19,6 +18,7 @@ use e3_events::{
     E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EventBus, PartyId,
     PublishDocumentRequested, Subscribe, ThresholdShareCreated,
 };
+use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};

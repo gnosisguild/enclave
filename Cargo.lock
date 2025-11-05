@@ -2884,6 +2884,7 @@ dependencies = [
  "e3-events",
  "e3-sortition",
  "e3-utils",
+ "futures",
  "futures-util",
  "num-bigint",
  "serde",
@@ -3240,6 +3241,8 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
