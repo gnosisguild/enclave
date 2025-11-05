@@ -248,6 +248,9 @@ importers:
 
   examples/CRISP/packages/crisp-contracts:
     dependencies:
+      '@crisp-e3/sdk':
+        specifier: workspace:*
+        version: link:../crisp-sdk
       '@enclave-e3/contracts':
         specifier: workspace:*
         version: link:../../../../packages/enclave-contracts
@@ -303,6 +306,9 @@ importers:
       '@types/node':
         specifier: 22.7.5
         version: 22.7.5
+      chai:
+        specifier: ^6.2.0
+        version: 6.2.0
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
