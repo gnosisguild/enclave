@@ -1,13 +1,30 @@
 {
-  "name": "@enclave/crisp-contracts",
-  "version": "0.0.1",
+  "name": "@crisp-e3/contracts",
+  "version": "0.0.1-test",
   "type": "module",
   "files": [
-    "contracts/**/*.sol"
+    "contracts",
+    "dist"
   ],
+  "exports": {
+    "./contracts/*": "./contracts/*",
+    "./types": {
+      "import": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      },
+      "require": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      }
+    }
+  },
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "compile": "hardhat compile",
