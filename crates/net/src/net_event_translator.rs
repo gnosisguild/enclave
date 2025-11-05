@@ -7,6 +7,7 @@
 use crate::events::GossipData;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
+use crate::DocumentPublisher;
 use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -20,6 +21,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+use tracing::warn;
 use tracing::{error, info, instrument, trace};
 
 // TODO: store event filtering here on this actor instead of is_local_only() on the event. We
@@ -59,11 +61,12 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         tx: &mpsc::Sender<NetCommand>,
-        mut rx: broadcast::Receiver<NetEvent>,
+        rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
     ) -> Addr<Self> {
+        let mut rx = rx.resubscribe();
         let addr = NetEventTranslator::new(bus.clone(), tx, topic).start();
 
         // Listen on all events
@@ -101,7 +104,6 @@ impl NetEventTranslator {
             EnclaveEvent::KeyshareCreated { .. } => true,
             EnclaveEvent::PlaintextAggregated { .. } => true,
             EnclaveEvent::PublicKeyAggregated { .. } => true,
-            EnclaveEvent::ThresholdShareCreated { .. } => true,
             _ => false,
         }
     }
@@ -114,7 +116,13 @@ impl NetEventTranslator {
         cipher: &Arc<Cipher>,
         quic_port: u16,
         repository: Repository<Vec<u8>>,
-    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
+        experimental_trbfv: bool,
+    ) -> Result<(
+        Addr<Self>,
+        Option<Addr<DocumentPublisher>>,
+        tokio::task::JoinHandle<Result<()>>,
+        String,
+    )> {
         let topic = "tmp-enclave-gossip-topic";
         // Get existing keypair or generate a new one
         let mut bytes = match repository.read().await? {
@@ -131,11 +139,27 @@ impl NetEventTranslator {
         let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
 
         // Setup and start net event translator
-        let rx = interface.rx();
-        let addr = NetEventTranslator::setup(bus, &interface.tx(), rx, topic);
+        let rx = &Arc::new(interface.rx());
+        let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
+
+        // NOTE:
+        // This is a little rough but having the trbfv switch is short term
+        // Once we setup permenantly we should refactor to
+        // We should separate NetInterface from NetEventTranslator
+        let maybe_publisher = if experimental_trbfv {
+            Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic))
+        } else {
+            None
+        };
+
         let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
-        Ok((addr, handle, keypair.public().to_peer_id().to_string()))
+        Ok((
+            addr,
+            maybe_publisher,
+            handle,
+            keypair.public().to_peer_id().to_string(),
+        ))
     }
 }
 
@@ -175,7 +199,7 @@ impl Handler<EnclaveEvent> for NetEventTranslator {
                 trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
                 return;
             }
-
+            warn!("GossipPublish event: {}", event.event_type());
             match evt.to_bytes() {
                 Ok(data) => {
                     if let Err(e) = tx

@@ -11,7 +11,6 @@ pub mod events;
 mod net_event_translator;
 mod net_interface;
 mod repo;
-mod retry;
 
 pub use cid::Cid;
 pub use document_publisher::*;

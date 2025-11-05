@@ -7,10 +7,12 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
-alloy.workspace = true
-derivative.workspace = true
-serde.workspace = true
 actix.workspace = true
+alloy.workspace = true
 anyhow.workspace = true
+derivative.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true

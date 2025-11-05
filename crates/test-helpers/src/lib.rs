@@ -18,7 +18,7 @@ use e3_events::{
     CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
-use e3_net::NetEventTranslator;
+use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
@@ -137,6 +137,7 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
                         // converted to DocumentReceived events
 
                         NetEventTranslator::is_forwardable_event(e)
+                            || DocumentPublisher::is_document_publisher_event(e)
                     },
                     dest,
                 )
@@ -190,17 +191,23 @@ impl AddToCommittee {
 pub fn encrypt_ciphertext(
     params: &Arc<BfvParameters>,
     pubkey: PublicKey,
-    raw_plaintext: Vec<u64>,
-) -> Result<(Arc<Ciphertext>, Vec<u8>)> {
-    let padded = &pad_end(&raw_plaintext, 0, 2048);
-    let mut bytes = Vec::with_capacity(padded.len() * 8);
-    for value in padded {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
-    let expected = bytes;
-    let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
-    let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
-    Ok((Arc::new(ciphertext), expected))
+    raw_plaintext: Vec<Vec<u64>>,
+) -> Result<(Vec<Ciphertext>, Vec<Plaintext>)> {
+    let mut rng = ChaCha20Rng::seed_from_u64(42);
+    let plaintext = raw_plaintext
+        .into_iter()
+        .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), &params)?))
+        .collect::<Result<Vec<Plaintext>>>()?;
+
+    let ciphertext = plaintext
+        .iter()
+        .map(|pt| {
+            pubkey
+                .try_encrypt(&pt, &mut rng)
+                .map_err(|e| anyhow!("{e}"))
+        })
+        .collect::<Result<Vec<Ciphertext>>>()?;
+    Ok((ciphertext, plaintext))
 }
 
 fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {

@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -247,6 +247,12 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
+        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
+            self.state.get()
+        else {
+            debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
+            return Box::pin(fut::ready(Ok(())));
+        };
         info!(event=?event, "Processing DecryptionShareCreated...");
         let address = event.node.clone();
         let party_id = event.party_id;
