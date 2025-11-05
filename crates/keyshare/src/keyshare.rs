@@ -161,7 +161,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
         self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
             party_id: 0, // Not used
             e3_id,
-            decryption_share: vec![ArcBytes::from_bytes(decryption_share)],
+            decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],
             node: self.address.clone(),
         }));
     }

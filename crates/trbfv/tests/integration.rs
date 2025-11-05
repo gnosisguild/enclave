@@ -55,10 +55,10 @@ async fn test_trbfv_isolation() -> Result<()> {
     );
 
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
-    let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
+    let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
-    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
+    let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
         5,
         3,
@@ -106,7 +106,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     // Encrypt the plaintext
     let ciphertexts = outputs
         .into_iter()
-        .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
+        .map(|ct| ArcBytes::from_bytes(&(*ct).clone().to_bytes()))
         .collect::<Vec<ArcBytes>>();
 
     let mut decryption_shares = HashMap::new();

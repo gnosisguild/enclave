@@ -118,14 +118,14 @@ async fn test_trbfv_actor() -> Result<()> {
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
     // Encoded Params
-    let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
+    let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // round information
     let threshold_m = 2;
     let threshold_n = 5;
     let esi_per_ct = 3;
     let seed = create_seed_from_u64(123);
-    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
+    let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
         threshold_n,
         threshold_m,
@@ -295,7 +295,7 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("Have outputs. Creating ciphertexts...");
     let ciphertexts = outputs
         .into_iter()
-        .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
+        .map(|ct| ArcBytes::from_bytes(&(*ct).clone().to_bytes()))
         .collect::<Vec<ArcBytes>>();
 
     // Created the event

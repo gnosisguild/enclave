@@ -80,7 +80,7 @@ impl Fhe {
 
         Ok((
             SecretKeySerializer::to_bytes(sk_share)?,
-            ArcBytes::from_bytes(pk_share.to_bytes()),
+            ArcBytes::from_bytes(&pk_share.to_bytes()),
         ))
     }
 

@@ -447,7 +447,7 @@ impl ThresholdKeyshare {
         let trbfv_config: TrBFVConfig = state.get_trbfv_config();
 
         let crp = ArcBytes::from_bytes(
-            create_crp(
+            &create_crp(
                 trbfv_config.params(),
                 Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
             )
