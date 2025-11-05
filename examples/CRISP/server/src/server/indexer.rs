@@ -95,8 +95,14 @@ pub async fn register_e3_requested(
                             token_address,
                             event.e3.requestBlock.to::<u64>(),
                             &CONFIG.http_rpc_url,
-                            U256::from_str_radix(&balance_threshold.to_string(), 10)
-                                .unwrap_or(U256::ZERO),
+                            U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
+                                |e| {
+                                    eyre::eyre!(
+                                        "Failed to convert balance threshold to U256: {}",
+                                        e
+                                    )
+                                },
+                            )?,
                         )
                         .await
                         .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?

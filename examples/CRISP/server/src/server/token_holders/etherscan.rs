@@ -8,7 +8,7 @@ use crate::server::CONFIG;
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
-use eyre::{Result, eyre, Context}; // Add this import
+use eyre::{eyre, Context, Result}; // Add this import
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -107,9 +107,15 @@ impl EtherscanClient {
             ETHERSCAN_API_URL, token, self.chain_id, self.api_key
         );
 
-        let response = self.client.get(&url).send().await
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .context("Failed to send request to Etherscan")?;
-        let data: EtherscanResponse<Vec<ContractCreation>> = response.json().await
+        let data: EtherscanResponse<Vec<ContractCreation>> = response
+            .json()
+            .await
             .context("Failed to parse Etherscan response")?;
 
         if data.status != "1" {
@@ -126,7 +132,9 @@ impl EtherscanClient {
             u64::from_str_radix(&result.block_number[2..], 16)
                 .context("Failed to parse hex block number")?
         } else {
-            result.block_number.parse::<u64>()
+            result
+                .block_number
+                .parse::<u64>()
                 .context("Failed to parse decimal block number")?
         };
 
@@ -152,14 +160,28 @@ impl EtherscanClient {
                 ETHERSCAN_API_URL, token, from_block, to_block, transfer_topic, page, self.chain_id, self.api_key
             );
 
-            let response = self.client.get(&url).send().await
+            let response = self
+                .client
+                .get(&url)
+                .send()
+                .await
                 .context("Failed to fetch transfer logs")?;
-            let data: EtherscanResponse<Vec<TransferLog>> = response.json().await
+            let data: EtherscanResponse<Vec<TransferLog>> = response
+                .json()
+                .await
                 .context("Failed to parse transfer logs response")?;
 
             // Break if request failed
             if data.status != "1" {
-                break;
+                if data.message.eq_ignore_ascii_case("No records found") {
+                    break;
+                }
+
+                return Err(eyre!(
+                    "Etherscan getLogs failed on page {}: {}", 
+                    page, 
+                    data.message
+                ));
             }
 
             // Break if no results
@@ -205,14 +227,28 @@ impl EtherscanClient {
                 ETHERSCAN_API_URL, token, from_block, to_block, delegate_votes_changed_topic, page, self.chain_id, self.api_key
             );
 
-            let response = self.client.get(&url).send().await
+            let response = self
+                .client
+                .get(&url)
+                .send()
+                .await
                 .context("Failed to fetch delegation logs")?;
-            let data: EtherscanResponse<Vec<DelegateVotesChangedLog>> = response.json().await
+            let data: EtherscanResponse<Vec<DelegateVotesChangedLog>> = response
+                .json()
+                .await
                 .context("Failed to parse delegation logs response")?;
 
             // Break if request failed
             if data.status != "1" {
-                break;
+                if data.message.eq_ignore_ascii_case("No records found") {
+                    break;
+                }
+
+                return Err(eyre!(
+                    "Etherscan getLogs failed on page {}: {}", 
+                    page, 
+                    data.message
+                ));
             }
 
             // Break if no results
@@ -293,7 +329,7 @@ impl EtherscanClient {
         for voter in potential_voters {
             match Self::get_past_votes(token_address, voter.address, block_number, rpc_url).await {
                 Ok(votes) => {
-                    if votes > threshold {
+                    if votes >= threshold {
                         token_holders.push(TokenHolder {
                             address: voter.address.to_string(),
                             balance: votes.to_string(),
@@ -403,8 +439,7 @@ impl EtherscanClient {
         block_number: u64,
         rpc_url: &str,
     ) -> Result<U256> {
-        let url = rpc_url.parse()
-            .context("Failed to parse RPC URL")?;
+        let url = rpc_url.parse().context("Failed to parse RPC URL")?;
         let provider = ProviderBuilder::new().connect_http(url);
         let token = ERC20Votes::new(token_address, provider);
 
