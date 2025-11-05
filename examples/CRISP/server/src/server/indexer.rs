@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::token_holders::{get_mock_token_holders, BitqueryClient};
+use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
     models::{CurrentRound, CustomParams},
     program_server_request::run_compute,
@@ -14,7 +14,7 @@ use crate::server::{
 };
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
-use alloy_primitives::Address;
+use alloy_primitives::{Address, U256};
 use e3_sdk::{
     evm_helpers::{
         contracts::{
@@ -84,22 +84,22 @@ pub async fn register_e3_requested(
                     get_mock_token_holders()
                 } else {
                     info!(
-                        "Using Bitquery API for network (chain_id: {})",
+                        "Using Etherscan API for network (chain_id: {})",
                         CONFIG.chain_id
                     );
 
-                    let bitquery_client = BitqueryClient::new(CONFIG.bitquery_api_key.clone());
-                    bitquery_client
-                        .get_token_holders(
+                    let etherscan_client =
+                        EtherscanClient::new(CONFIG.etherscan_api_key.clone(), CONFIG.chain_id);
+                    etherscan_client
+                        .get_token_holders_with_voting_power(
                             token_address,
-                            balance_threshold,
-                            event.e3.requestBlock.to::<u64>(),
-                            CONFIG.chain_id,
-                            10000, // TODO: this is fine for now, but we need pagination or chunking strategies
-                                   // to retrieve large datasets efficiently.
+                            9,
+                            &CONFIG.http_rpc_url,
+                            U256::from_str_radix(&balance_threshold.to_string(), 10)
+                                .unwrap_or(U256::ZERO),
                         )
                         .await
-                        .with_context(|| "Bitquery error")?
+                        .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
                 };
 
                 if token_holders.is_empty() {
