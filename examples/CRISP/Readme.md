@@ -313,6 +313,14 @@ Once the CLI client is running, you can interact with the CRISP voting protocol 
 
 Ensure all services are running correctly and that components are communicating as expected before starting a new CRISP round.
 
+## Publishing packages to npm
+
+In order to publish a new versinon of the CRISP packages to npm, you can use:
+
+```sh
+pnpm publish:packages x.x.x # where x.x.x is the new version
+```
+
 ## Contributing
 
 We welcome and encourage community contributions to this repository. Please ensure that you read and understand the [Contributor License Agreement (CLA)](https://github.com/gnosisguild/CLA) before submitting any contributions.
