@@ -1,6 +1,6 @@
 {
-  "name": "@enclave/crisp-sdk",
-  "version": "0.0.1",
+  "name": "@crisp/sdk",
+  "version": "0.1.0",
   "type": "module",
   "author": {
     "name": "gnosisguild",
@@ -43,7 +43,7 @@
     "@noir-lang/noir_js": "1.0.0-beta.3"
   },
   "dependencies": {
-    "@enclave/crisp-zk-inputs": "workspace:*",
+    "@crisp/zk-inputs": "workspace:*",
     "@zk-kit/lean-imt": "^2.2.4",
     "poseidon-lite": "^0.3.0",
     "viem": "2.30.6"

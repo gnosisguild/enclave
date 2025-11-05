@@ -1,5 +1,5 @@
 {
-  "name": "@enclave/crisp-zk-inputs",
+  "name": "@crisp/zk-inputs",
   "type": "module",
   "description": "Core logic to pre-compute CRISP ZK inputs (WASM/JavaScript bindings).",
   "version": "0.1.0",
@@ -14,6 +14,9 @@
     "pkg/index_bg.js",
     "pkg/index.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "pkg/index.js",
   "types": "pkg/index.d.ts",
   "sideEffects": [

@@ -1,5 +1,5 @@
 {
-  "name": "crisp",
+  "name": "@crisp/main",
   "private": true,
   "type": "module",
   "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",
@@ -23,7 +23,8 @@
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report",
-    "build:wasm": "wasm-pack build ./crates/zk-inputs-wasm --no-pack --out-dir ../../packages/crisp-zk-inputs/pkg --out-name index"
+    "build:wasm": "wasm-pack build ./crates/zk-inputs-wasm --no-pack --out-dir ../../packages/crisp-zk-inputs/pkg --out-name index",
+    "publish:packages": "tsx scripts/publish.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
