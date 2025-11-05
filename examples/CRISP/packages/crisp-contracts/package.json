@@ -33,11 +33,12 @@
     "deploy:contracts": "hardhat run deploy/deploy.ts",
     "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",
     "deploy:contracts:full:mock": "export DEPLOY_ENCLAVE=true && export USE_MOCK_VERIFIER=true && export USE_MOCK_INPUT_VALIDATOR=true && pnpm deploy:contracts",
-    "test": "hardhat test tests/crisp.contracts.test.ts --network localhost",
+    "test": "hardhat test mocha",
     "verify": "hardhat run deploy/verify.ts"
   },
   "dependencies": {
     "@enclave-e3/contracts": "workspace:*",
+    "@crisp-e3/sdk": "workspace:*",
     "@excubiae/contracts": "^0.4.0",
     "@zk-kit/lean-imt.sol": "2.0.0",
     "poseidon-solidity": "^0.0.5",
@@ -57,6 +58,7 @@
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
     "@types/node": "^22.18.0",
+    "chai": "^6.2.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
