@@ -29,10 +29,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
         let coeff = k1.coefficients[i];
         assert(0 == coeff * (q_mod_t - coeff));
 
-        let position = i - START_INDEX_Y;
-        let exponent = HALF_LARGEST_MINIMUM_DEGREE - 1 - position;
-        let weight: u64 = (1 << exponent) as u64;
-        sum_yes += (coeff as u64) * weight;
+        // evaluate using Horner's method
+        sum_yes = sum_yes + sum_yes + coeff as u64;
     }
 
     // no part
@@ -40,10 +38,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
         let coeff = k1.coefficients[i];
         assert(0 == coeff * (q_mod_t - coeff));
 
-        let position = i - START_INDEX_N;
-        let exponent = HALF_LARGEST_MINIMUM_DEGREE - 1 - position;
-        let weight: u64 = (1 << exponent) as u64;
-        sum_no += (coeff as u64) * weight;
+        // evaluate using Horner's method
+        sum_no = sum_no + sum_no + coeff as u64;
     }
 
     if (sum_yes != 0) {
