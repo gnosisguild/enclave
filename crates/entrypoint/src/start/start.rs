@@ -50,9 +50,7 @@ pub async fn execute(
     } else {
         builder = builder.with_keyshare();
     }
-
     builder.build().await?;
-
     let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
