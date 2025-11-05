@@ -40,7 +40,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
-  const SORTITION_SUBMISSION_WINDOW = 3;
+  const SORTITION_SUBMISSION_WINDOW = 15;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });

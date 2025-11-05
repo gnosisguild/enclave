@@ -479,9 +479,17 @@ pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
+    let mut builder = contract
         .submitTicket(e3_id, ticket_number)
         .nonce(current_nonce);
+
+    if let Ok(estimated) = builder.estimate_gas().await {
+        builder = builder.gas(estimated * 130 / 100);
+    } else {
+        // Fallback to a safe default
+        builder = builder.gas(250_000);
+    }
+
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
