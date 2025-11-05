@@ -14,7 +14,7 @@ use crate::server::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::{
     dyn_abi::DynSolValue,
-    primitives::{Bytes, U256, Address},
+    primitives::{Address, Bytes, U256},
 };
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
