@@ -142,10 +142,7 @@ impl NetEventTranslator {
         let rx = &Arc::new(interface.rx());
         let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
 
-        // NOTE:
-        // This is a little rough but having the trbfv switch is short term
-        // Once we setup permenantly we should refactor to
-        // We should separate NetInterface from NetEventTranslator
+        // TODO: We should separate NetInterface from NetEventTranslator
         let maybe_publisher = if experimental_trbfv {
             Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic))
         } else {

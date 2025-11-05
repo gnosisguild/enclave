@@ -28,7 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
@@ -89,10 +89,7 @@ impl DocumentPublisher {
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
         let addr = Self::new(bus, tx, rx, topic).start();
-
-        // Convert events
         EventConverter::setup(bus);
-
         // Listen on all events
         bus.do_send(Subscribe::new("*", addr.clone().recipient()));
 
@@ -406,14 +403,12 @@ impl EventConverter {
     pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         Self { bus: bus.clone() }
     }
-
     pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
         bus.do_send(Subscribe::new("DocumentReceived", addr.clone().into()));
         addr
     }
-
     /// Local node created a threshold share. Send it as a published document
     pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
         // If this is received from elsewhere
@@ -428,7 +423,6 @@ impl EventConverter {
             vec![],
             None,
         );
-
         self.bus
             .do_send(EnclaveEvent::from(PublishDocumentRequested::new(
                 meta, value,
