@@ -51,7 +51,6 @@ impl DocumentMeta {
     ) -> DocumentMeta {
         let expires_at =
             expires_at.unwrap_or_else(|| Utc::now() + Duration::days(DEFAULT_KADEMLIA_EXPIRY_DAYS));
-
         Self {
             e3_id,
             expires_at,
