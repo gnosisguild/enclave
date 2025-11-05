@@ -1,6 +1,6 @@
 {
-  "name": "@crisp/contracts",
-  "version": "0.1.0",
+  "name": "@crisp-e3/contracts",
+  "version": "0.0.1-test",
   "type": "module",
   "files": [
     "contracts",

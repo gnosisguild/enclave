@@ -33,8 +33,7 @@ class CRISPPublisher {
 
   constructor(newVersion: string, options: PublishOptions = {}) {
     this.newVersion = newVersion
-    this.rootDir = resolve(__dirname, '..')
-    this.crispDir = join(this.rootDir, 'examples/CRISP')
+    this.crispDir = resolve(__dirname, '..')
     this.options = options
   }
 
@@ -65,15 +64,15 @@ class CRISPPublisher {
       if (this.options.dryRun) {
         console.log('\n📋 Would perform the following actions:')
         console.log('   1. Update package versions in:')
-        console.log('      - @crisp/sdk')
-        console.log('      - @crisp/contracts')
-        console.log('      - @crisp/zk-inputs')
+        console.log('      - @crisp-e3/sdk')
+        console.log('      - @crisp-e3/contracts')
+        console.log('      - @crisp-e3/zk-inputs')
         console.log('   2. Update pnpm-lock.yaml')
         console.log('   3. Build packages')
         console.log('   4. Publish to npm:')
-        console.log('      - @crisp/sdk')
-        console.log('      - @crisp/contracts')
-        console.log('      - @crisp/zk-inputs')
+        console.log('      - @crisp-e3/sdk')
+        console.log('      - @crisp-e3/contracts')
+        console.log('      - @crisp-e3/zk-inputs')
         if (!this.options.skipGit) {
           console.log('   5. Commit changes')
         }
@@ -120,9 +119,9 @@ class CRISPPublisher {
       }
       
       console.log('\n🎉 Packages are now available on npm!')
-      console.log('   npm install @crisp/sdk@' + this.newVersion)
-      console.log('   npm install @crisp/contracts@' + this.newVersion)
-      console.log('   npm install @crisp/zk-inputs@' + this.newVersion)
+      console.log('   npm install @crisp-e3/sdk@' + this.newVersion)
+      console.log('   npm install @crisp-e3/contracts@' + this.newVersion)
+      console.log('   npm install @crisp-e3/zk-inputs@' + this.newVersion)
     } catch (error) {
       console.error('❌ Error during publish:', error)
       process.exit(1)
@@ -136,9 +135,9 @@ class CRISPPublisher {
     console.log('\n🔨 Building packages...')
     
     const packagesToBuild = [
-      { path: 'packages/crisp-sdk', name: '@crisp/sdk' },
-      { path: 'packages/crisp-contracts', name: '@crisp/contracts' },
-      { path: 'packages/crisp-zk-inputs', name: '@crisp/zk-inputs' }
+      { path: 'packages/crisp-sdk', name: '@crisp-e3/sdk' },
+      { path: 'packages/crisp-contracts', name: '@crisp-e3/contracts' },
+      { path: 'packages/crisp-zk-inputs', name: '@crisp-e3/zk-inputs' }
     ]
     
     for (const pkg of packagesToBuild) {
@@ -174,9 +173,9 @@ class CRISPPublisher {
     console.log('\n📤 Publishing packages to npm...')
     
     const packagesToPublish = [
-      { path: 'packages/crisp-sdk', name: '@crisp/sdk' },
-      { path: 'packages/crisp-contracts', name: '@crisp/contracts' },
-      { path: 'packages/crisp-zk-inputs', name: '@crisp/zk-inputs' }
+      { path: 'packages/crisp-sdk', name: '@crisp-e3/sdk' },
+      { path: 'packages/crisp-contracts', name: '@crisp-e3/contracts' },
+      { path: 'packages/crisp-zk-inputs', name: '@crisp-e3/zk-inputs' }
     ]
     
     const tag = this.options.tag || (this.newVersion.includes('-') ? 'next' : 'latest')
@@ -207,7 +206,7 @@ class CRISPPublisher {
   private checkGitStatus(): void {
     try {
       const status = execSync('git status --porcelain', { 
-        cwd: this.rootDir,
+        cwd: this.crispDir,
         encoding: 'utf-8'
       }).trim()
       
@@ -233,20 +232,20 @@ class CRISPPublisher {
     try {
       // Add all changes
       console.log('   Adding changes...')
-      execSync('git add .', { cwd: this.rootDir })
+      execSync('git add .', { cwd: this.crispDir })
       
       // Create commit message
       const commitMessage = `chore(crisp): publish version ${this.newVersion}
 
-- Updated @crisp/sdk to ${this.newVersion}
-- Updated @crisp/contracts to ${this.newVersion}
-- Updated @crisp/zk-inputs to ${this.newVersion}
+- Updated @crisp-e3/sdk to ${this.newVersion}
+- Updated @crisp-e3/contracts to ${this.newVersion}
+- Updated @crisp-e3/zk-inputs to ${this.newVersion}
 - Published to npm`
       
       // Commit changes
       console.log('   Committing changes...')
       execSync(`git commit -m "${commitMessage}"`, { 
-        cwd: this.rootDir,
+        cwd: this.crispDir,
         stdio: 'pipe'
       })
       console.log(`   ✓ Committed with message: "chore(crisp): publish version ${this.newVersion}"`)
@@ -418,7 +417,7 @@ Examples:
 
 The script will:
   1. Check for uncommitted changes
-  2. Update versions in @crisp/sdk, @crisp/contracts, @crisp/zk-inputs
+  2. Update versions in @crisp-e3/sdk, @crisp-e3/contracts, @crisp-e3/zk-inputs
   3. Update pnpm-lock.yaml
   4. Build packages
   5. Publish to npm

@@ -1,5 +1,5 @@
 {
-  "name": "@crisp/main",
+  "name": "@crisp-e3/main",
   "private": true,
   "type": "module",
   "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",

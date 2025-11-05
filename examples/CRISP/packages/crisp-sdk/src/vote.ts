@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, MESSAGE } from './constants'
