@@ -8,10 +8,10 @@ use crate::server::CONFIG;
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
+use eyre::{Result, eyre, Context}; // Add this import
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use tokio::time::{sleep, Duration};
 
 // Define the Votes contract interface for getPastVotes
@@ -101,29 +101,33 @@ impl EtherscanClient {
     }
 
     /// Get the deployment block number for a contract
-    pub async fn get_deployment_block(&self, token: &str) -> Result<u64, Box<dyn Error>> {
+    pub async fn get_deployment_block(&self, token: &str) -> Result<u64> {
         let url = format!(
             "{}?module=contract&action=getcontractcreation&contractaddresses={}&chainid={}&apikey={}",
             ETHERSCAN_API_URL, token, self.chain_id, self.api_key
         );
 
-        let response = self.client.get(&url).send().await?;
-        let data: EtherscanResponse<Vec<ContractCreation>> = response.json().await?;
+        let response = self.client.get(&url).send().await
+            .context("Failed to send request to Etherscan")?;
+        let data: EtherscanResponse<Vec<ContractCreation>> = response.json().await
+            .context("Failed to parse Etherscan response")?;
 
         if data.status != "1" {
-            return Err(format!("Deployment block not found: {}", data.message).into());
+            return Err(eyre!("Deployment block not found: {}", data.message));
         }
 
         let result = data
             .result
             .and_then(|r| r.into_iter().next())
-            .ok_or("No deployment data found")?;
+            .ok_or_else(|| eyre!("No deployment data found"))?;
 
         // Parse block number (could be hex or decimal)
         let block_number = if result.block_number.starts_with("0x") {
-            u64::from_str_radix(&result.block_number[2..], 16)?
+            u64::from_str_radix(&result.block_number[2..], 16)
+                .context("Failed to parse hex block number")?
         } else {
-            result.block_number.parse::<u64>()?
+            result.block_number.parse::<u64>()
+                .context("Failed to parse decimal block number")?
         };
 
         Ok(block_number)
@@ -135,7 +139,7 @@ impl EtherscanClient {
         token: &str,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<TransferLog>, Box<dyn Error>> {
+    ) -> Result<Vec<TransferLog>> {
         let mut all_logs = Vec::new();
         let mut page = 1;
 
@@ -148,8 +152,10 @@ impl EtherscanClient {
                 ETHERSCAN_API_URL, token, from_block, to_block, transfer_topic, page, self.chain_id, self.api_key
             );
 
-            let response = self.client.get(&url).send().await?;
-            let data: EtherscanResponse<Vec<TransferLog>> = response.json().await?;
+            let response = self.client.get(&url).send().await
+                .context("Failed to fetch transfer logs")?;
+            let data: EtherscanResponse<Vec<TransferLog>> = response.json().await
+                .context("Failed to parse transfer logs response")?;
 
             // Break if request failed
             if data.status != "1" {
@@ -180,13 +186,12 @@ impl EtherscanClient {
     }
 
     /// Get DelegateVotesChanged logs for a token
-    /// Event signature: DelegateVotesChanged(address indexed delegate, uint256 previousBalance, uint256 newBalance)
     pub async fn get_delegate_votes_changed_logs(
         &self,
         token: &str,
         from_block: u64,
         to_block: u64,
-    ) -> Result<Vec<DelegateVotesChangedLog>, Box<dyn Error>> {
+    ) -> Result<Vec<DelegateVotesChangedLog>> {
         let mut all_logs = Vec::new();
         let mut page = 1;
 
@@ -200,8 +205,10 @@ impl EtherscanClient {
                 ETHERSCAN_API_URL, token, from_block, to_block, delegate_votes_changed_topic, page, self.chain_id, self.api_key
             );
 
-            let response = self.client.get(&url).send().await?;
-            let data: EtherscanResponse<Vec<DelegateVotesChangedLog>> = response.json().await?;
+            let response = self.client.get(&url).send().await
+                .context("Failed to fetch delegation logs")?;
+            let data: EtherscanResponse<Vec<DelegateVotesChangedLog>> = response.json().await
+                .context("Failed to parse delegation logs response")?;
 
             // Break if request failed
             if data.status != "1" {
@@ -280,7 +287,7 @@ impl EtherscanClient {
         block_number: u64,
         rpc_url: &str,
         threshold: U256,
-    ) -> Result<Vec<TokenHolder>, Box<dyn Error>> {
+    ) -> Result<Vec<TokenHolder>> {
         let mut token_holders: Vec<TokenHolder> = Vec::new();
 
         for voter in potential_voters {
@@ -395,15 +402,17 @@ impl EtherscanClient {
         voter_address: Address,
         block_number: u64,
         rpc_url: &str,
-    ) -> Result<U256, Box<dyn Error>> {
-        let url = rpc_url.parse()?;
+    ) -> Result<U256> {
+        let url = rpc_url.parse()
+            .context("Failed to parse RPC URL")?;
         let provider = ProviderBuilder::new().connect_http(url);
         let token = ERC20Votes::new(token_address, provider);
 
         let votes = token
             .getPastVotes(voter_address, U256::from(block_number))
             .call()
-            .await?;
+            .await
+            .context("Failed to call getPastVotes")?;
 
         Ok(votes)
     }
@@ -437,37 +446,21 @@ impl EtherscanClient {
         U256::from_str_radix(hex_data, 16).unwrap_or(U256::ZERO)
     }
 
-    /// Get all token holders with voting power at a specific block in one call.
-    /// This is a convenience method that orchestrates the entire flow:
-    /// 1. Gets deployment block (or uses provided from_block)
-    /// 2. Fetches transfer logs
-    /// 3. Fetches delegation logs
-    /// 4. Identifies potential voters
-    /// 5. Verifies actual voting power via RPC
-    /// 6. Returns list of token holders meeting the threshold
-    ///
-    /// # Arguments
-    /// * `token_address` - The ERC20Votes token contract address
-    /// * `snapshot_block` - The block number to check voting power at
-    /// * `rpc_url` - RPC endpoint for querying voting power
-    /// * `threshold` - Minimum voting power required (use U256::ZERO for all voters)
-    /// * `from_block` - Optional starting block (if None, uses deployment block)
-    ///
-    /// # Returns
-    /// A vector of TokenHolder structs with address and voting power
+    /// Get all token holders with voting power at a specific block
     pub async fn get_token_holders_with_voting_power(
         &self,
         token_address: Address,
         snapshot_block: u64,
         rpc_url: &str,
         threshold: U256,
-    ) -> Result<Vec<TokenHolder>, Box<dyn Error>> {
+    ) -> Result<Vec<TokenHolder>> {
         log::info!("Starting token holder discovery for {}", token_address);
 
         // Step 1: Determine starting block
         let start_block = self
             .get_deployment_block(&token_address.to_string())
-            .await?;
+            .await
+            .context("Failed to get deployment block")?;
         log::info!("Token deployed at block: {}", start_block);
 
         // Step 2: Fetch transfer logs
@@ -478,7 +471,8 @@ impl EtherscanClient {
         );
         let transfer_logs = self
             .get_transfer_logs(&token_address.to_string(), start_block, snapshot_block)
-            .await?;
+            .await
+            .context("Failed to fetch transfer logs")?;
         log::info!("Found {} transfer events", transfer_logs.len());
 
         // Step 3: Fetch delegation logs
@@ -489,7 +483,8 @@ impl EtherscanClient {
                 start_block,
                 snapshot_block,
             )
-            .await?;
+            .await
+            .context("Failed to fetch delegation logs")?;
         log::info!("Found {} delegation events", delegation_logs.len());
 
         // Step 4: Identify potential voters
@@ -507,7 +502,8 @@ impl EtherscanClient {
                 rpc_url,
                 threshold,
             )
-            .await?;
+            .await
+            .context("Failed to verify voting power")?;
 
         log::info!(
             "Discovery complete: {} addresses with voting power above threshold",
@@ -519,10 +515,6 @@ impl EtherscanClient {
 }
 
 /// Convenience function to get mocked token holder data for testing.
-/// This is useful when you don't need a BitqueryClient instance.
-///
-/// # Returns
-/// A vector of 10 `TokenHolder` structs with realistic test data.
 pub fn get_mock_token_holders() -> Vec<TokenHolder> {
     vec![
         TokenHolder {
@@ -570,8 +562,6 @@ pub fn get_mock_token_holders() -> Vec<TokenHolder> {
 
 #[cfg(test)]
 mod tests {
-    use fhe::trbfv::threshold;
-
     use super::*;
 
     #[test]
