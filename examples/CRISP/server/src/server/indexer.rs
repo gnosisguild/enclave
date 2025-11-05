@@ -74,8 +74,8 @@ pub async fn register_e3_requested(
                 repo.initialize_round(custom_params.token_address, custom_params.balance_threshold)
                     .await?;
 
-                // Get token holders from Bitquery API or mocked data.
-                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337 | 11155111) {
+                // Get token holders from Etherscan API or mocked data.
+                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
                     info!(
                         "Using mocked token holders for local network (chain_id: {})",
                         CONFIG.chain_id
