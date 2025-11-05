@@ -11,11 +11,16 @@ export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
 
 /**
+ * Half the minimum degree needed to support the maxium vote value
+ * If you change MAXIMUM_VOTE_VALUE, make sure to update this value too.
+ */
+export const HALF_LARGEST_MINIMUM_DEGREE = 28;
+
+/**
  * This is the maximum value for a vote (Yes or No). This is 2^28
  * The minimum degree that BFV should use is 56 (to accommodate both Yes and No votes)
- * If you change this value, make sure to update the circuit too.
  */
-export const MAXIMUM_VOTE_VALUE = 268435456n
+export const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE))
 
 /**
  * Default BFV parameters for the CRISP ZK inputs generator.
