@@ -315,7 +315,7 @@ Ensure all services are running correctly and that components are communicating 
 
 ## Publishing packages to npm
 
-In order to publish a new versinon of the CRISP packages to npm, you can use:
+In order to publish a new version of the CRISP packages to npm, you can use:
 
 ```sh
 pnpm publish:packages x.x.x # where x.x.x is the new version

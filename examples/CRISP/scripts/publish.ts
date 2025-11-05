@@ -27,7 +27,6 @@ interface PublishOptions {
 class CRISPPublisher {
   private newVersion: string
   private oldVersion: string | null = null
-  private rootDir: string
   private crispDir: string
   private options: PublishOptions
 
@@ -385,7 +384,7 @@ async function main() {
 
 function showHelp() {
   console.log(`
-Usage: tsx scripts/publish-crisp.ts [options] <version>
+Usage: tsx scripts/publish.ts [options] <version>
 
 CRISP Package Publishing Script
 Bumps versions, builds, and publishes CRISP npm packages.
@@ -401,19 +400,19 @@ Options:
 
 Examples:
   # Publish stable release
-  tsx scripts/publish-crisp.ts 1.0.0
+  tsx scripts/publish.ts 1.0.0
 
   # Publish beta release
-  tsx scripts/publish-crisp.ts 1.0.0-beta.1
+  tsx scripts/publish.ts 1.0.0-beta.1
 
   # Publish with custom tag
-  tsx scripts/publish-crisp.ts --tag canary 1.0.0-canary.1
+  tsx scripts/publish.ts --tag canary 1.0.0-canary.1
 
   # Test without publishing
-  tsx scripts/publish-crisp.ts --dry-run 1.0.0
+  tsx scripts/publish.ts --dry-run 1.0.0
 
   # Publish without committing
-  tsx scripts/publish-crisp.ts --skip-git 1.0.0
+  tsx scripts/publish.ts --skip-git 1.0.0
 
 The script will:
   1. Check for uncommitted changes
