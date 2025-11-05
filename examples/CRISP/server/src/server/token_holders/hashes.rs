@@ -11,7 +11,7 @@ use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use std::str::FromStr;
 
-use super::TokenHolder;
+use super::etherscan::TokenHolder;
 
 /// Computes Poseidon hashes for token holder address + balance pairs.
 ///

@@ -91,7 +91,11 @@ impl<S: DataStore> CrispE3Repository<S> {
         self.set_crisp(e3_crisp).await
     }
 
-    pub async fn initialize_round(&mut self, token_address: String, balance_threshold: String) -> Result<()> {
+    pub async fn initialize_round(
+        &mut self,
+        token_address: String,
+        balance_threshold: String,
+    ) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
             start_time: 0u64,
@@ -254,7 +258,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             })
             .await
             .map_err(|_| eyre::eyre!("Could not set token_holder_hashes for '{key}'"))?;
-        
+
         Ok(())
     }
 

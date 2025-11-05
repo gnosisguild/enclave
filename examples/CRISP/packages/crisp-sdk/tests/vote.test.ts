@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect } from 'vitest'
-import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import {
   calculateValidIndicesForPlaintext,
   decodeTally,
