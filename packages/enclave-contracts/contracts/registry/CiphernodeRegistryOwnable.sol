@@ -325,6 +325,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         // Store submission
         c.submitted[msg.sender] = true;
+        c.scoreOf[msg.sender] = score;
 
         // Insert into top-N (ascending score)
         _insertTopN(c, msg.sender, score);
@@ -504,43 +505,58 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(ticketNumber <= availableTickets, InvalidTicketNumber());
     }
 
-    /// @notice Inserts a node into the top-N list - Smallest scores
-    /// @dev If the node is not in the top-N, it is added to the top-N.
+    /// @notice Inserts a node into the top-N sorted list by score
+    /// @dev Maintains sorted order (ascending by score)
     /// @param c Committee storage reference
-    /// @param node Address of the node
-    /// @param score Score of the node
-    /// @return entered Whether the node was inserted into the top-N
+    /// @param node Address of the ciphernode
+    /// @param score The computed score
     function _insertTopN(
         Committee storage c,
         address node,
         uint256 score
-    ) internal returns (bool entered) {
-        address[] storage top = c.topNodes;
-        uint256 cap = c.threshold[1];
+    ) internal {
+        address[] storage topNodes = c.topNodes;
 
-        if (top.length < cap) {
-            top.push(node);
-            c.scoreOf[node] = score;
-            return true;
+        // If list not full, insert in sorted order
+        if (topNodes.length < c.threshold[1]) {
+            _insertSorted(c, node, score);
+            return;
         }
 
-        uint256 worstIdx = 0;
-        uint256 worstScore = c.scoreOf[top[0]];
-        unchecked {
-            for (uint256 i = 1; i < top.length; ++i) {
-                uint256 s = c.scoreOf[top[i]];
-                if (s > worstScore) {
-                    worstScore = s;
-                    worstIdx = i;
-                }
+        // If list is full, only add if score is better than worst
+        uint256 worstScore = c.scoreOf[topNodes[topNodes.length - 1]];
+        if (score < worstScore) {
+            topNodes.pop();
+            _insertSorted(c, node, score);
+        }
+    }
+
+    /// @notice Inserts a node at the correct sorted position (ascending by score)
+    /// @param c Committee storage reference
+    /// @param node Address of the ciphernode
+    /// @param score The computed score
+    function _insertSorted(
+        Committee storage c,
+        address node,
+        uint256 score
+    ) internal {
+        address[] storage topNodes = c.topNodes;
+
+        // Find insertion position
+        uint256 insertPos = topNodes.length;
+        for (uint256 i = 0; i < topNodes.length; i++) {
+            uint256 existingScore = c.scoreOf[topNodes[i]];
+            if (score < existingScore) {
+                insertPos = i;
+                break;
             }
         }
 
-        if (score >= worstScore) return false;
-
-        top[worstIdx] = node;
-        c.scoreOf[node] = score;
-
-        return true;
+        // Insert at position
+        topNodes.push(address(0));
+        for (uint256 i = topNodes.length - 1; i > insertPos; i--) {
+            topNodes[i] = topNodes[i - 1];
+        }
+        topNodes[insertPos] = node;
     }
 }
