@@ -54,7 +54,7 @@ async fn test_trbfv_isolation() -> Result<()> {
         ] as &[u64],
     );
 
-    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
+    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
