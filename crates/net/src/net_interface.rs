@@ -181,11 +181,9 @@ fn create_behaviour(
     const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
     let payload_mb = 10;
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
-
     config
         .set_max_packet_size(payload_mb * 1024 * 1024)
         .set_query_timeout(Duration::from_secs(30));
-
     let store_config = MemoryStoreConfig {
         max_records: 1024,
         max_value_bytes: payload_mb * 1024 * 1024,
@@ -193,7 +191,6 @@ fn create_behaviour(
         max_provided_keys: 1024,
     };
     let store = MemoryStore::with_config(peer_id, store_config);
-
     // Setup Kademlia as server so that it responds to events correctly
     let mut kademlia = KademliaBehaviour::with_config(peer_id, store, config);
     kademlia.set_mode(Some(kad::Mode::Server));

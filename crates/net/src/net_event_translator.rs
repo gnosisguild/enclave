@@ -123,6 +123,7 @@ impl NetEventTranslator {
         tokio::task::JoinHandle<Result<()>>,
         String,
     )> {
+        // TODO: We should separate NetInterface from NetEventTranslator
         let topic = "tmp-enclave-gossip-topic";
         // Get existing keypair or generate a new one
         let mut bytes = match repository.read().await? {
@@ -141,8 +142,6 @@ impl NetEventTranslator {
         // Setup and start net event translator
         let rx = &Arc::new(interface.rx());
         let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
-
-        // TODO: We should separate NetInterface from NetEventTranslator
         let maybe_publisher = if experimental_trbfv {
             Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic))
         } else {
