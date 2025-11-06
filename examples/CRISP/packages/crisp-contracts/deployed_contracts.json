@@ -165,7 +165,7 @@
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "enclaveAddress": "0x0000000000000000000000000000000000000001",
-        "submissionWindow": "3"
+        "submissionWindow": "10"
       },
       "blockNumber": 10,
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
@@ -203,7 +203,7 @@
       "blockNumber": 23,
       "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
     },
-    "RiscZeroGroth16Verifier": {
+    "MockRISC0Verifier": {
       "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
     },
     "CRISPInputValidator": {
