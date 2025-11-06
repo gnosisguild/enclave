@@ -375,9 +375,7 @@ describe('Vote', () => {
       // invalidate signature
       inputs.signature[0] = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
     })
 
     it('should throw when the merkle tree inclusion proof is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
@@ -403,12 +401,10 @@ describe('Vote', () => {
         isFirstVote: false,
       })
 
-      // invalidate signature
+      // invalidate merkle root
       inputs.merkle_root = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
     })
 
     it('should succeed when the vote is the maximum value supported', { timeout: 100000 }, async () => {
@@ -475,9 +471,7 @@ describe('Vote', () => {
       // set balance to 0
       inputs.balance = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
     })
   })
 })
