@@ -32,6 +32,10 @@ use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
+const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
+const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
+const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
+
 use crate::events::{GossipData, NetCommand};
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
@@ -168,7 +172,7 @@ fn create_behaviour(
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
-        .max_transmit_size(700 * 1024)
+        .max_transmit_size(MAX_GOSSIP_MSG_SIZE_KB * 1024)
         .validation_mode(gossipsub::ValidationMode::Strict)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
@@ -178,15 +182,13 @@ fn create_behaviour(
         gossipsub_config,
     )?;
 
-    const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
-    let payload_mb = 10;
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
     config
-        .set_max_packet_size(payload_mb * 1024 * 1024)
+        .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
         .set_query_timeout(Duration::from_secs(30));
     let store_config = MemoryStoreConfig {
         max_records: 1024,
-        max_value_bytes: payload_mb * 1024 * 1024,
+        max_value_bytes: MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024,
         max_providers_per_key: usize::MAX,
         max_provided_keys: 1024,
     };
