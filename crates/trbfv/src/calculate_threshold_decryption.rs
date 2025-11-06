@@ -116,7 +116,7 @@ impl TryFrom<InnerResponse> for CalculateThresholdDecryptionResponse {
                 .map(|open_result| -> Result<_> {
                     let vec_64 = Vec::<u64>::try_decode(&open_result, Encoding::poly())
                         .context("could not decode plaintext")?;
-                    println!("FINISHED AGGREGATING: {:?}", vec_64);
+                    info!("FINISHED AGGREGATING: {:?}", vec_64);
                     let bytes = bincode::serialize(&vec_64)?;
                     Ok(ArcBytes::from_bytes(&bytes))
                 })
