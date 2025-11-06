@@ -33,6 +33,7 @@ fn main(
     u: Polynomial<2048>,
     e0: Polynomial<2048>,
     e1: Polynomial<2048>,
+    e1is: [Polynomial<2048>; 1],
     k1: Polynomial<2048>,
     r1is: [Polynomial<4095>; 1],
     r2is: [Polynomial<2047>; 1],
@@ -71,7 +72,7 @@ fn main(
         merkle_proof_siblings,
     );
 
-    let greco: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
+    let greco: Greco<2048, 1, 54, 54, 5, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
         pk1is,
@@ -80,6 +81,7 @@ fn main(
         u,
         e0,
         e1,
+        e1is,
         k1,
         r1is,
         r2is,
