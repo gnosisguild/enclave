@@ -322,7 +322,7 @@ fn test_polynomial_bounds() {
     poly.range_check_1bound::<8>(242);
 
     // Test double bounds check - constrains to [-240, 242]
-    poly.range_check_2bounds::<8>(242, -240);
+    poly.range_check_2bounds::<8>(242, 240);
 }
 
 #[test(should_fail_with = "assert_max_bit_size")]
@@ -336,7 +336,7 @@ fn test_polynomial_out_of_bounds_coefficients() {
 
     // Test double bounds check - constrains to [-98, 99]
     // Should fail because -100 is out of bounds.
-    poly.range_check_2bounds::<7>(99, -98);
+    poly.range_check_2bounds::<7>(99, 98);
 }
 
 #[test]
