@@ -420,7 +420,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(5))
         .await?;
 
-<<<<<<< HEAD
     let actual = history
         .into_iter()
         .filter_map(|e| match e {
