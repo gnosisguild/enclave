@@ -33,7 +33,6 @@ use tracing::{debug, error, warn};
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
 /// interactions of publishing a document and listening for notifications, determining if the node
