@@ -24,7 +24,7 @@ impl SensitiveBytes {
         let mut bytes = input.into();
         let encrypted = cipher.encrypt_data(&mut bytes)?;
         Ok(Self {
-            encrypted: ArcBytes::from_bytes(encrypted),
+            encrypted: ArcBytes::from_bytes(&encrypted),
         })
     }
 
