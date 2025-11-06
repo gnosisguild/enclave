@@ -120,7 +120,7 @@ fn main(
     } else {
         // check if vote == 0.
         let is_vote_zero = check_coefficient_zero(k1);
-        assert(is_vote_zero);
+        assert(is_vote_zero == true);
 
         // need to check if slot is empty (no previous ciphertext).
         // If so, (ct0is, ct1is) should be returned.

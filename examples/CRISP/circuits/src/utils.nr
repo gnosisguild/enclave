@@ -6,40 +6,44 @@
 
 use polynomial::Polynomial;
 
-// Check that all valid coefficients are either 0 or 1 and that the vote is <= balance
+// Check that all valid coefficients are either 0 or q_mod_t and that the vote is <= balance
 pub fn check_coefficient_values_with_balance<let D: u32>(
     k1: Polynomial<D>,
     q_mod_t: Field,
     balance: Field,
 ) {
-    // This value would allow to fit
-    // 268435456 for yes and 268435456 for no
-    // which would fit the supply of most tokens really (imagining one user just holds all tokens)
+    // This value allows to fit 268,435,455 for yes and 268,435,455 for no
     let HALF_LARGEST_MINIMUM_DEGREE = 28;
     let HALF_D = D / 2;
-    let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
-    let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
+
+    // After reversal, bits that were at END of first half are now at START of second half
+    let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
+
+    // Bits that were at END of second half are now at START of first half
+    let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
 
     let mut sum_yes: u64 = 0;
     let mut sum_no: u64 = 0;
 
-    // Loop through all coefficients in the space where we could have a vote
-    // yes part
-    for i in START_INDEX_Y..HALF_D {
-        let coeff = k1.coefficients[i];
+    // Yes part - process from END to START (reverse order)
+    for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
+        // Access indices backwards: from (END_INDEX_Y - 1) down to START_INDEX_Y
+        let idx = END_INDEX_Y - 1 - i;
+        let coeff = k1.coefficients[idx];
         assert(0 == coeff * (q_mod_t - coeff));
 
-        // evaluate using Horner's method
-        sum_yes = sum_yes + sum_yes + coeff as u64;
+        let bit: u64 = if coeff == 0 { 0 } else { 1 };
+        sum_yes = sum_yes * 2 + bit;
     }
 
-    // no part
-    for i in START_INDEX_N..D {
-        let coeff = k1.coefficients[i];
+    // No part - process from END to START (reverse order)
+    for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
+        let idx = END_INDEX_N - 1 - i;
+        let coeff = k1.coefficients[idx];
         assert(0 == coeff * (q_mod_t - coeff));
 
-        // evaluate using Horner's method
-        sum_no = sum_no + sum_no + coeff as u64;
+        let bit: u64 = if coeff == 0 { 0 } else { 1 };
+        sum_no = sum_no * 2 + bit;
     }
 
     if (sum_yes != 0) {
@@ -53,28 +57,25 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     }
 }
 
-// Check that the polynomial has 0 for all relevant coefficients
 pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
-    // This value would allow to fit
-    // 268435456 for yes and 268435456 for no
-    // which would fit the supply of most tokens really (imagining one user just holds all tokens)
     let HALF_LARGEST_MINIMUM_DEGREE = 28;
     let HALF_D = D / 2;
-    let START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
-    let START_INDEX_N = D - HALF_LARGEST_MINIMUM_DEGREE;
+
+    let START_INDEX_Y = HALF_D;
+    let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
+
+    let START_INDEX_N = 0;
+    let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
 
     let mut res = true;
 
-    // Loop through all coefficients in the space where we could have a vote
-    // yes part
-    for i in START_INDEX_Y..HALF_D {
+    for i in START_INDEX_Y..END_INDEX_Y {
         if k1.coefficients[i] != 0 {
             res = false;
         }
     }
 
-    // no part
-    for i in START_INDEX_N..D {
+    for i in START_INDEX_N..END_INDEX_N {
         if k1.coefficients[i] != 0 {
             res = false;
         }
@@ -88,9 +89,10 @@ fn test_check_vote_is_within_balance_pass() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // YES votes: bits at indices 50-52 (START of YES window)
+            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
@@ -101,10 +103,12 @@ fn test_check_vote_is_within_balance_pass() {
 fn test_check_vote_is_within_balance_yes_and_no_not_zero() {
     let pol = Polynomial {
         coefficients: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+            // NO votes: index 0
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // YES votes: indices 50-52
+            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
@@ -116,9 +120,10 @@ fn test_check_vote_is_within_balance_fail() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // YES votes: indices 50-52 (binary 111 = 7, exceeds balance of 1)
+            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
@@ -129,9 +134,10 @@ fn test_check_vote_is_within_balance_fail() {
 fn test_check_coefficient_values_pass() {
     let pol = Polynomial {
         coefficients: [
+            // NO vote: index 0 (binary 1 = 1)
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
@@ -143,10 +149,11 @@ fn test_check_coefficient_values_pass() {
 fn test_check_coefficient_values_fail() {
     let pol = Polynomial {
         coefficients: [
+            // Invalid coefficient value 2 (not 0 or 1)
+            2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
@@ -158,9 +165,10 @@ fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // Non-zero at index 50 (YES section)
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
