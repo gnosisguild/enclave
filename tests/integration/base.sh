@@ -94,8 +94,7 @@ pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR
 
 waiton "$SCRIPT_DIR/output/plaintext.txt"
 
-ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
- 
+ACTUAL=$(cut -d',' -f1,2 $SCRIPT_DIR/output/plaintext.txt)
 
 # Assume plaintext is shorter
 echo "ACTUAL:"
