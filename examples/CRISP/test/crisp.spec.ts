@@ -48,8 +48,8 @@ test("CRISP smoke test", async ({
   );
 
   await runCliInit();
-  // Wait 10 seconds for committee to be published
-  await page.waitForTimeout(10_000);
+  // Wait 15 seconds for committee to be published
+  await page.waitForTimeout(15_000);
   await page.goto("/");
   await ensureHomePageLoaded(page);
   await page.locator('button:has-text("Connect Wallet")').click();
