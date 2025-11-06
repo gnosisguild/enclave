@@ -13,7 +13,7 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     actionTimeout: 75 * 1000,
   },
-  retries: process.env.CI ? 2 : 0,
+  retries: 0,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   workers: process.env.CI ? 1 : undefined,
