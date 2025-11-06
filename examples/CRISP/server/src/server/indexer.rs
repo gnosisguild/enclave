@@ -46,7 +46,7 @@ pub async fn register_e3_requested(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
 
-            info!("E3Requested: {:?}", event);
+            info!("[e3_id={}] E3Requested: {:?}", e3_id, event);
 
             async move {
                 // Convert custom params bytes back to token address and balance threshold.
@@ -77,15 +77,15 @@ pub async fn register_e3_requested(
                 // Get token holders from Etherscan API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
                     info!(
-                        "Using mocked token holders for local network (chain_id: {})",
-                        CONFIG.chain_id
+                        "[e3_id={}] Using mocked token holders for local network (chain_id: {})",
+                        e3_id, CONFIG.chain_id
                     );
 
                     get_mock_token_holders()
                 } else {
                     info!(
-                        "Using Etherscan API for network (chain_id: {})",
-                        CONFIG.chain_id
+                        "[e3_id={}] Using Etherscan API for network (chain_id: {})",
+                        e3_id, CONFIG.chain_id
                     );
 
                     let etherscan_client =
@@ -98,7 +98,8 @@ pub async fn register_e3_requested(
                             U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
                                 |e| {
                                     eyre::eyre!(
-                                        "Failed to convert balance threshold to U256: {}",
+                                        "[e3_id={}] Failed to convert balance threshold to U256: {}",
+                                        e3_id,
                                         e
                                     )
                                 },
@@ -110,7 +111,8 @@ pub async fn register_e3_requested(
 
                 if token_holders.is_empty() {
                     return Err(eyre::eyre!(
-                        "No eligible token holders found for token address {}.",
+                        "[e3_id={}] No eligible token holders found for token address {}.",
+                        e3_id,
                         token_address
                     )
                     .into());
@@ -129,7 +131,7 @@ pub async fn register_e3_requested(
                     .root()
                     .ok_or_else(|| eyre::eyre!("Failed to get merkle root from tree"))?;
 
-                info!("Merkle root: {}", merkle_root);
+                info!("[e3_id={}] Merkle root: {}", e3_id, merkle_root);
 
                 // TODO: Publish merkle root on-chain (inputValidator contract).
 
@@ -151,7 +153,7 @@ pub async fn register_e3_activated(
             let mut current_round_repo = CurrentRoundRepository::new(store);
             let expiration = event.expiration.to::<u64>();
 
-            info!("Handling E3 request with id {}", e3_id);
+            info!("[e3_id={}] Handling E3 request", e3_id);
             async move {
                 repo.start_round().await?;
 
@@ -161,12 +163,16 @@ pub async fn register_e3_activated(
 
                 // Calculate expiration time to sleep until
                 let now = get_current_timestamp_rpc().await?;
+                info!("[e3_id={}] Current time before sleep: {}", e3_id, now);
                 let wait_duration = if expiration > now {
                     let secs = expiration - now;
-                    info!("Need to wait {} seconds until expiration", secs);
+                    info!(
+                        "[e3_id={}] Need to wait {} seconds until expiration",
+                        e3_id, secs
+                    );
                     Duration::from_secs(secs)
                 } else {
-                    info!("Expired E3");
+                    info!("[e3_id={}] Expired E3", e3_id);
                     Duration::ZERO
                 };
                 if !wait_duration.is_zero() {
@@ -176,7 +182,7 @@ pub async fn register_e3_activated(
                 repo.update_status("Expired").await?;
 
                 if repo.get_vote_count().await? > 0 {
-                    info!("Starting computation for E3: {}", e3_id);
+                    info!("[e3_id={}] Starting computation for E3", e3_id);
                     repo.update_status("Computing").await?;
 
                     let (id, status) = run_compute(
@@ -205,14 +211,17 @@ pub async fn register_e3_activated(
                         .into());
                     }
 
-                    info!("Request Computation for E3: {}", e3_id);
+                    info!("[e3_id={}] Request Computation for E3", e3_id);
 
                     repo.update_status("PublishingCiphertext").await?;
                 } else {
-                    info!("E3 has no votes to decrypt. Setting status to Finished.");
+                    info!(
+                        "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
+                        e3_id
+                    );
                     repo.update_status("Finished").await?;
                 }
-                info!("E3 request handled successfully.");
+                info!("[e3_id={}] E3 request handled successfully.", e3_id);
 
                 Ok(())
             }
@@ -230,6 +239,7 @@ pub async fn register_ciphertext_output_published(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
+                info!("[e3_id={}] Handling CiphertextOutputPublished", e3_id);
                 repo.update_status("CiphertextPublished").await?;
                 Ok(())
             }
@@ -247,7 +257,7 @@ pub async fn register_plaintext_output_published(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
-                info!("CRISP: handling 'PlaintextOutputPublished'");
+                info!("[e3_id={}] Handling PlaintextOutputPublished", e3_id);
 
                 // The plaintextOutput from the event contains the result of the FHE computation.
                 // The computation sums the encrypted votes: '0' for Option 1, '1' for Option 2.
@@ -267,9 +277,9 @@ pub async fn register_plaintext_output_published(
                 // the Option 2 votes (the sum from the FHE output) from the total votes.
                 let option_1 = total_votes - option_2;
 
-                info!("Vote Count: {:?}", total_votes);
-                info!("Votes Option 1: {:?}", option_1);
-                info!("Votes Option 2: {:?}", option_2);
+                info!("[e3_id={}] Vote Count: {:?}", e3_id, total_votes);
+                info!("[e3_id={}] Votes Option 1: {:?}", e3_id, option_1);
+                info!("[e3_id={}] Votes Option 2: {:?}", e3_id, option_2);
 
                 repo.set_votes(option_1, option_2).await?;
                 repo.update_status("Finished").await?;
@@ -294,28 +304,31 @@ pub async fn register_committee_published(
                 // making two calls to contract
                 let e3 = contract.get_e3(event.e3Id).await?;
                 if u64::try_from(e3.expiration)? > 0 {
-                    info!("E3 already activated '{}'", event.e3Id);
+                    info!("[e3_id={}] E3 already activated", event.e3Id);
                     return Ok(());
                 }
 
                 // Read Start time in Seconds
                 let start_time = e3.startWindow[0].to::<u64>();
-                info!("Start time: {}", start_time);
+                info!("[e3_id={}] Start time: {}", event.e3Id, start_time);
 
                 // Get current time
                 let now = get_current_timestamp_rpc().await?;
-                info!("Current time: {}", now);
+                info!("[e3_id={}] Current time: {}", event.e3Id, now);
 
                 // Calculate wait duration
                 let wait_duration = if start_time > now {
                     let secs = start_time - now;
-                    info!("Need to wait {} seconds until activation", secs);
+                    info!(
+                        "[e3_id={}] Need to wait {} seconds until activation",
+                        event.e3Id, secs
+                    );
                     Duration::from_secs(secs)
                 } else {
-                    info!("Activating E3");
+                    info!("[e3_id={}] Activating E3", event.e3Id);
                     Duration::ZERO
                 };
-                info!("Wait duration: {:?}", wait_duration);
+                info!("[e3_id={}] Wait duration: {:?}", event.e3Id, wait_duration);
 
                 // Sleep until start time
                 if !wait_duration.is_zero() {
@@ -324,7 +337,10 @@ pub async fn register_committee_published(
 
                 // If not activated activate
                 let tx = contract.activate(event.e3Id, event.publicKey).await?;
-                info!("E3 activated with tx: {:?}", tx.transaction_hash);
+                info!(
+                    "[e3_id={}] E3 activated with tx: {:?}",
+                    event.e3Id, tx.transaction_hash
+                );
                 Ok(())
             }
         })
