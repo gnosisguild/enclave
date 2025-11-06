@@ -14,6 +14,7 @@
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build && ./scripts/compile-circuits.sh",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint && ./scripts/lint-circuits.sh",
     "check:license": "./scripts/check-license-headers.sh",
+    "check:size": "./scripts/check-size.sh",
     "check:pnpm": "./scripts/check-pnpm.sh",
     "test": "pnpm evm:test && pnpm ciphernode:test && pnpm sdk:test && ./scripts/test-circuits.sh",
     "test:integration": "cd ./tests/integration && ./test.sh",
@@ -70,7 +71,7 @@
       "tsup": "8.5.0",
       "typescript": "5.8.3",
       "undici-types": "6.19.8",
-      "viem": "2.30.6"
+      "viem": "2.38.6"
     }
   }
 }

@@ -252,8 +252,8 @@ PROGRAM_SERVER_URL=http://127.0.0.1:13151
 WS_RPC_URL=ws://127.0.0.1:8545
 CHAIN_ID=31337
 
-# Bitquery API key
-BITQUERY_API_KEY=""
+# Etherscan API key
+ETHERSCAN_API_KEY=""
 
 # Cron-job API key to trigger new rounds
 CRON_API_KEY=1234567890
@@ -275,8 +275,8 @@ E3_COMPUTE_PROVIDER_NAME="RISC0"
 E3_COMPUTE_PROVIDER_PARALLEL=false
 E3_COMPUTE_PROVIDER_BATCH_SIZE=4 # Must be a power of 2
 
-# Bitquery API Key (optional, leave empty if not using)
-BITQUERY_API_KEY=""
+# ETHERSCAN API Key (optional, leave empty if not using)
+ETHERSCAN_API_KEY=""
 ```
 
 ## Running Ciphernodes
@@ -312,6 +312,14 @@ Once the CLI client is running, you can interact with the CRISP voting protocol 
 2. To initiate a new CRISP round, choose the option `Initialize new CRISP round`.
 
 Ensure all services are running correctly and that components are communicating as expected before starting a new CRISP round.
+
+## Publishing packages to npm
+
+In order to publish a new version of the CRISP packages to npm, you can use:
+
+```sh
+pnpm publish:packages x.x.x # where x.x.x is the new version
+```
 
 ## Contributing
 

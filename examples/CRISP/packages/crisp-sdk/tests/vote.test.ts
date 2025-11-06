@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect } from 'vitest'
-import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import {
   calculateValidIndicesForPlaintext,
   decodeTally,
@@ -13,6 +13,7 @@ import {
   encryptVoteAndGenerateCRISPInputs,
   generateMaskVote,
   generateProof,
+  generateProofWithReturnValue,
   validateVote,
   verifyProof,
 } from '../src/vote'
@@ -21,6 +22,7 @@ import { DEFAULT_BFV_PARAMS, generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE }
 
 import { LEAVES, merkleProof, MESSAGE, SIGNATURE, testAddress, VOTE, votingPowerLeaf } from './constants'
 import { privateKeyToAccount } from 'viem/accounts'
+import { compareCoefficientsArrays } from './utils'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -139,6 +141,7 @@ describe('Vote', () => {
         merkleData: merkleProof,
         balance: votingPowerLeaf,
         slotAddress: testAddress,
+        isFirstVote: false,
       })
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
@@ -169,7 +172,7 @@ describe('Vote', () => {
 
   describe('generateMaskVote', () => {
     it('should generate a mask vote and the right circuit inputs', async () => {
-      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress)
+      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
       expect(crispInputs.prev_ct1is).toBeInstanceOf(Array)
@@ -198,7 +201,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof/verifyProof', () => {
-    it('should generate a proof for a voter and verify it', { timeout: 180000 }, async () => {
+    it('should generate a proof for a voter and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
@@ -218,6 +221,7 @@ describe('Vote', () => {
         merkleData: merkleProof,
         balance: votingPowerLeaf,
         slotAddress: account.address.toLowerCase(),
+        isFirstVote: false,
       })
 
       const proof = await generateProof(inputs)
@@ -236,12 +240,48 @@ describe('Vote', () => {
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
       const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
 
-      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress)
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
 
       const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
 
       expect(isValid).toBe(true)
+    })
+
+    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 180000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, true)
+
+      const { returnValue } = await generateProofWithReturnValue(maskVote)
+
+      expect(compareCoefficientsArrays(maskVote.ct0is, (returnValue as any[])[0])).toBe(true);
+      expect(compareCoefficientsArrays(maskVote.ct1is, (returnValue as any[])[1])).toBe(true);
+    })
+
+    it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 180000 }, async () => {
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+        DEFAULT_BFV_PARAMS.degree,
+        DEFAULT_BFV_PARAMS.plaintextModulus,
+        DEFAULT_BFV_PARAMS.moduli,
+      )
+      const vote = BigInt64Array.from(encodedVote.map(BigInt))
+      const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
+
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
+
+      const { returnValue } = await generateProofWithReturnValue(maskVote)
+
+      expect(compareCoefficientsArrays(maskVote.sum_ct0is, (returnValue as any[])[0])).toBe(true);
+      expect(compareCoefficientsArrays(maskVote.sum_ct1is, (returnValue as any[])[1])).toBe(true);
     })
   })
 })

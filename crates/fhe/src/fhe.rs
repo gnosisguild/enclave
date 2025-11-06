@@ -64,7 +64,7 @@ impl Fhe {
         crp: &[u8],
         rng: Arc<Mutex<ChaCha20Rng>>,
     ) -> Result<Self> {
-        let params = build_bfv_params_arc(degree, plaintext_modulus, moduli);
+        let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
 
         Ok(Fhe::new(
             params.clone(),

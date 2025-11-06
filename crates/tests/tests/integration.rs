@@ -115,7 +115,7 @@ async fn test_trbfv_actor() -> Result<()> {
     );
 
     // Params for BFV
-    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
+    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
 
     // Encoded Params
     let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));

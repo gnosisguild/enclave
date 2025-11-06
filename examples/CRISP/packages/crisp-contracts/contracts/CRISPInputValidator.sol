@@ -89,6 +89,11 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
             address slot
         ) = abi.decode(data, (bytes, bytes32[], bytes, address));
 
+        /// @notice we need to check whether the slot is empty.
+        /// if the slot is empty 
+        /// @todo pass it to the verifier 
+        // bool isFirstVote = voteSlots[slot].length == 0;
+
         // Check if the ciphertext was encrypted correctly
         if (!noirVerifier.verify(noirProof, noirPublicInputs))
             revert InvalidNoirProof();
