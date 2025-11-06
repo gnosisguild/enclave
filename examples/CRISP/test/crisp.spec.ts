@@ -48,8 +48,8 @@ test("CRISP smoke test", async ({
   );
 
   await runCliInit();
-  // Wait 6 seconds for committee to be published
-  await page.waitForTimeout(6_000);
+  // Wait 10 seconds for committee to be published
+  await page.waitForTimeout(10_000);
   await page.goto("/");
   await ensureHomePageLoaded(page);
   await page.locator('button:has-text("Connect Wallet")').click();
@@ -60,7 +60,7 @@ test("CRISP smoke test", async ({
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
   await page.locator('button:has-text("Cast Vote")').click();
-  await page.waitForTimeout(280_000);
+  await page.waitForTimeout(220_000);
   await page.locator('a:has-text("Historic polls")').click();
   await expect(page.locator("h1")).toHaveText("Historic polls");
   await expect(
