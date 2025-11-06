@@ -375,9 +375,7 @@ describe('Vote', () => {
       // invalidate signature
       inputs.signature[0] = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
     })
 
     it('should throw when the merkle tree inclusion proof is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
@@ -403,12 +401,48 @@ describe('Vote', () => {
         isFirstVote: false,
       })
 
-      // invalidate signature
+      // invalidate merkle root
       inputs.merkle_root = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
+    })
+
+    it('should succeed when the vote is the maximum value supported', { timeout: 100000 }, async () => {
+      const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, 28) - 1) // 268,435,455
+      const votingPowerLeaf = MAXIMUM_VOTE_VALUE // Balance at the limit
+
+      // Vote exactly at the maximum
+      const VOTE = {
+        yes: MAXIMUM_VOTE_VALUE,
+        no: 0n,
+      }
+
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
+
+      // hardhat default private key
+      const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+      const account = privateKeyToAccount(privateKey)
+      const signature = await account.signMessage({ message: MESSAGE })
+      const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
+      const leaves = [...LEAVES, leaf]
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+
+      const inputs = await encryptVoteAndGenerateCRISPInputs({
+        encodedVote,
+        publicKey,
+        previousCiphertext,
+        signature,
+        message: MESSAGE,
+        merkleData: merkleProof,
+        balance: votingPowerLeaf,
+        slotAddress: account.address.toLowerCase(),
+        isFirstVote: false,
+      })
+
+      // This should pass - vote equals balance
+      const proof = await generateProof(inputs)
+      const isValid = await verifyProof(proof)
+      expect(isValid).toBe(true)
     })
 
     it('should throw when the vote is > balance', { timeout: 100000 }, async () => {
@@ -437,9 +471,7 @@ describe('Vote', () => {
       // set balance to 0
       inputs.balance = '0'
 
-      expect(async () => {
-        await getCircuitOutputValue(inputs)
-      }).rejects.toThrow()
+      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
     })
   })
 })
