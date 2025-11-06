@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use chrono::Utc;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use log::info;
 use num_bigint::BigUint;
@@ -19,7 +18,7 @@ use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{
     build_bfv_params_from_set_arc, encode_bfv_params, params::SET_2048_1032193_1,
 };
-use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
@@ -74,7 +73,7 @@ pub async fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error + 
 pub async fn initialize_crisp_round(
     token_address: &str,
     balance_threshold: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     info!(
         "Starting new CRISP round with token address: {} and balance threshold: {}",
         token_address, balance_threshold
@@ -178,7 +177,7 @@ pub async fn initialize_crisp_round(
         CONFIG.ciphernode_registry_address
     );
 
-    let res = contract
+    let (res, e3_id) = contract
         .request_e3(
             threshold,
             start_window,
@@ -190,8 +189,19 @@ pub async fn initialize_crisp_round(
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
+    let e3_id_u64 = u64::try_from(e3_id)?;
+    info!("E3 ID: {}", e3_id_u64);
 
-    Ok(())
+    Ok(e3_id_u64)
+}
+
+pub async fn check_e3_activated(
+    e3_id: u64,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let contract =
+        EnclaveContract::read_only(&CONFIG.http_rpc_url, &CONFIG.enclave_address).await?;
+    let e3: E3 = contract.get_e3(U256::from(e3_id)).await?;
+    Ok(u64::try_from(e3.expiration)? > 0)
 }
 
 pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

@@ -10,7 +10,7 @@ mod commands;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use reqwest::Client;
 
-use commands::initialize_crisp_round;
+use commands::{check_e3_activated, initialize_crisp_round};
 use crisp::logger::init_logger;
 use log::info;
 
@@ -49,6 +49,10 @@ enum Commands {
         #[arg(short, long, default_value = "1000000000000000000")]
         balance_threshold: String,
     },
+    CheckActivate {
+        #[arg(short, long)]
+        e3id: u64,
+    },
 }
 
 #[tokio::main]
@@ -68,7 +72,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             token_address,
             balance_threshold,
         }) => {
-            initialize_crisp_round(&token_address, &balance_threshold).await?;
+            let e3_id = initialize_crisp_round(&token_address, &balance_threshold).await?;
+            println!("{}", e3_id);
+        }
+        Some(Commands::CheckActivate { e3id }) => {
+            let is_activated = check_e3_activated(e3id).await?;
+            println!("{}", is_activated);
         }
         None => {
             // Fall back to interactive mode if no command was specified
@@ -77,7 +86,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 0 => {
                     let token_address = get_token_address()?;
                     let balance_threshold = get_balance_threshold()?;
-                    initialize_crisp_round(&token_address, &balance_threshold).await?;
+                    let e3_id = initialize_crisp_round(&token_address, &balance_threshold).await?;
+                    println!("E3 ID: {}", e3_id);
                 }
                 _ => unreachable!(),
             }

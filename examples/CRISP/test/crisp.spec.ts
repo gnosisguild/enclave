@@ -10,7 +10,7 @@ import { MetaMask, metaMaskFixtures } from "@synthetixio/synpress/playwright";
 import basicSetup from "./wallet-setup/basic.setup";
 import { execSync } from "child_process";
 
-async function runCliInit() {
+async function runCliInit(): Promise<number> {
   try {
     // Execute the command and wait for it to complete
     const output = execSync(
@@ -18,11 +18,47 @@ async function runCliInit() {
       { encoding: "utf-8" }
     );
     console.log("Command output:", output);
-    return output;
+    const lines = output.trim().split("\n");
+    const lastLine = lines[lines.length - 1].trim();
+    const e3Id = parseInt(lastLine, 10);
+    if (isNaN(e3Id)) {
+      throw new Error(`Failed to parse e3Id from CLI output: ${lastLine}`);
+    }
+    return e3Id;
   } catch (error) {
     console.error("Error executing command:", error);
     throw error;
   }
+}
+
+async function checkE3Activated(e3id: number): Promise<boolean> {
+  try {
+    const output = execSync(`pnpm cli check-activate --e3id ${e3id}`, {
+      encoding: "utf-8",
+    });
+    const lines = output.trim().split("\n");
+    const lastLine = lines[lines.length - 1].trim();
+    return lastLine === "true";
+  } catch (error) {
+    console.error("Error checking e3 activation:", error);
+    return false;
+  }
+}
+
+async function waitForE3Activation(
+  e3id: number,
+  maxWaitMs: number = 300000
+): Promise<void> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWaitMs) {
+    const isActivated = await checkE3Activated(e3id);
+    if (isActivated) {
+      console.log(`E3 ${e3id} is activated`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error(`E3 ${e3id} was not activated within ${maxWaitMs}ms`);
 }
 
 const test = testWithSynpress(metaMaskFixtures(basicSetup));
@@ -47,15 +83,19 @@ test("CRISP smoke test", async ({
     extensionId
   );
 
-  await runCliInit();
-  // Wait 15 seconds for committee to be published
-  await page.waitForTimeout(15_000);
+  const e3id = await runCliInit();
+  console.log(`Got e3 id: ${e3id}`);
+
   await page.goto("/");
   await ensureHomePageLoaded(page);
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await metamask.connectToDapp();
   await page.locator('button:has-text("Try Demo")').click();
+
+  await waitForE3Activation(e3id);
+  await page.reload();
+
   await page
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
