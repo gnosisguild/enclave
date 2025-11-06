@@ -18,7 +18,6 @@ use tracing::warn;
 use crate::E3id;
 
 pub type PartyId = u64;
-
 const DEFAULT_KADEMLIA_EXPIRY_DAYS: i64 = 30;
 
 /// Diambiguates the kind of document we are looking for
