@@ -194,10 +194,10 @@ pub fn encrypt_ciphertext(
     raw_plaintext: Vec<Vec<u64>>,
 ) -> Result<(Vec<Ciphertext>, Vec<Plaintext>)> {
     let mut rng = ChaCha20Rng::seed_from_u64(42);
-    let plaintext = raw_plaintext
+    let plaintext: Vec<_> = raw_plaintext
         .into_iter()
         .map(|raw| Ok(Plaintext::try_encode(&raw, Encoding::poly(), &params)?))
-        .collect::<Result<Vec<Plaintext>>>()?;
+        .collect::<Result<_>>()?;
 
     let ciphertext = plaintext
         .iter()

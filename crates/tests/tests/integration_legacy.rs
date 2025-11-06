@@ -30,11 +30,12 @@ use e3_test_helpers::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::SharedRng;
+use fhe::bfv::Encoding;
 use fhe::{
     bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
-use fhe_traits::Serialize;
+use fhe_traits::{FheDecoder, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
@@ -247,7 +248,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Aggregate decryption
 
     let raw_plaintext = vec![vec![1234, 567890]];
-    let (ciphertext, _) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext.clone())?;
+    let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
@@ -264,7 +265,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(6))
         .await?;
 
-    let event = history
+    let actual = history
         .into_iter()
         .filter_map(|e| match e {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
@@ -276,12 +277,15 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .clone();
 
     assert_eq!(
-        event
+        actual
             .decrypted_output
             .iter()
-            .map(|b| bincode::deserialize::<Vec<u64>>(b).map_err(|e| anyhow!("{e}")))
-            .collect::<Result<Vec<Vec<u64>>>>()?,
-        raw_plaintext
+            .map(|b| bincode::deserialize::<Vec<u64>>(b).unwrap())
+            .collect::<Vec<Vec<u64>>>(),
+        expected
+            .iter()
+            .map(|p| Vec::<u64>::try_decode(&p, Encoding::poly()).unwrap())
+            .collect::<Vec<Vec<u64>>>()
     );
 
     Ok(())
@@ -398,8 +402,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .aggregate()?;
 
     // Publish the ciphertext
-    let raw_plaintext = vec![vec![1234u64, 873827u64]];
-    let (ciphertext, _) = encrypt_ciphertext(&params, pubkey, raw_plaintext.clone())?;
+    let raw_plaintext = vec![vec![1234, 567890]];
+    let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
             ciphertext_output: ciphertext
@@ -416,7 +420,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(5))
         .await?;
 
-    let event = history
+    let actual = history
         .into_iter()
         .filter_map(|e| match e {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
@@ -428,12 +432,15 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .clone();
 
     assert_eq!(
-        event
+        actual
             .decrypted_output
             .iter()
-            .map(|b| bincode::deserialize::<Vec<u64>>(b).map_err(|e| anyhow!("{e}")))
-            .collect::<Result<Vec<Vec<u64>>>>()?,
-        raw_plaintext
+            .map(|b| bincode::deserialize::<Vec<u64>>(b).unwrap())
+            .collect::<Vec<Vec<u64>>>(),
+        expected
+            .iter()
+            .map(|p| Vec::<u64>::try_decode(&p, Encoding::poly()).unwrap())
+            .collect::<Vec<Vec<u64>>>()
     );
 
     Ok(())

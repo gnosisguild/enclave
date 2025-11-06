@@ -122,11 +122,7 @@ impl Fhe {
             .map(|k| DecryptionShare::deserialize(k, &self.params, arc_ct.clone()))
             .aggregate()?;
         let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
-        let mut bytes = Vec::with_capacity(decoded.len() * 8);
-        for value in decoded {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
-
+        let bytes = bincode::serialize(&decoded)?;
         Ok(bytes)
     }
 }
