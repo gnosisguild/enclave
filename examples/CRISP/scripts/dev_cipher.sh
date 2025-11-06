@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+READYFILE=$1
 
 # nuke past installations as we are adding these nodes to the contract
-rm -rf ./enclave/data
-rm -rf ./enclave/config
+rm -rf ./.enclave/data
+rm -rf ./.enclave/config
+rm -rf $READYFILE
 
 PRIVATE_KEY_AG="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 PRIVATE_KEY_CN1="0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
@@ -37,5 +39,9 @@ pnpm ciphernode:add --ciphernode-address "$CN2" --network "localhost"
 pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost"
 pnpm ciphernode:add --ciphernode-address "$CN4" --network "localhost"
 pnpm ciphernode:add --ciphernode-address "$CN5" --network "localhost"
+
+echo 1 > $READYFILE
+
+echo "CIPHERNODES HAVE BEEN ADDED."
 
 wait
