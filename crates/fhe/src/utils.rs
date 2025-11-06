@@ -25,7 +25,7 @@ pub fn setup_crp_params(
     plaintext_modulus: u64,
     rng: SharedRng,
 ) -> ParamsWithCrp {
-    let params = build_bfv_params_arc(degree, plaintext_modulus, moduli);
+    let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
     let crp = create_crp(params.clone(), rng);
     ParamsWithCrp {
         moduli: moduli.to_vec(),
