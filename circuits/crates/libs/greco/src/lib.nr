@@ -35,10 +35,8 @@ pub struct BoundParams<let L: u32> {
     pub e1_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
     pub u_bound: Field,
-    /// Lower bounds for r1 polynomials (modulus switching quotients)
-    pub r1_low_bounds: [Field; L],
-    /// Upper bounds for r1 polynomials (modulus switching quotients)
-    pub r1_up_bounds: [Field; L],
+    /// Bounds for r1 polynomials (modulus switching quotients)
+    pub r1_bounds: [Field; L],
     /// Bounds for r2 polynomials (cyclotomic reduction quotients)
     pub r2_bounds: [Field; L],
     /// Bounds for p1 polynomials (modulus switching quotients)
@@ -58,8 +56,7 @@ impl<let L: u32> BoundParams<L> {
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
+        r1_bounds: [Field; L],
         r2_bounds: [Field; L],
         p1_bounds: [Field; L],
         p2_bounds: [Field; L],
@@ -71,8 +68,7 @@ impl<let L: u32> BoundParams<L> {
             e0_bound,
             e1_bound,
             u_bound,
-            r1_low_bounds,
-            r1_up_bounds,
+            r1_bounds,
             r2_bounds,
             p1_bounds,
             p2_bounds,
@@ -99,8 +95,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
+        r1_bounds: [Field; L],
         r2_bounds: [Field; L],
         p1_bounds: [Field; L],
         p2_bounds: [Field; L],
@@ -115,8 +110,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
             e0_bound,
             e1_bound,
             u_bound,
-            r1_low_bounds,
-            r1_up_bounds,
+            r1_bounds,
             r2_bounds,
             p1_bounds,
             p2_bounds,
@@ -328,10 +322,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             self.pk1is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
 
             // Randomness polynomials for ct0 computation
-            self.r1is[i].range_check_2bounds::<BIT_R1>(
-                bound_params.r1_up_bounds[i],
-                bound_params.r1_low_bounds[i],
-            );
+            self.r1is[i].range_check_1bound::<BIT_R1>(bound_params.r1_bounds[i]);
             self.r2is[i].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[i]);
 
             // Randomness polynomials for ct1 computation
