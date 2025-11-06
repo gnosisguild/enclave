@@ -21,7 +21,7 @@
   "scripts": {
     "build:wasm": "pnpm -C ../../ build:wasm",
     "compile:circuit": "pnpm -C ../../ compile:circuit",
-    "build": "pnpm compile:circuit && pnpm build:wasm && tsc",
+    "build": "pnpm compile:circuit && pnpm build:wasm && tsup",
     "test": "pnpm compile:circuit && vitest --run",
     "prettier:fix": "pnpm prettier --write .",
     "prettier:check": "pnpm prettier --check .",
@@ -33,20 +33,21 @@
   "devDependencies": {
     "@types/chai": "^5.2.2",
     "@types/node": "22.7.5",
+    "tsup": "^8.5.0",
+    "typescript": "5.8.3",
     "chai": "^6.2.0",
     "prettier": "^3.2.5",
-    "typescript": "^5.0.0",
     "vite": "^5.4.19",
     "vite-plugin-wasm": "^3.2.2",
-    "vitest": "^1.6.1",
-    "@aztec/bb.js": "^0.82.2",
-    "@noir-lang/noir_js": "1.0.0-beta.3"
+    "vitest": "^1.6.1"
   },
   "dependencies": {
     "@crisp-e3/zk-inputs": "workspace:*",
     "@zk-kit/lean-imt": "^2.2.4",
     "poseidon-lite": "^0.3.0",
-    "viem": "2.30.6"
+    "viem": "2.30.6",
+    "@aztec/bb.js": "^0.82.2",
+    "@noir-lang/noir_js": "1.0.0-beta.3"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
 }
