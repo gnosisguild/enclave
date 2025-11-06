@@ -19,7 +19,7 @@ use e3_events::{
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::NetEventTranslator;
-use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
+use e3_sdk::bfv_helpers::{params::SET_2048_1032193_1, BfvParamSet};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
@@ -69,7 +69,7 @@ pub fn create_crp_bytes_params(
 }
 
 pub fn get_common_setup(
-    param_set: Option<(usize, u64, &[u64])>,
+    param_set: Option<BfvParamSet>,
 ) -> Result<(
     Addr<EventBus<EnclaveEvent>>,
     SharedRng,
@@ -87,11 +87,10 @@ pub fn get_common_setup(
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let (degree, plaintext_modulus, moduli) = param_set.unwrap_or((
-        SET_2048_1032193_1.0,
-        SET_2048_1032193_1.1,
-        &SET_2048_1032193_1.2,
-    ));
+    let param_set = param_set.unwrap_or(SET_2048_1032193_1);
+    let degree = param_set.degree;
+    let plaintext_modulus = param_set.plaintext_modulus;
+    let moduli = param_set.moduli;
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
