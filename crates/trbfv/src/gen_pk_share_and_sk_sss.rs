@@ -60,7 +60,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
     fn try_from(
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
-        let pk_share = ArcBytes::from_bytes(value.pk_share.to_bytes());
+        let pk_share = ArcBytes::from_bytes(&value.pk_share.to_bytes());
         let sk_sss = Encrypted::new(value.sk_sss, cipher)?;
         Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
     }

@@ -22,8 +22,8 @@ pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 pub struct ArcBytes(Arc<Vec<u8>>);
 
 impl ArcBytes {
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(Arc::new(bytes))
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(Arc::new(bytes.to_vec()))
     }
 
     pub fn extract_bytes(&self) -> Vec<u8> {

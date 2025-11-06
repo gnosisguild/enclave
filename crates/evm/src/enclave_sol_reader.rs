@@ -29,14 +29,14 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
         e3_events::E3Requested {
-            params: ArcBytes::from_bytes(value.0.e3.e3ProgramParams.to_vec()),
+            params: ArcBytes::from_bytes(&value.0.e3.e3ProgramParams.to_vec()),
             threshold_m: value.0.e3.threshold[0] as usize,
             threshold_n: value.0.e3.threshold[1] as usize,
             seed: value.0.e3.seed.into(),
             // TODO: this should be delivered from the e3_program. Here we provide a sensible
             // default that passes our tests
             error_size: ArcBytes::from_bytes(
-                BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
+                &BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
             ),
             esi_per_ct: 3, // TODO: this should be delivered from the e3_program
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
@@ -59,7 +59,7 @@ impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputP
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
             // XXX: Ciphertext is an array of bytes this needs to be coordinated with enclave
             // contract
-            ciphertext_output: vec![ArcBytes::from_bytes(value.0.ciphertextOutput.to_vec())],
+            ciphertext_output: vec![ArcBytes::from_bytes(&value.0.ciphertextOutput.to_vec())],
         }
     }
 }

@@ -277,7 +277,7 @@ async fn process_swarm_event(
                 event_tx.send(NetEvent::DhtGetRecordSucceeded {
                     key,
                     correlation_id: cid,
-                    value: ArcBytes::from_bytes(record_bytes),
+                    value: ArcBytes::from_bytes(&record_bytes),
                 })?;
             }
             Ok(GetRecordOk::FinishedWithNoAdditionalRecord {

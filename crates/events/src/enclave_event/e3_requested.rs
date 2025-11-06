@@ -34,9 +34,9 @@ impl Default for E3Requested {
     fn default() -> Self {
         E3Requested {
             e3_id: E3id::new("99", 0),
-            error_size: ArcBytes::from_bytes(vec![]),
+            error_size: ArcBytes::from_bytes(&[]),
             esi_per_ct: 0,
-            params: ArcBytes::from_bytes(vec![]),
+            params: ArcBytes::from_bytes(&[]),
             seed: Seed([0u8; 32]),
             threshold_m: 0,
             threshold_n: 0,

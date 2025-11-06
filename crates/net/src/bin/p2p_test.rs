@@ -29,7 +29,7 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
             .send(NetCommand::DhtPutRecord {
                 correlation_id: CorrelationId::new(),
                 key: key.clone(),
-                value: ArcBytes::from_bytes(value.to_vec()),
+                value: ArcBytes::from_bytes(value),
                 expires: None,
             })
             .await?;

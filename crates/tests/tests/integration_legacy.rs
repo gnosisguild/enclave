@@ -193,7 +193,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
-        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         seed: seed.clone(),
         threshold_m: 3,
         threshold_n: 3, // Need to use n now to suggest committee size
@@ -254,7 +254,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
         ciphertext_output: ciphertext
             .iter()
-            .map(|ct| ArcBytes::from_bytes(ct.to_bytes()))
+            .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
             .collect(),
         e3_id: e3_id.clone(),
     });
@@ -313,7 +313,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
                 threshold_m: 2,
                 threshold_n: 2,
                 seed: seed.clone(),
-                params: ArcBytes::from_bytes(encode_bfv_params(&params)),
+                params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
                 ..E3Requested::default()
             })
             .clone(),
@@ -408,7 +408,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::from(CiphertextOutputPublished {
             ciphertext_output: ciphertext
                 .iter()
-                .map(|ct| ArcBytes::from_bytes(ct.to_bytes()))
+                .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
                 .collect(),
             e3_id: e3_id.clone(),
         })
@@ -420,6 +420,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(5))
         .await?;
 
+<<<<<<< HEAD
     let actual = history
         .into_iter()
         .filter_map(|e| match e {
@@ -485,12 +486,12 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
-        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
+        decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
     });
 
     let evt_2 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
-        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
+        decrypted_output: vec![ArcBytes::from_bytes(&[1, 2, 3, 4])],
     });
 
     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
@@ -547,7 +548,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
     }))
     .await?;
@@ -584,7 +585,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
     }))
     .await?;
@@ -635,7 +636,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: ArcBytes::from_bytes(vec![1, 2, 3, 4]),
+        params: ArcBytes::from_bytes(&[1, 2, 3, 4]),
         ..E3Requested::default()
     });
 

@@ -539,7 +539,7 @@ mod tests {
     async fn test_publishes_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, _, _) =
             setup_test();
-        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
+        let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
 
@@ -675,7 +675,7 @@ mod tests {
             errors,
             _,
         ) = setup_test();
-        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
+        let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
 
@@ -724,7 +724,7 @@ mod tests {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =
             setup_test();
 
-        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
+        let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
         let cid = Cid::from_content(&value);

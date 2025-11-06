@@ -16,19 +16,17 @@ jobs:
           else
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-
       - uses: actions/checkout@v4
         if: steps.should_skip.outputs.skip == 'false'
         with:
           fetch-depth: 0
-
       - name: Check PR size
         if: steps.should_skip.outputs.skip == 'false'
         run: |
           git fetch origin ${{ github.base_ref }}
-          # Count changed lines excluding lock files
-          CHANGED_LINES=$(git diff --numstat origin/${{ github.base_ref }}...HEAD | grep -v -E '(\.lock$|lock\.yaml$)' | awk '{sum += $1 + $2} END {print sum+0}')
-          echo "Changed lines (excluding lock files): ${CHANGED_LINES}"
+          # Count changed lines excluding whitespace, comments, and lock files
+          CHANGED_LINES=$(bash ./scripts/check-size.sh ${{ github.base_ref }})
+          echo "Changed lines (excluding whitespace, comments, and lock files): ${CHANGED_LINES}"
           echo "Maximum allowed: $MAX_LINES"
           if [ "${CHANGED_LINES}" -gt "$MAX_LINES" ]; then
             echo "::error::PR is too large ($CHANGED_LINES lines). Max: $MAX_LINES lines."
