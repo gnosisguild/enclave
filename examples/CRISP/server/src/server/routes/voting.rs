@@ -40,7 +40,7 @@ async fn broadcast_encrypted_vote(
     store: web::Data<AppData>,
 ) -> impl Responder {
     let vote = data.into_inner();
-
+    error!("[e3_id={}] Broadcasting encrypted vote", vote.round_id);
     // Validate and update vote status
     let has_voted = match store
         .e3(vote.round_id)
@@ -49,12 +49,16 @@ async fn broadcast_encrypted_vote(
     {
         Ok(voted) => voted,
         Err(e) => {
-            log::error!("Database error checking vote status: {:?}", e);
+            error!(
+                "[e3_id={}] Database error checking vote status: {:?}",
+                vote.round_id, e
+            );
             return HttpResponse::InternalServerError().json("Internal server error");
         }
     };
 
     if has_voted {
+        info!("[e3_id={}] User has already voted", vote.round_id);
         return HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::UserAlreadyVoted,
             tx_hash: None,
@@ -65,7 +69,10 @@ async fn broadcast_encrypted_vote(
     let mut repo = store.e3(vote.round_id);
 
     if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
-        log::error!("Database error inserting voter: {:?}", e);
+        error!(
+            "[e3_id={}] Database error inserting voter: {:?}",
+            vote.round_id, e
+        );
         return HttpResponse::InternalServerError().json("Internal server error");
     }
 
@@ -103,17 +110,23 @@ async fn broadcast_encrypted_vote(
     {
         Ok(c) => c,
         Err(e) => {
-            log::error!("Database error checking vote status: {:?}", e);
+            error!(
+                "[e3_id={}] Database error checking vote status: {:?}",
+                vote.round_id, e
+            );
             return HttpResponse::InternalServerError().json("Internal server error");
         }
     };
 
     match contract.publish_input(e3_id, encoded_params).await {
-        Ok(hash) => HttpResponse::Ok().json(VoteResponse {
-            status: VoteResponseStatus::Success,
-            tx_hash: Some(hash.transaction_hash.to_string()),
-            message: Some("Vote Successful".to_string()),
-        }),
+        Ok(hash) => {
+            info!("[e3_id={}] Vote broadcasted successfully", vote.round_id);
+            HttpResponse::Ok().json(VoteResponse {
+                status: VoteResponseStatus::Success,
+                tx_hash: Some(hash.transaction_hash.to_string()),
+                message: Some("Vote Successful".to_string()),
+            })
+        }
         Err(e) => handle_vote_error(e, repo, &vote.address).await,
     }
 }
