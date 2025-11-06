@@ -146,11 +146,10 @@ impl<let N: u32> Polynomial<N> {
     /// * `lower_bound` - The lower bound for coefficient range checking (can be negative)
     ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
     pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: Field, lower_bound: Field) {
-        let shifted_amount = lower_bound;
-        let range_size = shifted_amount + upper_bound;
+        let range_size = lower_bound + upper_bound;
 
         for i in 0..self.coefficients.len() {
-            let shifted_coefficient = self.coefficients[i] + shifted_amount;
+            let shifted_coefficient = self.coefficients[i] + lower_bound;
 
             shifted_coefficient.assert_max_bit_size::<BIT + 1>();
             (range_size - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
