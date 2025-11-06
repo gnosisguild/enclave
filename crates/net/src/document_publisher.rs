@@ -415,7 +415,7 @@ impl EventConverter {
             return Ok(());
         }
         let receivable = ReceivableDocument::ThresholdShareCreated(msg);
-        let value = ArcBytes::from_bytes(receivable.to_bytes()?);
+        let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
         let meta = DocumentMeta::new(
             receivable.get_e3_id().clone(),
             DocumentKind::TrBFV,
