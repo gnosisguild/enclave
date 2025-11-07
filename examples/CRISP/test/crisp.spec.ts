@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { Page } from "@playwright/test";
+import { ConsoleMessage, Page } from "@playwright/test";
 import { testWithSynpress } from "@synthetixio/synpress";
 import { MetaMask, metaMaskFixtures } from "@synthetixio/synpress/playwright";
 import basicSetup from "./wallet-setup/basic.setup";
@@ -70,12 +70,25 @@ async function ensureHomePageLoaded(page: Page) {
   );
 }
 
+function log(msg: string) {
+  console.log(`[playwright] ${msg}`);
+}
+
 test("CRISP smoke test", async ({
   context,
   page,
   metamaskPage,
   extensionId,
 }) => {
+  page.on("console", (msg: ConsoleMessage) => {
+    console.log(msg.text());
+  });
+
+  log("============================================");
+  log("      STARTING YOUR PLAYWRIGHT TEST!        ");
+  log("============================================");
+
+  log("Creating new Metamask...");
   const metamask = new MetaMask(
     context,
     metamaskPage,
@@ -83,35 +96,51 @@ test("CRISP smoke test", async ({
     extensionId,
   );
 
+  log("runCliInit()...");
   const e3id = await runCliInit();
-  console.log(`Got e3 id: ${e3id}`);
+  log(`Got e3 id: ${e3id}`);
 
   await page.goto("/");
 
-  page.on("console", (...msg: any[]) => {
-    console.log(...msg);
-  });
-
+  log(`ensureHomePageLoaded...`);
   await ensureHomePageLoaded(page);
+
+  log(`searching for connect button...`);
   await page.locator('button:has-text("Connect Wallet")').click();
+  log(`searching for MetaMask button...`);
   await page.locator('button:has-text("MetaMask")').click();
+  log(`connecting to dapp...`);
   await metamask.connectToDapp();
+  log(`clicking try demo...`);
   await page.locator('button:has-text("Try Demo")').click();
 
+  log(`waiting for E3 activation...`);
   await waitForE3Activation(e3id);
+  log(`forcing page reload...`);
   await page.reload();
 
+  log(`clicking first vote card...`);
   await page
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
+  log(`clicking Cast Vote...`);
   await page.locator('button:has-text("Cast Vote")').click();
+  log(`waiting for 220_000...`);
   await page.waitForTimeout(220_000);
+  log(`clicking historic polls button...`);
   await page.locator('a:has-text("Historic polls")').click();
+  log(`asserting that Historic polls exists...`);
   await expect(page.locator("h1")).toHaveText("Historic polls");
+  log(`asserting that result has 100% on the vote we clicked on...`);
   await expect(
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
   ).toHaveText("100%");
+  log(`asserting that result has 0% on the vote we did not click on...`);
   await expect(
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] h3"),
   ).toHaveText("0%");
+
+  log("============================================");
+  log("        PLAYWRIGHT TEST IS COMPLETE         ");
+  log("============================================");
 });
