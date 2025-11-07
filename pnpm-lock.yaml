@@ -248,9 +248,6 @@ importers:
 
   examples/CRISP/packages/crisp-contracts:
     dependencies:
-      '@crisp-e3/sdk':
-        specifier: workspace:*
-        version: link:../crisp-sdk
       '@enclave-e3/contracts':
         specifier: workspace:*
         version: link:../../../../packages/enclave-contracts
@@ -267,6 +264,12 @@ importers:
         specifier: ^0.1.13
         version: 0.1.26
     devDependencies:
+      '@crisp-e3/sdk':
+        specifier: workspace:^
+        version: link:../crisp-sdk
+      '@crisp-e3/zk-inputs':
+        specifier: workspace:^
+        version: link:../crisp-zk-inputs
       '@nomicfoundation/hardhat-ethers':
         specifier: '4'
         version: 4.0.3(bufferutil@4.0.9)(hardhat@3.0.11(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
@@ -345,9 +348,15 @@ importers:
 
   examples/CRISP/packages/crisp-sdk:
     dependencies:
+      '@aztec/bb.js':
+        specifier: ^0.82.2
+        version: 0.82.3
       '@crisp-e3/zk-inputs':
         specifier: workspace:*
         version: link:../crisp-zk-inputs
+      '@noir-lang/noir_js':
+        specifier: 1.0.0-beta.3
+        version: 1.0.0-beta.3
       '@zk-kit/lean-imt':
         specifier: ^2.2.4
         version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -358,12 +367,6 @@ importers:
         specifier: 2.38.6
         version: 2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)
     devDependencies:
-      '@aztec/bb.js':
-        specifier: ^0.82.2
-        version: 0.82.3
-      '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
       '@types/chai':
         specifier: ^5.2.2
         version: 5.2.3
@@ -376,6 +379,9 @@ importers:
       prettier:
         specifier: ^3.2.5
         version: 3.6.2
+      tsup:
+        specifier: 8.5.0
+        version: 8.5.0(@microsoft/api-extractor@7.54.0(@types/node@22.7.5))(@swc/core@1.15.0(@swc/helpers@0.5.17))(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.8.3)
       typescript:
         specifier: 5.8.3
         version: 5.8.3
