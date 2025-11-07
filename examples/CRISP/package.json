@@ -24,6 +24,7 @@
     "test:circuits:inputs": "node --test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
     "compile:circuit": "bash ./scripts/compile_circuits.sh",
+    "test:sdk": "pnpm -C packages/crisp-sdk test",
     "report": "playwright show-report",
     "publish:packages": "tsx scripts/publish.ts",
     "setup:testnet": "bash ./scripts/setup_testnet.sh"
