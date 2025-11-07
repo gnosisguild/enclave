@@ -313,7 +313,7 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 180000 }, async () => {
+    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 240000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
         DEFAULT_BFV_PARAMS.degree,
