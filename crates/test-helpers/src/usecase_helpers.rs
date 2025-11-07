@@ -55,7 +55,7 @@ pub fn generate_shares_hash_map(
             &cipher,
             GenPkShareAndSkSssRequest {
                 trbfv_config: trbfv_config.clone(),
-                crp: ArcBytes::from_bytes(crp.to_bytes()),
+                crp: ArcBytes::from_bytes(&crp.to_bytes()),
             },
         )?;
 

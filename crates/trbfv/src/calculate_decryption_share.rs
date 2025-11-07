@@ -93,7 +93,7 @@ impl From<InnerResponse> for CalculateDecryptionShareResponse {
             d_share_poly: value
                 .d_share_poly
                 .into_iter()
-                .map(|p| ArcBytes::from_bytes(p.to_bytes()))
+                .map(|p| ArcBytes::from_bytes(&p.to_bytes()))
                 .collect(),
         }
     }

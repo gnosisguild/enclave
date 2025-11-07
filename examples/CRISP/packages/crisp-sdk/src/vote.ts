@@ -97,37 +97,37 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
 export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
-      const HALF_D = tally.length / 2;
-      const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE;
-      const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
+      const HALF_D = tally.length / 2
+      const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
+      const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
 
       // Extract only the relevant parts of the tally
-      const yesBinary = tally.slice(START_INDEX_Y, HALF_D);
-      const noBinary = tally.slice(START_INDEX_N, tally.length);
+      const yesBinary = tally.slice(START_INDEX_Y, HALF_D)
+      const noBinary = tally.slice(START_INDEX_N, tally.length)
 
-      let yes = 0n;
-      let no = 0n;
+      let yes = 0n
+      let no = 0n
 
       // Convert yes votes (from START_INDEX_Y to HALF_D)
       for (let i = 0; i < yesBinary.length; i += 1) {
-        const weight = 2n ** BigInt(yesBinary.length - 1 - i);
-        yes += BigInt(yesBinary[i]) * weight;
+        const weight = 2n ** BigInt(yesBinary.length - 1 - i)
+        yes += BigInt(yesBinary[i]) * weight
       }
 
       // Convert no votes (from START_INDEX_N to D)
       for (let i = 0; i < noBinary.length; i += 1) {
-        const weight = 2n ** BigInt(noBinary.length - 1 - i);
-        no += BigInt(noBinary[i]) * weight;
+        const weight = 2n ** BigInt(noBinary.length - 1 - i)
+        no += BigInt(noBinary[i]) * weight
       }
 
       return {
         yes,
         no,
-      };
+      }
     default:
-      throw new Error('Unsupported voting mode');
+      throw new Error('Unsupported voting mode')
   }
-};
+}
 
 /**
  * Validate whether a vote is valid for a given voting mode
@@ -271,7 +271,9 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   return proof
 }
 
-export const generateProofWithReturnValue = async (crispInputs: CRISPCircuitInputs): Promise<{ returnValue: unknown, proof:ProofData }> => {
+export const generateProofWithReturnValue = async (
+  crispInputs: CRISPCircuitInputs,
+): Promise<{ returnValue: unknown; proof: ProofData }> => {
   const noir = new Noir(circuit as CompiledCircuit)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
@@ -279,6 +281,14 @@ export const generateProofWithReturnValue = async (crispInputs: CRISPCircuitInpu
   const proof = await backend.generateProof(witness)
 
   return { returnValue, proof }
+}
+
+export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Promise<{ returnValue: unknown }> => {
+  const noir = new Noir(circuit as CompiledCircuit)
+
+  const { returnValue } = await noir.execute(crispInputs as any)
+
+  return { returnValue }
 }
 
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
