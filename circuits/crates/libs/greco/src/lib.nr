@@ -4,6 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use bignum::{
+    bignum::{BigNum, derive_bignum},
+    fields::{bn254Fq::{self, BN254_Fq, BN254_Fq_PARAMS}, U256::U256},
+    params::BigNumParams,
+    RuntimeBigNum,
+};
 use polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
@@ -30,7 +36,7 @@ impl<let L: u32> CryptographicParams<L> {
 pub struct BoundParams<let L: u32> {
     /// Bounds for public key polynomials for each CRT basis
     pub pk_bounds: [Field; L],
-    /// BoundS for error polynomials (e0, e1)
+    /// Bounds for error polynomials (e0, e1)
     pub e0_bound: Field,
     pub e1_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
