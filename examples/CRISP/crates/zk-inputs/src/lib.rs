@@ -14,9 +14,14 @@ use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe::bfv::{Encoding, Plaintext};
+use fhe_math::rq::Poly;
+use fhe_math::rq::Representation;
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
+use num_bigint::BigInt;
+use num_bigint::BigUint;
+use num_bigint::ToBigInt;
 use rand::thread_rng;
 use std::sync::Arc;
 
@@ -86,10 +91,31 @@ impl ZKInputsGenerator {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .with_context(|| "Failed to encrypt plaintext")?;
 
+        // Reconstruct e1_rns in mod Q.
+        let mut e1_power = e1_rns.clone();
+        e1_power.change_representation(Representation::PowerBasis);
+
+        // This conversion internally calls lift for each coefficient
+        // to make them in mod Q.
+        let e1_mod_q: Vec<BigUint> = Vec::<BigUint>::from(&e1_power);
+
+        // Then, make it a polynomial in mod Q.
+        let ctx = self.bfv_params.ctx()[0].clone();
+        let e1_bigints: Vec<BigInt> = e1_mod_q.iter().map(|c| c.to_bigint().unwrap()).collect();
+        let e1 = (*Poly::from_bigints(&e1_bigints, &ctx)?).clone();
+
         // Compute the vectors of the GRECO inputs.
-        let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &self.bfv_params)
-                .with_context(|| "Failed to compute vectors")?;
+        let greco_vectors = GrecoVectors::compute(
+            &pt,
+            &u_rns,
+            &e0_rns,
+            &e1_rns,
+            &e1,
+            &ct,
+            &pk,
+            &self.bfv_params,
+        )
+        .with_context(|| "Failed to compute vectors")?;
 
         let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
             .with_context(|| "Failed to compute bounds")?;
@@ -341,7 +367,6 @@ mod tests {
         assert!(parsed.get("sum_ct1is").is_some());
         assert!(parsed.get("sum_r0is").is_some());
         assert!(parsed.get("sum_r1is").is_some());
-        assert!(parsed.get("sum_r_bound").is_some());
         assert!(parsed.get("ct0is").is_some());
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());

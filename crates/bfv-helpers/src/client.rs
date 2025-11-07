@@ -8,8 +8,13 @@ use crate::build_bfv_params_arc;
 use anyhow::{anyhow, Result};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
+use fhe_math::rq::Poly;
+use fhe_math::rq::Representation;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::vectors::GrecoVectors;
+use num_bigint::BigInt;
+use num_bigint::BigUint;
+use num_bigint::ToBigInt;
 use rand::thread_rng;
 
 /// Encrypt some data using BFV homomorphic encryption
@@ -103,12 +108,26 @@ where
         .try_encrypt_extended(&plaintext, &mut thread_rng())
         .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
+    // Reconstruct e1_rns in mod Q.
+    let mut e1_power = e1_rns.clone();
+    e1_power.change_representation(Representation::PowerBasis);
+
+    // This conversion internally calls lift for each coefficient
+    // to make them in mod Q.
+    let e1_mod_q: Vec<BigUint> = Vec::<BigUint>::from(&e1_power);
+
+    // Then, make it a polynomial in mod Q.
+    let ctx = params.ctx()[0].clone();
+    let e1_bigints: Vec<BigInt> = e1_mod_q.iter().map(|c| c.to_bigint().unwrap()).collect();
+    let e1 = (*Poly::from_bigints(&e1_bigints, &ctx)?).clone();
+
     // Create Greco input validation ZK proof
     let input_val_vectors = GrecoVectors::compute(
         &plaintext,
         &u_rns,
         &e0_rns,
         &e1_rns,
+        &e1,
         &cipher_text,
         &pk,
         &params,

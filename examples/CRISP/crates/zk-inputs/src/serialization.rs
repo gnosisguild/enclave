@@ -36,6 +36,7 @@ pub struct ZKInputs {
     u: serde_json::Value,
     e0: serde_json::Value,
     e1: serde_json::Value,
+    e1is: Vec<serde_json::Value>,
     k1: serde_json::Value,
 }
 
@@ -72,7 +73,8 @@ pub fn construct_inputs(
 
     // Add bounds.
     let bounds_json = serde_json::json!({
-        "e_bound": bounds.e_bound.to_string(),
+        "e0_bound": bounds.e0_bound.to_string(),
+        "e1_bound": bounds.e1_bound.to_string(),
         "u_bound": bounds.u_bound.to_string(),
         "k1_low_bound": bounds.k1_low_bound.to_string(),
         "k1_up_bound": bounds.k1_up_bound.to_string(),
@@ -213,6 +215,15 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
+        e1is: vectors_standard
+            .e1is
+            .iter()
+            .map(|v| {
+                serde_json::json!({
+                    "coefficients": to_string_1d_vec(v)
+                })
+            })
+            .collect(),
         u: serde_json::json!({
             "coefficients": to_string_1d_vec(&vectors_standard.u)
         }),
@@ -243,6 +254,7 @@ pub fn serialize_inputs_to_json(inputs: &ZKInputs) -> Result<String> {
 mod tests {
     use super::*;
     use num_bigint::BigInt;
+    use num_bigint::BigUint;
     use serde_json::Value;
 
     fn create_mock_crypto_params() -> GrecoCryptographicParameters {
@@ -255,16 +267,17 @@ mod tests {
 
     fn create_mock_bounds() -> GrecoBounds {
         GrecoBounds {
-            e_bound: 100u64,
-            u_bound: 200u64,
-            k1_low_bound: 10i64,
-            k1_up_bound: 20u64,
-            p1_bounds: vec![30u64, 40u64],
-            p2_bounds: vec![50u64, 60u64],
-            pk_bounds: vec![70u64, 80u64],
-            r1_low_bounds: vec![90i64, 100i64],
-            r1_up_bounds: vec![110u64, 120u64],
-            r2_bounds: vec![130u64, 140u64],
+            e0_bound: BigUint::from(100u64),
+            e1_bound: BigUint::from(100u64),
+            u_bound: BigUint::from(200u64),
+            k1_low_bound: BigUint::from(10u64),
+            k1_up_bound: BigUint::from(20u64),
+            p1_bounds: vec![BigUint::from(30u64), BigUint::from(40u64)],
+            p2_bounds: vec![BigUint::from(50u64), BigUint::from(60u64)],
+            pk_bounds: vec![BigUint::from(70u64), BigUint::from(80u64)],
+            r1_low_bounds: vec![BigUint::from(90u64), BigUint::from(100u64)],
+            r1_up_bounds: vec![BigUint::from(110u64), BigUint::from(120u64)],
+            r2_bounds: vec![BigUint::from(130u64), BigUint::from(140u64)],
         }
     }
 
@@ -302,6 +315,10 @@ mod tests {
             p2is: vec![
                 vec![BigInt::from(33), BigInt::from(34)],
                 vec![BigInt::from(35), BigInt::from(36)],
+            ],
+            e1is: vec![
+                vec![BigInt::from(43), BigInt::from(44)],
+                vec![BigInt::from(45), BigInt::from(46)],
             ],
             u: vec![BigInt::from(37), BigInt::from(38)],
             e0: vec![BigInt::from(39), BigInt::from(40)],
