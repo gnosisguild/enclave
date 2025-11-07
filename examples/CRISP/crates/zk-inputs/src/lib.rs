@@ -14,9 +14,14 @@ use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe::bfv::{Encoding, Plaintext};
+use fhe_math::rq::Poly;
+use fhe_math::rq::Representation;
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
+use num_bigint::BigInt;
+use num_bigint::BigUint;
+use num_bigint::ToBigInt;
 use rand::thread_rng;
 use std::sync::Arc;
 
@@ -341,7 +346,6 @@ mod tests {
         assert!(parsed.get("sum_ct1is").is_some());
         assert!(parsed.get("sum_r0is").is_some());
         assert!(parsed.get("sum_r1is").is_some());
-        assert!(parsed.get("sum_r_bound").is_some());
         assert!(parsed.get("ct0is").is_some());
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());

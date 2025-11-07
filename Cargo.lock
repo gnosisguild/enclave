@@ -2670,6 +2670,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "fhe",
+ "fhe-math",
  "fhe-traits",
  "fhe-util",
  "hex",
