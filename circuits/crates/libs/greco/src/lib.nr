@@ -29,44 +29,48 @@ impl<let L: u32> CryptographicParams<L> {
 /// Contains all the bounds used to validate polynomial coefficients.
 pub struct BoundParams<let L: u32> {
     /// Bounds for public key polynomials for each CRT basis
-    pub pk_bounds: [u64; L],
-    /// Bound for error polynomials (e0, e1)
-    pub e_bound: u64,
+    pub pk_bounds: [Field; L],
+    /// Bounds for error polynomials (e0)
+    pub e0_bound: Field,
+    /// Bounds for error polynomials (e1)
+    pub e1_bound: Field,
     /// Bound for secret polynomial u (ternary distribution)
-    pub u_bound: u64,
+    pub u_bound: Field,
     /// Lower bounds for r1 polynomials (modulus switching quotients)
-    pub r1_low_bounds: [i64; L],
+    pub r1_low_bounds: [Field; L],
     /// Upper bounds for r1 polynomials (modulus switching quotients)
-    pub r1_up_bounds: [u64; L],
+    pub r1_up_bounds: [Field; L],
     /// Bounds for r2 polynomials (cyclotomic reduction quotients)
-    pub r2_bounds: [u64; L],
+    pub r2_bounds: [Field; L],
     /// Bounds for p1 polynomials (modulus switching quotients)
-    pub p1_bounds: [u64; L],
+    pub p1_bounds: [Field; L],
     /// Bounds for p2 polynomials (cyclotomic reduction quotients)
-    pub p2_bounds: [u64; L],
+    pub p2_bounds: [Field; L],
     /// Lower bound for k1 polynomial (scaled message)
-    pub k1_low_bound: i64,
+    pub k1_low_bound: Field,
     /// Upper bound for k1 polynomial (scaled message)
-    pub k1_up_bound: u64,
+    pub k1_up_bound: Field,
 }
 
 impl<let L: u32> BoundParams<L> {
     /// Creates new bound parameters
     pub fn new(
-        pk_bounds: [u64; L],
-        e_bound: u64,
-        u_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
-        p1_bounds: [u64; L],
-        p2_bounds: [u64; L],
-        k1_low_bound: i64,
-        k1_up_bound: u64,
+        pk_bounds: [Field; L],
+        e0_bound: Field,
+        e1_bound: Field,
+        u_bound: Field,
+        r1_low_bounds: [Field; L],
+        r1_up_bounds: [Field; L],
+        r2_bounds: [Field; L],
+        p1_bounds: [Field; L],
+        p2_bounds: [Field; L],
+        k1_low_bound: Field,
+        k1_up_bound: Field,
     ) -> Self {
         BoundParams {
             pk_bounds,
-            e_bound,
+            e0_bound,
+            e1_bound,
             u_bound,
             r1_low_bounds,
             r1_up_bounds,
@@ -92,23 +96,25 @@ impl<let N: u32, let L: u32> Params<N, L> {
     /// Creates new complete parameters
     pub fn new(
         q_mod_t: Field,
-        pk_bounds: [u64; L],
-        e_bound: u64,
-        u_bound: u64,
-        r1_low_bounds: [i64; L],
-        r1_up_bounds: [u64; L],
-        r2_bounds: [u64; L],
-        p1_bounds: [u64; L],
-        p2_bounds: [u64; L],
-        k1_low_bound: i64,
-        k1_up_bound: u64,
+        pk_bounds: [Field; L],
+        e0_bound: Field,
+        e1_bound: Field,
+        u_bound: Field,
+        r1_low_bounds: [Field; L],
+        r1_up_bounds: [Field; L],
+        r2_bounds: [Field; L],
+        p1_bounds: [Field; L],
+        p2_bounds: [Field; L],
+        k1_low_bound: Field,
+        k1_up_bound: Field,
         qis: [Field; L],
         k0is: [Field; L],
     ) -> Self {
         let crypto = CryptographicParams::new(q_mod_t, qis, k0is);
         let bounds = BoundParams::new(
             pk_bounds,
-            e_bound,
+            e0_bound,
+            e1_bound,
             u_bound,
             r1_low_bounds,
             r1_up_bounds,
@@ -157,7 +163,8 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0is`/`pk1is`
 /// * `BIT_CT` - Bit-width bound per coefficient for cipher texts `ct0is`/`ct1is`
 /// * `BIT_U` - Bit-width bound per coefficient for the ternary secret `u`
-/// * `BIT_E` - Bit-width bound per coefficient for error polynomials `e0`/`e1`
+/// * `BIT_E0` - Bit-width bound per coefficient for error polynomial `e0`
+/// * `BIT_E1` - Bit-width bound per coefficient for error polynomials `e1`
 /// * `BIT_K` - Bit-width bound per coefficient for the scaled message polynomial `k1`
 /// * `BIT_R1` - Bit-width bound per coefficient for randomness polynomials `r1is`
 /// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomials `r2is`
@@ -172,7 +179,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `k1` - Scaled message polynomial
 /// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
 /// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
-pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
+pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     params: Params<N, L>,
     pk0is: [Polynomial<N>; L],
@@ -182,6 +189,7 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     u: Polynomial<N>,
     e0: Polynomial<N>,
     e1: Polynomial<N>,
+    e1is: [Polynomial<N>; L],
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
@@ -189,7 +197,7 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     p2is: [Polynomial<N - 1>; L],
 }
 
-impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     /// Creates a new Greco instance.
     ///
     /// This constructor initializes all the polynomials and parameters needed for
@@ -221,13 +229,14 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         u: Polynomial<N>,
         e0: Polynomial<N>,
         e1: Polynomial<N>,
+        e1is: [Polynomial<N>; L],
         k1: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
-    ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
-        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, k1, r1is, r2is, p1is, p2is }
+    ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, e1is, k1, r1is, r2is, p1is, p2is }
     }
 
     /// Flattens all polynomials coefficients into a single array for challenge generation.
@@ -249,8 +258,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
         // Flatten common polynomials (used across all CRT bases)
-        inputs = flatten::<_, _, BIT_E>(inputs, [self.e0]);
-        inputs = flatten::<_, _, BIT_E>(inputs, [self.e1]);
+        inputs = flatten::<_, _, BIT_E0>(inputs, [self.e0]);
+        inputs = flatten::<_, _, BIT_E1>(inputs, [self.e1]);
         inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
         inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
 
@@ -308,27 +317,42 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let bound_params = self.params.bound_params();
 
         // Common polynomials (used across all CRT bases)
-        self.u.range_check_1bound::<BIT_U>(bound_params.u_bound);
-        self.e0.range_check_1bound::<BIT_E>(bound_params.e_bound);
-        self.e1.range_check_1bound::<BIT_E>(bound_params.e_bound);
+        self.u.range_check_2bounds::<BIT_U>(bound_params.u_bound, bound_params.u_bound);
+        self.e0.range_check_2bounds::<BIT_E0>(bound_params.e0_bound, bound_params.e0_bound);
+        self.e1.range_check_2bounds::<BIT_E1>(bound_params.e1_bound, bound_params.e1_bound);
         self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
 
         // CRT basis-specific polynomials
         for i in 0..L {
             // Public key polynomials must be within bounds for each CRT basis
-            self.pk0is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
-            self.pk1is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
+            self.pk0is[i].range_check_2bounds::<BIT_PK>(
+                bound_params.pk_bounds[i],
+                bound_params.pk_bounds[i],
+            );
+            self.pk1is[i].range_check_2bounds::<BIT_PK>(
+                bound_params.pk_bounds[i],
+                bound_params.pk_bounds[i],
+            );
 
             // Randomness polynomials for ct0 computation
             self.r1is[i].range_check_2bounds::<BIT_R1>(
                 bound_params.r1_up_bounds[i],
                 bound_params.r1_low_bounds[i],
             );
-            self.r2is[i].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[i]);
+            self.r2is[i].range_check_2bounds::<BIT_R2>(
+                bound_params.r2_bounds[i],
+                bound_params.r2_bounds[i],
+            );
 
             // Randomness polynomials for ct1 computation
-            self.p1is[i].range_check_1bound::<BIT_P1>(bound_params.p1_bounds[i]);
-            self.p2is[i].range_check_1bound::<BIT_P2>(bound_params.p2_bounds[i]);
+            self.p1is[i].range_check_2bounds::<BIT_P1>(
+                bound_params.p1_bounds[i],
+                bound_params.p1_bounds[i],
+            );
+            self.p2is[i].range_check_2bounds::<BIT_P2>(
+                bound_params.p2_bounds[i],
+                bound_params.p2_bounds[i],
+            );
         }
     }
 
@@ -377,7 +401,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let u_at_gamma = self.u.eval(gamma);
         let e0_at_gamma = self.e0.eval(gamma);
         let k1_at_gamma = self.k1.eval(gamma);
-        let e1_at_gamma = self.e1.eval(gamma);
 
         let mut sum = (0, 0);
         for i in 0..L {
@@ -407,9 +430,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let pk1is_at_gamma = self.pk1is[i].eval(gamma);
             let p1is_at_gamma = self.p1is[i].eval(gamma);
             let p2is_at_gamma = self.p2is[i].eval(gamma);
+            let e1is_at_gamma = self.e1is[i].eval(gamma);
 
             // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
-            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
+            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1is_at_gamma;
 
             // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
             let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
