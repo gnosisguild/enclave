@@ -35,12 +35,12 @@ pub fn bfv_encrypt<T>(
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
-    moduli: Vec<u64>,
+    moduli: &[u64],
 ) -> Result<Vec<u8>>
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
 {
-    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+    let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
 
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key:{e}"))?;
@@ -145,14 +145,8 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = [1u64];
-        let encrypted_data = bfv_encrypt(
-            num,
-            pk.to_bytes(),
-            degree,
-            plaintext_modulus,
-            moduli.to_vec(),
-        )
-        .unwrap();
+        let encrypted_data =
+            bfv_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, &moduli).unwrap();
 
         let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
@@ -181,7 +175,7 @@ mod tests {
             pk.to_bytes(),
             degree,
             plaintext_modulus,
-            moduli.to_vec(),
+            &moduli,
         )
         .unwrap();
 

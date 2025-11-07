@@ -32,7 +32,7 @@ pub fn bfv_encrypt_number(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<Vec<u8>, JsValue> {
-    let encrypted_data = bfv_encrypt([data], public_key, degree, plaintext_modulus, moduli)
+    let encrypted_data = bfv_encrypt([data], public_key, degree, plaintext_modulus, &moduli)
         .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
     Ok(encrypted_data)
 }
@@ -62,7 +62,7 @@ pub fn bfv_encrypt_vector(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<Vec<u8>, JsValue> {
-    let encrypted_data = bfv_encrypt(data, public_key, degree, plaintext_modulus, moduli)
+    let encrypted_data = bfv_encrypt(data, public_key, degree, plaintext_modulus, &moduli)
         .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
     Ok(encrypted_data)
 }
