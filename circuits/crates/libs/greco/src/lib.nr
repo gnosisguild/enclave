@@ -317,27 +317,42 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let bound_params = self.params.bound_params();
 
         // Common polynomials (used across all CRT bases)
-        self.u.range_check_1bound::<BIT_U>(bound_params.u_bound);
-        self.e0.range_check_1bound::<BIT_E0>(bound_params.e0_bound);
-        self.e1.range_check_1bound::<BIT_E1>(bound_params.e1_bound);
+        self.u.range_check_2bounds::<BIT_U>(bound_params.u_bound, bound_params.u_bound);
+        self.e0.range_check_2bounds::<BIT_E0>(bound_params.e0_bound, bound_params.e0_bound);
+        self.e1.range_check_2bounds::<BIT_E1>(bound_params.e1_bound, bound_params.e1_bound);
         self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
 
         // CRT basis-specific polynomials
         for i in 0..L {
             // Public key polynomials must be within bounds for each CRT basis
-            self.pk0is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
-            self.pk1is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
+            self.pk0is[i].range_check_2bounds::<BIT_PK>(
+                bound_params.pk_bounds[i],
+                bound_params.pk_bounds[i],
+            );
+            self.pk1is[i].range_check_2bounds::<BIT_PK>(
+                bound_params.pk_bounds[i],
+                bound_params.pk_bounds[i],
+            );
 
             // Randomness polynomials for ct0 computation
             self.r1is[i].range_check_2bounds::<BIT_R1>(
                 bound_params.r1_up_bounds[i],
                 bound_params.r1_low_bounds[i],
             );
-            self.r2is[i].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[i]);
+            self.r2is[i].range_check_2bounds::<BIT_R2>(
+                bound_params.r2_bounds[i],
+                bound_params.r2_bounds[i],
+            );
 
             // Randomness polynomials for ct1 computation
-            self.p1is[i].range_check_1bound::<BIT_P1>(bound_params.p1_bounds[i]);
-            self.p2is[i].range_check_1bound::<BIT_P2>(bound_params.p2_bounds[i]);
+            self.p1is[i].range_check_2bounds::<BIT_P1>(
+                bound_params.p1_bounds[i],
+                bound_params.p1_bounds[i],
+            );
+            self.p2is[i].range_check_2bounds::<BIT_P2>(
+                bound_params.p2_bounds[i],
+                bound_params.p2_bounds[i],
+            );
         }
     }
 
