@@ -22,7 +22,7 @@
     "@aztec/bb.js": "^0.82.2",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
-    "@enclave-e3/sdk": "^0.1.5",
+    "@enclave-e3/sdk": "workspace:*",
     "@noir-lang/acvm_js": "1.0.0-beta.3",
     "@noir-lang/noir_js": "1.0.0-beta.3",
     "@noir-lang/noirc_abi": "1.0.0-beta.3",

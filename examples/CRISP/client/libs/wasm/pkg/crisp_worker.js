@@ -20,6 +20,7 @@ self.onmessage = async function (event) {
           contracts: {
             enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
             ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+            feeToken: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
           },
           // local node
           rpcUrl: 'http://localhost:8545',
@@ -34,7 +35,7 @@ self.onmessage = async function (event) {
           type: 'encrypt_vote',
           success: true,
           encryptedVote: {
-            vote: result.encryptedVote,
+            vote: result.encryptedData,
             proofData: result.proof,
           },
         })

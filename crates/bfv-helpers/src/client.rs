@@ -35,7 +35,7 @@ pub fn bfv_encrypt<T>(
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
-    moduli: [u64; 1],
+    moduli: Vec<u64>,
 ) -> Result<Vec<u8>>
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
@@ -86,7 +86,7 @@ pub fn bfv_verifiable_encrypt<T>(
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
-    moduli: [u64; 1],
+    moduli: Vec<u64>,
 ) -> Result<VerifiableEncryptionResult>
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
@@ -145,8 +145,14 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = [1u64];
-        let encrypted_data =
-            bfv_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
+        let encrypted_data = bfv_encrypt(
+            num,
+            pk.to_bytes(),
+            degree,
+            plaintext_modulus,
+            moduli.to_vec(),
+        )
+        .unwrap();
 
         let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
@@ -175,7 +181,7 @@ mod tests {
             pk.to_bytes(),
             degree,
             plaintext_modulus,
-            moduli,
+            moduli.to_vec(),
         )
         .unwrap();
 
@@ -202,8 +208,14 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = [1u64];
-        let encrypted_data =
-            bfv_verifiable_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
+        let encrypted_data = bfv_verifiable_encrypt(
+            num,
+            pk.to_bytes(),
+            degree,
+            plaintext_modulus,
+            moduli.to_vec(),
+        )
+        .unwrap();
 
         let ct = Ciphertext::from_bytes(&encrypted_data.encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
@@ -232,7 +244,7 @@ mod tests {
             pk.to_bytes(),
             degree,
             plaintext_modulus,
-            moduli,
+            moduli.to_vec(),
         )
         .unwrap();
 

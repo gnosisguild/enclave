@@ -42,7 +42,7 @@ import {
   bfv_verifiable_encrypt_number,
   bfv_verifiable_encrypt_vector,
 } from "@enclave-e3/wasm";
-import { CircuitInputs, generateProof } from "./greco";
+import { generateProof } from "./greco";
 import { CompiledCircuit } from "@noir-lang/noir_js";
 
 export class EnclaveSDK {
@@ -140,7 +140,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          new BigUint64Array(this.protocolParams.moduli)
         );
       default:
         throw new Error("Protocol not supported");
@@ -165,7 +165,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          new BigUint64Array(this.protocolParams.moduli)
         );
       default:
         throw new Error("Protocol not supported");
@@ -191,7 +191,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          new BigUint64Array(this.protocolParams.moduli)
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -244,7 +244,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          new BigUint64Array(this.protocolParams.moduli)
         );
 
         const publicInputs = JSON.parse(circuitInputs);
