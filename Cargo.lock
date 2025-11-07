@@ -9130,7 +9130,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#ce938762aca87a948ecc38f3c0fc3974d444544c"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#1bb8019b8d9944ebf2fd293ec15d6cabc4e37da0"
 dependencies = [
  "anyhow",
  "bigint-poly",
@@ -9153,7 +9153,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#ce938762aca87a948ecc38f3c0fc3974d444544c"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#1bb8019b8d9944ebf2fd293ec15d6cabc4e37da0"
 dependencies = [
  "anyhow",
  "bigint-poly",
