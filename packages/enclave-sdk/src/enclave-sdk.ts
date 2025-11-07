@@ -98,6 +98,9 @@ export class EnclaveSDK {
         case FheProtocol.BFV:
           this.protocolParams = BfvProtocolParams.BFV_NORMAL;
           break;
+        case FheProtocol.TRBFV:
+          this.protocolParams = BfvProtocolParams.BFV_THRESHOLD;
+          break;
         default:
           throw new Error("Protocol not supported");
       }

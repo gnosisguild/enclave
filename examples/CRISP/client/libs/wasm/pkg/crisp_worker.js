@@ -26,7 +26,7 @@ self.onmessage = async function (event) {
           rpcUrl: 'http://localhost:8545',
           // default Anvil private key
           privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-          protocol: FheProtocol.BFV,
+          protocol: FheProtocol.TRBFV,
         })
 
         const result = await sdk.encryptNumberAndGenProof(voteId, publicKey, circuit)

@@ -291,6 +291,10 @@ export enum FheProtocol {
    * The BFV protocol
    */
   BFV = "BFV",
+  /**
+   * The TrBFV protocol
+   */
+  TRBFV = "TRBFV",
 }
 
 /**
@@ -339,7 +343,7 @@ export const BfvProtocolParams = {
    */
   BFV_THRESHOLD: {
     degree: 8192,
-    plaintextModulus: 1032193n,
+    plaintextModulus: 1000n,
     moduli: [
       0x00800000022a0001n,
       0x00800000021a0001n,
