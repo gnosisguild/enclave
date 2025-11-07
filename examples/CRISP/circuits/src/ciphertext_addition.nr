@@ -127,8 +127,8 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         for i in 0..L {
             // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial.
             // must be in {-1, 0, 1}, so the bound will always be 1 for all CRT moduli.
-            self.r0is[i].range_check_1bound::<1>(1);
-            self.r1is[i].range_check_1bound::<1>(1);
+            self.r0is[i].range_check_2bounds::<1>(1, 1);
+            self.r1is[i].range_check_2bounds::<1>(1, 1);
         }
     }
 
