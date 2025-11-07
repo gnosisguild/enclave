@@ -4,12 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bignum::{
-    bignum::{BigNum, derive_bignum},
-    fields::{bn254Fq::{self, BN254_Fq, BN254_Fq_PARAMS}, U256::U256},
-    params::BigNumParams,
-    RuntimeBigNum,
-};
 use polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
