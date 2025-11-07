@@ -181,7 +181,7 @@ pub async fn initialize_crisp_round(
     }
 
     info!("Generating parameters...");
-    let params = encode_bfv_params(&build_bfv_params_from_set_arc(SET_2048_1032193_1));
+    let params = encode_bfv_params(&build_bfv_params_from_set_arc(SET_8192_1000_4));
 
     let token_address: Address = token_address.parse()?;
     let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
