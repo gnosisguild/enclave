@@ -35,7 +35,7 @@ enclave wallet set --name cn2 --private-key "$PRIVATE_KEY_CN2"
 enclave wallet set --name cn3 --private-key "$PRIVATE_KEY_CN3" 
 
 # using & instead of -d so that wait works below
-enclave nodes up -v &
+enclave nodes up -v --experimental-trbfv &
 
 sleep 2
 
