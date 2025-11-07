@@ -13,6 +13,7 @@ use crate::server::models::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;
+use e3_sdk::bfv_helpers::params::SET_8192_1000_4;
 use e3_sdk::bfv_helpers::{
     build_bfv_params_from_set_arc, encode_bfv_params, params::SET_2048_1032193_1,
 };
