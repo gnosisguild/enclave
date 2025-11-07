@@ -140,7 +140,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli,
+          BigUint64Array.from(this.protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -165,7 +165,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli,
+          BigUint64Array.from(this.protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -193,7 +193,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli,
+          BigUint64Array.from(this.protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -246,7 +246,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli,
+          BigUint64Array.from(this.protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
