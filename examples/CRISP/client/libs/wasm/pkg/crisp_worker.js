@@ -20,13 +20,12 @@ self.onmessage = async function (event) {
           contracts: {
             enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
             ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
-            feeToken: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
           },
           // local node
           rpcUrl: 'http://localhost:8545',
           // default Anvil private key
           privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-          protocol: FheProtocol.TRBFV,
+          protocol: FheProtocol.BFV,
         })
 
         const result = await sdk.encryptNumberAndGenProof(voteId, publicKey, circuit)
@@ -35,7 +34,7 @@ self.onmessage = async function (event) {
           type: 'encrypt_vote',
           success: true,
           encryptedVote: {
-            vote: result.encryptedData,
+            vote: result.encryptedVote,
             proofData: result.proof,
           },
         })

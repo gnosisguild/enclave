@@ -128,8 +128,8 @@ importers:
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.26)(react@18.3.1)
       '@enclave-e3/sdk':
-        specifier: workspace:*
-        version: link:../../../packages/enclave-sdk
+        specifier: ^0.1.5
+        version: 0.1.5(@openzeppelin/contracts@5.3.0)(@swc/helpers@0.5.17)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.52.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.21(@types/node@22.7.5))(zod@4.1.12)
       '@noir-lang/acvm_js':
         specifier: 1.0.0-beta.3
         version: 1.0.0-beta.3
@@ -1561,6 +1561,15 @@ packages:
 
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
+
+  '@enclave-e3/contracts@0.1.5':
+    resolution: {integrity: sha512-C1Mo9z2JG6netDhpOsk0kZV8DBjVd4ftE5oqhpXDDbK+HHD4XHozjKMqmlUYTooSzzT3INGYNS/IEDUHxYOqTA==}
+
+  '@enclave-e3/sdk@0.1.5':
+    resolution: {integrity: sha512-AZGIYrlJZ6FeK6DIQWqNKZDwvDpw+l1zCd7hc97giFX2LrNbSAzf/UJmNewAXFfaGtlnOePSVsuixk/ZQd1TVw==}
+
+  '@enclave-e3/wasm@0.1.5':
+    resolution: {integrity: sha512-PZ/TpABK/PAAzO0d2+q17i3plzCs/E3chihc4yOi9DqCxdGFhm76hTueY/lDXusDnM+LUrEuaD11YR/2kBRvTg==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -11056,6 +11065,52 @@ snapshots:
   '@emotion/utils@1.4.2': {}
 
   '@emotion/weak-memoize@0.4.0': {}
+
+  '@enclave-e3/contracts@0.1.5(@openzeppelin/contracts@5.3.0)':
+    dependencies:
+      '@openzeppelin/contracts-upgradeable': 5.4.0(@openzeppelin/contracts@5.3.0)
+      '@zk-kit/lean-imt.sol': 2.0.1
+      poseidon-solidity: 0.0.5
+    transitivePeerDependencies:
+      - '@openzeppelin/contracts'
+
+  '@enclave-e3/sdk@0.1.5(@openzeppelin/contracts@5.3.0)(@swc/helpers@0.5.17)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.52.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.21(@types/node@22.7.5))(zod@4.1.12)':
+    dependencies:
+      '@aztec/bb.js': 0.82.3
+      '@enclave-e3/contracts': 0.1.5(@openzeppelin/contracts@5.3.0)
+      '@enclave-e3/wasm': 0.1.5
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      comlink: 4.4.2
+      viem: 2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)
+      vite-plugin-top-level-await: 1.6.0(@swc/helpers@0.5.17)(rollup@4.52.5)(vite@5.4.21(@types/node@22.7.5))
+      vite-plugin-wasm: 3.5.0(vite@5.4.21(@types/node@22.7.5))
+      vitest: 1.6.1(@types/node@22.7.5)
+      web-worker: 1.5.0
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@openzeppelin/contracts'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
+
+  '@enclave-e3/wasm@0.1.5': {}
 
   '@esbuild/aix-ppc64@0.20.0':
     optional: true

@@ -30,14 +30,9 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ownerAddress = await owner.getAddress();
 
-  const polynomial_degree = ethers.toBigInt(8192);
-  const plaintext_modulus = ethers.toBigInt(1000);
-  const moduli = [
-    ethers.toBigInt("36028797055270913"),
-    ethers.toBigInt("36028797054222337"),
-    ethers.toBigInt("36028797053698049"),
-    ethers.toBigInt("36028797051863041"),
-  ];
+  const polynomial_degree = ethers.toBigInt(2048);
+  const plaintext_modulus = ethers.toBigInt(1032193);
+  const moduli = [ethers.toBigInt("18014398492704769")];
 
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
     ["uint256", "uint256", "uint256[]"],

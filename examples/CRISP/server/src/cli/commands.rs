@@ -16,7 +16,7 @@ use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{
-    build_bfv_params_from_set_arc, encode_bfv_params, params::SET_8192_1000_4,
+    build_bfv_params_from_set_arc, encode_bfv_params, params::SET_2048_1032193_1,
 };
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -329,7 +329,7 @@ pub async fn decrypt_and_publish_result(
 }
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
-    build_bfv_params_from_set_arc(SET_8192_1000_4)
+    build_bfv_params_from_set_arc(SET_2048_1032193_1)
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
