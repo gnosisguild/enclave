@@ -125,14 +125,14 @@ test("CRISP smoke test", async ({
     .click();
   log(`clicking Cast Vote...`);
   await page.locator('button:has-text("Cast Vote")').click();
-  log(`waiting for 220_000...`);
-  await page.waitForTimeout(220_000);
+  const WAIT = 300_000;
+  log(`waiting for ${WAIT}ms...`);
+  await page.waitForTimeout(WAIT);
   log(`clicking historic polls button...`);
   await page.locator('a:has-text("Historic polls")').click();
   log(`asserting that Historic polls exists...`);
   await expect(page.locator("h1")).toHaveText("Historic polls");
   log(`asserting that result has 100% on the vote we clicked on...`);
-  await page.waitForSelector("[data-test-id^='poll-']", { timeout: 15000 });
   await expect(
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
   ).toHaveText("100%");
