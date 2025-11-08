@@ -9,6 +9,7 @@ use std::sync::Arc;
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
+use e3_bfv_helpers::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
@@ -114,10 +115,8 @@ impl TryFrom<InnerResponse> for CalculateThresholdDecryptionResponse {
                 .plaintext
                 .into_iter()
                 .map(|open_result| -> Result<_> {
-                    let vec_64 = Vec::<u64>::try_decode(&open_result, Encoding::poly())
-                        .context("could not decode plaintext")?;
-                    info!("FINISHED AGGREGATING: {:?}", vec_64);
-                    let bytes = bincode::serialize(&vec_64)?;
+                    let decoded = decode_plaintext_to_vec_u64(&open_result)?;
+                    let bytes = encode_vec_u64_to_bytes(&decoded);
                     Ok(ArcBytes::from_bytes(&bytes))
                 })
                 .collect::<Result<_>>()?,

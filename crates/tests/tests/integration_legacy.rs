@@ -22,6 +22,8 @@ use e3_events::{
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
+use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
+use e3_sdk::bfv_helpers::decode_plaintext_to_vec_u64;
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
@@ -280,11 +282,11 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         actual
             .decrypted_output
             .iter()
-            .map(|b| bincode::deserialize::<Vec<u64>>(b).unwrap())
+            .map(|b| decode_bytes_to_vec_u64(b))
             .collect::<Vec<Vec<u64>>>(),
         expected
             .iter()
-            .map(|p| Vec::<u64>::try_decode(&p, Encoding::poly()).unwrap())
+            .map(|p| decode_plaintext_to_vec_u64(p).unwrap())
             .collect::<Vec<Vec<u64>>>()
     );
 
@@ -435,11 +437,11 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         actual
             .decrypted_output
             .iter()
-            .map(|b| bincode::deserialize::<Vec<u64>>(b).unwrap())
+            .map(|b| decode_bytes_to_vec_u64(b))
             .collect::<Vec<Vec<u64>>>(),
         expected
             .iter()
-            .map(|p| Vec::<u64>::try_decode(&p, Encoding::poly()).unwrap())
+            .map(|p| decode_plaintext_to_vec_u64(p).unwrap())
             .collect::<Vec<Vec<u64>>>()
     );
 

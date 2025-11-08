@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use e3_events::{EnclaveEvent, EventBus, Subscribe};
+use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
 use tracing::{error, info};
 
 pub struct PlaintextWriter {
@@ -41,7 +42,8 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
                 error!("Decrypted output must not be empty!");
                 return;
             };
-            let output: Vec<u64> = bincode::deserialize(decrypted).unwrap();
+
+            let output = decode_bytes_to_vec_u64(&decrypted);
 
             info!(path = ?&self.path, "Writing Plaintext To Path");
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();

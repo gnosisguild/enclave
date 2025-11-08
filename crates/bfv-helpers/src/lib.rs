@@ -9,8 +9,20 @@ mod util;
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder};
+use fhe::bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext};
+use fhe_traits::FheDecoder;
 use std::sync::Arc;
+use thiserror::Error as ThisError;
+
+#[derive(ThisError, Debug)]
+pub enum Error {
+    #[error("Plaintext decoding failed")]
+    PlaintextDecodeFailed,
+    // TODO: add errors from client.rs
+}
+
+/// Result that returns a type T or a BfvHelpersError
+type Result<T> = std::result::Result<T, Error>;
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
@@ -335,6 +347,31 @@ pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
 /// Panics if the decoding fails (see `decode_bfv_params`).
 pub fn decode_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
     Arc::new(decode_bfv_params(bytes))
+}
+
+/// Decode Plaintext to a Vec<u64>
+pub fn decode_plaintext_to_vec_u64(value: &Plaintext) -> Result<Vec<u64>> {
+    let decoded = Vec::<u64>::try_decode(&value, Encoding::poly())
+        .map_err(|_| Error::PlaintextDecodeFailed)?;
+
+    Ok(decoded)
+}
+
+/// Convert from a Vec<u64> to Vec<u8>
+pub fn encode_vec_u64_to_bytes(value: &[u64]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for num in &value.to_vec() {
+        bytes.extend_from_slice(&num.to_le_bytes());
+    }
+    bytes
+}
+
+/// Decode bytes to Vec<u64>
+pub fn decode_bytes_to_vec_u64(bytes: &[u8]) -> Vec<u64> {
+    bytes
+        .chunks_exact(8)
+        .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
+        .collect()
 }
 
 #[cfg(test)]
