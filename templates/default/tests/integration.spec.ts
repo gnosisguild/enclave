@@ -245,7 +245,6 @@ describe("Integration", () => {
     const num1 = 12n;
     const num2 = 21n;
     const publicKeyBytes = hexToBytes(state.publicKey);
-    console.log(`publicKeyBytes: ${publicKeyBytes}`);
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes);
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes);
 
