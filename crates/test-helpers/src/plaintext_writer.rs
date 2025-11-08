@@ -43,7 +43,7 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
                 return;
             };
 
-            let output = decode_bytes_to_vec_u64(&decrypted);
+            let output = decode_bytes_to_vec_u64(&decrypted).unwrap();
 
             info!(path = ?&self.path, "Writing Plaintext To Path");
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();

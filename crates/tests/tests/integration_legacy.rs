@@ -282,7 +282,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         actual
             .decrypted_output
             .iter()
-            .map(|b| decode_bytes_to_vec_u64(b))
+            .map(|b| decode_bytes_to_vec_u64(b).unwrap())
             .collect::<Vec<Vec<u64>>>(),
         expected
             .iter()
@@ -437,7 +437,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         actual
             .decrypted_output
             .iter()
-            .map(|b| decode_bytes_to_vec_u64(b))
+            .map(|b| decode_bytes_to_vec_u64(b).unwrap())
             .collect::<Vec<Vec<u64>>>(),
         expected
             .iter()

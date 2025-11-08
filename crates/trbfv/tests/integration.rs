@@ -142,7 +142,7 @@ async fn test_trbfv_isolation() -> Result<()> {
 
     let results = plaintext
         .into_iter()
-        .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()))
+        .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()).unwrap())
         .collect::<Vec<Vec<u64>>>();
 
     let results: Vec<u64> = results

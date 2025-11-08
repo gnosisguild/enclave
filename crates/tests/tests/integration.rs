@@ -6,7 +6,7 @@
 
 use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
@@ -340,7 +340,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let results = plaintext
         .into_iter()
-        .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()))
+        .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()).expect("error decoding bytes"))
         .collect::<Vec<Vec<u64>>>();
 
     let results: Vec<u64> = results

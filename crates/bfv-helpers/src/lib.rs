@@ -19,6 +19,8 @@ pub enum Error {
     #[error("Plaintext decoding failed")]
     PlaintextDecodeFailed,
     // TODO: add errors from client.rs
+    #[error("Input was not encoded correctly")]
+    BadEncoding,
 }
 
 /// Result that returns a type T or a BfvHelpersError
@@ -367,11 +369,15 @@ pub fn encode_vec_u64_to_bytes(value: &[u64]) -> Vec<u8> {
 }
 
 /// Decode bytes to Vec<u64>
-pub fn decode_bytes_to_vec_u64(bytes: &[u8]) -> Vec<u64> {
-    bytes
+pub fn decode_bytes_to_vec_u64(bytes: &[u8]) -> Result<Vec<u64>> {
+    if bytes.len() % 8 != 0 {
+        return Err(Error::BadEncoding);
+    }
+
+    Ok(bytes
         .chunks_exact(8)
         .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]
