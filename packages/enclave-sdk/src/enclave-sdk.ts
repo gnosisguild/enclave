@@ -186,8 +186,6 @@ export class EnclaveSDK {
     data: bigint,
     publicKey: Uint8Array,
   ): Promise<EncryptedValueAndPublicInputs> {
-    console.log("encrypting number:" + data);
-    console.log("encrypting with public key:" + publicKey);
     await initializeWasm();
     switch (this.protocol) {
       case FheProtocol.BFV:
@@ -589,9 +587,9 @@ export class EnclaveSDK {
       options.rpcUrl.startsWith("ws://") || options.rpcUrl.startsWith("wss://");
     const transport = isWebSocket
       ? webSocket(options.rpcUrl, {
-        keepAlive: { interval: 30_000 },
-        reconnect: { attempts: 5, delay: 2_000 },
-      })
+          keepAlive: { interval: 30_000 },
+          reconnect: { attempts: 5, delay: 2_000 },
+        })
       : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,
