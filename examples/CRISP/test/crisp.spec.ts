@@ -132,6 +132,7 @@ test("CRISP smoke test", async ({
   log(`asserting that Historic polls exists...`);
   await expect(page.locator("h1")).toHaveText("Historic polls");
   log(`asserting that result has 100% on the vote we clicked on...`);
+  await page.waitForSelector("[data-test-id^='poll-']", { timeout: 15000 });
   await expect(
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
   ).toHaveText("100%");
