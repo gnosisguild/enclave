@@ -264,7 +264,7 @@ pub async fn register_plaintext_output_published(
                 // The computation sums the encrypted votes: '0' for Option 1, '1' for Option 2.
                 // Thus, the decrypted sum directly represents the number of votes for Option 2.
                 // The output is expected to be a Vec<u8> in little endian format of u64s.
-                let decoded = decode_bytes_to_vec_u64(&event.plaintextOutput);
+                let decoded = decode_bytes_to_vec_u64(&event.plaintextOutput)?;
 
                 // decoded[0] is the sum of all encrypted votes (0s and 1s).
                 // Since Option 1 votes are encrypted as '0' and Option 2 votes as '1',
