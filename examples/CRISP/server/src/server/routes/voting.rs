@@ -40,7 +40,7 @@ async fn broadcast_encrypted_vote(
     store: web::Data<AppData>,
 ) -> impl Responder {
     let vote = data.into_inner();
-    error!("[e3_id={}] Broadcasting encrypted vote", vote.round_id);
+    info!("[e3_id={}] Broadcasting encrypted vote", vote.round_id);
     // Validate and update vote status
     let has_voted = match store
         .e3(vote.round_id)
