@@ -84,7 +84,7 @@ export const SET_8192_1000_4 = {
 };
 
 // Set default parameter set
-export const BFV_PARAMS_SET = SET_8192_1000_4;
+export const BFV_PARAMS_SET = SET_2048_1032193_1;
 
 // Compute provider parameters structure
 export interface ComputeProviderParams {
