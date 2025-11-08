@@ -14,11 +14,13 @@ use libp2p::{
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
     kad::{
-        self, store::MemoryStore, Behaviour as KademliaBehaviour, GetRecordOk, QueryId,
+        self,
+        store::{MemoryStore, MemoryStoreConfig},
+        Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
-    Swarm,
+    StreamProtocol, Swarm,
 };
 use std::sync::atomic::AtomicBool;
 use std::{
@@ -29,6 +31,10 @@ use std::{
 use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
+
+const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
+const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
+const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
 use crate::events::{GossipData, NetCommand};
 use crate::events::{NetEvent, PutOrStoreError};
@@ -166,6 +172,7 @@ fn create_behaviour(
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
+        .max_transmit_size(MAX_GOSSIP_MSG_SIZE_KB * 1024)
         .validation_mode(gossipsub::ValidationMode::Strict)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
@@ -175,8 +182,19 @@ fn create_behaviour(
         gossipsub_config,
     )?;
 
+    let mut config = KademliaConfig::new(PROTOCOL_NAME);
+    config
+        .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
+        .set_query_timeout(Duration::from_secs(30));
+    let store_config = MemoryStoreConfig {
+        max_records: 1024,
+        max_value_bytes: MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024,
+        max_providers_per_key: usize::MAX,
+        max_provided_keys: 1024,
+    };
+    let store = MemoryStore::with_config(peer_id, store_config);
     // Setup Kademlia as server so that it responds to events correctly
-    let mut kademlia = KademliaBehaviour::new(peer_id, MemoryStore::new(peer_id));
+    let mut kademlia = KademliaBehaviour::with_config(peer_id, store, config);
     kademlia.set_mode(Some(kad::Mode::Server));
 
     Ok(NodeBehaviour {
@@ -323,7 +341,9 @@ async fn process_swarm_event(
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
-        _ => {}
+        unknown => {
+            trace!("Unknown event: {:?}", unknown);
+        }
     };
     Ok(())
 }
@@ -376,8 +396,10 @@ fn handle_gossip_publish(
     topic: String,
     correlation_id: CorrelationId,
 ) -> Result<()> {
+    let bytes = data.to_bytes()?;
+    warn!("About to try to Gossip {} bytes", bytes.len());
     let gossipsub_behaviour = &mut swarm.behaviour_mut().gossipsub;
-    match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
+    match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), bytes) {
         Ok(message_id) => {
             event_tx.send(NetEvent::GossipPublished {
                 correlation_id,
@@ -385,7 +407,7 @@ fn handle_gossip_publish(
             })?;
         }
         Err(e) => {
-            warn!(error=?e, "Could not publish to swarm. Retrying...");
+            error!(error=?e, "Could not GossipPublish.");
             event_tx.send(NetEvent::GossipPublishError {
                 correlation_id,
                 error: Arc::new(e),

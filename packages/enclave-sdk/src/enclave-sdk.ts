@@ -42,7 +42,7 @@ import {
   bfv_verifiable_encrypt_number,
   bfv_verifiable_encrypt_vector,
 } from "@enclave-e3/wasm";
-import { CircuitInputs, generateProof } from "./greco";
+import { generateProof } from "./greco";
 import { CompiledCircuit } from "@noir-lang/noir_js";
 
 export class EnclaveSDK {
@@ -71,14 +71,14 @@ export class EnclaveSDK {
     if (!isValidAddress(config.contracts.ciphernodeRegistry)) {
       throw new SDKError(
         "Invalid CiphernodeRegistry contract address",
-        "INVALID_ADDRESS"
+        "INVALID_ADDRESS",
       );
     }
 
     if (!isValidAddress(config.contracts.feeToken)) {
       throw new SDKError(
         "Invalid FeeToken contract address",
-        "INVALID_ADDRESS"
+        "INVALID_ADDRESS",
       );
     }
 
@@ -86,7 +86,7 @@ export class EnclaveSDK {
     this.contractClient = new ContractClient(
       config.publicClient,
       config.walletClient,
-      config.contracts
+      config.contracts,
     );
 
     this.protocol = config.protocol;
@@ -97,6 +97,9 @@ export class EnclaveSDK {
       switch (this.protocol) {
         case FheProtocol.BFV:
           this.protocolParams = BfvProtocolParams.BFV_NORMAL;
+          break;
+        case FheProtocol.TRBFV:
+          this.protocolParams = BfvProtocolParams.BFV_THRESHOLD;
           break;
         default:
           throw new Error("Protocol not supported");
@@ -117,7 +120,7 @@ export class EnclaveSDK {
     } catch (error) {
       throw new SDKError(
         `Failed to initialize SDK: ${error}`,
-        "SDK_INITIALIZATION_FAILED"
+        "SDK_INITIALIZATION_FAILED",
       );
     }
   }
@@ -130,7 +133,7 @@ export class EnclaveSDK {
    */
   public async encryptNumber(
     data: bigint,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
   ): Promise<Uint8Array> {
     await initializeWasm();
     switch (this.protocol) {
@@ -140,7 +143,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          BigUint64Array.from(this.protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -155,7 +158,7 @@ export class EnclaveSDK {
    */
   public async encryptVector(
     data: BigUint64Array,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
   ): Promise<Uint8Array> {
     await initializeWasm();
     switch (this.protocol) {
@@ -165,7 +168,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          BigUint64Array.from(this.protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -181,7 +184,7 @@ export class EnclaveSDK {
    */
   public async encryptNumberAndGenInputs(
     data: bigint,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     switch (this.protocol) {
@@ -191,7 +194,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          BigUint64Array.from(this.protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -214,7 +217,7 @@ export class EnclaveSDK {
   public async encryptNumberAndGenProof(
     data: bigint,
     publicKey: Uint8Array,
-    circuit: CompiledCircuit
+    circuit: CompiledCircuit,
   ): Promise<VerifiableEncryptionResult> {
     const { publicInputs, encryptedData } =
       await this.encryptNumberAndGenInputs(data, publicKey);
@@ -234,7 +237,7 @@ export class EnclaveSDK {
    */
   public async encryptVectorAndGenInputs(
     data: BigUint64Array,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     switch (this.protocol) {
@@ -244,7 +247,7 @@ export class EnclaveSDK {
           publicKey,
           this.protocolParams.degree,
           this.protocolParams.plaintextModulus,
-          this.protocolParams.moduli
+          BigUint64Array.from(this.protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -267,7 +270,7 @@ export class EnclaveSDK {
   public async encryptVectorAndGenProof(
     data: BigUint64Array,
     publicKey: Uint8Array,
-    circuit: CompiledCircuit
+    circuit: CompiledCircuit,
   ): Promise<VerifiableEncryptionResult> {
     const { publicInputs, encryptedData } =
       await this.encryptVectorAndGenInputs(data, publicKey);
@@ -322,7 +325,7 @@ export class EnclaveSDK {
       params.e3ProgramParams,
       params.computeProviderParams,
       params.customParams,
-      params.gasLimit
+      params.gasLimit,
     );
   }
 
@@ -345,7 +348,7 @@ export class EnclaveSDK {
   public async activateE3(
     e3Id: bigint,
     publicKey: `0x${string}`,
-    gasLimit?: bigint
+    gasLimit?: bigint,
   ): Promise<Hash> {
     if (!this.initialized) {
       await this.initialize();
@@ -360,7 +363,7 @@ export class EnclaveSDK {
   public async publishInput(
     e3Id: bigint,
     data: `0x${string}`,
-    gasLimit?: bigint
+    gasLimit?: bigint,
   ): Promise<Hash> {
     if (!this.initialized) {
       await this.initialize();
@@ -376,7 +379,7 @@ export class EnclaveSDK {
     e3Id: bigint,
     ciphertextOutput: `0x${string}`,
     proof: `0x${string}`,
-    gasLimit?: bigint
+    gasLimit?: bigint,
   ): Promise<Hash> {
     if (!this.initialized) {
       await this.initialize();
@@ -386,7 +389,7 @@ export class EnclaveSDK {
       e3Id,
       ciphertextOutput,
       proof,
-      gasLimit
+      gasLimit,
     );
   }
 
@@ -406,11 +409,11 @@ export class EnclaveSDK {
    */
   public onEnclaveEvent<T extends AllEventTypes>(
     eventType: T,
-    callback: EventCallback<T>
+    callback: EventCallback<T>,
   ): void {
     // Determine which contract to listen to based on event type
     const isEnclaveEvent = Object.values(EnclaveEventType).includes(
-      eventType as EnclaveEventType
+      eventType as EnclaveEventType,
     );
     const contractAddress = isEnclaveEvent
       ? this.config.contracts.enclave
@@ -423,7 +426,7 @@ export class EnclaveSDK {
       contractAddress,
       eventType,
       abi,
-      callback
+      callback,
     );
   }
 
@@ -432,7 +435,7 @@ export class EnclaveSDK {
    */
   public off<T extends AllEventTypes>(
     eventType: T,
-    callback: EventCallback<T>
+    callback: EventCallback<T>,
   ): void {
     this.eventListener.off(eventType, callback);
   }
@@ -442,7 +445,7 @@ export class EnclaveSDK {
    */
   public once<T extends AllEventTypes>(
     type: T,
-    callback: EventCallback<T>
+    callback: EventCallback<T>,
   ): void {
     const handler: EventCallback<T> = (event) => {
       this.off(type, handler);
@@ -460,10 +463,10 @@ export class EnclaveSDK {
   public async getHistoricalEvents(
     eventType: AllEventTypes,
     fromBlock?: bigint,
-    toBlock?: bigint
+    toBlock?: bigint,
   ): Promise<Log[]> {
     const isEnclaveEvent = Object.values(EnclaveEventType).includes(
-      eventType as EnclaveEventType
+      eventType as EnclaveEventType,
     );
     const contractAddress = isEnclaveEvent
       ? this.config.contracts.enclave
@@ -477,7 +480,7 @@ export class EnclaveSDK {
       eventType,
       abi,
       fromBlock,
-      toBlock
+      toBlock,
     );
   }
 
@@ -507,14 +510,14 @@ export class EnclaveSDK {
     args: readonly unknown[],
     contractAddress: `0x${string}`,
     abi: Abi,
-    value?: bigint
+    value?: bigint,
   ): Promise<bigint> {
     return this.contractClient.estimateGas(
       functionName,
       args,
       contractAddress,
       abi,
-      value
+      value,
     );
   }
 
@@ -560,7 +563,7 @@ export class EnclaveSDK {
     this.contractClient = new ContractClient(
       this.config.publicClient,
       this.config.walletClient,
-      this.config.contracts
+      this.config.contracts,
     );
 
     this.initialized = false;

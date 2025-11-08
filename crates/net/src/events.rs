@@ -21,6 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
+use tracing::{info, warn};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -138,6 +139,8 @@ impl NetEvent {
     pub fn correlation_id(&self) -> Option<CorrelationId> {
         use NetEvent as N;
         match self {
+            N::GossipPublished { correlation_id, .. } => Some(*correlation_id),
+            N::GossipPublishError { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecordError { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
@@ -157,6 +160,10 @@ pub struct DocumentPublishedNotification {
 }
 
 impl DocumentPublishedNotification {
+    pub fn new(meta: DocumentMeta, key: Cid) -> Self {
+        Self { meta, key }
+    }
+
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         bincode::serialize(self).context("Could not serialize DocumentPublishedNotification")
     }
@@ -212,6 +219,5 @@ where
     })
     .await
     .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {}", debug_cmd)))?;
-
     result
 }

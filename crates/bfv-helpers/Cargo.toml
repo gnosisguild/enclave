@@ -15,8 +15,9 @@ rand.workspace = true
 anyhow.workspace = true
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
-greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator"}
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 num-bigint = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 hex.workspace = true

@@ -136,7 +136,7 @@ pub trait EnclaveWrite {
         e3_params: Bytes,
         compute_provider_params: Bytes,
         custom_params: Bytes,
-    ) -> Result<TransactionReceipt>;
+    ) -> Result<(TransactionReceipt, U256)>;
 
     /// Activate an E3 with a public key
     async fn activate(&self, e3_id: U256, pub_key: Bytes) -> Result<TransactionReceipt>;
@@ -382,12 +382,15 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_params: Bytes,
         compute_provider_params: Bytes,
         custom_params: Bytes,
-    ) -> Result<TransactionReceipt> {
+    ) -> Result<(TransactionReceipt, U256)> {
         let _guard = NONCE_LOCK.lock().await;
         let wallet_addr = self
             .wallet_address
             .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
+
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let e3_id = contract.nexte3Id().call().await?;
 
         let e3_request = E3RequestParams {
             threshold,
@@ -399,11 +402,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             customParams: custom_params.clone(),
         };
 
-        let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract.request(e3_request).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
-        Ok(receipt)
+        Ok((receipt, e3_id))
     }
 
     async fn activate(&self, e3_id: U256, pub_key: Bytes) -> Result<TransactionReceipt> {

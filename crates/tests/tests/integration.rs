@@ -6,7 +6,7 @@
 
 use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
@@ -15,7 +15,7 @@ use e3_events::{
     TicketBalanceUpdated,
 };
 use e3_multithread::Multithread;
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
+use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
@@ -340,10 +340,8 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let results = plaintext
         .into_iter()
-        .map(|a| {
-            bincode::deserialize(&a.extract_bytes()).context("Could not deserialize plaintext")
-        })
-        .collect::<Result<Vec<Vec<u64>>>>()?;
+        .map(|a| decode_bytes_to_vec_u64(&a.extract_bytes()).expect("error decoding bytes"))
+        .collect::<Vec<Vec<u64>>>();
 
     let results: Vec<u64> = results
         .into_iter()

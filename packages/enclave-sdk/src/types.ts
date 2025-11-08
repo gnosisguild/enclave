@@ -291,6 +291,10 @@ export enum FheProtocol {
    * The BFV protocol
    */
   BFV = "BFV",
+  /**
+   * The TrBFV protocol
+   */
+  TRBFV = "TRBFV",
 }
 
 /**
@@ -312,7 +316,7 @@ export interface ProtocolParams {
   /**
    * The moduli
    */
-  moduli: bigint;
+  moduli: bigint[];
 }
 
 /**
@@ -328,7 +332,24 @@ export const BfvProtocolParams = {
   BFV_NORMAL: {
     degree: 2048,
     plaintextModulus: 1032193n,
-    moduli: 0x3fffffff000001n,
+    moduli: [0x3fffffff000001n],
+  } as const satisfies ProtocolParams,
+
+  /**
+   * Recommended parameters for TrBFV protocol
+   * - Degree: 8192
+   * - Plaintext modulus: 1000
+   * - Moduli: [0x00800000022a0001, 0x00800000021a0001, 0x0080000002120001, 0x0080000001f60001]
+   */
+  BFV_THRESHOLD: {
+    degree: 8192,
+    plaintextModulus: 1000n,
+    moduli: [
+      0x00800000022a0001n,
+      0x00800000021a0001n,
+      0x0080000002120001n,
+      0x0080000001f60001n,
+    ],
   } as const satisfies ProtocolParams,
 };
 

@@ -26,6 +26,7 @@ use crate::helpers::datastore::setup_datastore;
 pub async fn execute(
     config: &AppConfig,
     address: Address,
+    experimental_trbfv: bool,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
@@ -34,25 +35,29 @@ pub async fn execute(
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
 
-    CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(&address.to_string())
-        .with_keyshare()
         .with_source_bus(&bus)
         .with_datastore(store)
         .with_sortition_score()
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
         .with_contract_bonding_registry()
-        .with_contract_ciphernode_registry()
-        .build()
-        .await?;
+        .with_contract_ciphernode_registry();
 
-    let (_, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
+    if experimental_trbfv {
+        builder = builder.with_trbfv();
+    } else {
+        builder = builder.with_keyshare();
+    }
+    builder.build().await?;
+    let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
         &cipher,
         config.quic_port(),
         repositories.libp2p_keypair(),
+        experimental_trbfv,
     )
     .await?;
 

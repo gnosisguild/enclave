@@ -6,12 +6,28 @@
 
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
+use e3_sdk::bfv_helpers::decode_bfv_params;
 use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, params::SET_2048_1032193_1};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::fs;
+use std::{fs, sync::Arc};
+
+#[derive(Debug, Clone)]
+struct HexBytes(pub Vec<u8>);
+
+fn parse_hex(s: &str) -> Result<HexBytes, String> {
+    // Remove "0x" or "0X" prefix if present
+    let s = s
+        .strip_prefix("0x")
+        .or_else(|| s.strip_prefix("0X"))
+        .unwrap_or(s);
+    // Decode hex string to bytes
+    hex::decode(s)
+        .map(HexBytes)
+        .map_err(|e| format!("Invalid hex string: {}", e))
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,6 +40,9 @@ struct Args {
 
     #[arg(short, long, value_delimiter = ',')]
     plaintext: Vec<u64>,
+
+    #[arg(long, value_parser = parse_hex)]
+    params: Option<HexBytes>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,13 +51,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read the base64 encoded string from the input file
     println!("Loading public key from {}", args.input);
     let bytes = fs::read(&args.input)?;
-
-    // Decode the base64 string
-    let param_set = SET_2048_1032193_1;
-    let params = build_bfv_params_from_set_arc(param_set);
+    let params = if let Some(params_bytes) = args.params {
+        Arc::new(decode_bfv_params(&params_bytes.0))
+    } else {
+        build_bfv_params_from_set_arc(SET_2048_1032193_1)
+    };
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
-
     let raw_plaintext = args.plaintext;
+
     println!("Encrypting plaintext: {:?}", raw_plaintext);
 
     let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;

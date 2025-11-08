@@ -9,14 +9,16 @@ mod filter;
 use std::fmt::{self, Display};
 
 use actix::Message;
-use chrono::{serde::ts_seconds, DateTime, Utc};
+use chrono::{serde::ts_seconds, DateTime, Duration, Utc};
 use e3_utils::ArcBytes;
 use filter::Filter;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::E3id;
 
 pub type PartyId = u64;
+const DEFAULT_KADEMLIA_EXPIRY_DAYS: i64 = 30;
 
 /// Diambiguates the kind of document we are looking for
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -44,8 +46,10 @@ impl DocumentMeta {
         e3_id: E3id,
         kind: DocumentKind,
         filter: Vec<Filter<PartyId>>,
-        expires_at: DateTime<Utc>,
+        expires_at: Option<DateTime<Utc>>,
     ) -> DocumentMeta {
+        let expires_at =
+            expires_at.unwrap_or_else(|| Utc::now() + Duration::days(DEFAULT_KADEMLIA_EXPIRY_DAYS));
         Self {
             e3_id,
             expires_at,
@@ -76,9 +80,16 @@ pub struct PublishDocumentRequested {
     pub value: ArcBytes,
 }
 
+impl PublishDocumentRequested {
+    pub fn new(meta: DocumentMeta, value: ArcBytes) -> Self {
+        warn!("Publishing document that is {}", value.size());
+        Self { meta, value }
+    }
+}
+
 impl Display for PublishDocumentRequested {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.meta) // XXX:: apply ArcBytes and rely on debug once trbfv is merged
+        write!(f, "{:?}", self)
     }
 }
 
@@ -101,7 +112,7 @@ mod tests {
             E3id::new("1", 1),
             DocumentKind::TrBFV,
             vec![Filter::Range(Some(100), Some(200)), Filter::Item(77)],
-            Utc::now(),
+            Some(Utc::now()),
         );
         assert_eq!(meta.matches(&21), false);
         assert_eq!(meta.matches(&77), true);
@@ -111,7 +122,12 @@ mod tests {
     }
     #[test]
     fn test_meta_no_filters() {
-        let meta = DocumentMeta::new(E3id::new("1", 1), DocumentKind::TrBFV, vec![], Utc::now());
+        let meta = DocumentMeta::new(
+            E3id::new("1", 1),
+            DocumentKind::TrBFV,
+            vec![],
+            Some(Utc::now()),
+        );
         assert_eq!(meta.matches(&21), true);
         assert_eq!(meta.matches(&77), true);
         assert_eq!(meta.matches(&90), true);

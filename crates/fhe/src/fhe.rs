@@ -7,7 +7,10 @@
 use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
+use e3_bfv_helpers::{
+    build_bfv_params_arc, decode_bfv_params_arc, decode_plaintext_to_vec_u64,
+    encode_vec_u64_to_bytes,
+};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
 use e3_utils::{ArcBytes, SharedRng};
@@ -121,12 +124,9 @@ impl Fhe {
             .iter()
             .map(|k| DecryptionShare::deserialize(k, &self.params, arc_ct.clone()))
             .aggregate()?;
-        let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
-        let mut bytes = Vec::with_capacity(decoded.len() * 8);
-        for value in decoded {
-            bytes.extend_from_slice(&value.to_le_bytes());
-        }
-
+        let decoded =
+            decode_plaintext_to_vec_u64(&plaintext).context("Could not decode plaintext")?;
+        let bytes = encode_vec_u64_to_bytes(&decoded);
         Ok(bytes)
     }
 }

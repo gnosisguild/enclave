@@ -14,6 +14,15 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
     otel: Option<String>,
+    experimental_trbfv: bool,
 ) -> Result<()> {
-    daemon::execute(config, exclude, verbose, config_string, otel).await
+    daemon::execute(
+        config,
+        exclude,
+        verbose,
+        config_string,
+        otel,
+        experimental_trbfv,
+    )
+    .await
 }

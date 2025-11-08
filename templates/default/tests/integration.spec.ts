@@ -73,11 +73,11 @@ type E3State =
 
 async function setupEventListeners(
   sdk: EnclaveSDK,
-  store: Map<bigint, E3State>
+  store: Map<bigint, E3State>,
 ) {
   async function waitForEvent<T extends AllEventTypes>(
     type: T,
-    trigger?: () => Promise<void>
+    trigger?: () => Promise<void>,
   ): Promise<EnclaveEvent<T>> {
     return new Promise((resolve) => {
       sdk.once(type, resolve);
@@ -191,7 +191,7 @@ describe("Integration", () => {
     const e3ProgramParams = encodeBfvParams();
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
-      true // Mock the compute provider parameters, return 32 bytes of 0x00
+      true, // Mock the compute provider parameters, return 32 bytes of 0x00
     );
 
     let state;
@@ -252,21 +252,21 @@ describe("Integration", () => {
       await sdk.publishInput(
         e3Id,
         `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join(
-          ""
-        )}` as `0x${string}`
+          "",
+        )}` as `0x${string}`,
       );
     });
     await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
       await sdk.publishInput(
         e3Id,
         `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join(
-          ""
-        )}` as `0x${string}`
+          "",
+        )}` as `0x${string}`,
       );
     });
 
     const plaintextEvent = await waitForEvent(
-      EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED
+      EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED,
     );
 
     const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput);

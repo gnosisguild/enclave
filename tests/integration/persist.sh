@@ -24,6 +24,8 @@ enclave_wallet_set ag "$PRIVATE_KEY_AG"
 enclave_wallet_set cn1 "$PRIVATE_KEY_CN1"
 enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
 enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
+enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
+enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
 
 # start swarm
 enclave_nodes_up
@@ -39,11 +41,28 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localho
 heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
 
+heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
+pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
+
+heading "Add ciphernode $CIPHERNODE_ADDRESS_5"
+pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_5 --network localhost
+
 heading "Request Committee"
 
-ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
+ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh \
+  --moduli 0x800000022a0001 \
+  --moduli 0x800000021a0001 \
+  --moduli 0x80000002120001 \
+  --moduli 0x80000001f60001 \
+  --degree 8192 \
+  --plaintext-modulus 1032193)
 
-pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
+pnpm committee:new \
+  --network localhost \
+  --duration 4 \
+  --e3-params "$ENCODED_PARAMS" \
+  --threshold-quorum 2 \
+  --threshold-total 5
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
@@ -60,11 +79,13 @@ enclave_nodes_start ag
 sleep 2
 
 heading "Mock encrypted plaintext"
-$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
+$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
 heading "Mock activate e3-id"
-# NOTE using -s to avoid key spaming the output
-pnpm -s e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
+
+PUBLIC_KEY_FILE=/tmp/enclave-public-key.txt
+echo "0x${PUBLIC_KEY}" > $PUBLIC_KEY_FILE
+pnpm -s e3:activate --e3-id 0 --network localhost --public-key-file $PUBLIC_KEY_FILE
 
 heading "Mock publish input e3-id"
 pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
@@ -78,8 +99,7 @@ pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR
 
 waiton "$SCRIPT_DIR/output/plaintext.txt"
 
-ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
- 
+ACTUAL=$(cut -d',' -f1,2 $SCRIPT_DIR/output/plaintext.txt)
 
 # Assume plaintext is shorter
 
@@ -109,4 +129,3 @@ echo -e "\033[32m
 
 
 gracefull_shutdown
-

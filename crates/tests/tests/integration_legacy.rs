@@ -22,6 +22,8 @@ use e3_events::{
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
+use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
+use e3_sdk::bfv_helpers::decode_plaintext_to_vec_u64;
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
@@ -30,11 +32,12 @@ use e3_test_helpers::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::SharedRng;
+use fhe::bfv::Encoding;
 use fhe::{
     bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
-use fhe_traits::Serialize;
+use fhe_traits::{FheDecoder, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
@@ -165,6 +168,15 @@ fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
 
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    let subscriber = fmt()
+        .with_env_filter(EnvFilter::new("info"))
+        .with_test_writer()
+        .finish();
+
+    let _guard = tracing::subscriber::set_default(subscriber);
+
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
     let e3_id = E3id::new("1234", 1);
@@ -237,37 +249,46 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     println!("Aggregating decryption...");
     // Aggregate decryption
 
-    // TODO:
-    // Making these values large (especially the yes value) requires changing
-    // the params we use here - as we tune the FHE we need to take care
-    let raw_plaintext = vec![1234u64, 873827u64];
+    let raw_plaintext = vec![vec![1234, 567890]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: vec![ArcBytes::from_bytes(&ciphertext.to_bytes())],
+        ciphertext_output: ciphertext
+            .iter()
+            .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
+            .collect(),
         e3_id: e3_id.clone(),
     });
 
     bus.send(ciphertext_published_event.clone()).await?;
-    let expected_plaintext_agg_event = PlaintextAggregated {
-        e3_id: e3_id.clone(),
-        decrypted_output: vec![ArcBytes::from_bytes(&expected)],
-    };
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(6))
         .await?;
 
-    let aggregated_event = history
+    let actual = history
         .into_iter()
         .filter_map(|e| match e {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
             _ => None,
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+        .first()
+        .unwrap()
+        .clone();
 
-    assert_eq!(aggregated_event, vec![expected_plaintext_agg_event]);
+    assert_eq!(
+        actual
+            .decrypted_output
+            .iter()
+            .map(|b| decode_bytes_to_vec_u64(b).unwrap())
+            .collect::<Vec<Vec<u64>>>(),
+        expected
+            .iter()
+            .map(|p| decode_plaintext_to_vec_u64(p).unwrap())
+            .collect::<Vec<Vec<u64>>>()
+    );
 
     Ok(())
 }
@@ -383,11 +404,14 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .aggregate()?;
 
     // Publish the ciphertext
-    let raw_plaintext = vec![1234u64, 873827u64];
+    let raw_plaintext = vec![vec![1234, 567890]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: vec![ArcBytes::from_bytes(&ciphertext.to_bytes())],
+            ciphertext_output: ciphertext
+                .iter()
+                .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
+                .collect(),
             e3_id: e3_id.clone(),
         })
         .clone(),
@@ -398,11 +422,28 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .send(TakeEvents::<EnclaveEvent>::new(5))
         .await?;
 
-    let actual = history.iter().find_map(|evt| match evt {
-        EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
-        _ => None,
-    });
-    assert_eq!(actual, Some(vec![ArcBytes::from_bytes(&expected)]));
+    let actual = history
+        .into_iter()
+        .filter_map(|e| match e {
+            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .first()
+        .unwrap()
+        .clone();
+
+    assert_eq!(
+        actual
+            .decrypted_output
+            .iter()
+            .map(|b| decode_bytes_to_vec_u64(b).unwrap())
+            .collect::<Vec<Vec<u64>>>(),
+        expected
+            .iter()
+            .map(|p| decode_plaintext_to_vec_u64(p).unwrap())
+            .collect::<Vec<Vec<u64>>>()
+    );
 
     Ok(())
 }
@@ -415,9 +456,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
-    let event_rx = event_tx.subscribe();
+    let event_rx = Arc::new(event_tx.subscribe());
     // Pas cmd and event channels to NetEventTranslator
-    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "my-topic");
+    NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<GossipData>>> = Arc::new(Mutex::new(Vec::new()));
@@ -588,7 +629,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
 
-    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "mytopic");
+    NetEventTranslator::setup(&bus, &cmd_tx, &Arc::new(event_rx), "mytopic");
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {

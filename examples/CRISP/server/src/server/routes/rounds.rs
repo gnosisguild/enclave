@@ -209,7 +209,7 @@ pub async fn initialize_crisp_round(
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
     let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
-    let res = contract
+    let (receipt, e3_id) = contract
         .request_e3(
             threshold,
             start_window,
@@ -220,7 +220,10 @@ pub async fn initialize_crisp_round(
             custom_params_bytes,
         )
         .await?;
-    info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
+    info!(
+        "E3 request sent. TxHash: {:?}, E3 ID: {}",
+        receipt.transaction_hash, e3_id
+    );
 
     Ok(())
 }
