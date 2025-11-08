@@ -8,10 +8,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Context, Result};
-use e3_bfv_helpers::{
-    build_bfv_params_arc, decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64, encode_bfv_params,
-};
+use anyhow::Result;
+use e3_bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
