@@ -116,45 +116,45 @@
   },
   "localhost": {
     "PoseidonT3": {
-      "blockNumber": 1,
+      "blockNumber": 3,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
     },
     "MockUSDC": {
       "constructorArgs": {
         "initialSupply": "1000000"
       },
-      "blockNumber": 2,
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      "blockNumber": 4,
+      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
     "EnclaveToken": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 3,
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "blockNumber": 5,
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     },
     "EnclaveTicketToken": {
       "constructorArgs": {
-        "baseToken": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "baseToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
         "registry": "0x0000000000000000000000000000000000000001",
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 5,
-      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+      "blockNumber": 7,
+      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "SlashingManager": {
       "constructorArgs": {
         "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "bondingRegistry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 6,
-      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+      "blockNumber": 8,
+      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
     },
     "BondingRegistry": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "ticketToken": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-        "licenseToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "ticketToken": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+        "licenseToken": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
         "registry": "0x0000000000000000000000000000000000000001",
         "slashedFundsTreasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "ticketPrice": "10000000",
@@ -162,8 +162,9 @@
         "minTicketBalance": "1",
         "exitDelay": "604800"
       },
-      "blockNumber": 7,
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+      "blockNumber": 8,
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+      "implementationAddress": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "CiphernodeRegistryOwnable": {
       "constructorArgs": {
@@ -171,41 +172,43 @@
         "enclaveAddress": "0x0000000000000000000000000000000000000001",
         "submissionWindow": "10"
       },
-      "blockNumber": 8,
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+      "blockNumber": 11,
+      "address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "implementationAddress": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "Enclave": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "registry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "bondingRegistry": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-        "feeToken": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "registry": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+        "bondingRegistry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+        "feeToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
         "maxDuration": "2592000",
         "params": [
-          "0x000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000fc0010000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000800000022a000100000000000000000000000000000000000000000000000000800000021a000100000000000000000000000000000000000000000000000000800000021200010000000000000000000000000000000000000000000000000080000001f60001"
+          "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
         ]
       },
-      "blockNumber": 9,
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      "blockNumber": 13,
+      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+      "implementationAddress": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
     },
     "MockComputeProvider": {
-      "blockNumber": 18,
-      "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+      "blockNumber": 23,
+      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 19,
-      "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
+      "blockNumber": 24,
+      "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
     },
     "MockInputValidator": {
-      "blockNumber": 20,
-      "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+      "blockNumber": 25,
+      "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
     },
     "MockE3Program": {
       "constructorArgs": {
-        "mockInputValidator": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+        "mockInputValidator": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
       },
-      "blockNumber": 21,
-      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
+      "blockNumber": 26,
+      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
     }
   }
 }

@@ -75,17 +75,26 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
     signer,
   );
 
-  const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
-    owner,
-    enclaveAddress,
-    submissionWindow,
+  const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy();
+  await ciphernodeRegistry.waitForDeployment();
+  const blockNumber = await ethers.provider.getBlockNumber();
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
+
+  const initData = ciphernodeRegistryFactory.interface.encodeFunctionData(
+    "initialize",
+    [owner, enclaveAddress, submissionWindow],
   );
 
-  await ciphernodeRegistry.waitForDeployment();
-
-  const blockNumber = await ethers.provider.getBlockNumber();
-
-  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
+  const ProxyCF = await ethers.getContractFactory(
+    "TransparentUpgradeableProxy",
+  );
+  const proxy = await ProxyCF.deploy(
+    ciphernodeRegistryAddress,
+    signer,
+    initData,
+  );
+  await proxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
 
   storeDeploymentArgs(
     {
@@ -95,16 +104,88 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
         submissionWindow: submissionWindow.toString(),
       },
       blockNumber,
-      address: ciphernodeRegistryAddress,
+      address: proxyAddress,
+      implementationAddress: ciphernodeRegistryAddress,
     },
     "CiphernodeRegistryOwnable",
     chain,
   );
 
   const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-    ciphernodeRegistryAddress,
+    proxyAddress,
     signer,
   );
 
   return { ciphernodeRegistry: ciphernodeRegistryContract };
+};
+
+export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
+  poseidonT3Address,
+  proxyAdminAddress,
+  hre,
+}: {
+  poseidonT3Address: string;
+  proxyAdminAddress: string;
+  hre: HardhatRuntimeEnvironment;
+}): Promise<{
+  ciphernodeRegistry: CiphernodeRegistryOwnable;
+  implementationAddress: string;
+}> => {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network;
+
+  const preDeployedArgs = readDeploymentArgs(
+    "CiphernodeRegistryOwnable",
+    chain,
+  );
+  if (!preDeployedArgs?.address) {
+    throw new Error(
+      "CiphernodeRegistryOwnable proxy not found. Deploy first before upgrading.",
+    );
+  }
+
+  const proxyAddress = preDeployedArgs.address;
+
+  const ciphernodeRegistryFactory = await ethers.getContractFactory(
+    CiphernodeRegistryOwnableFactory.abi,
+    CiphernodeRegistryOwnableFactory.linkBytecode({
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
+
+  const newImplementation = await ciphernodeRegistryFactory.deploy();
+  await newImplementation.waitForDeployment();
+  const newImplementationAddress = await newImplementation.getAddress();
+
+  const proxyAdmin = await ethers.getContractAt(
+    "ProxyAdmin",
+    proxyAdminAddress,
+    signer,
+  );
+  const upgradeTx = await proxyAdmin.upgrade(
+    proxyAddress,
+    newImplementationAddress,
+  );
+  await upgradeTx.wait();
+
+  storeDeploymentArgs(
+    {
+      ...preDeployedArgs,
+      implementationAddress: newImplementationAddress,
+    },
+    "CiphernodeRegistryOwnable",
+    chain,
+  );
+
+  const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
+    proxyAddress,
+    signer,
+  );
+  return {
+    ciphernodeRegistry: ciphernodeRegistryContract,
+    implementationAddress: newImplementationAddress,
+  };
 };

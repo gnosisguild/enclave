@@ -175,12 +175,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructor that initializes the registry with owner and enclave
-    /// @param _owner Address that will own the contract
-    /// @param _enclave Address of the Enclave contract
-    /// @param _submissionWindow The submission window for the E3 sortition in seconds
-    constructor(address _owner, address _enclave, uint256 _submissionWindow) {
-        initialize(_owner, _enclave, _submissionWindow);
+    /// @notice Constructor that disables initializers.
+    /// @dev This contract does not use initializers.
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initializes the registry contract
