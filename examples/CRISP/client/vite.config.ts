@@ -41,6 +41,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
+    plugins: () => [wasm(), topLevelAwait()],
   },
   plugins: [
     // here is the main update
