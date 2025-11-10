@@ -22,6 +22,7 @@ import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
+  BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
@@ -237,6 +238,12 @@ describe("Enclave", function () {
       ciphernodeRegistryAddress,
       owner,
     );
+
+    const bondingRegistry = BondingRegistryFactory.connect(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+      owner,
+    );
+
     const registryAddress = await enclave.ciphernodeRegistry();
 
     if (registryAddress !== ciphernodeRegistryAddress) {
@@ -244,25 +251,21 @@ describe("Enclave", function () {
     }
 
     await ciphernodeRegistryContract.setBondingRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistry.getAddress(),
     );
 
     await ticketTokenContract.enclaveTicketToken.setRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistry.getAddress(),
     );
-    await bondingRegistryContract.bondingRegistry.setRegistry(
-      ciphernodeRegistryAddress,
-    );
-    await bondingRegistryContract.bondingRegistry.setSlashingManager(
+    await bondingRegistry.setRegistry(ciphernodeRegistryAddress);
+    await bondingRegistry.setSlashingManager(
       await slashingManagerContract.slashingManager.getAddress(),
     );
     await slashingManagerContract.slashingManager.setBondingRegistry(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistry.getAddress(),
     );
 
-    await bondingRegistryContract.bondingRegistry.setRewardDistributor(
-      enclaveAddress,
-    );
+    await bondingRegistry.setRewardDistributor(enclaveAddress);
 
     const tree = new LeanIMT(hash);
 
@@ -273,7 +276,7 @@ describe("Enclave", function () {
 
     await setupOperatorForSortition(
       operator1,
-      bondingRegistryContract.bondingRegistry,
+      bondingRegistry,
       licenseToken,
       usdcToken,
       ticketToken,
@@ -283,7 +286,7 @@ describe("Enclave", function () {
 
     await setupOperatorForSortition(
       operator2,
-      bondingRegistryContract.bondingRegistry,
+      bondingRegistry,
       licenseToken,
       usdcToken,
       ticketToken,
@@ -347,7 +350,7 @@ describe("Enclave", function () {
     return {
       enclave,
       ciphernodeRegistryContract,
-      bondingRegistry: bondingRegistryContract.bondingRegistry,
+      bondingRegistry: bondingRegistry,
       ticketToken: ticketTokenContract.enclaveTicketToken,
       licenseToken: licenseToken,
       usdcToken,

@@ -9,6 +9,7 @@ import {
   CiphernodeRegistryOwnable,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
 } from "../../types";
+import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 /**
@@ -121,11 +122,11 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
 export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
   poseidonT3Address,
-  proxyAdminAddress,
+  ownerAddress,
   hre,
 }: {
   poseidonT3Address: string;
-  proxyAdminAddress: string;
+  ownerAddress: string;
   hre: HardhatRuntimeEnvironment;
 }): Promise<{
   ciphernodeRegistry: CiphernodeRegistryOwnable;
@@ -147,6 +148,12 @@ export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
 
   const proxyAddress = preDeployedArgs.address;
 
+  const autoProxyAdminAddress = await getProxyAdmin(
+    ethers.provider,
+    proxyAddress,
+  );
+  console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
+
   const ciphernodeRegistryFactory = await ethers.getContractFactory(
     CiphernodeRegistryOwnableFactory.abi,
     CiphernodeRegistryOwnableFactory.linkBytecode({
@@ -159,15 +166,22 @@ export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
   const newImplementation = await ciphernodeRegistryFactory.deploy();
   await newImplementation.waitForDeployment();
   const newImplementationAddress = await newImplementation.getAddress();
+  console.log("New Implementation Address:", newImplementationAddress);
 
   const proxyAdmin = await ethers.getContractAt(
     "ProxyAdmin",
-    proxyAdminAddress,
+    autoProxyAdminAddress,
     signer,
   );
-  const upgradeTx = await proxyAdmin.upgrade(
+
+  await verifyProxyAdminOwner(proxyAdmin, ownerAddress);
+
+  // TODO: Add init data if needed
+  const initData = "0x";
+  const upgradeTx = await proxyAdmin.upgradeAndCall(
     proxyAddress,
     newImplementationAddress,
+    initData,
   );
   await upgradeTx.wait();
 

@@ -6,6 +6,7 @@
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
+import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
 import {
   areArraysEqual,
   readDeploymentArgs,
@@ -135,11 +136,11 @@ export const deployAndSaveEnclave = async ({
  */
 export const upgradeAndSaveEnclave = async ({
   poseidonT3Address,
-  proxyAdminAddress,
+  ownerAddress,
   hre,
 }: {
   poseidonT3Address: string;
-  proxyAdminAddress: string;
+  ownerAddress: string;
   hre: HardhatRuntimeEnvironment;
 }): Promise<{ enclave: Enclave; implementationAddress: string }> => {
   const { ethers } = await hre.network.connect();
@@ -152,6 +153,12 @@ export const upgradeAndSaveEnclave = async ({
   }
 
   const proxyAddress = preDeployedArgs.address;
+
+  const autoProxyAdminAddress = await getProxyAdmin(
+    ethers.provider,
+    proxyAddress,
+  );
+  console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
 
   const enclaveFactory = await ethers.getContractFactory(
     EnclaveFactory.abi,
@@ -169,14 +176,17 @@ export const upgradeAndSaveEnclave = async ({
 
   const proxyAdmin = await ethers.getContractAt(
     "ProxyAdmin",
-    proxyAdminAddress,
+    autoProxyAdminAddress,
     signer,
   );
+  await verifyProxyAdminOwner(proxyAdmin, ownerAddress);
 
+  // TODO: Add init data if needed
+  const initData = "0x";
   const upgradeTx = await proxyAdmin.upgradeAndCall(
     proxyAddress,
     newImplementationAddress,
-    "0x",
+    initData,
   );
   await upgradeTx.wait();
 

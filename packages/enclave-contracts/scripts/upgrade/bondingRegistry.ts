@@ -37,7 +37,7 @@ export const upgradeBondingRegistry = async () => {
 
   const { bondingRegistry, implementationAddress } =
     await upgradeAndSaveBondingRegistry({
-      proxyAdminAddress: ownerAddress,
+      ownerAddress: ownerAddress,
       hre,
     });
 

@@ -82,7 +82,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @notice Percentage (in basis points) of license bond that must remain bonded to stay active
     /// @dev Default 8000 = 80%. Allows operators to unbond up to 20% while remaining active
-    uint256 public licenseActiveBps = 8_000;
+    uint256 public licenseActiveBps;
 
     /// @notice Operator state data structure
     /// @param licenseBond Amount of license tokens currently bonded
@@ -176,6 +176,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         setLicenseRequiredBond(_licenseRequiredBond);
         setMinTicketBalance(_minTicketBalance);
         setExitDelay(_exitDelay);
+        setLicenseActiveBps(8_000);
         if (_owner != owner()) transferOwnership(_owner);
     }
 

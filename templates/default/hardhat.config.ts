@@ -118,6 +118,8 @@ const config: HardhatUserConfig = {
   solidity: {
     npmFilesToBuild: [
       "poseidon-solidity/PoseidonT3.sol",
+      "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
+      "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
       "@enclave-e3/contracts/contracts/Enclave.sol",
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
       "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",

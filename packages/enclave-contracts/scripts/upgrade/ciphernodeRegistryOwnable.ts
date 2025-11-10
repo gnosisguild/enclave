@@ -43,7 +43,7 @@ export const upgradeCiphernodeRegistryOwnable = async () => {
   const { ciphernodeRegistry, implementationAddress } =
     await upgradeAndSaveCiphernodeRegistryOwnable({
       poseidonT3Address: poseidonT3,
-      proxyAdminAddress: ownerAddress,
+      ownerAddress: ownerAddress,
       hre,
     });
 

@@ -37,7 +37,7 @@ export const upgradeEnclave = async () => {
 
   const { enclave, implementationAddress } = await upgradeAndSaveEnclave({
     poseidonT3Address: poseidonT3,
-    proxyAdminAddress: ownerAddress,
+    ownerAddress: ownerAddress,
     hre,
   });
 

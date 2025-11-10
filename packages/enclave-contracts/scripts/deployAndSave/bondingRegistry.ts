@@ -9,6 +9,7 @@ import {
   BondingRegistry,
   BondingRegistry__factory as BondingRegistryFactory,
 } from "../../types";
+import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 /**
@@ -153,10 +154,10 @@ export const deployAndSaveBondingRegistry = async ({
  * @returns The upgraded BondingRegistry contract (same proxy address)
  */
 export const upgradeAndSaveBondingRegistry = async ({
-  proxyAdminAddress,
+  ownerAddress,
   hre,
 }: {
-  proxyAdminAddress: string;
+  ownerAddress: string;
   hre: HardhatRuntimeEnvironment;
 }): Promise<{
   bondingRegistry: BondingRegistry;
@@ -175,6 +176,12 @@ export const upgradeAndSaveBondingRegistry = async ({
 
   const proxyAddress = preDeployedArgs.address;
 
+  const autoProxyAdminAddress = await getProxyAdmin(
+    ethers.provider,
+    proxyAddress,
+  );
+  console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
+
   const bondingRegistryFactory = await ethers.getContractFactory(
     "BondingRegistry",
     signer,
@@ -183,15 +190,21 @@ export const upgradeAndSaveBondingRegistry = async ({
   const newImplementation = await bondingRegistryFactory.deploy();
   await newImplementation.waitForDeployment();
   const newImplementationAddress = await newImplementation.getAddress();
+  console.log("New Implementation Address:", newImplementationAddress);
 
   const proxyAdmin = await ethers.getContractAt(
     "ProxyAdmin",
-    proxyAdminAddress,
+    autoProxyAdminAddress,
     signer,
   );
-  const upgradeTx = await proxyAdmin.upgrade(
+  await verifyProxyAdminOwner(proxyAdmin, ownerAddress);
+
+  // TODO: Add init data if needed
+  const initData = "0x";
+  const upgradeTx = await proxyAdmin.upgradeAndCall(
     proxyAddress,
     newImplementationAddress,
+    initData,
   );
   await upgradeTx.wait();
 
