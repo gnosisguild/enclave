@@ -15,15 +15,21 @@ import { readDeploymentArgs } from "../utils";
  */
 export const upgradeEnclave = async () => {
   const { ethers } = await hre.network.connect();
-  const [owner] = await ethers.getSigners();
-  const ownerAddress = await owner.getAddress();
-  const chain = hre.globalOptions.network;
-  console.log("Owner:", ownerAddress);
+  const [signer] = await ethers.getSigners();
+  const signerAddress = await signer.getAddress();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  console.log("Signer:", signerAddress);
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
   if (!preDeployedArgs?.address) {
     throw new Error("Enclave proxy not found. Deploy first before upgrading.");
+  }
+
+  if (!preDeployedArgs?.implementationAddress) {
+    throw new Error(
+      "Existing deployment is not proxy-based. Cannot upgrade non-proxy deployments.",
+    );
   }
 
   console.log(
@@ -41,7 +47,7 @@ export const upgradeEnclave = async () => {
 
   const { enclave, implementationAddress } = await upgradeAndSaveEnclave({
     poseidonT3Address: poseidonT3,
-    ownerAddress: ownerAddress,
+    ownerAddress: signerAddress,
     hre,
   });
 

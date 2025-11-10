@@ -176,7 +176,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     /// @notice Constructor that disables initializers.
-    /// @dev This contract does not use initializers.
+    /// @dev Prevents the implementation contract from being initialized. Initialization is performed via the initialize() function when deployed behind a proxy.
     constructor() {
         _disableInitializers();
     }

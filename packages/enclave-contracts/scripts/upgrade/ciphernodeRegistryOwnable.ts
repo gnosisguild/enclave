@@ -10,15 +10,15 @@ import { deployAndSavePoseidonT3 } from "../deployAndSave/poseidonT3";
 import { readDeploymentArgs } from "../utils";
 
 /**
- * Upgrades the Enclave contract implementation and saves the deployment arguments
+ * Upgrades the CiphernodeRegistryOwnable contract implementation and saves the deployment arguments
  * This keeps the same proxy address, only updates the implementation
  */
 export const upgradeCiphernodeRegistryOwnable = async () => {
   const { ethers } = await hre.network.connect();
-  const [owner] = await ethers.getSigners();
-  const ownerAddress = await owner.getAddress();
-  const chain = hre.globalOptions.network;
-  console.log("Owner:", ownerAddress);
+  const [signer] = await ethers.getSigners();
+  const signerAddress = await signer.getAddress();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  console.log("Signer:", signerAddress);
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });
   const preDeployedArgs = readDeploymentArgs(
@@ -28,6 +28,12 @@ export const upgradeCiphernodeRegistryOwnable = async () => {
   if (!preDeployedArgs?.address) {
     throw new Error(
       "CiphernodeRegistryOwnable proxy not found. Deploy first before upgrading.",
+    );
+  }
+
+  if (!preDeployedArgs?.implementationAddress) {
+    throw new Error(
+      "Existing deployment is not proxy-based. Cannot upgrade non-proxy deployments.",
     );
   }
 
@@ -47,7 +53,7 @@ export const upgradeCiphernodeRegistryOwnable = async () => {
   const { ciphernodeRegistry, implementationAddress } =
     await upgradeAndSaveCiphernodeRegistryOwnable({
       poseidonT3Address: poseidonT3,
-      ownerAddress: ownerAddress,
+      ownerAddress: signerAddress,
       hre,
     });
 
