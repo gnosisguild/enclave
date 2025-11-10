@@ -2948,6 +2948,8 @@ dependencies = [
 name = "e3-hamt"
 version = "0.1.5"
 dependencies = [
+ "anyhow",
+ "bincode",
  "serde",
 ]
 

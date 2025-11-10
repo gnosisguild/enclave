@@ -98,3 +98,17 @@ Add to your `Cargo.toml`:
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 ```
+
+## Future considerations
+
+We could consider adding a Rc version for signlethreaded usage which is cheaper and faster than using Arc.
+
+## Benchmarks
+
+Against cloning a HashMap performance on my laptop
+
+```
+HAMT total time: 368.344061ms
+HashMap total time: 640.458474ms
+HAMT is 0.58x the cost
+```

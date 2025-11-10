@@ -352,9 +352,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Instant;
-
     use super::*;
+    use anyhow::Result;
+    use std::time::Instant;
 
     #[test]
     fn it_works() {
@@ -376,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialization_deduplication() {
+    fn test_serialization_deduplication() -> Result<()> {
         let map1 = Hamt::new();
         let map1 = map1.insert("hello".to_string(), 42);
         let map1 = map1.insert("world".to_string(), 100);
@@ -386,16 +386,20 @@ mod tests {
         // Serialize both maps together
         let serialized = Hamt::serialize_multiple(&[&map1, &map2]);
 
+        let bytes = bincode::serialize(&serialized)?;
+
         println!("Total nodes serialized: {}", serialized.nodes.len());
         println!("Number of HAMTs: {}", serialized.roots.len());
 
         // Deserialize back
-        let deserialized = Hamt::deserialize_multiple(serialized);
+        let from_bytes: SerializedHamt<String, i32> = bincode::deserialize(&bytes)?;
+        let deserialized = Hamt::deserialize_multiple(from_bytes);
 
         assert_eq!(Some(&42), deserialized[0].get(&"hello".to_string()));
         assert_eq!(Some(&100), deserialized[0].get(&"world".to_string()));
         assert_eq!(Some(&999), deserialized[1].get(&"hello".to_string()));
         assert_eq!(Some(&100), deserialized[1].get(&"world".to_string()));
+        Ok(())
     }
 
     #[test]

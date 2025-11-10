@@ -8,3 +8,5 @@ repository = "https://github.com/gnosisguild/enclave/crates/hamt"
 
 [dependencies]
 serde.workspace = true
+bincode.workspace = true
+anyhow.workspace = true
