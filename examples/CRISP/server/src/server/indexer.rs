@@ -394,10 +394,36 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
     Ok(block.header.timestamp)
 }
 
+pub async fn register_input_published(mut listener: EventListener,
+    contract: EnclaveContract<ReadWrite>) -> Result<EventListener> {
+    let store = self.store.clone();
+    listener
+        .add_event_handler(move |e: InputPublished| {
+            let store = SharedStore::new(store.clone());
+            async move {
+                println!(
+                    "InputPublished: e3_id={}, index={}, data=0x{}...",
+                    e.e3Id,
+                    e.index,
+                    hex::encode(&e.data[..8.min(e.data.len())])
+                );
+                let e3_id = u64_try_from(e.e3Id)?;
+
+                let mut repo = E3Repository::new(store, e3_id);
+                repo.insert_ciphertext_input(e.data.to_vec(), e.index.to::<u64>())
+                    .await?;
+                Ok(())
+            }
+        })
+        .await;
+    Ok(listener)
+}
+
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
     registry_address: &str,
+    input_validator_address: &str,
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
@@ -422,8 +448,13 @@ pub async fn start_indexer(
     let registry_contract_listener =
         EventListener::create_contract_listener(&ws_url, registry_address).await?;
     let registry_listener =
-        register_committee_published(registry_contract_listener, readwrite_contract).await?;
+        register_committee_published(registry_contract_listener, readwrite_contract.clone()).await?;
     registry_listener.start();
+
+    let input_validator_contract_listener = EventListener::create_contract_listener(&ws_url, input_validator_address).await?;
+    let input_validator_listener =
+        register_input_published(input_validator_contract_listener, readwrite_contract.clone()).await?;
+    input_validator_listener.start();
 
     Ok(())
 }

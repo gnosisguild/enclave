@@ -23,7 +23,6 @@ export interface EnclaveArgs {
   registry?: string;
   bondingRegistry?: string;
   feeToken?: string;
-  poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -39,7 +38,6 @@ export const deployAndSaveEnclave = async ({
   registry,
   bondingRegistry,
   feeToken,
-  poseidonT3Address,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
   const { ethers } = await hre.network.connect();
@@ -77,11 +75,7 @@ export const deployAndSaveEnclave = async ({
   }
 
   const enclaveFactory = await ethers.getContractFactory(
-    EnclaveFactory.abi,
-    EnclaveFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
-        poseidonT3Address,
-    }),
+    "Enclave",
     signer,
   );
 

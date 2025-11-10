@@ -107,22 +107,7 @@
       "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
     },
     "MockRISC0Verifier": {
-      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F"
-    },
-    "HonkVerifier": {
-      "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
-    },
-    "CRISPProgram": {
-      "address": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
-      "constructorArgs": {
-        "enclave": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "verifierAddress": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-        "honkVerifierAddress": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-        "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
-      }
-    },
-    "CRISPInputValidator": {
-      "address": "0x764364c0e4C3072A7DF777F4037907fdf2f1A89f"
+      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
     }
   }
 }
