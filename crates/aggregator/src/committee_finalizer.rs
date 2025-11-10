@@ -66,6 +66,11 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
+            // TODO: we should have no dependencies on e3_evm here. Reason being that this is core
+            // functionality and evm is shell. Shell can depend on core but core MUST not depend on
+            // shell. This means we should not hold an address to a shell actor even and should use
+            // the eventbus to communicate.
+            // see https://github.com/gnosisguild/enclave/issues/989
             match e3_evm::helpers::get_current_timestamp().await {
                 Ok(timestamp) => Some(timestamp),
                 Err(e) => {
