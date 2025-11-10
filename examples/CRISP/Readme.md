@@ -99,8 +99,6 @@ Deployments:
 ----------------------------------------------------------------------
 Enclave: 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
 Verifier: 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
-InputValidator: 0x610178dA211FEF7D417bC0e6FeD39F05609AD788
-CRISPInputValidatorFactory: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
 HonkVerifier: 0x9A676e781A523b5d0C0e43731313A708CB607508
 CRISPProgram: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
 ```

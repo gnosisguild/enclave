@@ -51,9 +51,6 @@ contract CRISPProgram is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
 
-    // Events
-    event InputValidatorUpdated(address indexed newValidator);
-
     // Errors
     error CallerNotAuthorized();
     error E3AlreadyInitialized();
