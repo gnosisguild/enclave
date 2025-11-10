@@ -99,7 +99,7 @@ describe("CRISP Contracts", function () {
   });
 
   describe("validate input", () => {
-    it("should verify the proof correctly wi", async function () {
+    it("should verify the proof correctly with the crisp verifier", async function () {
       // It needs some time to generate the proof.
       this.timeout(60000);
 

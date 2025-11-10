@@ -263,10 +263,13 @@ export const generateMaskVote = async (
 
 export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness } = await noir.execute(crispInputs as any)
+
   const proof = await backend.generateProof(witness, { keccak: true })
+
+  await backend.destroy()
 
   return proof
 }
@@ -275,10 +278,12 @@ export const generateProofWithReturnValue = async (
   crispInputs: CRISPCircuitInputs,
 ): Promise<{ returnValue: unknown; proof: ProofData }> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness, returnValue } = await noir.execute(crispInputs as any)
   const proof = await backend.generateProof(witness, { keccak: true })
+
+  await backend.destroy()
 
   return { returnValue, proof }
 }
@@ -294,5 +299,9 @@ export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Pr
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  return await backend.verifyProof(proof)
+  const isValid = await backend.verifyProof(proof, { keccak: true })
+
+  await backend.destroy()
+
+  return isValid
 }
