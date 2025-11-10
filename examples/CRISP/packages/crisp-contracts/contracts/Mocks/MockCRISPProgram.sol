@@ -10,9 +10,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import {HonkVerifier} from "./CRISPVerifier.sol";
+import {HonkVerifier} from "../CRISPVerifier.sol";
 
-contract CRISPProgram is IE3Program, Ownable {
+contract MockCRISPProgram is IE3Program, Ownable {
     /// @notice a structure that holds the round data
     struct RoundData {
         /// @notice The governance token address.
@@ -145,29 +145,10 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     function validateInput(address, bytes memory data) external returns (bytes memory input) {
-        // we need to ensure that the CRISP admin set the merkle root of the census
-        // @todo update this once we have all components working
-        // if (!isDataSet) revert RoundDataNotSet();
-
         if (data.length == 0) revert EmptyInputData();
 
-        (bytes memory noirProof, bytes32[] memory noirPublicInputs, bytes memory vote, address slot) =
-            abi.decode(data, (bytes, bytes32[], bytes, address));
+        (,, bytes memory vote,) = abi.decode(data, (bytes, bytes32[], bytes, address));
 
-        /// @notice we need to check whether the slot is empty.
-        /// if the slot is empty
-        /// @todo pass it to the verifier
-        // bool isFirstVote = voteSlots[slot].length == 0;
-
-        // Check if the ciphertext was encrypted correctly
-        if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
-            revert InvalidNoirProof();
-        }
-
-        /// @notice Store the vote in the correct slot.
-        voteSlots[slot] = vote;
-
-        // return the vote so that it can be stored in Enclave's input merkle tree
         input = vote;
     }
 

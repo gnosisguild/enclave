@@ -10,6 +10,7 @@ import {
 } from "@enclave-e3/contracts/scripts";
 import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
 
+import { ContractFactory } from "ethers";
 import hre from "hardhat";
 
 const IMAGE_ID =
@@ -29,7 +30,6 @@ export const deployCRISPContracts = async () => {
 
   const verifier = await deployVerifier(useMockVerifier);
 
-  const inputValidator = await deployInputValidator(useMockInputValidator);
 
   const enclaveAddress = readDeploymentArgs("Enclave", chain)?.address;
   if (!enclaveAddress) {
@@ -37,28 +37,9 @@ export const deployCRISPContracts = async () => {
   }
   const enclave = EnclaveFactory.connect(enclaveAddress, owner);
 
-  const crispInputValidatorFactoryFactory = await ethers.getContractFactory(
-    "CRISPInputValidatorFactory"
-  );
-  const crispInputValidatorFactory =
-    await crispInputValidatorFactoryFactory.deploy(inputValidator);
-
-  const crispInputValidatorFactoryAddress =
-    await crispInputValidatorFactory.getAddress();
-  storeDeploymentArgs(
-    {
-      address: crispInputValidatorFactoryAddress,
-      constructorArgs: {
-        inputValidator,
-      },
-    },
-    "CRISPInputValidatorFactory",
-    chain
-  );
-
-  const honkVerifierFactory = await ethers.getContractFactory("HonkVerifier");
-  const honkVerifier = await honkVerifierFactory.deploy();
-  const honkVerifierAddress = await honkVerifier.getAddress();
+    const honkVerifierFactory = await ethers.getContractFactory("HonkVerifier");
+    const honkVerifier = await honkVerifierFactory.deploy();
+    const honkVerifierAddress = await honkVerifier.getAddress();
 
   storeDeploymentArgs(
     {
@@ -68,46 +49,45 @@ export const deployCRISPContracts = async () => {
     chain
   );
 
-  const crispFactory = await ethers.getContractFactory("CRISPProgram");
-  const crisp = await crispFactory.deploy(
-    enclaveAddress,
-    verifier,
-    crispInputValidatorFactory.getAddress(),
-    honkVerifierAddress,
-    IMAGE_ID
-  );
+    let crispFactory: ContractFactory;
 
-  const crispAddress = await crisp.getAddress();
+    if (useMockInputValidator) {
+        console.log("Using MockCRISPProgram");
+        crispFactory = await ethers.getContractFactory("MockCRISPProgram");
+    } else {
+        crispFactory = await ethers.getContractFactory("CRISPProgram");
+    }
 
-  storeDeploymentArgs(
-    {
+    const crisp = await crispFactory.deploy(
+        enclaveAddress,
+        verifier,
+        honkVerifierAddress,
+        IMAGE_ID,
+    )
+
+    const crispAddress = await crisp.getAddress();
+    storeDeploymentArgs({
       address: crispAddress,
       constructorArgs: {
-        enclave: enclaveAddress,
-        verifierAddress: verifier,
-        inputValidatorAddress: inputValidator,
-        honkVerifierAddress,
-        imageId: IMAGE_ID,
-      },
-    },
-    "CRISPProgram",
-    chain
-  );
+          enclave: enclaveAddress,
+          verifierAddress: verifier,
+          honkVerifierAddress,
+          imageId: IMAGE_ID
+      }
+  }, "CRISPProgram", chain);
 
   // enable the program on Enclave
   const tx = await enclave.enableE3Program(crispAddress);
   await tx.wait();
 
   console.log(`
-        Deployments:
-        ----------------------------------------------------------------------
-        Enclave: ${enclaveAddress}
-        Risc0Verifier: ${verifier}
-        InputValidator: ${inputValidator}
-        CRISPInputValidatorFactory: ${crispInputValidatorFactoryAddress}
-        HonkVerifier: ${honkVerifierAddress}
-        CRISPProgram: ${crispAddress}
-        `);
+      Deployments:
+      ----------------------------------------------------------------------
+      Enclave: ${enclaveAddress}
+      Risc0Verifier: ${verifier}
+      HonkVerifier: ${honkVerifierAddress}
+      CRISPProgram: ${crispAddress}
+      `);
 };
 
 /**
@@ -122,132 +102,33 @@ export const deployVerifier = async (
   const chain = hre.globalOptions.network;
 
   if (!useMockVerifier) {
-    const existingVerifier = readDeploymentArgs(
-      "RiscZeroGroth16Verifier",
-      chain
-    );
+    const existingVerifier = readDeploymentArgs("RiscZeroGroth16Verifier", chain);
     if (existingVerifier?.address) {
-      console.log(
-        "RiscZeroGroth16Verifier already deployed at:",
-        existingVerifier.address
-      );
-      return existingVerifier.address;
+        console.log("RiscZeroGroth16Verifier already deployed at:", existingVerifier.address);
+        return existingVerifier.address;
     }
-
-    const verifierFactory = await ethers.getContractFactory(
-      "RiscZeroGroth16Verifier"
-    );
+    const verifierFactory = await ethers.getContractFactory("RiscZeroGroth16Verifier");
     const verifier = await verifierFactory.deploy();
     await verifier.waitForDeployment();
-
     const address = await verifier.getAddress();
-
-    storeDeploymentArgs(
-      {
+    
+    storeDeploymentArgs({
         address,
-      },
-      "RiscZeroGroth16Verifier",
-      chain
-    );
-
+    }, "RiscZeroGroth16Verifier", chain);
     return address;
-  }
-
+    }
   // Check if mock verifier already deployed
   const existingMockVerifier = readDeploymentArgs("MockRISC0Verifier", chain);
   if (existingMockVerifier?.address) {
-    console.log(
-      "MockRISC0Verifier already deployed at:",
-      existingMockVerifier.address
-    );
-    return existingMockVerifier.address;
+      console.log("MockRISC0Verifier already deployed at:", existingMockVerifier.address);
+      return existingMockVerifier.address;
   }
-
-  const mockVerifierFactory = await ethers.getContractFactory(
-    "MockRISC0Verifier"
-  );
+  const mockVerifierFactory = await ethers.getContractFactory("MockRISC0Verifier");
   const mockVerifier = await mockVerifierFactory.deploy();
-
   const mockVerifierAddress = await mockVerifier.getAddress();
-  storeDeploymentArgs(
-    {
+  storeDeploymentArgs({
       address: mockVerifierAddress,
-    },
-    "MockRISC0Verifier",
-    hre.globalOptions.network
-  );
+  }, "MockRISC0Verifier", hre.globalOptions.network);
 
-  return mockVerifierAddress;
-};
-
-/**
- * Deploys the input validator contract
- * @param useMockInputValidator - whether to use a mock input validator
- * @returns The address of the input validator
- */
-export const deployInputValidator = async (
-  useMockInputValidator: boolean
-): Promise<string> => {
-  const { ethers } = await hre.network.connect();
-  const chain = hre.globalOptions.network;
-
-  if (useMockInputValidator) {
-    // Check if mock input validator already deployed
-    const existingMockInputValidator = readDeploymentArgs(
-      "MockCRISPInputValidator",
-      chain
-    );
-    if (existingMockInputValidator?.address) {
-      console.log(
-        "MockInputValidator already deployed at:",
-        existingMockInputValidator.address
-      );
-      return existingMockInputValidator.address;
-    }
-
-    const mockInputValidatorFactory = await ethers.getContractFactory(
-      "MockCRISPInputValidator"
-    );
-    const mockInputValidator = await mockInputValidatorFactory.deploy();
-    const address = await mockInputValidator.getAddress();
-
-    storeDeploymentArgs(
-      {
-        address,
-      },
-      "MockCRISPInputValidator",
-      hre.globalOptions.network
-    );
-
-    return address;
-  }
-
-  // Check if input validator already deployed
-  const existingInputValidator = readDeploymentArgs(
-    "CRISPInputValidator",
-    chain
-  );
-  if (existingInputValidator?.address) {
-    console.log(
-      "CRISPInputValidator already deployed at:",
-      existingInputValidator.address
-    );
-    return existingInputValidator.address;
-  }
-
-  const inputValidatorFactory = await ethers.getContractFactory(
-    "CRISPInputValidator"
-  );
-  const inputValidator = await inputValidatorFactory.deploy();
-  const address = await inputValidator.getAddress();
-
-  storeDeploymentArgs(
-    {
-      address,
-    },
-    "CRISPInputValidator",
-    hre.globalOptions.network
-  );
-
-  return address;
-};
+  return mockVerifierAddress; 
+}

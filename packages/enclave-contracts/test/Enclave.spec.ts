@@ -18,7 +18,6 @@ import MockCiphernodeRegistryEmptyKeyModule from "../ignition/modules/mockCipher
 import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
 import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
-import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
@@ -304,16 +303,7 @@ describe("Enclave", function () {
       MockDecryptionVerifierModule,
     );
 
-    const inputValidator = await ignition.deploy(MockInputValidatorModule);
-
-    const e3Program = await ignition.deploy(MockE3ProgramModule, {
-      parameters: {
-        MockE3Program: {
-          mockInputValidator:
-            await inputValidator.mockInputValidator.getAddress(),
-        },
-      },
-    });
+    const e3Program = await ignition.deploy(MockE3ProgramModule);
 
     await enclave.enableE3Program(await e3Program.mockE3Program.getAddress());
     await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
@@ -358,7 +348,6 @@ describe("Enclave", function () {
       tree,
       mocks: {
         decryptionVerifier: decryptionVerifier.mockDecryptionVerifier,
-        inputValidator: inputValidator.mockInputValidator,
         e3Program: e3Program.mockE3Program,
         mockComputeProvider: mockComputeProvider.mockComputeProvider,
       },
@@ -536,7 +525,7 @@ describe("Enclave", function () {
     });
 
     it("returns correct E3 details", async function () {
-      const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -554,9 +543,6 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
-      expect(e3.inputValidator).to.equal(
-        await mocks.inputValidator.getAddress(),
-      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -909,7 +895,7 @@ describe("Enclave", function () {
         .withArgs(encryptionSchemeId);
     });
     it("instantiates a new E3", async function () {
-      const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -928,9 +914,6 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.requestBlock).to.equal(block.number);
-      expect(e3.inputValidator).to.equal(
-        await mocks.inputValidator.getAddress(),
-      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );

@@ -149,8 +149,9 @@ contract EnclaveToken is
         string[] calldata allocations
     ) external onlyRole(MINTER_ROLE) {
         uint256 len = recipients.length;
-        if (amounts.length != len || allocations.length != len)
+        if (amounts.length != len || allocations.length != len) {
             revert ArrayLengthMismatch();
+        }
 
         uint256 minted = totalMinted;
 
@@ -232,8 +233,9 @@ contract EnclaveToken is
     ) internal override(ERC20, ERC20Votes) {
         // When transfers are restricted, only whitelisted addresses can send or receive.
         if (from != address(0) && to != address(0) && transfersRestricted) {
-            if (!transferWhitelisted[from] && !transferWhitelisted[to])
+            if (!transferWhitelisted[from] && !transferWhitelisted[to]) {
                 revert TransferNotAllowed();
+            }
         }
         super._update(from, to, value);
     }

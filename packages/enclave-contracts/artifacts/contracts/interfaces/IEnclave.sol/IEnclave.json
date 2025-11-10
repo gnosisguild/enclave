@@ -174,11 +174,6 @@
               "type": "bytes"
             },
             {
-              "internalType": "contract IInputValidator",
-              "name": "inputValidator",
-              "type": "address"
-            },
-            {
               "internalType": "contract IDecryptionVerifier",
               "name": "decryptionVerifier",
               "type": "address"
@@ -504,11 +499,6 @@
               "type": "bytes"
             },
             {
-              "internalType": "contract IInputValidator",
-              "name": "inputValidator",
-              "type": "address"
-            },
-            {
               "internalType": "contract IDecryptionVerifier",
               "name": "decryptionVerifier",
               "type": "address"
@@ -816,11 +806,6 @@
               "internalType": "bytes",
               "name": "customParams",
               "type": "bytes"
-            },
-            {
-              "internalType": "contract IInputValidator",
-              "name": "inputValidator",
-              "type": "address"
             },
             {
               "internalType": "contract IDecryptionVerifier",
