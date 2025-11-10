@@ -29,7 +29,7 @@ self.onmessage = async function (event) {
 
         const leaf = hashLeaf(address.toLowerCase(), balance.toString())
         // TODO: get the leaves from the server (pass them from the client).
-        const merkleProof = generateMerkleProof(0n, balance, address, [
+        const merkleProof = generateMerkleProof(0n, balance, address.toLowerCase(), [
           leaf,
           4720511075913887710172192848636076523165432993226978491435561065722130431597n,
           14131255645332550266535358189863475289290770471998199141522479556687499890181n,

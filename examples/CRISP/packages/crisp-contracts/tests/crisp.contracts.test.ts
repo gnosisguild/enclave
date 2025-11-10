@@ -129,8 +129,7 @@ describe("CRISP Contracts", function () {
         threshold,
         vote.yes,
         address,
-        leaves,
-        20
+        leaves
       );
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
