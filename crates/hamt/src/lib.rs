@@ -1,32 +1,19 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
 const BITS_PER_LEVEL: u32 = 5;
 const CHUNK_SIZE: usize = 1 << BITS_PER_LEVEL;
 const CHUNK_MASK: u64 = (CHUNK_SIZE - 1) as u64;
-
-// #[derive(Serialize, Deserialize, Debug)]
-// pub struct SerializedHamt<K, V> {
-//     nodes: Vec<SerializedNode<K, V>>,
-//     roots: Vec<HamtRoot>,
-// }
-//
-// #[derive(Serialize, Deserialize, Debug)]
-// struct HamtRoot {
-//     root_node_id: usize,
-//     size: usize,
-// }
-
-// #[derive(Serialize, Deserialize, Debug)]
-// enum SerializedNode<K, V> {
-//     Empty,
-//     Leaf { hash: u64, key: K, value: V },
-//     Internal { bitmap: u32, children: Vec<usize> },
-//     Collision { hash: u64, entries: Vec<(K, V)> },
-// }
 
 #[derive(Clone)]
 enum Node<K, V> {
@@ -93,7 +80,6 @@ where
         value: V,
         shift: u32,
     ) -> Arc<Node<K, V>> {
-        // Arc here
         match node.as_ref() {
             Node::Empty => Arc::new(Node::Leaf { hash, key, value }),
 
@@ -107,7 +93,6 @@ where
                         Arc::new(Node::Leaf { hash, key, value })
                     } else {
                         Arc::new(Node::Collision {
-                            // Arc here
                             hash,
                             entries: vec![
                                 (existing_key.clone(), existing_value.clone()),
@@ -117,7 +102,6 @@ where
                     }
                 } else {
                     let mut new_node = Arc::new(Node::Internal {
-                        // Arc here
                         bitmap: 0,
                         children: Vec::new(),
                     });
@@ -145,7 +129,6 @@ where
                     new_children.insert(index, Arc::new(Node::Leaf { hash, key, value }));
 
                     Arc::new(Node::Internal {
-                        // Arc here
                         bitmap: bitmap | bit,
                         children: new_children,
                     })
@@ -158,7 +141,6 @@ where
                     new_children[index] = new_child;
 
                     Arc::new(Node::Internal {
-                        // Arc here
                         bitmap: *bitmap,
                         children: new_children,
                     })
@@ -179,7 +161,6 @@ where
                     }
 
                     Arc::new(Node::Collision {
-                        // Arc here
                         hash: *collision_hash,
                         entries: new_entries,
                     })
@@ -260,19 +241,9 @@ struct HamtRoot {
 #[derive(Serialize, Deserialize, Debug)]
 enum SerializedNode<K, V> {
     Empty,
-    Leaf {
-        hash: u64,
-        key: K,
-        value: V,
-    },
-    Internal {
-        bitmap: u32,
-        children: Vec<usize>, // Node IDs instead of Arc pointers
-    },
-    Collision {
-        hash: u64,
-        entries: Vec<(K, V)>,
-    },
+    Leaf { hash: u64, key: K, value: V },
+    Internal { bitmap: u32, children: Vec<usize> },
+    Collision { hash: u64, entries: Vec<(K, V)> },
 }
 
 impl<K, V> Hamt<K, V>
@@ -381,11 +352,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
     fn it_works() {
-        let mut map = Hamt::new(); // single-threaded
+        let mut map = Hamt::new();
 
         map = map.insert("hello", 42);
         map = map.insert("world", 100);
@@ -408,7 +381,7 @@ mod tests {
         let map1 = map1.insert("hello".to_string(), 42);
         let map1 = map1.insert("world".to_string(), 100);
 
-        let map2 = map1.insert("hello".to_string(), 999); // Shares structure with map1
+        let map2 = map1.insert("hello".to_string(), 999);
 
         // Serialize both maps together
         let serialized = Hamt::serialize_multiple(&[&map1, &map2]);
@@ -423,5 +396,55 @@ mod tests {
         assert_eq!(Some(&100), deserialized[0].get(&"world".to_string()));
         assert_eq!(Some(&999), deserialized[1].get(&"hello".to_string()));
         assert_eq!(Some(&100), deserialized[1].get(&"world".to_string()));
+    }
+
+    #[test]
+    fn test_hamt_vs_hashmap_persistence_cost() {
+        const NUM_ENTRIES: usize = 100_000;
+        const NUM_UPDATES: usize = 1_000;
+
+        println!("\n=== HAMT vs HashMap: Cost of Persistence ===");
+
+        // Test HAMT with persistence
+        println!("Testing HAMT (persistent)...");
+        let hamt_start = Instant::now();
+        let mut hamt = Hamt::new();
+        for i in 0..NUM_ENTRIES {
+            hamt = hamt.insert(i, i);
+        }
+
+        let mut hamt_versions = Vec::new();
+        for i in 0..NUM_UPDATES {
+            let updated = hamt.insert(i, i * 2);
+            hamt_versions.push(updated);
+        }
+        let hamt_duration = hamt_start.elapsed();
+
+        // Test HashMap with cloning
+        println!("Testing HashMap (with cloning)...");
+        let hashmap_start = Instant::now();
+        let mut hashmap = HashMap::new();
+        for i in 0..NUM_ENTRIES {
+            hashmap.insert(i, i);
+        }
+
+        let mut hashmap_versions = Vec::new();
+        for i in 0..NUM_UPDATES {
+            let mut cloned = hashmap.clone();
+            cloned.insert(i, i * 2);
+            hashmap_versions.push(cloned);
+        }
+        let hashmap_duration = hashmap_start.elapsed();
+
+        println!("\nHAMT total time: {:?}", hamt_duration);
+        println!("HashMap total time: {:?}", hashmap_duration);
+        println!(
+            "HAMT is {:.2}x the cost",
+            hamt_duration.as_secs_f64() / hashmap_duration.as_secs_f64()
+        );
+
+        // Verify original map unchanged
+        assert_eq!(Some(&0), hamt.get(&0));
+        assert_eq!(Some(&0), hashmap.get(&0));
     }
 }
