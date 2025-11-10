@@ -48,6 +48,7 @@ contract CRISPProgram is IE3Program, Ownable {
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
+    mapping(uint256 e3Id => IInputValidator inputValidator) public inputValidators;
 
     // Errors
     error CallerNotAuthorized();
@@ -226,7 +227,7 @@ contract CRISPProgram is IE3Program, Ownable {
         returns (bool)
     {
         require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
-        bytes32 inputRoot = bytes32(enclave.getInputRoot(e3Id));
+        bytes32 inputRoot = bytes32(inputValidators[e3Id].getInputRoot());
         bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
         encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);

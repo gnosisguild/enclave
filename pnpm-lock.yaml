@@ -248,6 +248,9 @@ importers:
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
+      '@zk-kit/lazy-imt.sol':
+        specifier: 2.0.0-beta.12
+        version: 2.0.0-beta.12
       '@zk-kit/lean-imt.sol':
         specifier: 2.0.0
         version: 2.0.0
@@ -4277,6 +4280,9 @@ packages:
 
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
+
+  '@zk-kit/lazy-imt.sol@2.0.0-beta.12':
+    resolution: {integrity: sha512-9kiCM0hrO3EKl+Zkbl6l9616UwbF9snLgcMqDPhuLozZtwXnn6PE8vMIwgfuYGea4X5weH4O2VjnUFpIm/CIkg==}
 
   '@zk-kit/lean-imt.sol@2.0.0':
     resolution: {integrity: sha512-e9pAm+IXveLPy7b1h05ipIo6U44vp8g/2E+Ocx3PIloMu7lgTXFkIeZj/qZ/iLgEMsF74T0dsg7aVIT0B0nsDA==}
@@ -15321,6 +15327,10 @@ snapshots:
     dependencies:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
+
+  '@zk-kit/lazy-imt.sol@2.0.0-beta.12':
+    dependencies:
+      poseidon-solidity: 0.0.5
 
   '@zk-kit/lean-imt.sol@2.0.0':
     dependencies:

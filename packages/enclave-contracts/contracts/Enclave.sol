@@ -65,14 +65,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Contains the full state and configuration of each E3.
     mapping(uint256 e3Id => E3 e3) public e3s;
 
-    /// @notice Mapping of input merkle trees for each E3.
-    /// @dev Uses Lean IMT for efficient incremental merkle tree operations.
-    mapping(uint256 e3Id => LeanIMTData imt) public inputs;
-
-    /// @notice Counter tracking the number of inputs published for each E3.
-    /// @dev Used as the index when inserting new inputs into the merkle tree.
-    mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
-
     /// @notice Mapping of enabled encryption schemes to their decryption verifiers.
     /// @dev Each encryption scheme ID maps to a contract that can verify decrypted outputs.
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
@@ -349,18 +341,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        uint256 inputIndex = inputCounts[e3Id];
-        inputCounts[e3Id] = inputIndex + 1;
+        e3.inputValidator.validate(msg.sender, data);
 
-        bytes memory input = e3.e3Program.validateInput(msg.sender, data);
-
-        uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(input)), inputIndex]
-        );
-        inputs[e3Id]._insert(inputHash);
         success = true;
-
-        emit InputPublished(e3Id, input, inputHash, inputIndex);
     }
 
     /// @inheritdoc IEnclave
@@ -601,15 +584,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function getInputRoot(uint256 e3Id) public view returns (uint256) {
-        require(
-            e3s[e3Id].e3Program != IE3Program(address(0)),
-            E3DoesNotExist(e3Id)
-        );
-        return InternalLeanIMT._root(inputs[e3Id]);
-    }
-
-    /// @inheritdoc IEnclave
     function getE3Quote(
         E3RequestParams calldata
     ) public pure returns (uint256 fee) {
@@ -622,14 +596,5 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes32 encryptionSchemeId
     ) public view returns (IDecryptionVerifier) {
         return decryptionVerifiers[encryptionSchemeId];
-    }
-
-    /// @inheritdoc IEnclave
-    function getInputsLength(uint256 e3Id) public view returns (uint256) {
-        require(
-            e3s[e3Id].e3Program != IE3Program(address(0)),
-            E3DoesNotExist(e3Id)
-        );
-        return inputCounts[e3Id];
     }
 }
