@@ -24,7 +24,13 @@ export const useWebAssemblyHook = () => {
     }
   }, [])
 
-  const encryptVote = async (voteId: bigint, publicKey: Uint8Array): Promise<EncryptedVote | undefined> => {
+  const encryptVote = async (
+    voteId: bigint,
+    publicKey: Uint8Array,
+    address: string,
+    signature: string,
+    message: string,
+  ): Promise<EncryptedVote | undefined> => {
     if (!worker) {
       console.error('WebAssembly worker not initialized')
       return
@@ -32,14 +38,14 @@ export const useWebAssemblyHook = () => {
 
     return new Promise<EncryptedVote | undefined>((resolve, reject) => {
       setIsLoading(true)
-      worker.postMessage({ type: 'encrypt_vote', data: { voteId, publicKey } })
+      worker.postMessage({ type: 'encrypt_vote', data: { voteId, publicKey, address, signature, message } })
       worker.onmessage = async (event) => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
-            const { vote, proofData } = encryptedVote;
+            const { vote, proofData } = encryptedVote
             const { proof, publicInputs } = proofData
-           
+
             resolve({
               vote: vote,
               proof: proof,

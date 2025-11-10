@@ -18,16 +18,16 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 
 fn main(
     // Ciphertext Addition Section.
-    prev_ct0is: pub [Polynomial<2048>; 1],
-    prev_ct1is: pub [Polynomial<2048>; 1],
+    prev_ct0is: [Polynomial<2048>; 1],
+    prev_ct1is: [Polynomial<2048>; 1],
     sum_ct0is: [Polynomial<2048>; 1],
     sum_ct1is: [Polynomial<2048>; 1],
     sum_r0is: [Polynomial<2048>; 1],
     sum_r1is: [Polynomial<2048>; 1],
     // Greco Section.
-    params: pub Params<2048, 1>,
-    pk0is: pub [Polynomial<2048>; 1],
-    pk1is: pub [Polynomial<2048>; 1],
+    params: Params<2048, 1>,
+    pk0is: [Polynomial<2048>; 1],
+    pk1is: [Polynomial<2048>; 1],
     ct0is: [Polynomial<2048>; 1],
     ct1is: [Polynomial<2048>; 1],
     u: Polynomial<2048>,
@@ -45,17 +45,17 @@ fn main(
     signature: [u8; 64],
     hashed_message: [u8; 32],
     // Merkle Tree Section.
-    merkle_root: pub Field,
+    merkle_root: Field,
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],
     // Slot Address Section.
-    slot_address: pub Field,
+    slot_address: Field,
     // Balance Section.
     balance: Field,
     // Whether this is the first vote for this slot.
-    is_first_vote: pub bool,
-) -> pub ([Polynomial<2048>; 1], [Polynomial<2048>; 1]) {
+    is_first_vote: bool,
+) {
     // Verify the ECDSA signature.
     let is_signature_valid =
         verify_signature(hashed_message, public_key_x, public_key_y, signature);
@@ -118,7 +118,7 @@ fn main(
         // Verify the correct coefficient values and that the vote is <= balance
         check_coefficient_values_with_balance(k1, params.crypto_params().q_mod_t, balance);
 
-        (ct0is, ct1is)
+        // (ct0is, ct1is)
     } else {
         // check if vote == 0.
         let is_vote_zero = check_coefficient_zero(k1);
@@ -128,11 +128,11 @@ fn main(
         // If so, (ct0is, ct1is) should be returned.
 
         if is_first_vote {
-            (ct0is, ct1is)
+            // (ct0is, ct1is)
         } else {
             // check if the sum is valid
             assert(is_ct_add_valid);
-            (sum_ct0is, sum_ct1is)
+            // (sum_ct0is, sum_ct1is)
         }
     }
 }

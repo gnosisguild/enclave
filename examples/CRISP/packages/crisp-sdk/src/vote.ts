@@ -152,6 +152,18 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
   }
 }
 
+export const encryptVote = async (encodedVote: string[], publicKey: Uint8Array): Promise<Uint8Array> => {
+  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+    DEFAULT_BFV_PARAMS.degree,
+    DEFAULT_BFV_PARAMS.plaintextModulus,
+    DEFAULT_BFV_PARAMS.moduli,
+  )
+
+  const vote = BigInt64Array.from(encodedVote.map(BigInt))
+
+  return zkInputsGenerator.encryptVote(publicKey, vote)
+}
+
 /**
  * This is a wrapper around enclave-e3/sdk encryption functions as CRISP circuit will require some more
  * input values which generic Greco do not need.
@@ -266,7 +278,6 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness } = await noir.execute(crispInputs as any)
-
   const proof = await backend.generateProof(witness, { keccak: true })
 
   await backend.destroy()

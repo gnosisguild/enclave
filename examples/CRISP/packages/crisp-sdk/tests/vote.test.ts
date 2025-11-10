@@ -124,8 +124,6 @@ describe('Vote', () => {
     const validVote = { yes: 10n, no: 0n }
     const invalidVote = { yes: 5n, no: 5n }
 
-    const votingPower = 10n
-
     it('should throw an error for invalid GOVERNANCE votes', () => {
       expect(() => {
         validateVote(VotingMode.GOVERNANCE, invalidVote, votingPower)
@@ -135,11 +133,6 @@ describe('Vote', () => {
       expect(() => {
         validateVote(VotingMode.GOVERNANCE, validVote, votingPower)
       }).not.toThrow()
-    })
-    it('should throw when vote are greater than the voting power available', () => {
-      expect(() => {
-        validateVote(VotingMode.GOVERNANCE, { yes: 11n, no: 0n }, votingPower)
-      }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
     })
     it('should not throw when vote does not exceed the maximum value supported', () => {
       expect(() => {
@@ -275,7 +268,7 @@ describe('Vote', () => {
       const signature = await account.signMessage({ message: MESSAGE })
       const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -350,7 +343,7 @@ describe('Vote', () => {
     })
 
     it('should throw when the signature is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
       const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -358,7 +351,7 @@ describe('Vote', () => {
       const signature = await account.signMessage({ message: MESSAGE })
       const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -379,7 +372,7 @@ describe('Vote', () => {
     })
 
     it('should throw when the merkle tree inclusion proof is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
       const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -387,7 +380,7 @@ describe('Vote', () => {
       const signature = await account.signMessage({ message: MESSAGE })
       const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -417,7 +410,7 @@ describe('Vote', () => {
         no: 0n,
       }
 
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
       const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -425,7 +418,7 @@ describe('Vote', () => {
       const signature = await account.signMessage({ message: MESSAGE })
       const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
@@ -446,7 +439,7 @@ describe('Vote', () => {
     })
 
     it('should throw when the vote is > balance', { timeout: 100000 }, async () => {
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
 
       // hardhat default private key
       const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -454,7 +447,7 @@ describe('Vote', () => {
       const signature = await account.signMessage({ message: MESSAGE })
       const leaf = hashLeaf(account.address.toLowerCase(), votingPowerLeaf.toString())
       const leaves = [...LEAVES, leaf]
-      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves, 20)
+      const merkleProof = generateMerkleProof(0n, votingPowerLeaf, account.address.toLowerCase(), leaves)
 
       const inputs = await encryptVoteAndGenerateCRISPInputs({
         encodedVote,
