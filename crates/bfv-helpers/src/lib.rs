@@ -33,7 +33,7 @@ pub mod params {
     /// Note that 10 is the default value for both error1 and error2 variance
     /// for both BFV and TRBFV (if not explicitly set).
 
-    /// Standard development parameters set (DO NOT USE IN PRODUCTION).
+    /// Standard BFV development parameters set (DO NOT USE IN PRODUCTION).
     /// - Degree: 2048 (polynomial ring size)
     /// - Plaintext modulus: 1032193
     /// - Moduli: [0x3FFFFFFF000001] (provides good security level)
@@ -41,6 +41,30 @@ pub mod params {
         degree: 2048,
         plaintext_modulus: 1032193,
         moduli: &[0x3FFFFFFF000001],
+        error2_variance: None,
+    };
+
+    /// Testing TrBFV development parameters set (DO NOT USE IN PRODUCTION).
+    /// - Degree: 512
+    /// - Moduli: [0xffffee001, 0xffffc4001]
+    /// - Plaintext modulus: 10
+    /// - Error2 Variance: 3
+    pub const SET_512_10_1: BfvParamSet = BfvParamSet {
+        degree: 512,
+        moduli: &[0xffffee001, 0xffffc4001],
+        plaintext_modulus: 10,
+        error2_variance: Some("3"),
+    };
+
+    /// Testing BFV development parameters for share encryption (DO NOT USE IN PRODUCTION).
+    /// - Degree: 512
+    /// - Moduli: [0x7fffffffe0001]
+    /// - Plaintext modulus: 0xffffee001
+    /// - Error2 Variance: 3
+    pub const SET_512_0XFFFFEE001_1: BfvParamSet = BfvParamSet {
+        degree: 512,
+        moduli: &[0x7fffffffe0001],
+        plaintext_modulus: 0xffffee001,
         error2_variance: None,
     };
 
