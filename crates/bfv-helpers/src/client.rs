@@ -125,7 +125,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::params::SET_2048_1032193_1;
+    use crate::params::INSECURE_SET_2048_1032193_1;
 
     use super::*;
 
@@ -135,7 +135,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = SET_2048_1032193_1;
+        let param_set = INSECURE_SET_2048_1032193_1;
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -160,7 +160,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = SET_2048_1032193_1;
+        let param_set = INSECURE_SET_2048_1032193_1;
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -192,7 +192,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = SET_2048_1032193_1;
+        let param_set = INSECURE_SET_2048_1032193_1;
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -223,7 +223,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = SET_2048_1032193_1;
+        let param_set = INSECURE_SET_2048_1032193_1;
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;

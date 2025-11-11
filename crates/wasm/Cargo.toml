@@ -11,5 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 e3-bfv-helpers.workspace = true
+serde.workspace = true
+serde-wasm-bindgen.workspace = true
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2.99"
