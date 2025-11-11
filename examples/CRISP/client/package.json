@@ -12,15 +12,14 @@
     "cli": "pnpm sh ./scripts/cli.sh",
     "dev": "vite --no-open --host",
     "dev-static": "NO_HOT=1 vite --no-open --host",
-    "build:sdk": "pnpm -C ../packages/crisp-sdk build",
-    "build": "pnpm build:sdk && tsc && vite build",
+    "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@crisp-e3/sdk": "workspace:*",
+    "@crisp-e3/sdk": "0.2.0-test",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
     "@phosphor-icons/react": "^2.1.4",
