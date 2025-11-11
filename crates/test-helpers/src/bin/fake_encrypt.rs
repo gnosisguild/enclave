@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = if let Some(params_bytes) = args.params {
         Arc::new(decode_bfv_params(&params_bytes.0))
     } else {
-        build_bfv_params_from_set_arc(BfvParams::InsecureSet2048_1032193_1.params())
+        build_bfv_params_from_set_arc(BfvParams::InsecureSet2048_1032193_1.into())
     };
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
     let raw_plaintext = args.plaintext;
