@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
+use e3_sdk::bfv_helpers::BfvParams;
 use log::info;
 use num_bigint::BigUint;
 use reqwest::Client;
@@ -15,9 +16,7 @@ use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use crisp::config::CONFIG;
-use e3_sdk::bfv_helpers::{
-    build_bfv_params_from_set_arc, encode_bfv_params, params::INSECURE_SET_2048_1032193_1,
-};
+use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
@@ -329,7 +328,7 @@ pub async fn decrypt_and_publish_result(
 }
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
-    build_bfv_params_from_set_arc(INSECURE_SET_2048_1032193_1)
+    build_bfv_params_from_set_arc(BfvParams::InsecureSet2048_1032193_1.into())
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
