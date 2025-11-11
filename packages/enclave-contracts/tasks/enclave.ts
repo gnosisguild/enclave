@@ -139,19 +139,8 @@ export const requestCommittee = task(
         "MockE3Program",
         hre.globalOptions.network,
       );
-
-      let e3ProgramParams = e3Params;
-
-      const mockInputValidatorArgs = readDeploymentArgs(
-        "MockInputValidator",
-        hre.globalOptions.network,
-      );
-      if (e3ProgramParams === ZeroAddress) {
-        if (!mockInputValidatorArgs) {
-          throw new Error("MockInputValidator deployment arguments not found");
-        }
-        e3ProgramParams = zeroPadValue(mockInputValidatorArgs.address, 32);
-      }
+      
+      const e3ProgramParams = zeroPadValue(e3Params, 32);      
 
       let computeProviderParams = computeParams;
       const mockDecryptionVerifierArgs = readDeploymentArgs(

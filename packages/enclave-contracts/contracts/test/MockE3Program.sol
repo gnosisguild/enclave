@@ -8,7 +8,7 @@ pragma solidity >=0.8.27;
 import { IE3Program } from "../interfaces/IE3Program.sol";
 
 contract MockE3Program is IE3Program {
-    error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
+    error InvalidParams(bytes e3ProgramParams, bytes computeProviderParams);
     error E3AlreadyInitialized();
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
@@ -27,7 +27,7 @@ contract MockE3Program is IE3Program {
     ) external returns (bytes32) {
         require(
             computeProviderParams.length == 32,
-            invalidParams(e3ProgramParams, computeProviderParams)
+            InvalidParams(e3ProgramParams, computeProviderParams)
         );
 
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
