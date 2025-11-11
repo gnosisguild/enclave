@@ -38,5 +38,5 @@ export default buildModule("BondingRegistry", (m) => {
     initData,
   ]);
 
-  return { bondingRegistry };
+  return { bondingRegistry, bondingRegistryImpl };
 }) as any;

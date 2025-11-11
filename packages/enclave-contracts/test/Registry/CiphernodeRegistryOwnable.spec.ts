@@ -6,6 +6,7 @@
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import type { Signer } from "ethers";
+import hre from "hardhat";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -19,6 +20,7 @@ import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
 } from "../../types";
+import { upgradeCiphernodeRegistryOwnableTestUtils } from "../upgrade.utils";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -149,7 +151,11 @@ describe("CiphernodeRegistryOwnable", function () {
       },
     );
 
-    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+    const {
+      ciphernodeRegistry: registryContract,
+      ciphernodeRegistryImpl: registryImpl,
+      poseidonT3,
+    } = await ignition.deploy(CiphernodeRegistryModule, {
       parameters: {
         CiphernodeRegistry: {
           enclaveAddress: ownerAddress,
@@ -159,8 +165,7 @@ describe("CiphernodeRegistryOwnable", function () {
       },
     });
 
-    const registryAddress =
-      await registryContract.cipherNodeRegistry.getAddress();
+    const registryAddress = await registryContract.getAddress();
 
     const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
 
@@ -215,6 +220,8 @@ describe("CiphernodeRegistryOwnable", function () {
       operator1,
       operator2,
       registry,
+      registryImpl,
+      poseidonT3: await poseidonT3.getAddress(),
       bondingRegistry,
       licenseToken,
       ticketToken,
@@ -568,6 +575,73 @@ describe("CiphernodeRegistryOwnable", function () {
     it("returns the size of the ciphernode registry merkle tree", async function () {
       const { registry, tree } = await loadFixture(setup);
       expect(await registry.treeSize()).to.equal(tree.size);
+    });
+  });
+
+  describe("Upgrade", function () {
+    it("should preserve proxy address after upgrade", async function () {
+      const { owner, registry, registryImpl, poseidonT3 } =
+        await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const proxyAddressBefore = await registry.getAddress();
+      const { ciphernodeRegistry: upgradedRegistry, implementationAddress } =
+        await upgradeCiphernodeRegistryOwnableTestUtils({
+          poseidonT3,
+          proxyAddress: proxyAddressBefore,
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+      expect(implementationAddress).to.not.equal(
+        await registryImpl.getAddress(),
+      );
+      expect(await upgradedRegistry.getAddress()).to.equal(proxyAddressBefore);
+    });
+
+    it("should preserve storage after upgrade", async function () {
+      const { owner, registry, poseidonT3 } = await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      // Set some state
+      const ownerBefore = await registry.owner();
+      const enclaveBefore = await registry.enclave();
+      const submissionWindowBefore = await registry.sortitionSubmissionWindow();
+
+      const { ciphernodeRegistry: upgradedRegistry } =
+        await upgradeCiphernodeRegistryOwnableTestUtils({
+          poseidonT3,
+          proxyAddress: await registry.getAddress(),
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+
+      expect(await upgradedRegistry.owner()).to.equal(ownerBefore);
+      expect(await upgradedRegistry.enclave()).to.equal(enclaveBefore);
+      expect(await upgradedRegistry.sortitionSubmissionWindow()).to.equal(
+        submissionWindowBefore,
+      );
+    });
+
+    it("should preserve functionality after upgrade", async function () {
+      const { owner, registry, poseidonT3 } = await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const { ciphernodeRegistry: upgradedRegistry } =
+        await upgradeCiphernodeRegistryOwnableTestUtils({
+          poseidonT3,
+          proxyAddress: await registry.getAddress(),
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+
+      const newWindow = 20;
+      await upgradedRegistry.setSortitionSubmissionWindow(newWindow);
+      expect(await upgradedRegistry.sortitionSubmissionWindow()).to.equal(
+        newWindow,
+      );
     });
   });
 });

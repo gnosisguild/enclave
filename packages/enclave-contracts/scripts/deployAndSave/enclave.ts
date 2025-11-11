@@ -102,7 +102,8 @@ export const deployAndSaveEnclave = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(enclaveAddress, signer, initData);
+  const signerAddress = await signer.getAddress();
+  const proxy = await ProxyCF.deploy(enclaveAddress, signerAddress, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 

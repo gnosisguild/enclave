@@ -38,5 +38,5 @@ export default buildModule("Enclave", (m) => {
     initData,
   ]);
 
-  return { enclave };
+  return { enclave, enclaveImpl, poseidonT3 };
 }) as any;

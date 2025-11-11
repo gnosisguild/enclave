@@ -115,7 +115,8 @@ export const deployAndSaveBondingRegistry = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signer, initData);
+  const signerAddress = await signer.getAddress();
+  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signerAddress, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 

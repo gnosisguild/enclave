@@ -6,6 +6,7 @@
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import type { Signer } from "ethers";
+import hre from "hardhat";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -29,6 +30,7 @@ import {
 } from "../types";
 import type { Enclave } from "../types/contracts/Enclave";
 import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
+import { upgradeEnclaveTestUtils } from "./upgrade.utils";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -184,9 +186,8 @@ describe("Enclave", function () {
       },
     );
 
-    const bondingRegistryContract = await ignition.deploy(
-      BondingRegistryModule,
-      {
+    const { bondingRegistry: bondingRegistryContract, bondingRegistryImpl } =
+      await ignition.deploy(BondingRegistryModule, {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
@@ -201,37 +202,39 @@ describe("Enclave", function () {
             exitDelay: 7 * 24 * 60 * 60,
           },
         },
-      },
-    );
+      });
 
-    const enclaveContract = await ignition.deploy(EnclaveModule, {
+    const {
+      enclave: enclaveContract,
+      enclaveImpl,
+      poseidonT3,
+    } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
           params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS_IN_SECONDS,
           registry: addressOne,
-          bondingRegistry:
-            await bondingRegistryContract.bondingRegistry.getAddress(),
+          bondingRegistry: await bondingRegistryContract.getAddress(),
           feeToken: await usdcToken.getAddress(),
         },
       },
     });
 
-    const enclaveAddress = await enclaveContract.enclave.getAddress();
+    const enclaveAddress = await enclaveContract.getAddress();
 
-    const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
-      parameters: {
-        CiphernodeRegistry: {
-          enclaveAddress: enclaveAddress,
-          owner: ownerAddress,
-          submissionWindow: SORTITION_SUBMISSION_WINDOW,
+    const { ciphernodeRegistry, ciphernodeRegistryImpl } =
+      await ignition.deploy(CiphernodeRegistryModule, {
+        parameters: {
+          CiphernodeRegistry: {
+            enclaveAddress: enclaveAddress,
+            owner: ownerAddress,
+            submissionWindow: SORTITION_SUBMISSION_WINDOW,
+          },
         },
-      },
-    });
+      });
 
-    const ciphernodeRegistryAddress =
-      await ciphernodeRegistry.cipherNodeRegistry.getAddress();
+    const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
@@ -240,7 +243,7 @@ describe("Enclave", function () {
     );
 
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistryContract.getAddress(),
       owner,
     );
 
@@ -349,8 +352,12 @@ describe("Enclave", function () {
 
     return {
       enclave,
+      enclaveImpl,
+      ciphernodeRegistryImpl,
       ciphernodeRegistryContract,
-      bondingRegistry: bondingRegistry,
+      bondingRegistry,
+      bondingRegistryImpl,
+      poseidonT3: await poseidonT3.getAddress(),
       ticketToken: ticketTokenContract.enclaveTicketToken,
       licenseToken: licenseToken,
       usdcToken,
@@ -2006,6 +2013,78 @@ describe("Enclave", function () {
       await expect(await enclave.publishPlaintextOutput(e3Id, data, proof))
         .to.emit(enclave, "PlaintextOutputPublished")
         .withArgs(e3Id, data);
+    });
+  });
+
+  describe("Upgrade", function () {
+    it("should preserve proxy address after upgrade", async function () {
+      const { owner, enclave, enclaveImpl, poseidonT3 } =
+        await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const proxyAddressBefore = await enclave.getAddress();
+      const implementationBefore = await enclaveImpl.getAddress();
+
+      const {
+        enclave: upgradedEnclave,
+        implementationAddress: implementationAfter,
+      } = await upgradeEnclaveTestUtils({
+        poseidonT3,
+        proxyAddress: proxyAddressBefore,
+        ownerAddress,
+        signer: owner,
+        hre,
+      });
+
+      const proxyAddressAfter = await upgradedEnclave.getAddress();
+      expect(proxyAddressAfter).to.equal(proxyAddressBefore);
+      expect(implementationAfter).to.not.equal(implementationBefore);
+    });
+
+    it("should preserve storage after upgrade", async function () {
+      const { owner, enclave, enclaveImpl, poseidonT3 } =
+        await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const maxDurationBefore = await enclave.maxDuration();
+      const ownerBefore = await enclave.owner();
+      const ciphernodeRegistryBefore = await enclave.ciphernodeRegistry();
+
+      const proxyAddress = await enclave.getAddress();
+
+      const { enclave: upgradedEnclave } = await upgradeEnclaveTestUtils({
+        poseidonT3,
+        proxyAddress,
+        ownerAddress,
+        signer: owner,
+        hre,
+      });
+
+      expect(await upgradedEnclave.maxDuration()).to.equal(maxDurationBefore);
+      expect(await upgradedEnclave.owner()).to.equal(ownerBefore);
+      expect(await upgradedEnclave.ciphernodeRegistry()).to.equal(
+        ciphernodeRegistryBefore,
+      );
+    });
+
+    it("should preserve functionality after upgrade", async function () {
+      const { owner, enclave, enclaveImpl, poseidonT3 } =
+        await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const proxyAddress = await enclave.getAddress();
+
+      const { enclave: upgradedEnclave } = await upgradeEnclaveTestUtils({
+        poseidonT3,
+        proxyAddress,
+        ownerAddress,
+        signer: owner,
+        hre,
+      });
+
+      const newMaxDuration = 1000000;
+      await upgradedEnclave.setMaxDuration(newMaxDuration);
+      expect(await upgradedEnclave.maxDuration()).to.equal(newMaxDuration);
     });
   });
 });

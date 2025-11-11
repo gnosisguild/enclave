@@ -89,9 +89,10 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
+  const signerAddress = await signer.getAddress();
   const proxy = await ProxyCF.deploy(
     ciphernodeRegistryAddress,
-    signer,
+    signerAddress,
     initData,
   );
   await proxy.waitForDeployment();

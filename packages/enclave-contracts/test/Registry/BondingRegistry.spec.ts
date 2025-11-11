@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
+import hre from "hardhat";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -22,6 +23,7 @@ import {
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
+import { upgradeBondingRegistryTestUtils } from "../upgrade.utils";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 
@@ -102,9 +104,8 @@ describe("BondingRegistry", function () {
       },
     );
 
-    const bondingRegistryContract = await ignition.deploy(
-      BondingRegistryModule,
-      {
+    const { bondingRegistry: bondingRegistryContract, bondingRegistryImpl } =
+      await ignition.deploy(BondingRegistryModule, {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
@@ -120,11 +121,10 @@ describe("BondingRegistry", function () {
             exitDelay: SEVEN_DAYS_IN_SECONDS,
           },
         },
-      },
-    );
+      });
 
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await bondingRegistryContract.getAddress(),
       owner,
     );
     const ticketToken = EnclaveTicketTokenFactory.connect(
@@ -181,6 +181,7 @@ describe("BondingRegistry", function () {
 
     return {
       bondingRegistry,
+      bondingRegistryImpl,
       ticketToken,
       licenseToken,
       usdcToken,
@@ -1154,6 +1155,125 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).registerOperator();
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.true;
+    });
+  });
+
+  describe("Upgrade", function () {
+    it("should preserve proxy address after upgrade", async function () {
+      const { owner, ownerAddress, bondingRegistry, bondingRegistryImpl } =
+        await loadFixture(setup);
+
+      const proxyAddressBefore = await bondingRegistry.getAddress();
+      const { bondingRegistry: upgradedRegistry, implementationAddress } =
+        await upgradeBondingRegistryTestUtils({
+          proxyAddress: proxyAddressBefore,
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+      expect(implementationAddress).to.not.equal(
+        await bondingRegistryImpl.getAddress(),
+      );
+      expect(await upgradedRegistry.getAddress()).to.equal(proxyAddressBefore);
+    });
+
+    it("should preserve storage after upgrade", async function () {
+      const { owner, ownerAddress, bondingRegistry, bondingRegistryImpl } =
+        await loadFixture(setup);
+
+      const licenseActiveBpsBefore = await bondingRegistry.licenseActiveBps();
+      const ticketPriceBefore = await bondingRegistry.ticketPrice();
+      const licenseRequiredBondBefore =
+        await bondingRegistry.licenseRequiredBond();
+      const ownerBefore = await bondingRegistry.owner();
+
+      const proxyAddressBefore = await bondingRegistry.getAddress();
+      const { bondingRegistry: upgradedRegistry } =
+        await upgradeBondingRegistryTestUtils({
+          proxyAddress: proxyAddressBefore,
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+
+      expect(await upgradedRegistry.licenseActiveBps()).to.equal(
+        licenseActiveBpsBefore,
+      );
+      expect(await upgradedRegistry.ticketPrice()).to.equal(ticketPriceBefore);
+      expect(await upgradedRegistry.licenseRequiredBond()).to.equal(
+        licenseRequiredBondBefore,
+      );
+      expect(await upgradedRegistry.owner()).to.equal(ownerBefore);
+    });
+
+    it("should preserve functionality after upgrade", async function () {
+      const { owner, ownerAddress, bondingRegistry } = await loadFixture(setup);
+
+      const proxyAddressBefore = await bondingRegistry.getAddress();
+      const { bondingRegistry: upgradedRegistry, implementationAddress } =
+        await upgradeBondingRegistryTestUtils({
+          proxyAddress: proxyAddressBefore,
+          ownerAddress,
+          signer: owner,
+          hre,
+        });
+
+      const newBps = 8500;
+      await upgradedRegistry.setLicenseActiveBps(newBps);
+      expect(await upgradedRegistry.licenseActiveBps()).to.equal(newBps);
+    });
+
+    it("should revert if non-owner tries to upgrade", async function () {
+      const { owner, notTheOwner, bondingRegistry, bondingRegistryImpl } =
+        await loadFixture(setup);
+      const notTheOwnerAddress = await notTheOwner.getAddress();
+
+      const proxyAddressBefore = await bondingRegistry.getAddress();
+
+      await expect(
+        upgradeBondingRegistryTestUtils({
+          proxyAddress: proxyAddressBefore,
+          ownerAddress: notTheOwnerAddress,
+          signer: owner,
+          hre,
+        }),
+      ).to.be.rejected;
+    });
+
+    it("should allow multiple upgrades", async function () {
+      const { owner, bondingRegistry } = await loadFixture(setup);
+      const ownerAddress = await owner.getAddress();
+
+      const proxyAddressBefore = await bondingRegistry.getAddress();
+
+      // First upgrade
+      const {
+        bondingRegistry: upgraded1,
+        implementationAddress: implementationAfterFirst,
+      } = await upgradeBondingRegistryTestUtils({
+        proxyAddress: proxyAddressBefore,
+        ownerAddress,
+        signer: owner,
+        hre,
+      });
+
+      const proxyAddress1 = await upgraded1.getAddress();
+      const {
+        bondingRegistry: upgraded2,
+        implementationAddress: implementationAfterSecond,
+      } = await upgradeBondingRegistryTestUtils({
+        proxyAddress: proxyAddress1,
+        ownerAddress,
+        signer: owner,
+        hre,
+      });
+
+      const proxyAddress2 = await upgraded2.getAddress();
+
+      expect(proxyAddress1).to.equal(proxyAddress2);
+      const licenseActiveBps = await upgraded2.licenseActiveBps();
+      expect(licenseActiveBps).to.be.gt(0);
+      expect(implementationAfterSecond).to.not.equal(implementationAfterFirst);
     });
   });
 });
