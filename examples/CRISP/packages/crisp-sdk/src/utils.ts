@@ -8,6 +8,7 @@ import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
 
 import type { IMerkleProof } from './types'
+import { MERKLE_TREE_MAX_DEPTH } from './constants'
 
 /**
  * Hash a leaf node for the Merkle tree
@@ -34,15 +35,8 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
  * @param balance The voter's balance
  * @param address The voter's address
  * @param leaves The leaves of the Merkle tree
- * @param maxDepth The maximum depth of the Merkle tree
  */
-export const generateMerkleProof = (
-  threshold: bigint,
-  balance: bigint,
-  address: string,
-  leaves: bigint[],
-  maxDepth: number,
-): IMerkleProof => {
+export const generateMerkleProof = (threshold: bigint, balance: bigint, address: string, leaves: bigint[]): IMerkleProof => {
   if (balance < threshold) {
     throw new Error('Balance is below the threshold')
   }
@@ -60,10 +54,10 @@ export const generateMerkleProof = (
   const proof = tree.generateProof(index)
 
   // Pad siblings with zeros
-  const paddedSiblings = [...proof.siblings, ...Array(maxDepth - proof.siblings.length).fill(0n)]
+  const paddedSiblings = [...proof.siblings, ...Array(MERKLE_TREE_MAX_DEPTH - proof.siblings.length).fill(0n)]
   // Pad indices with zeros
   const indices = proof.siblings.map((_, i) => Number((BigInt(proof.index) >> BigInt(i)) & 1n))
-  const paddedIndices = [...indices, ...Array(maxDepth - indices.length).fill(0)]
+  const paddedIndices = [...indices, ...Array(MERKLE_TREE_MAX_DEPTH - indices.length).fill(0)]
 
   return {
     leaf,

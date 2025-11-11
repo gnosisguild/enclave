@@ -7,6 +7,8 @@ export CARGO_INCREMENTAL=1
 echo "SETUP..."
 echo "pnpm install"
 (cd ../../ && pnpm install --frozen-lockfile)
+echo "sdk"
+(cd packages/crisp-sdk && pnpm install && pnpm build)
 echo "evm"
 (cd ../../packages/enclave-contracts && pnpm compile)
 echo "server"
