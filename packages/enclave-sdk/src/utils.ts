@@ -61,8 +61,8 @@ export function getCurrentTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-// BFV parameter set matching the Rust SET_2048_1032193_1 configuration
-export const SET_2048_1032193_1 = {
+// BFV parameter set matching the Rust INSECURE_SET_2048_1032193_1 configuration
+export const INSECURE_SET_2048_1032193_1 = {
   degree: 2048,
   plaintext_modulus: 1032193,
   moduli: [0x3fffffff000001n], // BigInt for the modulus
@@ -84,7 +84,7 @@ export const SET_8192_1000_4 = {
 };
 
 // Set default parameter set
-export const BFV_PARAMS_SET = SET_2048_1032193_1;
+export const BFV_PARAMS_SET = INSECURE_SET_2048_1032193_1;
 
 // Compute provider parameters structure
 export interface ComputeProviderParams {

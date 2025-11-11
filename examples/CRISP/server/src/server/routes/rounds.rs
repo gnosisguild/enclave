@@ -14,7 +14,7 @@ use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;
 use e3_sdk::bfv_helpers::{
-    build_bfv_params_from_set_arc, encode_bfv_params, params::SET_2048_1032193_1,
+    build_bfv_params_from_set_arc, encode_bfv_params, params::INSECURE_SET_2048_1032193_1,
 };
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
@@ -181,7 +181,7 @@ pub async fn initialize_crisp_round(
     }
 
     info!("Generating parameters...");
-    let params = encode_bfv_params(&build_bfv_params_from_set_arc(SET_2048_1032193_1));
+    let params = encode_bfv_params(&build_bfv_params_from_set_arc(INSECURE_SET_2048_1032193_1));
 
     let token_address: Address = token_address.parse()?;
     let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
