@@ -139,8 +139,8 @@ export const requestCommittee = task(
         "MockE3Program",
         hre.globalOptions.network,
       );
-      
-      const e3ProgramParams = zeroPadValue(e3Params, 32);      
+
+      const e3ProgramParams = zeroPadValue(e3Params, 32);
 
       let computeProviderParams = computeParams;
       const mockDecryptionVerifierArgs = readDeploymentArgs(
