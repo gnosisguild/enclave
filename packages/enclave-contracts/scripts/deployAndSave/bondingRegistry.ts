@@ -116,7 +116,11 @@ export const deployAndSaveBondingRegistry = async ({
     "TransparentUpgradeableProxy",
   );
   const signerAddress = await signer.getAddress();
-  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signerAddress, initData);
+  const proxy = await ProxyCF.deploy(
+    bondingRegistryAddress,
+    signerAddress,
+    initData,
+  );
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 
