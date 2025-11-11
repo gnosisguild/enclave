@@ -2675,8 +2675,8 @@ dependencies = [
  "fhe-util",
  "hex",
  "num-bigint",
- "phf",
  "rand 0.8.5",
+ "strum",
  "thiserror 1.0.69",
  "zkfhe-greco",
 ]

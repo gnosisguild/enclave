@@ -16,7 +16,7 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe.workspace = true
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 num-bigint = { workspace = true }
-phf.workspace = true
+strum.workspace = true
 rand.workspace = true
 thiserror = { workspace = true }
 

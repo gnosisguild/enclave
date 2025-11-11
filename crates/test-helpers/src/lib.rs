@@ -19,7 +19,7 @@ use e3_events::{
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
-use e3_sdk::bfv_helpers::{params::INSECURE_SET_2048_1032193_1, BfvParamSet};
+use e3_sdk::bfv_helpers::{BfvParamSet, BfvParams};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
@@ -87,7 +87,7 @@ pub fn get_common_setup(
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let param_set = param_set.unwrap_or(INSECURE_SET_2048_1032193_1);
+    let param_set = param_set.unwrap_or(BfvParams::InsecureSet2048_1032193_1.params());
     let degree = param_set.degree;
     let plaintext_modulus = param_set.plaintext_modulus;
     let moduli = param_set.moduli;
