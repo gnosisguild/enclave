@@ -11,8 +11,8 @@ use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext};
 use fhe_traits::FheDecoder;
-use phf::phf_map;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 use thiserror::Error as ThisError;
 
 #[derive(ThisError, Debug)]
@@ -29,85 +29,113 @@ pub enum Error {
 /// Result that returns a type T or a BfvHelpersError
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug, Clone, Copy, EnumString, IntoStaticStr, EnumIter)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 /// Predefined BFV parameters for common use cases
-pub mod params {
-    use super::BfvParamSet;
-
-    /// Note that 10 is the default value for both error1 and error2 variance
-    /// for both BFV and TRBFV (if not explicitly set).
-
+/// Note that 10 is the default value for both error1 and error2 variance
+/// for both BFV and TRBFV (if not explicitly set).
+pub enum BfvParams {
     /// Standard BFV development parameters set (DO NOT USE IN PRODUCTION).
     /// - Degree: 2048 (polynomial ring size)
     /// - Plaintext modulus: 1032193
     /// - Moduli: [0x3FFFFFFF000001] (provides good security level)
-    pub const INSECURE_SET_2048_1032193_1: BfvParamSet = BfvParamSet {
-        degree: 2048,
-        plaintext_modulus: 1032193,
-        moduli: &[0x3FFFFFFF000001],
-        error2_variance: None,
-    };
+    #[strum(serialize = "INSECURE_SET_2048_1032193_1")]
+    InsecureSet2048_1032193_1,
 
     /// Testing TrBFV development parameters set (DO NOT USE IN PRODUCTION).
     /// - Degree: 512
     /// - Moduli: [0xffffee001, 0xffffc4001]
     /// - Plaintext modulus: 10
     /// - Error2 Variance: 3
-    pub const INSECURE_SET_512_10_1: BfvParamSet = BfvParamSet {
-        degree: 512,
-        moduli: &[0xffffee001, 0xffffc4001],
-        plaintext_modulus: 10,
-        error2_variance: Some("3"),
-    };
+    #[strum(serialize = "INSECURE_SET_512_10_1")]
+    InsecureSet512_10_1,
 
     /// Testing BFV development parameters for share encryption (DO NOT USE IN PRODUCTION).
     /// - Degree: 512
     /// - Moduli: [0x7fffffffe0001]
     /// - Plaintext modulus: 0xffffee001
     /// - Error2 Variance: 3
-    pub const INSECURE_SET_512_0XFFFFEE001_1: BfvParamSet = BfvParamSet {
-        degree: 512,
-        moduli: &[0x7fffffffe0001],
-        plaintext_modulus: 0xffffee001,
-        error2_variance: None,
-    };
+    #[strum(serialize = "INSECURE_SET_512_0XFFFFEE001_1")]
+    InsecureSet512_0xffffee001_1,
 
     /// 128bits security TRBFV parameters set (PRODUCTION READY).
     /// - Degree: 8192
     /// - Plaintext modulus: 1000
     /// - Moduli: [0x00800000022a0001, 0x00800000021a0001, 0x0080000002120001, 0x0080000001f60001]
     /// - Error2 Variance: 52309181128222339698631578526730685514457152477762943514050560000
-    pub const SET_8192_1000_4: BfvParamSet = BfvParamSet {
-        degree: 8192,
-        plaintext_modulus: 1000,
-        moduli: &[
-            0x00800000022a0001,
-            0x00800000021a0001,
-            0x0080000002120001,
-            0x0080000001f60001,
-        ],
-        error2_variance: Some("52309181128222339698631578526730685514457152477762943514050560000"),
-    };
+    #[strum(serialize = "SET_8192_1000_4")]
+    Set8192_1000_4,
 
     /// 128bits security BFV parameters set (PRODUCTION READY).
     /// - Degree: 8192
     /// - Plaintext modulus: 144115188075855872
     /// - Moduli: [288230376173076481, 288230376167047169]
-    pub const SET_8192_144115188075855872_2: BfvParamSet = BfvParamSet {
-        degree: 8192,
-        plaintext_modulus: 144115188075855872,
-        moduli: &[288230376173076481, 288230376167047169],
-        error2_variance: None,
-    };
+    #[strum(serialize = "SET_8192_144115188075855872_2")]
+    Set8192_144115188075855872_2,
 }
 
 // Map for getters
-static PARAMS_MAP: phf::Map<&'static str, BfvParamSet> = phf_map! {
-    "INSECURE_SET_2048_1032193_1" => params::INSECURE_SET_2048_1032193_1,
-    "INSECURE_SET_512_10_1" => params::INSECURE_SET_512_10_1,
-    "INSECURE_SET_512_0XFFFFEE001_1" => params::INSECURE_SET_512_0XFFFFEE001_1,
-    "SET_8192_1000_4" => params::SET_8192_1000_4,
-    "SET_8192_144115188075855872_2" => params::SET_8192_144115188075855872_2,
-};
+impl BfvParams {
+    /// Get the params for the current variant
+    pub fn params(self) -> BfvParamSet {
+        match self {
+            Self::InsecureSet2048_1032193_1 => BfvParamSet {
+                degree: 2048,
+                plaintext_modulus: 1032193,
+                moduli: &[0x3FFFFFFF000001],
+                error2_variance: None,
+            },
+            Self::InsecureSet512_10_1 => BfvParamSet {
+                degree: 512,
+                moduli: &[0xffffee001, 0xffffc4001],
+                plaintext_modulus: 10,
+                error2_variance: Some("3"),
+            },
+            Self::InsecureSet512_0xffffee001_1 => BfvParamSet {
+                degree: 512,
+                moduli: &[0x7fffffffe0001],
+                plaintext_modulus: 0xffffee001,
+                error2_variance: None,
+            },
+            Self::Set8192_1000_4 => BfvParamSet {
+                degree: 8192,
+                plaintext_modulus: 1000,
+                moduli: &[
+                    0x00800000022a0001,
+                    0x00800000021a0001,
+                    0x0080000002120001,
+                    0x0080000001f60001,
+                ],
+                error2_variance: Some(
+                    "52309181128222339698631578526730685514457152477762943514050560000",
+                ),
+            },
+            Self::Set8192_144115188075855872_2 => BfvParamSet {
+                degree: 8192,
+                plaintext_modulus: 144115188075855872,
+                moduli: &[288230376173076481, 288230376167047169],
+                error2_variance: None,
+            },
+        }
+    }
+
+    /// Return the given param set based on the input key &str.
+    pub fn get_params_by_str(key: &str) -> Result<BfvParamSet> {
+        key.parse::<BfvParams>()
+            .map(|k| k.params())
+            .map_err(|_| Error::UnknownParamSet(key.to_string()))
+    }
+
+    /// List all the available parameter keys
+    pub fn get_params_list() -> Vec<String> {
+        BfvParams::iter()
+            .map(|key| {
+                let s: &'static str = key.into();
+                s.to_string()
+            })
+            .collect()
+    }
+}
 
 /// A consistent type representing a BFV parameter set.
 ///
@@ -123,21 +151,6 @@ pub struct BfvParamSet {
     pub moduli: &'static [u64],
     /// Optional error2 variance (as decimal string). If None, defaults to "10"
     pub error2_variance: Option<&'static str>,
-}
-
-impl BfvParamSet {
-    /// Return the given param set based on the input key
-    pub fn get_params(key: &str) -> Result<BfvParamSet> {
-        PARAMS_MAP
-            .get(key)
-            .copied()
-            .ok_or_else(|| Error::UnknownParamSet(key.to_string()))
-    }
-
-    /// List all the available parameter keys
-    pub fn get_params_list() -> Vec<String> {
-        PARAMS_MAP.keys().map(|n| n.to_string()).collect()
-    }
 }
 
 /// Builds BFV parameters from a `BfvParamSet`.
@@ -600,7 +613,7 @@ mod tests {
 
         #[test]
         fn test_params_constant() {
-            let param_set = params::INSECURE_SET_2048_1032193_1;
+            let param_set = BfvParams::InsecureSet2048_1032193_1.params();
             assert_eq!(param_set.degree, 2048);
             assert_eq!(param_set.plaintext_modulus, 1032193);
             assert_eq!(param_set.moduli, &[0x3FFFFFFF000001]);
@@ -608,7 +621,7 @@ mod tests {
 
         #[test]
         fn test_params_function() {
-            let param_set = params::INSECURE_SET_2048_1032193_1;
+            let param_set = BfvParams::InsecureSet2048_1032193_1.params();
             let params = build_bfv_params_from_set(param_set);
 
             assert_eq!(params.degree(), param_set.degree);
@@ -618,7 +631,7 @@ mod tests {
 
         #[test]
         fn test_params_arc_function() {
-            let param_set = params::INSECURE_SET_2048_1032193_1;
+            let param_set = BfvParams::InsecureSet2048_1032193_1.params();
             let params = build_bfv_params_from_set_arc(param_set);
 
             assert_eq!(params.degree(), param_set.degree);
@@ -628,7 +641,7 @@ mod tests {
 
         #[test]
         fn test_params_encoding_roundtrip() {
-            let param_set = params::INSECURE_SET_2048_1032193_1;
+            let param_set = BfvParams::InsecureSet2048_1032193_1.params();
             let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);
@@ -642,7 +655,7 @@ mod tests {
 
         #[test]
         fn test_params_arc_encoding_roundtrip() {
-            let param_set = params::INSECURE_SET_2048_1032193_1;
+            let param_set = BfvParams::InsecureSet2048_1032193_1.params();
             let params = build_bfv_params_from_set_arc(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params_arc(&encoded);
@@ -656,7 +669,7 @@ mod tests {
 
         #[test]
         fn test_params_trbfv_encoding_roundtrip() {
-            let param_set = params::SET_8192_1000_4;
+            let param_set = BfvParams::Set8192_1000_4.params();
             let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);

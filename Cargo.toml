@@ -153,10 +153,11 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde-wasm-bindgen = "=0.6.5"
 serde_json = "=1.0.141"
 serial_test = "=3.2.0"
-sled = "=0.34.7"
 serde_yaml = "=0.9.34"
 sha2 = "=0.10.9"
 shellexpand = "=3.1.1"
+sled = "=0.34.7"
+strum = "=0.27.2"
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
