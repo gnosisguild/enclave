@@ -45,16 +45,16 @@ fn main(
     signature: [u8; 64],
     hashed_message: [u8; 32],
     // Merkle Tree Section.
-    merkle_root: Field,
+    merkle_root: pub Field,
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],
     // Slot Address Section.
-    slot_address: Field,
+    slot_address: pub Field,
     // Balance Section.
     balance: Field,
     // Whether this is the first vote for this slot.
-    is_first_vote: bool,
+    is_first_vote: pub bool,
 ) {
     // Verify the ECDSA signature.
     let is_signature_valid =

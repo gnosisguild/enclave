@@ -25,7 +25,7 @@ export interface BroadcastVoteRequest {
   round_id: number
   enc_vote_bytes: number[]
   proof: number[]
-  public_inputs: string[]
+  public_inputs: number[][]
   address: string
 }
 
