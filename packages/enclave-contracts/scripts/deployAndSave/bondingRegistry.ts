@@ -9,6 +9,7 @@ import {
   BondingRegistry,
   BondingRegistry__factory as BondingRegistryFactory,
 } from "../../types";
+import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 /**
@@ -87,26 +88,36 @@ export const deployAndSaveBondingRegistry = async ({
     return { bondingRegistry: bondingRegistryContract };
   }
 
+  const blockNumber = await ethers.provider.getBlockNumber();
+
   const bondingRegistryFactory =
     await ethers.getContractFactory("BondingRegistry");
 
-  const bondingRegistry = await bondingRegistryFactory.deploy(
-    owner,
-    ticketToken,
-    licenseToken,
-    registry,
-    slashedFundsTreasury,
-    ticketPrice,
-    licenseRequiredBond,
-    minTicketBalance,
-    exitDelay,
+  const bondingRegistry = await bondingRegistryFactory.deploy();
+  await bondingRegistry.waitForDeployment();
+  const bondingRegistryAddress = await bondingRegistry.getAddress();
+
+  const initData = bondingRegistryFactory.interface.encodeFunctionData(
+    "initialize",
+    [
+      owner,
+      ticketToken,
+      licenseToken,
+      registry,
+      slashedFundsTreasury,
+      ticketPrice,
+      licenseRequiredBond,
+      minTicketBalance,
+      exitDelay,
+    ],
   );
 
-  await bondingRegistry.waitForDeployment();
-
-  const blockNumber = await ethers.provider.getBlockNumber();
-
-  const bondingRegistryAddress = await bondingRegistry.getAddress();
+  const ProxyCF = await ethers.getContractFactory(
+    "TransparentUpgradeableProxy",
+  );
+  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signer, initData);
+  await proxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
 
   storeDeploymentArgs(
     {
@@ -122,16 +133,97 @@ export const deployAndSaveBondingRegistry = async ({
         exitDelay: exitDelay.toString(),
       },
       blockNumber,
-      address: bondingRegistryAddress,
+      address: proxyAddress,
+      implementationAddress: bondingRegistryAddress,
     },
     "BondingRegistry",
     chain,
   );
 
   const bondingRegistryContract = BondingRegistryFactory.connect(
-    bondingRegistryAddress,
+    proxyAddress,
     signer,
   );
 
   return { bondingRegistry: bondingRegistryContract };
+};
+
+/**
+ * Upgrades the BondingRegistry implementation while keeping the same proxy address
+ * @param param0 - The upgrade arguments
+ * @returns The upgraded BondingRegistry contract (same proxy address)
+ */
+export const upgradeAndSaveBondingRegistry = async ({
+  ownerAddress,
+  hre,
+}: {
+  ownerAddress: string;
+  hre: HardhatRuntimeEnvironment;
+}): Promise<{
+  bondingRegistry: BondingRegistry;
+  implementationAddress: string;
+}> => {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network;
+
+  const preDeployedArgs = readDeploymentArgs("BondingRegistry", chain);
+  if (!preDeployedArgs?.address) {
+    throw new Error(
+      "BondingRegistry proxy not found. Deploy first before upgrading.",
+    );
+  }
+
+  const proxyAddress = preDeployedArgs.address;
+
+  const autoProxyAdminAddress = await getProxyAdmin(
+    ethers.provider,
+    proxyAddress,
+  );
+  console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
+
+  const bondingRegistryFactory = await ethers.getContractFactory(
+    "BondingRegistry",
+    signer,
+  );
+
+  const newImplementation = await bondingRegistryFactory.deploy();
+  await newImplementation.waitForDeployment();
+  const newImplementationAddress = await newImplementation.getAddress();
+  console.log("New Implementation Address:", newImplementationAddress);
+
+  const proxyAdmin = await ethers.getContractAt(
+    "ProxyAdmin",
+    autoProxyAdminAddress,
+    signer,
+  );
+  await verifyProxyAdminOwner(proxyAdmin, ownerAddress);
+
+  // TODO: Add init data if needed
+  const initData = "0x";
+  const upgradeTx = await proxyAdmin.upgradeAndCall(
+    proxyAddress,
+    newImplementationAddress,
+    initData,
+  );
+  await upgradeTx.wait();
+
+  storeDeploymentArgs(
+    {
+      ...preDeployedArgs,
+      implementationAddress: newImplementationAddress,
+    },
+    "BondingRegistry",
+    chain,
+  );
+
+  const bondingRegistryContract = BondingRegistryFactory.connect(
+    proxyAddress,
+    signer,
+  );
+
+  return {
+    bondingRegistry: bondingRegistryContract,
+    implementationAddress: newImplementationAddress,
+  };
 };

@@ -82,7 +82,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @notice Percentage (in basis points) of license bond that must remain bonded to stay active
     /// @dev Default 8000 = 80%. Allows operators to unbond up to 20% while remaining active
-    uint256 public licenseActiveBps = 8_000;
+    uint256 public licenseActiveBps;
 
     /// @notice Operator state data structure
     /// @param licenseBond Amount of license tokens currently bonded
@@ -139,38 +139,11 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructor that initializes the bonding registry
-    /// @param _owner Address that will own the contract
-    /// @param _ticketToken Ticket token contract for collateral
-    /// @param _licenseToken License token contract for bonding
-    /// @param _registry Ciphernode registry contract
-    /// @param _slashedFundsTreasury Address to receive slashed funds
-    /// @param _ticketPrice Initial price per ticket
-    /// @param _licenseRequiredBond Initial required license bond for registration
-    /// @param _minTicketBalance Initial minimum ticket balance for activation
-    /// @param _exitDelay Initial exit delay period in seconds
-    constructor(
-        address _owner,
-        EnclaveTicketToken _ticketToken,
-        IERC20 _licenseToken,
-        ICiphernodeRegistry _registry,
-        address _slashedFundsTreasury,
-        uint256 _ticketPrice,
-        uint256 _licenseRequiredBond,
-        uint256 _minTicketBalance,
-        uint64 _exitDelay
-    ) {
-        initialize(
-            _owner,
-            _ticketToken,
-            _licenseToken,
-            _registry,
-            _slashedFundsTreasury,
-            _ticketPrice,
-            _licenseRequiredBond,
-            _minTicketBalance,
-            _exitDelay
-        );
+    /// @notice Constructor that disables initializers.
+    /// @dev Prevents the implementation contract from being initialized. Initialization is performed
+    /// via the initialize() function when deployed behind a proxy.
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initializes the bonding registry contract
@@ -204,6 +177,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         setLicenseRequiredBond(_licenseRequiredBond);
         setMinTicketBalance(_minTicketBalance);
         setExitDelay(_exitDelay);
+        setLicenseActiveBps(8_000);
         if (_owner != owner()) transferOwnership(_owner);
     }
 

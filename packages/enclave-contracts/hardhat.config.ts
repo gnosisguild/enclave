@@ -168,7 +168,11 @@ const config: HardhatUserConfig = {
     tsNocheck: false,
   },
   solidity: {
-    npmFilesToBuild: ["poseidon-solidity/PoseidonT3.sol"],
+    npmFilesToBuild: [
+      "poseidon-solidity/PoseidonT3.sol",
+      "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol",
+      "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+    ],
     compilers: [
       {
         version: "0.8.28",
