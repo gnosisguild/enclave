@@ -14,15 +14,23 @@ export default buildModule("CiphernodeRegistry", (m) => {
 
   const poseidonT3 = m.library("PoseidonT3");
 
-  const cipherNodeRegistry = m.contract(
-    "CiphernodeRegistryOwnable",
-    [owner, enclaveAddress, submissionWindow],
-    {
-      libraries: {
-        PoseidonT3: poseidonT3,
-      },
+  const cipherNodeRegistryImpl = m.contract("CiphernodeRegistryOwnable", [], {
+    libraries: {
+      PoseidonT3: poseidonT3,
     },
-  );
+  });
+
+  const initData = m.encodeFunctionCall(cipherNodeRegistryImpl, "initialize", [
+    owner,
+    enclaveAddress,
+    submissionWindow,
+  ]);
+
+  const cipherNodeRegistry = m.contract("TransparentUpgradeableProxy", [
+    cipherNodeRegistryImpl,
+    owner,
+    initData,
+  ]);
 
   return { cipherNodeRegistry };
 }) as any;

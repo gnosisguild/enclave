@@ -17,15 +17,26 @@ export default buildModule("Enclave", (m) => {
 
   const poseidonT3 = m.library("PoseidonT3");
 
-  const enclave = m.contract(
-    "Enclave",
-    [owner, registry, bondingRegistry, feeToken, maxDuration, [params]],
-    {
-      libraries: {
-        PoseidonT3: poseidonT3,
-      },
+  const enclaveImpl = m.contract("Enclave", [], {
+    libraries: {
+      PoseidonT3: poseidonT3,
     },
-  );
+  });
+
+  const initData = m.encodeFunctionCall(enclaveImpl, "initialize", [
+    owner,
+    registry,
+    bondingRegistry,
+    feeToken,
+    maxDuration,
+    [params],
+  ]);
+
+  const enclave = m.contract("TransparentUpgradeableProxy", [
+    enclaveImpl,
+    owner,
+    initData,
+  ]);
 
   return { enclave };
 }) as any;

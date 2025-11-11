@@ -15,7 +15,10 @@ import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken"
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
-import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
+import {
+  BondingRegistry__factory as BondingRegistryFactory,
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -160,7 +163,11 @@ describe("CiphernodeRegistryOwnable", function () {
       await registryContract.cipherNodeRegistry.getAddress();
 
     const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
-    const bondingRegistry = bondingRegistryContract.bondingRegistry;
+
+    const bondingRegistry = BondingRegistryFactory.connect(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+      owner,
+    );
 
     await ticketTokenContract.enclaveTicketToken.setRegistry(
       await bondingRegistry.getAddress(),
@@ -224,21 +231,44 @@ describe("CiphernodeRegistryOwnable", function () {
     it("correctly sets `_owner` and `enclave` ", async function () {
       const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
       const poseidonDeployment = await poseidonFactory.deploy();
+      await poseidonDeployment.waitForDeployment();
+      const poseidonAddress = await poseidonDeployment.getAddress();
       const [deployer] = await ethers.getSigners();
       if (!deployer) throw new Error("Bad getSigners() output");
+
       const ciphernodeRegistryFactory = await ethers.getContractFactory(
         "CiphernodeRegistryOwnable",
         {
           libraries: {
-            PoseidonT3: await poseidonDeployment.getAddress(),
+            PoseidonT3: poseidonAddress,
           },
         },
       );
-      const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
-        deployer.address,
-        AddressTwo,
-        SORTITION_SUBMISSION_WINDOW,
+      const implementation = await ciphernodeRegistryFactory.deploy();
+      await implementation.waitForDeployment();
+      const implementationAddress = await implementation.getAddress();
+
+      const initData = ciphernodeRegistryFactory.interface.encodeFunctionData(
+        "initialize",
+        [deployer.address, AddressTwo, SORTITION_SUBMISSION_WINDOW],
       );
+
+      const proxyFactory = await ethers.getContractFactory(
+        "TransparentUpgradeableProxy",
+      );
+      const proxy = await proxyFactory.deploy(
+        implementationAddress,
+        deployer.address,
+        initData,
+      );
+      await proxy.waitForDeployment();
+      const proxyAddress = await proxy.getAddress();
+
+      const ciphernodeRegistry = CiphernodeRegistryFactory.connect(
+        proxyAddress,
+        deployer,
+      );
+
       expect(await ciphernodeRegistry.owner()).to.equal(deployer.address);
       expect(await ciphernodeRegistry.enclave()).to.equal(AddressTwo);
       expect(await ciphernodeRegistry.sortitionSubmissionWindow()).to.equal(

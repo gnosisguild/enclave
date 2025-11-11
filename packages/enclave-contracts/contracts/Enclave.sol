@@ -196,30 +196,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Constructs the Enclave contract.
-    /// @dev Calls initialize() to set up the contract state. Can be used for non-proxy deployments.
-    /// @param _owner The owner address of this contract.
-    /// @param _ciphernodeRegistry The address of the Ciphernode Registry contract.
-    /// @param _bondingRegistry The address of the Bonding Registry contract.
-    /// @param _feeToken The address of the ERC20 token used for E3 fees.
-    /// @param _maxDuration The maximum duration of a computation in seconds.
-    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
-    constructor(
-        address _owner,
-        ICiphernodeRegistry _ciphernodeRegistry,
-        IBondingRegistry _bondingRegistry,
-        IERC20 _feeToken,
-        uint256 _maxDuration,
-        bytes[] memory _e3ProgramsParams
-    ) {
-        initialize(
-            _owner,
-            _ciphernodeRegistry,
-            _bondingRegistry,
-            _feeToken,
-            _maxDuration,
-            _e3ProgramsParams
-        );
+    /// @notice Constructor that disables initializers.
+    /// @dev Prevents the implementation contract from being initialized. Initialization is performed
+    /// via the initialize() function when deployed behind a proxy.
+    constructor() {
+        _disableInitializers();
     }
 
     /// @notice Initializes the Enclave contract with initial configuration.

@@ -18,7 +18,9 @@ export default buildModule("BondingRegistry", (m) => {
   const exitDelay = m.getParameter("exitDelay");
   const owner = m.getParameter("owner");
 
-  const bondingRegistry = m.contract("BondingRegistry", [
+  const bondingRegistryImpl = m.contract("BondingRegistry", []);
+
+  const initData = m.encodeFunctionCall(bondingRegistryImpl, "initialize", [
     owner,
     ticketToken,
     licenseToken,
@@ -28,6 +30,12 @@ export default buildModule("BondingRegistry", (m) => {
     licenseRequiredBond,
     minTicketBalance,
     exitDelay,
+  ]);
+
+  const bondingRegistry = m.contract("TransparentUpgradeableProxy", [
+    bondingRegistryImpl,
+    owner,
+    initData,
   ]);
 
   return { bondingRegistry };
