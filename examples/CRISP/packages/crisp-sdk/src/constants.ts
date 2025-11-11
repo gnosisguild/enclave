@@ -10,6 +10,8 @@ import { BFVParams } from './types'
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
 
+export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
+
 /**
  * Half the minimum degree needed to support the maxium vote value
  * If you change MAXIMUM_VOTE_VALUE, make sure to update this value too.

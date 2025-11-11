@@ -27,7 +27,13 @@ export type VoteManagementContextType = {
   getPastPolls: () => Promise<void>
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
-  encryptVote: (voteId: bigint, publicKey: Uint8Array) => Promise<EncryptedVote | undefined>
+  encryptVote: (
+    voteId: bigint,
+    publicKey: Uint8Array,
+    address: string,
+    signature: string,
+    message: string,
+  ) => Promise<EncryptedVote | undefined>
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>
   setPastPolls: React.Dispatch<React.SetStateAction<PollResult[]>>

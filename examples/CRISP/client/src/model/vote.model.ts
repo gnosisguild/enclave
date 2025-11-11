@@ -22,18 +22,18 @@ export interface CurrentRound {
 }
 
 export interface BroadcastVoteRequest {
-  round_id: number;
-  enc_vote_bytes: number[];
-  proof: number[];
-  public_inputs: string[];
-  address: string;
+  round_id: number
+  enc_vote_bytes: number[]
+  proof: number[]
+  public_inputs: string[]
+  address: string
 }
 
-export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast';
+export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast'
 export interface BroadcastVoteResponse {
-  status: VoteResponseStatus;
-  tx_hash?: string;
-  message?: string;
+  status: VoteResponseStatus
+  tx_hash?: string
+  message?: string
 }
 
 export interface VoteStateLite {
