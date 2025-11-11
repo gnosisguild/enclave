@@ -152,6 +152,18 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
   }
 }
 
+export const encryptVote = async (encodedVote: string[], publicKey: Uint8Array): Promise<Uint8Array> => {
+  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
+    DEFAULT_BFV_PARAMS.degree,
+    DEFAULT_BFV_PARAMS.plaintextModulus,
+    DEFAULT_BFV_PARAMS.moduli,
+  )
+
+  const vote = BigInt64Array.from(encodedVote.map(BigInt))
+
+  return zkInputsGenerator.encryptVote(publicKey, vote)
+}
+
 /**
  * This is a wrapper around enclave-e3/sdk encryption functions as CRISP circuit will require some more
  * input values which generic Greco do not need.
@@ -263,10 +275,12 @@ export const generateMaskVote = async (
 
 export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness } = await noir.execute(crispInputs as any)
-  const proof = await backend.generateProof(witness)
+  const proof = await backend.generateProof(witness, { keccak: true })
+
+  await backend.destroy()
 
   return proof
 }
@@ -275,10 +289,12 @@ export const generateProofWithReturnValue = async (
   crispInputs: CRISPCircuitInputs,
 ): Promise<{ returnValue: unknown; proof: ProofData }> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness, returnValue } = await noir.execute(crispInputs as any)
-  const proof = await backend.generateProof(witness)
+  const proof = await backend.generateProof(witness, { keccak: true })
+
+  await backend.destroy()
 
   return { returnValue, proof }
 }
@@ -294,5 +310,9 @@ export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Pr
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  return await backend.verifyProof(proof)
+  const isValid = await backend.verifyProof(proof, { keccak: true })
+
+  await backend.destroy()
+
+  return isValid
 }

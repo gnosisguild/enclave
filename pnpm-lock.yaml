@@ -118,27 +118,15 @@ importers:
 
   examples/CRISP/client:
     dependencies:
-      '@aztec/bb.js':
-        specifier: ^0.82.2
-        version: 0.82.3
+      '@crisp-e3/sdk':
+        specifier: workspace:*
+        version: link:../packages/crisp-sdk
       '@emotion/babel-plugin':
         specifier: ^11.11.0
         version: 11.13.5
       '@emotion/react':
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.26)(react@18.3.1)
-      '@enclave-e3/sdk':
-        specifier: ^0.1.5
-        version: 0.1.5(@openzeppelin/contracts@5.3.0)(@swc/helpers@0.5.17)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.52.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.21(@types/node@22.7.5))(zod@4.1.12)
-      '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
-      '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
-      '@noir-lang/noirc_abi':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
       '@phosphor-icons/react':
         specifier: ^2.1.4
         version: 2.1.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -349,14 +337,14 @@ importers:
   examples/CRISP/packages/crisp-sdk:
     dependencies:
       '@aztec/bb.js':
-        specifier: ^0.82.2
-        version: 0.82.3
+        specifier: 0.87.0
+        version: 0.87.0
       '@crisp-e3/zk-inputs':
         specifier: workspace:*
         version: link:../crisp-zk-inputs
       '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
+        specifier: 1.0.0-beta.9
+        version: 1.0.0-beta.9
       '@zk-kit/lean-imt':
         specifier: ^2.2.4
         version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -842,6 +830,10 @@ packages:
 
   '@aztec/bb.js@0.82.3':
     resolution: {integrity: sha512-jtnCqf+/QLw5yJGOmy818RMQqzHzHqcROtTdQZJybSxp0z3h76xpLSwoDQUBmZZVbP9e46FJjOLqB6gM9gY5cw==}
+    hasBin: true
+
+  '@aztec/bb.js@0.87.0':
+    resolution: {integrity: sha512-1tGxrJc/or9p4zwP7yvSLHU0z0N/DQGLfIeTYRdlQQPBMcnKX51rMI0PJ07/zZj0XxwHVFlqtV+PqvFBszIPwA==}
     hasBin: true
 
   '@babel/code-frame@7.27.1':
@@ -1561,15 +1553,6 @@ packages:
 
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
-
-  '@enclave-e3/contracts@0.1.5':
-    resolution: {integrity: sha512-C1Mo9z2JG6netDhpOsk0kZV8DBjVd4ftE5oqhpXDDbK+HHD4XHozjKMqmlUYTooSzzT3INGYNS/IEDUHxYOqTA==}
-
-  '@enclave-e3/sdk@0.1.5':
-    resolution: {integrity: sha512-AZGIYrlJZ6FeK6DIQWqNKZDwvDpw+l1zCd7hc97giFX2LrNbSAzf/UJmNewAXFfaGtlnOePSVsuixk/ZQd1TVw==}
-
-  '@enclave-e3/wasm@0.1.5':
-    resolution: {integrity: sha512-PZ/TpABK/PAAzO0d2+q17i3plzCs/E3chihc4yOi9DqCxdGFhm76hTueY/lDXusDnM+LUrEuaD11YR/2kBRvTg==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -2472,6 +2455,36 @@ packages:
   '@motionone/utils@10.18.0':
     resolution: {integrity: sha512-3XVF7sgyTSI2KWvTf6uLlBJ5iAgRgmvp3bpuOiQJvInd4nZ19ET8lX5unn30SlmRH7hXbBbH+Gxd0m0klJ3Xtw==}
 
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
+    resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
+    resolution: {integrity: sha512-mdzd3AVzYKuUmiWOQ8GNhl64/IoFGol569zNRdkLReh6LRLHOXxU4U8eq0JwaD8iFHdVGqSy4IjFL4reoWCDFw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
+    resolution: {integrity: sha512-YxQL+ax0XqBJDZiKimS2XQaf+2wDGVa1enVRGzEvLLVFeqa5kx2bWbtcSXgsxjQB7nRqqIGFIcLteF/sHeVtQg==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
+    resolution: {integrity: sha512-fg0uy/dG/nZEXfYilKoRe7yALaNmHoYeIoJuJ7KJ+YyU2bvY8vPv27f7UKhGRpY6euFYqEVhxCFZgAUNQBM3nw==}
+    cpu: [arm]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
+    resolution: {integrity: sha512-cvwNfbP07pKUfq1uH+S6KJ7dT9K8WOE4ZiAcsrSes+UY55E/0jLYc+vq+DO7jlmqRb5zAggExKm0H7O/CBaesg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
+    resolution: {integrity: sha512-x0fWaQtYp4E6sktbsdAqnehxDgEc/VwM7uLsRCYWaiGu0ykYdZPiS8zCWdnjHwyiumousxfBm4SO31eXqwEZhQ==}
+    cpu: [x64]
+    os: [win32]
+
   '@napi-rs/simple-git-android-arm-eabi@0.1.22':
     resolution: {integrity: sha512-JQZdnDNm8o43A5GOzwN/0Tz3CDBQtBUNqzVwEopm32uayjdjxev1Csp1JeaqF3v9djLDIvsSE39ecsN2LhCKKQ==}
     engines: {node: '>= 10'}
@@ -2702,14 +2715,26 @@ packages:
   '@noir-lang/acvm_js@1.0.0-beta.3':
     resolution: {integrity: sha512-Dc6g5rJr/x7tKsWvnTbZvjwqI1uiAtvq+NAz5tcLRzUHJw6NAvDXEH5h117h+BfIAhhsHXuPTkDfDB1Gnqp/Bg==}
 
+  '@noir-lang/acvm_js@1.0.0-beta.9':
+    resolution: {integrity: sha512-cWDKgOkDCj6USfSITB0IM/o3ThndLOsrH6pDptaB6D6wHpSxTOpl/pKP8m1KHXGLVsU0BjIImZ2RrWB4F3a2Pw==}
+
   '@noir-lang/noir_js@1.0.0-beta.3':
     resolution: {integrity: sha512-Nt/rP7zRMOfNq9urD8+GtRpYqEc0K10FoKXs/v+ZTbGaP6Jkm7+F+UPj2bkWy66k1HNzsN6ortli7c7mnLDHwA==}
+
+  '@noir-lang/noir_js@1.0.0-beta.9':
+    resolution: {integrity: sha512-UDHvQBvWiAbo70+taFQyUgBysVxgxuMkEXxtQUPD8v9sbHp4J5ecGRrtp/1eq15D0zpVc34Vfo8zy2CWndfbaA==}
 
   '@noir-lang/noirc_abi@1.0.0-beta.3':
     resolution: {integrity: sha512-L6BI64ennatwTUciHqQ14ahUFsgzL41tzghqUELzO7XojasStcWDaSMjlTxca/2pvpWtEJHDtseKe1VZWIIVXQ==}
 
+  '@noir-lang/noirc_abi@1.0.0-beta.9':
+    resolution: {integrity: sha512-JOBLJBZqE6skGztI5xy4GW5WB40YGADt0mU/vf1QAuVY9yArRU3oAJIjuXi4Mo1fvE1TSx/4XPZr7Rocl6Effg==}
+
   '@noir-lang/types@1.0.0-beta.3':
     resolution: {integrity: sha512-BPOmf0qDiTn4wH1Lo7mHa67GTQFueIVaDUcUb+N9+ALiXC5nVU8HrzWmx1yvZB64ZiCEy7yPdNEaNrszSrE2fg==}
+
+  '@noir-lang/types@1.0.0-beta.9':
+    resolution: {integrity: sha512-2KB4uSUUHjDZzrUY8CIRyaIS4Q9d0s1T9bwabw1rysSBICDkgKOdVKkG0szaCFbmeDNQ3kqanPjqBj7IEEHD7A==}
 
   '@nomicfoundation/edr-darwin-arm64@0.12.0-next.10':
     resolution: {integrity: sha512-LYXaU0Pk7zA4iAHMdvZ9Gs5QaScs9n5IpclWBNVevSHnL1/uJiFLDF4FYE/NonvaCST6Rd0E4MS3pJltsrBQmA==}
@@ -7441,6 +7466,13 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
+  msgpackr-extract@3.0.3:
+    resolution: {integrity: sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA==}
+    hasBin: true
+
+  msgpackr@1.11.5:
+    resolution: {integrity: sha512-UjkUHN0yqp9RWKy0Lplhh+wlpdt9oQBYgULZOiFhV3VclSF1JnSQWZ5r9gORQlNYaUKQoR8itv7g7z1xDDuACA==}
+
   muggle-string@0.4.1:
     resolution: {integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==}
 
@@ -7548,6 +7580,10 @@ packages:
     peerDependenciesMeta:
       encoding:
         optional: true
+
+  node-gyp-build-optional-packages@5.2.2:
+    resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
+    hasBin: true
 
   node-gyp-build@4.8.4:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
@@ -9997,6 +10033,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@aztec/bb.js@0.87.0':
+    dependencies:
+      comlink: 4.4.2
+      commander: 12.1.0
+      debug: 4.4.3(supports-color@8.1.1)
+      fflate: 0.8.2
+      msgpackr: 1.11.5
+      pako: 2.1.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@babel/code-frame@7.27.1':
     dependencies:
       '@babel/helper-validator-identifier': 7.28.5
@@ -11066,52 +11114,6 @@ snapshots:
 
   '@emotion/weak-memoize@0.4.0': {}
 
-  '@enclave-e3/contracts@0.1.5(@openzeppelin/contracts@5.3.0)':
-    dependencies:
-      '@openzeppelin/contracts-upgradeable': 5.4.0(@openzeppelin/contracts@5.3.0)
-      '@zk-kit/lean-imt.sol': 2.0.1
-      poseidon-solidity: 0.0.5
-    transitivePeerDependencies:
-      - '@openzeppelin/contracts'
-
-  '@enclave-e3/sdk@0.1.5(@openzeppelin/contracts@5.3.0)(@swc/helpers@0.5.17)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.52.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.21(@types/node@22.7.5))(zod@4.1.12)':
-    dependencies:
-      '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.1.5(@openzeppelin/contracts@5.3.0)
-      '@enclave-e3/wasm': 0.1.5
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      comlink: 4.4.2
-      viem: 2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)
-      vite-plugin-top-level-await: 1.6.0(@swc/helpers@0.5.17)(rollup@4.52.5)(vite@5.4.21(@types/node@22.7.5))
-      vite-plugin-wasm: 3.5.0(vite@5.4.21(@types/node@22.7.5))
-      vitest: 1.6.1(@types/node@22.7.5)
-      web-worker: 1.5.0
-    transitivePeerDependencies:
-      - '@edge-runtime/vm'
-      - '@openzeppelin/contracts'
-      - '@swc/helpers'
-      - '@types/node'
-      - '@vitest/browser'
-      - '@vitest/ui'
-      - bufferutil
-      - happy-dom
-      - jsdom
-      - less
-      - lightningcss
-      - rollup
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - typescript
-      - utf-8-validate
-      - vite
-      - zod
-
-  '@enclave-e3/wasm@0.1.5': {}
-
   '@esbuild/aix-ppc64@0.20.0':
     optional: true
 
@@ -12108,6 +12110,24 @@ snapshots:
       hey-listen: 1.0.8
       tslib: 2.8.1
 
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
+    optional: true
+
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
+    optional: true
+
   '@napi-rs/simple-git-android-arm-eabi@0.1.22':
     optional: true
 
@@ -12262,17 +12282,32 @@ snapshots:
 
   '@noir-lang/acvm_js@1.0.0-beta.3': {}
 
+  '@noir-lang/acvm_js@1.0.0-beta.9': {}
+
   '@noir-lang/noir_js@1.0.0-beta.3':
     dependencies:
       '@noir-lang/acvm_js': 1.0.0-beta.3
       '@noir-lang/noirc_abi': 1.0.0-beta.3
       '@noir-lang/types': 1.0.0-beta.3
 
+  '@noir-lang/noir_js@1.0.0-beta.9':
+    dependencies:
+      '@noir-lang/acvm_js': 1.0.0-beta.9
+      '@noir-lang/noirc_abi': 1.0.0-beta.9
+      '@noir-lang/types': 1.0.0-beta.9
+      pako: 2.1.0
+
   '@noir-lang/noirc_abi@1.0.0-beta.3':
     dependencies:
       '@noir-lang/types': 1.0.0-beta.3
 
+  '@noir-lang/noirc_abi@1.0.0-beta.9':
+    dependencies:
+      '@noir-lang/types': 1.0.0-beta.9
+
   '@noir-lang/types@1.0.0-beta.3': {}
+
+  '@noir-lang/types@1.0.0-beta.9': {}
 
   '@nomicfoundation/edr-darwin-arm64@0.12.0-next.10': {}
 
@@ -19255,6 +19290,22 @@ snapshots:
 
   ms@2.1.3: {}
 
+  msgpackr-extract@3.0.3:
+    dependencies:
+      node-gyp-build-optional-packages: 5.2.2
+    optionalDependencies:
+      '@msgpackr-extract/msgpackr-extract-darwin-arm64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-darwin-x64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-arm': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-arm64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-linux-x64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-win32-x64': 3.0.3
+    optional: true
+
+  msgpackr@1.11.5:
+    optionalDependencies:
+      msgpackr-extract: 3.0.3
+
   muggle-string@0.4.1: {}
 
   multiformats@9.9.0: {}
@@ -19406,6 +19457,11 @@ snapshots:
   node-fetch@2.7.0:
     dependencies:
       whatwg-url: 5.0.0
+
+  node-gyp-build-optional-packages@5.2.2:
+    dependencies:
+      detect-libc: 2.1.2
+    optional: true
 
   node-gyp-build@4.8.4: {}
 
