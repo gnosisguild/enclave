@@ -2042,8 +2042,7 @@ describe("Enclave", function () {
     });
 
     it("should preserve storage after upgrade", async function () {
-      const { owner, enclave, enclaveImpl, poseidonT3 } =
-        await loadFixture(setup);
+      const { owner, enclave, poseidonT3 } = await loadFixture(setup);
       const ownerAddress = await owner.getAddress();
 
       const maxDurationBefore = await enclave.maxDuration();
@@ -2068,8 +2067,7 @@ describe("Enclave", function () {
     });
 
     it("should preserve functionality after upgrade", async function () {
-      const { owner, enclave, enclaveImpl, poseidonT3 } =
-        await loadFixture(setup);
+      const { owner, enclave, poseidonT3 } = await loadFixture(setup);
       const ownerAddress = await owner.getAddress();
 
       const proxyAddress = await enclave.getAddress();

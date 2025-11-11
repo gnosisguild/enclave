@@ -1178,8 +1178,7 @@ describe("BondingRegistry", function () {
     });
 
     it("should preserve storage after upgrade", async function () {
-      const { owner, ownerAddress, bondingRegistry, bondingRegistryImpl } =
-        await loadFixture(setup);
+      const { owner, ownerAddress, bondingRegistry } = await loadFixture(setup);
 
       const licenseActiveBpsBefore = await bondingRegistry.licenseActiveBps();
       const ticketPriceBefore = await bondingRegistry.ticketPrice();
@@ -1210,7 +1209,7 @@ describe("BondingRegistry", function () {
       const { owner, ownerAddress, bondingRegistry } = await loadFixture(setup);
 
       const proxyAddressBefore = await bondingRegistry.getAddress();
-      const { bondingRegistry: upgradedRegistry, implementationAddress } =
+      const { bondingRegistry: upgradedRegistry } =
         await upgradeBondingRegistryTestUtils({
           proxyAddress: proxyAddressBefore,
           ownerAddress,
@@ -1224,8 +1223,7 @@ describe("BondingRegistry", function () {
     });
 
     it("should revert if non-owner tries to upgrade", async function () {
-      const { owner, notTheOwner, bondingRegistry, bondingRegistryImpl } =
-        await loadFixture(setup);
+      const { owner, notTheOwner, bondingRegistry } = await loadFixture(setup);
       const notTheOwnerAddress = await notTheOwner.getAddress();
 
       const proxyAddressBefore = await bondingRegistry.getAddress();
