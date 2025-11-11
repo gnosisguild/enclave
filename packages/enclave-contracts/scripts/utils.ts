@@ -13,6 +13,7 @@ export interface DeploymentArgs {
   address: string;
   constructorArgs?: Record<string, string | string[]>;
   blockNumber?: number | null;
+  implementationAddress?: string | null;
 }
 
 // Type for chain-specific deployments

@@ -6,6 +6,7 @@
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
+import { getProxyAdmin, verifyProxyAdminOwner } from "../proxy";
 import {
   areArraysEqual,
   readDeploymentArgs,
@@ -84,19 +85,26 @@ export const deployAndSaveEnclave = async ({
     signer,
   );
 
-  const enclave = await enclaveFactory.deploy(
+  const enclave = await enclaveFactory.deploy();
+  await enclave.waitForDeployment();
+  const blockNumber = await ethers.provider.getBlockNumber();
+  const enclaveAddress = await enclave.getAddress();
+
+  const initData = enclaveFactory.interface.encodeFunctionData("initialize", [
     owner,
     registry,
     bondingRegistry,
     feeToken,
     maxDuration,
     params,
+  ]);
+
+  const ProxyCF = await ethers.getContractFactory(
+    "TransparentUpgradeableProxy",
   );
-
-  await enclave.waitForDeployment();
-
-  const enclaveAddress = await enclave.getAddress();
-  const blockNumber = await ethers.provider.getBlockNumber();
+  const proxy = await ProxyCF.deploy(enclaveAddress, signer, initData);
+  await proxy.waitForDeployment();
+  const proxyAddress = await proxy.getAddress();
 
   storeDeploymentArgs(
     {
@@ -109,13 +117,91 @@ export const deployAndSaveEnclave = async ({
         params,
       },
       blockNumber,
-      address: enclaveAddress,
+      address: proxyAddress,
+      implementationAddress: enclaveAddress,
     },
     "Enclave",
     chain,
   );
 
-  const enclaveContract = EnclaveFactory.connect(enclaveAddress, signer);
+  const enclaveContract = EnclaveFactory.connect(proxyAddress, signer);
 
   return { enclave: enclaveContract };
+};
+
+/**
+ * Upgrades the Enclave implementation while keeping the same proxy address
+ * @param param0 - The upgrade arguments
+ * @returns The upgraded Enclave contract (same proxy address)
+ */
+export const upgradeAndSaveEnclave = async ({
+  poseidonT3Address,
+  ownerAddress,
+  hre,
+}: {
+  poseidonT3Address: string;
+  ownerAddress: string;
+  hre: HardhatRuntimeEnvironment;
+}): Promise<{ enclave: Enclave; implementationAddress: string }> => {
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = hre.globalOptions.network;
+
+  const preDeployedArgs = readDeploymentArgs("Enclave", chain);
+  if (!preDeployedArgs?.address) {
+    throw new Error("Enclave proxy not found. Deploy first before upgrading.");
+  }
+
+  const proxyAddress = preDeployedArgs.address;
+
+  const autoProxyAdminAddress = await getProxyAdmin(
+    ethers.provider,
+    proxyAddress,
+  );
+  console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
+
+  const enclaveFactory = await ethers.getContractFactory(
+    EnclaveFactory.abi,
+    EnclaveFactory.linkBytecode({
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
+
+  const newImplementation = await enclaveFactory.deploy();
+  await newImplementation.waitForDeployment();
+  const newImplementationAddress = await newImplementation.getAddress();
+  console.log("New Implementation Address:", newImplementationAddress);
+
+  const proxyAdmin = await ethers.getContractAt(
+    "ProxyAdmin",
+    autoProxyAdminAddress,
+    signer,
+  );
+  await verifyProxyAdminOwner(proxyAdmin, ownerAddress);
+
+  // TODO: Add init data if needed
+  const initData = "0x";
+  const upgradeTx = await proxyAdmin.upgradeAndCall(
+    proxyAddress,
+    newImplementationAddress,
+    initData,
+  );
+  await upgradeTx.wait();
+
+  storeDeploymentArgs(
+    {
+      ...preDeployedArgs,
+      implementationAddress: newImplementationAddress,
+    },
+    "Enclave",
+    chain,
+  );
+
+  const enclaveContract = EnclaveFactory.connect(proxyAddress, signer);
+  return {
+    enclave: enclaveContract,
+    implementationAddress: newImplementationAddress,
+  };
 };
