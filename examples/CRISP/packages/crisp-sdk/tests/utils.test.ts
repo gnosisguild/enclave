@@ -6,7 +6,7 @@
 
 import { expect, describe, it } from 'vitest'
 import { generateMerkleProof, generateMerkleTree, hashLeaf } from '../src/utils'
-import { LEAVES, MAX_DEPTH } from './constants'
+import { LEAVES } from './constants'
 
 describe('Utils', () => {
   describe('hashLeaf', () => {
@@ -29,11 +29,10 @@ describe('Utils', () => {
     it('should generate a valid merkle proof for a leaf', () => {
       const tree = generateMerkleTree(LEAVES)
 
-      const proof = generateMerkleProof(0n, balance, address, LEAVES, MAX_DEPTH)
+      const proof = generateMerkleProof(0n, balance, address, LEAVES)
       expect(proof.leaf).toBe(hashLeaf(address, balance.toString()))
 
       expect(proof.length).toBe(4)
-      expect(proof.indices.length).toBe(MAX_DEPTH)
       // Unpad the proof for verification
       const unpaddedProof = {
         ...proof.proof,
@@ -43,8 +42,8 @@ describe('Utils', () => {
       expect(tree.verifyProof(unpaddedProof)).toBe(true)
     })
     it('should throw if the leaf does not exist in the tree', () => {
-      expect(() => generateMerkleProof(0n, balance, address, [], MAX_DEPTH)).toThrow('Leaf not found in the tree')
-      expect(() => generateMerkleProof(0n, 999n, address, LEAVES, MAX_DEPTH)).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0n, balance, address, [])).toThrow('Leaf not found in the tree')
+      expect(() => generateMerkleProof(0n, 999n, address, LEAVES)).toThrow('Leaf not found in the tree')
     })
   })
 })
