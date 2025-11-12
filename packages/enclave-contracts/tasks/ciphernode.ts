@@ -265,6 +265,15 @@ export const ciphernodeMintTokens = task(
         console.log("\n=== Token Balances ===");
         console.log(`ENCL: ${ethers.formatEther(enclBalance)}`);
         console.log(`USDC: ${ethers.formatUnits(usdcBalance, 6)}`);
+
+        const transfersRestricted = await enclaveTokenContract.transfersRestricted();
+        if (transfersRestricted) {
+          console.log("Allowing EnclaveToken to be transferrable...");
+          const transferEnabledTx = await enclaveTokenContract.setTransferRestriction(false);
+          await transferEnabledTx.wait();
+          console.log("EnclaveToken transfers are now enabled");
+        }
+
       } catch (error) {
         console.error("Token minting failed:", error);
         throw error;
