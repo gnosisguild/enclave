@@ -155,7 +155,7 @@ pub fn bfv_verifiable_encrypt_vector(
 /// {
 ///   degree: number;              // Polynomial degree (e.g., 8192)
 ///   plaintext_modulus: number;   // Plaintext modulus value (e.g., 1000)
-///   moduli: number[];            // Array of moduli
+///   moduli: bigint[];            // Array of moduli
 ///   error1_variance: string | null; // Error variance as string or null
 /// }
 /// ```
@@ -166,7 +166,10 @@ pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
     let params =
         BfvParams::get_params_by_str(name).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let js_params = BfvParamSetJs::from(&params);
-    serde_wasm_bindgen::to_value(&js_params)
+    let serializer =
+        serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
+    js_params
+        .serialize(&serializer)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
 }
 
