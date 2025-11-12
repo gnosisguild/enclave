@@ -56,12 +56,22 @@ where
             println!("pattern:{} found {:?}", &filter.glob_pattern, file_paths);
         }
         for file_path in file_paths {
+            if verbose {
+                println!(
+                    "replacing content in {} with {}",
+                    file_path, filter.replacement
+                );
+            }
             fs.replace_in_place(
                 &Regex::new(&filter.search_pattern)?,
                 &filter.replacement,
                 file_path,
+                true,
             )
             .await?;
+            if verbose {
+                println!("replacement done successfully.")
+            }
         }
     }
     Ok(())

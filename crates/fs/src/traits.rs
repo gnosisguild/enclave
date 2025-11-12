@@ -48,5 +48,6 @@ pub trait Replacer {
         pattern: &Regex,
         replacement: &str,
         file_path: P,
+        verbose: bool,
     ) -> Result<()>;
 }

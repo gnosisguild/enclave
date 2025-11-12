@@ -168,10 +168,14 @@ impl Replacer for Fs {
         pattern: &Regex,
         replacement: &str,
         file_path: P,
+        verbose: bool,
     ) -> Result<()> {
         let content = self.read_to_string(&file_path).await?;
         let new_content = pattern.replace_all(&content, replacement);
         if content != new_content {
+            if verbose {
+                println!("content is being replaced {}", new_content)
+            }
             self.write_to_file(file_path, &new_content).await?;
         }
         Ok(())
@@ -311,7 +315,7 @@ mod tests {
         let replacement = "server_url=production.example.com:443";
 
         // Apply the replacement
-        fs.replace_in_place(&pattern, replacement, test_path)
+        fs.replace_in_place(&pattern, replacement, test_path, true)
             .await?;
 
         // Read the modified content

@@ -117,6 +117,11 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                         r#""@enclave-e3/sdk":\s*"[^"]*""#,
                         &format!(r#""@enclave-e3/sdk": "{}""#, sdk_version),
                     ),
+                    Filter::new(
+                        "**/program/Cargo.toml",
+                        r#"e3-compute-provider"#,
+                        &format!("YO LATER DUDE {}", commit_hash),
+                    ),
                 ],
                 verbose,
             )
