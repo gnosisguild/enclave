@@ -1,6 +1,6 @@
 # Wasm bundle for crisp-zk-inputs
 
-Here we export wasm funcionality for consumption in typescript to enable use to share code between Rust and Typescript.
+Here we export wasm functionality for consumption in TypeScript to enable us to share code between Rust and TypeScript.
 
 ## Usage
 
