@@ -9,6 +9,7 @@ members = [
 e3-user-program = { path = "./program" }
 fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+# TODO: point the following to the monorepo paths (eg ../../crates/**) and overwrite them during enclave init
 e3-program-server = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
 e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
 e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
