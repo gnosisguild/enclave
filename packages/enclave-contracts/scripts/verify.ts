@@ -135,7 +135,7 @@ export const verifyContracts = (chain: string): void => {
     `\n🔍 Verifying ${contractNames.length} contracts on ${chain}...\n`,
   );
 
-  contractNames.forEach((contractName, index) => {
+  contractNames.forEach((contractName, _) => {
     // we skip PoseidonT3 as it's a library
     if (contractName === "PoseidonT3") {
       console.log(
