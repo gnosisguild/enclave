@@ -158,7 +158,7 @@
     "ciphernode:siblings": "hardhat ciphernode:siblings",
     "committee:new": "hardhat committee:new",
     "lint": "pnpm lint:sol && pnpm lint:ts && pnpm prettier:check",
-    "lint:sol": "solhint --max-warnings 10 \"contracts/**/*.sol\"",
+    "lint:sol": "solhint --disc --max-warnings 10 \"contracts/**/*.sol\"",
     "lint:ts": "eslint --ignore-path ./.eslintignore --ext .js,.ts .",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
