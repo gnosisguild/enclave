@@ -117,6 +117,7 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @notice Set the RISC Zero verifier address
     /// @param _verifier The new RISC Zero verifier address
     function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
+        if (address(_verifier) == address(0)) revert VerifierAddressZero();
         verifier = _verifier;
     }
 
@@ -142,6 +143,8 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     function validateInput(address, bytes memory data) external returns (bytes memory input) {
+        // it should only be called via Enclave for now
+        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
         // we need to ensure that the CRISP admin set the merkle root of the census
         // @todo update this once we have all components working
         // if (!isDataSet) revert RoundDataNotSet();

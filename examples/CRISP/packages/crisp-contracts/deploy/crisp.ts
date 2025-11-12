@@ -125,6 +125,7 @@ export const deployVerifier = async (
   }
   const mockVerifierFactory = await ethers.getContractFactory("MockRISC0Verifier");
   const mockVerifier = await mockVerifierFactory.deploy();
+  await mockVerifier.waitForDeployment();
   const mockVerifierAddress = await mockVerifier.getAddress();
   storeDeploymentArgs({
       address: mockVerifierAddress,

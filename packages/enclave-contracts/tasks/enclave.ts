@@ -141,7 +141,7 @@ export const requestCommittee = task(
       );
 
       let e3ProgramParams = e3Params;
-      if (e3ProgramParams == ZeroAddress) {
+      if (e3ProgramParams === ZeroAddress) {
         e3ProgramParams = zeroPadValue(e3ProgramParams, 32);
       }
 
