@@ -4,6 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-module.exports = async function initializeWasm() {
+module.exports = async function init() {
   // Node does not need to be loaded async
-}
+};

@@ -8,7 +8,7 @@ import * as bindgen from "./dist/web/index.js";
 
 let promise;
 
-export default async function initializeWasm(initParams) {
+export default async function init() {
   promise ??= (async () => {
     const { default: base64 } = await import("./dist/web/index_base64.js");
 
