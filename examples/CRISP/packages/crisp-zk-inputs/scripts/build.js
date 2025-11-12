@@ -37,12 +37,10 @@ try {
 
   // Parallel cleanup and JS modification to prevent Next.js and other bundlers static analysis issues.
   await Promise.all([
-    await Promise.all([
-      rm("./dist/web/index_bg.wasm", { force: true }),
-      rm("./dist/web/index_bg.wasm.d.ts", { force: true }),
-      rm("./dist/web/.gitignore", { force: true }),
-      rm("./dist/node/.gitignore", { force: true }),
-    ]),
+    rm("./dist/web/index_bg.wasm", { force: true }),
+    rm("./dist/web/index_bg.wasm.d.ts", { force: true }),
+    rm("./dist/web/.gitignore", { force: true }),
+    rm("./dist/node/.gitignore", { force: true }),
     replaceInFile({
       files: "./dist/web/index.js",
       from: /module_or_path\s*=\s*new URL\(['"]index_bg\.wasm['"],\s*import\.meta\.url\);\s*/g,
