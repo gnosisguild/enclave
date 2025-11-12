@@ -17,12 +17,12 @@ import {
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
-  params: string[];
-  owner: string;
-  maxDuration: string;
-  registry: string;
-  bondingRegistry: string;
-  feeToken: string;
+  params?: string[];
+  owner?: string;
+  maxDuration?: string;
+  registry?: string;
+  bondingRegistry?: string;
+  feeToken?: string;
   poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }

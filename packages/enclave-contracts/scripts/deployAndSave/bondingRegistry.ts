@@ -16,15 +16,15 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveBondingRegistry function
  */
 export interface BondingRegistryArgs {
-  owner: string;
-  ticketToken: string;
-  licenseToken: string;
-  registry: string;
-  slashedFundsTreasury: string;
-  ticketPrice: string;
-  licenseRequiredBond: string;
-  minTicketBalance: number;
-  exitDelay: number;
+  owner?: string;
+  ticketToken?: string;
+  licenseToken?: string;
+  registry?: string;
+  slashedFundsTreasury?: string;
+  ticketPrice?: string;
+  licenseRequiredBond?: string;
+  minTicketBalance?: number;
+  exitDelay?: number;
   hre: HardhatRuntimeEnvironment;
 }
 
