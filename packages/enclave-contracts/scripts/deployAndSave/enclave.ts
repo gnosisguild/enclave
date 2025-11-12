@@ -198,17 +198,24 @@ export const upgradeAndSaveEnclave = async ({
   );
   await upgradeTx.wait();
 
-  storeDeploymentArgs(
-    {
-      ...preDeployedArgs,
-      proxyRecords: {
-        // initData, //TODO: Add init data if needed
-        implementationAddress: newImplementationAddress,
-      },
-    },
-    "Enclave",
-    chain,
-  );
+  const existingProxyRecords = preDeployedArgs.proxyRecords
+    ? Object.fromEntries(
+        Object.entries(preDeployedArgs.proxyRecords).filter(
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+
+  const proxyRecords: Record<string, string | string[]> = {
+    ...existingProxyRecords,
+    implementationAddress: newImplementationAddress,
+  };
+
+  if (initData !== "0x") {
+    proxyRecords.initData = initData;
+  }
+
+  storeDeploymentArgs({ ...preDeployedArgs, proxyRecords }, "Enclave", chain);
 
   const enclaveContract = EnclaveFactory.connect(proxyAddress, signer);
   return {

@@ -193,14 +193,25 @@ export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
   );
   await upgradeTx.wait();
 
+  const existingProxyRecords = preDeployedArgs.proxyRecords
+    ? Object.fromEntries(
+        Object.entries(preDeployedArgs.proxyRecords).filter(
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+
+  const proxyRecords: Record<string, string | string[]> = {
+    ...existingProxyRecords,
+    implementationAddress: newImplementationAddress,
+  };
+
+  if (initData !== "0x") {
+    proxyRecords.initData = initData;
+  }
+
   storeDeploymentArgs(
-    {
-      ...preDeployedArgs,
-      proxyRecords: {
-        // initData, //TODO: Add init data if needed
-        implementationAddress: newImplementationAddress,
-      },
-    },
+    { ...preDeployedArgs, proxyRecords },
     "CiphernodeRegistryOwnable",
     chain,
   );
