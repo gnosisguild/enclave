@@ -36,11 +36,10 @@ exclude = [
   "examples/CRISP",
   "examples/CRISP/server",
   "examples/CRISP/program",
-  "examples/default/client/wasm",
-  "examples/default",
   # client needs to be able to build crates/support independently
   "crates/support", 
-  "crates/support-scripts/dev"
+  "crates/support-scripts/dev",
+  "templates/default"
 ]
 resolver = "3"
 msrv = "1.86.0"
