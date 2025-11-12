@@ -8,14 +8,14 @@ This package exposes an `init` subpackage default function which should be used 
 
 This is because in modern node there is no need for preloading however in the browser we still need to load the wasm bundle.
 
-##### ❌ DONT USE THE DEFAULT INIT
+### ❌ DONT USE THE DEFAULT INIT
 
 ```ts
 // Bad! Because this uses the raw loader which doesn't exist in node contexts
 import init, { bfvEncryptNumber } from "@crisp-e3/zk-inputs";
 ```
 
-##### ✅ DO USE THE EXPORTED SUBMODULE
+### ✅ DO USE THE EXPORTED SUBMODULE
 
 ```ts
 // Good! Use the universal loader
