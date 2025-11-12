@@ -25,7 +25,7 @@ struct Args {
     #[arg(short, long = "plaintext-modulus")]
     plaintext_modulus: u64,
 
-    #[arg(short, long = "error2-variance")]
+    #[arg(short, long = "error1-variance")]
     error1_variance: Option<String>,
 }
 
