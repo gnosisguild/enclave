@@ -17,12 +17,12 @@ import {
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
-  params?: string[];
-  owner?: string;
-  maxDuration?: string;
-  registry?: string;
-  bondingRegistry?: string;
-  feeToken?: string;
+  params: string[];
+  owner: string;
+  maxDuration: string;
+  registry: string;
+  bondingRegistry: string;
+  feeToken: string;
   poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
@@ -102,7 +102,7 @@ export const deployAndSaveEnclave = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(enclaveAddress, signer, initData);
+  const proxy = await ProxyCF.deploy(enclaveAddress, owner, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 

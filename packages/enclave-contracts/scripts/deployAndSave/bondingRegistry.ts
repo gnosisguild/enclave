@@ -16,15 +16,15 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveBondingRegistry function
  */
 export interface BondingRegistryArgs {
-  owner?: string;
-  ticketToken?: string;
-  licenseToken?: string;
-  registry?: string;
-  slashedFundsTreasury?: string;
-  ticketPrice?: string;
-  licenseRequiredBond?: string;
-  minTicketBalance?: number;
-  exitDelay?: number;
+  owner: string;
+  ticketToken: string;
+  licenseToken: string;
+  registry: string;
+  slashedFundsTreasury: string;
+  ticketPrice: string;
+  licenseRequiredBond: string;
+  minTicketBalance: number;
+  exitDelay: number;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -115,7 +115,7 @@ export const deployAndSaveBondingRegistry = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signer, initData);
+  const proxy = await ProxyCF.deploy(bondingRegistryAddress, owner, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 

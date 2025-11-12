@@ -16,9 +16,9 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveCiphernodeRegistryOwnable function
  */
 export interface CiphernodeRegistryOwnableArgs {
-  enclaveAddress?: string;
-  owner?: string;
-  submissionWindow?: number;
+  enclaveAddress: string;
+  owner: string;
+  submissionWindow: number;
   poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
@@ -91,7 +91,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   );
   const proxy = await ProxyCF.deploy(
     ciphernodeRegistryAddress,
-    signer,
+    owner,
     initData,
   );
   await proxy.waitForDeployment();
