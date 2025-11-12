@@ -31,6 +31,8 @@ bytemuck = { version = "=1.23.1" }
 derivative = "=2.2.0"
 e3-compute-provider = { path = "../../crates/compute-provider" }
 e3-program-server = { path = "../../crates/program-server" }
+e3-bfv-helpers = { path = "../../crates/bfv-helpers" }
+e3-sdk = { path = "../../crates/sdk" }
 eyre = "=0.6.12"
 env_logger = "=0.11.8"
 hex = { version = "=0.4.3" }
