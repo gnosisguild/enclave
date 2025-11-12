@@ -8,8 +8,8 @@ name = "e3-support-scripts-dev"
 path = "src/main.rs"
 
 [dependencies]
-e3-program-server = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
+e3-program-server = { workspace = true }
+e3-compute-provider = { workspace = true }
 tokio = { version = "1.38", features = ["full"] }
 anyhow = "1.0.86"
 e3-user-program = { path = "../../../program" }
