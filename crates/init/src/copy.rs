@@ -9,7 +9,6 @@ use e3_fs::prelude::*;
 use e3_fs::Fs;
 use regex::Regex;
 use std::path::Path;
-use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct Filter {
@@ -32,28 +31,30 @@ pub async fn copy_with_filters_impl<P1, P2>(
     src_path: P1,
     dest_path: P2,
     filters: &[Filter],
+    verbose: bool,
 ) -> Result<()>
 where
     P1: AsRef<Path> + Send + Sync,
     P2: AsRef<Path> + Send + Sync,
 {
-    info!("mkdirp {:?}", dest_path.as_ref());
+    if verbose {
+        println!("mkdirp {:?}", dest_path.as_ref());
+    }
     fs.mkdirp(&dest_path).await?;
-    info!("cp -r {:?} {:?}", src_path.as_ref(), dest_path.as_ref());
+
+    if verbose {
+        println!("cp -r {:?} {:?}", src_path.as_ref(), dest_path.as_ref());
+    }
     fs.cp(&src_path, &dest_path).await?;
 
     for filter in filters {
-        // We need to prefix the glob pattern or it will be from the root of the filesystem
-        let prefixed_glob_pattern = format!(
-            "{}/{}",
-            dest_path.as_ref().to_string_lossy(),
-            &filter.glob_pattern
-        );
-        info!("Running filter: {:?}", filter);
-
-        let file_paths = fs.find_files(&dest_path, &prefixed_glob_pattern).await?;
-        info!("pattern:{} found {:?}", filter.glob_pattern, file_paths);
-
+        if verbose {
+            println!("Running filter: {:?}", filter);
+        }
+        let file_paths = fs.find_files(&dest_path, &filter.glob_pattern).await?;
+        if verbose {
+            println!("pattern:{} found {:?}", &filter.glob_pattern, file_paths);
+        }
         for file_path in file_paths {
             fs.replace_in_place(
                 &Regex::new(&filter.search_pattern)?,
@@ -70,22 +71,26 @@ pub async fn copy_with_filters<P1, P2>(
     src_path: P1,
     dest_path: P2,
     filters: &[Filter],
+    verbose: bool,
 ) -> Result<()>
 where
     P1: AsRef<Path> + Send + Sync,
     P2: AsRef<Path> + Send + Sync,
 {
-    info!(
-        "src: {:?} dest: {:?}",
-        src_path.as_ref(),
-        dest_path.as_ref()
-    );
+    if verbose {
+        println!(
+            "copying with src: {:?} dest: {:?}",
+            src_path.as_ref(),
+            dest_path.as_ref()
+        );
+    }
 
     copy_with_filters_impl(
         &Fs::physical()?,
         src_path.as_ref().join("."),
         dest_path,
         filters,
+        true,
     )
     .await?;
     Ok(())
@@ -153,6 +158,7 @@ mod tests {
                 // Filter::new("package.json", "lodash", "nodash"),
                 Filter::new("**/*/file3.txt", "file", "chicken"),
             ],
+            true,
         )
         .await?;
 

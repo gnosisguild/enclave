@@ -118,6 +118,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                         &format!(r#""@enclave-e3/sdk": "{}""#, sdk_version),
                     ),
                 ],
+                verbose,
             )
             .await
         })
@@ -141,6 +142,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                 &PathBuf::from(TEMP_DIR).join("crates/support-scripts/ctl"),
                 &cwd.join(".enclave/support/ctl"),
                 &vec![],
+                verbose,
             )
             .await?;
 
@@ -148,6 +150,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                 &PathBuf::from(TEMP_DIR).join("crates/support-scripts/dev"),
                 &cwd.join(".enclave/support/dev"),
                 &vec![],
+                verbose,
             )
             .await
         })
