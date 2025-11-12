@@ -8,19 +8,60 @@
     "type": "git",
     "url": "https://github.com/gnosisguild/enclave"
   },
+  "main": "dist/node/index.js",
+  "module": "dist/web/index.js",
+  "types": "dist/web/index.d.ts",
   "files": [
-    "pkg/index_bg.wasm",
-    "pkg/index.js",
-    "pkg/index_bg.js",
-    "pkg/index.d.ts"
+    "dist/",
+    "dist/node/**",
+    "dist/web/**",
+    "init_node.js",
+    "init_node.cjs",
+    "init_web.js",
+    "init.d.ts"
   ],
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/node/index.d.ts",
+        "default": "./dist/node/index.js"
+      },
+      "browser": {
+        "types": "./dist/web/index.d.ts",
+        "default": "./dist/web/index.js"
+      },
+      "default": {
+        "types": "./dist/web/index.d.ts",
+        "default": "./dist/web/index.js"
+      }
+    },
+    "./init": {
+      "node": {
+        "types": "./init.d.ts",
+        "import": "./init_node.js",
+        "require": "./init_node.cjs"
+      },
+      "browser": {
+        "types": "./init.d.ts",
+        "default": "./init_web.js"
+      },
+      "default": {
+        "types": "./init.d.ts",
+        "import": "./init_node.js",
+        "require": "./init_node.cjs",
+        "default": "./init_web.js"
+      }
+    }
+  },
   "publishConfig": {
     "access": "public"
   },
-  "main": "pkg/index.js",
-  "types": "pkg/index.d.ts",
-  "sideEffects": [
-    "./pkg/index.js",
-    "./pkg/snippets/*"
-  ]
+  "scripts": {
+    "compile:circuit": "pnpm -C ../../ compile:circuit",
+    "build": "rm -rf dist && pnpm compile:circuit && node scripts/build.js"
+  },
+  "devDependencies": {
+    "execa": "^8.0.1",
+    "replace-in-file": "^7.2.0"
+  }
 }
