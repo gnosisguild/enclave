@@ -54,7 +54,16 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
         })
         .await?;
 
-    spinner.complete_task("Template downloaded\n");
+    let commit_hash = spinner
+        .run("Getting commit hash...", || async {
+            git::get_commit_hash(TEMP_DIR).await
+        })
+        .await?;
+
+    spinner.complete_task(&format!(
+        "Template downloaded with commit hash '{}'\n",
+        commit_hash
+    ));
 
     spinner.update("Configuring template...".to_string()).await;
 
