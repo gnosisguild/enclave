@@ -24,7 +24,7 @@ import {
 } from "@enclave-e3/contracts/types";
 import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
-import { FheProtocol, EnclaveEventType, BfvProtocolParams } from "./types";
+import { FheProtocol, EnclaveEventType } from "./types";
 import { SDKError, isValidAddress } from "./utils";
 
 import type {
@@ -35,12 +35,14 @@ import type {
   ProtocolParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
+  ProtocolParamsName,
 } from "./types";
 import {
   bfv_encrypt_number,
   bfv_encrypt_vector,
   bfv_verifiable_encrypt_number,
   bfv_verifiable_encrypt_vector,
+  get_bfv_params,
 } from "@enclave-e3/wasm";
 import { generateProof } from "./greco";
 import { CompiledCircuit } from "@noir-lang/noir_js";
@@ -57,8 +59,9 @@ export class EnclaveSDK {
   private contractClient: ContractClient;
   private initialized = false;
   private protocol: FheProtocol;
-  private protocolParams: ProtocolParams;
+  private protocolParams?: ProtocolParams;
 
+  // TODO: use zod for config validation
   constructor(private config: SDKConfig) {
     if (!config.publicClient) {
       throw new SDKError("Public client is required", "MISSING_PUBLIC_CLIENT");
@@ -93,17 +96,6 @@ export class EnclaveSDK {
 
     if (config.protocolParams) {
       this.protocolParams = config.protocolParams;
-    } else {
-      switch (this.protocol) {
-        case FheProtocol.BFV:
-          this.protocolParams = BfvProtocolParams.BFV_NORMAL;
-          break;
-        case FheProtocol.TRBFV:
-          this.protocolParams = BfvProtocolParams.BFV_THRESHOLD;
-          break;
-        default:
-          throw new Error("Protocol not supported");
-      }
     }
   }
 
@@ -125,6 +117,33 @@ export class EnclaveSDK {
     }
   }
 
+  public async getBfvParamsSet(
+    name: ProtocolParamsName,
+  ): Promise<ProtocolParams> {
+    await initializeWasm();
+    let params = get_bfv_params(name as string);
+    return {
+      degree: Number(params.degree), // degree is returned as a bigint from wasm
+      plaintextModulus: params.plaintext_modulus as bigint,
+      moduli: params.moduli as bigint[],
+      error1Variance: params.error1_variance,
+    };
+  }
+
+  public async getProtocolParams(): Promise<ProtocolParams> {
+    await initializeWasm();
+    if (this.protocolParams) {
+      return this.protocolParams;
+    }
+
+    switch (this.protocol) {
+      case FheProtocol.BFV:
+        return await this.getBfvParamsSet("INSECURE_SET_2048_1032193_1");
+      case FheProtocol.TRBFV:
+        return await this.getBfvParamsSet("INSECURE_SET_512_10_1");
+    }
+  }
+
   /**
    * Encrypt a number using the configured protocol
    * @param data - The number to encrypt
@@ -136,14 +155,15 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
   ): Promise<Uint8Array> {
     await initializeWasm();
+    const protocolParams = await this.getProtocolParams();
     switch (this.protocol) {
       case FheProtocol.BFV:
         return bfv_encrypt_number(
           data,
           publicKey,
-          this.protocolParams.degree,
-          this.protocolParams.plaintextModulus,
-          BigUint64Array.from(this.protocolParams.moduli),
+          protocolParams.degree,
+          protocolParams.plaintextModulus,
+          BigUint64Array.from(protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -161,14 +181,15 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
   ): Promise<Uint8Array> {
     await initializeWasm();
+    const protocolParams = await this.getProtocolParams();
     switch (this.protocol) {
       case FheProtocol.BFV:
         return bfv_encrypt_vector(
           data,
           publicKey,
-          this.protocolParams.degree,
-          this.protocolParams.plaintextModulus,
-          BigUint64Array.from(this.protocolParams.moduli),
+          protocolParams.degree,
+          protocolParams.plaintextModulus,
+          BigUint64Array.from(protocolParams.moduli),
         );
       default:
         throw new Error("Protocol not supported");
@@ -187,14 +208,15 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
+    const protocolParams = await this.getProtocolParams();
     switch (this.protocol) {
       case FheProtocol.BFV:
         const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
           data,
           publicKey,
-          this.protocolParams.degree,
-          this.protocolParams.plaintextModulus,
-          BigUint64Array.from(this.protocolParams.moduli),
+          protocolParams.degree,
+          protocolParams.plaintextModulus,
+          BigUint64Array.from(protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -240,14 +262,15 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
+    const protocolParams = await this.getProtocolParams();
     switch (this.protocol) {
       case FheProtocol.BFV:
         const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_vector(
           data,
           publicKey,
-          this.protocolParams.degree,
-          this.protocolParams.plaintextModulus,
-          BigUint64Array.from(this.protocolParams.moduli),
+          protocolParams.degree,
+          protocolParams.plaintextModulus,
+          BigUint64Array.from(protocolParams.moduli),
         );
 
         const publicInputs = JSON.parse(circuitInputs);
@@ -587,9 +610,9 @@ export class EnclaveSDK {
       options.rpcUrl.startsWith("ws://") || options.rpcUrl.startsWith("wss://");
     const transport = isWebSocket
       ? webSocket(options.rpcUrl, {
-          keepAlive: { interval: 30_000 },
-          reconnect: { attempts: 5, delay: 2_000 },
-        })
+        keepAlive: { interval: 30_000 },
+        reconnect: { attempts: 5, delay: 2_000 },
+      })
       : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,

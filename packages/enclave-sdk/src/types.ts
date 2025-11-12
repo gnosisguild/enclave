@@ -242,10 +242,10 @@ export interface RegistryEventData {
 export interface EnclaveEvent<T extends AllEventTypes> {
   type: T;
   data: T extends EnclaveEventType
-    ? EnclaveEventData[T]
-    : T extends RegistryEventType
-    ? RegistryEventData[T]
-    : unknown;
+  ? EnclaveEventData[T]
+  : T extends RegistryEventType
+  ? RegistryEventData[T]
+  : unknown;
   log: Log;
   timestamp: Date;
   blockNumber: bigint;
@@ -253,7 +253,7 @@ export interface EnclaveEvent<T extends AllEventTypes> {
 }
 
 export type EventCallback<T extends AllEventTypes = AllEventTypes> = (
-  event: EnclaveEvent<T>
+  event: EnclaveEvent<T>,
 ) => void | Promise<void>;
 
 export interface EventFilter<T = unknown> {
@@ -317,7 +317,18 @@ export interface ProtocolParams {
    * The moduli
    */
   moduli: bigint[];
+  /**
+   * error1
+   */
+  error1Variance: string | undefined;
 }
+
+export type ProtocolParamsName =
+  | "INSECURE_SET_2048_1032193_1"
+  | "INSECURE_SET_512_10_1"
+  | "INSECURE_SET_512_0XFFFFEE001_1"
+  | "SET_8192_1000_4"
+  | "SET_8192_144115188075855872_2";
 
 /**
  * Parameters for the BFV protocol
@@ -333,6 +344,7 @@ export const BfvProtocolParams = {
     degree: 2048,
     plaintextModulus: 1032193n,
     moduli: [0x3fffffff000001n],
+    error1Variance: "10",
   } as const satisfies ProtocolParams,
 
   /**
@@ -350,6 +362,7 @@ export const BfvProtocolParams = {
       0x0080000002120001n,
       0x0080000001f60001n,
     ],
+    error1Variance: "10",
   } as const satisfies ProtocolParams,
 };
 

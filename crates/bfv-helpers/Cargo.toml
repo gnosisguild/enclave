@@ -9,14 +9,15 @@ repository = "https://github.com/gnosisguild/enclave/crates/bfv-helpers"
 [dependencies]
 alloy-dyn-abi = { workspace = true }
 alloy-primitives = { workspace = true }
-fhe-traits.workspace = true
-fhe.workspace = true
-rand.workspace = true
 anyhow.workspace = true
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits.workspace = true
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe.workspace = true
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 num-bigint = { workspace = true }
+strum.workspace = true
+rand.workspace = true
 thiserror = { workspace = true }
 
 [dev-dependencies]

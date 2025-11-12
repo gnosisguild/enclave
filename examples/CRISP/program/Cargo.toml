@@ -6,5 +6,5 @@ edition = { workspace = true }
 [dependencies]
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
-e3-bfv-helpers = { path = "../../../crates/bfv-helpers" }
+e3-compute-provider = { workspace = true }
+e3-bfv-helpers = { workspace = true }

@@ -218,15 +218,16 @@ describe("Integration", () => {
     });
 
     state = store.get(0n);
-    assert(state);
+    assert(state, "store should have E3State but it was falsey");
     assert.strictEqual(state.e3Id, 0n);
     assert.strictEqual(state.type, "requested");
+    console.log("E3 Sucessfully Requested!");
 
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
     event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED);
 
     state = store.get(0n);
-    assert(state);
+    assert(state, "store should have E3State but it was falsey");
     assert.strictEqual(state.type, "committee_published");
     assert.strictEqual(state.publicKey, event.data.publicKey);
 
@@ -238,13 +239,16 @@ describe("Integration", () => {
     });
 
     state = store.get(0n);
-    assert(state);
+    assert(state, "store should have activated state but it was falsey");
     assert.strictEqual(state.type, "activated");
 
     // INPUT PUBLISHING phase
+    console.log("PUBLISHING PRIVATE INPUT");
     const num1 = 12n;
     const num2 = 21n;
     const publicKeyBytes = hexToBytes(state.publicKey);
+
+    console.log("ENCRYPTING NUMBERS");
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes);
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes);
 
@@ -272,5 +276,6 @@ describe("Integration", () => {
     const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput);
 
     expect(BigInt(parsed[0])).toBe(num1 + num2);
+    console.log("Answer was correct");
   }, 9999999);
 });

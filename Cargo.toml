@@ -33,13 +33,13 @@ members = [
   "crates/wasm",
 ]
 exclude = [
+  "examples/CRISP",
   "examples/CRISP/server",
   "examples/CRISP/program",
-  "examples/default/client/wasm",
-  "examples/default",
   # client needs to be able to build crates/support independently
   "crates/support", 
-  "crates/support-scripts/dev"
+  "crates/support-scripts/dev",
+  "templates/default"
 ]
 resolver = "3"
 msrv = "1.86.0"
@@ -150,12 +150,14 @@ rayon = "=1.10.0"
 regex = "=1.11.1" 
 reqwest = { version = "=0.12.22", features = ["json"] }
 serde = { version = "=1.0.228", features = ["derive"] }
+serde-wasm-bindgen = "=0.6.5"
 serde_json = "=1.0.141"
 serial_test = "=3.2.0"
-sled = "=0.34.7"
 serde_yaml = "=0.9.34"
 sha2 = "=0.10.9"
 shellexpand = "=3.1.1"
+sled = "=0.34.7"
+strum = { version = "=0.27.2", features = ["derive"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }

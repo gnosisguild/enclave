@@ -25,8 +25,8 @@ struct Args {
     #[arg(short, long = "plaintext-modulus")]
     plaintext_modulus: u64,
 
-    #[arg(short, long = "error2-variance")]
-    error2_variance: Option<String>,
+    #[arg(short, long = "error1-variance")]
+    error1_variance: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -38,12 +38,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    if let Some(error2_variance) = args.error2_variance {
+    if let Some(error1_variance) = args.error1_variance {
         params = build_bfv_params_arc(
             args.degree as usize,
             args.plaintext_modulus,
             &args.moduli,
-            Some(&error2_variance),
+            Some(&error1_variance),
         );
     } else {
         params = build_bfv_params_arc(
