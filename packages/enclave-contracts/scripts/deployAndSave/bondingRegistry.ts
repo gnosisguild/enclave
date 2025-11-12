@@ -119,6 +119,8 @@ export const deployAndSaveBondingRegistry = async ({
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
+
   storeDeploymentArgs(
     {
       constructorArgs: {
@@ -132,9 +134,15 @@ export const deployAndSaveBondingRegistry = async ({
         minTicketBalance: minTicketBalance.toString(),
         exitDelay: exitDelay.toString(),
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: bondingRegistryAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: bondingRegistryAddress,
     },
     "BondingRegistry",
     chain,
@@ -211,7 +219,10 @@ export const upgradeAndSaveBondingRegistry = async ({
   storeDeploymentArgs(
     {
       ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
+      proxyRecords: {
+        // initData, //TODO: Add init data if needed
+        implementationAddress: newImplementationAddress,
+      },
     },
     "BondingRegistry",
     chain,

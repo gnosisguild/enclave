@@ -145,28 +145,56 @@ export const verifyContracts = (chain: string): void => {
     }
 
     const deployment = chainDeployments[contractName];
+    const isProxy = Boolean(deployment.proxyRecords?.implementationAddress);
 
-    // Auto-discover the fully qualified contract name
+    if (isProxy && deployment.proxyRecords) {
+      console.log(`  📦 Proxy deployment detected`);
+
+      console.log(`  ├─ Verifying TransparentUpgradeableProxy...`);
+      verifyContract(
+        "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
+        deployment.address,
+        {
+          _logic: deployment.proxyRecords.implementationAddress,
+          _owner: deployment.proxyRecords.initialOwner,
+          _data: deployment.proxyRecords.initData,
+        },
+        chain,
+      );
+
+      console.log(`  ├─ Verifying ProxyAdmin...`);
+      verifyContract(
+        "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+        deployment.proxyRecords.proxyAdminAddress as string,
+        { owner: deployment.proxyRecords.initialOwner },
+        chain,
+      );
+    }
+
+    // Verify the main contract (or implementation if proxy)
     const fullyQualifiedName = findContractPath(contractName);
 
     if (!fullyQualifiedName) {
       console.log(
-        `❌ Could not find contract source for ${contractName}. Skipping verification.`,
+        `  ❌ Could not find contract source for ${contractName}. Skipping.\n`,
       );
       return;
     }
 
-    verifyContract(
-      fullyQualifiedName,
-      deployment.address,
-      deployment.constructorArgs,
-      chain,
-    );
+    const targetAddress = isProxy
+      ? (deployment.proxyRecords?.implementationAddress as string)
+      : deployment.address;
+
+    const constructorArgs = isProxy ? undefined : deployment.constructorArgs;
 
     console.log(
-      `[${index + 1}/${contractNames.length}] Verifying ${contractName}...`,
+      `  ${isProxy ? "└─" : "  "} Verifying ${isProxy ? "implementation" : "contract"} at ${targetAddress.slice(0, 10)}...`,
     );
+
+    verifyContract(fullyQualifiedName, targetAddress, constructorArgs, chain);
+
+    console.log(`  ✅ ${contractName} verification complete\n`);
   });
 
-  console.log(`\n✅ Verification process completed for ${chain}.\n`);
+  console.log(`\n🎉 Verification process completed for ${chain}!\n`);
 };

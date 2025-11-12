@@ -106,6 +106,8 @@ export const deployAndSaveEnclave = async ({
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
+
   storeDeploymentArgs(
     {
       constructorArgs: {
@@ -116,9 +118,15 @@ export const deployAndSaveEnclave = async ({
         maxDuration,
         params,
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: enclaveAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: enclaveAddress,
     },
     "Enclave",
     chain,
@@ -193,7 +201,10 @@ export const upgradeAndSaveEnclave = async ({
   storeDeploymentArgs(
     {
       ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
+      proxyRecords: {
+        // initData, //TODO: Add init data if needed
+        implementationAddress: newImplementationAddress,
+      },
     },
     "Enclave",
     chain,

@@ -97,6 +97,8 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
 
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
+
   storeDeploymentArgs(
     {
       constructorArgs: {
@@ -104,9 +106,15 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
         enclaveAddress: enclaveAddress,
         submissionWindow: submissionWindow.toString(),
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: ciphernodeRegistryAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: ciphernodeRegistryAddress,
     },
     "CiphernodeRegistryOwnable",
     chain,
@@ -188,7 +196,10 @@ export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
   storeDeploymentArgs(
     {
       ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
+      proxyRecords: {
+        // initData, //TODO: Add init data if needed
+        implementationAddress: newImplementationAddress,
+      },
     },
     "CiphernodeRegistryOwnable",
     chain,
