@@ -156,7 +156,7 @@ pub fn bfv_verifiable_encrypt_vector(
 ///   degree: number;              // Polynomial degree (e.g., 8192)
 ///   plaintext_modulus: number;   // Plaintext modulus value (e.g., 1000)
 ///   moduli: number[];            // Array of moduli
-///   error2_variance: string | null; // Error variance as string or null
+///   error1_variance: string | null; // Error variance as string or null
 /// }
 /// ```
 ///
@@ -186,7 +186,7 @@ pub struct BfvParamSetJs {
     pub degree: usize,
     pub plaintext_modulus: u64,
     pub moduli: Vec<u64>,
-    pub error2_variance: Option<String>,
+    pub error1_variance: Option<String>,
 }
 
 impl From<&BfvParamSet> for BfvParamSetJs {
@@ -195,7 +195,7 @@ impl From<&BfvParamSet> for BfvParamSetJs {
             degree: params.degree,
             plaintext_modulus: params.plaintext_modulus,
             moduli: params.moduli.to_vec(),
-            error2_variance: params.error2_variance.map(|s| s.to_string()),
+            error1_variance: params.error1_variance.map(|s| s.to_string()),
         }
     }
 }

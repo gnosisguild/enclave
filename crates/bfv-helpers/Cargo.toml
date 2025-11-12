@@ -14,7 +14,7 @@ fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits.workspace = true
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe.workspace = true
-greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator", branch="fix/errors" }
 num-bigint = { workspace = true }
 strum.workspace = true
 rand.workspace = true

@@ -66,7 +66,7 @@ export const INSECURE_SET_2048_1032193_1 = {
   degree: 2048,
   plaintext_modulus: 1032193,
   moduli: [0x3fffffff000001n], // BigInt for the modulus
-  error2_variance: "10",
+  error1_variance: "10",
 } as const;
 
 // BFV parameter set matching the Rust SET_8192_1000_4 configuration
@@ -79,7 +79,7 @@ export const SET_8192_1000_4 = {
     0x0080000002120001n,
     0x0080000001f60001n,
   ],
-  error2_variance:
+  error1_variance:
     "52309181128222339698631578526730685514457152477762943514050560000",
 };
 
@@ -117,7 +117,7 @@ export function encodeBfvParams(
   degree: number = BFV_PARAMS_SET.degree,
   plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
   moduli: readonly bigint[] = BFV_PARAMS_SET.moduli,
-  error2_variance: string = BFV_PARAMS_SET.error2_variance,
+  error1_variance: string = BFV_PARAMS_SET.error1_variance,
 ): `0x${string}` {
   return encodeAbiParameters(
     [
@@ -128,7 +128,7 @@ export function encodeBfvParams(
           { name: "degree", type: "uint256" },
           { name: "plaintext_modulus", type: "uint256" },
           { name: "moduli", type: "uint256[]" },
-          { name: "error2_variance", type: "string" },
+          { name: "error1_variance", type: "string" },
         ],
       },
     ],
@@ -137,7 +137,7 @@ export function encodeBfvParams(
         degree: BigInt(degree),
         plaintext_modulus: BigInt(plaintext_modulus),
         moduli: [...moduli],
-        error2_variance,
+        error1_variance,
       },
     ],
   );
