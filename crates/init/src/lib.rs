@@ -347,7 +347,7 @@ pub async fn execute(
             }
             eprintln!("❌ Sorry about this but there was an error running the installer. ");
             eprintln!("❌ Error: {}\n", e);
-            eprintln!("Enclave is currently under active development please share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
+            eprintln!("Enclave is currently under active development please try again using the --verbose flag and share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
             exit(1);
         }
     }
