@@ -153,7 +153,7 @@ export interface CRISPCircuitInputs {
   u: Polynomial
   e0: Polynomial
   e1: Polynomial
-  e1is: Polynomial[]
+  e0is: Polynomial[]
   k1: Polynomial
   // ECDSA Section.
   public_key_x: string[]

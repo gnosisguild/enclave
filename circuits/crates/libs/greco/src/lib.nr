@@ -189,7 +189,7 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let B
     u: Polynomial<N>,
     e0: Polynomial<N>,
     e1: Polynomial<N>,
-    e1is: [Polynomial<N>; L],
+    e0is: [Polynomial<N>; L],
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
@@ -229,14 +229,14 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         u: Polynomial<N>,
         e0: Polynomial<N>,
         e1: Polynomial<N>,
-        e1is: [Polynomial<N>; L],
+        e0is: [Polynomial<N>; L],
         k1: Polynomial<N>,
         r1is: [Polynomial<2 * N - 1>; L],
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
-        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, e1is, k1, r1is, r2is, p1is, p2is }
+        Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, e0is, k1, r1is, r2is, p1is, p2is }
     }
 
     /// Flattens all polynomials coefficients into a single array for challenge generation.
@@ -399,7 +399,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Cyclotomic polynomial evaluation: cyclo(x) = x^N + 1
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
         let u_at_gamma = self.u.eval(gamma);
-        let e0_at_gamma = self.e0.eval(gamma);
+        let e1_at_gamma = self.e1.eval(gamma);
         let k1_at_gamma = self.k1.eval(gamma);
 
         let mut sum = (0, 0);
@@ -409,9 +409,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let pk0is_at_gamma = self.pk0is[i].eval(gamma);
             let r1i_at_gamma = self.r1is[i].eval(gamma);
             let r2i_at_gamma = self.r2is[i].eval(gamma);
+            let e0is_at_gamma = self.e0is[i].eval(gamma);
 
             // Step 1: pk0_u = pk0i(gamma) * u(gamma) + e0(gamma)
-            let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
+            let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0is_at_gamma;
 
             // Step 2: rhs = pk0_u + k1(gamma) * k0i
             let mut ct0_rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
@@ -430,10 +431,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             let pk1is_at_gamma = self.pk1is[i].eval(gamma);
             let p1is_at_gamma = self.p1is[i].eval(gamma);
             let p2is_at_gamma = self.p2is[i].eval(gamma);
-            let e1is_at_gamma = self.e1is[i].eval(gamma);
 
             // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
-            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1is_at_gamma;
+            let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
 
             // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
             let mut ct1_rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;

@@ -342,9 +342,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-chains"
-version = "0.2.17"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6068f356948cd84b5ad9ac30c50478e433847f14a50714d2b68f15d052724049"
+checksum = "bfaa9ea039a6f9304b4a593d780b1f23e1ae183acdee938b11b38795acacc9f1"
 dependencies = [
  "alloy-primitives",
  "num_enum",
@@ -2315,9 +2315,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-common"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
  "generic-array",
  "rand_core 0.6.4",
@@ -3842,9 +3842,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.14.9"
+version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
@@ -5193,9 +5193,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.22"
+version = "1.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b70e7a7df205e92a1a4cd9aaae7898dac0aa555503cc0a649494d0d60e7651d"
+checksum = "15d118bbf3771060e7311cc7bb0545b01d08a8b4a7de949198dec1fa0ca1c0f7"
 dependencies = [
  "cc",
  "libc",
@@ -5597,9 +5597,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint-dig"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82c79c15c05d4bf82b6f5ef163104cc81a760d8e874d38ac50ab67c8877b647b"
+checksum = "e661dda6640fad38e827a6d4a310ff4763082116fe217f279885c97f511bb0b7"
 dependencies = [
  "lazy_static",
  "libm",
@@ -9148,7 +9148,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=fix%2Ferrors#fe97fa569c811b9b6a0b42903513de774ccbd97a"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
 dependencies = [
  "anyhow",
  "bigint-poly",
@@ -9171,7 +9171,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=fix%2Ferrors#fe97fa569c811b9b6a0b42903513de774ccbd97a"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
 dependencies = [
  "anyhow",
  "bigint-poly",

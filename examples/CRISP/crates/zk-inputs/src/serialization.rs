@@ -36,7 +36,7 @@ pub struct ZKInputs {
     u: serde_json::Value,
     e0: serde_json::Value,
     e1: serde_json::Value,
-    e1is: Vec<serde_json::Value>,
+    e0is: Vec<serde_json::Value>,
     k1: serde_json::Value,
 }
 
@@ -215,8 +215,8 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-        e1is: vectors_standard
-            .e1is
+        e0is: vectors_standard
+            .e0is
             .iter()
             .map(|v| {
                 serde_json::json!({
@@ -316,7 +316,7 @@ mod tests {
                 vec![BigInt::from(33), BigInt::from(34)],
                 vec![BigInt::from(35), BigInt::from(36)],
             ],
-            e1is: vec![
+            e0is: vec![
                 vec![BigInt::from(43), BigInt::from(44)],
                 vec![BigInt::from(45), BigInt::from(46)],
             ],
