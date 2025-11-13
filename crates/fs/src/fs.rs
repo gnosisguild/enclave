@@ -296,36 +296,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn test_replace_in_place() -> Result<()> {
-        // Create an in-memory filesystem
-        let fs = Fs::mem();
-
-        // Create a test file with content to replace
-        let test_path = "config.txt";
-        let original_content =
-            "server_url=localhost:8080\napi_version=v1\nserver_url=example.com:9090";
-        fs.write_to_file(test_path, original_content).await?;
-
-        // Create a regex pattern to replace all server_url values
-        let pattern = Regex::new(r"server_url=([^\n]+)")?;
-        let replacement = "server_url=production.example.com:443";
-
-        // Apply the replacement
-        fs.replace_in_place(&pattern, replacement, test_path)
-            .await?;
-
-        // Read the modified content
-        let modified_content = fs.read_to_string(test_path).await?;
-
-        // Verify the replacements were made
-        let expected_content = "server_url=production.example.com:443\napi_version=v1\nserver_url=production.example.com:443";
-        assert_eq!(modified_content, expected_content);
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_replace_in_place_table() -> Result<()> {
         // Define test cases as a table
         struct TestCase {
