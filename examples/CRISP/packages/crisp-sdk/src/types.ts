@@ -215,7 +215,6 @@ export interface EncryptVoteAndGenerateCRISPInputsParams {
   message: string
   merkleData: IMerkleProof
   balance: bigint
-  bfvParams?: BFVParams
   slotAddress: string
   isFirstVote: boolean
 }
