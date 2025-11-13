@@ -27,19 +27,19 @@ permissions:
   packages: write
 
 jobs:
-  # crisp_rust_unit:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: Install Rust 1.86.0
-  #       uses: dtolnay/rust-toolchain@stable
-  #       with:
-  #         toolchain: 1.86.0
-  #
-  #     - name: Run CRISP Unit Tests
-  #       working-directory: ./examples/CRISP
-  #       run: "cargo test"
+  crisp_rust_unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.86.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+
+      - name: Run CRISP Unit Tests
+        working-directory: ./examples/CRISP
+        run: "cargo test"
 
   rust_unit:
     runs-on: ubuntu-latest
