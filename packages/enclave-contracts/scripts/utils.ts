@@ -225,6 +225,6 @@ export const updateE3Config = (
     lineWidth: -1, // Don't wrap lines
   });
 
-  fs.writeFileSync(pathToConfigFile, yamlStr, "utf8");
+  fs.writeFileSync(pathToConfigFile, yamlStr + "\n", "utf8");
   console.log("\n✓ enclave.config.yaml updated successfully!");
 };
