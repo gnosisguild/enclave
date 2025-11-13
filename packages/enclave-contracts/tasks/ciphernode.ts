@@ -96,12 +96,19 @@ export const ciphernodeAdd = task(
           `Licensed bonded: ${ethers.formatEther(licenseBondAmountBigInt)} ENCL`,
         );
 
+
+
         console.log("Step 4: Registering as operator...");
-        const registerTx = await bondingRegistryConnected.registerOperator();
-        await registerTx.wait();
-        console.log(
-          "Operator registered (automatically added to CiphernodeRegistry)",
-        );
+        const isRegistered = await bondingRegistry.isRegistered(signer.address);
+        if (!isRegistered) {
+          const registerTx = await bondingRegistryConnected.registerOperator();
+          await registerTx.wait();
+          console.log(
+            "Operator registered (automatically added to CiphernodeRegistry)",
+          );
+        } else {
+          console.log("Ciphernode is already registered as operator");
+        }
 
         console.log("Step 5: Approving USDC for ticket purchase...");
         const approveUsdcTx = await usdcToken.approve(
@@ -119,7 +126,6 @@ export const ciphernodeAdd = task(
           `Ticket balance added: ${ethers.formatUnits(ticketAmountBigInt, 6)} USDC worth`,
         );
 
-        const isRegistered = await bondingRegistry.isRegistered(signer.address);
         const isActive = await bondingRegistry.isActive(signer.address);
         const licenseBond = await bondingRegistry.getLicenseBond(
           signer.address,
