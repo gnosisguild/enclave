@@ -26,9 +26,8 @@ pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use e3_bfv_helpers::{
-        build_bfv_params_arc, encode_bfv_params, params::INSECURE_SET_2048_1032193_1,
-    };
+    use e3_bfv_helpers::BfvParamSet;
+    use e3_bfv_helpers::{BfvParams, build_bfv_params_arc, encode_bfv_params};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use fhe_traits::FheEncrypter;
@@ -39,8 +38,13 @@ mod tests {
     fn test() -> Result<()> {
         let mut rng = thread_rng();
 
-        let (degree, plaintext, moduli) = INSECURE_SET_2048_1032193_1;
-        let params = build_bfv_params_arc(degree, plaintext, &moduli);
+        let params_set: BfvParamSet = BfvParams::InsecureSet2048_1032193_1.into();
+        let params = build_bfv_params_arc(
+            params_set.degree,
+            params_set.plaintext_modulus,
+            &params_set.moduli,
+            params_set.error1_variance,
+        );
 
         let secret_key = SecretKey::random(&params, &mut OsRng);
         let public_key = PublicKey::new(&secret_key, &mut rng);
