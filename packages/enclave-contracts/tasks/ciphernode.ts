@@ -96,8 +96,6 @@ export const ciphernodeAdd = task(
           `Licensed bonded: ${ethers.formatEther(licenseBondAmountBigInt)} ENCL`,
         );
 
-
-
         console.log("Step 4: Registering as operator...");
         const isRegistered = await bondingRegistry.isRegistered(signer.address);
         if (!isRegistered) {
