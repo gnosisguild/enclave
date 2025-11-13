@@ -11,17 +11,6 @@ if ! (cd circuits && nargo compile); then
     exit 1
 fi
 
-# Create the public circuits directory
-echo "Creating public circuits directory..."
-mkdir -p client/libs/noir
-
-# Copy the compiled artifacts
-echo "Copying circuit artifacts..."
-if ! cp -r circuits/target/* client/libs/noir/; then
-    echo "Error: Failed to copy circuit artifacts"
-    exit 1
-fi
-
 # Generate the Verifier
 echo "Generating Verifier Key..."
 if ! bb write_vk -b circuits/target/*.json -o circuits/target --oracle_hash keccak; then
@@ -41,5 +30,20 @@ if ! cp circuits/target/CRISPVerifier.sol packages/crisp-contracts/contracts/CRI
     echo "Error: Failed to copy Solidity Verifier to contracts folder"
     exit 1
 fi
+
+# Add the correct license header
+echo "Adding license header to CRISPVerifier.sol..."
+LICENSE_HEADER="// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE."
+# Remove the first 2 lines (Apache license and copyright) and prepend our license header
+TEMP_FILE=$(mktemp)
+{
+    echo "$LICENSE_HEADER"
+    tail -n +3 packages/crisp-contracts/contracts/CRISPVerifier.sol
+} > "$TEMP_FILE"
+mv "$TEMP_FILE" packages/crisp-contracts/contracts/CRISPVerifier.sol
 
 echo "Noir setup completed successfully"
