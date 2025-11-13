@@ -16,6 +16,8 @@
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
     "ciphernode:add": "pnpm -C packages/crisp-contracts ciphernode:add",
+    "ciphernode:mint:tokens": "pnpm -C packages/crisp-contracts ciphernode:mint:tokens",
+    "ciphernode:add:self": "pnpm -C packages/crisp-contracts ciphernode:add:self",
     "test": "pnpm test:e2e",
     "test:circuits:inputs": "node --test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
@@ -23,7 +25,8 @@
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report",
-    "publish:packages": "tsx scripts/publish.ts"
+    "publish:packages": "tsx scripts/publish.ts",
+    "setup:testnet": "bash ./scripts/setup_testnet.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",

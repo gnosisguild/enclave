@@ -1,5 +1,8 @@
 {
   "sepolia": {
+    "RiscZeroGroth16Verifier": {
+      "address": "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
+    },
     "PoseidonT3": {
       "blockNumber": 9615389,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
