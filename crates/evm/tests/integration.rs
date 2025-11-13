@@ -19,7 +19,7 @@ use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     new_event_bus_with_history, EnclaveEvent, GetEvents, HistoryCollector, Shutdown, TestEvent,
 };
-use e3_evm::{helpers::EthProvider, EvmEventReader, HistoricalEventCoordinator, Start};
+use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -95,7 +95,7 @@ async fn evm_reader() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
 
     contract
         .setValue("hello".to_string())
@@ -177,7 +177,7 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
 
     for msg in live_events.clone() {
         contract
@@ -252,7 +252,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
 
     for msg in ["live", "events"] {
         contract
@@ -357,7 +357,7 @@ async fn coordinator_single_reader() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
     sleep(Duration::from_millis(100)).await;
 
     let msgs = get_msgs(&history_collector).await?;
@@ -407,7 +407,6 @@ async fn coordinator_multiple_readers() -> Result<()> {
     let repository1 = Repository::new(get_in_mem_store());
     let repository2 = Repository::new(get_in_mem_store());
 
-    // Setup coordinator
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
     let processor = coordinator.clone().recipient();
 
@@ -460,7 +459,7 @@ async fn coordinator_multiple_readers() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
 
     // Wait for historical events to be processed
     sleep(Duration::from_millis(200)).await;
@@ -477,7 +476,6 @@ async fn coordinator_multiple_readers() -> Result<()> {
 
 #[actix::test]
 async fn coordinator_no_historical_events() -> Result<()> {
-    // Test coordinator when there are no historical events
     let anvil = Anvil::new().block_time(1).try_spawn()?;
     let rpc_url = anvil.ws_endpoint();
     let provider = EthProvider::new(
@@ -506,7 +504,7 @@ async fn coordinator_no_historical_events() -> Result<()> {
     )
     .await?;
 
-    coordinator.do_send(Start);
+    coordinator.do_send(CoordinatorStart);
     sleep(Duration::from_millis(50)).await;
 
     let msgs = get_msgs(&history_collector).await?;

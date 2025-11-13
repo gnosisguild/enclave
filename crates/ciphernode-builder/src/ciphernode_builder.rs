@@ -304,7 +304,6 @@ impl CiphernodeBuilder {
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
-        // Setup coordinator for event ordering
         let coordinator = HistoricalEventCoordinator::setup(local_bus.clone());
         let processor = coordinator.clone().recipient();
 
