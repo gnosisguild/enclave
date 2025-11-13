@@ -11,7 +11,6 @@ import {
   encodeVote,
   encryptVote,
   generateMerkleProof,
-  verifyProof,
   hashLeaf,
 } from '@crisp-e3/sdk'
 

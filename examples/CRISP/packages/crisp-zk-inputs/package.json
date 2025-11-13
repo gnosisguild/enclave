@@ -8,51 +8,20 @@
     "type": "git",
     "url": "https://github.com/gnosisguild/enclave"
   },
-  "main": "dist/node/index.js",
-  "module": "dist/web/index.js",
-  "types": "dist/web/index.d.ts",
-  "files": [
-    "dist/",
-    "dist/node/**",
-    "dist/web/**",
-    "init_node.js",
-    "init_node.cjs",
-    "init_web.js",
-    "init.d.ts"
-  ],
+  "main": "main.js",
+  "module": "main.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "node": {
-        "types": "./dist/node/index.d.ts",
-        "default": "./dist/node/index.js"
-      },
-      "browser": {
-        "types": "./dist/web/index.d.ts",
-        "default": "./dist/web/index.js"
-      },
-      "default": {
-        "types": "./dist/web/index.d.ts",
-        "default": "./dist/web/index.js"
-      }
-    },
-    "./init": {
-      "node": {
-        "types": "./init.d.ts",
-        "import": "./init_node.js",
-        "require": "./init_node.cjs"
-      },
-      "browser": {
-        "types": "./init.d.ts",
-        "default": "./init_web.js"
-      },
-      "default": {
-        "types": "./init.d.ts",
-        "import": "./init_node.js",
-        "require": "./init_node.cjs",
-        "default": "./init_web.js"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./main.js",
+      "default": "./main.js"
     }
   },
+  "files": [
+    "dist/",
+    "main.js"
+  ],
   "publishConfig": {
     "access": "public"
   },
