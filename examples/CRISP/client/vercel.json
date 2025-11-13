@@ -1,0 +1,4 @@
+{
+  "installCommand": "bash ../scripts/vercel-install.sh && pnpm install",
+  "buildCommand": "export PATH=.vercel/cache/tools:$PATH && pnpm build"
+}
