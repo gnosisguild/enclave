@@ -21,7 +21,7 @@
     "test": "pnpm test:e2e",
     "test:circuits:inputs": "node --test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
-    "compile:circuit": "cd circuits && nargo compile",
+    "compile:circuit": "bash ./scripts/compile_circuits.sh",
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report",
