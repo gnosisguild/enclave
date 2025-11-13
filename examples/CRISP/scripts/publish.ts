@@ -66,14 +66,17 @@ class CRISPPublisher {
         console.log("      - @crisp-e3/sdk");
         console.log("      - @crisp-e3/contracts");
         console.log("      - @crisp-e3/zk-inputs");
-        console.log("   2. Update pnpm-lock.yaml");
-        console.log("   3. Build packages");
-        console.log("   4. Publish to npm:");
+        console.log(
+          "   2. Update @crisp-e3/sdk dependency in client/package.json"
+        );
+        console.log("   3. Update pnpm-lock.yaml");
+        console.log("   4. Build packages");
+        console.log("   5. Publish to npm:");
         console.log("      - @crisp-e3/sdk");
         console.log("      - @crisp-e3/contracts");
         console.log("      - @crisp-e3/zk-inputs");
         if (!this.options.skipGit) {
-          console.log("   5. Commit changes");
+          console.log("   6. Commit changes");
         }
         console.log(
           "\n✅ Dry run complete. Run without --dry-run to perform these actions."
@@ -83,6 +86,9 @@ class CRISPPublisher {
 
       // Bump npm packages
       this.bumpNpmPackages();
+
+      // Update client dependency
+      this.updateClientDependency();
 
       // Update lock files
       this.updateLockFiles();
@@ -103,6 +109,7 @@ class CRISPPublisher {
       console.log(`   Previous version: ${this.oldVersion || "unknown"}`);
       console.log(`   New version: ${this.newVersion}`);
       console.log(`   Packages updated: ✓`);
+      console.log(`   Client dependency updated: ✓`);
       console.log(`   Packages built: ✓`);
       console.log(`   Packages published: ✓`);
 
@@ -369,6 +376,49 @@ class CRISPPublisher {
     const packageJson: PackageJson = JSON.parse(content);
     return packageJson.name;
   }
+
+  /**
+   * Update @crisp-e3/sdk dependency in client package.json
+   */
+  private updateClientDependency(): void {
+    console.log("\n📝 Updating client dependency...");
+
+    const clientPackagePath = join(this.crispDir, "client/package.json");
+
+    if (!existsSync(clientPackagePath)) {
+      console.warn(
+        "   ⚠️  Client package.json not found, skipping dependency update"
+      );
+      return;
+    }
+
+    try {
+      const content = readFileSync(clientPackagePath, "utf-8");
+      const packageJson = JSON.parse(content);
+
+      if (
+        packageJson.dependencies &&
+        packageJson.dependencies["@crisp-e3/sdk"]
+      ) {
+        const oldVersion = packageJson.dependencies["@crisp-e3/sdk"];
+        packageJson.dependencies["@crisp-e3/sdk"] = this.newVersion;
+
+        writeFileSync(
+          clientPackagePath,
+          JSON.stringify(packageJson, null, 2) + "\n"
+        );
+        console.log(
+          `   ✓ Updated @crisp-e3/sdk from ${oldVersion} to ${this.newVersion}`
+        );
+      } else {
+        console.warn(
+          "   ⚠️  @crisp-e3/sdk dependency not found in client package.json"
+        );
+      }
+    } catch (error) {
+      console.warn("   ⚠️  Could not update client dependency:", error);
+    }
+  }
 }
 
 // CLI interface
@@ -441,10 +491,11 @@ Examples:
 The script will:
   1. Check for uncommitted changes
   2. Update versions in @crisp-e3/sdk, @crisp-e3/contracts, @crisp-e3/zk-inputs
-  3. Update pnpm-lock.yaml
-  4. Build packages
-  5. Publish to npm
-  6. Commit changes (no tags)
+  3. Update @crisp-e3/sdk dependency in client/package.json
+  4. Update pnpm-lock.yaml
+  5. Build packages
+  6. Publish to npm
+  7. Commit changes (no tags)
 
 Note: Make sure you're logged in to npm (npm login) before publishing.
 `);

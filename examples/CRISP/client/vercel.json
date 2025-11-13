@@ -1,4 +1,3 @@
 {
-  "installCommand": "bash ../scripts/vercel-install.sh && pnpm install",
-  "buildCommand": "export PATH=$(pwd)/.vercel/cache/tools:$PATH && pnpm -C ../packages/crisp-sdk build && pnpm build"
+  "installCommand": "pnpm install --no-link-workspace-packages"
 }
