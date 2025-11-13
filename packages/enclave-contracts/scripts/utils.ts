@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import fs from "fs";
+import yaml from "js-yaml";
 import path from "path";
 
 export const deploymentsFile = path.join("deployed_contracts.json");
@@ -24,6 +25,26 @@ export interface ChainDeployments {
 // Type for the deployments object organized by chain
 export interface Deployments {
   [chainName: string]: ChainDeployments;
+}
+
+/**
+ * Defines the Enclave.config.yaml structure
+ */
+export interface EnclaveConfig {
+  chains: Array<{
+    name: string;
+    rpc_url: string;
+    contracts: {
+      e3_program?: { address: string; deploy_block: number };
+      enclave?: { address: string; deploy_block: number };
+      ciphernode_registry?: { address: string; deploy_block: number };
+      bonding_registry?: { address: string; deploy_block: number };
+      fee_token?: { address: string; deploy_block: number };
+    };
+  }>;
+  // we don't care about the below fields
+  program: unknown;
+  nodes: unknown;
 }
 
 /**
@@ -140,3 +161,70 @@ export function areArraysEqual<T>(arr1: T[], arr2: T[]): boolean {
 
   return true;
 }
+
+/**
+ * The function to update the encalve.config.yaml file with the deployed contract addresses
+ * @param chainToConfig - The chain name to update in the config
+ * @param pathToConfigFile - The path to the enclave.config.yaml file
+ * @param contractMapping - A mapping of contract names to config keys
+ */
+export const updateE3Config = (
+  chainToConfig: string,
+  pathToConfigFile: string,
+  contractMapping: Record<string, string>,
+  rpcUrl?: string,
+): void => {
+  const fileContent = fs.readFileSync(pathToConfigFile, "utf8");
+  const config = yaml.load(fileContent) as EnclaveConfig;
+
+  // Find the hardhat chain config
+  // Find the chain config or create it
+  let configChain = config.chains.find((chain) => chain.name === chainToConfig);
+
+  if (!configChain) {
+    console.log(
+      `Chain "${chainToConfig}" not found in config. Creating new entry...`,
+    );
+
+    if (!rpcUrl) {
+      console.warn(
+        "Warning: No RPC URL provided. You'll need to update it manually in the config.",
+      );
+    }
+
+    configChain = {
+      name: chainToConfig,
+      rpc_url: rpcUrl || `ws://localhost:8545`,
+      contracts: {},
+    };
+
+    config.chains.push(configChain);
+    console.log(`✓ Created new chain entry for "${chainToConfig}"`);
+  }
+
+  console.log(`\nUpdating contracts for chain: ${chainToConfig}`);
+
+  // Update contract addresses and deploy blocks
+  for (const [contractName, configKey] of Object.entries(contractMapping)) {
+    const deployment = readDeploymentArgs(contractName, chainToConfig);
+
+    if (deployment) {
+      configChain.contracts[configKey as keyof typeof configChain.contracts] = {
+        address: deployment.address,
+        deploy_block: deployment.blockNumber ?? 1,
+      };
+      console.log(
+        `✓ Updated ${configKey}: ${deployment.address} (block ${deployment.blockNumber ?? 1})`,
+      );
+    }
+  }
+
+  // Write updated config back to file
+  const yamlStr = yaml.dump(config, {
+    indent: 2,
+    lineWidth: -1, // Don't wrap lines
+  });
+
+  fs.writeFileSync(pathToConfigFile, yamlStr, "utf8");
+  console.log("\n✓ enclave.config.yaml updated successfully!");
+};

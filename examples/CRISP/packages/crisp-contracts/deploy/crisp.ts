@@ -10,7 +10,10 @@ import {
 } from "@enclave-e3/contracts/scripts";
 import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
 
-import { execSync } from "child_process";
+import path from "path";
+import fs from "fs";
+
+import yaml from "js-yaml";
 import hre from "hardhat";
 
 const IMAGE_ID =

@@ -46,6 +46,8 @@
     "solady": "^0.1.13"
   },
   "devDependencies": {
+    "@crisp-e3/sdk": "workspace:^",
+    "@crisp-e3/zk-inputs": "workspace:^",
     "@nomicfoundation/hardhat-ethers": "4",
     "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
     "@nomicfoundation/hardhat-network-helpers": "3",
@@ -60,8 +62,6 @@
     "@types/mocha": ">=9.1.0",
     "@types/node": "^22.18.0",
     "chai": "^6.2.0",
-    "@crisp-e3/sdk": "workspace:^",
-    "@crisp-e3/zk-inputs": "workspace:^",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
