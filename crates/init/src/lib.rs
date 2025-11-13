@@ -119,17 +119,17 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                     ),
                     Filter::new(
                         "**/Cargo.toml",
-                        r"(?m)^e3-program-server  = \{ git =.*\n?",
+                        r"(?m)^e3-program-server =.*\n?",
                         &format!("e3-program-server = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
                     ),
                     Filter::new(
                        "**/Cargo.toml",
-                       r"(?m)^e3-bfv-helpers = \{ git =.*\n?",
+                       r"(?m)^e3-bfv-helpers =.*\n?",
                        &format!("e3-bfv-helpers = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
                     ),
                     Filter::new(
                        "**/Cargo.toml",
-                       r"(?m)^e3-compute-provider = \{ git =.*\n?",
+                       r"(?m)^e3-compute-provider =.*\n?",
                        &format!("e3-compute-provider = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
                     ),
                 ],
