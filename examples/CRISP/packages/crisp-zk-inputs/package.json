@@ -26,11 +26,11 @@
     "access": "public"
   },
   "scripts": {
-    "compile:circuit": "pnpm -C ../../ compile:circuit",
-    "build": "rm -rf dist && pnpm compile:circuit && node scripts/build.js"
+    "build": "rm -rf dist && node scripts/build.js"
   },
   "devDependencies": {
     "execa": "^8.0.1",
-    "replace-in-file": "^7.2.0"
+    "replace-in-file": "^7.2.0",
+    "wasm-pack": "^0.13.1"
   }
 }
