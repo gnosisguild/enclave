@@ -19,7 +19,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@crisp-e3/sdk": "0.2.1-test",
+    "@crisp-e3/sdk": "0.2.3-test",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
     "@phosphor-icons/react": "^2.1.4",
