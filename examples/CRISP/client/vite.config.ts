@@ -23,7 +23,15 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: { target: 'esnext' },
-    exclude: ['@rollup/browser', '@crisp-e3/zk-inputs', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@noir-lang/noir_js', '@aztec/bb.js'],
+    exclude: [
+      '@rollup/browser',
+      '@crisp-e3/zk-inputs',
+      '@crisp-e3/zk-inputs/init',
+      '@noir-lang/noirc_abi',
+      '@noir-lang/acvm_js',
+      '@noir-lang/noir_js',
+      '@aztec/bb.js',
+    ],
   },
   resolve: {
     alias: {

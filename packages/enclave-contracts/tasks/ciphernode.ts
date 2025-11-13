@@ -97,11 +97,16 @@ export const ciphernodeAdd = task(
         );
 
         console.log("Step 4: Registering as operator...");
-        const registerTx = await bondingRegistryConnected.registerOperator();
-        await registerTx.wait();
-        console.log(
-          "Operator registered (automatically added to CiphernodeRegistry)",
-        );
+        const isRegistered = await bondingRegistry.isRegistered(signer.address);
+        if (!isRegistered) {
+          const registerTx = await bondingRegistryConnected.registerOperator();
+          await registerTx.wait();
+          console.log(
+            "Operator registered (automatically added to CiphernodeRegistry)",
+          );
+        } else {
+          console.log("Ciphernode is already registered as operator");
+        }
 
         console.log("Step 5: Approving USDC for ticket purchase...");
         const approveUsdcTx = await usdcToken.approve(
@@ -119,7 +124,6 @@ export const ciphernodeAdd = task(
           `Ticket balance added: ${ethers.formatUnits(ticketAmountBigInt, 6)} USDC worth`,
         );
 
-        const isRegistered = await bondingRegistry.isRegistered(signer.address);
         const isActive = await bondingRegistry.isActive(signer.address);
         const licenseBond = await bondingRegistry.getLicenseBond(
           signer.address,
@@ -265,6 +269,16 @@ export const ciphernodeMintTokens = task(
         console.log("\n=== Token Balances ===");
         console.log(`ENCL: ${ethers.formatEther(enclBalance)}`);
         console.log(`USDC: ${ethers.formatUnits(usdcBalance, 6)}`);
+
+        const transfersRestricted =
+          await enclaveTokenContract.transfersRestricted();
+        if (transfersRestricted) {
+          console.log("Allowing EnclaveToken to be transferrable...");
+          const transferEnabledTx =
+            await enclaveTokenContract.setTransferRestriction(false);
+          await transferEnabledTx.wait();
+          console.log("EnclaveToken transfers are now enabled");
+        }
       } catch (error) {
         console.error("Token minting failed:", error);
         throw error;

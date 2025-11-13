@@ -383,7 +383,14 @@ importers:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@22.7.5)
 
-  examples/CRISP/packages/crisp-zk-inputs: {}
+  examples/CRISP/packages/crisp-zk-inputs:
+    devDependencies:
+      execa:
+        specifier: ^8.0.1
+        version: 8.0.1
+      replace-in-file:
+        specifier: ^7.2.0
+        version: 7.2.0
 
   packages/enclave-config:
     dependencies:

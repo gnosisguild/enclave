@@ -29,6 +29,8 @@
   "scripts": {
     "compile": "hardhat compile",
     "ciphernode:add": "hardhat ciphernode:admin-add",
+    "ciphernode:mint:tokens": "hardhat ciphernode:mint-tokens",
+    "ciphernode:add:self": "hardhat ciphernode:add",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy:contracts": "hardhat run deploy/deploy.ts",
     "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",

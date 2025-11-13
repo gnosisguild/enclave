@@ -26,7 +26,7 @@ export const upgradeEnclave = async () => {
     throw new Error("Enclave proxy not found. Deploy first before upgrading.");
   }
 
-  if (!preDeployedArgs?.implementationAddress) {
+  if (!preDeployedArgs?.proxyRecords?.implementationAddress) {
     throw new Error(
       "Existing deployment is not proxy-based. Cannot upgrade non-proxy deployments.",
     );

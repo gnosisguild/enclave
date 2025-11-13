@@ -444,7 +444,7 @@ impl EtherscanClient {
         let token = ERC20Votes::new(token_address, provider);
 
         let votes = token
-            .getPastVotes(voter_address, U256::from(block_number))
+            .getPastVotes(voter_address, U256::from(block_number - 1))
             .call()
             .await
             .context("Failed to call getPastVotes")?;

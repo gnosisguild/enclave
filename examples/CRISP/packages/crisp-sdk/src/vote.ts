@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
+import initializeWasm from '@crisp-e3/zk-inputs/init'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE } from './constants'
@@ -153,6 +154,7 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
 }
 
 export const encryptVote = async (encodedVote: string[], publicKey: Uint8Array): Promise<Uint8Array> => {
+  await initializeWasm()
   const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
     DEFAULT_BFV_PARAMS.degree,
     DEFAULT_BFV_PARAMS.plaintextModulus,
@@ -191,6 +193,8 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   slotAddress,
   isFirstVote,
 }: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
+  await initializeWasm()
+
   if (encodedVote.length !== bfvParams.degree) {
     throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
   }
@@ -238,6 +242,8 @@ export const generateMaskVote = async (
   slotAddress: string,
   isFirstVote: boolean,
 ): Promise<CRISPCircuitInputs> => {
+  await initializeWasm()
+
   const plaintextVote: IVote = {
     yes: 0n,
     no: 0n,

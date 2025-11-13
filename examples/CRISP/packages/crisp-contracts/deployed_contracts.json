@@ -1,233 +1,122 @@
 {
-  "mainnet": {
-    "RiscZeroGroth16Verifier": {
-      "address": "0x8EaB2D97Dfce405A1692a21b3ff3A172d593D319"
-    }
-  },
   "sepolia": {
-    "RiscZeroGroth16Verifier": {
-      "address": "0x925d8331ddc0a1F0d96E68CF073DFE1d92b69187"
-    },
     "PoseidonT3": {
-      "blockNumber": 9473284,
-      "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
-    },
-    "Enclave": {
-      "constructorArgs": {
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
-        "registry": "0x0000000000000000000000000000000000000001",
-        "maxDuration": "2592000",
-        "params": [
-          "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
-        ]
-      },
-      "blockNumber": 9473285,
-      "address": "0xeF857ba8231E4B8ea4E5DC9CC0891D70BC8E35B8"
-    },
-    "CiphernodeRegistryOwnable": {
-      "constructorArgs": {
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
-        "enclaveAddress": "0xeF857ba8231E4B8ea4E5DC9CC0891D70BC8E35B8"
-      },
-      "blockNumber": 9473286,
-      "address": "0x9c45A278A1C36B50fF1687C8DFdb123d2214BE34"
-    },
-    "NaiveRegistryFilter": {
-      "constructorArgs": {
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
-        "ciphernodeRegistryAddress": "0x9c45A278A1C36B50fF1687C8DFdb123d2214BE34"
-      },
-      "blockNumber": 9473287,
-      "address": "0xbbdF6af7EBe4Ad730C726af2f40dAa867B2C0D35"
-    },
-    "MockComputeProvider": {
-      "blockNumber": 9473289,
-      "address": "0x6C0cE8865D822803E072486D7ea0c5dEC076a066"
-    },
-    "MockDecryptionVerifier": {
-      "blockNumber": 9473290,
-      "address": "0x3E6a993EE75C73dA0BAF5a86a9716190d2b0920f"
-    },
-    "MockInputValidator": {
-      "blockNumber": 9473291,
-      "address": "0x4F1c2BBfE0a827EAF4A7CA912f51DdAd2281819F"
-    },
-    "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0x4F1c2BBfE0a827EAF4A7CA912f51DdAd2281819F"
-      },
-      "blockNumber": 9473292,
-      "address": "0xf69076Aa814a6206C3f049Ea8D1217495793AABa"
-    },
-    "MockRISC0Verifier": {
-      "address": "0xb9384e2b88A69E69149554F31288a8c305859463"
-    },
-    "CRISPInputValidatorFactory": {
-      "address": "0x20e599457c864241F46A38550ba3dCAAbeC20B48",
-      "constructorArgs": {
-        "inputValidator": "0x4F1c2BBfE0a827EAF4A7CA912f51DdAd2281819F"
-      }
-    },
-    "HonkVerifier": {
-      "address": "0xD3c89CD0B492f55F49203A0Da25d7ca744298B8d"
-    },
-    "CRISPProgram": {
-      "address": "0x26fd7066b28C0e18db3Bbfb7163f16e58597C273",
-      "constructorArgs": {
-        "enclave": "0xeF857ba8231E4B8ea4E5DC9CC0891D70BC8E35B8",
-        "verifierAddress": "0xb9384e2b88A69E69149554F31288a8c305859463",
-        "inputValidatorAddress": "0x4F1c2BBfE0a827EAF4A7CA912f51DdAd2281819F",
-        "honkVerifierAddress": "0xD3c89CD0B492f55F49203A0Da25d7ca744298B8d",
-        "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
-      }
-    }
-  },
-  "undefined": {
-    "RiscZeroGroth16Verifier": {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-    },
-    "CRISPInputValidator": {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-    },
-    "PoseidonT3": {
-      "blockNumber": 3,
-      "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
-    }
-  },
-  "default": {
-    "MockUSDC": {
-      "constructorArgs": {
-        "initialSupply": "1000000"
-      },
-      "blockNumber": 1,
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-    },
-    "EnclaveToken": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-      },
-      "blockNumber": 1,
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-    }
-  },
-  "localhost": {
-    "PoseidonT3": {
-      "blockNumber": 3,
+      "blockNumber": 9614015,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
     },
     "MockUSDC": {
       "constructorArgs": {
         "initialSupply": "1000000"
       },
-      "blockNumber": 4,
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "blockNumber": 9614016,
+      "address": "0x8363d6fE06BDF6ff8F06738f4e25b94AF7Fa211e"
     },
     "EnclaveToken": {
       "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
       },
-      "blockNumber": 5,
-      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      "blockNumber": 9614017,
+      "address": "0xD3186014A42a3eD26521e87FFADe7c7a6A314D44"
     },
     "EnclaveTicketToken": {
       "constructorArgs": {
-        "baseToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "baseToken": "0x8363d6fE06BDF6ff8F06738f4e25b94AF7Fa211e",
         "registry": "0x0000000000000000000000000000000000000001",
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
       },
-      "blockNumber": 7,
-      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+      "blockNumber": 9614018,
+      "address": "0xD581Dd5716A1775571e0Bd886429f84b3018231c"
     },
     "SlashingManager": {
       "constructorArgs": {
-        "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "admin": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
         "bondingRegistry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 8,
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+      "blockNumber": 9614019,
+      "address": "0x588551C640F602BF6Cad5367C0651018F375bA3D"
     },
     "BondingRegistry": {
       "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "ticketToken": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-        "licenseToken": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
+        "ticketToken": "0xD581Dd5716A1775571e0Bd886429f84b3018231c",
+        "licenseToken": "0xD3186014A42a3eD26521e87FFADe7c7a6A314D44",
         "registry": "0x0000000000000000000000000000000000000001",
-        "slashedFundsTreasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "slashedFundsTreasury": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
         "ticketPrice": "10000000",
         "licenseRequiredBond": "100000000000000000000",
         "minTicketBalance": "1",
         "exitDelay": "604800"
       },
-      "blockNumber": 8,
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "implementationAddress": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+      "blockNumber": 9614019,
+      "address": "0x0dEF7a61373998067B7d4C61659328F7296A18ad",
+      "implementationAddress": "0x1958d52f4534B5881B06011Bc5f68aeE9a31D90B"
     },
     "CiphernodeRegistryOwnable": {
       "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
         "enclaveAddress": "0x0000000000000000000000000000000000000001",
         "submissionWindow": "10"
       },
-      "blockNumber": 11,
-      "address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-      "implementationAddress": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+      "blockNumber": 9614022,
+      "address": "0xa31da59c60a221CFd7C4d2080D7BBfF5F9739c4d",
+      "implementationAddress": "0x81BBcC759C558F7dCb234fEb20Fbd7dEa7247D0f"
     },
     "Enclave": {
       "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "registry": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-        "bondingRegistry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "feeToken": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
+        "registry": "0xa31da59c60a221CFd7C4d2080D7BBfF5F9739c4d",
+        "bondingRegistry": "0x0dEF7a61373998067B7d4C61659328F7296A18ad",
+        "feeToken": "0x8363d6fE06BDF6ff8F06738f4e25b94AF7Fa211e",
         "maxDuration": "2592000",
         "params": [
           "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
         ]
       },
-      "blockNumber": 13,
-      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-      "implementationAddress": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      "blockNumber": 9614024,
+      "address": "0xafF0BCfF301fB4635bEA961DA49612aCfC79A8Cb",
+      "implementationAddress": "0xB0E546Db661408EB6Be21d8958dD7B87fb77b1F5"
     },
     "MockComputeProvider": {
-      "blockNumber": 23,
-      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
+      "blockNumber": 9614031,
+      "address": "0x4a0431fF900B959dd0080C6AAFc94B73fB5Cf1B7"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 24,
-      "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+      "blockNumber": 9614032,
+      "address": "0x46a5cF0d9FaaE667FB596E3bfAb2B3aE8433A890"
     },
     "MockInputValidator": {
-      "blockNumber": 25,
-      "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
+      "blockNumber": 9614033,
+      "address": "0xBdaFF5aD8a00d05a4ECeE946f3721286d312681a"
     },
     "MockE3Program": {
       "constructorArgs": {
-        "mockInputValidator": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
+        "mockInputValidator": "0xBdaFF5aD8a00d05a4ECeE946f3721286d312681a"
       },
-      "blockNumber": 26,
-      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
+      "blockNumber": 9614034,
+      "address": "0x33BBadcf70d843Cd074Ff8D151211f647e219e7A"
     },
     "MockRISC0Verifier": {
-      "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
+      "address": "0x6c39658221603adBd02f956574efdb3c75822F0f"
     },
-    "CRISPInputValidator": {
-      "address": "0xc5a5C42992dECbae36851359345FE25997F5C42d"
+    "MockCRISPInputValidator": {
+      "address": "0x1D396BC1334900c9B1b62672B34127A1A127c718"
     },
     "CRISPInputValidatorFactory": {
-      "address": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
+      "address": "0xfD39C325D7914d48eAB591e511079E1CdBf32217",
       "constructorArgs": {
-        "inputValidator": "0xc5a5C42992dECbae36851359345FE25997F5C42d"
+        "inputValidator": "0x1D396BC1334900c9B1b62672B34127A1A127c718"
       }
     },
     "HonkVerifier": {
-      "address": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E"
+      "address": "0x2Db157578d13116bF7668bA7c5E0F50f2CD29e07"
     },
     "CRISPProgram": {
-      "address": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+      "address": "0x68EB7F4482BD7331c54fa5EbDBA145C37D42Ff26",
       "constructorArgs": {
-        "enclave": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "verifierAddress": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-        "inputValidatorAddress": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
-        "honkVerifierAddress": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
+        "enclave": "0xafF0BCfF301fB4635bEA961DA49612aCfC79A8Cb",
+        "verifierAddress": "0x6c39658221603adBd02f956574efdb3c75822F0f",
+        "inputValidatorAddress": "0x1D396BC1334900c9B1b62672B34127A1A127c718",
+        "honkVerifierAddress": "0x2Db157578d13116bF7668bA7c5E0F50f2CD29e07",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     }

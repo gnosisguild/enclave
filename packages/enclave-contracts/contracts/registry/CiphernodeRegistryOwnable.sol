@@ -492,8 +492,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         Committee storage c = committees[e3Id];
 
+        // @todo Ensure we check everywhere that we use the block before the request block
+        // to ensure cases where everything is done in the same block are handled correctly.
         uint256 ticketBalance = IBondingRegistry(bondingRegistry)
-            .getTicketBalanceAtBlock(node, c.requestBlock);
+            .getTicketBalanceAtBlock(node, c.requestBlock - 1);
         uint256 ticketPrice = IBondingRegistry(bondingRegistry).ticketPrice();
 
         require(ticketPrice > 0, InvalidTicketNumber());

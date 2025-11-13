@@ -102,9 +102,11 @@ export const deployAndSaveEnclave = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(enclaveAddress, signer, initData);
+  const proxy = await ProxyCF.deploy(enclaveAddress, owner, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
+
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
 
   storeDeploymentArgs(
     {
@@ -116,9 +118,15 @@ export const deployAndSaveEnclave = async ({
         maxDuration,
         params,
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: enclaveAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: enclaveAddress,
     },
     "Enclave",
     chain,
@@ -190,14 +198,24 @@ export const upgradeAndSaveEnclave = async ({
   );
   await upgradeTx.wait();
 
-  storeDeploymentArgs(
-    {
-      ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
-    },
-    "Enclave",
-    chain,
-  );
+  const existingProxyRecords = preDeployedArgs.proxyRecords
+    ? Object.fromEntries(
+        Object.entries(preDeployedArgs.proxyRecords).filter(
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+
+  const proxyRecords: Record<string, string | string[]> = {
+    ...existingProxyRecords,
+    implementationAddress: newImplementationAddress,
+  };
+
+  if (initData !== "0x") {
+    proxyRecords.initData = initData;
+  }
+
+  storeDeploymentArgs({ ...preDeployedArgs, proxyRecords }, "Enclave", chain);
 
   const enclaveContract = EnclaveFactory.connect(proxyAddress, signer);
   return {

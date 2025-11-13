@@ -31,7 +31,7 @@ pub async fn approve_token(
     let token_address: Address = token_address.parse()?;
     let spender_address: Address = spender_address.parse()?;
     let signer: PrivateKeySigner = private_key.parse()?;
-    let wallet = EthereumWallet::from(signer);
+    let wallet = EthereumWallet::from(signer.clone());
 
     let provider = ProviderBuilder::new()
         .wallet(wallet)
@@ -39,8 +39,7 @@ pub async fn approve_token(
         .await?;
 
     let contract = ERC20::new(token_address, &provider);
-
-    let owner = provider.get_accounts().await?[0];
+    let owner = signer.clone().address();
     let current_allowance = contract.allowance(owner, spender_address).call().await?;
 
     log::info!("Current allowance: {}", current_allowance);
