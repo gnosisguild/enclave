@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
+use crate::{
+    event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader,
+    HistoricalEventCoordinator,
+};
 use actix::Addr;
 use alloy::{
     primitives::{LogData, B256},
@@ -15,6 +18,7 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{EnclaveEvent, EventBus};
+use std::sync::Arc;
 use tracing::{error, info, trace};
 
 sol!(
@@ -148,6 +152,7 @@ impl BondingRegistrySolReader {
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
+        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<EvmEventReader<P>>>
     where
         P: Provider + Clone + 'static,
@@ -157,9 +162,10 @@ impl BondingRegistrySolReader {
             extractor,
             contract_address,
             start_block,
-            &bus.clone().into(),
+            bus,
             repository,
             rpc_url,
+            sync_coordinator,
         )
         .await?;
 
@@ -180,6 +186,7 @@ impl BondingRegistrySol {
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
+        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<()>
     where
         P: Provider + Clone + 'static,
@@ -191,6 +198,7 @@ impl BondingRegistrySol {
             repository,
             start_block,
             rpc_url,
+            sync_coordinator,
         )
         .await?;
         Ok(())

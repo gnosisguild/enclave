@@ -73,6 +73,7 @@ async fn evm_reader() -> Result<()> {
         &bus,
         &repository,
         rpc_url.clone(), // Pass RPC URL
+        None,
     )
     .await?;
 
@@ -148,6 +149,7 @@ async fn ensure_historical_events() -> Result<()> {
         &bus,
         &repository,
         rpc_url.clone(), // Pass RPC URL
+        None,
     )
     .await?;
 
@@ -235,6 +237,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
         &bus,
         &repository,
         rpc_url.clone(), // Pass RPC URL
+        None,
     )
     .await?;
 
@@ -272,6 +275,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
         &bus,
         &repository,
         rpc_url.clone(), // Pass RPC URL
+        None,
     )
     .await?;
 

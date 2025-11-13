@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
+use crate::{
+    event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader,
+    HistoricalEventCoordinator,
+};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, LogData, B256, U256},
@@ -20,6 +23,7 @@ use e3_events::{
     EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
     TicketId,
 };
+use std::sync::Arc;
 use tracing::{error, info, trace};
 
 sol!(
@@ -221,6 +225,7 @@ impl CiphernodeRegistrySolReader {
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
+        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<EvmEventReader<P>>>
     where
         P: Provider + Clone + 'static,
@@ -230,9 +235,10 @@ impl CiphernodeRegistrySolReader {
             extractor,
             contract_address,
             start_block,
-            &bus.clone().into(),
+            bus,
             repository,
             rpc_url,
+            sync_coordinator,
         )
         .await?;
 
@@ -514,6 +520,7 @@ impl CiphernodeRegistrySol {
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
+        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<()>
     where
         P: Provider + Clone + 'static,
@@ -525,6 +532,7 @@ impl CiphernodeRegistrySol {
             repository,
             start_block,
             rpc_url,
+            sync_coordinator,
         )
         .await?;
         Ok(())

@@ -5,8 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::helpers::EthProvider;
+use crate::historical_event_coordinator::HistoricalEventCoordinator;
 use actix::prelude::*;
-use actix::{Addr, Recipient};
+use actix::Addr;
 use alloy::eips::BlockNumberOrTag;
 use alloy::primitives::Address;
 use alloy::primitives::{LogData, B256};
@@ -17,6 +18,7 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
+use std::sync::Arc;
 use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{error, info, instrument, trace, warn};
@@ -48,6 +50,7 @@ pub struct EvmEventReaderParams<P> {
     bus: Addr<EventBus<EnclaveEvent>>,
     state: Persistable<EvmEventReaderState>,
     rpc_url: String,
+    pub sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
@@ -77,6 +80,10 @@ pub struct EvmEventReader<P> {
     state: Persistable<EvmEventReaderState>,
     /// The RPC URL for the provider
     rpc_url: String,
+    /// Optional shared coordinator for historical ordering
+    sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
+    /// Become true after we finish historical replay
+    historical_complete: bool,
 }
 
 impl<P: Provider + Clone + 'static> EvmEventReader<P> {
@@ -92,6 +99,8 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
             bus: params.bus,
             state: params.state,
             rpc_url: params.rpc_url,
+            sync_coordinator: params.sync_coordinator,
+            historical_complete: false,
         }
     }
 
@@ -103,6 +112,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
         bus: &Addr<EventBus<EnclaveEvent>>,
         repository: &Repository<EvmEventReaderState>,
         rpc_url: String,
+        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<Self>> {
         let sync_state = repository
             .clone()
@@ -117,6 +127,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
             bus: bus.clone(),
             state: sync_state,
             rpc_url,
+            sync_coordinator,
         };
 
         let addr = EvmEventReader::new(params).start();
@@ -129,7 +140,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let processor = ctx.address().recipient();
+        let reader_addr = ctx.address();
         let bus = self.bus.clone();
 
         let Some(provider) = self.provider.take() else {
@@ -152,7 +163,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
                 stream_from_evm(
                     provider,
                     &contract_address,
-                    &processor,
+                    reader_addr.clone(),
                     extractor,
                     shutdown,
                     start_block,
@@ -167,10 +178,10 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
 }
 
 #[instrument(name = "evm_event_reader", skip_all)]
-async fn stream_from_evm<P: Provider + Clone>(
+async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: &Address,
-    processor: &Recipient<EnclaveEvmEvent>,
+    reader_addr: Addr<EvmEventReader<P>>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
@@ -210,9 +221,12 @@ async fn stream_from_evm<P: Provider + Clone>(
                 let block_number = log.block_number;
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     trace!("Processing historical log");
-                    processor.do_send(EnclaveEvmEvent::new(event, block_number));
+                    reader_addr.do_send(EnclaveEvmEvent::new(event, block_number));
                 }
             }
+
+            // NEW: tell the reader that we've finished historical logs
+            reader_addr.do_send(HistoricalSyncComplete);
         }
         Err(e) => {
             error!("Failed to fetch historical events: {}", e);
@@ -241,7 +255,7 @@ async fn stream_from_evm<P: Provider + Clone>(
                                 };
 
                                 trace!("Extracted EVM Event: {}", event);
-                                processor.do_send(EnclaveEvmEvent::new(event, block_number));
+                                reader_addr.do_send(EnclaveEvmEvent::new(event, block_number));
                             }
                             None => break, // Stream ended
                         }
@@ -281,6 +295,22 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> 
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+struct HistoricalSyncComplete;
+
+impl<P: Provider + Clone + 'static> Handler<HistoricalSyncComplete> for EvmEventReader<P> {
+    type Result = ();
+
+    fn handle(&mut self, _msg: HistoricalSyncComplete, _ctx: &mut Self::Context) -> Self::Result {
+        self.historical_complete = true;
+        if let Some(coord) = &self.sync_coordinator {
+            coord.reader_finished();
+        }
+        info!("EvmEventReader: historical sync complete for this reader");
+    }
+}
+
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<P> {
     type Result = ();
 
@@ -301,8 +331,18 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
 
             let event_type = wrapped.event.event_type();
 
-            // Forward to the event bus
-            self.bus.do_send(wrapped.event);
+            if !self.historical_complete {
+                if let Some(coord) = &self.sync_coordinator {
+                    // Historical phase with coordinato and buffer for global ordering
+                    coord.buffer_event(wrapped.block, &wrapped.event);
+                } else {
+                    // No coordinator for backwards compatibility / tests, publish immediately
+                    self.bus.do_send(wrapped.event.clone());
+                }
+            } else {
+                // Live phase: publish immediately
+                self.bus.do_send(wrapped.event.clone());
+            }
 
             // Save processed IDs
             trace!("Storing event(EVM) in cache {}({})", event_type, event_id);

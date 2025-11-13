@@ -24,7 +24,7 @@ use e3_evm::{
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, HistoricalEventCoordinator,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -303,6 +303,33 @@ impl CiphernodeBuilder {
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
+        // Count how many EvmEventReaders we'll create (for historical ordering)
+        let mut reader_count = 0;
+        for chain in self
+            .chains
+            .iter()
+            .filter(|chain| chain.enabled.unwrap_or(true))
+        {
+            if self.contract_components.enclave_reader {
+                reader_count += 1;
+            }
+            if self.contract_components.bonding_registry {
+                reader_count += 1;
+            }
+            if self.contract_components.ciphernode_registry {
+                reader_count += 1;
+            }
+        }
+
+        let sync_coordinator = if reader_count > 0 {
+            Some(HistoricalEventCoordinator::new(
+                reader_count,
+                local_bus.clone(),
+            ))
+        } else {
+            None
+        };
+
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
         for chain in self
@@ -323,6 +350,7 @@ impl CiphernodeBuilder {
                     &repositories.enclave_sol_reader(read_provider.chain_id()),
                     chain.contracts.enclave.deploy_block(),
                     chain.rpc_url.clone(),
+                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -336,6 +364,7 @@ impl CiphernodeBuilder {
                     &repositories.enclave_sol_reader(read_provider.chain_id()),
                     chain.contracts.enclave.deploy_block(),
                     chain.rpc_url.clone(),
+                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -349,6 +378,7 @@ impl CiphernodeBuilder {
                     &repositories.bonding_registry_reader(read_provider.chain_id()),
                     chain.contracts.bonding_registry.deploy_block(),
                     chain.rpc_url.clone(),
+                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -362,6 +392,7 @@ impl CiphernodeBuilder {
                     &repositories.ciphernode_registry_reader(read_provider.chain_id()),
                     chain.contracts.ciphernode_registry.deploy_block(),
                     chain.rpc_url.clone(),
+                    sync_coordinator.clone(),
                 )
                 .await?;
 
