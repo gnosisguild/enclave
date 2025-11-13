@@ -34,17 +34,16 @@ impl ZKInputsGenerator {
     ) -> Result<ZKInputsGenerator, JsValue> {
         let plaintext_modulus_u64 = plaintext_modulus as u64;
         let moduli_vec: Vec<u64> = moduli.into_iter().map(|m| m as u64).collect();
-
-        let generator = CoreZKInputsGenerator::new(degree, plaintext_modulus_u64, &moduli_vec)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        // Should we pass an error1_variance here?
+        let generator =
+            CoreZKInputsGenerator::new(degree, plaintext_modulus_u64, &moduli_vec, None);
         Ok(ZKInputsGenerator { generator })
     }
 
     /// Create a new JavaScript CRISP ZK inputs generator with default BFV parameters.
     #[wasm_bindgen(js_name = "withDefaults")]
     pub fn with_defaults() -> Result<ZKInputsGenerator, JsValue> {
-        let generator = CoreZKInputsGenerator::with_defaults()
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let generator = CoreZKInputsGenerator::with_defaults();
         Ok(ZKInputsGenerator { generator })
     }
 
