@@ -14,7 +14,7 @@ cleanup() {
   sleep 1
   
   # Kill any remaining background jobs from this script
-  jobs -p | xargs -r kill -9 2>/dev/null || true
+  jobs -p | xargs kill -9 2>/dev/null || true
   
   # Give processes a moment to terminate
   sleep 1
@@ -29,6 +29,10 @@ trap cleanup INT TERM
 echo "TESTNET SCRIPT STARTING..."
 
 # Read .env
+if [ ! -f .env ]; then
+  echo "Error: .env file not found. Please copy .env.example to .env and configure it."
+  exit 1
+fi
 source .env 
 
 enclave wallet set --name ag --private-key "$PRIVATE_KEY_AG"
@@ -44,15 +48,15 @@ enclave nodes up -v &
 
 sleep 2
 
-CN1=$(cat ./enclave.config.yaml | yq -r '.nodes.cn1.address')
-CN2=$(cat ./enclave.config.yaml | yq -r '.nodes.cn2.address')
-CN3=$(cat ./enclave.config.yaml | yq -r '.nodes.cn3.address')
-CN4=$(cat ./enclave.config.yaml | yq -r '.nodes.cn4.address')
-CN5=$(cat ./enclave.config.yaml | yq -r '.nodes.cn5.address')
+CN1=$(yq -r '.nodes.cn1.address' ./enclave.config.yaml)
+CN2=$(yq -r '.nodes.cn2.address' ./enclave.config.yaml)
+CN3=$(yq -r '.nodes.cn3.address' ./enclave.config.yaml)
+CN4=$(yq -r '.nodes.cn4.address' ./enclave.config.yaml)
+CN5=$(yq -r '.nodes.cn5.address' ./enclave.config.yaml)
 
 echo "Minting tokens" 
 
-# The aggregator is supposed to be the contract owner for testing
+# The aggregator is supposed to be the contract owner for testing
 export PRIVATE_KEY="$PRIVATE_KEY_AG"
 
 pnpm ciphernode:mint:tokens --ciphernode-address "$CN1" --network "sepolia"
@@ -76,7 +80,7 @@ pnpm ciphernode:add:self --network "sepolia"
 
 echo "CIPHERNODES HAVE BEEN ADDED."
 
-wait
+# wait
 
 concurrently -kr \
   --names "PROGRAM SERVER,CRISP SERVER" \
