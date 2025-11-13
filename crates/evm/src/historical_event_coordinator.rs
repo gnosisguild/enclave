@@ -99,7 +99,7 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
                     "Reader completed historical sync"
                 );
 
-                if self.all_readers_complete() {
+                if self.started && self.all_readers_complete() {
                     info!("All readers completed historical sync, flushing buffered events");
                     self.flush_buffered_events();
                 }
