@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader};
+use crate::{
+    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+};
 use actix::{Addr, Recipient};
 use alloy::{
     primitives::{LogData, B256},
