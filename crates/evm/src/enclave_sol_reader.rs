@@ -6,9 +6,8 @@
 
 use crate::event_reader::EvmEventReaderState;
 use crate::helpers::EthProvider;
-use crate::EvmEventReader;
-use crate::HistoricalEventCoordinator;
-use actix::Addr;
+use crate::{EnclaveEvmEvent, EvmEventReader};
+use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
 use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
@@ -17,7 +16,6 @@ use e3_data::Repository;
 use e3_events::{E3id, EnclaveEvent, EventBus};
 use e3_utils::utility_types::ArcBytes;
 use num_bigint::BigUint;
-use std::sync::Arc;
 use tracing::{error, info, trace};
 
 sol!(
@@ -106,13 +104,13 @@ pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<EvmEventReader<P>>>
     where
         P: Provider + Clone + 'static,
@@ -122,10 +120,10 @@ impl EnclaveSolReader {
             extractor,
             contract_address,
             start_block,
+            processor,
             bus,
             repository,
             rpc_url,
-            sync_coordinator,
         )
         .await?;
 

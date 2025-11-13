@@ -4,10 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader,
-    HistoricalEventCoordinator,
-};
+use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, LogData, B256, U256},
@@ -23,7 +20,6 @@ use e3_events::{
     EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
     TicketId,
 };
-use std::sync::Arc;
 use tracing::{error, info, trace};
 
 sol!(
@@ -219,13 +215,13 @@ pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<EvmEventReader<P>>>
     where
         P: Provider + Clone + 'static,
@@ -235,10 +231,10 @@ impl CiphernodeRegistrySolReader {
             extractor,
             contract_address,
             start_block,
+            processor,
             bus,
             repository,
             rpc_url,
-            sync_coordinator,
         )
         .await?;
 
@@ -514,25 +510,25 @@ pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<()>
     where
         P: Provider + Clone + 'static,
     {
         CiphernodeRegistrySolReader::attach(
+            processor,
             bus,
             provider,
             contract_address,
             repository,
             start_block,
             rpc_url,
-            sync_coordinator,
         )
         .await?;
         Ok(())

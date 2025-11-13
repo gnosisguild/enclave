@@ -4,11 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader,
-    HistoricalEventCoordinator,
-};
-use actix::Addr;
+use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader};
+use actix::{Addr, Recipient};
 use alloy::{
     primitives::{LogData, B256},
     providers::Provider,
@@ -18,7 +15,6 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{EnclaveEvent, EventBus};
-use std::sync::Arc;
 use tracing::{error, info, trace};
 
 sol!(
@@ -146,13 +142,13 @@ pub struct BondingRegistrySolReader;
 
 impl BondingRegistrySolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<Addr<EvmEventReader<P>>>
     where
         P: Provider + Clone + 'static,
@@ -162,10 +158,10 @@ impl BondingRegistrySolReader {
             extractor,
             contract_address,
             start_block,
+            processor,
             bus,
             repository,
             rpc_url,
-            sync_coordinator,
         )
         .await?;
 
@@ -180,25 +176,25 @@ pub struct BondingRegistrySol;
 
 impl BondingRegistrySol {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-        sync_coordinator: Option<Arc<HistoricalEventCoordinator>>,
     ) -> Result<()>
     where
         P: Provider + Clone + 'static,
     {
         BondingRegistrySolReader::attach(
+            processor,
             bus,
             provider,
             contract_address,
             repository,
             start_block,
             rpc_url,
-            sync_coordinator,
         )
         .await?;
         Ok(())

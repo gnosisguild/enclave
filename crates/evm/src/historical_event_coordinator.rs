@@ -4,10 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Addr;
+use crate::EnclaveEvmEvent;
+use actix::prelude::*;
 use e3_events::{EnclaveEvent, EventBus};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use tracing::info;
 
 #[derive(Clone)]
@@ -16,64 +15,124 @@ struct BufferedEvent {
     event: EnclaveEvent,
 }
 
+/// Message to start forwarding buffered events after all readers have registered
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct CoordinatorStart;
+
 /// Coordinates historical replay across all EvmEventReaders.
 /// Buffers historical events, then sorts + publishes once all readers finish.
 pub struct HistoricalEventCoordinator {
-    pending_readers: AtomicUsize,
-    events: Mutex<Vec<BufferedEvent>>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    /// Count of readers that have registered
+    registered_count: usize,
+    /// Count of readers that have completed historical sync
+    completed_count: usize,
+    /// Buffered events during historical sync
+    buffered_events: Vec<BufferedEvent>,
+    /// Target to forward events to (typically EventBus)
+    target: Addr<EventBus<EnclaveEvent>>,
+    /// Whether we've started forwarding (after Start message)
+    started: bool,
 }
 
 impl HistoricalEventCoordinator {
-    pub fn new(reader_count: usize, bus: Addr<EventBus<EnclaveEvent>>) -> Arc<Self> {
-        Arc::new(Self {
-            pending_readers: AtomicUsize::new(reader_count),
-            events: Mutex::new(Vec::new()),
-            bus,
-        })
-    }
-
-    pub fn buffer_event(&self, block: Option<u64>, event: &EnclaveEvent) {
-        let Some(block) = block else {
-            // If block is missing, we skip
-            return;
-        };
-
-        let mut guard = self
-            .events
-            .lock()
-            .expect("HistoricalEventCoordinator.events poisoned");
-
-        guard.push(BufferedEvent {
-            block,
-            event: event.clone(),
-        });
-    }
-
-    /// Called once per reader when it has finished fetching historical logs.
-    /// When the last reader calls this, we sort + publish everything.
-    pub fn reader_finished(&self) {
-        let remaining = self.pending_readers.fetch_sub(1, Ordering::SeqCst);
-        if remaining != 1 {
-            return;
+    pub fn new(target: Addr<EventBus<EnclaveEvent>>) -> Self {
+        Self {
+            registered_count: 0,
+            completed_count: 0,
+            buffered_events: Vec::new(),
+            target,
+            started: false,
         }
+    }
 
-        let mut events = self
-            .events
-            .lock()
-            .expect("HistoricalEventCoordinator.events poisoned");
+    pub fn setup(target: Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+        Self::new(target).start()
+    }
 
+    fn all_readers_complete(&self) -> bool {
+        self.registered_count > 0 && self.registered_count == self.completed_count
+    }
+
+    fn flush_buffered_events(&mut self) {
         // Ordering by block number. But we should also consider the tx_index and log_index.
-        events.sort_by_key(|e| e.block);
+        self.buffered_events.sort_by_key(|e| e.block);
 
-        let count = events.len();
-        for BufferedEvent { event, .. } in events.drain(..) {
-            self.bus.do_send(event);
+        let count = self.buffered_events.len();
+        for BufferedEvent { event, .. } in self.buffered_events.drain(..) {
+            self.target.do_send(event);
         }
 
         info!(
             "HistoricalEventCoordinator: replay complete, published {} ordered events",
             count
         );
+    }
+}
+
+impl Actor for HistoricalEventCoordinator {
+    type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        info!("HistoricalEventCoordinator started");
+    }
+}
+
+impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
+    type Result = ();
+
+    fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvmEvent::RegisterReader => {
+                self.registered_count += 1;
+                info!(
+                    total_registered = self.registered_count,
+                    "Reader registered with coordinator"
+                );
+            }
+
+            EnclaveEvmEvent::HistoricalSyncComplete => {
+                self.completed_count += 1;
+                info!(
+                    completed = self.completed_count,
+                    total_registered = self.registered_count,
+                    "Reader completed historical sync"
+                );
+
+                if self.all_readers_complete() {
+                    info!("All readers completed historical sync, flushing buffered events");
+                    self.flush_buffered_events();
+                }
+            }
+
+            EnclaveEvmEvent::Event { event, block } => {
+                if !self.started || !self.all_readers_complete() {
+                    if let Some(block) = block {
+                        self.buffered_events.push(BufferedEvent {
+                            block,
+                            event: event.clone(),
+                        });
+                    }
+                } else {
+                    self.target.do_send(event);
+                }
+            }
+        }
+    }
+}
+
+impl Handler<CoordinatorStart> for HistoricalEventCoordinator {
+    type Result = ();
+
+    fn handle(&mut self, _msg: CoordinatorStart, _ctx: &mut Self::Context) -> Self::Result {
+        info!(
+            registered_readers = self.registered_count,
+            "Starting HistoricalEventCoordinator"
+        );
+        self.started = true;
+
+        if self.all_readers_complete() {
+            self.flush_buffered_events();
+        }
     }
 }

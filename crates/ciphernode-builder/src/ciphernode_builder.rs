@@ -23,8 +23,9 @@ use e3_evm::{
         ProviderConfig,
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, HistoricalEventCoordinator,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
+    EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
+    HistoricalEventCoordinator,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -303,36 +304,9 @@ impl CiphernodeBuilder {
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
-        // Count how many EvmEventReaders we'll create (for historical ordering)
-        // this is used to create a single shared coordinator for all readers
-        let mut reader_count = 0;
-        for _ in self
-            .chains
-            .iter()
-            .filter(|chain| chain.enabled.unwrap_or(true))
-        {
-            if self.contract_components.enclave {
-                reader_count += 1;
-            }
-            if self.contract_components.enclave_reader {
-                reader_count += 1;
-            }
-            if self.contract_components.bonding_registry {
-                reader_count += 1;
-            }
-            if self.contract_components.ciphernode_registry {
-                reader_count += 1;
-            }
-        }
-
-        let sync_coordinator = if reader_count > 0 {
-            Some(HistoricalEventCoordinator::new(
-                reader_count,
-                local_bus.clone(),
-            ))
-        } else {
-            None
-        };
+        // Setup coordinator for event ordering
+        let coordinator = HistoricalEventCoordinator::setup(local_bus.clone());
+        let processor = coordinator.clone().recipient();
 
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
@@ -347,6 +321,7 @@ impl CiphernodeBuilder {
                     .ensure_write_provider(&repositories, chain, cipher)
                     .await?;
                 EnclaveSol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     write_provider.clone(),
@@ -354,7 +329,6 @@ impl CiphernodeBuilder {
                     &repositories.enclave_sol_reader(read_provider.chain_id()),
                     chain.contracts.enclave.deploy_block(),
                     chain.rpc_url.clone(),
-                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -362,13 +336,13 @@ impl CiphernodeBuilder {
             if self.contract_components.enclave_reader {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 EnclaveSolReader::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.enclave.address(),
                     &repositories.enclave_sol_reader(read_provider.chain_id()),
                     chain.contracts.enclave.deploy_block(),
                     chain.rpc_url.clone(),
-                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -376,13 +350,13 @@ impl CiphernodeBuilder {
             if self.contract_components.bonding_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 BondingRegistrySol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.bonding_registry.address(),
                     &repositories.bonding_registry_reader(read_provider.chain_id()),
                     chain.contracts.bonding_registry.deploy_block(),
                     chain.rpc_url.clone(),
-                    sync_coordinator.clone(),
                 )
                 .await?;
             }
@@ -390,13 +364,13 @@ impl CiphernodeBuilder {
             if self.contract_components.ciphernode_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 CiphernodeRegistrySol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.ciphernode_registry.address(),
                     &repositories.ciphernode_registry_reader(read_provider.chain_id()),
                     chain.contracts.ciphernode_registry.deploy_block(),
                     chain.rpc_url.clone(),
-                    sync_coordinator.clone(),
                 )
                 .await?;
 
@@ -405,7 +379,7 @@ impl CiphernodeBuilder {
                     .await
                 {
                     Ok(write_provider) => {
-                        let writer = CiphernodeRegistrySol::attach_writer(
+                        let _writer = CiphernodeRegistrySol::attach_writer(
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
@@ -426,6 +400,9 @@ impl CiphernodeBuilder {
                 }
             }
         }
+
+        // We start after all readers have registered
+        coordinator.do_send(CoordinatorStart);
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&local_bus, store.clone());
