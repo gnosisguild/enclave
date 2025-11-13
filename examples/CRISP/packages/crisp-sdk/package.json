@@ -20,10 +20,9 @@
   },
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
-    "build:wasm": "pnpm -C ../../ build:wasm",
-    "compile:circuit": "pnpm -C ../../ compile:circuit",
-    "build": "pnpm compile:circuit && pnpm build:wasm && tsup",
-    "test": "pnpm compile:circuit && vitest --run",
+    "build:wasm": "pnpm -C ../crisp-zk-inputs build",
+    "build": "pnpm build:wasm && tsup",
+    "test": "pnpm build:wasm && vitest --run",
     "prettier:fix": "pnpm prettier --write .",
     "prettier:check": "pnpm prettier --check .",
     "release": "pnpm build && pnpm publish --access public"
