@@ -163,7 +163,7 @@ export function areArraysEqual<T>(arr1: T[], arr2: T[]): boolean {
 }
 
 /**
- * The function to update the encalve.config.yaml file with the deployed contract addresses
+ * The function to update the enclave.config.yaml file with the deployed contract addresses
  * @param chainToConfig - The chain name to update in the config
  * @param pathToConfigFile - The path to the enclave.config.yaml file
  * @param contractMapping - A mapping of contract names to config keys
