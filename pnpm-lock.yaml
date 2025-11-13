@@ -45,6 +45,9 @@ importers:
       replace-in-file:
         specifier: ^7.2.0
         version: 7.2.0
+      wasm-pack:
+        specifier: ^0.13.1
+        version: 0.13.1
 
   docs:
     dependencies:
@@ -388,6 +391,9 @@ importers:
       replace-in-file:
         specifier: ^7.2.0
         version: 7.2.0
+      wasm-pack:
+        specifier: ^0.13.1
+        version: 0.13.1
 
   packages/enclave-config:
     dependencies:
