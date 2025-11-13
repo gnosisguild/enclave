@@ -296,6 +296,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_replace_in_place() -> Result<()> {
         // Create an in-memory filesystem
         let fs = Fs::mem();
@@ -320,6 +321,65 @@ mod tests {
         // Verify the replacements were made
         let expected_content = "server_url=production.example.com:443\napi_version=v1\nserver_url=production.example.com:443";
         assert_eq!(modified_content, expected_content);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_replace_in_place_table() -> Result<()> {
+        // Define test cases as a table
+        struct TestCase {
+            name: &'static str,
+            original_content: &'static str,
+            pattern: &'static str,
+            replacement: &'static str,
+            expected_content: &'static str,
+        }
+
+        let test_cases = vec![
+        TestCase {
+            name: "replace server_url values",
+            original_content: "server_url=localhost:8080\napi_version=v1\nserver_url=example.com:9090",
+            pattern: r"server_url=([^\n]+)",
+            replacement: "server_url=production.example.com:443",
+            expected_content: "server_url=production.example.com:443\napi_version=v1\nserver_url=production.example.com:443",
+        },
+        TestCase {
+            name: "replace e3-compute-provider line",
+            original_content: "[dependencies]\nsome-crate = \"1.0\"\ne3-compute-provider = { git = \"https://github.com/example/repo\" }\nother-crate = \"2.0\"",
+            pattern: r"(?m)^e3-compute-provider = \{ git =.*\n?",
+            replacement: "YO LATER DUDE!\n",
+            expected_content: "[dependencies]\nsome-crate = \"1.0\"\nYO LATER DUDE!\nother-crate = \"2.0\"",
+        },
+    ];
+
+        // Run each test case
+        for test_case in test_cases {
+            // Create an in-memory filesystem for each test
+            let fs = Fs::mem();
+            let test_path = format!("{}.txt", test_case.name.replace(" ", "_"));
+
+            // Write the original content
+            fs.write_to_file(&test_path, test_case.original_content)
+                .await?;
+
+            // Create the regex pattern
+            let pattern = Regex::new(test_case.pattern)?;
+
+            // Apply the replacement
+            fs.replace_in_place(&pattern, test_case.replacement, &test_path)
+                .await?;
+
+            // Read the modified content
+            let modified_content = fs.read_to_string(&test_path).await?;
+
+            // Verify the replacement was made
+            assert_eq!(
+                modified_content, test_case.expected_content,
+                "Test case '{}' failed",
+                test_case.name
+            );
+        }
 
         Ok(())
     }

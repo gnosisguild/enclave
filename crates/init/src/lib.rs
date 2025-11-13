@@ -118,9 +118,19 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                         &format!(r#""@enclave-e3/sdk": "{}""#, sdk_version),
                     ),
                     Filter::new(
-                        "./Cargo.toml",
-                        r#"e3-compute-provider = { git"#,
-                        &format!("YO LATER DUDE {}", commit_hash),
+                        "**/Cargo.toml",
+                        r"(?m)^e3-program-server  = \{ git =.*\n?",
+                        &format!("e3-program-server = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
+                    ),
+                    Filter::new(
+                       "**/Cargo.toml",
+                       r"(?m)^e3-bfv-helpers = \{ git =.*\n?",
+                       &format!("e3-bfv-helpers = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
+                    ),
+                    Filter::new(
+                       "**/Cargo.toml",
+                       r"(?m)^e3-compute-provider = \{ git =.*\n?",
+                       &format!("e3-compute-provider = {{ git = \"https://github.com/gnosisguild/enclave\", rev = \"{}\" }}\n",commit_hash),
                     ),
                 ],
             )
