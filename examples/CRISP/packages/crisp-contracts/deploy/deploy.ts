@@ -37,7 +37,6 @@ export const deploy = async () => {
     await deployCRISPContracts();
 
     // this expects you to run it from CRISP's root
-    console.log("path:", path.join(__dirname, "..", "..", "..", "enclave.config.yaml"));
     updateE3Config(chain, path.join(__dirname, "..", "..", "..", "enclave.config.yaml"), contractMapping);
 }
 
