@@ -5,13 +5,33 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { defineConfig } from 'tsup'
+import { baseConfig } from '@enclave-e3/config/tsup'
 
-export default defineConfig({
-  entry: ['src/index.ts'],
-  include: ['src/**/*.ts'],
-  splitting: false,
-  sourcemap: true,
-  clean: true,
-  format: ['esm'],
-  dts: true,
-})
+export default defineConfig([
+  {
+    ...baseConfig,
+    include: ['./src/**/*.ts'],
+    format: ['esm'],
+    outExtension: () => ({
+      js: '.js',
+    }),
+    esbuildOptions: (options) => {
+      options.alias = {
+        '@crisp-e3/zk-inputs/init': '../crisp-zk-inputs/init_node.js',
+      }
+    },
+  },
+  {
+    ...baseConfig,
+    include: ['./src/**/*.ts'],
+    format: ['cjs'],
+    outExtension: () => ({
+      js: '.cjs',
+    }),
+    esbuildOptions: (options) => {
+      options.alias = {
+        '@crisp-e3/zk-inputs/init': '../crisp-zk-inputs/init_node.cjs',
+      }
+    },
+  },
+])

@@ -342,6 +342,9 @@ importers:
       '@crisp-e3/zk-inputs':
         specifier: workspace:*
         version: link:../crisp-zk-inputs
+      '@enclave-e3/config':
+        specifier: workspace:*
+        version: link:../../../../packages/enclave-config
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.9
         version: 1.0.0-beta.9

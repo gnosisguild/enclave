@@ -9,15 +9,17 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     }
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
     "build:wasm": "pnpm -C ../crisp-zk-inputs build",
@@ -45,6 +47,7 @@
     "@aztec/bb.js": "0.87.0",
     "@crisp-e3/zk-inputs": "workspace:*",
     "@noir-lang/noir_js": "1.0.0-beta.9",
+    "@enclave-e3/config": "workspace:*",
     "@zk-kit/lean-imt": "^2.2.4",
     "poseidon-lite": "^0.3.0",
     "viem": "2.30.6"
