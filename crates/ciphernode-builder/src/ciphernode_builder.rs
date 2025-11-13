@@ -304,12 +304,16 @@ impl CiphernodeBuilder {
         let cipher = &self.cipher;
 
         // Count how many EvmEventReaders we'll create (for historical ordering)
+        // this is used to create a single shared coordinator for all readers
         let mut reader_count = 0;
-        for chain in self
+        for _ in self
             .chains
             .iter()
             .filter(|chain| chain.enabled.unwrap_or(true))
         {
+            if self.contract_components.enclave {
+                reader_count += 1;
+            }
             if self.contract_components.enclave_reader {
                 reader_count += 1;
             }

@@ -33,10 +33,9 @@ impl HistoricalEventCoordinator {
         })
     }
 
-    /// Called by readers while still in "historical" phase.
     pub fn buffer_event(&self, block: Option<u64>, event: &EnclaveEvent) {
         let Some(block) = block else {
-            // If block is missing, treat as 0 or skip – here we skip to avoid weird ordering.
+            // If block is missing, we skip
             return;
         };
 
@@ -55,8 +54,6 @@ impl HistoricalEventCoordinator {
     /// When the last reader calls this, we sort + publish everything.
     pub fn reader_finished(&self) {
         let remaining = self.pending_readers.fetch_sub(1, Ordering::SeqCst);
-
-        // `remaining` is the *old* value. When it hits 1 -> this call makes it 0.
         if remaining != 1 {
             return;
         }
