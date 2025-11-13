@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
-use actix::Addr;
+use crate::{
+    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+};
+use actix::{Addr, Recipient};
 use alloy::{
     primitives::{LogData, B256},
     providers::Provider,
@@ -142,6 +144,7 @@ pub struct BondingRegistrySolReader;
 
 impl BondingRegistrySolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
@@ -157,7 +160,8 @@ impl BondingRegistrySolReader {
             extractor,
             contract_address,
             start_block,
-            &bus.clone().into(),
+            processor,
+            bus,
             repository,
             rpc_url,
         )
@@ -174,6 +178,7 @@ pub struct BondingRegistrySol;
 
 impl BondingRegistrySol {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
@@ -185,6 +190,7 @@ impl BondingRegistrySol {
         P: Provider + Clone + 'static,
     {
         BondingRegistrySolReader::attach(
+            processor,
             bus,
             provider,
             contract_address,

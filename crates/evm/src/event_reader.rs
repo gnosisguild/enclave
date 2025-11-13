@@ -23,14 +23,21 @@ use tracing::{error, info, instrument, trace, warn};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
-pub struct EnclaveEvmEvent {
-    pub event: EnclaveEvent,
-    pub block: Option<u64>,
+pub enum EnclaveEvmEvent {
+    /// Register a reader with the coordinator before it starts processing
+    RegisterReader,
+    /// Signal that this reader has completed historical sync
+    HistoricalSyncComplete,
+    /// An actual event from the blockchain
+    Event {
+        event: EnclaveEvent,
+        block: Option<u64>,
+    },
 }
 
 impl EnclaveEvmEvent {
     pub fn new(event: EnclaveEvent, block: Option<u64>) -> Self {
-        Self { event, block }
+        Self::Event { event, block }
     }
 
     pub fn get_id(&self) -> EventId {
@@ -45,6 +52,7 @@ pub struct EvmEventReaderParams<P> {
     extractor: ExtractorFn<EnclaveEvent>,
     contract_address: Address,
     start_block: Option<u64>,
+    processor: Recipient<EnclaveEvmEvent>,
     bus: Addr<EventBus<EnclaveEvent>>,
     state: Persistable<EvmEventReaderState>,
     rpc_url: String,
@@ -71,7 +79,9 @@ pub struct EvmEventReader<P> {
     shutdown_tx: Option<oneshot::Sender<()>>,
     /// The block that processing should start from
     start_block: Option<u64>,
-    /// Event bus for error propagation
+    /// Processor to forward events an actor
+    processor: Recipient<EnclaveEvmEvent>,
+    /// Event bus for error propagation only
     bus: Addr<EventBus<EnclaveEvent>>,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
@@ -89,6 +99,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
             start_block: params.start_block,
+            processor: params.processor,
             bus: params.bus,
             state: params.state,
             rpc_url: params.rpc_url,
@@ -100,6 +111,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
         start_block: Option<u64>,
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         repository: &Repository<EvmEventReaderState>,
         rpc_url: String,
@@ -114,12 +126,16 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
             extractor,
             contract_address: contract_address.parse()?,
             start_block,
+            processor: processor.clone(),
             bus: bus.clone(),
             state: sync_state,
             rpc_url,
         };
 
         let addr = EvmEventReader::new(params).start();
+
+        processor.do_send(EnclaveEvmEvent::RegisterReader);
+
         bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
         Ok(addr)
     }
@@ -129,7 +145,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let processor = ctx.address().recipient();
+        let reader_addr = ctx.address();
         let bus = self.bus.clone();
 
         let Some(provider) = self.provider.take() else {
@@ -152,7 +168,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
                 stream_from_evm(
                     provider,
                     &contract_address,
-                    &processor,
+                    reader_addr.clone(),
                     extractor,
                     shutdown,
                     start_block,
@@ -167,10 +183,10 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
 }
 
 #[instrument(name = "evm_event_reader", skip_all)]
-async fn stream_from_evm<P: Provider + Clone>(
+async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: &Address,
-    processor: &Recipient<EnclaveEvmEvent>,
+    reader_addr: Addr<EvmEventReader<P>>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
@@ -210,9 +226,11 @@ async fn stream_from_evm<P: Provider + Clone>(
                 let block_number = log.block_number;
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     trace!("Processing historical log");
-                    processor.do_send(EnclaveEvmEvent::new(event, block_number));
+                    reader_addr.do_send(EnclaveEvmEvent::new(event, block_number));
                 }
             }
+
+            reader_addr.do_send(EnclaveEvmEvent::HistoricalSyncComplete);
         }
         Err(e) => {
             error!("Failed to fetch historical events: {}", e);
@@ -241,7 +259,7 @@ async fn stream_from_evm<P: Provider + Clone>(
                                 };
 
                                 trace!("Extracted EVM Event: {}", event);
-                                processor.do_send(EnclaveEvmEvent::new(event, block_number));
+                                reader_addr.do_send(EnclaveEvmEvent::new(event, block_number));
                             }
                             None => break, // Stream ended
                         }
@@ -285,34 +303,49 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
     type Result = ();
 
     #[instrument(name = "evm_event_reader", skip_all)]
-    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        match self.state.try_mutate(|mut state| {
-            let event_id = wrapped.get_id();
-            trace!("Processing event: {}", event_id);
-            trace!("Cache length: {}", state.ids.len());
-
-            if state.ids.contains(&event_id) {
-                warn!(
-                    "Event id {} has already been seen and was not forwarded to the bus",
-                    &event_id
-                );
-                return Ok(state);
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvmEvent::RegisterReader | EnclaveEvmEvent::HistoricalSyncComplete => {
+                self.processor.do_send(msg);
             }
 
-            let event_type = wrapped.event.event_type();
+            EnclaveEvmEvent::Event { event, block } => {
+                match self.state.try_mutate(|mut state| {
+                    let temp_wrapped = EnclaveEvmEvent::Event {
+                        event: event.clone(),
+                        block,
+                    };
+                    let event_id = temp_wrapped.get_id();
 
-            // Forward to the event bus
-            self.bus.do_send(wrapped.event);
+                    trace!("Processing event: {}", event_id);
+                    trace!("Cache length: {}", state.ids.len());
 
-            // Save processed IDs
-            trace!("Storing event(EVM) in cache {}({})", event_type, event_id);
-            state.ids.insert(event_id);
-            state.last_block = wrapped.block;
+                    if state.ids.contains(&event_id) {
+                        warn!(
+                            "Event id {} has already been seen and was not forwarded",
+                            &event_id
+                        );
+                        return Ok(state);
+                    }
 
-            Ok(state)
-        }) {
-            Ok(_) => (),
-            Err(err) => self.bus.err(EnclaveErrorType::Evm, err),
+                    let event_type = event.event_type();
+
+                    self.processor.do_send(EnclaveEvmEvent::Event {
+                        event: event.clone(),
+                        block,
+                    });
+
+                    // Save processed IDs
+                    trace!("Storing event(EVM) in cache {}({})", event_type, event_id);
+                    state.ids.insert(event_id);
+                    state.last_block = block;
+
+                    Ok(state)
+                }) {
+                    Ok(_) => (),
+                    Err(err) => self.bus.err(EnclaveErrorType::Evm, err),
+                }
+            }
         }
     }
 }

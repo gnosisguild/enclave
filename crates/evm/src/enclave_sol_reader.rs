@@ -6,8 +6,8 @@
 
 use crate::event_reader::EvmEventReaderState;
 use crate::helpers::EthProvider;
-use crate::EvmEventReader;
-use actix::Addr;
+use crate::{EnclaveEvmEvent, EvmEventReader};
+use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
 use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
@@ -104,6 +104,7 @@ pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
@@ -119,7 +120,8 @@ impl EnclaveSolReader {
             extractor,
             contract_address,
             start_block,
-            &bus.clone(),
+            processor,
+            bus,
             repository,
             rpc_url,
         )

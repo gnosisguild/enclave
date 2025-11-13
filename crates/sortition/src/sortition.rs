@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
 use tracing::instrument;
+use tracing::warn;
 
 /// State for a single ciphernode
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -64,6 +65,7 @@ impl NodeStateStore {
     /// 7. Return the available tickets
     pub fn available_tickets(&self, address: &str) -> u64 {
         if self.ticket_price.is_zero() {
+            warn!("Ticket price is zero, returning 0 tickets, Please make sure this is the correct behavior");
             return 0;
         }
 
@@ -346,14 +348,18 @@ impl Handler<OperatorActivationChanged> for Sortition {
         if let Err(err) = self.node_state.try_mutate(|mut state_map| {
             // Update all entries for this operator across all chains
             for (_, chain_state) in state_map.iter_mut() {
-                if let Some(node) = chain_state.nodes.get_mut(&msg.operator) {
-                    node.active = msg.active;
-                    info!(
-                        operator = %msg.operator,
-                        active = msg.active,
-                        "Updated operator active status"
-                    );
-                }
+                let node = chain_state
+                    .nodes
+                    .entry(msg.operator.clone())
+                    .or_insert_with(NodeState::default);
+
+                node.active = msg.active;
+
+                info!(
+                    operator = %msg.operator,
+                    active = msg.active,
+                    "Updated operator active status"
+                );
             }
             Ok(state_map)
         }) {

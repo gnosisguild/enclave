@@ -6,9 +6,9 @@
 
 use crate::{
     enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
-    event_reader::EvmEventReaderState, helpers::EthProvider,
+    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent,
 };
-use actix::Addr;
+use actix::{Addr, Recipient};
 use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
@@ -18,6 +18,7 @@ pub struct EnclaveSol;
 
 impl EnclaveSol {
     pub async fn attach<R, W>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         read_provider: EthProvider<R>,
         write_provider: EthProvider<W>,
@@ -31,6 +32,7 @@ impl EnclaveSol {
         W: Provider + WalletProvider + Clone + 'static,
     {
         EnclaveSolReader::attach(
+            processor,
             bus,
             read_provider,
             contract_address,

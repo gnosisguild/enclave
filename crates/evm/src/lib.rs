@@ -11,6 +11,7 @@ mod enclave_sol_reader;
 mod enclave_sol_writer;
 mod event_reader;
 pub mod helpers;
+mod historical_event_coordinator;
 mod repo;
 
 pub use bonding_registry_sol::{BondingRegistrySol, BondingRegistrySolReader};
@@ -21,4 +22,5 @@ pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
 pub use event_reader::{EnclaveEvmEvent, EvmEventReader, EvmEventReaderState, ExtractorFn};
+pub use historical_event_coordinator::{CoordinatorStart, HistoricalEventCoordinator};
 pub use repo::*;
