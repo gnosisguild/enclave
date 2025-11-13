@@ -123,7 +123,7 @@ importers:
     dependencies:
       '@crisp-e3/sdk':
         specifier: 0.2.3-test
-        version: 0.2.3-test(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)
+        version: link:../packages/crisp-sdk
       '@emotion/babel-plugin':
         specifier: ^11.11.0
         version: 11.13.5
@@ -1471,12 +1471,6 @@ packages:
         optional: true
       conventional-commits-parser:
         optional: true
-
-  '@crisp-e3/sdk@0.2.3-test':
-    resolution: {integrity: sha512-lWvyDiRiIxCjFWAdlgDHBKBcAZYt5IpjwhbNJAEOxQj8xiJv7LjGnNdE39WydBIth1F8mhd5DBER6w36OAIZ5A==}
-
-  '@crisp-e3/zk-inputs@0.2.3-test':
-    resolution: {integrity: sha512-LHaP5csVjI/pv8uI5Xi8SYWu2ifB5iYbttD6EvGcwv08w7NRPF2c7k1iUjIBcw4Jmsjeh4c8EwasM6YL5mWVzA==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -10934,23 +10928,6 @@ snapshots:
     optionalDependencies:
       conventional-commits-filter: 5.0.0
       conventional-commits-parser: 6.2.1
-
-  '@crisp-e3/sdk@0.2.3-test(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)':
-    dependencies:
-      '@aztec/bb.js': 0.82.2
-      '@crisp-e3/zk-inputs': 0.2.3-test
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      '@zk-kit/lean-imt': 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      poseidon-lite: 0.3.0
-      viem: 2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12)
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - typescript
-      - utf-8-validate
-      - zod
-
-  '@crisp-e3/zk-inputs@0.2.3-test': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
