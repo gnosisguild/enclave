@@ -136,7 +136,7 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-    use zk_inputs::DEFAULT_DEGREE;
+    const DEFAULT_DEGREE: usize = 512;
 
     wasm_bindgen_test_configure!(run_in_browser);
 

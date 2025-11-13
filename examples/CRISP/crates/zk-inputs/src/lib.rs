@@ -28,11 +28,6 @@ use crate::ciphertext_addition::CiphertextAdditionInputs;
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
 
-// Default BFV parameters constants for testing purposes.
-pub const DEFAULT_DEGREE: usize = 2048;
-pub const DEFAULT_PLAINTEXT_MODULUS: u64 = 1032193;
-pub const DEFAULT_MODULI: [u64; 1] = [0x3FFFFFFF000001];
-
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
 }
@@ -172,6 +167,8 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
 
+    const DEFAULT_DEGREE: usize = 512;
+
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
         (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect()
@@ -245,7 +242,12 @@ mod tests {
 
     #[test]
     fn test_get_bfv_params() {
-        let generator = ZKInputsGenerator::with_defaults();
+        let generator = ZKInputsGenerator::from_set(BfvParamSet {
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: &[0x3FFFFFFF000001],
+            error1_variance: None,
+        });
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == 2048);
@@ -315,17 +317,6 @@ mod tests {
         // Test vote = 1.
         let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_1.is_ok());
-    }
-
-    #[test]
-    fn test_bfv_params_consistency() {
-        let generator = ZKInputsGenerator::with_defaults();
-        let bfv_params = generator.get_bfv_params();
-
-        // Verify default parameters.
-        assert_eq!(bfv_params.degree(), 2048);
-        assert_eq!(bfv_params.plaintext(), 1032193);
-        assert_eq!(bfv_params.moduli(), &[0x3FFFFFFF000001]);
     }
 
     #[test]
