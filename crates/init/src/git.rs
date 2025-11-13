@@ -135,6 +135,28 @@ pub async fn add_submodule(
     Ok(())
 }
 
+pub async fn get_commit_hash(path: impl AsRef<Path>) -> Result<String> {
+    let path = path.as_ref();
+
+    let output = Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .current_dir(path)
+        .output()
+        .await
+        .with_context(|| format!("Failed to get commit hash in directory: {}", path.display()))?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Git rev-parse failed with exit code: {}",
+            output.status.code().unwrap_or(-1)
+        ));
+    }
+
+    let hash = String::from_utf8(output.stdout)?.trim().to_string();
+
+    Ok(hash)
+}
+
 #[derive(Debug)]
 pub struct GitReference {
     pub base_url: String,
