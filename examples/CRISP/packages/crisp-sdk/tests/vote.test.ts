@@ -19,7 +19,7 @@ import {
   verifyProof,
 } from '../src/vote'
 import { BFVParams, VotingMode } from '../src/types'
-import { DEFAULT_BFV_PARAMS, generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE } from '../src'
+import { generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE } from '../src'
 
 import { LEAVES, merkleProof, MESSAGE, SIGNATURE, testAddress, VOTE, votingPowerLeaf } from './constants'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -29,6 +29,8 @@ describe('Vote', () => {
   const votingPower = 10n
 
   let zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  const DEFAULT_BFV_PARAMS = zkInputsGenerator.getBFVParams() as BFVParams
+
   let publicKey = zkInputsGenerator.generatePublicKey()
   const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
 
@@ -36,20 +38,6 @@ describe('Vote', () => {
     it('should work for valid votes', () => {
       const encoded = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       expect(encoded.length).toBe(DEFAULT_BFV_PARAMS.degree)
-    })
-    it('should work with small moduli', () => {
-      const params: BFVParams = {
-        degree: 10,
-        // Irrelevant for this test.
-        plaintextModulus: 0n,
-        moduli: new BigInt64Array([0n]),
-      }
-      const encoded = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower, params)
-      expect(encoded.length).toBe(params.degree)
-
-      // 01010 = 10
-      // 00000 = 0
-      expect(encoded).toEqual(['0', '1', '0', '1', '0', '0', '0', '0', '0', '0'])
     })
   })
 
@@ -223,14 +211,7 @@ describe('Vote', () => {
 
   describe('generateMaskVote', () => {
     it('should generate a mask vote and the right circuit inputs', async () => {
-      const crispInputs = await generateMaskVote(
-        publicKey,
-        previousCiphertext,
-        DEFAULT_BFV_PARAMS,
-        merkleProof.proof.root,
-        testAddress,
-        false,
-      )
+      const crispInputs = await generateMaskVote(publicKey, previousCiphertext, merkleProof.proof.root, testAddress, false)
 
       expect(crispInputs.prev_ct0is).toBeInstanceOf(Array)
       expect(crispInputs.prev_ct1is).toBeInstanceOf(Array)
@@ -290,15 +271,11 @@ describe('Vote', () => {
 
     it('should generate a proof for a masking user and verify it', { timeout: 180000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
-        DEFAULT_BFV_PARAMS.degree,
-        DEFAULT_BFV_PARAMS.plaintextModulus,
-        DEFAULT_BFV_PARAMS.moduli,
-      )
+      const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
       const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
 
-      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, merkleProof.proof.root, testAddress, false)
 
       const proof = await generateProof(maskVote)
       const isValid = await verifyProof(proof)
@@ -308,15 +285,11 @@ describe('Vote', () => {
 
     it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 180000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
-        DEFAULT_BFV_PARAMS.degree,
-        DEFAULT_BFV_PARAMS.plaintextModulus,
-        DEFAULT_BFV_PARAMS.moduli,
-      )
+      const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
       const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
 
-      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, true)
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, merkleProof.proof.root, testAddress, true)
 
       const { returnValue } = await generateProofWithReturnValue(maskVote)
 
@@ -326,15 +299,11 @@ describe('Vote', () => {
 
     it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 180000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
-      const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
-        DEFAULT_BFV_PARAMS.degree,
-        DEFAULT_BFV_PARAMS.plaintextModulus,
-        DEFAULT_BFV_PARAMS.moduli,
-      )
+      const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
       const encryptedVote = zkInputsGenerator.encryptVote(publicKey, vote)
 
-      let maskVote = await generateMaskVote(publicKey, encryptedVote, DEFAULT_BFV_PARAMS, merkleProof.proof.root, testAddress, false)
+      let maskVote = await generateMaskVote(publicKey, encryptedVote, merkleProof.proof.root, testAddress, false)
 
       const { returnValue } = await generateProofWithReturnValue(maskVote)
 
