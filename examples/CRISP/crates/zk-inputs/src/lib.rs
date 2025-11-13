@@ -202,7 +202,6 @@ mod tests {
             moduli: &[0x3FFFFFFF000001],
             error1_variance: None,
         });
-        panic!("am I running?");
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
