@@ -26,8 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "compile:circuit": "pnpm -C ../../ compile:circuit",
-    "build": "rm -rf dist && pnpm compile:circuit && node scripts/build.js"
+    "build": "rm -rf dist && node scripts/build.js"
   },
   "devDependencies": {
     "execa": "^8.0.1",
