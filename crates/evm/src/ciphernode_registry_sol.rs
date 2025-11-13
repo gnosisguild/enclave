@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
+use crate::{
+    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, LogData, B256, U256},
@@ -215,6 +217,7 @@ pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
@@ -230,7 +233,8 @@ impl CiphernodeRegistrySolReader {
             extractor,
             contract_address,
             start_block,
-            &bus.clone().into(),
+            processor,
+            bus,
             repository,
             rpc_url,
         )
@@ -508,6 +512,7 @@ pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
     pub async fn attach<P>(
+        processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
@@ -519,6 +524,7 @@ impl CiphernodeRegistrySol {
         P: Provider + Clone + 'static,
     {
         CiphernodeRegistrySolReader::attach(
+            processor,
             bus,
             provider,
             contract_address,
