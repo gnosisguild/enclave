@@ -24,7 +24,7 @@ use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{fs, sync::Arc};
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
@@ -69,10 +69,29 @@ async fn setup_score_sortition_environment(
     Ok(())
 }
 
+fn serialize_report(report: &[(&str, Duration)]) -> String {
+    let max_key_len = report.iter().map(|(k, _)| k.len()).max().unwrap_or(0);
+
+    report
+        .iter()
+        .map(|(key, duration)| {
+            format!(
+                "{:width$}: {:.3}s",
+                key,
+                duration.as_secs_f64(),
+                width = max_key_len
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv_actor() -> Result<()> {
+    let mut report: Vec<(&str, Duration)> = vec![];
+    let whole_test = Instant::now();
     use tracing_subscriber::{fmt, EnvFilter};
 
     let subscriber = fmt()
@@ -95,6 +114,8 @@ async fn test_trbfv_actor() -> Result<()> {
     //   - 7 nodes (so as to check for some nodes not getting selected)
     //   - Loopback libp2p simulation
     ///////////////////////////////////////////////////////////////////////////////////
+
+    let setup = Instant::now();
 
     // Create rng
     let rng = create_shared_rng_from_u64(42);
@@ -136,15 +157,13 @@ async fn test_trbfv_actor() -> Result<()> {
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
 
     // Actor system setup
-    let concurrent_jobs = 2;
+    let concurrent_jobs = 1; // Seems like you cannot send more than one job at a time to rayon
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let multithread = Multithread::attach(
         rng.clone(),
         cipher.clone(),
-        // max_threadroom,
-        1,
-        // concurrent_jobs,
-        1,
+        max_threadroom,
+        concurrent_jobs,
         true,
     );
 
@@ -183,12 +202,16 @@ async fn test_trbfv_actor() -> Result<()> {
         .build()
         .await?;
 
+    report.push(("Setup", setup.elapsed()));
+
+    let committee_setup = Instant::now();
     let chain_id = 1u64;
     let eth_addrs: Vec<String> = nodes.iter().map(|n| n.address()).collect();
     setup_score_sortition_environment(&bus, &eth_addrs, chain_id).await?;
 
     // Flush all events
     nodes.flush_all_history(100).await?;
+    report.push(("Committee Setup", committee_setup.elapsed()));
 
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
@@ -200,7 +223,7 @@ async fn test_trbfv_actor() -> Result<()> {
     ///////////////////////////////////////////////////////////////////////////////////
 
     // Prepare round
-
+    let e3_requested_timer = Instant::now();
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
@@ -245,14 +268,34 @@ async fn test_trbfv_actor() -> Result<()> {
     }))
     .await?;
 
+    let committee_finalized_timer = Instant::now();
+
+    let expected = vec!["E3Requested", "CommitteeFinalized"];
+
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+
+    report.push((
+        "Committee Finalization",
+        committee_finalized_timer.elapsed(),
+    ));
+
+    let shares_timer = Instant::now();
     let expected = vec![
-        "E3Requested",
-        "CommitteeFinalized",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
+    ];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+    report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
+
+    let shares_to_pubkey_agg_timer = Instant::now();
+    let expected = vec![
         "KeyshareCreated",
         "KeyshareCreated",
         "KeyshareCreated",
@@ -260,11 +303,19 @@ async fn test_trbfv_actor() -> Result<()> {
         "KeyshareCreated",
         "PublicKeyAggregated",
     ];
-
     let h = nodes
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
+    report.push((
+        "ThresholdShares -> PublicKeyAggregated",
+        shares_to_pubkey_agg_timer.elapsed(),
+    ));
 
+    report.push((
+        "E3Request -> PublicKeyAggregated",
+        e3_requested_timer.elapsed(),
+    ));
+    let app_gen_timer = Instant::now();
     assert_eq!(h.event_types(), expected);
     // Aggregate decryption
 
@@ -292,11 +343,15 @@ async fn test_trbfv_actor() -> Result<()> {
         num_voters,
         num_votes_per_voter,
     );
+    report.push(("Application CT Gen", app_gen_timer.elapsed()));
 
+    let running_app_timer = Instant::now();
     println!("Running application to generate outputs...");
     let outputs =
         e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
+    report.push(("Running FHE Application", running_app_timer.elapsed()));
 
+    let publishing_ct_timer = Instant::now();
     println!("Have outputs. Creating ciphertexts...");
     let ciphertexts = outputs
         .into_iter()
@@ -330,6 +385,10 @@ async fn test_trbfv_actor() -> Result<()> {
         .await?;
 
     assert_eq!(h.event_types(), expected);
+    report.push((
+        "Ciphertext published -> PlaintextAggregated",
+        publishing_ct_timer.elapsed(),
+    ));
 
     let Some(EnclaveEvent::PlaintextAggregated {
         data:
@@ -366,9 +425,11 @@ async fn test_trbfv_actor() -> Result<()> {
         assert_eq!(res, exp);
     }
 
-    let report = multithread.send(GetReport).await.unwrap().unwrap();
+    let mt_report = multithread.send(GetReport).await.unwrap().unwrap();
+    println!("{}", mt_report);
 
-    println!("{}", report);
+    report.push(("Entire Test", whole_test.elapsed()));
+    println!("{}", serialize_report(&report));
 
     Ok(())
 }

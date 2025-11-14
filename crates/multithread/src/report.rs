@@ -4,16 +4,26 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, thread, time::Duration};
 
 use crate::TrackDuration;
 
 #[derive(Default)]
 pub struct MultithreadReport {
+    rayon_threads: usize,
+    max_simultaneous_rayon_tasks: usize,
     events: Vec<TrackDuration>,
 }
 
 impl MultithreadReport {
+    pub fn new(rayon_threads: usize, max_simultaneous_rayon_tasks: usize) -> Self {
+        Self {
+            rayon_threads,
+            max_simultaneous_rayon_tasks,
+            events: Vec::new(),
+        }
+    }
+
     pub fn track(&mut self, msg: TrackDuration) {
         self.events.push(msg);
     }
@@ -21,6 +31,10 @@ impl MultithreadReport {
     pub fn to_report(&self) -> FlattenedReport {
         let mut total_durations: HashMap<String, Duration> = HashMap::new();
         let mut runs: HashMap<String, u64> = HashMap::new();
+        let cores_available: usize = match thread::available_parallelism() {
+            Ok(count) => count.into(),
+            Err(_) => 0usize,
+        };
 
         // Accumulate durations and count runs
         for event in &self.events {
@@ -41,18 +55,34 @@ impl MultithreadReport {
                 (name, avg)
             })
             .collect();
-
-        FlattenedReport { avg_dur, runs }
+        FlattenedReport {
+            cores_available,
+            avg_dur,
+            rayon_threads: self.rayon_threads,
+            max_simultaneous_rayon_tasks: self.max_simultaneous_rayon_tasks,
+            runs,
+        }
     }
 }
 
 pub struct FlattenedReport {
+    cores_available: usize,
+    rayon_threads: usize,
+    max_simultaneous_rayon_tasks: usize,
     avg_dur: HashMap<String, Duration>,
     runs: HashMap<String, u64>,
 }
 
 impl std::fmt::Display for FlattenedReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{:<32} {:>5}", "Rayon Threads:", self.rayon_threads)?;
+        writeln!(
+            f,
+            "{:<32} {:>5}",
+            "Max Simultaneous Rayon Tasks:", self.max_simultaneous_rayon_tasks
+        )?;
+        writeln!(f, "{:<32} {:>5}", "Cores Available:", self.cores_available)?;
+        writeln!(f)?;
         writeln!(f, "{:<30} {:>15} {:>10}", "Name", "Avg Duration", "Runs")?;
         writeln!(f, "{}", "-".repeat(58))?;
 

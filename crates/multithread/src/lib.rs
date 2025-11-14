@@ -29,6 +29,7 @@ use report::MultithreadReport;
 use tokio::sync::Semaphore;
 use tracing::error;
 use tracing::info;
+use tracing::warn;
 
 /// Multithread actor
 pub struct Multithread {
@@ -65,7 +66,10 @@ impl Multithread {
             thread_pool,
             rayon_limit,
             report: if capture_events {
-                Some(MultithreadReport::default())
+                Some(MultithreadReport::new(
+                    rayon_threads,
+                    max_simultaneous_rayon_tasks,
+                ))
             } else {
                 None
             },
@@ -113,7 +117,7 @@ impl Handler<ComputeRequest> for Multithread {
         let msg_string = msg.to_string();
         let self_addr = ctx.address();
         let capture_events = self.report.is_some();
-
+        let job_name = msg_string.clone();
         Box::pin(async move {
             // Block until we have enough task slots available we have to do this this way as
             // because we use do_send() everywhere there is no backpressure on the actors
@@ -121,6 +125,20 @@ impl Handler<ComputeRequest> for Multithread {
                 .acquire()
                 .await
                 .map_err(|_| ComputeRequestError::SemaphoreError(msg_string.to_string()))?;
+
+            // Warn of long running jobs
+            let warning_handle = tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                warn!(
+                    "Job '{}' has been running for more than 10 seconds",
+                    job_name
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+                error!(
+                    "Job '{}' has been running for more than 30 seconds",
+                    job_name
+                );
+            });
 
             // This uses channels to track pending and complete tasks when
             // using the thread pool
@@ -139,7 +157,7 @@ impl Handler<ComputeRequest> for Multithread {
                     );
                 }
             });
-            // back in async io land...
+            // we are back in async io land...
 
             // await the oneshot
             let (result, duration) = rx.await.unwrap_or_else(|_| {
@@ -148,6 +166,8 @@ impl Handler<ComputeRequest> for Multithread {
                     None,
                 )
             });
+
+            warning_handle.abort();
 
             // incase we are collecting events for a report
             if capture_events {
