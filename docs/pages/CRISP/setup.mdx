@@ -27,7 +27,8 @@ Before getting started, ensure you have installed:
 - [RiscZero](https://dev.risczero.com/api/zkvm/install)
 - [NodeJS](https://nodejs.org/en/download)
 - [pnpm](https://pnpm.io)
-- [Metamask](https://metamask.io)
+- [MetaMask](https://metamask.io)
+- [Noir toolchain (`nargo`, `bb`)](https://noir-lang.org/docs/getting_started/installation) — required when you recompile the circuits
 
 ### Install Node
 
@@ -48,44 +49,32 @@ You can add Metamask as extension to your browser following the official
 You need to install Rust and Foundry first. After installation, restart your terminal.
 
 ```sh
-# Install Rust
-curl https://sh.rustup.rs -sSf | sh
-
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
-```
-
-### Install RISC Zero Toolchain
-
-Next, install `rzup` for the `cargo-risczero` toolchain.
-
-```sh
-# Install rzup
-curl -L https://risczero.com/install | bash
-
-# Install RISC Zero toolchain
-rzup install cargo-risczero
-```
-
-Verify the installation was successful by running:
-
-```sh
-cargo risczero --version
-```
-
-At this point, you should have all the tools required to develop and deploy an application with
-[RISC Zero](https://www.risczero.com).
-
-## Environment
-
-You need to setup your environment variables for `client/` and `server/`. Just copy and paste the
-`.env.default` as `.env` and overwrite with your values the following variables (you can leave the
-others initialized with the default values).
-
-### Client
 
 ```bash
+# Prepare the workspace (installs deps, builds server binaries, copies .env files, ensures enclave CLI)
 VITE_E3_PROGRAM_ADDRESS=0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44 # Default E3 program address from anvil
+
+# Launch Hardhat, deploy contracts, start ciphernodes, the program server, coordination server, and UI
+pnpm dev:up
+
+# Rebuild client/server/crates without re-running setup each time
+pnpm dev:build
+
+# (Optional) Recompile Noir circuits + verifiers
+pnpm compile:circuit
+
+# Open the interactive CLI to start rounds
+pnpm cli
+```
+
+`dev:up` runs `scripts/dev.sh`, which in turn:
+
+- Starts the Hardhat node (`packages/crisp-contracts`)
+- Deploys the full contract stack (Enclave, CRISPProgram, validators, registries)
+- Boots ciphernodes using the provided `enclave.config.yaml`
+- Launches the program server (RISC Zero)
+- Starts the coordination server (Rust) and waits for it to expose port `4000`
+- Starts the client once the server and nodes are ready
 VITE_SEMAPHORE_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
 ```
 

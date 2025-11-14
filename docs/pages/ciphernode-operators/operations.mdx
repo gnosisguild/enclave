@@ -1,0 +1,106 @@
+---
+title: 'Operations & Responsibilities'
+---
+
+# Operations & Responsibilities
+
+Staying online matters as much as bonding. Use this checklist to manage daily duties, networking,
+and deployment automation.
+
+## Daily responsibilities
+
+- Watch `enclave nodes ps` and contract events for liveness
+- Keep RPC endpoints funded and redundant.
+- Rotate secrets and backups on a defined cadence.
+- Capture logs for sortition submissions, key publication, and decryption shares.
+
+## CLI workflow
+
+```bash
+# Start all nodes defined in config
+enclave nodes up --detach
+
+# Check status
+enclave nodes ps
+
+# Inspect a specific node
+enclave nodes status cn1
+
+# Restart a node
+enclave nodes restart cn1
+
+# Stop everything
+enclave nodes down
+
+# Wipe state (irreversible)
+enclave nodes purge
+```
+
+To run a single node profile manually:
+
+```bash
+enclave start --config /path/to/enclave.config.yaml --peer /dns4/bootstrap.enclave.gg/udp/9091/quic-v1
+```
+
+Flags such as `--autowallet` and `--autonetkey` will prompt-less configure secrets when the config
+contains `autowallet: true` and siblings.
+
+## Configuration reference
+
+```yaml
+node:
+  address: "0x7099…79C8"
+  quic_port: 9201
+  peers:
+    - "/dns4/aggregator1.example.com/udp/9094/quic-v1"
+  autonetkey: true
+  autopassword: true
+  role:
+    type: aggregator
+chains:
+  - name: sepolia
+    rpc_url: "wss://ethereum-sepolia.publicnode.com"
+    contracts:
+      enclave:
+        address: "0x1E8B…FAa6"
+        deploy_block: 9615399
+      ciphernode_registry:
+        address: "0x11F6…0b1C7"
+      bonding_registry:
+        address: "0x5636…406E3"
+      fee_token:
+        address: "0xB58B…4De0"
+```
+
+Key notes:
+
+- Provide at least one bootstrap `peer`. Operate your own static peer for redundancy.
+- Open `quic_port` over UDP in firewalls and security groups.
+- Override `data_dir` / `config_dir` if running under non-standard users or containers.
+
+## Deployment manifests & secrets
+
+The `deploy/` directory includes a Docker Swarm example:
+
+- `cn*.yaml` and `agg.yaml` template addresses and RPC URLs
+- `docker-compose.yml` runs multiple Ciphernodes plus an aggregator
+- Secret bundles follow:
+
+```json
+{
+  "password": "changeme",
+  "private_key": "0x…",
+  "network_private_key": "0x…"
+}
+```
+
+`ciphernode-entrypoint.sh` loads the config, injects secrets via `enclave password/net keypair/wallet`,
+then runs `enclave start -v`. Reuse this pattern for Kubernetes Jobs, Nomad, or systemd units.
+
+## Monitoring & alerting
+
+- Subscribe to `PlaintextOutputPublished`, `CiphertextOutputPublished`, and `E3Activated` to ensure
+  duties progress.
+- Track CLI logs for `sortition::submitted`, `decryption::share_published`, and errors.
+- Export Prometheus metrics from your infrastructure layer (CPU, bandwidth, disk) since the CLI
+  currently logs to stdout.

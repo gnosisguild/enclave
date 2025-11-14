@@ -1,0 +1,61 @@
+---
+title: 'Tickets & Sortition'
+---
+
+# Tickets & Sortition
+
+Tickets (ETK) express your willingness to perform work; sortition converts those staked tickets into
+committee slots. This page explains both the math and the operational workflow.
+
+## Ticket economics
+
+- Tickets are priced in stablecoins and wrapped as non-transferable ETK balances.
+- Your committee probability scales linearly with `availableTickets`. Doubling tickets roughly
+doubles the chance of selection, assuming peers keep balances constant.
+- Ticket balances are snapshotted **before** each `Enclave.request` (specifically, at
+  `requestBlock - 1`). Topping up after the request event does not affect that round.
+- Rewards distribute proportional to committee participation, so dormant tickets still incur capital
+cost without returns.
+
+## Sortition phases
+
+1. **Request created** — `Enclave.request` emits `E3Requested`. The CLI listens and schedules
+   submissions for operators that are `active` (bonded + tickets + not banned).
+2. **Submission window** — The registry exposes `sortitionSubmissionWindow` (10s on Sepolia). During
+   this period, operators call `submitTicket(e3Id, ticketNumber)` for each ticket they want in the
+   lottery. The CLI parallelizes submissions.
+3. **Committe finalization** — After the window closes and at least `threshold_m` submissions exist,
+   anyone can call `finalizeCommittee(e3Id)`. Winners publish key shares and assemble the committee
+   public key via `publishCommittee`.
+4. **Duty execution** — Selected nodes produce decryption shares for every ciphertext published in
+   that E3.
+
+## How tickets influence selection
+
+For each ticket submitted, the registry derives a pseudo-random value from the request seed. The top
+`t` values (based on threshold) win. Holding more tickets means more entries in that lottery.
+
+```text
+submissionRandom = keccak256(seed, operator, ticketNumber)
+```
+
+Operators can observe submission health through the CLI logs:
+
+```
+INFO sortition::submitted e3_id=42 ticket=3 latency_ms=412
+```
+
+If you prefer direct contract interaction, query:
+
+```solidity
+function submissions(uint256 e3Id, address operator) external view returns (uint256[] memory);
+```
+
+## Best practices
+
+- **Stagger ticket top-ups**: replenish balances ahead of time to avoid gas spikes right before a
+  request window.
+- **Alert on missed submissions**: set log-based alerts when `NodeNotEligible` or
+  `SubmissionWindowClosed` appears.
+- **Batch networks**: if you operate on multiple chains, keep per-chain ETK balances and run
+  independent CLI supervisors so a congested chain does not block others.

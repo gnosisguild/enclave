@@ -1,0 +1,52 @@
+---
+title: 'Exits, Rewards & Slashing'
+---
+
+# Exits, Rewards & Slashing
+
+Understand how to collect rewards, respond to slashing proposals, and exit the registry safely.
+
+## Rewards
+
+- Distributed via `BondingRegistry.distributeRewards` (any ERC20)
+- Watch for `RewardsDistributed(e3Id, nodes, amounts)` events
+- Ensure the operator wallet remains funded to claim rewards if additional gas is required
+
+## Slashing lifecycle
+
+1. `SlashingManager` emits `SlashProposed` referencing a policy + reason code.
+2. Operators inspect the evidence (if any) and the associated `SlashPolicy` parameters.
+3. File an appeal with `fileAppeal(e3Id, reason, evidenceURI)` before `appealWindow` expires, if the
+   policy allows it.
+4. Once finalized, penalties may burn tickets, confiscate license bonds, and optionally ban the
+   operator.
+
+Stay alert for:
+
+- `appealWindow` values per policy (some reasons skip appeals entirely)
+- `updateBanStatus` (governance must lift bans before re-registration)
+
+## Exit process
+
+1. Call `deregisterOperator(bytes32[] calldata siblingProof)`
+   - The proof removes the operator from the registry's incremental Merkle tree (IMT)
+   - Capture it via the CLI logs, `CiphernodeAdded` events, or by querying the registry
+2. Tickets burn immediately; license bonds enter the exit queue with an unlock timestamp
+3. Wait for the configured delay (`exitDelay`, 7 days on Sepolia)
+4. Claim funds with `claimExits(uint256 maxTickets, uint256 maxLicense)`
+   - Use `pendingExits(address)` or `previewClaimable(address)` to check readiness
+
+## Health checklist
+
+| Symptom | Actions |
+| --- | --- |
+| `ExitNotReady` on `claimExits` | Confirm `block.timestamp` passed `exitUnlocksAt` and delay. Call `previewClaimable`. |
+| Slashing appeal rejected immediately | Policy likely disables appeals. Review policy metadata. |
+| `isActive` toggles false unexpectedly | Check ticket balance (>= 1) and verify bonded ENCL >= 80% requirement. |
+| Missed reward payouts | Ensure registry still lists the operator, RPC did not drop events, and reward token address is supported. |
+
+## Post-exit
+
+- Securely wipe local secrets (`enclave nodes purge` and delete keystores)
+- Revoke RPC credentials and firewall openings
+- Document the exit reason for future audits or compliance
