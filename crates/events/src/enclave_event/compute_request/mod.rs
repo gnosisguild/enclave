@@ -86,7 +86,7 @@ impl fmt::Display for ComputeRequestError {
                 write!(f, "Multithread SemaphoreError. This means there was a problem acquiring the semaphore lock for this ComputeRequest: '{name}'")
             }
             ComputeRequestError::RecvError(name) => {
-                write!(f, "Multithread RecvError. This means there was a problem acquiring the semaphore lock for this ComputeRequest: '{name}'")
+                write!(f, "Multithread RecvError. This means there was a problem receiving a response for this ComputeRequest: '{name}'")
             }
         }
     }
