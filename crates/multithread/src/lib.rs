@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+mod report;
+
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 use std::time::Instant;
 
 use actix::prelude::*;
@@ -24,6 +25,8 @@ use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use rand::Rng;
 use rayon::{self, ThreadPool};
+use report::MultithreadReport;
+use tokio::sync::Semaphore;
 use tracing::error;
 use tracing::info;
 
@@ -31,35 +34,45 @@ use tracing::info;
 pub struct Multithread {
     rng: SharedRng,
     cipher: Arc<Cipher>,
-    thread_pool: Option<Arc<ThreadPool>>,
+    rayon_limit: Arc<Semaphore>,
+    thread_pool: Arc<ThreadPool>,
+    report: Option<MultithreadReport>,
 }
 
 impl Multithread {
-    pub fn new(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Self {
-        let thread_pool = if threads == 1 {
-            None
-        } else {
-            let thread_pool = Arc::new(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(threads)
-                    .build()
-                    .expect("Failed to create Rayon thread pool"),
-            );
-            info!(
-                "Created threadpool with {} threads.",
-                thread_pool.current_num_threads()
-            );
-
-            Some(thread_pool)
-        };
+    pub fn new(
+        rng: SharedRng,
+        cipher: Arc<Cipher>,
+        rayon_threads: usize,
+        max_simultaneous_rayon_tasks: usize,
+        capture_events: bool,
+    ) -> Self {
+        let thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(rayon_threads)
+                .build()
+                .expect("Failed to create Rayon thread pool"),
+        );
+        info!(
+            "Created threadpool with {} threads.",
+            thread_pool.current_num_threads()
+        );
+        let rayon_limit = Arc::new(Semaphore::new(max_simultaneous_rayon_tasks));
 
         Self {
             rng,
             cipher,
             thread_pool,
+            rayon_limit,
+            report: if capture_events {
+                Some(MultithreadReport::default())
+            } else {
+                None
+            },
         }
     }
 
+    /// Subtract the given amount from the total number of available threads and return the result
     pub fn get_max_threads_minus(amount: usize) -> usize {
         let total_threads = thread::available_parallelism()
             .map(|n| n.get())
@@ -68,8 +81,21 @@ impl Multithread {
         threads_to_use
     }
 
-    pub fn attach(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Addr<Self> {
-        Self::new(rng.clone(), cipher.clone(), threads).start()
+    pub fn attach(
+        rng: SharedRng,
+        cipher: Arc<Cipher>,
+        rayon_threads: usize,
+        max_simultaneous_rayon_tasks: usize,
+        capture_events: bool,
+    ) -> Addr<Self> {
+        Self::new(
+            rng.clone(),
+            cipher.clone(),
+            rayon_threads,
+            max_simultaneous_rayon_tasks,
+            capture_events,
+        )
+        .start()
     }
 }
 
@@ -77,48 +103,106 @@ impl Actor for Multithread {
     type Context = actix::Context<Self>;
 }
 
-static PENDING_TASKS: AtomicUsize = AtomicUsize::new(0);
-static COMPLETED_TASKS: AtomicUsize = AtomicUsize::new(0);
-
 impl Handler<ComputeRequest> for Multithread {
     type Result = ResponseFuture<Result<ComputeResponse, ComputeRequestError>>;
-    fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeRequest, ctx: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let thread_pool = self.thread_pool.clone();
-        Box::pin(async move {
-            // This uses channels to traack pending and complete tasks when
-            // using the thread pool
-            let res = if let Some(pool) = thread_pool {
-                let pending = PENDING_TASKS.fetch_add(1, Ordering::Relaxed);
-                info!(
-                    "Spawning task. Pending: {}, Completed: {}",
-                    pending + 1,
-                    COMPLETED_TASKS.load(Ordering::Relaxed)
-                );
-                let (tx, rx) = tokio::sync::oneshot::channel();
-                pool.spawn(move || {
-                    let res = handle_compute_request(rng, cipher, msg);
-                    PENDING_TASKS.fetch_sub(1, Ordering::Relaxed);
-                    COMPLETED_TASKS.fetch_add(1, Ordering::Relaxed);
+        let semaphore = self.rayon_limit.clone();
+        let msg_string = msg.to_string();
+        let self_addr = ctx.address();
+        let capture_events = self.report.is_some();
 
-                    let _ = tx.send(res);
-                });
-                // TODO: handle recv error
-                rx.await.unwrap()
-            } else {
-                // If not using the thread pool simply call inline
-                handle_compute_request(rng, cipher, msg)
+        Box::pin(async move {
+            // Block until we have enough task slots available we have to do this this way as
+            // because we use do_send() everywhere there is no backpressure on the actors
+            let _permit = semaphore
+                .acquire()
+                .await
+                .map_err(|_| ComputeRequestError::SemaphoreError(msg_string.to_string()))?;
+
+            // This uses channels to track pending and complete tasks when
+            // using the thread pool
+            let (tx, rx) = tokio::sync::oneshot::channel();
+
+            // We spawn a thread on rayon moving to "sync"-land
+            thread_pool.spawn(move || {
+                // Do the actual work this is gonna take a while...
+                let (result, duration) = handle_compute_request(rng, cipher, msg);
+
+                // try to return the result and it's duration note this is sync as it is a oneshot sender.
+                if let Err(res) = tx.send((result, Some(duration))) {
+                    error!(
+                        "There was an error sending the result from the multithread actor: result = {:?}",
+                        res
+                    );
+                }
+            });
+            // back in async io land...
+
+            // await the oneshot
+            let (result, duration) = rx.await.unwrap_or_else(|_| {
+                (
+                    Err(ComputeRequestError::RecvError(msg_string.to_string())),
+                    None,
+                )
+            });
+
+            // incase we are collecting events for a report
+            if capture_events {
+                if let Some(dur) = duration {
+                    self_addr.do_send(TrackDuration::new(msg_string, dur))
+                }
             };
 
-            res
+            result
         })
     }
 }
 
-// TODO: implement tracing for this
-// This enabled us to get insight into the timing of our long running functions
-fn timefunc<F>(name: &str, id: u8, func: F) -> Result<ComputeResponse, ComputeRequestError>
+impl Handler<TrackDuration> for Multithread {
+    type Result = ();
+    fn handle(&mut self, msg: TrackDuration, _: &mut Self::Context) -> Self::Result {
+        // If the report is there we are tracking durations
+        if let Some(report) = &mut self.report {
+            report.track(msg);
+        };
+    }
+}
+
+impl Handler<GetReport> for Multithread {
+    type Result = Option<String>;
+    fn handle(&mut self, _: GetReport, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref report) = self.report {
+            return Some(report.to_report().to_string());
+        }
+        None
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct TrackDuration {
+    name: String,
+    duration: Duration,
+}
+
+impl TrackDuration {
+    pub fn new(name: String, duration: Duration) -> Self {
+        Self { name, duration }
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype("Option<String>")]
+pub struct GetReport;
+
+fn timefunc<F>(
+    name: &str,
+    id: u8,
+    func: F,
+) -> (Result<ComputeResponse, ComputeRequestError>, Duration)
 where
     F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
 {
@@ -127,14 +211,15 @@ where
     let out = func();
     let dur = start.elapsed();
     info!("\nFINISHED MULTITHREAD `{}`({}) in {:?}\n", name, id, dur);
-    out
+    (out, dur) // return output as well as timing info
 }
 
+/// Handle our compute request. This function is run on a rayon threadpool.
 fn handle_compute_request(
     rng: SharedRng,
     cipher: Arc<Cipher>,
     request: ComputeRequest,
-) -> Result<ComputeResponse, ComputeRequestError> {
+) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     let id: u8 = rand::thread_rng().gen();
     match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => timefunc(

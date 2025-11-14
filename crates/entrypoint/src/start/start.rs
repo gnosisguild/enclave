@@ -43,6 +43,8 @@ pub async fn execute(
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
         .with_contract_bonding_registry()
+        .with_max_threads()
+        .with_multithread_concurrent_jobs(2)
         .with_contract_ciphernode_registry();
 
     if experimental_trbfv {

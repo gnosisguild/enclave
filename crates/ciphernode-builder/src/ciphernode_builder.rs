@@ -54,6 +54,8 @@ pub struct CiphernodeBuilder {
     keyshare: Option<KeyshareKind>,
     logging: bool,
     multithread_cache: Option<Addr<Multithread>>,
+    multithread_concurrent_jobs: Option<usize>,
+    multithread_capture_events: bool,
     plaintext_agg: bool,
     pubkey_agg: bool,
     rng: SharedRng,
@@ -98,12 +100,14 @@ impl CiphernodeBuilder {
             multithread_cache: None,
             plaintext_agg: false,
             pubkey_agg: false,
+            multithread_concurrent_jobs: None,
             rng,
             source_bus: None,
             sortition_backend: SortitionBackend::score(),
             testmode_errors: false,
             testmode_history: false,
             threads: None,
+            multithread_capture_events: false,
             threshold_plaintext_agg: false,
         }
     }
@@ -191,10 +195,33 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Setup how many threads to use within the multithread actor
-    #[deprecated(note = "This method is under construction and should not be used yet")]
+    /// Setup how many threads to use within the multithread actor for it's rayon based workload
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.threads = Some(threads);
+        self
+    }
+
+    /// This will provide one thread for the actor model and use all other threads for
+    /// rayon based workloads
+    pub fn with_max_threads(mut self) -> Self {
+        self.threads = Some(Multithread::get_max_threads_minus(1));
+        self
+    }
+
+    /// This will save the given number of threads from being used by the rayon threadpool
+    pub fn with_max_threads_minus(mut self, threads: usize) -> Self {
+        self.threads = Some(Multithread::get_max_threads_minus(threads));
+        self
+    }
+
+    /// Set the number of concurrent jobs defaults to 1
+    pub fn with_multithread_concurrent_jobs(mut self, jobs: usize) -> Self {
+        self.multithread_concurrent_jobs = Some(jobs);
+        self
+    }
+
+    pub fn with_multithread_capture_events(mut self) -> Self {
+        self.multithread_capture_events = true;
         self
     }
 
@@ -370,7 +397,7 @@ impl CiphernodeBuilder {
                     .await
                 {
                     Ok(write_provider) => {
-                        let writer = CiphernodeRegistrySol::attach_writer(
+                        let _writer = CiphernodeRegistrySol::attach_writer(
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
@@ -463,6 +490,8 @@ impl CiphernodeBuilder {
             self.rng.clone(),
             self.cipher.clone(),
             self.threads.unwrap_or(1),
+            self.multithread_concurrent_jobs.unwrap_or(1),
+            self.multithread_capture_events,
         );
 
         // Set the cache

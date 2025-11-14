@@ -14,7 +14,7 @@ use e3_events::{
     EnclaveEvent, EventBus, EventBusConfig, OperatorActivationChanged, PlaintextAggregated,
     TicketBalanceUpdated,
 };
-use e3_multithread::Multithread;
+use e3_multithread::{GetReport, Multithread};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
@@ -115,6 +115,7 @@ async fn test_trbfv_actor() -> Result<()> {
     );
 
     // Params for BFV
+    // TODO: use params set with secure params in test
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
 
     // Encoded Params
@@ -135,12 +136,16 @@ async fn test_trbfv_actor() -> Result<()> {
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
 
     // Actor system setup
+    let concurrent_jobs = 2;
+    let max_threadroom = Multithread::get_max_threads_minus(1);
     let multithread = Multithread::attach(
         rng.clone(),
         cipher.clone(),
-        // Multithread::get_max_threads_minus(2),
-        1, // TODO: There is a bug running multithread around thread starvation. We may have to
-           // setup a queue
+        // max_threadroom,
+        1,
+        // concurrent_jobs,
+        1,
+        true,
     );
 
     let nodes = CiphernodeSystemBuilder::new()
@@ -360,6 +365,10 @@ async fn test_trbfv_actor() -> Result<()> {
         println!("Tally {i} result = {res} / {exp}");
         assert_eq!(res, exp);
     }
+
+    let report = multithread.send(GetReport).await.unwrap().unwrap();
+
+    println!("{}", report);
 
     Ok(())
 }
