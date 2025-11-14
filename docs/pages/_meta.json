@@ -3,9 +3,9 @@
     "display": "hidden",
     "title": "Home"
   },
-  "-- Documentation": {
+  "-- Overview": {
     "type": "separator",
-    "title": "Documentation"
+    "title": "Overview"
   },
   "introduction": {
     "title": "Introduction"
@@ -19,12 +19,18 @@
   "computation-flow": {
     "title": "E3 Computation Flow"
   },
+  "use-cases": {
+    "title": "Use Cases"
+  },
   "building-with-enclave": {
     "title": "Building with Enclave"
   },
-  "-- TUTORIAL": {
+  "best-practices": {
+    "title": "Best Practices"
+  },
+  "-- Getting Started": {
     "type": "separator",
-    "title": "Tutorial"
+    "title": "Getting Started"
   },
   "installation": {
     "title": "Installation"
@@ -35,15 +41,28 @@
   "hello-world-tutorial": {
     "title": "Hello World"
   },
-  "-- BUILD AN E3": {
+  "-- Tooling": {
     "type": "separator",
-    "title": "BUILD AN E3 Program"
+    "title": "Tooling"
+  },
+  "project-template": {
+    "title": "Project Template"
+  },
+  "sdk": {
+    "title": "Enclave SDK"
+  },
+  "setting-up-server": {
+    "title": "Setting Up the Server"
+  },
+  "noir-circuits": {
+    "title": "Noir Circuits"
+  },
+  "-- Build an E3": {
+    "type": "separator",
+    "title": "Build an E3 Program"
   },
   "getting-started": {
     "title": "Getting Started"
-  },
-  "compute-provider": {
-    "title": "Compute Provider Setup"
   },
   "write-secure-program": {
     "title": "Writing the Secure Process"
@@ -51,25 +70,32 @@
   "write-e3-contract": {
     "title": "Writing the E3 Program Contract"
   },
-  "setting-up-server": {
-    "title": "Setting Up the Server"
+  "compute-provider": {
+    "title": "Compute Provider Setup"
   },
   "putting-it-together": {
     "title": "Putting It All Together"
   },
+  "-- Operations": {
+    "type": "separator",
+    "title": "Operations"
+  },
+  "ciphernode-operators": {
+    "title": "Ciphernode Operators"
+  },
   "build-e3": {
     "display": "hidden"
   },
-  "-- USE CASES": {
+  "-- Examples": {
     "type": "separator",
-    "title": "USE CASES"
+    "title": "Examples"
   },
   "CRISP": {
     "title": "CRISP"
   },
-  "-- WHITE PAPER": {
+  "-- Reference": {
     "type": "separator",
-    "title": "WHITE PAPER"
+    "title": "Reference"
   },
   "whitepaper": {
     "title": "White Paper"
