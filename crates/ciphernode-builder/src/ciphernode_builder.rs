@@ -217,7 +217,7 @@ impl CiphernodeBuilder {
 
     /// Set the number of concurrent jobs defaults to 1
     pub fn with_multithread_concurrent_jobs(mut self, jobs: usize) -> Self {
-        self.multithread_concurrent_jobs = Some(jobs);
+        self.multithread_concurrent_jobs = if jobs >= 1 { Some(jobs) } else { None };
         self
     }
 
