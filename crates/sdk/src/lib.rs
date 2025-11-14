@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-#[cfg(feature = "bfv-helpers")]
+#[cfg(feature = "bfv")]
 pub use e3_bfv_helpers as bfv_helpers;
 
-#[cfg(feature = "evm-helpers")]
+#[cfg(feature = "evm")]
 pub use e3_evm_helpers as evm_helpers;
 
 #[cfg(feature = "indexer")]
