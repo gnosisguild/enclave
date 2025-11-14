@@ -13,7 +13,7 @@ e3-indexer = { workspace = true, optional = true }
 
 [features]
 default = ["full"]
-full = ["evm-helpers", "bfv-helpers", "indexer"]
+full = ["evm", "bfv", "indexer"]
 indexer = ["dep:e3-indexer"]
-evm-helpers = ["dep:e3-evm-helpers"]
-bfv-helpers = ["dep:e3-bfv-helpers"]
+evm = ["dep:e3-evm-helpers"]
+bfv = ["dep:e3-bfv-helpers"]
