@@ -44,7 +44,6 @@ pub async fn execute(
         .with_contract_bonding_registry()
         .with_contract_ciphernode_registry()
         .with_max_threads()
-        .with_multithread_concurrent_jobs(2)
         .with_pubkey_aggregation();
 
     if experimental_trbfv {
