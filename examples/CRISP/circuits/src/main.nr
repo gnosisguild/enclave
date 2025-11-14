@@ -89,7 +89,7 @@ fn main(
         p2is,
     );
 
-    let ct_add: CiphertextAddition<512, 2, 54, 54, 54> = CiphertextAddition::new(
+    let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
         ct1is,
