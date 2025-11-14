@@ -1,0 +1,72 @@
+---
+title: 'Registration & Licensing'
+---
+
+# Registration & Licensing
+
+This guide covers everything required to become an active Ciphernode: collateral, bonding,
+registration transactions, and config secrets.
+
+## Economic requirements
+
+Sepolia defaults (check `BondingRegistry` on your network):
+
+- **Ticket price**: `10_000_000` base units (10 USDC per ticket)
+- **License bond requirement**: `100 ENCL`
+- **Active license floor**: 80% of the required bond must remain locked
+- **Minimum ticket balance**: 1 ticket (10 USDC)
+- **Exit delay**: `604_800 s` (7 days)
+
+Tickets live inside the non-transferable `EnclaveTicketToken`. Mint them by depositing the underlying
+stablecoin (MockUSDC on Sepolia) via `BondingRegistry.addTicketBalance`. The usable ticket count is:
+
+
+`availableTickets = floor(ticketTokenBalance / ticketPrice)`
+
+License bonds are denominated in ENCL. Falling below 80% of `licenseRequiredBond` moves the operator
+back to `inactive` even if tickets remain.
+
+## CLI prerequisites
+
+Before bonding, prepare local secrets:
+
+```bash
+# Set up config (or pass --config later)
+enclave config-set --rpc-url $RPC --eth-address $OPERATOR_ADDRESS
+
+# Store secrets (optional if using automation)
+enclave password set --password "$PASSWORD"
+enclave net keypair generate
+enclave wallet set --private-key $OPERATOR_KEY
+```
+
+These commands populate `~/.config/enclave` and `~/.local/share/enclave`. For containerized
+deployments, bake the steps into `ciphernode-entrypoint.sh` (see `deploy/`).
+
+## Lifecycle checklist
+
+1. **Acquire collateral**
+   - ENCL for license bonds
+   - USDC (or the configured fee token) for tickets
+2. **Bond the license**
+   ```bash
+   cast send $BONDING "bondLicense(uint256)" 100e18 --private-key $OPERATOR_KEY --rpc-url $RPC
+   ```
+3. **Register the operator**
+   ```bash
+   cast send $BONDING "registerOperator()" --private-key $OPERATOR_KEY --rpc-url $RPC
+   ```
+4. **Deposit tickets**
+   ```bash
+   cast send $FEE_TOKEN "approve(address,uint256)" $BONDING 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
+   cast send $BONDING "addTicketBalance(uint256)" 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
+   ```
+5. **Verify status**
+   - `BondingRegistry.isRegistered(address)` returns `true`
+   - `BondingRegistry.isActive(address)` flips `true` once bond + ticket floors are met
+6. **Snapshot config for production**
+   - Commit `enclave.config.yaml` alongside deployment manifests
+   - Store secrets in JSON (see `deploy/cn1.secrets.json`) and mount them securely
+
+> ℹ️ The CLI supports multiple named wallets. Use `enclave wallet list` to confirm the correct signer
+> is active before running bonding transactions.

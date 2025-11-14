@@ -1,0 +1,20 @@
+{
+  "index": {
+    "title": "Overview"
+  },
+  "registration": {
+    "title": "Registration & Licensing"
+  },
+  "tickets-and-sortition": {
+    "title": "Tickets & Sortition"
+  },
+  "operations": {
+    "title": "Operations & Responsibilities"
+  },
+  "exits-and-slashing": {
+    "title": "Exits, Rewards & Slashing"
+  },
+  "scenarios": {
+    "title": "Runbook Scenarios"
+  }
+}
