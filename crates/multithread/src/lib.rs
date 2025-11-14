@@ -48,6 +48,11 @@ impl Multithread {
         max_simultaneous_rayon_tasks: usize,
         capture_events: bool,
     ) -> Self {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build_global()
+            .expect("Failed to configure global Rayon pool");
+
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(rayon_threads)
