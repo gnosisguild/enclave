@@ -72,7 +72,7 @@ fn main(
         merkle_proof_siblings,
     );
 
-    let greco: Greco<512, 1, 54, 54, 5, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
+    let greco: Greco<512, 2, 36, 36, 2, 6, 6, 4, 10, 36, 10, 36> = Greco::new(
         params,
         pk0is,
         pk1is,
