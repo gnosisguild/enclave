@@ -8,9 +8,9 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
-use e3_sdk::bfv_helpers::build_bfv_params_arc;
-use e3_sdk::bfv_helpers::BfvParamSet;
-use e3_sdk::bfv_helpers::BfvParams;
+use e3_bfv_helpers::build_bfv_params_arc;
+use e3_bfv_helpers::BfvParamSet;
+use e3_bfv_helpers::BfvParams;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
