@@ -11,31 +11,34 @@ Providers, or other network participant.
 
 ### Phase 1: Request
 
-1. **Define the E3 Program**: The core FHE logic of your application must be written in a supported
-   FHE scheme. Currently, Enclave supports the [fhe.rs](https://github.com/gnosisguild/fhe.rs)
-   implementation of the BFV encryption scheme.
-2. **Choose a Compute Provider**: Your E3 program will likely need to be written to explicitly
-   support your chosen Compute Provider. For our demo application, [CRISP](/CRISP/introduction), we
-   use [Risc Zero](https://www.risczero.com/) as our Compute Provider.
-3. **Specify Parameters**:
-   - Set the threshold (t/n) for the Ciphernode Committee (CiCo), which defines the number of nodes
-     that must coordinate to decrypt the computation output. This can be user-defined or
-     pre-configured based on your application's needs.
-   - Provide any necessary parameters specific to the Compute Provider.
-   - Configure E3 Program parameters, including input submission deadlines and computation duration.
-4. **Submit the Request**: Call `request` on the Enclave contract to publish the request and
-   initialize the E3.
+1. **Define the E3 Program**: Author your Secure Process using the tooling described in
+   [Writing the Secure Process](/write-secure-program). Enclave currently ships first-party support
+   for the BFV scheme via [fhe.rs](https://github.com/gnosisguild/fhe.rs) and the SAFE library.
+2. **Choose a Compute Provider**: Your program must align with the execution backend (e.g.,
+   [RISC Zero](https://www.risczero.com/) for [CRISP](/CRISP/introduction) or a custom FHE
+   coprocessor).
+3. **Assemble `E3RequestParams`**:
+   - `threshold`: the CiCo size/threshold tuple (t/n) used for decryption security
+   - `startWindow` and `duration`: governs when inputs open/close and how long execution may run
+   - `e3Program`, `e3ProgramParams`, `computeProviderParams`, and optional `customParams`
+4. **Submit the Request**: Call `request` with the struct to publish the new computation.
 
    ```solidity
    function request(
-      address filter,
-      uint32[2] calldata threshold,
-      uint256[2] calldata startWindow,
-      uint256 duration,
-      IE3Program e3Program,
-      bytes memory e3ProgramParams,
-      bytes memory computeProviderParams
-   ) external returns (uint256 e3Id, E3 memory e3)
+       E3RequestParams calldata requestParams
+   ) external returns (uint256 e3Id, E3 memory e3);
+   ```
+
+   ```solidity
+   struct E3RequestParams {
+       uint32[2] threshold;
+       uint256[2] startWindow;
+       uint256 duration;
+       IE3Program e3Program;
+       bytes e3ProgramParams;
+       bytes computeProviderParams;
+       bytes customParams;
+   }
    ```
 
 ### Phase 2: Node Selection

@@ -1,0 +1,48 @@
+---
+title: 'Runbook Scenarios'
+---
+
+# Runbook Scenarios
+
+Borrowed from incident playbooks across Ritual/Fhenix-style docs, these scenarios show how to apply
+Enclave operator procedures under real conditions.
+
+## Scenario 1 — New operator onboarding
+
+1. Follow [Registration & Licensing](./registration) to bond ENCL and mint tickets.
+2. Use `enclave config-set` with production RPC URLs and bootstrap peers.
+3. Dry-run `enclave nodes up` against Sepolia before pointing at mainnet.
+4. Set alerts for `isActive` changes and missed sortition submissions.
+
+## Scenario 2 — Ticket rebalance before a major request
+
+1. Check `BondingRegistry.ticketPrice()` and current balances.
+2. Approve + add tickets at least one block before the anticipated request.
+3. Verify snapshots with `bondingRegistry.availableTickets(operator)`.
+4. Confirm the CLI logs show `sortition::submitted` for the new ticket numbers.
+
+## Scenario 3 — Handling a slashing proposal
+
+1. Fetch the policy via `SlashingManager.reasonPolicies(reason)`.
+2. Gather logs around the alleged offense (sortition miss, share mismatch, etc.).
+3. File `fileAppeal` if the policy's `requiresProof` is false and `appealWindow > 0`.
+4. Increase monitoring frequency to avoid cascading penalties.
+
+## Scenario 4 — Planned maintenance / temporary exit
+
+1. Stop nodes gracefully with `enclave nodes down`.
+2. If downtime > exit delay, call `deregisterOperator` and reclaim collateral later.
+3. Otherwise, keep tickets + license bonded but announce maintenance to aggregators so committee
+   planners know to expect fewer submissions.
+4. After maintenance, double-check config secrets and run `enclave nodes up`.
+
+## Scenario 5 — Expanding to multiple chains
+
+1. Duplicate the `chains` section inside `enclave.config.yaml` with new RPC URLs and contract
+   addresses.
+2. Allocate fresh ticket balances per chain (each registry is independent).
+3. Run separate CLI supervisors or containers to keep blast radius small.
+4. Use labeling/metrics to distinguish logs per chain.
+
+Adapt these scenarios to your internal runbooks and share improvements via PRs so the community keeps
+leveling up—just like the best competitor docs do.

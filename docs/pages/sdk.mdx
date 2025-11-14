@@ -1,0 +1,156 @@
+---
+title: 'Enclave SDK'
+description: 'Use the TypeScript + React SDKs to drive E3 programs from clients and services'
+---
+
+# Enclave SDK Overview
+
+The Enclave SDK (`@enclave-e3/sdk`) and React helpers (`@enclave-e3/react`) provide a batteries-included
+client stack for requesting E3 computations, subscribing to protocol events, and coordinating custom
+frontends or backend services. Both packages ship in this repository (see `packages/enclave-sdk` and
+`packages/enclave-react`).
+
+## Installation
+
+```bash
+pnpm add @enclave-e3/sdk           # TypeScript SDK
+pnpm add @enclave-e3/react         # React hooks (optional)
+```
+
+For browser projects using WASM (encryption helpers, FHE keygen), configure Vite per the SDK README:
+
+```ts
+// vite.config.ts
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@enclave-e3/wasm'],
+  },
+  plugins: [wasm(), topLevelAwait()],
+})
+```
+
+## Core client
+
+```ts
+import { EnclaveSDK, EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk'
+import { createPublicClient, createWalletClient, http, custom } from 'viem'
+
+const publicClient = createPublicClient({ transport: http(import.meta.env.VITE_RPC_URL) })
+const walletClient = createWalletClient({ transport: custom(window.ethereum) })
+
+const sdk = new EnclaveSDK({
+  publicClient,
+  walletClient,
+  contracts: {
+    enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
+    ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
+  },
+  chainId: 11155111,
+})
+
+await sdk.initialize()
+```
+
+### Requesting computations
+
+```ts
+const hash = await sdk.requestE3({
+  threshold: [2, 3],
+  startWindow: [BigInt(Date.now()), BigInt(Date.now() + 5 * 60 * 1000)],
+  duration: BigInt(1800),
+  e3Program: '0x...',
+  e3ProgramParams: '0x',
+  computeProviderParams: '0x',
+  customParams: '0x',
+})
+```
+
+### Event subscriptions
+
+```ts
+sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
+  console.log('New request', event.data)
+})
+
+sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
+  console.log('Operator joined', event.data)
+})
+
+// Later, remember to clean up
+sdk.off(EnclaveEventType.E3_REQUESTED, handler)
+```
+
+### React hook
+
+```tsx
+import { useEnclaveSDK } from '@enclave-e3/react'
+
+export function Dashboard() {
+  const {
+    isInitialized,
+    requestE3,
+    onEnclaveEvent,
+    EnclaveEventType,
+  } = useEnclaveSDK({
+    autoConnect: true,
+    contracts: {
+      enclave: import.meta.env.VITE_ENCLAVE_ADDRESS,
+      ciphernodeRegistry: import.meta.env.VITE_REGISTRY_ADDRESS,
+    },
+    chainId: 31337,
+  })
+
+  useEffect(() => {
+    if (!isInitialized) return
+    const handle = (event) => console.log('Activated', event.data)
+    onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handle)
+    return () => off(EnclaveEventType.E3_ACTIVATED, handle)
+  }, [isInitialized])
+
+  return <button onClick={() => requestE3(/* params */)}>Request E3</button>
+}
+```
+
+## Configuration contract map
+
+Provide both the Enclave and CiphernodeRegistry addresses. The template exposes these via
+`.env` / `enclave.config.yaml`, and CRISP scripts surface them in deployment logs. For multi-chain
+apps, instantiate multiple SDKs or call `sdk.updateConfig({ contracts: { ... }, chainId })` whenever
+wallets switch networks.
+
+## Working with the template
+
+`enclave init` generates the default template (see [Project Template](/project-template)). The client
+already wires `@enclave-e3/sdk` and `@enclave-e3/react`:
+
+- `client/src/sdk.ts` builds the shared SDK instance
+- `client/src/hooks/useE3.ts` uses `useEnclaveSDK` to expose helper hooks throughout the UI
+- `server/src/services/enclave.ts` instantiates the SDK with a server wallet using `createWalletClient`
+
+When you add new contracts or E3 programs, update `client/.env` and `server/.env` with the new
+addresses, then restart the dev server so the SDK reconnects.
+
+## Advanced usage
+
+- **Historical events**: `sdk.getHistoricalEvents(type, fromBlock, toBlock)` fetches logs without a
+  WebSocket provider; useful for CRON jobs or health checks.
+- **Gas controls**: pass `gasLimit` to `requestE3`, `activateE3`, or `publishInput` if you want fixed
+  limits when interacting with Enclave on L2s.
+- **Event polling**: `sdk.startEventPolling()` is handy in serverless environments where websockets
+  are unavailable.
+- **Custom transports**: on the server, call `createWalletClient({ account, transport: http(rpc) })`
+  and load the private key from Vaults/KMS.
+
+## Troubleshooting
+
+| Symptom | Triage |
+| --- | --- |
+| `MISSING_PUBLIC_CLIENT` errors | Ensure `createPublicClient` uses an HTTP or WebSocket RPC reachable from the app. |
+| `INVALID_ADDRESS` | Double-check contract addresses passed into the SDK match the current chain. |
+| Hooks never initialize | Confirm `autoConnect` is true, wallet is connected, and React component is inside a provider that renders on the client. |
+| No events arrive | Switch to a WebSocket RPC or call `sdk.startEventPolling()` so logs are polled over HTTP. |
+
+For additional API surface details see `packages/enclave-sdk/README.md` inside this repo.

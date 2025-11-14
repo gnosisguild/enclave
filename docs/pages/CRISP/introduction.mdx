@@ -31,31 +31,37 @@ CRISP follows a modern Hardhat-based structure with clear separation of concerns
 
 ```
 CRISP/
-|── client/                  # React frontend application
-|── server/                  # Rust coordination server
-|── program/                 # RISC Zero computation program
-├── contracts/               # Smart contracts (Solidity)
-├── circuits/                # Noir circuits for ZK proofs
-├── scripts/                 # Development and utility scripts
-├── enclave.config.yaml      # Ciphernode configuration
+├── client/                  # React frontend application (Vite + @enclave-e3/sdk)
+├── server/                  # Rust coordination server & CLI
+├── program/                 # RISC Zero guest + prover control plane
+├── packages/
+│   ├── crisp-contracts/     # Hardhat deployment + helpers
+│   └── sdk/                 # CRISP-specific TypeScript helpers
+├── crates/                  # Rust libraries for the CLI + services
+├── circuits/                # Noir circuits + verifiers (see [Noir Circuits](/noir-circuits))
+├── scripts/                 # dev.sh, setup.sh, compile_circuits.sh, etc.
+├── enclave.config.yaml      # Ciphernodes + aggregator config
+└── docker-compose.yaml      # Optional multi-node deployment
 ```
 
 ---
 
 ### **Client Application** (`/client`)
 
-The client is a React application built with TypeScript that provides a voting interface:
+The client is a React application built with TypeScript that provides a voting interface and reuses
+the shared [Enclave SDK](/sdk):
 
 - Wallet connection with MetaMask and other wallets
 - Vote encryption using WebAssembly-based FHE encryption before submission
-- Noir Zero-knowledge proof generation for vote validation
+- Noir zero-knowledge proof generation for vote validation
 - Real-time updates on voting status and results
 
 ---
 
 ### **Coordination Server** (`/server`)
 
-The server is a Rust-based coordination service that manages the E3 lifecycle:
+The server is a Rust-based coordination service that manages the E3 lifecycle and drives the same
+SDK from a privileged wallet:
 
 - Listens to blockchain events and coordinates protocol progression
 - Collects encrypted votes from the Smart Contract
@@ -65,17 +71,16 @@ The server is a Rust-based coordination service that manages the E3 lifecycle:
 
 ---
 
-### **ZK Program** (`/program`)
+### **ZK Program + Noir Circuits** (`/program`, `/circuits`)
 
-The core computation logic written in Rust for zkVM:
-
-- Performs computations on encrypted votes
-- Counts votes without decrypting individual ballots
-- Creates proofs of correct computation
+- `program/`: Rust guest code compiled to the RISC Zero zkVM image that runs the CRISP tally logic
+- `circuits/`: Noir circuits + SAFE/GRECO libraries used for membership proofs and encryption checks
+- `scripts/compile_circuits.sh`: compiles Noir circuits, writes verification keys, and emits the
+  `CRISPVerifier.sol` contract used by `packages/crisp-contracts`
 
 ---
 
-### **Smart Contracts** (`/contracts`)
+### **Smart Contracts** (`/packages/crisp-contracts`)
 
 Solidity contracts implementing the E3 program interface:
 
