@@ -29,7 +29,7 @@ impl MultithreadReport {
     }
 
     pub fn to_report(&self) -> FlattenedReport {
-        let mut total_durations: HashMap<String, Duration> = HashMap::new();
+        let mut total_dur: HashMap<String, Duration> = HashMap::new();
         let mut runs: HashMap<String, u64> = HashMap::new();
         let cores_available: usize = match thread::available_parallelism() {
             Ok(count) => count.into(),
@@ -40,14 +40,15 @@ impl MultithreadReport {
         for event in &self.events {
             *runs.entry(event.name.clone()).or_insert(0) += 1;
 
-            total_durations
+            total_dur
                 .entry(event.name.clone())
                 .and_modify(|d| *d += event.duration)
                 .or_insert(event.duration);
         }
 
         // Calculate averages
-        let avg_dur = total_durations
+        let avg_dur = total_dur
+            .clone()
             .into_iter()
             .map(|(name, total)| {
                 let count = runs[&name];
@@ -55,9 +56,17 @@ impl MultithreadReport {
                 (name, avg)
             })
             .collect();
+
+        let mt_total = total_dur
+            .clone()
+            .into_iter()
+            .fold(Duration::ZERO, |acc, (_, item)| acc + item);
+
         FlattenedReport {
             cores_available,
+            total_dur,
             avg_dur,
+            mt_total,
             rayon_threads: self.rayon_threads,
             max_simultaneous_rayon_tasks: self.max_simultaneous_rayon_tasks,
             runs,
@@ -70,6 +79,8 @@ pub struct FlattenedReport {
     rayon_threads: usize,
     max_simultaneous_rayon_tasks: usize,
     avg_dur: HashMap<String, Duration>,
+    total_dur: HashMap<String, Duration>,
+    mt_total: Duration,
     runs: HashMap<String, u64>,
 }
 
@@ -83,16 +94,27 @@ impl std::fmt::Display for FlattenedReport {
         )?;
         writeln!(f, "{:<32} {:>5}", "Cores Available:", self.cores_available)?;
         writeln!(f)?;
-        writeln!(f, "{:<30} {:>15} {:>10}", "Name", "Avg Duration", "Runs")?;
-        writeln!(f, "{}", "-".repeat(58))?;
+        writeln!(
+            f,
+            "{:<30} {:>15} {:>10} {:>15}",
+            "Name", "Avg Duration", "Runs", "Total Duration"
+        )?;
+        writeln!(f, "{}", "-".repeat(73))?;
 
         let mut entries: Vec<_> = self.avg_dur.iter().collect();
         entries.sort_by(|a, b| a.0.cmp(b.0));
 
         for (name, avg_dur) in entries {
             let runs = self.runs.get(name).unwrap_or(&0);
-            writeln!(f, "{:<30} {:>15?} {:>10}", name, avg_dur, runs)?;
+            let total_dur = self.total_dur.get(name).unwrap();
+            writeln!(
+                f,
+                "{:<30} {:>15?} {:>10} {:>15?}",
+                name, avg_dur, runs, total_dur
+            )?;
         }
+
+        writeln!(f, "{:<50} {:>22?}", "Total time", self.mt_total)?;
 
         Ok(())
     }

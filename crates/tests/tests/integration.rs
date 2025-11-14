@@ -157,7 +157,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
 
     // Actor system setup
-    let concurrent_jobs = 1; // Seems like you cannot send more than one job at a time to rayon
+    // Seems like you cannot send more than one job at a time to rayon
+    let concurrent_jobs = 1; // leaving at 1
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let multithread = Multithread::attach(
         rng.clone(),
