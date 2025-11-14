@@ -6533,7 +6533,7 @@ name = "zk-inputs"
 version = "0.1.0"
 dependencies = [
  "bigint-poly",
- "e3-sdk",
+ "e3-bfv-helpers",
  "eyre",
  "fhe",
  "fhe-math",
