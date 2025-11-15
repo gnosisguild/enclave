@@ -14,6 +14,21 @@ and deployment automation.
 - Rotate secrets and backups on a defined cadence.
 - Capture logs for sortition submissions, key publication, and decryption shares.
 
+## When you're selected for a committee
+
+1. **Keyshare generation**
+  - The CLI logs `jobs::selected` when `CommitteeFinalized` includes your operator address.
+  - Verify `~/.local/share/enclave/jobs/<e3_id>/` holds encrypted keyshare material.
+2. **Public key aggregation**
+  - Wait for every member to publish their share; the CLI automatically calls `publishCommittee` once the threshold is met.
+  - Monitor for `CommitteePublished` and accompanying CLI logs.
+3. **Ciphertext + decryption flow**
+  - Subscribe to `CiphertextOutputPublished` and `PlaintextOutputPublished`.
+  - Run `enclave jobs status <e3_id>` to check whether decryption shares were sent.
+
+Missing any of these steps is the fast path to slashing. Keep short-lived dashboards for the
+currently active E3 IDs so you can intervene manually if automation stalls.
+
 ## CLI workflow
 
 ```bash
@@ -44,6 +59,19 @@ enclave start --config /path/to/enclave.config.yaml --peer /dns4/bootstrap.encla
 
 Flags such as `--autowallet` and `--autonetkey` will prompt-less configure secrets when the config
 contains `autowallet: true` and siblings.
+
+## Job state cheat sheet
+
+| State | Trigger | What to verify |
+| --- | --- | --- |
+| `Selected` | Committee finalized | `enclave jobs list` shows new entry |
+| `KeyshareGeneration` | CLI deriving PVSS shares | Disk has encrypted secret + public share |
+| `WaitingForCiphertext` | Key material ready | Node staying synced to event stream |
+| `Decrypting` | Ciphertext output event received | Decryption share stored + submitted |
+| `Completed` | Plaintext emitted | Rewards monitoring sees participation |
+
+Use `enclave jobs details <e3_id>` for deep dives or to reprint diagnostics when coordinating with
+support/governance.
 
 ## Configuration reference
 
@@ -104,3 +132,5 @@ then runs `enclave start -v`. Reuse this pattern for Kubernetes Jobs, Nomad, or 
 - Track CLI logs for `sortition::submitted`, `decryption::share_published`, and errors.
 - Export Prometheus metrics from your infrastructure layer (CPU, bandwidth, disk) since the CLI
   currently logs to stdout.
+- Add alerts for `jobs::error`, `NodeNotEligible`, or `ExitNotReady` so you can correct course
+  before a slash happens.

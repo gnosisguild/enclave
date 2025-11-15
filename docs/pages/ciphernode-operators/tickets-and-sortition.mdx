@@ -4,58 +4,136 @@ title: 'Tickets & Sortition'
 
 # Tickets & Sortition
 
-Tickets (ETK) express your willingness to perform work; sortition converts those staked tickets into
-committee slots. This page explains both the math and the operational workflow.
+> Ticket availability: `availableTickets = floor(ticketTokenBalance / ticketPrice)`
+
+| Stake        | Token                                  | Purpose                                    | Key calls                                                                         |
+| ------------ | -------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| License bond | ENCL                                   | Unlock registration + maintain eligibility | `bondLicense`, `unbondLicense`, `getLicenseBond`                                  |
+| Tickets      | ETK (non-transferable, backed by USDC) | Determine committee probability            | `addTicketBalance`, `removeTicketBalance`, `getTicketBalance`, `availableTickets` |
+
+- Keep ≥ `licenseRequiredBond * 0.8` bonded or `isActive` flips false.
+- Hold ≥ `minTicketBalance` tickets so the registry considers you for committees.
+- Check `hasExitInProgress` / `pendingExits` before rebonding; queued exits block new registrations.
 
 ## Ticket economics
 
-- Tickets are priced in stablecoins and wrapped as non-transferable ETK balances.
-- Your committee probability scales linearly with `availableTickets`. Doubling tickets roughly
-doubles the chance of selection, assuming peers keep balances constant.
-- Ticket balances are snapshotted **before** each `Enclave.request` (specifically, at
-  `requestBlock - 1`). Topping up after the request event does not affect that round.
-- Rewards distribute proportional to committee participation, so dormant tickets still incur capital
-cost without returns.
+- Tickets are priced in stablecoins, minted into non-transferable ETK balances, and track intent to
+  work.
+- Committee probability scales linearly with `availableTickets`; doubling tickets doubles your odds
+  if peers stay constant.
+- Balances are snapshotted at `requestBlock - 1`. Adding tickets after the request event does not
+  change that round.
+- Rewards accrue only when committees form and you complete duties, so idle tickets still incur the
+  opportunity cost of locked capital.
 
-## Sortition phases
+### Managing ticket balance
 
-1. **Request created** — `Enclave.request` emits `E3Requested`. The CLI listens and schedules
-   submissions for operators that are `active` (bonded + tickets + not banned).
-2. **Submission window** — The registry exposes `sortitionSubmissionWindow` (10s on Sepolia). During
-   this period, operators call `submitTicket(e3Id, ticketNumber)` for each ticket they want in the
-   lottery. The CLI parallelizes submissions.
-3. **Committe finalization** — After the window closes and at least `threshold_m` submissions exist,
-   anyone can call `finalizeCommittee(e3Id)`. Winners publish key shares and assemble the committee
-   public key via `publishCommittee`.
-4. **Duty execution** — Selected nodes produce decryption shares for every ciphertext published in
-   that E3.
+```bash
+# Approve USDC (or configured fee token)
+cast send $FEE_TOKEN "approve(address,uint256)" $BONDING 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
 
-## How tickets influence selection
+# Add tickets (mints ETK)
+cast send $BONDING "addTicketBalance(uint256)" 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
 
-For each ticket submitted, the registry derives a pseudo-random value from the request seed. The top
-`t` values (based on threshold) win. Holding more tickets means more entries in that lottery.
-
-```text
-submissionRandom = keccak256(seed, operator, ticketNumber)
+# Remove tickets (burns ETK, returns USDC)
+cast send $BONDING "removeTicketBalance(uint256)" 500e6 --rpc-url $RPC --private-key $OPERATOR_KEY
 ```
 
-Operators can observe submission health through the CLI logs:
+`removeTicketBalance` takes effect immediately. Dropping below the minimum ticket balance makes you
+inactive until you top up again.
 
-```
-INFO sortition::submitted e3_id=42 ticket=3 latency_ms=412
+### Rebalancing tips
+
+- Add tickets one or two requests ahead of anticipated demand to avoid race-condition gas spikes.
+- Keep a small ticket buffer so slashing or removals do not instantly deactivate you.
+- Monitor `ticketPrice()` and `minTicketBalance()` before automating deposits on multiple networks.
+
+## Sortition algorithm
+
+```mermaid
+flowchart TD
+    A[E3Requested event] --> B[Snapshot balances (requestBlock - 1)]
+    B --> C[CLI filters active + ticketed operators]
+    C --> D[Submit numbered tickets via submitTicket]
+    D --> E[TicketSubmitted events expose scores]
+    E --> F[Finalize committee after submission deadline]
+    F --> G[Publish committee public key]
+    G --> H[Execute jobs (keyshares, ciphertext, decryption)]
 ```
 
-If you prefer direct contract interaction, query:
+### 1. Event intake & eligibility
+
+1. `Enclave` requests a committee, triggering `CommitteeRequested` with the round seed, threshold,
+   and submission deadline.
+2. Nodes snapshot balances at `requestBlock - 1` and build an **eligible set** where operators are:
+   - Registered and not banned
+   - `isActive` (bond + ticket minimums satisfied)
+   - Not in the middle of an exit
+
+### 2. Score-based selection
+
+Sortition is deterministic once the seed and eligible set are known:
+
+1. Derive per-ticket scores with `keccak256(seed, operator, ticketNumber)`.
+2. Sort scores and take the top `threshold_n` entries.
+3. Because the same inputs yield the same winners, every honest node converges on the same
+   committee.
+
+### 3. Ticket submissions & committee finalization
+
+1. Operators submit each winning ticket via `submitTicket(e3Id, ticketNumber)` during the
+   `sortitionSubmissionWindow` (10s on Sepolia).
+2. Every submission emits `TicketSubmitted(e3Id, operator, ticketNumber, score)` so you can audit
+   progress.
+3. After the window closes and ≥ `threshold_m` tickets are present, anyone calls
+   `finalizeCommittee(e3Id)`; the registry emits `CommitteeFinalized`.
+4. Once enough key shares are ready, the CLI drives `publishCommittee`, emitting
+   `CommitteePublished` with the aggregated key.
+
+### 4. Committee operations
+
+- Generate and encrypt PVSS key shares for the round.
+- Publish the committee public key once the threshold is met.
+- Stay online for `CiphertextOutputPublished` and respond with decryption shares until
+  `PlaintextOutputPublished` confirms completion.
+
+See the [Operations & Responsibilities](./operations) page for the detailed job lifecycle.
+
+## Parameter reference
 
 ```solidity
-function submissions(uint256 e3Id, address operator) external view returns (uint256[] memory);
+uint32[2] threshold; // [threshold_m, threshold_n]
 ```
+
+- `threshold_m` — Minimum number of operators needed for duties (e.g., 3).
+- `threshold_n` — Committee size (e.g., 5). The CLI submits up to this many tickets per E3.
+- Use `CiphernodeRegistry.sortitionSubmissionWindow()` to size your submission workers.
+
+## Monitoring & troubleshooting
+
+### Signals to watch
+
+- `CommitteeRequested`, `TicketSubmitted`, `CommitteeFinalized`, and `CommitteePublished` events.
+- CLI logs: `sortition::submitted`, `sortition::missed`, `jobs::selected`.
+- Contract reads: `submissions(e3Id, operator)` to confirm ticket IDs and `getCommitteeNodes(e3Id)`
+  post-finalization.
+
+### Common issues
+
+| Symptom                         | Checks                                                                                      | Fix                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Not being selected              | Verify `isActive`, ticket balance ≥ minimum, no bans, and compare tickets to peers          | Add tickets, rebond license, or appeal bans                                       |
+| `SubmissionWindowClosed` errors | Ensure submissions start immediately after `CommitteeRequested` and that RPC latency is low | Increase submission workers, reduce per-ticket delays                             |
+| Committee missing operator      | Confirm CLI derived the same winners (seed + tickets) and that submissions succeeded        | Replay submissions, inspect `TicketSubmitted` logs, retry with correct ticket IDs |
 
 ## Best practices
 
-- **Stagger ticket top-ups**: replenish balances ahead of time to avoid gas spikes right before a
-  request window.
-- **Alert on missed submissions**: set log-based alerts when `NodeNotEligible` or
-  `SubmissionWindowClosed` appears.
-- **Batch networks**: if you operate on multiple chains, keep per-chain ETK balances and run
-  independent CLI supervisors so a congested chain does not block others.
+- **Stagger ticket top-ups** to avoid last-minute gas spikes.
+- **Alert on missed submissions** so humans can intervene before committee deadlines.
+- **Batch networks** by running separate CLI supervisors per chain; congestion on one network should
+  not block another.
+- **Track governance knobs** like `sortitionSubmissionWindow`, `ticketPrice`, and
+  `licenseRequiredBond` so automation adapts when values change.
+
+For deeper visuals, skim `crates/sortition/README` or the ciphernodes architecture docs; they mirror
+the same deterministic score-based flow described here.

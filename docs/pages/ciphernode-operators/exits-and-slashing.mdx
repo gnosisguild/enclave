@@ -9,8 +9,19 @@ Understand how to collect rewards, respond to slashing proposals, and exit the r
 ## Rewards
 
 - Distributed via `BondingRegistry.distributeRewards` (any ERC20)
-- Watch for `RewardsDistributed(e3Id, nodes, amounts)` events
-- Ensure the operator wallet remains funded to claim rewards if additional gas is required
+- Watch for `RewardsDistributed` events and map them back to the source `e3Id`
+- Keep the operator wallet funded; payouts are on-chain transfers and still require gas when
+   claimed through automation scripts
+
+Pair reward monitoring with lightweight probes:
+
+```bash
+cast call $BONDING "pendingExits(address)" $OPERATOR
+cast call $BONDING "getTicketBalance(address)" $OPERATOR
+cast call $BONDING "licenseRequiredBond()"
+```
+
+Seeing rewards fall while balances remain healthy is an early indicator of missed jobs or RPC issues.
 
 ## Slashing lifecycle
 
@@ -26,15 +37,45 @@ Stay alert for:
 - `appealWindow` values per policy (some reasons skip appeals entirely)
 - `updateBanStatus` (governance must lift bans before re-registration)
 
+Policy anatomy:
+
+```solidity
+struct SlashPolicy {
+   uint256 ticketPenalty;
+   uint256 licensePenalty;
+   bool requiresProof;
+   uint64 appealWindow;
+   bool appealable;
+}
+```
+
+Never assume a slash is appealable without fetching the latest policy via `SlashingManager`.
+
 ## Exit process
 
-1. Call `deregisterOperator(bytes32[] calldata siblingProof)`
-   - The proof removes the operator from the registry's incremental Merkle tree (IMT)
-   - Capture it via the CLI logs, `CiphernodeAdded` events, or by querying the registry
-2. Tickets burn immediately; license bonds enter the exit queue with an unlock timestamp
-3. Wait for the configured delay (`exitDelay`, 7 days on Sepolia)
-4. Claim funds with `claimExits(uint256 maxTickets, uint256 maxLicense)`
-   - Use `pendingExits(address)` or `previewClaimable(address)` to check readiness
+1. **Deregister** — Call `deregisterOperator(uint256[] siblingNodes)` with a valid IMT proof. The
+   CLI logs the proof when you first register; stash it alongside your secrets bundle.
+2. **Queue assets** — Ticket balances burn immediately. License bonds slide into the exit queue and
+   set `exitUnlocksAt = block.timestamp + exitDelay`.
+3. **Wait out `exitDelay()`** — Default is 7 days on Sepolia. Automation should poll
+   `exitUnlocksAt(address)` to know when to attempt a claim.
+4. **Claim exits** — Once the unlock timestamp passes, drain the queue:
+
+   ```bash
+   cast send $BONDING "claimExits(uint256,uint256)" $MAX_TICKETS $MAX_LICENSE \
+     --rpc-url $RPC --private-key $OPERATOR_KEY
+   ```
+
+   Pass `type(uint256).max` to withdraw the full pending amount. The call reverts with
+   `ExitNotReady` if neither queue matured yet.
+5. **Cancel if needed** — Calling `registerOperator()` before `claimExits` clears the exit and puts
+   you back into the registry.
+
+Helpful getters:
+
+- `pendingExits(address)` → pending ticket + license totals
+- `exitUnlocksAt(address)` → timestamp when claims unlock
+- `hasExitInProgress(address)` → guard before attempting to re-register
 
 ## Health checklist
 
@@ -50,3 +91,10 @@ Stay alert for:
 - Securely wipe local secrets (`enclave nodes purge` and delete keystores)
 - Revoke RPC credentials and firewall openings
 - Document the exit reason for future audits or compliance
+
+## Slashing prevention checklist
+
+- Keep `enclave jobs list` empty before scheduled maintenance so you do not abandon active work.
+- Alert on `SlashProposed` events tagged with your operator address.
+- Archive CLI + RPC logs for every incident; you need them for appeals.
+- Double-check `isActive` after any ticket removal or license unbond to avoid accidental downtime.

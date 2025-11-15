@@ -46,3 +46,37 @@ Enclave operator procedures under real conditions.
 
 Adapt these scenarios to your internal runbooks and share improvements via PRs so the community keeps
 leveling up—just like the best competitor docs do.
+
+## Lifecycle quick reference
+
+| State | How you get here | How to leave |
+| --- | --- | --- |
+| Unbonded | Fresh wallet, zero ENCL locked | `bondLicense(amount)` |
+| Licensed | Bonded ≥ required amount but not registered | `registerOperator()` |
+| Registered | In the IMT but maybe inactive | `addTicketBalance()` (become active) or `deregisterOperator()` |
+| Active | Registered + ticket + bond minimums met | `removeTicketBalance()` / `unbondLicense()` (drops to inactive) |
+| Inactive | Registered but missing tickets/bond | Top up tickets/bond |
+| ExitPending | `deregisterOperator()` called | `claimExits()` (finish) or `registerOperator()` (cancel) |
+
+Use this alongside the state diagram in the overview page when debugging transitions.
+
+## Troubleshooting cheat sheet
+
+| Symptom | Checks | Fix |
+| --- | --- | --- |
+| Node fails to start | `enclave config show`, RPC connectivity, wallet + password presence | Re-run `enclave init`, reset secrets, verify WebSocket URL |
+| No events flowing | RPC health, `enclave nodes ps`, firewall rules | Switch RPC, restart CLI supervisor, ensure websocket endpoint |
+| Keyshare generation fails | Ensure you were actually selected, disk space, permissions on data dir | Restart node after clearing corrupt job folder, re-import secrets |
+| Decryption stalls | Confirm `CiphertextOutputPublished` fired, job still active, secret share available | Replay event logs, rehydrate job metadata, escalate before appeal window closes |
+
+## Monitoring commands
+
+```bash
+enclave nodes ps
+enclave jobs list
+enclave jobs status <e3_id>
+cast call $BONDING "isActive(address)" $OPERATOR
+```
+
+Pipe these into your favorite exporter or watch scripts so you notice issues before slashing
+proposals land.
