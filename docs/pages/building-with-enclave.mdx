@@ -124,7 +124,7 @@ the Enclave contracts will call the `validateInput()` function on your Program c
 function validateInput(
         address sender,
         bytes memory params
-    ) external returns (bytes memory input, bool success);
+    ) external returns (bytes memory input);
 ```
 
 At a minimum, this function should validate a proof that the given ciphertext is a valid encryption

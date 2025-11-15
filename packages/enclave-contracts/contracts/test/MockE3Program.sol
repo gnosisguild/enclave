@@ -17,8 +17,6 @@ contract MockE3Program is IE3Program {
 
     error InvalidInput();
 
-    constructor() {}
-
     function validate(
         uint256 e3Id,
         uint256,
