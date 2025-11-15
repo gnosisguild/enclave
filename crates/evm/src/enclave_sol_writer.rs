@@ -164,5 +164,3 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .await?;
     Ok(receipt)
 }
-
-fn is_send<P: Send + Sync>(_: &P) {}
