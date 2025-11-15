@@ -16,15 +16,20 @@
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
     "ciphernode:add": "pnpm -C packages/crisp-contracts ciphernode:add",
+    "ciphernode:mint:tokens": "pnpm -C packages/crisp-contracts ciphernode:mint:tokens",
+    "ciphernode:add:self": "pnpm -C packages/crisp-contracts ciphernode:add:self",
+    "deploy:contracts:full:mock": "pnpm -C packages/crisp-contracts deploy:contracts:full:mock",
+    "deploy:contracts:mock": "pnpm -C packages/crisp-contracts deploy:contracts:mock",
+    "deploy:contracts": "pnpm -C packages/crisp-contracts deploy:contracts",
     "test": "pnpm test:e2e",
     "test:circuits:inputs": "node --test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
-    "compile:circuit": "cd circuits && nargo compile",
+    "compile:circuit": "bash ./scripts/compile_circuits.sh",
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report",
-    "build:wasm": "wasm-pack build ./crates/zk-inputs-wasm --no-pack --out-dir ../../packages/crisp-zk-inputs/pkg --out-name index",
-    "publish:packages": "tsx scripts/publish.ts"
+    "publish:packages": "tsx scripts/publish.ts",
+    "setup:testnet": "bash ./scripts/setup_testnet.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",

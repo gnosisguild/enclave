@@ -9,15 +9,13 @@ import {
   MockE3Program,
   MockE3Program__factory as MockE3ProgramFactory,
 } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import { storeDeploymentArgs } from "../utils";
 
 interface MockProgramArgs {
-  mockInputValidator: string;
   hre: HardhatRuntimeEnvironment;
 }
 
 export const deployAndSaveMockProgram = async ({
-  mockInputValidator,
   hre,
 }: MockProgramArgs): Promise<{
   e3Program: MockE3Program;
@@ -26,20 +24,8 @@ export const deployAndSaveMockProgram = async ({
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
-  const preDeployedArgs = readDeploymentArgs("MockE3Program", chain);
-
-  if (
-    preDeployedArgs?.constructorArgs?.mockInputValidator === mockInputValidator
-  ) {
-    const e3ProgramContract = MockE3ProgramFactory.connect(
-      preDeployedArgs.address,
-      signer,
-    );
-    return { e3Program: e3ProgramContract };
-  }
-
   const e3ProgramFactory = await ethers.getContractFactory("MockE3Program");
-  const e3Program = await e3ProgramFactory.deploy(mockInputValidator);
+  const e3Program = await e3ProgramFactory.deploy();
 
   await e3Program.waitForDeployment();
 
@@ -48,7 +34,6 @@ export const deployAndSaveMockProgram = async ({
 
   storeDeploymentArgs(
     {
-      constructorArgs: { mockInputValidator },
       blockNumber,
       address: e3ProgramAddress,
     },

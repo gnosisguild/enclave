@@ -25,12 +25,6 @@ export const HALF_LARGEST_MINIMUM_DEGREE = 28
 export const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE) - 1)
 
 /**
- * Default BFV parameters for the CRISP ZK inputs generator.
- * These are the parameters used for the default testing purposes only.
- */
-export const DEFAULT_BFV_PARAMS = ZKInputsGenerator.withDefaults().getBFVParams() as BFVParams
-
-/**
  * Mock message for masking signature
  */
 export const MESSAGE = 'Vote for round 0'

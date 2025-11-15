@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/sdk",
-  "version": "0.2.0-test",
+  "version": "0.2.3-test",
   "type": "module",
   "author": {
     "name": "gnosisguild",
@@ -9,8 +9,6 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,12 +16,15 @@
       "default": "./dist/index.js"
     }
   },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
-    "build:wasm": "pnpm -C ../../ build:wasm",
-    "compile:circuit": "pnpm -C ../../ compile:circuit",
-    "build": "pnpm compile:circuit && pnpm build:wasm && tsup",
-    "test": "pnpm compile:circuit && vitest --run",
+    "compile:circuit": "cd ../../circuits && nargo compile",
+    "build:wasm": "pnpm -C ../crisp-zk-inputs build",
+    "build": "pnpm build:wasm && pnpm compile:circuit && tsup",
+    "test": "pnpm build:wasm && pnpm compile:circuit && vitest --run",
     "prettier:fix": "pnpm prettier --write .",
     "prettier:check": "pnpm prettier --check .",
     "release": "pnpm build && pnpm publish --access public"
@@ -43,9 +44,9 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
-    "@aztec/bb.js": "0.87.0",
+    "@aztec/bb.js": "0.82.2",
     "@crisp-e3/zk-inputs": "workspace:*",
-    "@noir-lang/noir_js": "1.0.0-beta.9",
+    "@noir-lang/noir_js": "1.0.0-beta.3",
     "@zk-kit/lean-imt": "^2.2.4",
     "poseidon-lite": "^0.3.0",
     "viem": "2.30.6"

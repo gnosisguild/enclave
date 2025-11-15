@@ -128,8 +128,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @param operator Address of the operator to check
     modifier noExitInProgress(address operator) {
         Operator memory op = operators[operator];
-        if (op.exitRequested && block.timestamp < op.exitUnlocksAt)
+        if (op.exitRequested && block.timestamp < op.exitUnlocksAt) {
             revert ExitInProgress();
+        }
         _;
     }
 
@@ -439,8 +440,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         require(ticketClaim > 0 || licenseClaim > 0, ExitNotReady());
 
         if (ticketClaim > 0) ticketToken.payout(msg.sender, ticketClaim);
-        if (licenseClaim > 0)
+        if (licenseClaim > 0) {
             licenseToken.safeTransfer(msg.sender, licenseClaim);
+        }
     }
 
     // ======================

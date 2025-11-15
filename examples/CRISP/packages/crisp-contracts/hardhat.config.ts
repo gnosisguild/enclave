@@ -9,6 +9,7 @@ import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
 import {
   ciphernodeAdd,
   ciphernodeAdminAdd,
+  ciphernodeMintTokens,
 } from "@enclave-e3/contracts/tasks/ciphernode";
 import dotenv from "dotenv";
 
@@ -74,7 +75,7 @@ const config: HardhatUserConfig = {
     hardhatToolboxMochaEthersPlugin,
     hardhatVerify,
   ],
-  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd],
+  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
   networks: {
     hardhat: {
       type: "edr-simulated",
@@ -155,7 +156,6 @@ const config: HardhatUserConfig = {
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
-      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
       "@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
     ],

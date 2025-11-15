@@ -23,8 +23,9 @@ use e3_evm::{
         ProviderConfig,
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
+    EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
+    HistoricalEventCoordinator,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -54,6 +55,8 @@ pub struct CiphernodeBuilder {
     keyshare: Option<KeyshareKind>,
     logging: bool,
     multithread_cache: Option<Addr<Multithread>>,
+    multithread_concurrent_jobs: Option<usize>,
+    multithread_capture_events: bool,
     plaintext_agg: bool,
     pubkey_agg: bool,
     rng: SharedRng,
@@ -98,12 +101,14 @@ impl CiphernodeBuilder {
             multithread_cache: None,
             plaintext_agg: false,
             pubkey_agg: false,
+            multithread_concurrent_jobs: None,
             rng,
             source_bus: None,
             sortition_backend: SortitionBackend::score(),
             testmode_errors: false,
             testmode_history: false,
             threads: None,
+            multithread_capture_events: false,
             threshold_plaintext_agg: false,
         }
     }
@@ -191,10 +196,33 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Setup how many threads to use within the multithread actor
-    #[deprecated(note = "This method is under construction and should not be used yet")]
+    /// Setup how many threads to use within the multithread actor for it's rayon based workload
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.threads = Some(threads);
+        self
+    }
+
+    /// This will provide one thread for the actor model and use all other threads for
+    /// rayon based workloads
+    pub fn with_max_threads(mut self) -> Self {
+        self.threads = Some(Multithread::get_max_threads_minus(1));
+        self
+    }
+
+    /// This will save the given number of threads from being used by the rayon threadpool
+    pub fn with_max_threads_minus(mut self, threads: usize) -> Self {
+        self.threads = Some(Multithread::get_max_threads_minus(threads));
+        self
+    }
+
+    /// Set the number of concurrent jobs defaults to 1
+    pub fn with_multithread_concurrent_jobs(mut self, jobs: usize) -> Self {
+        self.multithread_concurrent_jobs = if jobs >= 1 { Some(jobs) } else { None };
+        self
+    }
+
+    pub fn with_multithread_capture_events(mut self) -> Self {
+        self.multithread_capture_events = true;
         self
     }
 
@@ -303,6 +331,9 @@ impl CiphernodeBuilder {
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
+        let coordinator = HistoricalEventCoordinator::setup(local_bus.clone());
+        let processor = coordinator.clone().recipient();
+
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
         for chain in self
@@ -316,6 +347,7 @@ impl CiphernodeBuilder {
                     .ensure_write_provider(&repositories, chain, cipher)
                     .await?;
                 EnclaveSol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     write_provider.clone(),
@@ -330,6 +362,7 @@ impl CiphernodeBuilder {
             if self.contract_components.enclave_reader {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 EnclaveSolReader::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.enclave.address(),
@@ -343,6 +376,7 @@ impl CiphernodeBuilder {
             if self.contract_components.bonding_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 BondingRegistrySol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.bonding_registry.address(),
@@ -356,6 +390,7 @@ impl CiphernodeBuilder {
             if self.contract_components.ciphernode_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 CiphernodeRegistrySol::attach(
+                    &processor,
                     &local_bus,
                     read_provider.clone(),
                     &chain.contracts.ciphernode_registry.address(),
@@ -370,7 +405,7 @@ impl CiphernodeBuilder {
                     .await
                 {
                     Ok(write_provider) => {
-                        let writer = CiphernodeRegistrySol::attach_writer(
+                        let _writer = CiphernodeRegistrySol::attach_writer(
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
@@ -391,6 +426,9 @@ impl CiphernodeBuilder {
                 }
             }
         }
+
+        // We start after all readers have registered
+        coordinator.do_send(CoordinatorStart);
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&local_bus, store.clone());
@@ -463,6 +501,8 @@ impl CiphernodeBuilder {
             self.rng.clone(),
             self.cipher.clone(),
             self.threads.unwrap_or(1),
+            self.multithread_concurrent_jobs.unwrap_or(1),
+            self.multithread_capture_events,
         );
 
         // Set the cache

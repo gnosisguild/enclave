@@ -115,9 +115,11 @@ export const deployAndSaveBondingRegistry = async ({
   const ProxyCF = await ethers.getContractFactory(
     "TransparentUpgradeableProxy",
   );
-  const proxy = await ProxyCF.deploy(bondingRegistryAddress, signer, initData);
+  const proxy = await ProxyCF.deploy(bondingRegistryAddress, owner, initData);
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
+
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
 
   storeDeploymentArgs(
     {
@@ -132,9 +134,15 @@ export const deployAndSaveBondingRegistry = async ({
         minTicketBalance: minTicketBalance.toString(),
         exitDelay: exitDelay.toString(),
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: bondingRegistryAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: bondingRegistryAddress,
     },
     "BondingRegistry",
     chain,
@@ -208,10 +216,27 @@ export const upgradeAndSaveBondingRegistry = async ({
   );
   await upgradeTx.wait();
 
+  const existingProxyRecords = preDeployedArgs.proxyRecords
+    ? Object.fromEntries(
+        Object.entries(preDeployedArgs.proxyRecords).filter(
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+
+  const proxyRecords: Record<string, string | string[]> = {
+    ...existingProxyRecords,
+    implementationAddress: newImplementationAddress,
+  };
+
+  if (initData !== "0x") {
+    proxyRecords.initData = initData;
+  }
+
   storeDeploymentArgs(
     {
       ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
+      proxyRecords,
     },
     "BondingRegistry",
     chain,

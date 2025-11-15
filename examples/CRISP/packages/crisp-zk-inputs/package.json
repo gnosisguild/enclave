@@ -2,25 +2,35 @@
   "name": "@crisp-e3/zk-inputs",
   "type": "module",
   "description": "Core logic to pre-compute CRISP ZK inputs (WASM/JavaScript bindings).",
-  "version": "0.2.0-test",
+  "version": "0.2.3-test",
   "license": "LGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/gnosisguild/enclave"
   },
+  "main": "main.js",
+  "module": "main.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./main.js",
+      "default": "./main.js"
+    }
+  },
   "files": [
-    "pkg/index_bg.wasm",
-    "pkg/index.js",
-    "pkg/index_bg.js",
-    "pkg/index.d.ts"
+    "dist/",
+    "main.js"
   ],
   "publishConfig": {
     "access": "public"
   },
-  "main": "pkg/index.js",
-  "types": "pkg/index.d.ts",
-  "sideEffects": [
-    "./pkg/index.js",
-    "./pkg/snippets/*"
-  ]
+  "scripts": {
+    "build": "rm -rf dist && node scripts/build.js"
+  },
+  "devDependencies": {
+    "execa": "^8.0.1",
+    "replace-in-file": "^7.2.0",
+    "wasm-pack": "^0.13.1"
+  }
 }

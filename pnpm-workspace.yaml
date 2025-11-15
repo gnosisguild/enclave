@@ -12,3 +12,4 @@ packages:
   - packages/enclave-contracts
   - templates/default
   - templates/default/client
+linkWorkspacePackages: true

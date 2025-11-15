@@ -78,7 +78,6 @@ contract FakeEnclave {
             expiration: block.timestamp + 1 days,
             encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
             e3Program: 0x7F3E4df648B8Cb96C1D343be976b91B97CaD5c21,
-            inputValidator: 0xA51D5E87c0C82dDEBfa4E7E515B2D8Eea8f3e4f2,
             decryptionVerifier: 0x4B0D8c2E5f7a6c832f8b16d3aB0e7F5d9E9B24b1,
             e3ProgramParams: abi.encode(42, "testParams"),
             customParams: abi.encode("custom_params"),
@@ -100,7 +99,6 @@ struct E3 {
     address e3Program;
     bytes e3ProgramParams;
     bytes customParams;
-    address inputValidator;
     address decryptionVerifier;
     bytes32 committeePublicKey;
     bytes32 ciphertextOutput;

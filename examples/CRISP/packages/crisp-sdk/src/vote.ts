@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE } from './constants'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
@@ -61,13 +61,16 @@ export const calculateValidIndicesForPlaintext = (totalVotingPower: bigint, degr
  * @param bfvParams The BFV parameters to use for encoding
  * @returns The encoded vote as a string
  */
-export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: bigint, bfvParams?: BFVParams): string[] => {
+export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: bigint): string[] => {
+  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  const bfvParams = zkInputsGenerator.getBFVParams() as BFVParams
+
   validateVote(votingMode, vote, votingPower)
 
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
       const voteArray = []
-      const length = bfvParams?.degree || DEFAULT_BFV_PARAMS.degree
+      const length = bfvParams.degree
       const halfLength = length / 2
       const yesBinary = toBinary(vote.yes).split('')
       const noBinary = toBinary(vote.no).split('')
@@ -153,15 +156,16 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
 }
 
 export const encryptVote = async (encodedVote: string[], publicKey: Uint8Array): Promise<Uint8Array> => {
-  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(
-    DEFAULT_BFV_PARAMS.degree,
-    DEFAULT_BFV_PARAMS.plaintextModulus,
-    DEFAULT_BFV_PARAMS.moduli,
-  )
+  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
 
   const vote = BigInt64Array.from(encodedVote.map(BigInt))
 
   return zkInputsGenerator.encryptVote(publicKey, vote)
+}
+
+export const generatePublicKey = async (): Promise<Uint8Array> => {
+  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
+  return zkInputsGenerator.generatePublicKey()
 }
 
 /**
@@ -183,7 +187,6 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   encodedVote,
   publicKey,
   previousCiphertext,
-  bfvParams = DEFAULT_BFV_PARAMS,
   merkleData,
   message,
   signature,
@@ -191,11 +194,13 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
   slotAddress,
   isFirstVote,
 }: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
+  const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
+
+  const bfvParams = zkInputsGenerator.getBFVParams() as BFVParams
+
   if (encodedVote.length !== bfvParams.degree) {
     throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
   }
-
-  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(bfvParams.degree, bfvParams.plaintextModulus, bfvParams.moduli)
 
   const vote = BigInt64Array.from(encodedVote.map(BigInt))
 
@@ -224,7 +229,6 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
  * @param voter The voter's address
  * @param publicKey The voter's public key
  * @param previousCiphertext The previous ciphertext
- * @param bfvParams The BFV parameters
  * @param merkleRoot The merkle root of the census tree
  * @param slotAddress The voter's slot address
  * @param isFirstVote Whether this is the first vote for this slot
@@ -233,19 +237,18 @@ export const encryptVoteAndGenerateCRISPInputs = async ({
 export const generateMaskVote = async (
   publicKey: Uint8Array,
   previousCiphertext: Uint8Array,
-  bfvParams = DEFAULT_BFV_PARAMS,
   merkleRoot: bigint,
   slotAddress: string,
   isFirstVote: boolean,
 ): Promise<CRISPCircuitInputs> => {
+  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
+
   const plaintextVote: IVote = {
     yes: 0n,
     no: 0n,
   }
 
-  const encodedVote = encodeVote(plaintextVote, VotingMode.GOVERNANCE, 0n, bfvParams)
-
-  const zkInputsGenerator: ZKInputsGenerator = new ZKInputsGenerator(bfvParams.degree, bfvParams.plaintextModulus, bfvParams.moduli)
+  const encodedVote = encodeVote(plaintextVote, VotingMode.GOVERNANCE, 0n)
 
   const vote = BigInt64Array.from(encodedVote.map(BigInt))
 

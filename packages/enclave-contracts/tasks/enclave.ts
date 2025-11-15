@@ -141,16 +141,8 @@ export const requestCommittee = task(
       );
 
       let e3ProgramParams = e3Params;
-
-      const mockInputValidatorArgs = readDeploymentArgs(
-        "MockInputValidator",
-        hre.globalOptions.network,
-      );
       if (e3ProgramParams === ZeroAddress) {
-        if (!mockInputValidatorArgs) {
-          throw new Error("MockInputValidator deployment arguments not found");
-        }
-        e3ProgramParams = zeroPadValue(mockInputValidatorArgs.address, 32);
+        e3ProgramParams = zeroPadValue(e3ProgramParams, 32);
       }
 
       let computeProviderParams = computeParams;
@@ -169,6 +161,11 @@ export const requestCommittee = task(
           32,
         );
       }
+
+      console.log("Preparing request with the following parameters:", {
+        computeParams,
+        computeProviderParams,
+      });
 
       const requestParams = {
         threshold: [thresholdQuorum, thresholdTotal] as [number, number],

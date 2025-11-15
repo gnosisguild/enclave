@@ -26,7 +26,7 @@ export const upgradeBondingRegistry = async () => {
     );
   }
 
-  if (!preDeployedArgs?.implementationAddress) {
+  if (!preDeployedArgs?.proxyRecords?.implementationAddress) {
     throw new Error(
       "Existing deployment is not proxy-based. Cannot upgrade non-proxy deployments.",
     );

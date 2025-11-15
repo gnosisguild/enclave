@@ -8,22 +8,38 @@ pragma solidity >=0.8.27;
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
-import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "./CRISPVerifier.sol";
 
 contract CRISPProgram is IE3Program, Ownable {
+    /// @notice a structure that holds the round data
+    struct RoundData {
+        /// @notice The governance token address.
+        address token;
+        /// @notice The minimum balance required to pass the validation.
+        uint256 balanceThreshold;
+        /// @notice The Merkle root of the census.
+        uint256 censusMerkleRoot;
+    }
+
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     HonkVerifier private immutable HONK_VERIFIER;
     bytes32 public imageId;
+
+    /// @notice the round data
+    RoundData public roundData;
+    /// @notice whether the round data has been set
+    bool public isDataSet;
+
+    /// @notice Mapping to store votes. Each elegible voter has their own slot
+    /// to store their vote.
+    mapping(address => bytes) public voteSlots;
 
     /// @notice Half of the largest minimum degree used to fit votes
     /// inside the plaintext polynomial
@@ -33,42 +49,62 @@ contract CRISPProgram is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
 
-    // Events
-    event InputValidatorUpdated(address indexed newValidator);
-
     // Errors
     error CallerNotAuthorized();
     error E3AlreadyInitialized();
     error E3DoesNotExist();
     error EnclaveAddressZero();
     error VerifierAddressZero();
-    error InvalidInputValidatorFactory();
+
+    /// @notice The error emitted when the honk verifier address is invalid.
     error InvalidHonkVerifier();
+    /// @notice The error emitted when the input data is empty.
+    error EmptyInputData();
+    /// @notice The error emitted when the input data is invalid.
+    error InvalidInputData(bytes reason);
+    /// @notice The error emitted when the Noir proof is invalid.
+    error InvalidNoirProof();
+    /// @notice The error emitted when the round data is not set.
+    error RoundDataNotSet();
+    /// @notice The error emitted when trying to set the round data more than once.
+    error RoundDataAlreadySet();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
     /// @param _verifier The RISC Zero verifier address
-    /// @param _inputValidatorFactory The input validator factory address
     /// @param _honkVerifier The honk verifier address
     /// @param _imageId The image ID for the guest program
-    constructor(
-        IEnclave _enclave,
-        IRiscZeroVerifier _verifier,
-        CRISPInputValidatorFactory _inputValidatorFactory,
-        HonkVerifier _honkVerifier,
-        bytes32 _imageId
-    ) Ownable(msg.sender) {
+    constructor(IEnclave _enclave, IRiscZeroVerifier _verifier, HonkVerifier _honkVerifier, bytes32 _imageId)
+        Ownable(msg.sender)
+    {
         require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
-        require(address(_inputValidatorFactory) != address(0), InvalidInputValidatorFactory());
         require(address(_honkVerifier) != address(0), InvalidHonkVerifier());
 
         enclave = _enclave;
         verifier = _verifier;
-        INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
         HONK_VERIFIER = _honkVerifier;
         authorizedContracts[address(_enclave)] = true;
         imageId = _imageId;
+    }
+
+    /// @notice Sets the Round data. Can only be set once.
+    /// @param _root The Merkle root to set.
+    /// @param _token The governance token address.
+    /// @param _balanceThreshold The minimum balance required.
+    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold)
+        external
+        onlyOwner
+    {
+        if (isDataSet) revert RoundDataAlreadySet();
+
+        isDataSet = true;
+
+        roundData = RoundData({
+            token: _token,
+            balanceThreshold: _balanceThreshold,
+            censusMerkleRoot: _root
+        });
     }
 
     /// @notice Set the Image ID for the guest program
@@ -80,6 +116,7 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @notice Set the RISC Zero verifier address
     /// @param _verifier The new RISC Zero verifier address
     function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
+        if (address(_verifier) == address(0)) revert VerifierAddressZero();
         verifier = _verifier;
     }
 
@@ -95,16 +132,42 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param e3ProgramParams The E3 program parameters
     function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata)
         external
-        returns (bytes32, IInputValidator inputValidator)
+        returns (bytes32)
     {
         require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        // Deploy a new input validator
-        inputValidator = IInputValidator(INPUT_VALIDATOR_FACTORY.deploy(address(HONK_VERIFIER), owner()));
+        return ENCRYPTION_SCHEME_ID;
+    }
 
-        return (ENCRYPTION_SCHEME_ID, inputValidator);
+    function validateInput(address, bytes memory data) external returns (bytes memory input) {
+        // it should only be called via Enclave for now
+        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
+        // we need to ensure that the CRISP admin set the merkle root of the census
+        // @todo update this once we have all components working
+        // if (!isDataSet) revert RoundDataNotSet();
+
+        if (data.length == 0) revert EmptyInputData();
+
+        (bytes memory noirProof, bytes32[] memory noirPublicInputs, bytes memory vote, address slot) =
+            abi.decode(data, (bytes, bytes32[], bytes, address));
+
+        /// @notice we need to check whether the slot is empty.
+        /// if the slot is empty
+        /// @todo pass it to the verifier
+        // bool isFirstVote = voteSlots[slot].length == 0;
+
+        // Check if the ciphertext was encrypted correctly
+        if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
+            revert InvalidNoirProof();
+        }
+
+        /// @notice Store the vote in the correct slot.
+        voteSlots[slot] = vote;
+
+        // return the vote so that it can be stored in Enclave's input merkle tree
+        input = vote;
     }
 
     /// @notice Decode the tally from the plaintext output

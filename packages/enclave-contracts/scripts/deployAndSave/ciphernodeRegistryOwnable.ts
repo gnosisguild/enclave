@@ -91,11 +91,13 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   );
   const proxy = await ProxyCF.deploy(
     ciphernodeRegistryAddress,
-    signer,
+    owner,
     initData,
   );
   await proxy.waitForDeployment();
   const proxyAddress = await proxy.getAddress();
+
+  const proxyAdminAddress = await getProxyAdmin(ethers.provider, proxyAddress);
 
   storeDeploymentArgs(
     {
@@ -104,9 +106,15 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
         enclaveAddress: enclaveAddress,
         submissionWindow: submissionWindow.toString(),
       },
+      proxyRecords: {
+        initData,
+        initialOwner: owner,
+        proxyAddress,
+        proxyAdminAddress,
+        implementationAddress: ciphernodeRegistryAddress,
+      },
       blockNumber,
       address: proxyAddress,
-      implementationAddress: ciphernodeRegistryAddress,
     },
     "CiphernodeRegistryOwnable",
     chain,
@@ -185,11 +193,25 @@ export const upgradeAndSaveCiphernodeRegistryOwnable = async ({
   );
   await upgradeTx.wait();
 
+  const existingProxyRecords = preDeployedArgs.proxyRecords
+    ? Object.fromEntries(
+        Object.entries(preDeployedArgs.proxyRecords).filter(
+          ([, value]) => value !== undefined,
+        ),
+      )
+    : {};
+
+  const proxyRecords: Record<string, string | string[]> = {
+    ...existingProxyRecords,
+    implementationAddress: newImplementationAddress,
+  };
+
+  if (initData !== "0x") {
+    proxyRecords.initData = initData;
+  }
+
   storeDeploymentArgs(
-    {
-      ...preDeployedArgs,
-      implementationAddress: newImplementationAddress,
-    },
+    { ...preDeployedArgs, proxyRecords },
     "CiphernodeRegistryOwnable",
     chain,
   );
