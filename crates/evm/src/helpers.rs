@@ -26,7 +26,8 @@ use alloy::{
         Authorization,
     },
 };
-use anyhow::{Context, Result};
+use alloy_primitives::ChainId;
+use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
@@ -121,12 +122,20 @@ pub type ConcreteReadProvider = FillProvider<
     RootProvider,
 >;
 
+// pub type ConcreteWriteProvider = FillProvider<
+//     JoinFill<
+//         JoinFill<
+//             Identity,
+//             JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+//         >,
+//         WalletFiller<EthereumWallet>,
+//     >,
+//     RootProvider,
+// >;
+
 pub type ConcreteWriteProvider = FillProvider<
     JoinFill<
-        JoinFill<
-            Identity,
-            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
-        >,
+        JoinFill<JoinFill<JoinFill<Identity, GasFiller>, ChainIdFiller>, NonceFiller>,
         WalletFiller<EthereumWallet>,
     >,
     RootProvider,
@@ -155,15 +164,23 @@ impl ProviderConfig {
         signer: &PrivateKeySigner,
     ) -> Result<EthProviderWriter<ConcreteWriteProvider>> {
         let wallet = EthereumWallet::from(signer.clone());
-
+        let chain_id = signer.chain_id().unwrap(); // XXX
         let provider = if self.rpc.is_websocket() {
             ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .with_gas_estimation()
+                .with_chain_id(chain_id)
+                .with_cached_nonce_management()
                 .wallet(wallet)
                 .connect_ws(self.create_ws_connect()?)
                 .await
                 .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
             ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .with_gas_estimation()
+                .with_chain_id(chain_id)
+                .with_cached_nonce_management()
                 .wallet(wallet)
                 .connect_client(self.create_http_client()?)
         };
