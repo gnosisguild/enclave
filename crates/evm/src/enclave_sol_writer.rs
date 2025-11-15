@@ -157,5 +157,6 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     info!("publishPlaintextOutput() e3_id={:?}", e3_id);
     let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
+    drop(guard);
     Ok(receipt)
 }
