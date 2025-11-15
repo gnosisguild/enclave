@@ -448,17 +448,13 @@ pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
     let ticket_number = U256::from(ticket_number);
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
+    let receipt = contract
         .submitTicket(e3_id, ticket_number)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
     Ok(receipt)
 }
 
@@ -468,15 +464,13 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
     e3_id: E3id,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract.finalizeCommittee(e3_id).nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
+    let receipt = contract
+        .finalizeCommittee(e3_id)
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
     Ok(receipt)
 }
 
@@ -493,17 +487,13 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
+    let receipt = contract
         .publishCommittee(e3_id, nodes_vec, public_key)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
     Ok(receipt)
 }
 

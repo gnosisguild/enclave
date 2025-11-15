@@ -149,21 +149,20 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
 
+    // TODO: this is business logic as is specific to this event move this to core
     // Wait for ciphertext output transaction to propagate
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-
     let contract = IEnclave::new(contract_address, provider.provider());
     info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-    let builder = contract
+
+    let receipt = contract
         .publishPlaintextOutput(e3_id, decrypted_output, proof)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
+        .send()
+        .await?
+        .get_receipt()
+        .await?;
     Ok(receipt)
 }
+
+fn is_send<P: Send + Sync>(_: &P) {}
