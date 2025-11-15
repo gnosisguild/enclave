@@ -100,12 +100,12 @@ pub type ConcreteWriteProvider = FillProvider<
     JoinFill<
         JoinFill<
             JoinFill<
-                Identity,
+                alloy::providers::Identity,
                 JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
             >,
-            WalletFiller<EthereumWallet>,
+            NonceFiller<SimpleNonceManager>,
         >,
-        NonceFiller<SimpleNonceManager>,
+        WalletFiller<EthereumWallet>,
     >,
     RootProvider,
 >;
@@ -136,15 +136,15 @@ impl ProviderConfig {
 
         let provider = if self.rpc.is_websocket() {
             ProviderBuilder::new()
-                .wallet(wallet)
                 .with_simple_nonce_management()
+                .wallet(wallet)
                 .connect_ws(self.create_ws_connect()?)
                 .await
                 .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
             ProviderBuilder::new()
-                .wallet(wallet)
                 .with_simple_nonce_management()
+                .wallet(wallet)
                 .connect_client(self.create_http_client()?)
         };
 
