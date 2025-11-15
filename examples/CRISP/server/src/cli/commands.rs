@@ -328,7 +328,7 @@ pub async fn decrypt_and_publish_result(
 }
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
-    build_bfv_params_from_set_arc(BfvParams::InsecureSet2048_1032193_1.into())
+    build_bfv_params_from_set_arc(BfvParams::InsecureSet512_10_1.into())
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {

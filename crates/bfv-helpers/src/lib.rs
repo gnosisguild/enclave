@@ -94,6 +94,16 @@ impl BfvParams {
             })
             .collect()
     }
+
+    pub fn to_tuple(self) -> (usize, u64, &'static [u64], Option<&'static str>) {
+        let set: BfvParamSet = self.into();
+        (
+            set.degree,
+            set.plaintext_modulus,
+            set.moduli,
+            set.error1_variance,
+        )
+    }
 }
 
 impl From<BfvParams> for BfvParamSet {
@@ -156,6 +166,18 @@ pub struct BfvParamSet {
     pub moduli: &'static [u64],
     /// Optional error2 variance (as decimal string). If None, defaults to "10"
     pub error1_variance: Option<&'static str>,
+}
+
+impl BfvParamSet {
+    /// Build the BfvParamSet into an fhe.rs BfvParameters struct
+    pub fn build(self) -> BfvParameters {
+        build_bfv_params_from_set(self)
+    }
+
+    /// Build the BfvParamSet into an fhe.rs Arc<BfvParameters> struct
+    pub fn build_arc(self) -> Arc<BfvParameters> {
+        Arc::new(self.build())
+    }
 }
 
 /// Builds BFV parameters from a `BfvParamSet`.
