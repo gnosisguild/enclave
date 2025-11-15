@@ -95,46 +95,29 @@
       "address": "0x9e4b733ACa2b5af39185fc4C3A9bc65a60ac8C18"
     },
     "MockComputeProvider": {
-      "blockNumber": 9621863,
-      "address": "0xCD1c93B0353DFb4f6f65aB9CF4f7Cb3e545359F8"
+      "blockNumber": 23,
+      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 9621864,
-      "address": "0xf3260Bc8C6f2B94f7F7fD8f1C6A8972356432308"
-    },
-    "MockInputValidator": {
-      "blockNumber": 9621865,
-      "address": "0xe0A4A8DEBb24Ec9b7d79A97a4Cd3e10Dd52989E5"
+      "blockNumber": 24,
+      "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
     },
     "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0xe0A4A8DEBb24Ec9b7d79A97a4Cd3e10Dd52989E5"
-      },
-      "blockNumber": 9621866,
-      "address": "0x2103196DFA7817D262eEDB3B846E69Dd7Bd76f4C"
+      "blockNumber": 25,
+      "address": "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
     },
     "MockRISC0Verifier": {
-      "address": "0x6c39658221603adBd02f956574efdb3c75822F0f"
-    },
-    "MockCRISPInputValidator": {
-      "address": "0x1D396BC1334900c9B1b62672B34127A1A127c718"
-    },
-    "CRISPInputValidatorFactory": {
-      "address": "0x2D71D33BaA1FBA9dd677FA31863aA619AF0488E9",
-      "constructorArgs": {
-        "inputValidator": "0x764364c0e4C3072A7DF777F4037907fdf2f1A89f"
-      }
+      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F"
     },
     "HonkVerifier": {
-      "address": "0x957857a5EBe9177F2573cB3356e4c5e3eC88f42a"
+      "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
     },
     "CRISPProgram": {
-      "address": "0x029d937aFA153a6AF8CD1ff91B51b86Ca68fDa4b",
+      "address": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
       "constructorArgs": {
-        "enclave": "0x9e4b733ACa2b5af39185fc4C3A9bc65a60ac8C18",
-        "verifierAddress": "0x6c39658221603adBd02f956574efdb3c75822F0f",
-        "inputValidatorAddress": "0x764364c0e4C3072A7DF777F4037907fdf2f1A89f",
-        "honkVerifierAddress": "0x957857a5EBe9177F2573cB3356e4c5e3eC88f42a",
+        "enclave": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "verifierAddress": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+        "honkVerifierAddress": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     },

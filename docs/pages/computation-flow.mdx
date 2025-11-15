@@ -57,12 +57,12 @@ During this phase, Data Providers — who may include individual users, applicat
    ensure they are valid for the requested E3. Some of these proofs are generic (e.g., proof of
    valid encryption) while others will be specific to your application.
 3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to the Enclave contract, which will
-   call the `validate` function on your E3P InputValidator smart contract. The input hash is then
+   call the `validateInput` function on your E3P smart contract. The input hash is then
    added to a Merkle tree, the root of which can later be used to anchor proofs of correct execution
    of your E3 Program.
 
    ```solidity
-   function validate(
+   function validateInput(
       address sender,
       bytes memory data
    ) external returns (bytes memory input);

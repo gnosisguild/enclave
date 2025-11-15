@@ -103,7 +103,7 @@ impl ComputeProvider for Risc0Provider {
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import {CRISPBase, IEnclave, IE3Program, IInputValidator} from "evm_base/contracts/CRISPBase.sol";
+import {CRISPBase, IEnclave, IE3Program} from "evm_base/contracts/CRISPBase.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 
 contract MyE3Program is CRISPBase {
@@ -111,23 +111,19 @@ contract MyE3Program is CRISPBase {
     bytes32 public constant ENCRYPTION_SCHEME_ID = /* Your Encryption Scheme ID */;
 
     IRiscZeroVerifier public verifier;
-    IInputValidator public inputValidator;
 
     constructor(
         IEnclave _enclave,
-        IInputValidator _inputValidator,
         IRiscZeroVerifier _verifier
     ) {
-        initialize(_enclave, _inputValidator, _verifier);
+        initialize(_enclave, _verifier);
     }
 
     function initialize(
         IEnclave _enclave,
-        IInputValidator _inputValidator,
         IRiscZeroVerifier _verifier
     ) public {
         CRISPBase.initialize(_enclave);
-        inputValidator = _inputValidator;
         verifier = _verifier;
     }
 

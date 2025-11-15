@@ -11,14 +11,14 @@ import {
 } from "../interfaces/IComputeProvider.sol";
 
 contract MockComputeProvider is IComputeProvider {
-    error invalidParams();
+    error InvalidParams();
 
     function validate(
         uint256,
         uint256,
         bytes memory params
     ) external pure returns (IDecryptionVerifier decryptionVerifier) {
-        require(params.length == 32, invalidParams());
+        require(params.length == 32, InvalidParams());
         // solhint-disable no-inline-assembly
         assembly {
             decryptionVerifier := mload(add(params, 32))

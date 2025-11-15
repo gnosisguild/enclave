@@ -76,12 +76,10 @@ Solidity contracts implementing the E3 program interface:
 Main E3 program contract implementing the `IE3Program` interface:
 - `validate()`: Validates voting parameters and setup
 - `verify()`: Verifies zkVM proofs of computation
-
-#### **CRISPInputValidator.sol**
-Handles vote validation and zero-knowledge proof verification:
-- Validates encrypted vote format
-- Verifies voter eligibility proofs
-- Ensures vote uniqueness
+- `validateInput()`: Handles vote validation and zero-knowledge proof verification:
+    - Validates encrypted vote format
+    - Verifies voter eligibility proofs
+    - Ensures vote uniqueness
 
 #### **CRISPVerifier.sol**
 Noir verifier for proof of correct encryption:
