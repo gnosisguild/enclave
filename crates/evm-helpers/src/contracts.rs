@@ -50,7 +50,6 @@ sol! {
         address e3Program;
         bytes e3ProgramParams;
         bytes customParams;
-        address inputValidator;
         address decryptionVerifier;
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;

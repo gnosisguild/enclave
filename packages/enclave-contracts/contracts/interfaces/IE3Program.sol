@@ -5,8 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import { IInputValidator } from "./IInputValidator.sol";
-
 /**
  * @title IE3Program
  * @notice Interface for E3 program validation and verification
@@ -20,15 +18,12 @@ interface IE3Program {
     /// @param e3ProgramParams ABI encoded E3 program parameters
     /// @param computeProviderParams ABI encoded compute provider parameters
     /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation
-    /// @return inputValidator The input validator to be used for the computation
     function validate(
         uint256 e3Id,
         uint256 seed,
         bytes calldata e3ProgramParams,
         bytes calldata computeProviderParams
-    )
-        external
-        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);
+    ) external returns (bytes32 encryptionSchemeId);
 
     /// @notice Verify the ciphertext output of an E3 computation
     /// @dev This function is called by the Enclave contract when ciphertext output is published
@@ -41,4 +36,14 @@ interface IE3Program {
         bytes32 ciphertextOutputHash,
         bytes memory proof
     ) external returns (bool success);
+
+    /// @notice Validate and process input data for a computation
+    /// @dev This function is called by the Enclave contract when input is published
+    /// @param sender The account that is submitting the input
+    /// @param data The input data to be validated
+    /// @return input The decoded, policy-approved application payload
+    function validateInput(
+        address sender,
+        bytes memory data
+    ) external returns (bytes memory input);
 }

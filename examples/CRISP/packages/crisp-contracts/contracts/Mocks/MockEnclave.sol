@@ -7,7 +7,6 @@ pragma solidity >=0.8.27;
 
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
-import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IDecryptionVerifier} from "@enclave-e3/contracts/contracts/interfaces/IDecryptionVerifier.sol";
 
 contract MockEnclave {
@@ -29,7 +28,6 @@ contract MockEnclave {
             e3Program: IE3Program(address(0)),
             e3ProgramParams: bytes(""),
             customParams: bytes(""),
-            inputValidator: IInputValidator(address(0)),
             decryptionVerifier: IDecryptionVerifier(address(0)),
             committeePublicKey: bytes32(0),
             ciphertextOutput: bytes32(0),

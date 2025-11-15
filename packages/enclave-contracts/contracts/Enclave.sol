@@ -6,7 +6,6 @@
 pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
-import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
@@ -139,10 +138,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param e3Id The ID of the E3.
     /// @param expiration The expiration timestamp that has not yet passed.
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-
-    /// @notice Thrown when the input validator in the computation request is invalid.
-    /// @param inputValidator The address of the invalid input validator.
-    error InvalidComputationRequest(IInputValidator inputValidator);
 
     /// @notice Thrown when attempting to set an invalid ciphernode registry address.
     /// @param ciphernodeRegistry The invalid ciphernode registry address.
@@ -277,15 +272,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
 
-        (
-            bytes32 encryptionSchemeId,
-            IInputValidator inputValidator
-        ) = requestParams.e3Program.validate(
-                e3Id,
-                seed,
-                requestParams.e3ProgramParams,
-                requestParams.computeProviderParams
-            );
+        bytes32 encryptionSchemeId = requestParams.e3Program.validate(
+            e3Id,
+            seed,
+            requestParams.e3ProgramParams,
+            requestParams.computeProviderParams
+        );
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];
@@ -295,13 +287,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
                 IDecryptionVerifier(address(0)),
             InvalidEncryptionScheme(encryptionSchemeId)
         );
-        require(
-            address(inputValidator) != address(0),
-            InvalidComputationRequest(inputValidator)
-        );
 
         e3.encryptionSchemeId = encryptionSchemeId;
-        e3.inputValidator = inputValidator;
         e3.decryptionVerifier = decryptionVerifier;
 
         e3s[e3Id] = e3;
@@ -365,7 +352,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 inputIndex = inputCounts[e3Id];
         inputCounts[e3Id] = inputIndex + 1;
 
-        bytes memory input = e3.inputValidator.validate(msg.sender, data);
+        bytes memory input = e3.e3Program.validateInput(msg.sender, data);
 
         uint256 inputHash = PoseidonT3.hash(
             [uint256(keccak256(input)), inputIndex]

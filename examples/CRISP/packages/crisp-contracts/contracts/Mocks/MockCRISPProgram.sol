@@ -10,15 +10,17 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import {HonkVerifier} from "./CRISPVerifier.sol";
+import {HonkVerifier} from "../CRISPVerifier.sol";
 
-contract CRISPProgram is IE3Program, Ownable {
+contract MockCRISPProgram is IE3Program, Ownable {
     /// @notice a structure that holds the round data
     struct RoundData {
         /// @notice The governance token address.
         address token;
         /// @notice The minimum balance required to pass the validation.
         uint256 balanceThreshold;
+        /// @notice The block number at which the balance will be checked.
+        uint256 snapshotBlock;
         /// @notice The Merkle root of the census.
         uint256 censusMerkleRoot;
     }
@@ -88,11 +90,9 @@ contract CRISPProgram is IE3Program, Ownable {
         imageId = _imageId;
     }
 
-    /// @notice Sets the Round data. Can only be set once.
+    /// @notice Sets the Merkle root of the census. Can only be set once.
     /// @param _root The Merkle root to set.
-    /// @param _token The governance token address.
-    /// @param _balanceThreshold The minimum balance required.
-    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold)
+    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold, uint256 _snapshotBlock)
         external
         onlyOwner
     {
@@ -103,6 +103,7 @@ contract CRISPProgram is IE3Program, Ownable {
         roundData = RoundData({
             token: _token,
             balanceThreshold: _balanceThreshold,
+            snapshotBlock: _snapshotBlock,
             censusMerkleRoot: _root
         });
     }
@@ -116,7 +117,6 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @notice Set the RISC Zero verifier address
     /// @param _verifier The new RISC Zero verifier address
     function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
-        if (address(_verifier) == address(0)) revert VerifierAddressZero();
         verifier = _verifier;
     }
 
@@ -142,31 +142,10 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     function validateInput(address, bytes memory data) external returns (bytes memory input) {
-        // it should only be called via Enclave for now
-        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
-        // we need to ensure that the CRISP admin set the merkle root of the census
-        // @todo update this once we have all components working
-        // if (!isDataSet) revert RoundDataNotSet();
-
         if (data.length == 0) revert EmptyInputData();
 
-        (bytes memory noirProof, bytes32[] memory noirPublicInputs, bytes memory vote, address slot) =
-            abi.decode(data, (bytes, bytes32[], bytes, address));
+        (,, bytes memory vote,) = abi.decode(data, (bytes, bytes32[], bytes, address));
 
-        /// @notice we need to check whether the slot is empty.
-        /// if the slot is empty
-        /// @todo pass it to the verifier
-        // bool isFirstVote = voteSlots[slot].length == 0;
-
-        // Check if the ciphertext was encrypted correctly
-        if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
-            revert InvalidNoirProof();
-        }
-
-        /// @notice Store the vote in the correct slot.
-        voteSlots[slot] = vote;
-
-        // return the vote so that it can be stored in Enclave's input merkle tree
         input = vote;
     }
 

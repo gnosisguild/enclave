@@ -36,14 +36,7 @@ export const deployTemplate = async () => {
 
   const programId = await imageId.PROGRAM_ID();
 
-  const inputValidator = await ethers.deployContract("InputValidator");
-  await inputValidator.waitForDeployment();
-
-  storeDeploymentArgs({
-    address: await inputValidator.getAddress(),
-  }, "InputValidator", chain);
-
-  const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId, await inputValidator.getAddress()]);
+  const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId]);
   await e3Program.waitForDeployment();
 
   storeDeploymentArgs({
@@ -52,7 +45,6 @@ export const deployTemplate = async () => {
       enclave: await enclave.getAddress(),
       verifier: await verifier.getAddress(),
       programId,
-      inputValidator: await inputValidator.getAddress(),
     },
   }, "MyProgram", chain);
 

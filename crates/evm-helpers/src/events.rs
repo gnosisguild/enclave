@@ -21,11 +21,6 @@ sol! {
     }
 
     #[derive(Debug)]
-    interface IInputValidator {
-        function validateInput(bytes data) external view returns (bool);
-    }
-
-    #[derive(Debug)]
     interface IDecryptionVerifier {
         function verifyDecryption(bytes data) external view returns (bool);
     }
@@ -42,7 +37,6 @@ sol! {
         IE3Program e3Program;
         bytes e3ProgramParams;
         bytes customParams;
-        IInputValidator inputValidator;
         IDecryptionVerifier decryptionVerifier;
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;

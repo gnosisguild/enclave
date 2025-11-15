@@ -36,21 +36,19 @@ describe("CRISP Contracts", function () {
       /*
                 IEnclave _enclave,
                 IRiscZeroVerifier _verifier,
-                CRISPInputValidatorFactory _inputValidatorFactory,
                 HonkVerifier _honkVerifier,
                 bytes32 _imageId
             */
-      const program = await ethers.deployContract("CRISPProgram", [
-        nonZeroAddress,
-        nonZeroAddress,
-        nonZeroAddress,
-        nonZeroAddress,
-        zeroHash,
-      ]);
-
-      expect(await program.getAddress()).to.not.equal(zeroAddress);
+            const program = await ethers.deployContract("CRISPProgram", [
+                nonZeroAddress,
+                nonZeroAddress,
+                nonZeroAddress,
+                zeroHash
+            ])
+            
+            expect(await program.getAddress()).to.not.equal(zeroAddress)
+        })
     });
-  });
 
   describe("decode tally", () => {
     it("should decode different tallies correctly", async () => {

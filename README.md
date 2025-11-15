@@ -148,12 +148,10 @@ sequenceDiagram
     participant CiphernodeRegistry
     participant E3Program
     participant ComputeProvider
-    participant InputValidator
     participant DecryptionVerifier
 
     Users->>Enclave: request(parameters)
     Enclave->>E3Program: validate(e3ProgramParams)
-    E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(computeProviderParams)
     ComputeProvider-->>Enclave: decryptionVerifier
     Enclave->>CiphernodeRegistry: requestCommittee(e3Id, seed, threshold)
@@ -167,8 +165,8 @@ sequenceDiagram
     Enclave-->>Users: success
 
     Users->>Enclave: publishInput(e3Id, data)
-    Enclave->>InputValidator: validate(msg.sender, data)
-    InputValidator-->>Enclave: input, success
+    Enclave->>E3Program: validateInput(msg.sender, data)
+    E3Program-->>Enclave: input, success
     Enclave->>Enclave: Store input
     Enclave-->>Users: success
 

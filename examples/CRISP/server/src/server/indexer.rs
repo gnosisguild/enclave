@@ -134,7 +134,7 @@ pub async fn register_e3_requested(
 
                 info!("[e3_id={}] Merkle root: {}", e3_id, merkle_root);
 
-                // TODO: Publish merkle root on-chain (inputValidator contract).
+                // TODO: Publish merkle root on-chain (Program contract).
 
                 Ok(())
             }

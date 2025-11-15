@@ -9,8 +9,5 @@ import {RiscZeroGroth16Verifier as RiscZero} from "risc0/groth16/RiscZeroGroth16
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
 contract RiscZeroGroth16Verifier is RiscZero {
-    constructor() RiscZero(
-        ControlID.CONTROL_ROOT,
-        ControlID.BN254_CONTROL_ID
-    ) {}
+    constructor() RiscZero(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID) {}
 }

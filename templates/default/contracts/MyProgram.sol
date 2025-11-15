@@ -7,7 +7,6 @@ pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
-import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -18,7 +17,6 @@ contract MyProgram is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    IInputValidator public inputValidator;
     bytes32 public imageId;
 
     // Mappings
@@ -31,23 +29,21 @@ contract MyProgram is IE3Program, Ownable {
     error E3DoesNotExist();
     error VerifierAddressZero();
     error AlreadyRegistered();
+    error EmptyInputData();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The Enclave contract address
     /// @param _verifier The RISC Zero verifier address
     /// @param _imageId The image ID for the guest program
-    /// @param _inputValidator The input validator address
     constructor(
         IEnclave _enclave,
         IRiscZeroVerifier _verifier,
-        bytes32 _imageId,
-        IInputValidator _inputValidator
+        bytes32 _imageId
     ) Ownable(msg.sender) {
         require(address(_verifier) != address(0), VerifierAddressZero());
 
         enclave = _enclave;
         verifier = _verifier;
-        inputValidator = _inputValidator;
         imageId = _imageId;
         authorizedContracts[address(_enclave)] = true;
     }
@@ -60,7 +56,7 @@ contract MyProgram is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32, IInputValidator) {
+    ) external returns (bytes32) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
@@ -68,7 +64,23 @@ contract MyProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        return (ENCRYPTION_SCHEME_ID, IInputValidator(address(inputValidator)));
+        return ENCRYPTION_SCHEME_ID;
+    }
+
+    /// @notice Validates input
+    /// @param sender The account that is submitting the input.
+    /// @param data The input to be verified.
+    /// @return input The input data.
+    function validateInput(
+        address sender,
+        bytes memory data
+    ) external returns (bytes memory input) {
+        if (data.length == 0) revert EmptyInputData();
+
+        // You can add your own validation logic here.
+        // EXAMPLE: https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol
+
+        input = data;
     }
 
     /// @notice Verify the proof

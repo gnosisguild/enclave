@@ -143,8 +143,9 @@ library ExitQueueLib {
             ExitTranche storage lastTranche = operatorQueue[len - 1];
             if (lastTranche.unlockTimestamp == unlockTimestamp) {
                 if (ticketAmount != 0) lastTranche.ticketAmount += ticketAmount;
-                if (licenseAmount != 0)
+                if (licenseAmount != 0) {
                     lastTranche.licenseAmount += licenseAmount;
+                }
                 merged = true;
             }
         }
@@ -375,15 +376,19 @@ library ExitQueueLib {
         PendingAmounts storage pending = state.pendingTotals[operator];
 
         if (isIncrease) {
-            if (ticketAmountDelta != 0)
+            if (ticketAmountDelta != 0) {
                 pending.ticketAmount += ticketAmountDelta;
-            if (licenseAmountDelta != 0)
+            }
+            if (licenseAmountDelta != 0) {
                 pending.licenseAmount += licenseAmountDelta;
+            }
         } else {
-            if (ticketAmountDelta != 0)
+            if (ticketAmountDelta != 0) {
                 pending.ticketAmount -= ticketAmountDelta;
-            if (licenseAmountDelta != 0)
+            }
+            if (licenseAmountDelta != 0) {
                 pending.licenseAmount -= licenseAmountDelta;
+            }
         }
     }
 

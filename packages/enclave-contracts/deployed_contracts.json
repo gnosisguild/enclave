@@ -52,16 +52,9 @@
       "blockNumber": 9615410,
       "address": "0x37007c28bCc6522Baf079B2D97F9f22ffe4b13b7"
     },
-    "MockInputValidator": {
-      "blockNumber": 9615411,
-      "address": "0x3d7C302270a85F6e8798b607275B1fF265514b38"
-    },
     "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0x3d7C302270a85F6e8798b607275B1fF265514b38"
-      },
-      "blockNumber": 9615412,
-      "address": "0xeb3B7C06e7D327f377901356860D88AA50822a6b"
+      "blockNumber": 9479405,
+      "address": "0x5a196784e60A6A18b86Af7a9e564A969F6d2bC76"
     },
     "MockUSDC": {
       "constructorArgs": {

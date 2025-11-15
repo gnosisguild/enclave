@@ -134,7 +134,6 @@ export interface E3 {
   encryptionSchemeId: string;
   e3Program: string;
   e3ProgramParams: string;
-  inputValidator: string;
   decryptionVerifier: string;
   committeePublicKey: string;
   ciphertextOutput: string;

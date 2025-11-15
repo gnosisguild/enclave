@@ -7,13 +7,11 @@ import hre from "hardhat";
 
 import { deployAndSaveMockComputeProvider } from "./deployAndSave/mockComputeProvider";
 import { deployAndSaveMockDecryptionVerifier } from "./deployAndSave/mockDecryptionVerifier";
-import { deployAndSaveMockInputValidator } from "./deployAndSave/mockInputValidator";
 import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
   decryptionVerifierAddress: string;
-  inputValidatorAddress: string;
   e3ProgramAddress: string;
 }
 
@@ -33,14 +31,8 @@ export const deployMocks = async (): Promise<MockDeployments> => {
 
   const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
-  console.log("Deploying Input Validator");
-  const { inputValidator } = await deployAndSaveMockInputValidator(hre);
-
-  const inputValidatorAddress = await inputValidator.getAddress();
-
   console.log("Deploying E3 Program");
   const { e3Program } = await deployAndSaveMockProgram({
-    mockInputValidator: inputValidatorAddress,
     hre,
   });
 
@@ -51,14 +43,12 @@ export const deployMocks = async (): Promise<MockDeployments> => {
         ----------------------------------------------------------------------
         MockComputeProvider:${computeProviderAddress}
         MockDecryptionVerifier:${decryptionVerifierAddress}
-        MockInputValidator:${inputValidatorAddress}
         MockE3Program:${e3ProgramAddress}
         `);
 
   return {
     computeProviderAddress,
     decryptionVerifierAddress,
-    inputValidatorAddress,
     e3ProgramAddress,
   };
 };
