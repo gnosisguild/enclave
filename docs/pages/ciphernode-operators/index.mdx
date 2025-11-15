@@ -9,6 +9,19 @@ Ciphernodes decrypt committee outputs, publish threshold key shares, and keep th
 pipeline moving. This section organizes everything operators need—from bonding requirements to exit
 procedures—into focused guides.
 
+## Responsibilities at a glance
+
+Operators are expected to cover four concurrent tracks:
+
+- **Key management**: generate PVSS shares, keep private key material encrypted at rest, and publish
+	committee public keys once the threshold is met.
+- **Decryption work**: watch for ciphertext outputs, craft decryption shares, and ensure plaintext
+	gets relayed on-chain.
+- **Network availability**: run a QUIC/libp2p endpoint that stays reachable, stay synced to the
+	event bus, and keep RPC endpoints redundant.
+- **Operational hygiene**: rotate secrets, snapshot configs, monitor sortition + job logs, and react
+	to slashing proposals or bans quickly.
+
 ## Role overview
 
 Operators are expected to:
@@ -21,6 +34,18 @@ Operators are expected to:
 
 Each node profile in `enclave.config.yaml` can point to a different network (mainnet, testnet, or
 local dev). The CLI supervises all configured chains concurrently.
+
+## Why operate a Ciphernode?
+
+- **Rewards & upside**: committee participation and steady uptime translate to ERC20 payouts through
+	`distributeRewards`.
+- **Governance voice**: active operators are closest to the protocol and shape roadmap + policy
+	discussions.
+- **Visibility**: infra partners highlight high-performing nodes in working group updates and future
+	customer routes.
+
+Balance rewards against the capital tied up in ENCL bonds and ETK tickets plus infra costs. The
+Scenarios page includes quick ROI checklists.
 
 ## Contract references
 
@@ -37,6 +62,17 @@ local dev). The CLI supervises all configured chains concurrently.
 > ⚠️ Confirm addresses in `packages/enclave-contracts/deployed_contracts.json` or your deployment
 > output before funding a node. Values differ per network.
 
+## Requirements checklist
+
+| Track | What you need | Notes |
+| --- | --- | --- |
+| Financial | ≥ `licenseRequiredBond` ENCL, ≥ `minTicketBalance * ticketPrice` USDC, plus gas | Top up
+	ahead of big request windows |
+| Technical | Linux/macOS host, 4 cores / 8 GB RAM minimum, open UDP ports for QUIC | Containers or
+	bare metal both work |
+| Operational | CLI >= current release, secrets storage (password, wallet, net key), monitoring +
+	pager | Bake into `ciphernode-entrypoint.sh` in `deploy/` |
+
 ## Section map
 
 - [Registration & Licensing](./registration) — economic requirements, bonding steps, CLI commands
@@ -46,3 +82,23 @@ local dev). The CLI supervises all configured chains concurrently.
 - [Runbook Scenarios](./scenarios) — ready-made playbooks for common situations
 
 Use these pages sequentially when onboarding a new operator or jump to the topic you need.
+
+## Lifecycle states
+
+```mermaid
+stateDiagram-v2
+		[*] --> Unbonded
+		Unbonded --> Licensed: bondLicense(amount >= requiredBond)
+		Licensed --> Registered: registerOperator()
+		Registered --> Active: addTicketBalance(balance >= minBalance)
+		Active --> Inactive: removeTicketBalance() OR unbondLicense()
+		Inactive --> Active: addTicketBalance() OR bondLicense()
+		Active --> ExitPending: deregisterOperator()
+		Inactive --> ExitPending: deregisterOperator()
+		Registered --> ExitPending: deregisterOperator()
+		ExitPending --> [*]: claimExits() after exitDelay
+		ExitPending --> Registered: registerOperator() (cancels exit)
+```
+
+Refer back here while reading the rest of the section; each guide calls out which state transitions
+it affects.
