@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::helpers::EthProvider;
+use crate::helpers::EthProviderWriter;
 use actix::prelude::*;
 use actix::Addr;
 use alloy::{
@@ -30,7 +30,7 @@ sol!(
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter<P> {
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     bus: Addr<EventBus<EnclaveEvent>>,
 }
@@ -38,7 +38,7 @@ pub struct EnclaveSolWriter<P> {
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
+        provider: EthProviderWriter<P>,
         contract_address: Address,
     ) -> Result<Self> {
         Ok(Self {
@@ -50,7 +50,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
 
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
+        provider: EthProviderWriter<P>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
@@ -140,7 +140,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown> for Encla
 }
 
 async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,
@@ -152,18 +152,10 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     // Wait for ciphertext output transaction to propagate
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-
-    let contract = IEnclave::new(contract_address, provider.provider());
+    let guard = provider.provider().await;
+    let contract = IEnclave::new(contract_address, &*guard);
     info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-    let builder = contract
-        .publishPlaintextOutput(e3_id, decrypted_output, proof)
-        .nonce(current_nonce);
+    let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }

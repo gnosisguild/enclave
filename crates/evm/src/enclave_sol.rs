@@ -5,8 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
-    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent,
+    enclave_sol_reader::EnclaveSolReader,
+    enclave_sol_writer::EnclaveSolWriter,
+    event_reader::EvmEventReaderState,
+    helpers::{EthProvider, EthProviderWriter},
+    EnclaveEvmEvent,
 };
 use actix::{Addr, Recipient};
 use alloy::providers::{Provider, WalletProvider};
@@ -21,7 +24,7 @@ impl EnclaveSol {
         processor: &Recipient<EnclaveEvmEvent>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         read_provider: EthProvider<R>,
-        write_provider: EthProvider<W>,
+        write_provider: EthProviderWriter<W>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,

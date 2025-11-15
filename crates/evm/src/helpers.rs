@@ -32,6 +32,7 @@ use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use std::{env, sync::Arc};
+use tokio::sync::Mutex;
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -76,6 +77,30 @@ impl<P: Provider + Clone> EthProvider<P> {
 
     pub fn provider(&self) -> &P {
         &self.provider
+    }
+
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+}
+
+#[derive(Clone)]
+pub struct EthProviderWriter<P> {
+    provider: Arc<Mutex<P>>,
+    chain_id: u64,
+}
+
+impl<P: Provider> EthProviderWriter<P> {
+    pub async fn new(provider: P) -> Result<Self> {
+        let chain_id = provider.get_chain_id().await?;
+        Ok(Self {
+            provider: Arc::new(Mutex::new(provider)),
+            chain_id,
+        })
+    }
+
+    pub async fn provider(&self) -> tokio::sync::MutexGuard<'_, P> {
+        self.provider.lock().await
     }
 
     pub fn chain_id(&self) -> u64 {
@@ -128,7 +153,7 @@ impl ProviderConfig {
     pub async fn create_signer_provider(
         &self,
         signer: &PrivateKeySigner,
-    ) -> Result<EthProvider<ConcreteWriteProvider>> {
+    ) -> Result<EthProviderWriter<ConcreteWriteProvider>> {
         let wallet = EthereumWallet::from(signer.clone());
 
         let provider = if self.rpc.is_websocket() {
@@ -143,7 +168,7 @@ impl ProviderConfig {
                 .connect_client(self.create_http_client()?)
         };
 
-        EthProvider::new(provider).await
+        EthProviderWriter::new(provider).await
     }
 
     fn create_ws_connect(&self) -> Result<WsConnect> {

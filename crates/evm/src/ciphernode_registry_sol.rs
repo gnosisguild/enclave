@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+    event_reader::EvmEventReaderState,
+    helpers::{EthProvider, EthProviderWriter},
+    EnclaveEvmEvent, EvmEventReader,
 };
 use actix::prelude::*;
 use alloy::{
@@ -248,7 +250,7 @@ impl CiphernodeRegistrySolReader {
 
 /// Writer for publishing committees to CiphernodeRegistry
 pub struct CiphernodeRegistrySolWriter<P> {
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     bus: Addr<EventBus<EnclaveEvent>>,
 }
@@ -256,7 +258,7 @@ pub struct CiphernodeRegistrySolWriter<P> {
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
     pub async fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
+        provider: EthProviderWriter<P>,
         contract_address: Address,
     ) -> Result<Self> {
         Ok(Self {
@@ -268,7 +270,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
 
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
+        provider: EthProviderWriter<P>,
         contract_address: &str,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
@@ -441,47 +443,36 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 }
 
 pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     e3_id: E3id,
     ticket_number: u64,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
     let ticket_number = U256::from(ticket_number);
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
-        .submitTicket(e3_id, ticket_number)
-        .nonce(current_nonce);
+    let guard = provider.provider().await;
+    let contract = ICiphernodeRegistry::new(contract_address, &*guard);
+    let builder = contract.submitTicket(e3_id, ticket_number);
     let receipt = builder.send().await?.get_receipt().await?;
+    drop(guard);
     Ok(receipt)
 }
 
 pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone>(
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     e3_id: E3id,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract.finalizeCommittee(e3_id).nonce(current_nonce);
+    let guard = provider.provider().await;
+    let contract = ICiphernodeRegistry::new(contract_address, &*guard);
+    let builder = contract.finalizeCommittee(e3_id);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
 
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>(
-    provider: EthProvider<P>,
+    provider: EthProviderWriter<P>,
     contract_address: Address,
     e3_id: E3id,
     nodes: OrderedSet<String>,
@@ -493,16 +484,9 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
-        .publishCommittee(e3_id, nodes_vec, public_key)
-        .nonce(current_nonce);
+    let guard = provider.provider().await;
+    let contract = ICiphernodeRegistry::new(contract_address, &*guard);
+    let builder = contract.publishCommittee(e3_id, nodes_vec, public_key);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
@@ -538,7 +522,7 @@ impl CiphernodeRegistrySol {
 
     pub async fn attach_writer<P>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
+        provider: EthProviderWriter<P>,
         contract_address: &str,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>

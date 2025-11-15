@@ -20,7 +20,7 @@ use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
-        ProviderConfig,
+        EthProviderWriter, ProviderConfig,
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
@@ -518,7 +518,7 @@ impl CiphernodeBuilder {
 struct ProviderCaches {
     signer_cache: Option<LocalSigner<SigningKey>>,
     read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
-    write_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteWriteProvider>>,
+    write_provider_cache: HashMap<ChainConfig, EthProviderWriter<ConcreteWriteProvider>>,
 }
 
 impl ProviderCaches {
@@ -564,7 +564,7 @@ impl ProviderCaches {
         repositories: &Repositories,
         chain: &ChainConfig,
         cipher: &Cipher,
-    ) -> Result<EthProvider<ConcreteWriteProvider>> {
+    ) -> Result<EthProviderWriter<ConcreteWriteProvider>> {
         if let Some(cache) = self.write_provider_cache.get(chain) {
             return Ok(cache.clone());
         }
