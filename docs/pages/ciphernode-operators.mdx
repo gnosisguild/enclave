@@ -5,10 +5,10 @@ description: 'How to bond, configure, and operate Ciphernodes on the Enclave net
 
 # Ciphernode Operators
 
-Ciphernodes are the distributed workers that decrypt committee outputs, publish threshold key shares,
-and keep the Enclave network alive. This guide walks through the economic requirements, on-chain
-lifecycle, CLI workflow, networking expectations, and production deployment patterns for running a
-Ciphernode.
+Ciphernodes are the distributed workers that decrypt committee outputs, publish threshold key
+shares, and keep the Enclave network alive. This guide walks through the economic requirements,
+on-chain lifecycle, CLI workflow, networking expectations, and production deployment patterns for
+running a Ciphernode.
 
 ## Role overview
 
@@ -27,19 +27,17 @@ configured chains simultaneously.
 
 ## Contract references
 
-| Contract | Sepolia address | Notes |
-| --- | --- | --- |
-| Enclave | `0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6` | Core coordinator |
-| CiphernodeRegistry | `0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7` | Handles registration, committees |
-| BondingRegistry | `0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3` | Tracks license bonds + tickets |
-| SlashingManager | `0x50dfC643226f09423d51F81c7f37F7a5F1e8f359` | Slash + ban workflow |
-| EnclaveTicketToken (ETK) | `0x72691272E10a8CA6499c3aa0d59c76E4C090c9E2` | Ticket wrapper around USDC |
-| EnclaveToken (ENCL) | `0xc93f71D10874F09F7F514a3d160E5be21fD624ab` | License bond token |
-| MockUSDC (fee token) | `0xB58B762748c64f1a36B34012d1C52503617f4De0` | Underlying asset for ETK |
+| Contract                 | Sepolia address                              | Notes                            |
+| ------------------------ | -------------------------------------------- | -------------------------------- |
+| Enclave                  | `0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6` | Core coordinator                 |
+| CiphernodeRegistry       | `0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7` | Handles registration, committees |
+| BondingRegistry          | `0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3` | Tracks license bonds + tickets   |
+| SlashingManager          | `0x50dfC643226f09423d51F81c7f37F7a5F1e8f359` | Slash + ban workflow             |
+| EnclaveTicketToken (ETK) | `0x72691272E10a8CA6499c3aa0d59c76E4C090c9E2` | Ticket wrapper around USDC       |
+| EnclaveToken (ENCL)      | `0xc93f71D10874F09F7F514a3d160E5be21fD624ab` | License bond token               |
+| MockUSDC (fee token)     | `0xB58B762748c64f1a36B34012d1C52503617f4De0` | Underlying asset for ETK         |
 
-> ⚠️ Always confirm the latest addresses in
-> `packages/enclave-contracts/deployed_contracts.json` or your deployment output before funding a
-> node. Addresses differ per network.
+> ⚠️ Always confirm the latest addresses from the docs. Addresses differ per network.
 
 ## Economics & staking
 
@@ -68,8 +66,8 @@ Tickets control a node's probability of selection via sortition.
 License bonds are denominated in ENCL. Operators must keep at least 80% of `licenseRequiredBond`
 bonded to remain `active`.
 
-SlashingManager penalties can remove both ticket balances and license bonds, and may ban an operator.
-Appeals are time-bound by the policy's `appealWindow`.
+SlashingManager penalties can remove both ticket balances and license bonds, and may ban an
+operator. Appeals are time-bound by the policy's `appealWindow`.
 
 Rewards (any ERC20) are pushed by the configured `rewardDistributor` through
 `BondingRegistry.distributeRewards`. Only registered operators receive payouts.
@@ -116,19 +114,19 @@ enclave config-set --rpc-url $RPC --eth-address $OPERATOR_ADDRESS
 ```
 
 This creates `~/.config/enclave/config.yaml` (or the path you pass with `--config`). Most operators
-instead commit an `enclave.config.yaml` alongside deployment manifests (see sample below) and pass it
-with `--config /path/to/config.yaml` on every command.
+instead commit an `enclave.config.yaml` alongside deployment manifests (see sample below) and pass
+it with `--config /path/to/config.yaml` on every command.
 
 ### Manage credentials
 
-| Secret | Command | Notes |
-| --- | --- | --- |
-| Password (encrypts keystore + datastore) | `enclave password set --password <value>` | Use `enclave password delete` to remove |
-| Network key (libp2p ed25519) | `enclave net keypair generate` or `enclave net keypair set --net-keypair 0x…` | `enclave net peer-id purge` clears cached peer IDs |
-| Wallet key (signs on-chain tx) | `enclave wallet set --private-key 0x…` | Needed for aggregators or if the node submits committee txs |
+| Secret                                   | Command                                                                       | Notes                                                       |
+| ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Password (encrypts keystore + datastore) | `enclave password set --password <value>`                                     | Use `enclave password delete` to remove                     |
+| Network key (libp2p ed25519)             | `enclave net keypair generate` or `enclave net keypair set --net-keypair 0x…` | `enclave net peer-id purge` clears cached peer IDs          |
+| Wallet key (signs on-chain tx)           | `enclave wallet set --private-key 0x…`                                        | Needed for aggregators or if the node submits committee txs |
 
-The entrypoint automatically runs `autopassword`, `autonetkey`, and `autowallet` when the config sets
-those flags.
+The entrypoint automatically runs `autopassword`, `autonetkey`, and `autowallet` when the config
+sets those flags.
 
 ### Run nodes
 
@@ -141,8 +139,9 @@ enclave nodes down                      # stop everything
 enclave nodes purge                     # wipe local RocksDB + secrets (irreversible)
 ```
 
-To run a single node profile outside the supervisor, use `enclave start --config /path/to/config.yaml`.
-Pass peers with `--peer /dns4/example.com/udp/9091/quic-v1` to override the config at runtime.
+To run a single node profile outside the supervisor, use
+`enclave start --config /path/to/config.yaml`. Pass peers with
+`--peer /dns4/example.com/udp/9091/quic-v1` to override the config at runtime.
 
 ## Networking & configuration
 
@@ -150,25 +149,25 @@ Every node section in `enclave.config.yaml` defines how the CLI spawns that inst
 
 ```yaml
 node:
-  address: "0x7099…79C8"
+  address: '0x7099…79C8'
   quic_port: 9201
   peers:
-    - "/dns4/aggregator1.example.com/udp/9094/quic-v1"
+    - '/dns4/aggregator1.example.com/udp/9094/quic-v1'
   autonetkey: true
   autopassword: true
 chains:
   - name: sepolia
-    rpc_url: "wss://ethereum-sepolia.publicnode.com"
+    rpc_url: 'wss://ethereum-sepolia.publicnode.com'
     contracts:
       enclave:
-        address: "0x1E8B…FAa6"
+        address: '0x1E8B…FAa6'
         deploy_block: 9615399
       ciphernode_registry:
-        address: "0x11F6…0b1C7"
+        address: '0x11F6…0b1C7'
       bonding_registry:
-        address: "0x5636…406E3"
+        address: '0x5636…406E3'
       fee_token:
-        address: "0xB58B…4De0"
+        address: '0xB58B…4De0'
 ```
 
 Notes:
@@ -194,8 +193,9 @@ The repository ships a Docker Swarm example under `deploy/` that you can adapt:
     "network_private_key": "0x…"
   }
   ```
-- `ciphernode-entrypoint.sh` loads the config + secrets, runs the CLI commands (`enclave password set`,
-  `enclave net keypair set`, `enclave wallet set`), then execs `enclave start -v`
+- `ciphernode-entrypoint.sh` loads the config + secrets, runs the CLI commands
+  (`enclave password set`, `enclave net keypair set`, `enclave wallet set`), then execs
+  `enclave start -v`
 
 This pattern is also useful for Kubernetes Jobs or systemd units: mount a config, mount an encrypted
 secret bundle, run the entrypoint.
@@ -218,22 +218,22 @@ secret bundle, run the entrypoint.
 - **Rewards**: Watch for `RewardDistributed` (BondingRegistry) logs. Ensure the operator wallet can
   receive the reward token.
 - **Slashing**: `SlashingManager` proposals reference reason codes. Operators should monitor
-  `SlashProposed` and be ready to file `fileAppeal()` before `appealWindow` expires when proof is not
-  required. Banned nodes cannot reregister until governance clears them via `updateBanStatus`.
+  `SlashProposed` and be ready to file `fileAppeal()` before `appealWindow` expires when proof is
+  not required. Banned nodes cannot reregister until governance clears them via `updateBanStatus`.
 - **Exits**: `deregisterOperator()` burns tickets immediately and queues withdrawals. The exit queue
   tracks amounts per operator; call `pendingExits(address)` or `previewClaimable(address)` to view
   status.
 
 ## Troubleshooting
 
-| Symptom | Checks |
-| --- | --- |
-| `enclave start` exits immediately | Ensure `enclave config-set` ran or `--config` points to a file. Missing configs trigger auto-init. |
-| Node never `isActive` | Confirm you bonded `>= 80` ENCL, deposited at least 1 ticket, and were not banned/slashed. |
-| Cannot connect to peers | Open UDP `quic_port`, provide working multiaddrs, and consider `enclave start --peer …` to override. |
-| Sortition submissions fail | Node must be registered + active *before* `Enclave.request`. Inspect logs for `NodeNotEligible` or `SubmissionWindowClosed`. |
-| `ExitNotReady` on `claimExits` | Wait until `block.timestamp >= exitUnlocksAt` plus the queued delay. Use `previewClaimable`. |
-| Slashing appeal rejected | Review `SlashPolicy` for that reason—policies requiring proofs skip appeals. |
+| Symptom                           | Checks                                                                                                                       |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `enclave start` exits immediately | Ensure `enclave config-set` ran or `--config` points to a file. Missing configs trigger auto-init.                           |
+| Node never `isActive`             | Confirm you bonded `>= 80` ENCL, deposited at least 1 ticket, and were not banned/slashed.                                   |
+| Cannot connect to peers           | Open UDP `quic_port`, provide working multiaddrs, and consider `enclave start --peer …` to override.                         |
+| Sortition submissions fail        | Node must be registered + active _before_ `Enclave.request`. Inspect logs for `NodeNotEligible` or `SubmissionWindowClosed`. |
+| `ExitNotReady` on `claimExits`    | Wait until `block.timestamp >= exitUnlocksAt` plus the queued delay. Use `previewClaimable`.                                 |
+| Slashing appeal rejected          | Review `SlashPolicy` for that reason—policies requiring proofs skip appeals.                                                 |
 
 Maintaining high uptime, redundant networking, and alerting on contract events are the best ways to
 protect your stake. Use the CLI supervisors plus infrastructure automation to ensure secrets and
