@@ -717,7 +717,7 @@ impl ThresholdKeyshare {
     /// handler with the results. Errors at this stage are simply
     /// logged. Eventually we will need to configure a policy here
     /// For example retry with exponential backoff
-    fn handle_compute_request<F, R>(
+    fn multithread_request<F, R>(
         &mut self,
         request_fn: F,
         response_fn: R,
@@ -778,7 +778,7 @@ impl Handler<CiphernodeSelected> for ThresholdKeyshare {
 impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
-        self.handle_compute_request(
+        self.multithread_request(
             |act| act.handle_gen_esi_sss_requested(msg),
             |act, res, _| act.handle_gen_esi_sss_response(res),
         )
@@ -788,7 +788,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, _: &mut Self::Context) -> Self::Result {
-        self.handle_compute_request(
+        self.multithread_request(
             |act| act.handle_gen_pk_share_and_sk_sss_requested(msg),
             |act, res, _| act.handle_gen_pk_share_and_sk_sss_response(res),
         )
@@ -798,7 +798,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: AllThresholdSharesCollected, _: &mut Self::Context) -> Self::Result {
-        self.handle_compute_request(
+        self.multithread_request(
             |act| act.handle_all_threshold_shares_collected(msg),
             |act, res, _| act.handle_calculate_decryption_key_response(res),
         )
@@ -808,7 +808,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
 impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: CiphertextOutputPublished, _: &mut Self::Context) -> Self::Result {
-        self.handle_compute_request(
+        self.multithread_request(
             |act| act.handle_ciphertext_output_published(msg),
             |act, res, _| act.handle_calculate_decryption_share_response(res),
         )
