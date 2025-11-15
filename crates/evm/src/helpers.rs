@@ -9,7 +9,7 @@ use alloy::{
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
-            WalletFiller,
+            SimpleNonceManager, WalletFiller,
         },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
@@ -99,10 +99,13 @@ pub type ConcreteReadProvider = FillProvider<
 pub type ConcreteWriteProvider = FillProvider<
     JoinFill<
         JoinFill<
-            Identity,
-            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+            JoinFill<
+                Identity,
+                JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+            >,
+            WalletFiller<EthereumWallet>,
         >,
-        WalletFiller<EthereumWallet>,
+        NonceFiller<SimpleNonceManager>,
     >,
     RootProvider,
 >;
@@ -134,12 +137,14 @@ impl ProviderConfig {
         let provider = if self.rpc.is_websocket() {
             ProviderBuilder::new()
                 .wallet(wallet)
+                .with_simple_nonce_management()
                 .connect_ws(self.create_ws_connect()?)
                 .await
                 .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
             ProviderBuilder::new()
                 .wallet(wallet)
+                .with_simple_nonce_management()
                 .connect_client(self.create_http_client()?)
         };
 
