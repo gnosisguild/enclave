@@ -7,6 +7,17 @@ title: 'Registration & Licensing'
 This guide covers everything required to become an active Ciphernode: collateral, bonding,
 registration transactions, and config secrets.
 
+## Before you start
+
+| Track | Checklist |
+| --- | --- |
+| Financial | ENCL covering `licenseRequiredBond`, USDC covering at least `minTicketBalance * ticketPrice`, and ETH for gas |
+| Technical | Enclave CLI ≥ current release, WebSocket RPC, `enclave password/net keypair/wallet` secrets set |
+| Operational | `enclave.config.yaml` committed, secrets mirrored into `deploy/*.secrets.json`, monitoring hooks for registration state |
+
+Adjust the numbers using `cast call $BONDING` for `licenseRequiredBond()`, `ticketPrice()` and
+`minTicketBalance()` on your target network.
+
 ## Economic requirements
 
 Sepolia defaults (check `BondingRegistry` on your network):
@@ -62,11 +73,45 @@ deployments, bake the steps into `ciphernode-entrypoint.sh` (see `deploy/`).
    cast send $BONDING "addTicketBalance(uint256)" 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
    ```
 5. **Verify status**
-   - `BondingRegistry.isRegistered(address)` returns `true`
-   - `BondingRegistry.isActive(address)` flips `true` once bond + ticket floors are met
-6. **Snapshot config for production**
+   ```bash
+   cast call $BONDING "isRegistered(address)" $OPERATOR
+   cast call $BONDING "isActive(address)" $OPERATOR
+   cast call $BONDING "getLicenseBond(address)" $OPERATOR
+   cast call $BONDING "getTicketBalance(address)" $OPERATOR
+   ```
+6. **Add buffers (optional)**
+   - Maintain ≥ 1.1× the minimum license bond so transient unbonds or slashes do not deactivate you
+   - Keep a few extra tickets so `availableTickets` never dips below the floor
+7. **Snapshot config for production**
    - Commit `enclave.config.yaml` alongside deployment manifests
    - Store secrets in JSON (see `deploy/cn1.secrets.json`) and mount them securely
 
 > ℹ️ The CLI supports multiple named wallets. Use `enclave wallet list` to confirm the correct signer
 > is active before running bonding transactions.
+
+## One-command bootstrap (optional)
+
+Hardhat ships with a helper task that strings approvals + bonding + registration together:
+
+```bash
+npx hardhat ciphernode:add \
+   --license-bond-amount 100000000000000000000 \
+   --ticket-amount 10000000
+```
+
+It calls `bondLicense`, `registerOperator`, and `addTicketBalance` under the hood. Production nodes
+usually stick with explicit `cast` or `enclave` commands for better observability and auditing.
+
+## Status probes to monitor
+
+Once bonded, keep lightweight probes in your monitoring stack:
+
+```bash
+cast call $BONDING "minTicketBalance()"
+cast call $BONDING "ticketPrice()"
+cast call $BONDING "licenseRequiredBond()"
+cast call $BONDING "hasExitInProgress(address)" $OPERATOR
+```
+
+Pause automation if any probe changes unexpectedly until you reconcile it with a governance action
+or migration plan.
