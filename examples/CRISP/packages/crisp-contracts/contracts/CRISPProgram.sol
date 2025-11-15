@@ -19,8 +19,6 @@ contract CRISPProgram is IE3Program, Ownable {
         address token;
         /// @notice The minimum balance required to pass the validation.
         uint256 balanceThreshold;
-        /// @notice The block number at which the balance will be checked.
-        uint256 snapshotBlock;
         /// @notice The Merkle root of the census.
         uint256 censusMerkleRoot;
     }
@@ -90,9 +88,11 @@ contract CRISPProgram is IE3Program, Ownable {
         imageId = _imageId;
     }
 
-    /// @notice Sets the Merkle root of the census. Can only be set once.
+    /// @notice Sets the Round data. Can only be set once.
     /// @param _root The Merkle root to set.
-    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold, uint256 _snapshotBlock)
+    /// @param _token The governance token address.
+    /// @param _balanceThreshold The minimum balance required.
+    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold)
         external
         onlyOwner
     {
@@ -103,7 +103,6 @@ contract CRISPProgram is IE3Program, Ownable {
         roundData = RoundData({
             token: _token,
             balanceThreshold: _balanceThreshold,
-            snapshotBlock: _snapshotBlock,
             censusMerkleRoot: _root
         });
     }
