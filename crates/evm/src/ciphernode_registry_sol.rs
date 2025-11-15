@@ -468,6 +468,7 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
     let contract = ICiphernodeRegistry::new(contract_address, &*guard);
     let builder = contract.finalizeCommittee(e3_id);
     let receipt = builder.send().await?.get_receipt().await?;
+    drop(guard);
     Ok(receipt)
 }
 
@@ -488,6 +489,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
     let contract = ICiphernodeRegistry::new(contract_address, &*guard);
     let builder = contract.publishCommittee(e3_id, nodes_vec, public_key);
     let receipt = builder.send().await?.get_receipt().await?;
+    drop(guard);
     Ok(receipt)
 }
 
