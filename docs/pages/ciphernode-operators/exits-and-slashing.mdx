@@ -1,0 +1,100 @@
+---
+title: 'Exits, Rewards & Slashing'
+---
+
+# Exits, Rewards & Slashing
+
+Understand how to collect rewards, respond to slashing proposals, and exit the registry safely.
+
+## Rewards
+
+- Distributed via `BondingRegistry.distributeRewards` (any ERC20)
+- Watch for `RewardsDistributed` events and map them back to the source `e3Id`
+- Keep the operator wallet funded; payouts are on-chain transfers and still require gas when
+   claimed through automation scripts
+
+Pair reward monitoring with lightweight probes:
+
+```bash
+cast call $BONDING "pendingExits(address)" $OPERATOR
+cast call $BONDING "getTicketBalance(address)" $OPERATOR
+cast call $BONDING "licenseRequiredBond()"
+```
+
+Seeing rewards fall while balances remain healthy is an early indicator of missed jobs or RPC issues.
+
+## Slashing lifecycle
+
+1. `SlashingManager` emits `SlashProposed` referencing a policy + reason code.
+2. Operators inspect the evidence (if any) and the associated `SlashPolicy` parameters.
+3. File an appeal with `fileAppeal(e3Id, reason, evidenceURI)` before `appealWindow` expires, if the
+   policy allows it.
+4. Once finalized, penalties may burn tickets, confiscate license bonds, and optionally ban the
+   operator.
+
+Stay alert for:
+
+- `appealWindow` values per policy (some reasons skip appeals entirely)
+- `updateBanStatus` (governance must lift bans before re-registration)
+
+Policy anatomy:
+
+```solidity
+struct SlashPolicy {
+   uint256 ticketPenalty;
+   uint256 licensePenalty;
+   bool requiresProof;
+   uint64 appealWindow;
+   bool appealable;
+}
+```
+
+Never assume a slash is appealable without fetching the latest policy via `SlashingManager`.
+
+## Exit process
+
+1. **Deregister** — Call `deregisterOperator(uint256[] siblingNodes)` with a valid IMT proof. The
+   CLI logs the proof when you first register; stash it alongside your secrets bundle.
+2. **Queue assets** — Ticket balances burn immediately. License bonds slide into the exit queue and
+   set `exitUnlocksAt = block.timestamp + exitDelay`.
+3. **Wait out `exitDelay()`** — Default is 7 days on Sepolia. Automation should poll
+   `exitUnlocksAt(address)` to know when to attempt a claim.
+4. **Claim exits** — Once the unlock timestamp passes, drain the queue:
+
+   ```bash
+   cast send $BONDING "claimExits(uint256,uint256)" $MAX_TICKETS $MAX_LICENSE \
+     --rpc-url $RPC --private-key $OPERATOR_KEY
+   ```
+
+   Pass `type(uint256).max` to withdraw the full pending amount. The call reverts with
+   `ExitNotReady` if neither queue matured yet.
+5. **Cancel if needed** — Calling `registerOperator()` before `claimExits` clears the exit and puts
+   you back into the registry.
+
+Helpful getters:
+
+- `pendingExits(address)` → pending ticket + license totals
+- `exitUnlocksAt(address)` → timestamp when claims unlock
+- `hasExitInProgress(address)` → guard before attempting to re-register
+
+## Health checklist
+
+| Symptom | Actions |
+| --- | --- |
+| `ExitNotReady` on `claimExits` | Confirm `block.timestamp` passed `exitUnlocksAt` and delay. Call `previewClaimable`. |
+| Slashing appeal rejected immediately | Policy likely disables appeals. Review policy metadata. |
+| `isActive` toggles false unexpectedly | Check ticket balance (>= 1) and verify bonded ENCL >= 80% requirement. |
+| Missed reward payouts | Ensure registry still lists the operator, RPC did not drop events, and reward token address is supported. |
+
+## Post-exit
+
+- Securely wipe local secrets (`enclave nodes purge` and delete keystores)
+- Revoke RPC credentials and firewall openings
+- Document the exit reason for future audits or compliance
+
+## Slashing prevention checklist
+
+- Keep `enclave jobs list` empty before scheduled maintenance so you do not abandon active work.
+- Alert on `SlashProposed` events tagged with your operator address.
+- Archive CLI + RPC logs for every incident; you need them for appeals.
+- Double-check `isActive` after any ticket removal or license unbond to avoid accidental downtime.
