@@ -77,19 +77,13 @@ const config: HardhatUserConfig = {
   ],
   tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
   networks: {
-    hardhat: {
-      type: "edr-simulated",
-      chainType: "l1",
-    },
     localhost: {
       accounts: {
         mnemonic,
       },
       chainId: chainIds.hardhat,
-      url: "http://localhost:8545",
-      type: "http",
+      type: "edr-simulated",
       chainType: "l1",
-      timeout: 60000,
     },
     ganache: {
       accounts: {
