@@ -7,7 +7,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignMessage } from 'wagmi'
-import { hexToBytes } from 'viem'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
@@ -60,7 +59,6 @@ export const useVoteCasting = () => {
           round_id: roundState.id,
           enc_vote_bytes: Array.from(voteEncrypted.vote),
           proof: Array.from(voteEncrypted.proof),
-          public_inputs: voteEncrypted.public_inputs.map((h) => Array.from(hexToBytes(h as `0x${string}`))),
           address: user.address,
         }
 

@@ -43,13 +43,11 @@ export const useWebAssemblyHook = () => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
-            const { vote, proofData } = encryptedVote
-            const { proof, publicInputs } = proofData
+            const { vote, proof } = encryptedVote
 
             resolve({
               vote: vote,
               proof: proof,
-              public_inputs: publicInputs,
             })
           } else {
             showToast({

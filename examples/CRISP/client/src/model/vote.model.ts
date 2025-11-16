@@ -25,7 +25,6 @@ export interface BroadcastVoteRequest {
   round_id: number
   enc_vote_bytes: number[]
   proof: number[]
-  public_inputs: number[][]
   address: string
 }
 
@@ -56,5 +55,4 @@ export interface VoteStateLite {
 export interface EncryptedVote {
   vote: Uint8Array
   proof: Uint8Array
-  public_inputs: string[]
 }

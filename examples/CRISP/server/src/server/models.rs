@@ -75,7 +75,6 @@ pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
     pub proof: Vec<u8>,
-    pub public_inputs: Vec<[u8; 32]>,
     pub address: String,
 }
 

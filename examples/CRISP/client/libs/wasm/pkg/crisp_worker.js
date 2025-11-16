@@ -59,7 +59,7 @@ self.onmessage = async function (event) {
           success: true,
           encryptedVote: {
             vote: encryptedVote,
-            proofData: proof,
+            proof: proof.proof,
           },
         })
       } catch (error) {
