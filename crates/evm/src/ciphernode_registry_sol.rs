@@ -347,7 +347,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
         match msg.ticket_id {
             TicketId::Score(ticket_id) => {
                 info!(
-                    "Score sortition ticket {:?} generated for E3 {:?}, submitting to contract",
+                    "Score sortition ticket '{:?}' generated for E3 {:?}, submitting to contract",
                     ticket_id, msg.e3_id
                 );
 
