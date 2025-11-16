@@ -347,8 +347,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
         match msg.ticket_id {
             TicketId::Score(ticket_id) => {
                 info!(
-                    "Score sortition ticket generated for E3 {:?}, submitting to contract",
-                    msg.e3_id
+                    "Score sortition ticket {:?} generated for E3 {:?}, submitting to contract",
+                    ticket_id, msg.e3_id
                 );
 
                 let e3_id = msg.e3_id.clone();
