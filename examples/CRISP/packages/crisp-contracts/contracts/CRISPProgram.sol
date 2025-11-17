@@ -157,17 +157,13 @@ contract CRISPProgram is IE3Program, Ownable {
             (bytes, bytes, address)
         );
 
-        bytes32[] memory noirPublicInputs = new bytes32[](3);
+        bytes32[] memory noirPublicInputs = new bytes32[](2);
 
-        // First public input: merkle root
-        noirPublicInputs[0] = bytes32(roundData.censusMerkleRoot);
-
-        // Second public input: slot address
-        noirPublicInputs[1] = bytes32(uint256(uint160(slot)));
-
-        // Third public input: is first vote (bool as Field: 1 = true, 0 = false)
+        // Set public inputs for the proof. Order must match Noir circuit.
+        noirPublicInputs[0] = bytes32(uint256(uint160(slot)));
         bool isFirstVote = voteSlots[slot].length == 0;
-        noirPublicInputs[2] = bytes32(uint256(isFirstVote ? 1 : 0));
+        noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
+        // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
 
         // Check if the ciphertext was encrypted correctly
         if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
