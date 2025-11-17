@@ -37,6 +37,10 @@ jobs:
         with:
           toolchain: 1.86.0
 
+        # We must install foundry in order to be able to test anvil
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Install solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
