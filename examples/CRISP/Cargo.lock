@@ -1968,6 +1968,7 @@ dependencies = [
  "e3-compute-provider",
  "e3-sdk",
  "env_logger",
+ "evm-helpers",
  "eyre",
  "fhe",
  "fhe-traits",
@@ -2485,6 +2486,15 @@ name = "ethnum"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca81e6b4777c89fd810c25a4be2b1bd93ea034fbe58e6a75216a34c6b82c539b"
+
+[[package]]
+name = "evm-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "eyre",
+ "tokio",
+]
 
 [[package]]
 name = "eyre"

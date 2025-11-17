@@ -29,6 +29,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer},
 };
+use evm_helpers::CRISPContractFactory;
 use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
@@ -134,7 +135,41 @@ pub async fn register_e3_requested(
 
                 info!("[e3_id={}] Merkle root: {}", e3_id, merkle_root);
 
-                // TODO: Publish merkle root on-chain (Program contract).
+                // Convert merkle root from hex string to U256.
+                let merkle_root_bytes = hex::decode(&merkle_root)
+                    .with_context(|| format!("[e3_id={}] Merkle root is not valid hex", e3_id))?;
+                let merkle_root_u256 = U256::from_be_slice(&merkle_root_bytes);
+
+                // Convert balance_threshold from BigUint to U256.
+                let balance_threshold_bytes = balance_threshold.to_bytes_be();
+                let balance_threshold_u256 = U256::from_be_slice(&balance_threshold_bytes);
+
+                info!(
+                    "[e3_id={}] Calling setRoundData with root: {}, token: {}, threshold: {}",
+                    e3_id, merkle_root_u256, token_address, balance_threshold_u256
+                );
+
+                let contract = CRISPContractFactory::create_write(
+                    &CONFIG.http_rpc_url,
+                    &CONFIG.e3_program_address,
+                    &CONFIG.private_key,
+                )
+                .await
+                .with_context(|| {
+                    format!("[e3_id={}] Failed to create CRISP contract", e3_id)
+                })?;
+
+                let receipt = contract
+                    .set_round_data(merkle_root_u256, token_address, balance_threshold_u256)
+                    .await
+                    .with_context(|| {
+                        format!("[e3_id={}] Failed to call setRoundData", e3_id)
+                    })?;
+
+                info!(
+                    "[e3_id={}] setRoundData successful. TxHash: {:?}",
+                    e3_id, receipt.transaction_hash
+                );
 
                 Ok(())
             }

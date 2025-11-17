@@ -143,20 +143,27 @@ contract CRISPProgram is IE3Program, Ownable {
 
     function validateInput(address, bytes memory data) external returns (bytes memory input) {
         // it should only be called via Enclave for now
-        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
-        // we need to ensure that the CRISP admin set the merkle root of the census
-        // @todo update this once we have all components working
-        // if (!isDataSet) revert RoundDataNotSet();
+        require(
+            authorizedContracts[msg.sender] || msg.sender == owner(),
+            CallerNotAuthorized()
+        );
+        // We need to ensure that the CRISP admin set the merkle root of the census.
+        if (!isDataSet) revert RoundDataNotSet();
 
         if (data.length == 0) revert EmptyInputData();
 
-        (bytes memory noirProof, bytes32[] memory noirPublicInputs, bytes memory vote, address slot) =
-            abi.decode(data, (bytes, bytes32[], bytes, address));
+        (bytes memory noirProof, bytes memory vote, address slot) = abi.decode(
+            data,
+            (bytes, bytes, address)
+        );
 
-        /// @notice we need to check whether the slot is empty.
-        /// if the slot is empty
-        /// @todo pass it to the verifier
-        // bool isFirstVote = voteSlots[slot].length == 0;
+        bytes32[] memory noirPublicInputs = new bytes32[](2);
+
+        // Set public inputs for the proof. Order must match Noir circuit.
+        noirPublicInputs[0] = bytes32(uint256(uint160(slot)));
+        bool isFirstVote = voteSlots[slot].length == 0;
+        noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
+        // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
 
         // Check if the ciphertext was encrypted correctly
         if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {

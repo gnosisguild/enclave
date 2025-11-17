@@ -76,24 +76,11 @@ async fn broadcast_encrypted_vote(
         return HttpResponse::InternalServerError().json("Internal server error");
     }
 
-    // Prepare vote data for blockchain
-    let public_inputs_array = if vote.public_inputs.is_empty() {
-        DynSolValue::Array(vec![])
-    } else {
-        DynSolValue::Array(
-            vote.public_inputs
-                .into_iter()
-                .map(|pi_array_u8| DynSolValue::FixedBytes(pi_array_u8.into(), 32))
-                .collect(),
-        )
-    };
-
     let address: Address = vote.address.parse().expect("Invalid address");
 
     let e3_id = U256::from(vote.round_id);
     let params_value = DynSolValue::Tuple(vec![
         DynSolValue::Bytes(vote.proof),
-        public_inputs_array,
         DynSolValue::Bytes(vote.enc_vote_bytes),
         DynSolValue::Address(address),
     ]);

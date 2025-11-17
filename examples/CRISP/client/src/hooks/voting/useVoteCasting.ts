@@ -59,7 +59,6 @@ export const useVoteCasting = () => {
           round_id: roundState.id,
           enc_vote_bytes: Array.from(voteEncrypted.vote),
           proof: Array.from(voteEncrypted.proof),
-          public_inputs: voteEncrypted.public_inputs,
           address: user.address,
         }
 

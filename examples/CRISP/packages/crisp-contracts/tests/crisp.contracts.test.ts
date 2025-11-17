@@ -61,7 +61,6 @@ describe("CRISP Contracts", function () {
         await mockEnclave.getAddress(),
         nonZeroAddress,
         nonZeroAddress,
-        nonZeroAddress,
         zeroHash,
       ]);
 
