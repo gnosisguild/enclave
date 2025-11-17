@@ -44,6 +44,7 @@ lean-imt = "=0.1.2"
 # Local dependencies
 e3-compute-provider.workspace = true
 e3-sdk = { workspace = true, default-features = false, features=["full"] }
+evm-helpers = { path = "../crates/evm_helpers" }
 
 # CLI and user interaction
 dialoguer = { version = "=0.11.0", features = ["fuzzy-select"] }

@@ -4,7 +4,8 @@ members = [
   ".enclave/support/dev",
   "program",
   "crates/zk-inputs",
-  "crates/zk-inputs-wasm"
+  "crates/zk-inputs-wasm",
+  "crates/evm_helpers"
 ]
 resolver = "3"
 
@@ -18,6 +19,7 @@ repository = "https://github.com/gnosisguild/enclave"
 [workspace.dependencies]
 e3-user-program = { path = "./program" }
 
+alloy = { version = "=1.0.41", features = ["full", "rpc-types-eth"] }
 alloy-primitives = { version = "=1.3.0", default-features = false, features = [
     "rlp",
     "serde",
