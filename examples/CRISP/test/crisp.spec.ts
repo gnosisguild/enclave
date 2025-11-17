@@ -127,7 +127,7 @@ test("CRISP smoke test", async ({
   await page.locator('button:has-text("Cast Vote")').click();
   log(`confirming MetaMask signature request...`);
   await metamask.confirmSignature();
-  const WAIT = 300_000;
+  const WAIT = 500_000;
   log(`waiting for ${WAIT}ms...`);
   await page.waitForTimeout(WAIT);
   log(`clicking historic polls button...`);
