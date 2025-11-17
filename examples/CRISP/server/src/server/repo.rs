@@ -106,6 +106,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             token_holder_hashes: vec![],
             token_address,
             balance_threshold,
+            ciphertext_inputs: vec![],
         })
         .await
     }

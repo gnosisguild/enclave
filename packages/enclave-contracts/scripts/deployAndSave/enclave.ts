@@ -163,11 +163,7 @@ export const upgradeAndSaveEnclave = async ({
   console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
 
   const enclaveFactory = await ethers.getContractFactory(
-    EnclaveFactory.abi,
-    EnclaveFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
-        poseidonT3Address,
-    }),
+    "Enclave",
     signer,
   );
 
