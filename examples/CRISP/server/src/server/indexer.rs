@@ -6,7 +6,7 @@
 
 use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
-    models::{CurrentRound, CustomParams},
+    models::{CurrentRound, CustomParams, InputPublished},
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     token_holders::{build_tree, compute_token_holder_hashes},
@@ -394,36 +394,34 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
     Ok(block.header.timestamp)
 }
 
-pub async fn register_input_published(mut listener: EventListener,
-    contract: EnclaveContract<ReadWrite>) -> Result<EventListener> {
-    let store = self.store.clone();
-    listener
-        .add_event_handler(move |e: InputPublished| {
-            let store = SharedStore::new(store.clone());
+pub async fn register_input_published(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
+    indexer
+        .add_event_handler(move |event: InputPublished, store| {
+            let e3_id = event.e3Id.to::<u64>();
+            let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
                 println!(
                     "InputPublished: e3_id={}, index={}, data=0x{}...",
-                    e.e3Id,
-                    e.index,
-                    hex::encode(&e.data[..8.min(e.data.len())])
+                    event.e3Id,
+                    event.index,
+                    hex::encode(&event.vote[..8.min(event.vote.len())])
                 );
-                let e3_id = u64_try_from(e.e3Id)?;
 
-                let mut repo = E3Repository::new(store, e3_id);
-                repo.insert_ciphertext_input(e.data.to_vec(), e.index.to::<u64>())
+                repo.insert_ciphertext_input(event.vote.to_vec(), event.index.to::<u64>())
                     .await?;
                 Ok(())
             }
         })
         .await;
-    Ok(listener)
+    Ok(indexer)
 }
 
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
     registry_address: &str,
-    input_validator_address: &str,
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
@@ -450,11 +448,6 @@ pub async fn start_indexer(
     let registry_listener =
         register_committee_published(registry_contract_listener, readwrite_contract.clone()).await?;
     registry_listener.start();
-
-    let input_validator_contract_listener = EventListener::create_contract_listener(&ws_url, input_validator_address).await?;
-    let input_validator_listener =
-        register_input_published(input_validator_contract_listener, readwrite_contract.clone()).await?;
-    input_validator_listener.start();
 
     Ok(())
 }

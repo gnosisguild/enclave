@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::sol;
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -184,6 +185,7 @@ pub struct E3Crisp {
     pub token_holder_hashes: Vec<String>,
     pub token_address: String,
     pub balance_threshold: String,
+    pub ciphertext_inputs: Vec<u8>,
 }
 
 impl From<E3> for WebResultRequest {
@@ -198,4 +200,8 @@ impl From<E3> for WebResultRequest {
             end_time: e3.expiration,
         }
     }
+}
+
+sol! {
+    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
 }

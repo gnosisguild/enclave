@@ -16,11 +16,6 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    InternalLeanIMT,
-    LeanIMTData,
-    PoseidonT3
-} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 /**
  * @title Enclave
@@ -28,7 +23,6 @@ import {
  * @dev Coordinates E3 lifecycle including request, activation, input publishing, and output verification
  */
 contract Enclave is IEnclave, OwnableUpgradeable {
-    using InternalLeanIMT for LeanIMTData;
     using SafeERC20 for IERC20;
 
     ////////////////////////////////////////////////////////////
@@ -341,7 +335,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        e3.inputValidator.validate(msg.sender, data);
+        e3.e3Program.validateInput(e3Id, msg.sender, data);
 
         success = true;
     }
