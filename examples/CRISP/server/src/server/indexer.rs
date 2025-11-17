@@ -367,6 +367,7 @@ pub async fn register_committee_published(
                 info!("[e3_id={}] Wait duration: {:?}", event.e3Id, wait_duration);
 
                 // Sleep until start time
+                // XXX: refactor to use blocktime
                 if !wait_duration.is_zero() {
                     sleep(wait_duration).await;
                 }
