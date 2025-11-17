@@ -18,27 +18,27 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 
 fn main(
     // Ciphertext Addition Section.
-    prev_ct0is: [Polynomial<2048>; 1], // todo: make this pub
-    prev_ct1is: [Polynomial<2048>; 1], // todo: make this pub
-    sum_ct0is: [Polynomial<2048>; 1],
-    sum_ct1is: [Polynomial<2048>; 1],
-    sum_r0is: [Polynomial<2048>; 1],
-    sum_r1is: [Polynomial<2048>; 1],
+    prev_ct0is: [Polynomial<512>; 2], // todo: make this pub
+    prev_ct1is: [Polynomial<512>; 2], // todo: make this pub
+    sum_ct0is: [Polynomial<512>; 2],
+    sum_ct1is: [Polynomial<512>; 2],
+    sum_r0is: [Polynomial<512>; 2],
+    sum_r1is: [Polynomial<512>; 2],
     // Greco Section.
-    params: Params<2048, 1>, // todo: make this pub
-    pk0is: [Polynomial<2048>; 1],
-    pk1is: [Polynomial<2048>; 1],
-    ct0is: [Polynomial<2048>; 1],
-    ct1is: [Polynomial<2048>; 1],
-    u: Polynomial<2048>,
-    e0: Polynomial<2048>,
-    e1: Polynomial<2048>,
-    e0is: [Polynomial<2048>; 1],
-    k1: Polynomial<2048>,
-    r1is: [Polynomial<4095>; 1],
-    r2is: [Polynomial<2047>; 1],
-    p1is: [Polynomial<4095>; 1],
-    p2is: [Polynomial<2047>; 1],
+    params: Params<512, 2>, // todo: make this pub
+    pk0is: [Polynomial<512>; 2],
+    pk1is: [Polynomial<512>; 2],
+    ct0is: [Polynomial<512>; 2],
+    ct1is: [Polynomial<512>; 2],
+    u: Polynomial<512>,
+    e0: Polynomial<512>,
+    e1: Polynomial<512>,
+    e0is: [Polynomial<512>; 2],
+    k1: Polynomial<512>,
+    r1is: [Polynomial<1023>; 2],
+    r2is: [Polynomial<511>; 2],
+    p1is: [Polynomial<1023>; 2],
+    p2is: [Polynomial<511>; 2],
     // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
