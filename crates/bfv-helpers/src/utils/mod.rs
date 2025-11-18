@@ -134,4 +134,3 @@ pub fn encode_database(
 
 #[allow(dead_code)]
 fn main() {}
-
