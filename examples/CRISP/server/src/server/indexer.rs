@@ -221,10 +221,12 @@ pub async fn register_e3_activated(
                     info!("[e3_id={}] Starting computation for E3", e3_id);
                     repo.update_status("Computing").await?;
 
+                    let votes = repo.get_ciphertext_inputs().await?;
+
                     let (id, status) = run_compute(
                         e3_id,
                         e3.e3_params,
-                        e3.ciphertext_inputs,
+                        votes,
                         format!("{}/state/add-result", CONFIG.enclave_server_url),
                     )
                     .await
@@ -425,7 +427,7 @@ pub async fn start_indexer(
     contract_address: &str,
     registry_address: &str,
     crisp_address: &str,
-    store: impl DataStore,
+    store: SharedStore<impl DataStore>,
     private_key: &str,
 ) -> Result<()> {
     let readonly_contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
@@ -438,7 +440,7 @@ pub async fn start_indexer(
 
     // CRISP indexer
     let crisp_indexer =
-        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
+        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store.clone()).await?;
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
@@ -454,7 +456,7 @@ pub async fn start_indexer(
 
     // CRISP Listener
     let crisp_contract_listener = EventListener::create_contract_listener(ws_url, crisp_address).await?;
-    let crisp_listener = register_input_published(crisp_contract_listener, store);
+    let crisp_listener = register_input_published(crisp_contract_listener, store).await?;
     crisp_listener.start();
 
     Ok(())
