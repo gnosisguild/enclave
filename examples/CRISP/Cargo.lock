@@ -1962,6 +1962,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "crisp-constants",
  "derivative",
  "dialoguer",
  "dotenvy",
@@ -1985,6 +1986,13 @@ dependencies = [
  "sled",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "crisp-constants"
+version = "0.1.0"
+dependencies = [
+ "e3-sdk",
 ]
 
 [[package]]
@@ -6543,6 +6551,8 @@ name = "zk-inputs"
 version = "0.1.0"
 dependencies = [
  "bigint-poly",
+ "crisp-constants",
+ "e3-sdk",
  "eyre",
  "fhe",
  "fhe-math",

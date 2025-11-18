@@ -4,8 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crisp_constants::get_default_paramset;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
-use e3_sdk::bfv_helpers::BfvParams;
+use e3_sdk::bfv_helpers::BfvParamSets;
 use log::info;
 use num_bigint::BigUint;
 use reqwest::Client;
@@ -328,7 +329,7 @@ pub async fn decrypt_and_publish_result(
 }
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
-    build_bfv_params_from_set_arc(BfvParams::InsecureSet2048_1032193_1.into())
+    build_bfv_params_from_set_arc(get_default_paramset())
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
