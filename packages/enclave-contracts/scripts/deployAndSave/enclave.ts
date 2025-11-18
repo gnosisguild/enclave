@@ -134,11 +134,9 @@ export const deployAndSaveEnclave = async ({
  * @returns The upgraded Enclave contract (same proxy address)
  */
 export const upgradeAndSaveEnclave = async ({
-  poseidonT3Address,
   ownerAddress,
   hre,
 }: {
-  poseidonT3Address: string;
   ownerAddress: string;
   hre: HardhatRuntimeEnvironment;
 }): Promise<{ enclave: Enclave; implementationAddress: string }> => {
