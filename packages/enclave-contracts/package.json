@@ -170,6 +170,7 @@
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@zk-kit/lean-imt.sol": "2.0.1",
+    "@zk-kit/lean-imt": "2.2.4",
     "js-yaml": "^4.1.1",
     "poseidon-solidity": "0.0.5"
   },
