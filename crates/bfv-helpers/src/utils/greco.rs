@@ -20,7 +20,7 @@ use std::sync::Arc;
 fn convert_greco_coefficient_to_bfv(centered_coeff: &BigInt, qi: u64, zkp_modulus: &BigInt) -> u64 {
     let qi_bigint = BigInt::from(qi);
     let half_zkp = zkp_modulus / 2u64;
-    
+
     // Recover centered coefficient mod qi
     // If standard_form >= zkp_modulus/2, it's a negative centered value: centered = standard_form - zkp_modulus
     let centered_mod_qi = if centered_coeff >= &half_zkp {
@@ -28,7 +28,7 @@ fn convert_greco_coefficient_to_bfv(centered_coeff: &BigInt, qi: u64, zkp_modulu
     } else {
         centered_coeff % &qi_bigint
     };
-    
+
     // Un-center: convert from [-(qi-1)/2, (qi-1)/2] to [0, qi)
     if centered_mod_qi < BigInt::zero() {
         (&centered_mod_qi + &qi_bigint).to_u64().unwrap_or(0)
@@ -38,7 +38,11 @@ fn convert_greco_coefficient_to_bfv(centered_coeff: &BigInt, qi: u64, zkp_modulu
 }
 
 /// Converts greco-formatted coefficients (reversed, centered) to BFV coefficients.
-fn convert_greco_coefficients_to_bfv(greco_coeffs: &[BigInt], qi: u64, zkp_modulus: &BigInt) -> Vec<u64> {
+fn convert_greco_coefficients_to_bfv(
+    greco_coeffs: &[BigInt],
+    qi: u64,
+    zkp_modulus: &BigInt,
+) -> Vec<u64> {
     greco_coeffs
         .iter()
         .rev()
@@ -95,16 +99,17 @@ pub fn greco_to_bfv_ciphertext(
     let ct0_array = Array2::from_shape_fn((moduli.len(), degree), |(i, j)| ct0_coeffs_all[i][j]);
     let ct1_array = Array2::from_shape_fn((moduli.len(), degree), |(i, j)| ct1_coeffs_all[i][j]);
 
-    let mut ct0_poly = Poly::try_convert_from(ct0_array, &ctx, false, Some(Representation::PowerBasis))
-        .context("Failed to create ct0 Poly")?;
-    let mut ct1_poly = Poly::try_convert_from(ct1_array, &ctx, false, Some(Representation::PowerBasis))
-        .context("Failed to create ct1 Poly")?;
+    let mut ct0_poly =
+        Poly::try_convert_from(ct0_array, &ctx, false, Some(Representation::PowerBasis))
+            .context("Failed to create ct0 Poly")?;
+    let mut ct1_poly =
+        Poly::try_convert_from(ct1_array, &ctx, false, Some(Representation::PowerBasis))
+            .context("Failed to create ct1 Poly")?;
 
     ct0_poly.change_representation(Representation::Ntt);
     ct1_poly.change_representation(Representation::Ntt);
 
-    Ciphertext::new(vec![ct0_poly, ct1_poly], params)
-        .context("Failed to create Ciphertext")
+    Ciphertext::new(vec![ct0_poly, ct1_poly], params).context("Failed to create Ciphertext")
 }
 
 /// Deserializes greco coefficients from bytes format.
@@ -112,30 +117,30 @@ pub fn greco_to_bfv_ciphertext(
 /// The bytes are expected to be serialized from Solidity bytes32[] arrays.
 pub fn deserialize_greco_coefficients(bytes: &[u8]) -> Result<Vec<Vec<BigInt>>> {
     let mut offset = 0;
-    
+
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
-    
+
     // Read number of moduli
     let num_moduli = bytes[offset] as usize;
     offset += 1;
-    
+
     let mut result = Vec::with_capacity(num_moduli);
-    
+
     for _ in 0..num_moduli {
         if offset + 2 > bytes.len() {
             anyhow::bail!("Insufficient bytes for degree");
         }
-        
+
         // Read number of coefficients
         let num_coeffs = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]) as usize;
         offset += 2;
-        
+
         if offset + num_coeffs * 32 > bytes.len() {
             anyhow::bail!("Insufficient bytes for coefficients");
         }
-        
+
         let mut modulus_coeffs = Vec::with_capacity(num_coeffs);
         for _ in 0..num_coeffs {
             let coeff_bytes: [u8; 32] = bytes[offset..offset + 32]
@@ -144,10 +149,10 @@ pub fn deserialize_greco_coefficients(bytes: &[u8]) -> Result<Vec<Vec<BigInt>>> 
             modulus_coeffs.push(bytes32_to_bigint(&coeff_bytes));
             offset += 32;
         }
-        
+
         result.push(modulus_coeffs);
     }
-    
+
     Ok(result)
 }
 
@@ -155,14 +160,14 @@ pub fn deserialize_greco_coefficients(bytes: &[u8]) -> Result<Vec<Vec<BigInt>>> 
 fn bytes32_to_bigint(bytes: &[u8; 32]) -> BigInt {
     // Check if negative (MSB is 1)
     let is_negative = bytes[0] >= 0x80;
-    
+
     if is_negative {
         // Two's complement: invert all bits and add 1, then negate
         let mut inverted = [0u8; 32];
         for i in 0..32 {
             inverted[i] = !bytes[i];
         }
-        
+
         // Add 1
         let mut carry = 1u16;
         for i in (0..32).rev() {
@@ -170,7 +175,7 @@ fn bytes32_to_bigint(bytes: &[u8; 32]) -> BigInt {
             inverted[i] = sum as u8;
             carry = sum >> 8;
         }
-        
+
         -BigInt::from_bytes_be(Sign::Plus, &inverted)
     } else {
         BigInt::from_bytes_be(Sign::Plus, bytes)
@@ -202,16 +207,15 @@ mod tests {
 
         let vote = vec![1u64, 0u64, 0u64];
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut rng)
-            .unwrap();
+        let (ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
 
-        let greco_vectors = GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params)
-            .unwrap();
+        let greco_vectors =
+            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params).unwrap();
 
         let standard_vectors = greco_vectors.standard_form();
         let reconstructed_ct =
-            greco_to_bfv_ciphertext(&standard_vectors.ct0is, &standard_vectors.ct1is, &params).unwrap();
+            greco_to_bfv_ciphertext(&standard_vectors.ct0is, &standard_vectors.ct1is, &params)
+                .unwrap();
 
         assert_eq!(reconstructed_ct.c.len(), 2);
         assert_eq!(reconstructed_ct.level, 0);
@@ -243,15 +247,27 @@ mod tests {
             let orig1 = orig_coeffs1.row(mod_idx);
             let recon1 = recon_coeffs1.row(mod_idx);
 
-            for (i, ((&o0, &r0), (&o1, &r1))) in orig0.iter()
+            for (i, ((&o0, &r0), (&o1, &r1))) in orig0
+                .iter()
                 .zip(recon0.iter())
                 .zip(orig1.iter().zip(recon1.iter()))
                 .enumerate()
             {
-                assert_eq!(o0 % qi, r0 % qi, "ct0[{}] mismatch at modulus {}", i, mod_idx);
-                assert_eq!(o1 % qi, r1 % qi, "ct1[{}] mismatch at modulus {}", i, mod_idx);
+                assert_eq!(
+                    o0 % qi,
+                    r0 % qi,
+                    "ct0[{}] mismatch at modulus {}",
+                    i,
+                    mod_idx
+                );
+                assert_eq!(
+                    o1 % qi,
+                    r1 % qi,
+                    "ct1[{}] mismatch at modulus {}",
+                    i,
+                    mod_idx
+                );
             }
         }
     }
 }
-
