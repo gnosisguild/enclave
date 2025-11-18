@@ -34,7 +34,7 @@ type Result<T> = std::result::Result<T, Error>;
 /// Predefined BFV parameters for common use cases
 /// Note that 10 is the default value for both error1 and error2 variance
 /// for both BFV and TRBFV (if not explicitly set).
-pub enum BfvParams {
+pub enum BfvParamSets {
     // List parameter strings and variants here
     //
     /// Standard BFV development parameters set (DO NOT USE IN PRODUCTION).
@@ -77,17 +77,17 @@ pub enum BfvParams {
 }
 
 // Map for getters
-impl BfvParams {
+impl BfvParamSets {
     /// Return the given param set based on the input key &str.
     pub fn get_params_by_str(key: &str) -> Result<BfvParamSet> {
-        key.parse::<BfvParams>()
+        key.parse::<BfvParamSets>()
             .map(|k| k.into())
             .map_err(|_| Error::UnknownParamSet(key.to_string()))
     }
 
     /// List all the available parameter keys
     pub fn get_params_list() -> Vec<String> {
-        BfvParams::iter()
+        BfvParamSets::iter()
             .map(|key| {
                 let s: &'static str = key.into();
                 s.to_string()
@@ -96,9 +96,9 @@ impl BfvParams {
     }
 }
 
-impl From<BfvParams> for BfvParamSet {
-    fn from(value: BfvParams) -> Self {
-        use BfvParams as B;
+impl From<BfvParamSets> for BfvParamSet {
+    fn from(value: BfvParamSets) -> Self {
+        use BfvParamSets as B;
         match value {
             // List each new parameter set here
             B::InsecureSet2048_1032193_1 => BfvParamSet {
@@ -630,7 +630,7 @@ mod tests {
 
         #[test]
         fn test_params_constant() {
-            let param_set: BfvParamSet = BfvParams::InsecureSet2048_1032193_1.into();
+            let param_set: BfvParamSet = BfvParamSets::InsecureSet2048_1032193_1.into();
             assert_eq!(param_set.degree, 2048);
             assert_eq!(param_set.plaintext_modulus, 1032193);
             assert_eq!(param_set.moduli, &[0x3FFFFFFF000001]);
@@ -638,7 +638,7 @@ mod tests {
 
         #[test]
         fn test_params_function() {
-            let param_set = BfvParams::InsecureSet2048_1032193_1.into();
+            let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
             let params = build_bfv_params_from_set(param_set);
 
             assert_eq!(params.degree(), param_set.degree);
@@ -648,7 +648,7 @@ mod tests {
 
         #[test]
         fn test_params_arc_function() {
-            let param_set = BfvParams::InsecureSet2048_1032193_1.into();
+            let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
             let params = build_bfv_params_from_set_arc(param_set);
 
             assert_eq!(params.degree(), param_set.degree);
@@ -658,7 +658,7 @@ mod tests {
 
         #[test]
         fn test_params_encoding_roundtrip() {
-            let param_set = BfvParams::InsecureSet2048_1032193_1.into();
+            let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
             let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);
@@ -672,7 +672,7 @@ mod tests {
 
         #[test]
         fn test_params_arc_encoding_roundtrip() {
-            let param_set = BfvParams::InsecureSet2048_1032193_1.into();
+            let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
             let params = build_bfv_params_from_set_arc(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params_arc(&encoded);
@@ -686,7 +686,7 @@ mod tests {
 
         #[test]
         fn test_params_trbfv_encoding_roundtrip() {
-            let param_set = BfvParams::Set8192_1000_4.into();
+            let param_set = BfvParamSets::Set8192_1000_4.into();
             let params = build_bfv_params_from_set(param_set);
             let encoded = encode_bfv_params(&params);
             let decoded = decode_bfv_params(&encoded);

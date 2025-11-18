@@ -6,7 +6,7 @@
 
 use crisp_constants::get_default_paramset;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
-use e3_sdk::bfv_helpers::BfvParams;
+use e3_sdk::bfv_helpers::BfvParamSets;
 use log::info;
 use num_bigint::BigUint;
 use reqwest::Client;

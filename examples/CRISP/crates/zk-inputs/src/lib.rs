@@ -11,7 +11,7 @@
 use crisp_constants::get_default_paramset;
 use e3_sdk::bfv_helpers::build_bfv_params_arc;
 use e3_sdk::bfv_helpers::BfvParamSet;
-use e3_sdk::bfv_helpers::BfvParams;
+use e3_sdk::bfv_helpers::BfvParamSets;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
