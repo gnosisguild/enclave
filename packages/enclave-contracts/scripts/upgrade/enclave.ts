@@ -6,7 +6,6 @@
 import hre from "hardhat";
 
 import { upgradeAndSaveEnclave } from "../deployAndSave/enclave";
-import { deployAndSavePoseidonT3 } from "../deployAndSave/poseidonT3";
 import { readDeploymentArgs } from "../utils";
 
 /**
@@ -20,7 +19,6 @@ export const upgradeEnclave = async () => {
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
   console.log("Signer:", signerAddress);
 
-  const poseidonT3 = await deployAndSavePoseidonT3({ hre });
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
   if (!preDeployedArgs?.address) {
     throw new Error("Enclave proxy not found. Deploy first before upgrading.");
@@ -46,7 +44,6 @@ export const upgradeEnclave = async () => {
   console.log("Proxy contract exists on-chain");
 
   const { enclave, implementationAddress } = await upgradeAndSaveEnclave({
-    poseidonT3Address: poseidonT3,
     ownerAddress: signerAddress,
     hre,
   });
