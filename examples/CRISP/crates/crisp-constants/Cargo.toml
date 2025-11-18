@@ -1,0 +1,10 @@
+[package]
+name = "crisp-constants"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+
+[dependencies]
+e3-sdk = { workspace = true, default-features = false, features=["bfv"] }

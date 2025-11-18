@@ -94,16 +94,6 @@ impl BfvParams {
             })
             .collect()
     }
-
-    pub fn to_tuple(self) -> (usize, u64, &'static [u64], Option<&'static str>) {
-        let set: BfvParamSet = self.into();
-        (
-            set.degree,
-            set.plaintext_modulus,
-            set.moduli,
-            set.error1_variance,
-        )
-    }
 }
 
 impl From<BfvParams> for BfvParamSet {

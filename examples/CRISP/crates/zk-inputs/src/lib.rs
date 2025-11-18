@@ -8,6 +8,7 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
+use crisp_constants::get_default_paramset;
 use e3_sdk::bfv_helpers::build_bfv_params_arc;
 use e3_sdk::bfv_helpers::BfvParamSet;
 use e3_sdk::bfv_helpers::BfvParams;
@@ -59,7 +60,7 @@ impl ZKInputsGenerator {
     /// # Returns
     /// A new ZKInputsGenerator instance with default BFV parameters
     pub fn with_defaults() -> Self {
-        Self::from_set(BfvParams::InsecureSet512_10_1.into())
+        Self::from_set(get_default_paramset())
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.
