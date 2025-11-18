@@ -23,7 +23,7 @@ export interface CurrentRound {
 
 export interface BroadcastVoteRequest {
   round_id: number
-  enc_vote_bytes: number[]
+  enc_vote_bytes: number[][]
   proof: number[]
   address: string
 }
@@ -53,6 +53,6 @@ export interface VoteStateLite {
 }
 
 export interface EncryptedVote {
-  vote: Uint8Array
+  vote: string[]
   proof: Uint8Array
 }

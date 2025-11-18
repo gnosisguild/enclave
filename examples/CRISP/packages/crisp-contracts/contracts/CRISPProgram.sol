@@ -39,7 +39,7 @@ contract CRISPProgram is IE3Program, Ownable {
 
     /// @notice Mapping to store votes. Each elegible voter has their own slot
     /// to store their vote.
-    mapping(address => bytes) public voteSlots;
+    mapping(address => bytes32[]) public voteSlots;
 
     /// @notice Half of the largest minimum degree used to fit votes
     /// inside the plaintext polynomial
@@ -147,23 +147,29 @@ contract CRISPProgram is IE3Program, Ownable {
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
         );
-        // We need to ensure that the CRISP admin set the merkle root of the census.
+        // We need to ensure that the CRISP admin set the round data.
         if (!isDataSet) revert RoundDataNotSet();
 
         if (data.length == 0) revert EmptyInputData();
 
-        (bytes memory noirProof, bytes memory vote, address slot) = abi.decode(
+        (bytes memory noirProof, bytes32[] memory vote, address slot) = abi.decode(
             data,
-            (bytes, bytes, address)
+            (bytes, bytes32[], address)
         );
 
-        bytes32[] memory noirPublicInputs = new bytes32[](2);
-
+        // Concatenate vote to noir public inputs
+        bytes32[] memory noirPublicInputs = new bytes32[](2 + vote.length);
+        
         // Set public inputs for the proof. Order must match Noir circuit.
+        // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
         noirPublicInputs[0] = bytes32(uint256(uint160(slot)));
         bool isFirstVote = voteSlots[slot].length == 0;
         noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
-        // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
+        
+        // Append vote coefficients
+        for (uint256 i = 0; i < vote.length; i++) {
+            noirPublicInputs[2 + i] = vote[i];
+        }
 
         // Check if the ciphertext was encrypted correctly
         if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
@@ -173,8 +179,11 @@ contract CRISPProgram is IE3Program, Ownable {
         /// @notice Store the vote in the correct slot.
         voteSlots[slot] = vote;
 
+        // todo: change this conversion and return bytes32[] instead of bytes.
+        bytes memory voteBytes = abi.encodePacked(vote);
+
         // return the vote so that it can be stored in Enclave's input merkle tree
-        input = vote;
+        input = voteBytes;
     }
 
     /// @notice Decode the tally from the plaintext output
