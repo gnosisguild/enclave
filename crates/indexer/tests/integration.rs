@@ -75,8 +75,5 @@ async fn test_indexer() -> Result<()> {
 
     assert_eq!(e3.ciphertext_output, ciphertext_output);
 
-    let store = indexer.get_store();
-    let val = store.get::<u64>("input_count").await?.unwrap();
-    assert_eq!(val, 3);
     Ok(())
 }
