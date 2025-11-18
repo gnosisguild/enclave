@@ -91,6 +91,38 @@ impl<S: DataStore> CrispE3Repository<S> {
         self.set_crisp(e3_crisp).await
     }
 
+    /*
+        pub async fn insert_ciphertext_input(&mut self, data: Vec<u8>, index: u64) -> Result<()> {
+        let key = self.e3_key();
+        self.store
+            .modify(&key, |e3_obj: Option<E3>| {
+                e3_obj.map(|mut e| {
+                    e.ciphertext_inputs.push((data.clone(), index));
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+
+        Ok(())
+    }
+     */
+
+    pub async fn insert_ciphertext_input(&mut self, vote: Vec<u8>, index: u64) -> Result<()> {
+        let key = self.crisp_key();
+
+        self.store.modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.ciphertext_inputs.push((vote.clone(), index));
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+
+        Ok(())
+    }
+
     pub async fn initialize_round(
         &mut self,
         token_address: String,
