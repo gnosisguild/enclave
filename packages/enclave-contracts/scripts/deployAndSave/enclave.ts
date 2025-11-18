@@ -74,10 +74,7 @@ export const deployAndSaveEnclave = async ({
     return { enclave: enclaveContract };
   }
 
-  const enclaveFactory = await ethers.getContractFactory(
-    "Enclave",
-    signer,
-  );
+  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
 
   const enclave = await enclaveFactory.deploy();
   await enclave.waitForDeployment();
@@ -162,10 +159,7 @@ export const upgradeAndSaveEnclave = async ({
   );
   console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
 
-  const enclaveFactory = await ethers.getContractFactory(
-    "Enclave",
-    signer,
-  );
+  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
 
   const newImplementation = await enclaveFactory.deploy();
   await newImplementation.waitForDeployment();
