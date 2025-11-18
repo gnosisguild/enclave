@@ -8,33 +8,26 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
+use crisp_constants::get_default_paramset;
+use e3_sdk::bfv_helpers::build_bfv_params_arc;
+use e3_sdk::bfv_helpers::BfvParamSet;
+use e3_sdk::bfv_helpers::BfvParamSets;
 use eyre::{Context, Result};
+use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
 use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe::bfv::{Encoding, Plaintext};
-use fhe_math::rq::Poly;
-use fhe_math::rq::Representation;
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
-use num_bigint::BigInt;
-use num_bigint::BigUint;
-use num_bigint::ToBigInt;
 use rand::thread_rng;
 use std::sync::Arc;
-
 mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
 
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
-
-// Default BFV parameters constants for testing purposes.
-pub const DEFAULT_DEGREE: usize = 2048;
-pub const DEFAULT_PLAINTEXT_MODULUS: u64 = 1032193;
-pub const DEFAULT_MODULI: [u64; 1] = [0x3FFFFFFF000001];
 
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
@@ -42,14 +35,21 @@ pub struct ZKInputsGenerator {
 
 impl ZKInputsGenerator {
     /// Creates a new generator with the specified BFV parameters.
-    pub fn new(degree: usize, plaintext_modulus: u64, moduli: &[u64]) -> Result<Self> {
-        let bfv_params = BfvParametersBuilder::new()
-            .set_degree(degree)
-            .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(moduli)
-            .build_arc()
-            .map_err(|e| eyre::eyre!("Invalid BFV parameters: {}", e))?;
-        Ok(Self { bfv_params })
+    pub fn new(
+        degree: usize,
+        plaintext_modulus: u64,
+        moduli: &[u64],
+        error1_variance: Option<&str>,
+    ) -> Self {
+        let bfv_params = build_bfv_params_arc(degree, plaintext_modulus, moduli, error1_variance);
+        Self { bfv_params }
+    }
+
+    /// Creates a new generator with the specified BFV parameter set.
+    pub fn from_set(set: BfvParamSet) -> Self {
+        let bfv_params = set.build_arc();
+
+        Self { bfv_params }
     }
 
     /// Creates a generator with default BFV parameters for testing purposes.
@@ -59,8 +59,8 @@ impl ZKInputsGenerator {
     /// - The default parameters are not suitable for production.
     /// # Returns
     /// A new ZKInputsGenerator instance with default BFV parameters
-    pub fn with_defaults() -> Result<Self> {
-        Self::new(DEFAULT_DEGREE, DEFAULT_PLAINTEXT_MODULUS, &DEFAULT_MODULI)
+    pub fn with_defaults() -> Self {
+        Self::from_set(get_default_paramset())
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.
@@ -168,6 +168,8 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
 
+    const DEFAULT_DEGREE: usize = 512;
+
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
         (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect()
@@ -175,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_inputs_generation_with_defaults() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -195,8 +197,12 @@ mod tests {
 
     #[test]
     fn test_inputs_generation_with_custom_params() {
-        let generator = ZKInputsGenerator::new(2048, 1032193, &[0x3FFFFFFF000001])
-            .expect("failed to create generator");
+        let generator = ZKInputsGenerator::from_set(BfvParamSet {
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: &[0x3FFFFFFF000001],
+            error1_variance: None,
+        });
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -216,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_inputs_generation_with_vote_0() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -236,7 +242,12 @@ mod tests {
 
     #[test]
     fn test_get_bfv_params() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::from_set(BfvParamSet {
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: &[0x3FFFFFFF000001],
+            error1_variance: None,
+        });
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == 2048);
@@ -246,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_secure_rng_usage() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
 
         // Test that functions use secure randomness (no deterministic seed).
         let public_key = generator
@@ -271,7 +282,7 @@ mod tests {
     // Error handling tests
     #[test]
     fn test_invalid_inputs() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let vote = create_vote_vector();
 
         // Test invalid byte inputs.
@@ -290,7 +301,7 @@ mod tests {
     // Core functionality tests
     #[test]
     fn test_vote_values() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -309,19 +320,8 @@ mod tests {
     }
 
     #[test]
-    fn test_bfv_params_consistency() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
-        let bfv_params = generator.get_bfv_params();
-
-        // Verify default parameters.
-        assert_eq!(bfv_params.degree(), 2048);
-        assert_eq!(bfv_params.plaintext(), 1032193);
-        assert_eq!(bfv_params.moduli(), &[0x3FFFFFFF000001]);
-    }
-
-    #[test]
     fn test_json_output_structure() {
-        let generator = ZKInputsGenerator::with_defaults().expect("failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_cryptographic_properties() {
-        let generator = ZKInputsGenerator::with_defaults().expect("Failed to create generator");
+        let generator = ZKInputsGenerator::with_defaults();
         let public_key = generator
             .generate_public_key()
             .expect("Failed to generate public key");

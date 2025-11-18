@@ -6,7 +6,7 @@
 
 use e3_bfv_helpers::{
     client::{bfv_encrypt, bfv_verifiable_encrypt},
-    BfvParamSet, BfvParams,
+    BfvParamSet, BfvParamSets,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -164,7 +164,7 @@ pub fn bfv_verifiable_encrypt_vector(
 /// Returns error if the parameter set name is invalid or serialization fails.
 pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
     let params =
-        BfvParams::get_params_by_str(name).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        BfvParamSets::get_params_by_str(name).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let js_params = BfvParamSetJs::from(&params);
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
@@ -181,7 +181,7 @@ pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
 /// Includes both production-ready sets (e.g., "SET_8192_1000_4") and
 /// insecure sets for testing (prefixed with "INSECURE_").
 pub fn get_bfv_params_list() -> Vec<String> {
-    BfvParams::get_params_list()
+    BfvParamSets::get_params_list()
 }
 
 #[derive(Serialize, Deserialize)]

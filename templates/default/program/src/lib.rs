@@ -27,7 +27,7 @@ mod tests {
     use super::*;
     use anyhow::Result;
     use e3_bfv_helpers::BfvParamSet;
-    use e3_bfv_helpers::{BfvParams, build_bfv_params_arc, encode_bfv_params};
+    use e3_bfv_helpers::{BfvParamSets, build_bfv_params_arc, encode_bfv_params};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use fhe_traits::FheEncrypter;
@@ -38,7 +38,7 @@ mod tests {
     fn test() -> Result<()> {
         let mut rng = thread_rng();
 
-        let params_set: BfvParamSet = BfvParams::InsecureSet2048_1032193_1.into();
+        let params_set: BfvParamSet = BfvParamSets::InsecureSet2048_1032193_1.into();
         let params = build_bfv_params_arc(
             params_set.degree,
             params_set.plaintext_modulus,
