@@ -153,8 +153,8 @@ impl<S: DataStore> CrispE3Repository<S> {
     }
 
     pub async fn get_vote_count(&self) -> Result<u64> {
-        let e3 = self.get_e3().await?;
-        Ok(u64::try_from(e3.ciphertext_inputs.len())?)
+        let e3_crisp = self.get_crisp().await?;
+        Ok(u64::try_from(e3_crisp.ciphertext_inputs.len())?)
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -232,6 +232,11 @@ impl<S: DataStore> CrispE3Repository<S> {
         })
     }
 
+    pub async fn get_ciphertext_inputs(&self) -> Result<Vec<(Vec<u8>, u64)>> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.ciphertext_inputs)
+    }
+    
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())
