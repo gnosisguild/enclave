@@ -27,7 +27,7 @@ use e3_sdk::{
         },
         listener::EventListener,
     },
-    indexer::{DataStore, EnclaveIndexer},
+    indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
 use evm_helpers::CRISPContractFactory;
 use eyre::Context;
@@ -395,12 +395,14 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
 }
 
 pub async fn register_input_published(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
-    indexer
-        .add_event_handler(move |event: InputPublished, store| {
+    mut listener: EventListener,
+    store: SharedStore<impl DataStore>
+) -> Result<EventListener> {
+    listener
+        .add_event_handler(move |event: InputPublished| {
+
             let e3_id = event.e3Id.to::<u64>();
-            let mut repo = CrispE3Repository::new(store, e3_id);
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             async move {
                 println!(
                     "InputPublished: e3_id={}, index={}, data=0x{}...",
@@ -415,13 +417,14 @@ pub async fn register_input_published(
             }
         })
         .await;
-    Ok(indexer)
+    Ok(listener)
 }
 
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
     registry_address: &str,
+    crisp_address: &str,
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
@@ -448,6 +451,11 @@ pub async fn start_indexer(
     let registry_listener =
         register_committee_published(registry_contract_listener, readwrite_contract.clone()).await?;
     registry_listener.start();
+
+    // CRISP Listener
+    let crisp_contract_listener = EventListener::create_contract_listener(ws_url, crisp_address).await?;
+    let crisp_listener = register_input_published(crisp_contract_listener, store);
+    crisp_listener.start();
 
     Ok(())
 }
