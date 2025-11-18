@@ -266,7 +266,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
+          toolchain: v1.0.0-beta.15
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -449,7 +449,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
+          toolchain: v1.0.0-beta.15
 
       - name: Install wasm-pack
         uses: ./.github/actions/install-wasm-pack
@@ -521,7 +521,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
+          toolchain: v1.0.0-beta.15
 
       - name: Check formatting
         working-directory: ./circuits
