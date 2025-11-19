@@ -21,9 +21,15 @@ chains:
 program:
   dev: true
   # risc0:
-  #   risc0_dev_mode: 1  # 0 = real groth16 proofs, 1 = fake proofs (dev mode)
-  #   bonsai_api_key: xxxxxxxxxxxxxxxx
-  #   bonsai_api_url: xxxxxxxxxxxxxxxx
+  #   risc0_dev_mode: 1  # 0 = production (Boundless), 1 = dev mode (fake proofs)
+  #
+  #   # Boundless configuration (for production)
+  #   boundless:
+  #     rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"
+  #     private_key: "${PRIVATE_KEY}"  # Use env vars for secrets
+  #     pinata_jwt: "${PINATA_JWT}"  # For uploading programs
+  #     program_url: "https://gateway.pinata.cloud/ipfs/YOUR_CID"  # Pre-uploaded program
+  #     onchain: true  # true = onchain requests, false = offchain
 
 nodes:
   cn1:

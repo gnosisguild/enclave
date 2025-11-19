@@ -33,14 +33,25 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
         let Some(risc0_config) = self.0.risc0() else {
             bail!("start must be run with risc0 config available");
         };
-        let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
 
+        let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
         let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
 
-        if let (Some(api_key), Some(api_url)) =
-            (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
-        {
-            args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
+        // Boundless support
+        if let Some(boundless) = &risc0_config.boundless {
+            args.extend(["--rpc-url", boundless.rpc_url.as_str()]);
+            args.extend(["--private-key", boundless.private_key.as_str()]);
+
+            if let Some(jwt) = &boundless.pinata_jwt {
+                args.extend(["--pinata-jwt", jwt.as_str()]);
+            }
+
+            if let Some(url) = &boundless.program_url {
+                args.extend(["--program-url", url.as_str()]);
+            }
+
+            let onchain = if boundless.onchain { "true" } else { "false" };
+            args.extend(["--boundless-onchain", onchain]);
         }
 
         run_bash_script(&cwd, &script, &args).await?;

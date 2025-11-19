@@ -4,80 +4,145 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Result};
 use bincode::serialize;
 use e3_compute_provider::{
     ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs,
 };
+use alloy_signer_local::PrivateKeySigner;
 use e3_user_program::fhe_processor;
 use methods::PROGRAM_ELF;
-use risc0_ethereum_contracts::groth16;
-use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
+use boundless_market::{Client, storage::storage_provider_from_env, contracts::FulfillmentData};
+use url::Url;
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
-fn encode_input(input: &[u8]) -> Result<Vec<u8>, Error> {
-    Ok(bytemuck::pod_collect_to_vec(&risc0_zkvm::serde::to_vec(
-        input,
-    )?))
-}
-
-pub struct Risc0Provider;
+pub struct BoundlessProvider;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Risc0Output {
+pub struct BoundlessOutput {
     pub result: ComputeResult,
     pub bytes: Vec<u8>,
     pub seal: Vec<u8>,
 }
 
-impl ComputeProvider for Risc0Provider {
-    type Output = Risc0Output;
+impl ComputeProvider for BoundlessProvider {
+    type Output = BoundlessOutput;
 
     fn prove(&self, input: &ComputeInput) -> Self::Output {
-        let encoded_input = encode_input(&serialize(input).unwrap()).unwrap();
-        let env = ExecutorEnv::builder()
-            .write_slice(&encoded_input)
-            .build()
-            .unwrap();
-
-        let receipt = default_prover()
-            .prove_with_ctx(
-                env,
-                &VerifierContext::default(),
-                PROGRAM_ELF,
-                &ProverOpts::groth16(),
-            )
-            .unwrap()
-            .receipt;
-
-        let decoded_journal = receipt.journal.decode().unwrap();
-
-        // Check if RISC0_DEV_MODE is set to "1" (dev mode)
-        // If dev mode: return empty seal (fake proof)
-        // Otherwise: return real groth16 proof
-        let is_dev_mode = std::env::var("RISC0_DEV_MODE").unwrap_or_default() == "1";
-
-        let seal = if is_dev_mode {
-            println!("RISC0_DEV_MODE=1: Using fake proof (empty seal)");
-            vec![]
+        let is_dev_mode = std::env::var("RISC0_DEV_MODE")
+            .unwrap_or_else(|_| "0".to_string()) == "1";
+        
+        if is_dev_mode {
+            println!("Dev mode: Using fake proof");
+            fake_prove(input)
         } else {
-            println!("RISC0_DEV_MODE=0 or unset: Generating real Groth16 proof");
-            groth16::encode(receipt.inner.groth16().unwrap().seal.clone()).unwrap()
-        };
-
-        Risc0Output {
-            result: decoded_journal,
-            bytes: receipt.journal.bytes.clone(),
-            seal,
+            println!("Using Boundless for proving");
+            tokio::runtime::Handle::current()
+                .block_on(boundless_prove(input))
+                .expect("Boundless proving failed")
         }
     }
 }
 
-pub fn run_compute(params: FHEInputs) -> Result<(Risc0Output, Vec<u8>)> {
-    let risc0_provider = Risc0Provider;
+/// Dev mode: return fake proof without executing
+fn fake_prove(input: &ComputeInput) -> BoundlessOutput {
+    println!("Generating fake proof for dev mode");
+    
+    // Execute the program with the input
+    let result = input.process(fhe_processor);
+    
+    // Serialize the result as journal bytes
+    let journal_bytes = bincode::serialize(&result).unwrap_or_default();
+    
+    BoundlessOutput {
+        result,
+        bytes: journal_bytes,
+        seal: vec![], // No seal in dev mode
+    }
+}
 
-    let mut provider = ComputeManager::new(risc0_provider, params, fhe_processor, false, None);
+/// Boundless proving
+async fn boundless_prove(input: &ComputeInput) -> Result<BoundlessOutput> {
+    println!("Submitting proof request to Boundless...");
+
+    let rpc_url = std::env::var("RPC_URL")
+        .context("RPC_URL not set")?
+        .parse()
+        .context("Invalid RPC_URL")?;
+    
+    let private_key: PrivateKeySigner = std::env::var("PRIVATE_KEY")
+        .context("PRIVATE_KEY not set")?
+        .parse()
+        .context("Invalid PRIVATE_KEY")?;
+
+    let client = Client::builder()
+        .with_rpc_url(rpc_url)
+        .with_private_key(private_key)
+        .with_storage_provider(Some(storage_provider_from_env()?))
+        .build()
+        .await
+        .context("Failed to build Boundless client")?;
+
+    let input_bytes = serialize(input)?;
+    let program_url = std::env::var("PROGRAM_URL").ok();
+    
+    let request = if let Some(url) = program_url {
+        println!("Using pre-uploaded program: {}", url);
+        client.new_request()
+            .with_program_url(url.parse::<Url>().context("Failed to parse program URL")?)
+            .context("Failed to create new request")?
+            .with_stdin(input_bytes)
+    } else {
+        println!("Warning: Uploading {}MB program at runtime", PROGRAM_ELF.len() / 1_000_000);
+        client.new_request()
+            .with_program(PROGRAM_ELF)
+            .with_stdin(input_bytes)
+    };
+
+    let onchain = std::env::var("BOUNDLESS_ONCHAIN")
+        .unwrap_or_else(|_| "true".to_string()) == "true";
+    
+    let (request_id, expires_at) = if onchain {
+        println!("Submitting onchain...");
+        client.submit_onchain(request).await?
+    } else {
+        println!("Submitting offchain...");
+        client.submit_offchain(request).await?
+    };
+
+    println!("Request ID: {:x}, waiting for fulfillment...", request_id);
+
+    let fulfillment = client
+        .wait_for_request_fulfillment(
+            request_id,
+            Duration::from_secs(5),
+            expires_at,
+        )
+        .await
+        .context("Failed to wait for fulfillment")?;
+
+    println!("Proof received from Boundless!");
+    let data = fulfillment.data();
+    let (_, journal) = match data {
+        Ok(FulfillmentData::ImageIdAndJournal(image_id, journal)) => (image_id, journal),
+        _ => return Err(anyhow::anyhow!("Invalid fulfillment data")),
+    };
+
+    let decoded_journal: ComputeResult = bincode::deserialize(&journal)
+        .context("Failed to decode journal")?;
+
+    Ok(BoundlessOutput {
+        result: decoded_journal,
+        bytes: journal.to_vec(),
+        seal: fulfillment.seal.to_vec(),
+    })
+}
+
+pub fn run_compute(params: FHEInputs) -> Result<(BoundlessOutput, Vec<u8>)> {
+    let boundless_provider = BoundlessProvider;
+
+    let mut provider = ComputeManager::new(boundless_provider, params, fhe_processor, false, None);
 
     // Start timer
     let start_time = Instant::now();

@@ -28,6 +28,9 @@ pub enum ProgramCommands {
     /// Get a shell into the docker environment that the program runs in
     Shell,
 
+    /// Upload the compiled program to Pinata IPFS
+    Upload,
+
     /// Commands to manage the program compilation cache
     Cache {
         #[command(subcommand)]
@@ -50,6 +53,7 @@ pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()>
             e3_support_scripts::program_compile(config.program().clone(), dev).await?
         }
         ProgramCommands::Shell => e3_support_scripts::program_shell().await?,
+        ProgramCommands::Upload => e3_support_scripts::program_upload().await?,
         ProgramCommands::Cache { command } => match command {
             ProgramCacheCommands::Purge => e3_support_scripts::program_cache_purge().await?,
         },

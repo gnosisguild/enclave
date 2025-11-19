@@ -38,21 +38,13 @@ async fn call_webhook(
     Ok(())
 }
 
-#[cfg(feature = "risc0")]
 async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     println!("running computation...");
-    let (risc0_output, ciphertext) =
+    let (boundless_output, ciphertext) =
         tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs)).await??;
     println!("have result from computation!");
-    let proof: Vec<u8> = risc0_output.seal.into();
+    let proof: Vec<u8> = boundless_output.seal.into();
     Ok((proof, ciphertext))
-}
-
-#[cfg(not(feature = "risc0"))]
-async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
-    println!("NOOP: risc0 feature not enabled, skipping actual computation");
-    // Return dummy data
-    Ok((vec![0u8; 32], vec![1u8; 64]))
 }
 
 async fn handle_webhook_delivery(

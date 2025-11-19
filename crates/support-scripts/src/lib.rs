@@ -35,6 +35,15 @@ pub async fn program_shell() -> Result<()> {
     Ok(())
 }
 
+/// Upload the compiled program to Pinata IPFS
+pub async fn program_upload() -> Result<()> {
+    let cwd = env::current_dir()?;
+    let script = cwd.join("crates/support/scripts/upload_program.sh");
+    ensure_script_exists(&script).await?;
+    run_bash_script(&cwd, &script, &[]).await?;
+    Ok(())
+}
+
 /// Purge all build caches from support
 pub async fn program_cache_purge() -> Result<()> {
     let cwd = env::current_dir()?;
