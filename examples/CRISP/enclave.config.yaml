@@ -20,15 +20,13 @@ chains:
 program:
   dev: true
   # risc0:
-  #   risc0_dev_mode: 1  # 0 = production (Boundless), 1 = dev mode (fake proofs)
-  #
-  #   # Boundless configuration (for production)
+  #   risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode (fake proofs)
   #   boundless:
   #     rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"
-  #     private_key: "${PRIVATE_KEY}"  # Use env vars for secrets
-  #     pinata_jwt: "${PINATA_JWT}"  # For uploading programs
-  #     program_url: "https://gateway.pinata.cloud/ipfs/YOUR_CID"  # Pre-uploaded program
-  #     onchain: true  # true = onchain requests, false = offchain
+  #     private_key: "PRIVATE_KEY" # Use env vars for secrets
+  #     pinata_jwt: "PINATA_JWT" # For uploading programs
+  #     program_url: "https://gateway.pinata.cloud/ipfs/QmNMRAB7DW43JSmENfzGmD96G6sqaeBBNfTVrrq5WQae3D" # Pre-uploaded program
+  #     onchain: true # true = onchain requests, false = offchain
 
 nodes:
   cn1:

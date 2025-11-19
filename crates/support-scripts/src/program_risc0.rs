@@ -57,4 +57,24 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
         run_bash_script(&cwd, &script, &args).await?;
         Ok(())
     }
+
+    /// Upload the compiled program to Pinata IPFS
+    async fn upload(&self) -> Result<()> {
+        let cwd = env::current_dir()?;
+        let script = cwd.join(".enclave/support/ctl/upload");
+        ensure_script_exists(&script).await?;
+
+        let mut args = vec![];
+
+        if let Some(risc0_config) = self.0.risc0() {
+            if let Some(boundless) = &risc0_config.boundless {
+                if let Some(jwt) = &boundless.pinata_jwt {
+                    args.extend(["--pinata-jwt", jwt.as_str()]);
+                }
+            }
+        }
+
+        run_bash_script(&cwd, &script, &args).await?;
+        Ok(())
+    }
 }

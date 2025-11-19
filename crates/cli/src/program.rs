@@ -53,7 +53,9 @@ pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()>
             e3_support_scripts::program_compile(config.program().clone(), dev).await?
         }
         ProgramCommands::Shell => e3_support_scripts::program_shell().await?,
-        ProgramCommands::Upload => e3_support_scripts::program_upload().await?,
+        ProgramCommands::Upload => {
+            e3_support_scripts::program_upload(config.program().clone(), None).await?
+        }
         ProgramCommands::Cache { command } => match command {
             ProgramCacheCommands::Purge => e3_support_scripts::program_cache_purge().await?,
         },
