@@ -238,12 +238,18 @@ describe('Integration', () => {
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes)
 
-    await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
-      await sdk.publishInput(e3Id, `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
-    })
-    await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
-      await sdk.publishInput(e3Id, `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
-    })
+    await sdk.publishInput(
+      e3Id,
+      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join(
+        "",
+      )}` as `0x${string}`,
+    );
+    await sdk.publishInput(
+      e3Id,
+      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join(
+        "",
+      )}` as `0x${string}`,
+    );
 
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 
