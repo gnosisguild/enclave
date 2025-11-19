@@ -9,12 +9,9 @@
     "title": "Tickets & Sortition"
   },
   "operations": {
-    "title": "Operations & Responsibilities"
+    "title": "Running a Ciphernode"
   },
   "exits-and-slashing": {
     "title": "Exits, Rewards & Slashing"
-  },
-  "scenarios": {
-    "title": "Runbook Scenarios"
   }
 }
