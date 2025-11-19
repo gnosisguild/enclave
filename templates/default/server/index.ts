@@ -4,11 +4,27 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+<<<<<<< HEAD
 import express, { Request, Response } from 'express'
 import { EnclaveSDK, EnclaveEventType, type E3ActivatedData, type InputPublishedData, FheProtocol } from '@enclave-e3/sdk'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
 import { callFheRunner } from './runner'
+=======
+import express, { Request, Response } from "express";
+import {
+  EnclaveSDK,
+  EnclaveEventType,
+  type E3ActivatedData,
+  FheProtocol,
+} from "@enclave-e3/sdk";
+import { Log, PublicClient } from "viem";
+import { handleTestInteraction } from "./testHandler";
+import { getCheckedEnvVars } from "./utils";
+import { callFheRunner } from "./runner";
+import { ProgramEventType, type InputPublishedEvent } from "./types";
+import { MyProgram__factory } from "../types/factories/contracts";
+>>>>>>> 9e59517c (chore: update template)
 
 interface E3Session {
   e3Id: bigint
@@ -158,8 +174,13 @@ async function handleE3ActivatedEvent(event: any) {
 }
 
 async function handleInputPublishedEvent(event: any) {
+<<<<<<< HEAD
   const data = event.data as InputPublishedData
   const e3Id = data.e3Id
+=======
+  const data = event.data as InputPublishedEvent;
+  const e3Id = data.e3Id;
+>>>>>>> 9e59517c (chore: update template)
 
   console.log(`📝 Input Published for E3 ${e3Id}: index ${data.index}`)
 
@@ -181,13 +202,49 @@ async function handleInputPublishedEvent(event: any) {
   }
 }
 
+async function listenToInputPublishedEvents(
+  publicClient: PublicClient, 
+  address: `0x${string}`, 
+  fromBlock: bigint
+) {
+  const unwatch = publicClient.watchContractEvent({
+    address,
+    abi: MyProgram__factory.abi,
+    // @ts-ignore defaults to ownable event?
+    eventName: ProgramEventType.INPUT_PUBLISHED,
+    fromBlock,
+    async onLogs(logs: Log[]) {
+      for (let i = 0; i < logs.length; i++) {
+        const log = logs[i];
+        if (!log) {
+          console.log("warning: Log was falsy when a log was expected!");
+          break;
+        }
+        const eventData = log as unknown as InputPublishedEvent;
+
+        await handleInputPublishedEvent(eventData);
+      }
+    }
+  });
+}
+
+
 async function setupEventListeners() {
   const sdk = await createPrivateSDK()
 
+<<<<<<< HEAD
   console.log('📡 Setting up event listeners...')
 
   sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent)
   sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, handleInputPublishedEvent)
+=======
+  const { E3_PROGRAM_ADDRESS: PROGRAM_ADDRESS } = getCheckedEnvVars();
+
+  console.log("📡 Setting up event listeners...");
+
+  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent);
+  await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n);
+>>>>>>> 9e59517c (chore: update template)
 
   console.log('✅ Event listeners set up successfully')
 }

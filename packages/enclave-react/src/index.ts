@@ -20,7 +20,6 @@ export type {
   EnclaveEvent,
   E3RequestedData,
   E3ActivatedData,
-  InputPublishedData,
   CiphertextOutputPublishedData,
   PlaintextOutputPublishedData,
   CiphernodeAddedData,

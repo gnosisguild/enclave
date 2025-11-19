@@ -10,17 +10,18 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
+import {LazyIMTData, InternalLazyIMT} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+
 import {HonkVerifier} from "../CRISPVerifier.sol";
 
-contract MockCRISPProgram is IE3Program, Ownable {
+contract CRISPProgram is IE3Program, Ownable {
+    using InternalLazyIMT for LazyIMTData;
     /// @notice a structure that holds the round data
     struct RoundData {
         /// @notice The governance token address.
         address token;
         /// @notice The minimum balance required to pass the validation.
         uint256 balanceThreshold;
-        /// @notice The block number at which the balance will be checked.
-        uint256 snapshotBlock;
         /// @notice The Merkle root of the census.
         uint256 censusMerkleRoot;
     }
@@ -39,10 +40,6 @@ contract MockCRISPProgram is IE3Program, Ownable {
     /// @notice whether the round data has been set
     bool public isDataSet;
 
-    /// @notice Mapping to store votes. Each elegible voter has their own slot
-    /// to store their vote.
-    mapping(address => bytes) public voteSlots;
-
     /// @notice Half of the largest minimum degree used to fit votes
     /// inside the plaintext polynomial
     uint256 public constant HALF_LARGEST_MINIMUM_DEGREE = 28;
@@ -50,6 +47,10 @@ contract MockCRISPProgram is IE3Program, Ownable {
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
+    /// @notice Mapping to store votes slot indices. Each elegible voter has their own slot
+    /// to store their vote inside the merkle tree.
+    mapping(uint256 e3Id => mapping(address slot => uint40 index)) public voteSlots;
+    mapping(uint256 e3Id => LazyIMTData) public votes;    
 
     // Errors
     error CallerNotAuthorized();
@@ -71,6 +72,9 @@ contract MockCRISPProgram is IE3Program, Ownable {
     /// @notice The error emitted when trying to set the round data more than once.
     error RoundDataAlreadySet();
 
+    /// @notice The event emitted when an input is published.
+    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
     /// @param _verifier The RISC Zero verifier address
@@ -90,9 +94,11 @@ contract MockCRISPProgram is IE3Program, Ownable {
         imageId = _imageId;
     }
 
-    /// @notice Sets the Merkle root of the census. Can only be set once.
+    /// @notice Sets the Round data. Can only be set once.
     /// @param _root The Merkle root to set.
-    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold, uint256 _snapshotBlock)
+    /// @param _token The governance token address.
+    /// @param _balanceThreshold The minimum balance required.
+    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold)
         external
         onlyOwner
     {
@@ -103,7 +109,6 @@ contract MockCRISPProgram is IE3Program, Ownable {
         roundData = RoundData({
             token: _token,
             balanceThreshold: _balanceThreshold,
-            snapshotBlock: _snapshotBlock,
             censusMerkleRoot: _root
         });
     }
@@ -117,6 +122,7 @@ contract MockCRISPProgram is IE3Program, Ownable {
     /// @notice Set the RISC Zero verifier address
     /// @param _verifier The new RISC Zero verifier address
     function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
+        if (address(_verifier) == address(0)) revert VerifierAddressZero();
         verifier = _verifier;
     }
 
@@ -141,7 +147,8 @@ contract MockCRISPProgram is IE3Program, Ownable {
         return ENCRYPTION_SCHEME_ID;
     }
 
-    function validateInput(address, bytes memory data) external returns (bytes memory input) {
+    /// @inheritdoc IE3Program
+    function validateInput(uint256 e3Id, address, bytes memory data) external returns (bytes memory input) {
         if (data.length == 0) revert EmptyInputData();
 
         (,, bytes memory vote,) = abi.decode(data, (bytes, bytes32[], bytes, address));
@@ -198,7 +205,7 @@ contract MockCRISPProgram is IE3Program, Ownable {
         returns (bool)
     {
         require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
-        bytes32 inputRoot = bytes32(enclave.getInputRoot(e3Id));
+        bytes32 inputRoot = bytes32(votes[e3Id]._root());
         bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
         encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);

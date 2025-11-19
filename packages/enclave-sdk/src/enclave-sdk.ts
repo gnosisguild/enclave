@@ -4,10 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Abi, type Hash, type Log, WalletClient, createPublicClient, createWalletClient, http, webSocket } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
-import { hardhat, mainnet, monadTestnet, sepolia } from 'viem/chains'
-import initializeWasm from '@enclave-e3/wasm/init'
+import {
+  type Abi,
+  type Hash,
+  type Log,
+  PublicClient,
+  WalletClient,
+  createPublicClient,
+  createWalletClient,
+  http,
+  webSocket,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
+import initializeWasm from "@enclave-e3/wasm/init";
 
 import { CiphernodeRegistryOwnable__factory, Enclave__factory } from '@enclave-e3/contracts/types'
 import { ContractClient } from './contract-client'
@@ -43,11 +53,12 @@ export class EnclaveSDK {
     31337: hardhat,
   } as const
 
-  private eventListener: EventListener
-  private contractClient: ContractClient
-  private initialized = false
-  private protocol: FheProtocol
-  private protocolParams?: ProtocolParams
+  private eventListener: EventListener;
+  private contractClient: ContractClient;
+  private initialized = false;
+  private protocol: FheProtocol;
+  private protocolParams?: ProtocolParams;
+  private publicClient: PublicClient;
 
   // TODO: use zod for config validation
   constructor(private config: SDKConfig) {
@@ -79,6 +90,8 @@ export class EnclaveSDK {
     if (config.protocolParams) {
       this.protocolParams = config.protocolParams
     }
+
+    this.publicClient = config.publicClient;
   }
 
   /**
@@ -96,9 +109,19 @@ export class EnclaveSDK {
     }
   }
 
-  public async getBfvParamsSet(name: ProtocolParamsName): Promise<ProtocolParams> {
-    await initializeWasm()
-    let params = get_bfv_params(name as string)
+  /**
+   * Get the public client used by the SDK
+   * @returns The public client
+   */
+  public getPublicClient = (): PublicClient => {
+    return this.publicClient;
+  }
+
+  public async getBfvParamsSet(
+    name: ProtocolParamsName,
+  ): Promise<ProtocolParams> {
+    await initializeWasm();
+    let params = get_bfv_params(name as string);
     return {
       degree: Number(params.degree), // degree is returned as a bigint from wasm
       plaintextModulus: params.plaintext_modulus as bigint,
