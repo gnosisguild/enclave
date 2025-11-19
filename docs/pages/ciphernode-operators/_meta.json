@@ -1,0 +1,17 @@
+{
+  "index": {
+    "title": "Overview"
+  },
+  "registration": {
+    "title": "Registration & Licensing"
+  },
+  "operations": {
+    "title": "Running a Ciphernode"
+  },
+  "tickets-and-sortition": {
+    "title": "Tickets & Sortition"
+  },
+  "exits-and-slashing": {
+    "title": "Exits, Rewards & Slashing"
+  }
+}
