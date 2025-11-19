@@ -9,8 +9,10 @@ import {IRiscZeroVerifier} from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {LazyIMTData, InternalLazyIMT} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
 contract MyProgram is IE3Program, Ownable {
+    using InternalLazyIMT for LazyIMTData;
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
@@ -22,6 +24,7 @@ contract MyProgram is IE3Program, Ownable {
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
+    mapping(uint256 e3Id => LazyIMTData) public inputs;
 
     // Errors
     error CallerNotAuthorized();
@@ -30,6 +33,8 @@ contract MyProgram is IE3Program, Ownable {
     error VerifierAddressZero();
     error AlreadyRegistered();
     error EmptyInputData();
+
+    event InputPublished(uint256 indexed e3Id, bytes data, uint256 index);
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The Enclave contract address
@@ -72,6 +77,7 @@ contract MyProgram is IE3Program, Ownable {
     /// @param data The input to be verified.
     /// @return input The input data.
     function validateInput(
+        uint256 e3Id,
         address sender,
         bytes memory data
     ) external returns (bytes memory input) {
@@ -81,6 +87,10 @@ contract MyProgram is IE3Program, Ownable {
         // EXAMPLE: https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol
 
         input = data;
+
+        inputs[e3Id]._insert(uint256(keccak256(data)));
+
+        emit InputPublished(e3Id, data, inputs[e3Id].numberOfLeaves - 1);
     }
 
     /// @notice Verify the proof
@@ -93,7 +103,7 @@ contract MyProgram is IE3Program, Ownable {
         bytes memory proof
     ) external view override returns (bool) {
         require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
-        bytes32 inputRoot = bytes32(enclave.getInputRoot(e3Id));
+        bytes32 inputRoot = bytes32(inputs[e3Id]._root());
         bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
         encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);
