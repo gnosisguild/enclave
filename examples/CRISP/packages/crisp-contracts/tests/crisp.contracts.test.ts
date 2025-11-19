@@ -108,12 +108,10 @@ describe("CRISP Contracts", function () {
         await signer.getAddress()
       ).toLowerCase() as `0x${string}`;
 
-      // Deploy the library first
       const zkTranscriptLib = await ethers.deployContract("ZKTranscriptLib");
       await zkTranscriptLib.waitForDeployment();
       const zkTranscriptLibAddress = await zkTranscriptLib.getAddress();
 
-      // Link the library to HonkVerifier using the format Hardhat expects
       const HonkVerifierFactory = await ethers.getContractFactory(
         "HonkVerifier",
         {
