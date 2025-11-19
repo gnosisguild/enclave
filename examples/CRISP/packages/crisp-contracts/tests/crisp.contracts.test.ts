@@ -39,16 +39,16 @@ describe("CRISP Contracts", function () {
                 HonkVerifier _honkVerifier,
                 bytes32 _imageId
             */
-            const program = await ethers.deployContract("CRISPProgram", [
-                nonZeroAddress,
-                nonZeroAddress,
-                nonZeroAddress,
-                zeroHash
-            ])
-            
-            expect(await program.getAddress()).to.not.equal(zeroAddress)
-        })
+      const program = await ethers.deployContract("CRISPProgram", [
+        nonZeroAddress,
+        nonZeroAddress,
+        nonZeroAddress,
+        zeroHash,
+      ]);
+
+      expect(await program.getAddress()).to.not.equal(zeroAddress);
     });
+  });
 
   describe("decode tally", () => {
     it("should decode different tallies correctly", async () => {
@@ -108,9 +108,22 @@ describe("CRISP Contracts", function () {
         await signer.getAddress()
       ).toLowerCase() as `0x${string}`;
 
-      const honkVerifier = (await ethers.deployContract(
-        "HonkVerifier"
-      )) as HonkVerifier;
+      const zkTranscriptLib = await ethers.deployContract("ZKTranscriptLib");
+      await zkTranscriptLib.waitForDeployment();
+      const zkTranscriptLibAddress = await zkTranscriptLib.getAddress();
+
+      const HonkVerifierFactory = await ethers.getContractFactory(
+        "HonkVerifier",
+        {
+          libraries: {
+            "project/contracts/CRISPVerifier.sol:ZKTranscriptLib":
+              zkTranscriptLibAddress,
+          },
+        }
+      );
+
+      // Deploy HonkVerifier with the linked library
+      const honkVerifier = (await HonkVerifierFactory.deploy()) as HonkVerifier;
 
       const vote = { yes: 10n, no: 0n };
       const votingPower = vote.yes;

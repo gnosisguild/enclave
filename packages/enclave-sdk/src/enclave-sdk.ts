@@ -92,6 +92,11 @@ export class EnclaveSDK {
       config.contracts,
     );
 
+
+    if (!Object.values(FheProtocol).includes(config.protocol)) {
+      throw new SDKError(`Invalid protocol: ${config.protocol}`, "INVALID_PROTOCOL");
+    }
+
     this.protocol = config.protocol;
 
     if (config.protocolParams) {
@@ -156,18 +161,14 @@ export class EnclaveSDK {
   ): Promise<Uint8Array> {
     await initializeWasm();
     const protocolParams = await this.getProtocolParams();
-    switch (this.protocol) {
-      case FheProtocol.BFV:
-        return bfv_encrypt_number(
-          data,
-          publicKey,
-          protocolParams.degree,
-          protocolParams.plaintextModulus,
-          BigUint64Array.from(protocolParams.moduli),
-        );
-      default:
-        throw new Error("Protocol not supported");
-    }
+
+    return bfv_encrypt_number(
+      data,
+      publicKey,
+      protocolParams.degree,
+      protocolParams.plaintextModulus,
+      BigUint64Array.from(protocolParams.moduli),
+    );
   }
 
   /**
@@ -182,18 +183,14 @@ export class EnclaveSDK {
   ): Promise<Uint8Array> {
     await initializeWasm();
     const protocolParams = await this.getProtocolParams();
-    switch (this.protocol) {
-      case FheProtocol.BFV:
-        return bfv_encrypt_vector(
-          data,
-          publicKey,
-          protocolParams.degree,
-          protocolParams.plaintextModulus,
-          BigUint64Array.from(protocolParams.moduli),
-        );
-      default:
-        throw new Error("Protocol not supported");
-    }
+    
+    return bfv_encrypt_vector(
+      data,
+      publicKey,
+      protocolParams.degree,
+      protocolParams.plaintextModulus,
+      BigUint64Array.from(protocolParams.moduli),
+    );
   }
 
   /**
@@ -209,24 +206,20 @@ export class EnclaveSDK {
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     const protocolParams = await this.getProtocolParams();
-    switch (this.protocol) {
-      case FheProtocol.BFV:
-        const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
-          data,
-          publicKey,
-          protocolParams.degree,
-          protocolParams.plaintextModulus,
-          BigUint64Array.from(protocolParams.moduli),
-        );
 
-        const publicInputs = JSON.parse(circuitInputs);
-        return {
-          encryptedData,
-          publicInputs,
-        };
-      default:
-        throw new Error("Protocol not supported");
-    }
+    const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
+      data,
+      publicKey,
+      protocolParams.degree,
+      protocolParams.plaintextModulus,
+      BigUint64Array.from(protocolParams.moduli),
+    );
+
+    const publicInputs = JSON.parse(circuitInputs);
+    return {
+      encryptedData,
+      publicInputs,
+    };
   }
 
   /**
@@ -263,24 +256,20 @@ export class EnclaveSDK {
   ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     const protocolParams = await this.getProtocolParams();
-    switch (this.protocol) {
-      case FheProtocol.BFV:
-        const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_vector(
-          data,
-          publicKey,
-          protocolParams.degree,
-          protocolParams.plaintextModulus,
-          BigUint64Array.from(protocolParams.moduli),
-        );
 
-        const publicInputs = JSON.parse(circuitInputs);
-        return {
-          encryptedData,
-          publicInputs,
-        };
-      default:
-        throw new Error("Protocol not supported");
-    }
+    const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_vector(
+      data,
+      publicKey,
+      protocolParams.degree,
+      protocolParams.plaintextModulus,
+      BigUint64Array.from(protocolParams.moduli),
+    );
+
+    const publicInputs = JSON.parse(circuitInputs);
+    return {
+      encryptedData,
+      publicInputs,
+    };
   }
 
   /**

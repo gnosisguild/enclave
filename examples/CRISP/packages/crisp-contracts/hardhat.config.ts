@@ -75,7 +75,12 @@ const config: HardhatUserConfig = {
     hardhatToolboxMochaEthersPlugin,
     hardhatVerify,
   ],
-  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
+  tasks: [
+    cleanDeploymentsTask,
+    ciphernodeAdd,
+    ciphernodeAdminAdd,
+    ciphernodeMintTokens,
+  ],
   networks: {
     localhost: {
       accounts: {
@@ -156,7 +161,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 800,
+        runs: 100, // Minimum runs value maximizes bytecode size reduction (optimizes for deployment cost)
       },
       metadata: {
         bytecodeHash: "none",
