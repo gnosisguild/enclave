@@ -160,5 +160,5 @@ export const generateProof = async (
     p2is: p2is_poly,
   });
 
-  return await backend.generateProof(witness, { keccak: true });
+  return await backend.generateProof(witness, { keccakZK: true });
 };
