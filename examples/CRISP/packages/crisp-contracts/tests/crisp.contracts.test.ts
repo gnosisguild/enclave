@@ -153,7 +153,7 @@ describe('CRISP Contracts', function () {
       expect(isValid).to.be.true
     })
 
-    it.only('should validate input and store vote correctly', async function () {
+    it('should validate input and store vote correctly', async function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
@@ -165,7 +165,17 @@ describe('CRISP Contracts', function () {
 
       const mockEnclave = (await ethers.deployContract('MockEnclave')) as MockEnclave
 
-      const honkVerifier = (await ethers.deployContract('HonkVerifier')) as HonkVerifier
+      const zkTranscriptLib = await ethers.deployContract('ZKTranscriptLib')
+      await zkTranscriptLib.waitForDeployment()
+      const zkTranscriptLibAddress = await zkTranscriptLib.getAddress()
+
+      const HonkVerifierFactory = await ethers.getContractFactory('HonkVerifier', {
+        libraries: {
+          'project/contracts/CRISPVerifier.sol:ZKTranscriptLib': zkTranscriptLibAddress,
+        },
+      })
+
+      const honkVerifier = (await HonkVerifierFactory.deploy()) as HonkVerifier
 
       const program = await ethers.deployContract('CRISPProgram', [
         await mockEnclave.getAddress(),
