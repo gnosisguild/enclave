@@ -1,136 +1,231 @@
 ---
-title: 'Operations & Responsibilities'
+title: 'Running a Ciphernode'
 ---
 
-# Operations & Responsibilities
+# Running a Ciphernode
 
-Staying online matters as much as bonding. Use this checklist to manage daily duties, networking,
-and deployment automation.
+This guide walks you through setting up and running a ciphernode, then explains the complete
+computation flow from E3 request to plaintext decryption.
 
-## Daily responsibilities
+## Setup: Initialize Your Ciphernode
 
-- Watch `enclave nodes ps` and contract events for liveness
-- Keep RPC endpoints funded and redundant.
-- Rotate secrets and backups on a defined cadence.
-- Capture logs for sortition submissions, key publication, and decryption shares.
-
-## When you're selected for a committee
-
-1. **Keyshare generation**
-  - The CLI logs `jobs::selected` when `CommitteeFinalized` includes your operator address.
-  - Verify `~/.local/share/enclave/jobs/<e3_id>/` holds encrypted keyshare material.
-2. **Public key aggregation**
-  - Wait for every member to publish their share; the CLI automatically calls `publishCommittee` once the threshold is met.
-  - Monitor for `CommitteePublished` and accompanying CLI logs.
-3. **Ciphertext + decryption flow**
-  - Subscribe to `CiphertextOutputPublished` and `PlaintextOutputPublished`.
-  - Run `enclave jobs status <e3_id>` to check whether decryption shares were sent.
-
-Missing any of these steps is the fast path to slashing. Keep short-lived dashboards for the
-currently active E3 IDs so you can intervene manually if automation stalls.
-
-## CLI workflow
+Start by running `enclave init` to create the initial configuration:
 
 ```bash
-# Start all nodes defined in config
-enclave nodes up --detach
-
-# Check status
-enclave nodes ps
-
-# Inspect a specific node
-enclave nodes status cn1
-
-# Restart a node
-enclave nodes restart cn1
-
-# Stop everything
-enclave nodes down
-
-# Wipe state (irreversible)
-enclave nodes purge
+enclave init
 ```
 
-To run a single node profile manually:
+This command will:
 
-```bash
-enclave start --config /path/to/enclave.config.yaml --peer /dns4/bootstrap.enclave.gg/udp/9091/quic-v1
+- Create `~/.config/enclave/config.yaml` with your node configuration
+- Generate a network keypair in `~/.config/enclave/key`
+- Set up the data directory at `~/.local/share/enclave/`
+
+During initialization, you'll be prompted for:
+
+- Your Ethereum address (the address that will participate in committees)
+- A password to encrypt sensitive data
+- RPC URL for the chain you want to connect to
+
+## Configuration
+
+After initialization, edit your `~/.config/enclave/config.yaml` to configure:
+
+### 1. Contract Addresses
+
+Update the contract addresses to match the network you're connecting to:
+
+```yaml
+chains:
+  - name: sepolia
+    rpc_url: 'wss://ethereum-sepolia.publicnode.com'
+    contracts:
+      enclave:
+        address: '0x1E8B…FAa6'
+        deploy_block: 9615399
+      ciphernode_registry:
+        address: '0x11F6…0b1C7'
+      bonding_registry:
+        address: '0x5636…406E3'
+      fee_token:
+        address: '0xB58B…4De0'
 ```
 
-Flags such as `--autowallet` and `--autonetkey` will prompt-less configure secrets when the config
-contains `autowallet: true` and siblings.
+### 2. Bootstrap Peers
 
-## Job state cheat sheet
-
-| State | Trigger | What to verify |
-| --- | --- | --- |
-| `Selected` | Committee finalized | `enclave jobs list` shows new entry |
-| `KeyshareGeneration` | CLI deriving PVSS shares | Disk has encrypted secret + public share |
-| `WaitingForCiphertext` | Key material ready | Node staying synced to event stream |
-| `Decrypting` | Ciphertext output event received | Decryption share stored + submitted |
-| `Completed` | Plaintext emitted | Rewards monitoring sees participation |
-
-Use `enclave jobs details <e3_id>` for deep dives or to reprint diagnostics when coordinating with
-support/governance.
-
-## Configuration reference
+Add at least one bootstrap peer to join the network:
 
 ```yaml
 node:
-  address: "0x7099…79C8"
+  address: '0xYourAddress'
   quic_port: 9201
   peers:
-    - "/dns4/aggregator1.example.com/udp/9094/quic-v1"
+    - '/dns4/bootstrap.enclave.gg/udp/9091/quic-v1'
   autonetkey: true
   autopassword: true
-  role:
-    type: aggregator
-chains:
-  - name: sepolia
-    rpc_url: "wss://ethereum-sepolia.publicnode.com"
-    contracts:
-      enclave:
-        address: "0x1E8B…FAa6"
-        deploy_block: 9615399
-      ciphernode_registry:
-        address: "0x11F6…0b1C7"
-      bonding_registry:
-        address: "0x5636…406E3"
-      fee_token:
-        address: "0xB58B…4De0"
 ```
 
-Key notes:
+### 3. Set Your Wallet
 
-- Provide at least one bootstrap `peer`. Operate your own static peer for redundancy.
-- Open `quic_port` over UDP in firewalls and security groups.
-- Override `data_dir` / `config_dir` if running under non-standard users or containers.
+Configure your private key to sign transactions:
 
-## Deployment manifests & secrets
-
-The `deploy/` directory includes a Docker Swarm example:
-
-- `cn*.yaml` and `agg.yaml` template addresses and RPC URLs
-- `docker-compose.yml` runs multiple Ciphernodes plus an aggregator
-- Secret bundles follow:
-
-```json
-{
-  "password": "changeme",
-  "private_key": "0x…",
-  "network_private_key": "0x…"
-}
+```bash
+enclave wallet set --private-key "0xYourPrivateKey"
 ```
 
-`ciphernode-entrypoint.sh` loads the config, injects secrets via `enclave password/net keypair/wallet`,
-then runs `enclave start -v`. Reuse this pattern for Kubernetes Jobs, Nomad, or systemd units.
+**Warning:** Never share your private key. Keep it secure.
 
-## Monitoring & alerting
+## Starting Your Node
 
-- Subscribe to `PlaintextOutputPublished`, `CiphertextOutputPublished`, and `E3Activated` to ensure
-  duties progress.
-- Track CLI logs for `sortition::submitted`, `decryption::share_published`, and errors.
-- Export Prometheus metrics from your infrastructure layer (CPU, bandwidth, disk) since the CLI
-  currently logs to stdout.
-- Add alerts for `jobs::error`, `NodeNotEligible`, or `ExitNotReady` so you can correct course
-  before a slash happens.
+Once configured, start your ciphernode:
+
+```bash
+enclave start
+```
+
+Your node will:
+
+- Connect to the bootstrap peer(s)
+- Subscribe to blockchain events
+- Begin participating in sortition when E3s are requested
+
+## The Complete E3 Flow
+
+Here's what happens when an E3 (Encrypted Execution Environment) computation is requested:
+
+### Phase 1: E3 Request
+
+1. Someone calls `request()` on the Enclave contract with computation parameters
+2. A new E3 ID is created with a random seed
+3. The contract emits an `E3Requested` event
+
+### Phase 2: Committee Selection (Sortition)
+
+1. **Ticket Submission**: Your ciphernode listens for `E3Requested` events
+2. **Score Calculation**: Your node calculates a sortition score based on:
+   - The E3 seed
+   - Your tickets/stake
+   - Your node's tickets
+3. **Committee Finalization**: The top N nodes with the best scores are selected
+4. If selected, you'll receive a `CommitteeFinalized` event with your party ID
+
+### Phase 3: Keyshare Generation
+
+When your node is selected for a committee:
+
+1. **Generate Secret**: Your node generates a secret key share and public key share
+2. **Publish Keyshare**: The public key share is broadcast via libp2p and published onchain
+3. **Storage**: The secret is encrypted and stored in `~/.local/share/enclave/jobs/<e3_id>/`
+
+### Phase 4: Public Key Aggregation
+
+1. **Collect Keyshares**: An aggregator node collects all N public key shares from the committee
+2. **Aggregate**: Once all shares are received, they're combined into a single public encryption key
+3. **Publish**: The aggregated public key is published onchain via `publishPublicKey()`
+4. The contract emits `PublicKeyAggregated` event
+5. The E3 is now activated and ready to receive encrypted inputs
+
+### Phase 5: Input Window
+
+During this phase:
+
+1. Data providers encrypt their inputs using the aggregated public key
+2. They submit encrypted data to the contract via `publishInput()`
+3. The E3 Program validates each input
+4. Input hashes are added to a Merkle tree onchain
+
+### Phase 6: Computation
+
+1. **Deadline Passes**: Once the input window closes, computation can begin
+2. **Compute Provider Execution**: A compute provider (or E3 program) retrieves all encrypted inputs
+3. **FHE Computation**: The computation runs entirely on encrypted data
+4. **Output Generation**: The result is produced as encrypted ciphertext with a ZK proof
+
+### Phase 7: Ciphertext Publishing
+
+1. The compute provider calls `publishCiphertextOutput()` with the encrypted result and proof
+2. The contract verifies the proof
+3. Contract emits `CiphertextOutputPublished` event
+4. All committee members are notified to begin decryption
+
+### Phase 8: Decryption Share Generation
+
+When your ciphernode receives `CiphertextOutputPublished`:
+
+1. **Load Secret**: Your node retrieves the encrypted secret key share from storage
+2. **Decrypt Secret**: The secret is decrypted using your node's cipher
+3. **Generate Share**: Your node creates a decryption share by partially decrypting the ciphertext
+4. **Publish Share**: The decryption share is broadcast via libp2p and published onchain
+5. Your node emits `DecryptionshareCreated` event
+
+### Phase 9: Plaintext Aggregation
+
+1. **Collect Shares**: An aggregator node collects decryption shares from committee members
+2. **Threshold Met**: Once M-of-N threshold shares are received (e.g., 3 of 5)
+3. **Aggregate**: The aggregator combines the shares to decrypt the final plaintext
+4. **Publish Result**: The plaintext is published onchain via `publishPlaintextOutput()`
+5. Contract emits `PlaintextOutputPublished` event
+6. **Rewards**: Committee members receive their rewards for successful completion
+
+### Phase 10: Completion
+
+1. The plaintext output is now available onchain
+2. Anyone can query `getE3()` to retrieve the result
+3. Your node clears the secret from memory
+4. The E3 round is complete
+
+## Monitoring Your Node
+
+### Check Node Status
+
+```bash
+# View logs
+journalctl -u enclave -f
+
+# Check if your node is running
+ps aux | grep enclave
+```
+
+### What to Watch For
+
+Your node logs will show:
+
+- `E3Requested` - New computation request detected
+- `TicketGenerated` - Your sortition ticket was calculated
+- `CiphernodeSelected` - You were selected for a committee
+- `KeyshareCreated` - Your keyshare was generated
+- `PublicKeyAggregated` - Committee public key is ready
+- `CiphertextOutputPublished` - Time to generate decryption share
+- `DecryptionshareCreated` - Your decryption share was published
+- `PlaintextAggregated` - Final result is available
+
+## Important Notes
+
+### Stay Online
+
+- Your node must be online and responsive during all phases of an E3 you're selected for
+- Missing keyshare publication or decryption share submission may result in slashing
+
+### Network Connectivity
+
+- Ensure your `quic_port` (UDP) is accessible from the internet
+- Maintain stable connections to bootstrap peers
+- Consider running your own bootstrap node for redundancy
+
+### RPC Reliability
+
+- Use reliable RPC endpoints (consider running your own node)
+- Have backup RPC URLs configured
+- Monitor RPC connectivity and switch if needed
+
+### Data Persistence
+
+- The `~/.local/share/enclave/` directory contains critical job data
+- Back up this directory regularly
+- Do not delete data for active E3s
+
+### Key Security
+
+- Your network keypair is stored in `~/.config/enclave/key`
+- Your wallet private key is encrypted in the config
+- Never share these files or your private keys

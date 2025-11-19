@@ -14,7 +14,7 @@ running a Ciphernode.
 
 Ciphernodes are expected to:
 
-- Maintain an online QUIC/libp2p endpoint and participate in the event bus
+- Maintain an online endpoint and participate in the event bus
 - Bond license collateral (ENCL) and hold tickets (stablecoin-backed ETK) to earn committee slots
 - Submit tickets on-chain during sortition and publish committee key material
 - Produce decryption shares for every E3 the node was selected to serve
@@ -119,11 +119,11 @@ it with `--config /path/to/config.yaml` on every command.
 
 ### Manage credentials
 
-| Secret                                   | Command                                                                       | Notes                                                       |
-| ---------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Password (encrypts keystore + datastore) | `enclave password set --password <value>`                                     | Use `enclave password delete` to remove                     |
-| Network key (libp2p ed25519)             | `enclave net keypair generate` or `enclave net keypair set --net-keypair 0x…` | `enclave net peer-id purge` clears cached peer IDs          |
-| Wallet key (signs on-chain tx)           | `enclave wallet set --private-key 0x…`                                        | Needed for aggregators or if the node submits committee txs |
+| Secret                                   | Command                                                                       | Notes                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------- |
+| Password (encrypts keystore + datastore) | `enclave password set --password <value>`                                     | Use `enclave password delete` to remove            |
+| Network key (libp2p ed25519)             | `enclave net keypair generate` or `enclave net keypair set --net-keypair 0x…` | `enclave net peer-id purge` clears cached peer IDs |
+| Wallet key (signs on-chain tx)           | `enclave wallet set --private-key 0x…`                                        | Needed for the node to submit on-chain txs         |
 
 The entrypoint automatically runs `autopassword`, `autonetkey`, and `autowallet` when the config
 sets those flags.
@@ -136,12 +136,12 @@ enclave nodes ps                        # list process status
 enclave nodes status cn1                # query single node
 enclave nodes restart cn1               # restart one node
 enclave nodes down                      # stop everything
-enclave nodes purge                     # wipe local RocksDB + secrets (irreversible)
+enclave nodes purge                     # wipe local db + secrets (irreversible)
 ```
 
 To run a single node profile outside the supervisor, use
 `enclave start --config /path/to/config.yaml`. Pass peers with
-`--peer /dns4/example.com/udp/9091/quic-v1` to override the config at runtime.
+`--peer /dns4/bootstrap.enclave.gg/udp/5901/quic-v1` to override the config at runtime.
 
 ## Networking & configuration
 
@@ -152,7 +152,7 @@ node:
   address: '0x7099…79C8'
   quic_port: 9201
   peers:
-    - '/dns4/aggregator1.example.com/udp/9094/quic-v1'
+    - '/dns4/bootstrap.enclave.gg/udp/5901/quic-v1'
   autonetkey: true
   autopassword: true
 chains:
