@@ -5,11 +5,11 @@
   "registration": {
     "title": "Registration & Licensing"
   },
-  "tickets-and-sortition": {
-    "title": "Tickets & Sortition"
-  },
   "operations": {
     "title": "Running a Ciphernode"
+  },
+  "tickets-and-sortition": {
+    "title": "Tickets & Sortition"
   },
   "exits-and-slashing": {
     "title": "Exits, Rewards & Slashing"
