@@ -24,18 +24,14 @@ services:
       - test-results:/app/examples/CRISP/test-results
       - playwright-report:/app/examples/CRISP/playwright-report
     entrypoint:
-      - ""
+      - ''
     ports:
-      - "8545:8545"
-      - "3000:3000"
-      - "4000:4000"
+      - '8545:8545'
+      - '3000:3000'
+      - '4000:4000'
     command: >
-      /bin/bash -c '
-      sudo chown -R ubuntu:ubuntu /app &&
-      sudo chown -R ubuntu:ubuntu /home/ubuntu &&
-      sudo chmod -R 777 /app/examples/CRISP &&
-      tail -f /dev/null
-      '
+      /bin/bash -c ' sudo chown -R ubuntu:ubuntu /app && sudo chown -R ubuntu:ubuntu /home/ubuntu && sudo chmod -R 777 /app/examples/CRISP
+      && tail -f /dev/null '
 
 volumes:
   cargo-bin:

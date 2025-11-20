@@ -25,7 +25,7 @@ const config = {
         slate: {
           200: '#E3E9F5',
         },
-        'enclave': {
+        enclave: {
           50: '#eff9ff',
           100: '#def2ff',
           200: '#b6e8ff',
@@ -37,7 +37,7 @@ const config = {
           800: '#0369a1',
           900: '#0c4a6e',
           950: '#082f49',
-        }
+        },
       },
       letterSpacing: {
         custom: '0.03em',

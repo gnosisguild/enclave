@@ -1,6 +1,8 @@
 # FHE Compute Manager
 
-This project provides a flexible and efficient framework for managing Secure Programs (SP) of the [Enclave Protocol](enclave.gg). It supports both sequential and parallel processing, with the ability to integrate various compute providers.
+This project provides a flexible and efficient framework for managing Secure Programs (SP) of the
+[Enclave Protocol](enclave.gg). It supports both sequential and parallel processing, with the
+ability to integrate various compute providers.
 
 ## Features
 
@@ -72,7 +74,8 @@ pub fn run_compute(params: FHEInputs) -> Result<(Risc0Output, Vec<u8>)> {
 }
 ```
 
-This example demonstrates how to create a Risc0Provider, use it with the ComputeManager, and measure the execution time of the computation.
+This example demonstrates how to create a Risc0Provider, use it with the ComputeManager, and measure
+the execution time of the computation.
 
 ## Configuration
 

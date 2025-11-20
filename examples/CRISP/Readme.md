@@ -1,10 +1,17 @@
 # CRISP - Coercion-Resistant Impartial Selection Protocol
 
-CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for digital decision-making, leveraging fully homomorphic encryption (FHE) and distributed threshold cryptography (DTC) to enable verifiable secret ballots. Built with Enclave, CRISP safeguards democratic systems and decision-making applications against coercion, manipulation, and other vulnerabilities. To learn more about CRISP, you can read our [blog post](https://blog.enclave.gg/crisp-private-voting-secret-ballot-fhe-zkp-mpc/) or visit the [documentation](https://docs.enclave.gg/CRISP/introduction).
+CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for digital
+decision-making, leveraging fully homomorphic encryption (FHE) and distributed threshold
+cryptography (DTC) to enable verifiable secret ballots. Built with Enclave, CRISP safeguards
+democratic systems and decision-making applications against coercion, manipulation, and other
+vulnerabilities. To learn more about CRISP, you can read our
+[blog post](https://blog.enclave.gg/crisp-private-voting-secret-ballot-fhe-zkp-mpc/) or visit the
+[documentation](https://docs.enclave.gg/CRISP/introduction).
 
 ## Project Structure
 
-CRISP follows a modern structure with clear separation of concerns, consistent with the Enclave root structure.
+CRISP follows a modern structure with clear separation of concerns, consistent with the Enclave root
+structure.
 
 ```bash
 CRISP/
@@ -18,7 +25,8 @@ CRISP/
 ├── enclave.config.yaml      # Ciphernode configuration
 ```
 
-You can have an extended explanation of the single folders in the dedicated [documentation](https://docs.enclave.gg/CRISP/introduction#project-structure).
+You can have an extended explanation of the single folders in the dedicated
+[documentation](https://docs.enclave.gg/CRISP/introduction#project-structure).
 
 ## Prerequisites
 
@@ -33,7 +41,8 @@ Before getting started, ensure you have installed:
 
 ### Install Node
 
-You can install Node following the official [documentation](https://nodejs.org/en) or using a Node Version Manager (e.g., [nvm](https://github.com/nvm-sh/nvm)).
+You can install Node following the official [documentation](https://nodejs.org/en) or using a Node
+Version Manager (e.g., [nvm](https://github.com/nvm-sh/nvm)).
 
 ### Install Pnpm
 
@@ -41,7 +50,8 @@ You can install Pnpm following the official [documentation](https://pnpm.io/inst
 
 ### Install Metamask
 
-You can add Metamask as extension to your browser following the official [documentation](https://metamask.io).
+You can add Metamask as extension to your browser following the official
+[documentation](https://metamask.io).
 
 ### Install Rust
 
@@ -71,11 +81,14 @@ Verify the installation was successful by running:
 cargo risczero --version
 ```
 
-At this point, you should have all the tools required to develop and deploy an application with [RISC Zero](https://www.risczero.com).
+At this point, you should have all the tools required to develop and deploy an application with
+[RISC Zero](https://www.risczero.com).
 
 ## Environment
 
-You need to setup your environment variables for `client/` and `server/`. Just copy and paste the `.env.default` as `.env` and overwrite with your values the following variables (you can leave the others initialized with the default values).
+You need to setup your environment variables for `client/` and `server/`. Just copy and paste the
+`.env.default` as `.env` and overwrite with your values the following variables (you can leave the
+others initialized with the default values).
 
 ### Client
 
@@ -92,7 +105,8 @@ NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPProgram Contract Address
 ```
 
-These address will be displayed after successfully running the `pnpm dev:up` command in a log that will look like the following:
+These address will be displayed after successfully running the `pnpm dev:up` command in a log that
+will look like the following:
 
 ```bash
 Deployments:
@@ -103,7 +117,8 @@ HonkVerifier: 0x9A676e781A523b5d0C0e43731313A708CB607508
 CRISPProgram: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
 ```
 
-If you find any inconsistency with the addresses on the environment, you must update them and run the script again (they must match).
+If you find any inconsistency with the addresses on the environment, you must update them and run
+the script again (they must match).
 
 ## Quick Start
 
@@ -138,9 +153,12 @@ pnpm cli
 Once everything is running, you can:
 
 1. Navigate `http://localhost:3000` for the client interface
-2. Add the Hardhat private key to your wallet: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+2. Add the Hardhat private key to your wallet:
+   `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
 3. Press `Connect Wallet` button and complete the association with your MetaMask account
-4. Switch to `Hardhat` local network (this will be handled automatically by the app. You just need to press on the connected account on the frontend and select the network. Then, complete the configuration on MetaMask pop-up).
+4. Switch to `Hardhat` local network (this will be handled automatically by the app. You just need
+   to press on the connected account on the frontend and select the network. Then, complete the
+   configuration on MetaMask pop-up).
 5. Open a new terminal, run `pnpm cli` and start a new E3 Round.
 6. Refresh and interact with the round following the Client interface.
 
@@ -164,7 +182,8 @@ To set up the CRISP dApp in your local environment, follow these steps:
 
 ### Setting Up the CRISP Server
 
-Setting up the CRISP server involves several components, but this guide will walk you through each step.
+Setting up the CRISP server involves several components, but this guide will walk you through each
+step.
 
 #### Step 1: Start a Local Testnet with Anvil
 
@@ -210,14 +229,16 @@ After deployment, you will see the addresses for the following contracts:
 
 #### Step 3: RISC0 Setup (Optional)
 
-> Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0.
-> The smart contracts would have already been deployed at the previous step.
+> Please note that this step is optional for development only. You can run the program server in dev
+> mode which does not use Risc0. The smart contracts would have already been deployed at the
+> previous step.
 
 ---
 
 **Faster Proving w/ Bonsai**
 
-The following steps are optional. You can config [Bonsai](https://dev.risczero.com/api/generating-proofs/remote-proving) for faster proving.
+The following steps are optional. You can config
+[Bonsai](https://dev.risczero.com/api/generating-proofs/remote-proving) for faster proving.
 
 - Set up environment variables by creating a `.cargo` directory and `config.toml` file:
 
@@ -227,7 +248,8 @@ The following steps are optional. You can config [Bonsai](https://dev.risczero.c
 
 - Add the following configuration to `config.toml`:
 
-  > **_Note:_** _This requires having access to a Bonsai API Key. To request an API key [complete the form here](https://bonsai.xyz/apply)._
+  > **_Note:_** _This requires having access to a Bonsai API Key. To request an API key
+  > [complete the form here](https://bonsai.xyz/apply)._
 
   ```toml
   [env]
@@ -289,7 +311,8 @@ This script will start the ciphernodes, add the ciphernodes to the registry on c
 
 ## Running the CRISP Server
 
-To run the CRISP Server, open a new terminal and navigate to the `server` directory. Then, execute the following command:
+To run the CRISP Server, open a new terminal and navigate to the `server` directory. Then, execute
+the following command:
 
 ```sh
 cargo run --bin server
@@ -303,13 +326,15 @@ Open a new terminal and navigate to the `server` directory. Then, execute the fo
 cargo run --bin cli
 ```
 
-Once the CLI client is running, you can interact with the CRISP voting protocol by following these steps:
+Once the CLI client is running, you can interact with the CRISP voting protocol by following these
+steps:
 
 1. Select `CRISP: Voting Protocol (ETH)` from the menu.
 
 2. To initiate a new CRISP round, choose the option `Initialize new CRISP round`.
 
-Ensure all services are running correctly and that components are communicating as expected before starting a new CRISP round.
+Ensure all services are running correctly and that components are communicating as expected before
+starting a new CRISP round.
 
 ## Publishing packages to npm
 
@@ -321,11 +346,14 @@ pnpm publish:packages x.x.x # where x.x.x is the new version
 
 ## Contributing
 
-We welcome and encourage community contributions to this repository. Please ensure that you read and understand the [Contributor License Agreement (CLA)](https://github.com/gnosisguild/CLA) before submitting any contributions.
+We welcome and encourage community contributions to this repository. Please ensure that you read and
+understand the [Contributor License Agreement (CLA)](https://github.com/gnosisguild/CLA) before
+submitting any contributions.
 
 ### Branch Cleanup Policy
 
-To help keep the repository clean and maintainable, we automatically delete merged branches after **7 days**.  
+To help keep the repository clean and maintainable, we automatically delete merged branches after
+**7 days**.  
 You can control this behavior using **PR labels**:
 
 | Label            | Effect                                        |
@@ -334,11 +362,13 @@ You can control this behavior using **PR labels**:
 | `archive-branch` | 🏷️ Branch will be **tagged** and then deleted |
 | _no label_       | 🗑️ Branch will be deleted (no tag preserved)  |
 
-> Only apply these labels **before merging** your PR if you want to preserve history or keep the branch alive.
+> Only apply these labels **before merging** your PR if you want to preserve history or keep the
+> branch alive.
 
 ## Security and Liability
 
-This project is provided **WITHOUT ANY WARRANTY**; without even the implied warranty of **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**.
+This project is provided **WITHOUT ANY WARRANTY**; without even the implied warranty of
+**MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**.
 
 ## License
 

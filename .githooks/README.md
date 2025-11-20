@@ -4,7 +4,8 @@ This directory contains optional git hooks that can help with development workfl
 
 ## commit-msg
 
-This hook validates that commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+This hook validates that commit messages follow the
+[Conventional Commits](https://www.conventionalcommits.org/) specification.
 
 ### Enable the hook
 
@@ -42,4 +43,5 @@ git config --unset core.hooksPath
 
 ## Note
 
-These hooks are optional for local development. All pull requests are automatically validated by GitHub Actions regardless of whether you use local hooks.
+These hooks are optional for local development. All pull requests are automatically validated by
+GitHub Actions regardless of whether you use local hooks.

@@ -9,8 +9,8 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: "false"
-      ADDRESS: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+      AGGREGATOR: 'false'
+      ADDRESS: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
       QUIC_PORT: 9091
     deploy:
       replicas: 1
@@ -28,8 +28,8 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: "false"
-      ADDRESS: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+      AGGREGATOR: 'false'
+      ADDRESS: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
       QUIC_PORT: 9092
     deploy:
       replicas: 1
@@ -47,8 +47,8 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: "false"
-      ADDRESS: "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
+      AGGREGATOR: 'false'
+      ADDRESS: '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
       QUIC_PORT: 9093
     deploy:
       replicas: 1
@@ -68,8 +68,8 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      AGGREGATOR: "true"
-      ADDRESS: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+      AGGREGATOR: 'true'
+      ADDRESS: '0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199'
       QUIC_PORT: 9094
     deploy:
       replicas: 1

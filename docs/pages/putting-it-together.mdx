@@ -2,10 +2,10 @@
 title: 'Putting It All Together'
 ---
 
-
 ## Putting It All Together: A Complete Example
 
-To solidify your understanding, let's walk through an example of building and deploying an E3 Program using RISC Zero.
+To solidify your understanding, let's walk through an example of building and deploying an E3
+Program using RISC Zero.
 
 ### Step 1: Set Up Development Environment
 
@@ -155,8 +155,8 @@ await EnclaveContract.request(
   e3ProgramAddress,
   e3ProgramParams,
   computeProviderParams,
-  { value: computationFee }
-);
+  { value: computationFee },
+)
 ```
 
 ### Step 8: Submit Encrypted Inputs
@@ -182,28 +182,37 @@ await EnclaveContract.request(
 
 ## Conclusion
 
-By following this guide, you should now have a solid understanding of Enclave and how to build your own E3 Programs. Enclave provides a powerful framework for secure, privacy-preserving computations over encrypted data, enabling a new class of decentralized applications.
+By following this guide, you should now have a solid understanding of Enclave and how to build your
+own E3 Programs. Enclave provides a powerful framework for secure, privacy-preserving computations
+over encrypted data, enabling a new class of decentralized applications.
 
 **Key Takeaways:**
 
 - Enclave distributes trust and ensures data remains encrypted throughout computation.
-- The modular architecture allows for flexibility in choosing Compute Providers and designing computations.
-- The provided Compute Provider package simplifies integration and handles complex tasks like Merkle tree verification.
+- The modular architecture allows for flexibility in choosing Compute Providers and designing
+  computations.
+- The provided Compute Provider package simplifies integration and handles complex tasks like Merkle
+  tree verification.
 
 ---
 
 ## Additional Resources
 
-- **Enclave GitHub Repository**: [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave)
-- **CRISP GitHub Repository**: [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP)
+- **Enclave GitHub Repository**:
+  [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave)
+- **CRISP GitHub Repository**:
+  [https://github.com/gnosisguild/enclave](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP)
 - **Enclave Quick Start**: [Quick Start](/quick-start)
 - **RISC Zero Documentation**: [https://www.risczero.com](https://www.risczero.com)
-- **Compute Provider Package**: Check the Enclave repository for the Compute Provider package and examples.
+- **Compute Provider Package**: Check the Enclave repository for the Compute Provider package and
+  examples.
 - **FHE Libraries**: Explore libraries like `fhe.rs` for Rust to handle homomorphic encryption.
-- **Zero-Knowledge Proof Libraries**: Use libraries like `risc0-zkvm` for proof generation and verification.
+- **Zero-Knowledge Proof Libraries**: Use libraries like `risc0-zkvm` for proof generation and
+  verification.
 
 ---
 
 **Happy Building!**
 
-If you have any questions or need further assistance, feel free to reach out to [Gnosis Guild](https://gnosisguild.org), the initial development team building Enclave.
+If you have any questions or need further assistance, feel free to reach out to
+[Gnosis Guild](https://gnosisguild.org), the initial development team building Enclave.

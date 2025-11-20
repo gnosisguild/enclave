@@ -1,6 +1,9 @@
 # Template
 
-The Enclave Protocol Template provides a complete development environment for building and testing applications with Fully Homomorphic Encryption (FHE). This template enables local deployment and interaction with the Enclave protocol without requiring the core contracts to be copied and avoiding complexities of specific programs (as zk circuits for CRISP).
+The Enclave Protocol Template provides a complete development environment for building and testing
+applications with Fully Homomorphic Encryption (FHE). This template enables local deployment and
+interaction with the Enclave protocol without requiring the core contracts to be copied and avoiding
+complexities of specific programs (as zk circuits for CRISP).
 
 ## Prerequisites
 
@@ -53,7 +56,8 @@ The easiest way to install the Enclave CLI is using our installer script:
 Or if you prefer wget:
 `wget -qO- https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash`
 
-This script will download and install enclaveup, which is the standalone installer for the Enclave CLI.
+This script will download and install enclaveup, which is the standalone installer for the Enclave
+CLI.
 
 Once you have `enclaveup` installed, you can manage your Enclave CLI installation:
 
@@ -98,9 +102,11 @@ First, compile your E3 program to build the Risc0 zkvm image:
 enclave program compile
 ```
 
-This builds the Risc0 zkvm image that will be deployed on the blockchain and used for verification of the final proof.
+This builds the Risc0 zkvm image that will be deployed on the blockchain and used for verification
+of the final proof.
 
-If you want to avoid the proof or you have trouble with Risc0 zkvm installation, you can run it in dev mode (no proof).
+If you want to avoid the proof or you have trouble with Risc0 zkvm installation, you can run it in
+dev mode (no proof).
 
 ```bash
 enclave program start --dev true
@@ -128,7 +134,8 @@ This starts:
 ### Access Your Application
 
 1. Open your browser to [http://localhost:3000](http://localhost:3000)
-2. Import the local development private key: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` (DO NOT USE IN PRODUCTION)
+2. Import the local development private key:
+   `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` (DO NOT USE IN PRODUCTION)
 3. Configure MetaMask for local network development:
    - Network: `http://localhost:8545`
    - Chain ID: `31337`
@@ -160,7 +167,8 @@ You successfully ran a **Fully Homomorphic Encryption** computation where:
 
 ## Manual Start
 
-If you prefer to install the Enclave CLI manually, please visit the dedicated section in the [documentation](https://docs.enclave.gg/installation#manual-installation).
+If you prefer to install the Enclave CLI manually, please visit the dedicated section in the
+[documentation](https://docs.enclave.gg/installation#manual-installation).
 
 ## Next Steps
 
@@ -171,4 +179,6 @@ Now that you have a working E3 program:
 3. **Update the UI**: Customize the client in `./client/src/`
 4. **Deploy**: Learn about production deployment
 
-Ready to dive deeper? Continue with our [Hello World Tutorial](https://docs.enclave.gg/hello-world-tutorial) for a step-by-step breakdown of building E3 programs from scratch.
+Ready to dive deeper? Continue with our
+[Hello World Tutorial](https://docs.enclave.gg/hello-world-tutorial) for a step-by-step breakdown of
+building E3 programs from scratch.

@@ -105,7 +105,8 @@ Once you run `pnpm bump:versions X.Y.Z` and the tag is pushed, GitHub Actions au
 ### What it does
 
 - Scans all `.rs`, `.sol`, and `.ts` files in the repository
-- Excludes certain files with different licensing (e.g., `ImageID.sol` from RISC Zero with Apache license)
+- Excludes certain files with different licensing (e.g., `ImageID.sol` from RISC Zero with Apache
+  license)
 - Checks for the required SPDX license header:
   ```
   // SPDX-License-Identifier: LGPL-3.0-only
@@ -127,7 +128,8 @@ This script is automatically run in GitHub Actions:
 
 ## Clean Script
 
-`clean.ts` - Removes build artifacts and temporary files from the repository using predefined safe patterns while providing options to skip specific parts of the codebase.
+`clean.ts` - Removes build artifacts and temporary files from the repository using predefined safe
+patterns while providing options to skip specific parts of the codebase.
 
 ### Usage
 

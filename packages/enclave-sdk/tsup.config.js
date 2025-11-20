@@ -4,34 +4,34 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { defineConfig } from "tsup";
-import { baseConfig } from "@enclave-e3/config/tsup";
+import { defineConfig } from 'tsup'
+import { baseConfig } from '@enclave-e3/config/tsup'
 
 export default defineConfig([
   {
     ...baseConfig,
-    include: ["./src/**/*.ts"],
-    format: ["esm"],
+    include: ['./src/**/*.ts'],
+    format: ['esm'],
     outExtension: () => ({
-      js: ".js",
+      js: '.js',
     }),
     esbuildOptions: (options) => {
       options.alias = {
-        "@enclave-e3/wasm/init": "../../crates/wasm/init_node.js",
-      };
+        '@enclave-e3/wasm/init': '../../crates/wasm/init_node.js',
+      }
     },
   },
   {
     ...baseConfig,
-    include: ["./src/**/*.ts"],
-    format: ["cjs"],
+    include: ['./src/**/*.ts'],
+    format: ['cjs'],
     outExtension: () => ({
-      js: ".cjs",
+      js: '.cjs',
     }),
     esbuildOptions: (options) => {
       options.alias = {
-        "@enclave-e3/wasm/init": "../../crates/wasm/init_node.cjs",
-      };
+        '@enclave-e3/wasm/init': '../../crates/wasm/init_node.cjs',
+      }
     },
   },
-]);
+])
