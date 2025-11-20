@@ -30,7 +30,7 @@ contract CRISPProgram is IE3Program, Ownable {
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     // The depth of the input merkle tree
-    uint8 public constant treeDepth = 20;
+    uint8 public constant TREE_DEPTH = 20;
 
     // State variables
     IEnclave public enclave;
@@ -148,7 +148,7 @@ contract CRISPProgram is IE3Program, Ownable {
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
         // we need to init the inputs merkle tree for this e3Id
-        votes[e3Id]._init(treeDepth);
+        votes[e3Id]._init(TREE_DEPTH);
 
         return ENCRYPTION_SCHEME_ID;
     }
