@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // Main SDK class
-export { EnclaveSDK } from "./enclave-sdk";
+export { EnclaveSDK } from './enclave-sdk'
 
 // Core classes
-export { EventListener } from "./event-listener";
-export { ContractClient } from "./contract-client";
+export { EventListener } from './event-listener'
+export { ContractClient } from './contract-client'
 
 // Types and interfaces
 export type {
@@ -38,15 +38,10 @@ export type {
   ProtocolParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
-} from "./types";
+} from './types'
 
 // enums and constants
-export {
-  EnclaveEventType,
-  RegistryEventType,
-  FheProtocol,
-  BfvProtocolParams,
-} from "./types";
+export { EnclaveEventType, RegistryEventType, FheProtocol, BfvProtocolParams } from './types'
 
 // Export utilities
 export {
@@ -70,11 +65,6 @@ export {
   calculateStartWindow,
   decodePlaintextOutput,
   type ComputeProviderParams,
-} from "./utils";
+} from './utils'
 
-export {
-  generateProof,
-  type Polynomial,
-  convertToPolynomial,
-  convertToPolynomialArray,
-} from "./greco";
+export { generateProof, type Polynomial, convertToPolynomial, convertToPolynomialArray } from './greco'

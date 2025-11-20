@@ -22,9 +22,12 @@ anvil --version
 anvil 0.2.0 (9501589 2024-10-30T00:22:24.181391729Z)
 ```
 
-Note some older versions of `anvil` are not compatible and can cause errors - by older I mean before this particuar dated patch `(9501589 2024-10-30T00:22:24.181391729Z)` - note they are not using semver.
+Note some older versions of `anvil` are not compatible and can cause errors - by older I mean before
+this particuar dated patch `(9501589 2024-10-30T00:22:24.181391729Z)` - note they are not using
+semver.
 
-If you get an error that looks similar to the following you likely need to upgrade your anvil version:
+If you get an error that looks similar to the following you likely need to upgrade your anvil
+version:
 
 ```
 ERROR! event=EnclaveError(EnclaveError { err_type: Evm, message: "deserialization error: duplicate field `status` at line 1 column 34542" })

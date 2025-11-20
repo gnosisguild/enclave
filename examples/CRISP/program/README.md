@@ -2,7 +2,7 @@
 
 This module does the following:
 
-- Run an FHE computation given some inputs 
+- Run an FHE computation given some inputs
 
 This is the program component for our overall CRISP architecture:
 
@@ -32,4 +32,3 @@ graph TD
   end
   server -. "WebSocket listener" .-> evm
 ```
-

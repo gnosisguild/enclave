@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { defineConfig } from "tsup";
+import { defineConfig } from 'tsup'
 
 export const baseConfig = defineConfig({
-  entry: ["src/index.ts"],
+  entry: ['src/index.ts'],
   splitting: false,
   sourcemap: true,
   clean: true,
-  format: ["esm"],
+  format: ['esm'],
   dts: true,
-});
+})

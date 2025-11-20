@@ -4,56 +4,40 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import {
-  Abi,
-  Hash,
-  PublicClient,
-  TransactionReceipt,
-  WalletClient,
-} from "viem";
+import { Abi, Hash, PublicClient, TransactionReceipt, WalletClient } from 'viem'
 
-import {
-  CiphernodeRegistryOwnable__factory,
-  Enclave__factory,
-  EnclaveToken__factory,
-} from "@enclave-e3/contracts/types";
-import { type E3 } from "./types";
-import { SDKError, isValidAddress } from "./utils";
+import { CiphernodeRegistryOwnable__factory, Enclave__factory, EnclaveToken__factory } from '@enclave-e3/contracts/types'
+import { type E3 } from './types'
+import { SDKError, isValidAddress } from './utils'
 
 export class ContractClient {
   private contractInfo: {
-    enclave: { address: `0x${string}`; abi: Abi };
-    ciphernodeRegistry: { address: `0x${string}`; abi: Abi };
-    feeToken: { address: `0x${string}`; abi: Abi };
-  } | null = null;
+    enclave: { address: `0x${string}`; abi: Abi }
+    ciphernodeRegistry: { address: `0x${string}`; abi: Abi }
+    feeToken: { address: `0x${string}`; abi: Abi }
+  } | null = null
 
   constructor(
     private publicClient: PublicClient,
     private walletClient?: WalletClient,
     private addresses: {
-      enclave: `0x${string}`;
-      ciphernodeRegistry: `0x${string}`;
-      feeToken: `0x${string}`;
+      enclave: `0x${string}`
+      ciphernodeRegistry: `0x${string}`
+      feeToken: `0x${string}`
     } = {
-      enclave: "0x0000000000000000000000000000000000000000",
-      ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
-      feeToken: "0x0000000000000000000000000000000000000000",
-    }
+      enclave: '0x0000000000000000000000000000000000000000',
+      ciphernodeRegistry: '0x0000000000000000000000000000000000000000',
+      feeToken: '0x0000000000000000000000000000000000000000',
+    },
   ) {
     if (!isValidAddress(addresses.enclave)) {
-      throw new SDKError("Invalid Enclave contract address", "INVALID_ADDRESS");
+      throw new SDKError('Invalid Enclave contract address', 'INVALID_ADDRESS')
     }
     if (!isValidAddress(addresses.ciphernodeRegistry)) {
-      throw new SDKError(
-        "Invalid CiphernodeRegistry contract address",
-        "INVALID_ADDRESS"
-      );
+      throw new SDKError('Invalid CiphernodeRegistry contract address', 'INVALID_ADDRESS')
     }
     if (!isValidAddress(addresses.feeToken)) {
-      throw new SDKError(
-        "Invalid FeeToken contract address",
-        "INVALID_ADDRESS"
-      );
+      throw new SDKError('Invalid FeeToken contract address', 'INVALID_ADDRESS')
     }
   }
 
@@ -75,12 +59,9 @@ export class ContractClient {
           address: this.addresses.feeToken,
           abi: EnclaveToken__factory.abi,
         },
-      };
+      }
     } catch (error) {
-      throw new SDKError(
-        `Failed to initialize contracts: ${error}`,
-        "INITIALIZATION_FAILED"
-      );
+      throw new SDKError(`Failed to initialize contracts: ${error}`, 'INITIALIZATION_FAILED')
     }
   }
 
@@ -90,38 +71,32 @@ export class ContractClient {
    */
   public async approveFeeToken(amount: bigint): Promise<Hash> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for write operations",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
 
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       const { request } = await this.publicClient.simulateContract({
         address: this.addresses.feeToken,
         abi: EnclaveToken__factory.abi,
-        functionName: "approve",
+        functionName: 'approve',
         args: [this.addresses.enclave, amount],
         account,
-      });
+      })
 
-      const hash = await this.walletClient.writeContract(request);
+      const hash = await this.walletClient.writeContract(request)
 
-      return hash;
+      return hash
     } catch (error) {
-      throw new SDKError(
-        `Failed to approve fee token: ${error}`,
-        "APPROVE_FEE_TOKEN_FAILED"
-      );
+      throw new SDKError(`Failed to approve fee token: ${error}`, 'APPROVE_FEE_TOKEN_FAILED')
     }
   }
 
@@ -137,30 +112,27 @@ export class ContractClient {
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
     customParams?: `0x${string}`,
-    gasLimit?: bigint
+    gasLimit?: bigint,
   ): Promise<Hash> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for write operations",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
 
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       // Simulate transaction
       const { request } = await this.publicClient.simulateContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
-        functionName: "request",
+        functionName: 'request',
         args: [
           {
             threshold,
@@ -169,19 +141,19 @@ export class ContractClient {
             e3Program,
             e3ProgramParams,
             computeProviderParams,
-            customParams: customParams || "0x",
+            customParams: customParams || '0x',
           },
         ],
         account,
         gas: gasLimit,
-      });
+      })
 
       // Execute transaction
-      const hash = await this.walletClient.writeContract(request);
+      const hash = await this.walletClient.writeContract(request)
 
-      return hash;
+      return hash
     } catch (error) {
-      throw new SDKError(`Failed to request E3: ${error}`, "REQUEST_E3_FAILED");
+      throw new SDKError(`Failed to request E3: ${error}`, 'REQUEST_E3_FAILED')
     }
   }
 
@@ -189,45 +161,35 @@ export class ContractClient {
    * Activate an E3 computation
    * activate(uint256 e3Id, bytes memory publicKey)
    */
-  public async activateE3(
-    e3Id: bigint,
-    publicKey: `0x${string}`,
-    gasLimit?: bigint
-  ): Promise<Hash> {
+  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for write operations",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
 
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       const { request } = await this.publicClient.simulateContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
-        functionName: "activate",
+        functionName: 'activate',
         args: [e3Id, publicKey],
         account,
         gas: gasLimit,
-      });
+      })
 
-      const hash = await this.walletClient.writeContract(request);
+      const hash = await this.walletClient.writeContract(request)
 
-      return hash;
+      return hash
     } catch (error) {
-      throw new SDKError(
-        `Failed to activate E3: ${error}`,
-        "ACTIVATE_E3_FAILED"
-      );
+      throw new SDKError(`Failed to activate E3: ${error}`, 'ACTIVATE_E3_FAILED')
     }
   }
 
@@ -235,45 +197,35 @@ export class ContractClient {
    * Publish input for an E3 computation
    * publishInput(uint256 e3Id, bytes memory data)
    */
-  public async publishInput(
-    e3Id: bigint,
-    data: `0x${string}`,
-    gasLimit?: bigint
-  ): Promise<Hash> {
+  public async publishInput(e3Id: bigint, data: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for write operations",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
 
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       const { request } = await this.publicClient.simulateContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
-        functionName: "publishInput",
+        functionName: 'publishInput',
         args: [e3Id, data],
         account,
         gas: gasLimit,
-      });
+      })
 
-      const hash = await this.walletClient.writeContract(request);
+      const hash = await this.walletClient.writeContract(request)
 
-      return hash;
+      return hash
     } catch (error) {
-      throw new SDKError(
-        `Failed to publish input: ${error}`,
-        "PUBLISH_INPUT_FAILED"
-      );
+      throw new SDKError(`Failed to publish input: ${error}`, 'PUBLISH_INPUT_FAILED')
     }
   }
 
@@ -285,44 +237,38 @@ export class ContractClient {
     e3Id: bigint,
     ciphertextOutput: `0x${string}`,
     proof: `0x${string}`,
-    gasLimit?: bigint
+    gasLimit?: bigint,
   ): Promise<Hash> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for write operations",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
 
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       // Simulate transaction
       const { request } = await this.publicClient.simulateContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
-        functionName: "publishCiphertextOutput",
+        functionName: 'publishCiphertextOutput',
         args: [e3Id, ciphertextOutput, proof],
         account,
         gas: gasLimit,
-      });
+      })
 
       // Execute transaction
-      const hash = await this.walletClient.writeContract(request);
+      const hash = await this.walletClient.writeContract(request)
 
-      return hash;
+      return hash
     } catch (error) {
-      throw new SDKError(
-        `Failed to publish ciphertext output: ${error}`,
-        "PUBLISH_CIPHERTEXT_OUTPUT_FAILED"
-      );
+      throw new SDKError(`Failed to publish ciphertext output: ${error}`, 'PUBLISH_CIPHERTEXT_OUTPUT_FAILED')
     }
   }
 
@@ -332,20 +278,20 @@ export class ContractClient {
    */
   public async getE3(e3Id: bigint): Promise<E3> {
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
       const result: E3 = await this.publicClient.readContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
-        functionName: "getE3",
+        functionName: 'getE3',
         args: [e3Id],
-      });
+      })
 
-      return result;
+      return result
     } catch (error) {
-      throw new SDKError(`Failed to get E3: ${error}`, "GET_E3_FAILED");
+      throw new SDKError(`Failed to get E3: ${error}`, 'GET_E3_FAILED')
     }
   }
 
@@ -357,23 +303,20 @@ export class ContractClient {
    */
   public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
     if (!this.contractInfo) {
-      await this.initialize();
+      await this.initialize()
     }
 
     try {
       const result: `0x${string}` = await this.publicClient.readContract({
         address: this.addresses.ciphernodeRegistry,
         abi: CiphernodeRegistryOwnable__factory.abi,
-        functionName: "committeePublicKey",
+        functionName: 'committeePublicKey',
         args: [e3Id],
-      });
+      })
 
-      return result;
+      return result
     } catch (error) {
-      throw new SDKError(
-        `Failed to get E3 public key: ${error}`,
-        "GET_E3_PUBLIC_KEY_FAILED"
-      );
+      throw new SDKError(`Failed to get E3 public key: ${error}`, 'GET_E3_PUBLIC_KEY_FAILED')
     }
   }
 
@@ -385,19 +328,16 @@ export class ContractClient {
     args: readonly unknown[],
     contractAddress: `0x${string}`,
     abi: Abi,
-    value?: bigint
+    value?: bigint,
   ): Promise<bigint> {
     if (!this.walletClient) {
-      throw new SDKError(
-        "Wallet client required for gas estimation",
-        "NO_WALLET"
-      );
+      throw new SDKError('Wallet client required for gas estimation', 'NO_WALLET')
     }
 
     try {
-      const account = this.walletClient.account;
+      const account = this.walletClient.account
       if (!account) {
-        throw new SDKError("No account connected", "NO_ACCOUNT");
+        throw new SDKError('No account connected', 'NO_ACCOUNT')
       }
 
       const estimateParams = {
@@ -407,16 +347,13 @@ export class ContractClient {
         args,
         account,
         ...(value !== undefined && { value }),
-      };
+      }
 
-      const gas = await this.publicClient.estimateContractGas(estimateParams);
+      const gas = await this.publicClient.estimateContractGas(estimateParams)
 
-      return gas;
+      return gas
     } catch (error) {
-      throw new SDKError(
-        `Failed to estimate gas: ${error}`,
-        "GAS_ESTIMATION_FAILED"
-      );
+      throw new SDKError(`Failed to estimate gas: ${error}`, 'GAS_ESTIMATION_FAILED')
     }
   }
 
@@ -428,14 +365,11 @@ export class ContractClient {
       const receipt = await this.publicClient.waitForTransactionReceipt({
         hash,
         confirmations: 1,
-      });
+      })
 
-      return receipt;
+      return receipt
     } catch (error) {
-      throw new SDKError(
-        `Failed to wait for transaction: ${error}`,
-        "TRANSACTION_WAIT_FAILED"
-      );
+      throw new SDKError(`Failed to wait for transaction: ${error}`, 'TRANSACTION_WAIT_FAILED')
     }
   }
 }

@@ -4,11 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    pool: "forks",
+    pool: 'forks',
     poolOptions: {
       forks: {
         singleFork: true,
@@ -16,4 +16,4 @@ export default defineConfig({
     },
     testTimeout: 120_000,
   },
-});
+})

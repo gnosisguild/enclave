@@ -1,0 +1,43 @@
+# directories
+node_modules
+dist
+build
+cache
+coverage
+target
+artifacts
+types
+deployments
+.cargo
+.next
+.cache-synpress
+.enclave
+
+# files
+*.env
+*.log
+.DS_Store
+.pnp.*
+coverage.json
+enclave.config.yaml
+
+# lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+Cargo.lock
+
+# generated files
+deployed_contracts.json
+*.last-run.json
+
+# test results
+test-results/
+
+# secrets files
+**/example.secrets.json
+**/*.secrets.json
+
+# submodules
+examples/CRISP/packages/crisp-contracts/lib/risc0-ethereum
+templates/default/lib/risc0-ethereum

@@ -16,10 +16,11 @@ pnpm add @enclave-e3/react @enclave-e3/contracts
 
 ### useEnclaveSDK
 
-A React hook for interacting with the Enclave SDK. This hook provides a clean interface for managing SDK state, handling contract interactions, and listening to events.
+A React hook for interacting with the Enclave SDK. This hook provides a clean interface for managing
+SDK state, handling contract interactions, and listening to events.
 
 ```tsx
-import { useEnclaveSDK } from "@enclave-e3/react";
+import { useEnclaveSDK } from '@enclave-e3/react'
 
 function MyComponent() {
   const {
@@ -36,26 +37,26 @@ function MyComponent() {
   } = useEnclaveSDK({
     autoConnect: true,
     contracts: {
-      enclave: "0x...",
-      ciphernodeRegistry: "0x...",
+      enclave: '0x...',
+      ciphernodeRegistry: '0x...',
     },
     chainId: 1,
-  });
+  })
 
   // Listen to events
   React.useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized) return
 
     const handleE3Requested = (event) => {
-      console.log("E3 requested:", event.data);
-    };
+      console.log('E3 requested:', event.data)
+    }
 
-    onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested);
+    onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested)
 
     return () => {
-      off(EnclaveEventType.E3_REQUESTED, handleE3Requested);
-    };
-  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType]);
+      off(EnclaveEventType.E3_REQUESTED, handleE3Requested)
+    }
+  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType])
 
   // Request computation
   const handleRequest = async () => {
@@ -64,30 +65,30 @@ function MyComponent() {
         threshold: [2, 3],
         startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         duration: BigInt(1800),
-        e3Program: "0x...",
-        e3ProgramParams: "0x...",
-        computeProviderParams: "0x...",
-        customParams: "0x...",
-      });
-      console.log("E3 requested with hash:", hash);
+        e3Program: '0x...',
+        e3ProgramParams: '0x...',
+        computeProviderParams: '0x...',
+        customParams: '0x...',
+      })
+      console.log('E3 requested with hash:', hash)
     } catch (error) {
-      console.error("Failed to request E3:", error);
+      console.error('Failed to request E3:', error)
     }
-  };
+  }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Error: {error}</div>
   }
 
   if (!isInitialized) {
-    return <div>Initializing SDK...</div>;
+    return <div>Initializing SDK...</div>
   }
 
   return (
     <div>
       <button onClick={handleRequest}>Request E3 Computation</button>
     </div>
-  );
+  )
 }
 ```
 
