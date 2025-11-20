@@ -46,7 +46,7 @@ jobs:
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
-      
+
       - name: Run CRISP Unit Tests
         working-directory: ./examples/CRISP
         run: "cargo test"
@@ -88,8 +88,8 @@ jobs:
       - name: "Install the dependencies"
         run: "pnpm install"
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Unit Tests
         run: "cargo test --lib && cargo test --doc"
@@ -131,8 +131,8 @@ jobs:
       - name: "Install the dependencies"
         run: "pnpm install"
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Integration Tests
         run: "cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture"
