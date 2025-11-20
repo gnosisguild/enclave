@@ -17,7 +17,7 @@
     "check:size": "./scripts/check-size.sh",
     "check:pnpm": "./scripts/check-pnpm.sh",
     "test": "pnpm evm:test && pnpm rust:test && pnpm sdk:test && pnpm noir:test",
-    "test:integration": "pnpm -C ./tests/integration exec ./test.sh",
+    "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",
     "prepare": "husky",
     "enclave": "cd crates && ./scripts/launch.sh",
