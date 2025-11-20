@@ -50,7 +50,7 @@ contract CRISPProgram is IE3Program, Ownable {
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
-    /// @notice Mapping to store votes slot indices. Each elegible voter has their own slot
+    /// @notice Mapping to store votes slot indices. Each eligible voter has their own slot
     /// to store their vote inside the merkle tree.
     mapping(uint256 e3Id => mapping(address slot => uint40 index)) public voteSlots;
     mapping(uint256 e3Id => LazyIMTData) public votes;    
@@ -183,7 +183,7 @@ contract CRISPProgram is IE3Program, Ownable {
         // bool isFirstVote = oldCiphertext != 0;
 
         {
-            if (oldCiphertext != 0) {
+            if (oldCiphertext == 0) {
                 voteIndex = votes[e3Id].numberOfLeaves;
     
                 /// @notice Store the vote index in the correct slot.
