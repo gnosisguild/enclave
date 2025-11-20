@@ -149,6 +149,7 @@ contract CRISPProgram is IE3Program, Ownable {
 
     /// @inheritdoc IE3Program
     function validateInput(uint256 e3Id, address, bytes memory data) external returns (bytes memory input) {
+    
         // it should only be called via Enclave for now
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
@@ -173,21 +174,24 @@ contract CRISPProgram is IE3Program, Ownable {
         /// @todo pass it to the verifier 
         uint40 voteIndex = voteSlots[e3Id][slot];
         uint256 oldCiphertext = votes[e3Id].elements[voteIndex];
-        bool isFirstVote = oldCiphertext != 0;
+        // bool isFirstVote = oldCiphertext != 0;
 
         uint256 voteHash = uint256(keccak256(vote));
 
-        if (isFirstVote) {
-            voteIndex = votes[e3Id].numberOfLeaves;
-
-            /// @notice Store the vote index in the correct slot.
-            voteSlots[e3Id][slot] = voteIndex;
-            // Insert the leaf
-            votes[e3Id]._insert(voteHash);
-        } else {
-            votes[e3Id]._update(voteHash, voteIndex);
+        {
+            if (oldCiphertext != 0) {
+                voteIndex = votes[e3Id].numberOfLeaves;
+    
+                /// @notice Store the vote index in the correct slot.
+                voteSlots[e3Id][slot] = voteIndex;
+                // Insert the leaf
+                votes[e3Id]._insert(voteHash);
+            } else {
+                votes[e3Id]._update(voteHash, voteIndex);
+            }
         }
-        noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
+
+        noirPublicInputs[1] = bytes32(uint256(oldCiphertext != 0 ? 1 : 0));
         // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
 
         // Check if the ciphertext was encrypted correctly
