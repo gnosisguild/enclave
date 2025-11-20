@@ -35,7 +35,7 @@
     "e3:publishInput": "pnpm -C packages/enclave-contracts hardhat e3:publishInput",
     "e3:publishCiphertext": "pnpm -C packages/enclave-contracts hardhat e3:publishCiphertext",
     "evm:install": "pnpm -C packages/enclave-contracts install",
-    "evm:node": "pnpm -C packages/enclave-contracts hardhat node",
+    "evm:node": "cd packages/enclave-contracts && pnpm hardhat node",
     "evm:build": "pnpm -C packages/enclave-contracts compile",
     "evm:lint": "pnpm -C packages/enclave-contracts lint",
     "evm:test": "pnpm -C packages/enclave-contracts test",
