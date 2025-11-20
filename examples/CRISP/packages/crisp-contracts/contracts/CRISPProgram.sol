@@ -10,7 +10,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {E3} from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import {LazyIMTData, InternalLazyIMT} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import {LazyIMTData, InternalLazyIMT, PoseidonT3} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
 import {HonkVerifier} from "./CRISPVerifier.sol";
 
@@ -28,6 +28,9 @@ contract CRISPProgram is IE3Program, Ownable {
 
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
+
+    // The depth of the input merkle tree
+    uint8 public constant treeDepth = 20;
 
     // State variables
     IEnclave public enclave;
@@ -144,6 +147,9 @@ contract CRISPProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
+        // we need to init the inputs merkle tree for this e3Id
+        votes[e3Id]._init(treeDepth);
+
         return ENCRYPTION_SCHEME_ID;
     }
 
@@ -176,8 +182,6 @@ contract CRISPProgram is IE3Program, Ownable {
         uint256 oldCiphertext = votes[e3Id].elements[voteIndex];
         // bool isFirstVote = oldCiphertext != 0;
 
-        uint256 voteHash = uint256(keccak256(vote));
-
         {
             if (oldCiphertext != 0) {
                 voteIndex = votes[e3Id].numberOfLeaves;
@@ -185,9 +189,9 @@ contract CRISPProgram is IE3Program, Ownable {
                 /// @notice Store the vote index in the correct slot.
                 voteSlots[e3Id][slot] = voteIndex;
                 // Insert the leaf
-                votes[e3Id]._insert(voteHash);
+                votes[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
             } else {
-                votes[e3Id]._update(voteHash, voteIndex);
+                votes[e3Id]._update(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]), voteIndex);
             }
         }
 

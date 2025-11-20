@@ -11,6 +11,8 @@ import { readFileSync } from 'fs'
 import { ContractFactory } from 'ethers'
 import hre from 'hardhat'
 
+import { MockCRISPProgram__factory as MockCRISPProgramFactory, CRISPProgram__factory as CRISPProgramFactory } from "../types";
+
 const imageIdContent = readFileSync('../../.enclave/generated/contracts/ImageID.sol', 'utf-8')
 const match = imageIdContent.match(/bytes32 public constant PROGRAM_ID = bytes32\((0x[a-fA-F0-9]+)\)/)
 const IMAGE_ID = match ? match[1] : null
@@ -38,9 +40,14 @@ export const deployCRISPContracts = async () => {
   }
   const enclave = EnclaveFactory.connect(enclaveAddress, owner)
 
-  const zkTranscriptLib = await ethers.deployContract('ZKTranscriptLib')
-  await zkTranscriptLib.waitForDeployment()
-  const zkTranscriptLibAddress = await zkTranscriptLib.getAddress()
+  const poseidonT3Address = readDeploymentArgs("PoseidonT3", chain)?.address;
+  if (!poseidonT3Address) {
+    throw new Error("PoseidonT3 address not found, it must be deployed first");
+  } 
+
+  const zkTranscriptLib = await ethers.deployContract("ZKTranscriptLib");
+  await zkTranscriptLib.waitForDeployment();
+  const zkTranscriptLibAddress = await zkTranscriptLib.getAddress();
 
   const honkVerifierFactory = await ethers.getContractFactory('HonkVerifier', {
     libraries: {
@@ -61,10 +68,22 @@ export const deployCRISPContracts = async () => {
   let crispFactory: ContractFactory
 
   if (useMockInputValidator) {
-    console.log('Using MockCRISPProgram')
-    crispFactory = await ethers.getContractFactory('MockCRISPProgram')
+    console.log("Using MockCRISPProgram");
+    crispFactory = await ethers.getContractFactory(
+      MockCRISPProgramFactory.abi,
+      MockCRISPProgramFactory.linkBytecode({
+        "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3": poseidonT3Address
+      }),
+      owner,
+    );
   } else {
-    crispFactory = await ethers.getContractFactory('CRISPProgram')
+    crispFactory = await ethers.getContractFactory(
+      CRISPProgramFactory.abi,
+      CRISPProgramFactory.linkBytecode({
+        "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3": poseidonT3Address
+      }),
+      owner,
+    );
   }
 
   const crisp = await crispFactory.deploy(enclaveAddress, verifier, honkVerifierAddress, IMAGE_ID)
