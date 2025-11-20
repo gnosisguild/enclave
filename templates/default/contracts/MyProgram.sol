@@ -9,12 +9,14 @@ import {IRiscZeroVerifier} from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {LazyIMTData, InternalLazyIMT} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import {LazyIMTData, InternalLazyIMT, PoseidonT3} from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
 contract MyProgram is IE3Program, Ownable {
     using InternalLazyIMT for LazyIMTData;
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
+
+    uint8 public constant treeDepth = 20;
 
     // State variables
     IEnclave public enclave;
@@ -69,6 +71,8 @@ contract MyProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
+        inputs[e3Id]._init(treeDepth);
+
         return ENCRYPTION_SCHEME_ID;
     }
 
@@ -88,9 +92,10 @@ contract MyProgram is IE3Program, Ownable {
 
         input = data;
 
-        inputs[e3Id]._insert(uint256(keccak256(data)));
+        uint256 index = inputs[e3Id].numberOfLeaves;
+        inputs[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(data)), index]));
 
-        emit InputPublished(e3Id, data, inputs[e3Id].numberOfLeaves - 1);
+        emit InputPublished(e3Id, data, index);
     }
 
     /// @notice Verify the proof

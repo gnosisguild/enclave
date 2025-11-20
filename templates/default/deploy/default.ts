@@ -47,10 +47,17 @@ export const deployTemplate = async () => {
   )
   const e3Program = await e3ProgramFactory.deploy(await enclave.getAddress(), await verifier.getAddress(), programId);
   await e3Program.waitForDeployment();
-  
+
   const tx = await enclave.enableE3Program(await e3Program.getAddress())
 
   await tx.wait()
 
   console.log("E3 Program enabled for Enclave's template")
-}
+
+  console.log(
+    `
+      Deployed MyProgram at address: ${await e3Program.getAddress()}
+      Deployed MockRISC0Verifier at address: ${await verifier.getAddress()}
+    `,
+  )
+};
