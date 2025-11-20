@@ -6,7 +6,7 @@
 
 use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
-    models::{CurrentRound, CustomParams, InputPublished},
+    models::{CurrentRound, CustomParams},
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     token_holders::{build_tree, compute_token_holder_hashes},
@@ -29,7 +29,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
-use evm_helpers::CRISPContractFactory;
+use evm_helpers::{CRISPContractFactory, InputPublished};
 use eyre::Context;
 use log::info;
 use num_bigint::BigUint;

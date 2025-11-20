@@ -164,9 +164,6 @@ pub struct E3 {
     pub ciphertext_output: Vec<u8>,
     pub plaintext_output: Vec<u8>,
 
-    // // Ciphertext Inputs
-    // pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-
     // Emojis
     pub emojis: [String; 2],
 
@@ -200,8 +197,4 @@ impl From<E3> for WebResultRequest {
             end_time: e3.expiration,
         }
     }
-}
-
-sol! {
-    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
 }

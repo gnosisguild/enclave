@@ -29,6 +29,11 @@ sol! {
     }
 }
 
+sol! {
+    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+}
+
+
 /// Type alias for write provider (same as EnclaveWriteProvider)
 pub type CRISPWriteProvider = FillProvider<
     JoinFill<
