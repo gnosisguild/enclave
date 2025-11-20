@@ -17,3 +17,8 @@ export interface InputPublishedEvent {
     data: string;
     index: bigint;
 }
+
+export interface RawInputPublishedEvent {
+    eventName: string;
+    args: InputPublishedEvent;
+}
