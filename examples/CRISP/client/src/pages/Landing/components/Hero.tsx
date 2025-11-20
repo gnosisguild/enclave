@@ -20,9 +20,7 @@ const HeroSection: React.FC = () => {
         <div className='space-y-4'>
           <h3 className='font-normal leading-none text-zinc-400 sm:text-xl md:text-3xl'>Introducing</h3>
           <img src={Logo} alt='CRISP Logo' className='sm:h-10 md:h-20' />
-          <h4 className='w-full leading-none text-slate-800/50 sm:text-xs md:text-base'>
-            Coercion-Resistant Impartial Selection Protocol
-          </h4>
+          <h4 className='w-full leading-none text-slate-800/50 sm:text-xs md:text-base'>Coercion-Resistant Impartial Selection Protocol</h4>
         </div>
         <ul className='space-y-3'>
           <li className='flex items-start space-x-2 md:items-center'>

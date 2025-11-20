@@ -1,10 +1,13 @@
 # Sortition and E3 Complete Flow
 
-This document describes the complete flow of the Enclave system, from operator registration through E3 computation request, sortition, committee selection, keyshare generation, public key aggregation, encryption, and decryption.
+This document describes the complete flow of the Enclave system, from operator registration through
+E3 computation request, sortition, committee selection, keyshare generation, public key aggregation,
+encryption, and decryption.
 
 ## Overview
 
-The Enclave system uses a score-based sortition mechanism to select a committee of ciphernodes to perform threshold homomorphic encryption operations. The flow involves:
+The Enclave system uses a score-based sortition mechanism to select a committee of ciphernodes to
+perform threshold homomorphic encryption operations. The flow involves:
 
 1. **Operator Setup** - Bonding license tokens and ticket balance
 2. **Registration** - Registering as a ciphernode operator

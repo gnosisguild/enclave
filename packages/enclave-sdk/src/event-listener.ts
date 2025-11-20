@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Abi, type Log, type PublicClient } from "viem";
+import { type Abi, type Log, type PublicClient } from 'viem'
 
 import {
   type AllEventTypes,
@@ -16,19 +16,19 @@ import {
   type RegistryEventData,
   type RegistryEventType,
   type SDKEventEmitter,
-} from "./types";
-import { SDKError, sleep } from "./utils";
+} from './types'
+import { SDKError, sleep } from './utils'
 
 export class EventListener implements SDKEventEmitter {
-  private listeners: Map<AllEventTypes, Set<EventCallback>> = new Map();
-  private activeWatchers: Map<string, () => void> = new Map();
-  private isPolling = false;
-  private lastBlockNumber: bigint = BigInt(0);
+  private listeners: Map<AllEventTypes, Set<EventCallback>> = new Map()
+  private activeWatchers: Map<string, () => void> = new Map()
+  private isPolling = false
+  private lastBlockNumber: bigint = BigInt(0)
 
   constructor(
     private publicClient: PublicClient,
     private config: EventListenerConfig = {},
-  ) { }
+  ) {}
 
   /**
    * Listen to specific contract events
@@ -39,21 +39,21 @@ export class EventListener implements SDKEventEmitter {
     abi: Abi,
     callback: EventCallback<T>,
   ): Promise<void> {
-    const watcherKey = `${address}:${eventType}`;
-    console.log(`watchContractEvent: ${watcherKey}`);
+    const watcherKey = `${address}:${eventType}`
+    console.log(`watchContractEvent: ${watcherKey}`)
 
     if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, new Set());
+      this.listeners.set(eventType, new Set())
     }
-    console.log("Added callback");
-    this.listeners.get(eventType)!.add(callback as EventCallback);
+    console.log('Added callback')
+    this.listeners.get(eventType)!.add(callback as EventCallback)
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const emitter = this;
+    const emitter = this
 
     // If we don't have an active watcher for this event, create one
     if (!this.activeWatchers.has(watcherKey)) {
-      console.log("Adding active watcher for " + watcherKey);
+      console.log('Adding active watcher for ' + watcherKey)
 
       try {
         const unwatch = this.publicClient.watchContractEvent({
@@ -63,37 +63,33 @@ export class EventListener implements SDKEventEmitter {
           fromBlock: this.config.fromBlock,
           onLogs(logs: Log[]) {
             for (let i = 0; i < logs.length; i++) {
-              const log = logs[i];
+              const log = logs[i]
               if (!log) {
-                console.log("warning: Log was falsy when a log was expected!");
-                break;
+                console.log('warning: Log was falsy when a log was expected!')
+                break
               }
               const event: EnclaveEvent<T> = {
                 type: eventType,
-                data: (log as unknown as { args: unknown })
-                  .args as T extends EnclaveEventType
+                data: (log as unknown as { args: unknown }).args as T extends EnclaveEventType
                   ? EnclaveEventData[T]
                   : T extends RegistryEventType
-                  ? RegistryEventData[T]
-                  : unknown,
+                    ? RegistryEventData[T]
+                    : unknown,
                 log,
                 timestamp: new Date(),
                 blockNumber: log.blockNumber ?? BigInt(0),
-                transactionHash: log.transactionHash ?? "0x",
-              };
-              console.log("Created event, now emitting event...");
-              emitter.emit(event);
-              console.log("Event emitted");
+                transactionHash: log.transactionHash ?? '0x',
+              }
+              console.log('Created event, now emitting event...')
+              emitter.emit(event)
+              console.log('Event emitted')
             }
           },
-        });
+        })
 
-        this.activeWatchers.set(watcherKey, unwatch);
+        this.activeWatchers.set(watcherKey, unwatch)
       } catch (error) {
-        throw new SDKError(
-          `Failed to watch contract event ${eventType} on ${address}: ${error}`,
-          "WATCH_EVENT_FAILED",
-        );
+        throw new SDKError(`Failed to watch contract event ${eventType} on ${address}: ${error}`, 'WATCH_EVENT_FAILED')
       }
     }
   }
@@ -101,11 +97,8 @@ export class EventListener implements SDKEventEmitter {
   /**
    * Listen to all logs from a specific address
    */
-  public async watchLogs(
-    address: `0x${string}`,
-    callback: (log: Log) => void,
-  ): Promise<void> {
-    const watcherKey = `logs:${address}`;
+  public async watchLogs(address: `0x${string}`, callback: (log: Log) => void): Promise<void> {
+    const watcherKey = `logs:${address}`
 
     if (!this.activeWatchers.has(watcherKey)) {
       try {
@@ -113,17 +106,14 @@ export class EventListener implements SDKEventEmitter {
           address,
           onLogs: (logs: Log[]) => {
             logs.forEach((log: Log) => {
-              callback(log);
-            });
+              callback(log)
+            })
           },
-        });
+        })
 
-        this.activeWatchers.set(watcherKey, unwatch);
+        this.activeWatchers.set(watcherKey, unwatch)
       } catch (error) {
-        throw new SDKError(
-          `Failed to watch logs for address ${address}: ${error}`,
-          "WATCH_LOGS_FAILED",
-        );
+        throw new SDKError(`Failed to watch logs for address ${address}: ${error}`, 'WATCH_LOGS_FAILED')
       }
     }
   }
@@ -132,20 +122,17 @@ export class EventListener implements SDKEventEmitter {
    * Start polling for historical events
    */
   public async startPolling(): Promise<void> {
-    if (this.isPolling) return;
+    if (this.isPolling) return
 
-    this.isPolling = true;
+    this.isPolling = true
 
     try {
-      this.lastBlockNumber = await this.publicClient.getBlockNumber();
+      this.lastBlockNumber = await this.publicClient.getBlockNumber()
 
-      void this.pollForEvents();
+      void this.pollForEvents()
     } catch (error) {
-      this.isPolling = false;
-      throw new SDKError(
-        `Failed to start polling: ${error}`,
-        "POLLING_START_FAILED",
-      );
+      this.isPolling = false
+      throw new SDKError(`Failed to start polling: ${error}`, 'POLLING_START_FAILED')
     }
   }
 
@@ -153,7 +140,7 @@ export class EventListener implements SDKEventEmitter {
    * Stop polling for events
    */
   public stopPolling(): void {
-    this.isPolling = false;
+    this.isPolling = false
   }
 
   /**
@@ -173,69 +160,60 @@ export class EventListener implements SDKEventEmitter {
         eventName: eventType as string,
         fromBlock: fromBlock || this.config.fromBlock,
         toBlock: toBlock || this.config.toBlock,
-      });
+      })
 
-      return logs;
+      return logs
     } catch (error) {
-      throw new SDKError(
-        `Failed to get historical events: ${error}`,
-        "HISTORICAL_EVENTS_FAILED",
-      );
+      throw new SDKError(`Failed to get historical events: ${error}`, 'HISTORICAL_EVENTS_FAILED')
     }
   }
 
   /**
    * SDKEventEmitter implementation
    */
-  public on<T extends AllEventTypes>(
-    eventType: T,
-    callback: EventCallback<T>,
-  ): void {
+  public on<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
     if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, new Set());
+      this.listeners.set(eventType, new Set())
     }
-    this.listeners.get(eventType)!.add(callback as EventCallback);
+    this.listeners.get(eventType)!.add(callback as EventCallback)
   }
 
-  public off<T extends AllEventTypes>(
-    eventType: T,
-    callback: EventCallback<T>,
-  ): void {
-    const callbacks = this.listeners.get(eventType);
+  public off<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
+    const callbacks = this.listeners.get(eventType)
     if (callbacks) {
-      callbacks.delete(callback as EventCallback);
+      callbacks.delete(callback as EventCallback)
       if (callbacks.size === 0) {
-        this.listeners.delete(eventType);
+        this.listeners.delete(eventType)
         // Find and stop corresponding watchers
-        const watchersToRemove: string[] = [];
+        const watchersToRemove: string[] = []
         this.activeWatchers.forEach((unwatch, key) => {
           if (key.endsWith(`:${eventType}`)) {
             try {
-              unwatch();
+              unwatch()
             } catch (error) {
-              console.error(`Error unwatching event ${eventType}:`, error);
+              console.error(`Error unwatching event ${eventType}:`, error)
             }
-            watchersToRemove.push(key);
+            watchersToRemove.push(key)
           }
-        });
-        watchersToRemove.forEach((key) => this.activeWatchers.delete(key));
+        })
+        watchersToRemove.forEach((key) => this.activeWatchers.delete(key))
       }
     }
   }
 
   public emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void {
-    console.log("emit() called for " + event.type);
-    const callbacks = this.listeners.get(event.type);
+    console.log('emit() called for ' + event.type)
+    const callbacks = this.listeners.get(event.type)
     if (callbacks) {
-      console.log("Have " + callbacks.size + " callbacks");
+      console.log('Have ' + callbacks.size + ' callbacks')
       callbacks.forEach((callback) => {
-        console.log("Running callback...");
+        console.log('Running callback...')
         try {
-          void (callback as EventCallback<T>)(event);
+          void (callback as EventCallback<T>)(event)
         } catch (error) {
-          console.error(`Error in event callback for ${event.type}:`, error);
+          console.error(`Error in event callback for ${event.type}:`, error)
         }
-      });
+      })
     }
   }
 
@@ -243,35 +221,35 @@ export class EventListener implements SDKEventEmitter {
    * Clean up all listeners and watchers
    */
   public cleanup(): void {
-    this.stopPolling();
+    this.stopPolling()
 
     // Stop all active watchers
     this.activeWatchers.forEach((unwatch) => {
       try {
-        unwatch();
+        unwatch()
       } catch (error) {
-        console.error("Error unwatching during cleanup:", error);
+        console.error('Error unwatching during cleanup:', error)
       }
-    });
-    this.activeWatchers.clear();
+    })
+    this.activeWatchers.clear()
 
     // Clear all listeners
-    this.listeners.clear();
+    this.listeners.clear()
   }
 
   private async pollForEvents(): Promise<void> {
     while (this.isPolling) {
       try {
-        const currentBlock = await this.publicClient.getBlockNumber();
+        const currentBlock = await this.publicClient.getBlockNumber()
 
         if (currentBlock > this.lastBlockNumber) {
-          this.lastBlockNumber = currentBlock;
+          this.lastBlockNumber = currentBlock
         }
 
-        await sleep(this.config.pollingInterval || 5000);
+        await sleep(this.config.pollingInterval || 5000)
       } catch (error) {
-        console.error("Error during polling:", error);
-        await sleep(this.config.pollingInterval || 5000);
+        console.error('Error during polling:', error)
+        await sleep(this.config.pollingInterval || 5000)
       }
     }
   }

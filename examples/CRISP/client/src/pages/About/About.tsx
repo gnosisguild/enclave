@@ -23,8 +23,9 @@ const About: React.FC = () => {
             <div className='space-y-2'>
               <p className='leading-8 text-slate-600'>
                 CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for digital decision-making, leveraging fully
-                homomorphic encryption (FHE) and distributed threshold cryptography (DTC) to enable verifiable secret ballots. Built with 
-                Enclave, CRISP safeguards democratic systems and decision-making applications against coercion, manipulation, and other vulnerabilities.
+                homomorphic encryption (FHE) and distributed threshold cryptography (DTC) to enable verifiable secret ballots. Built with
+                Enclave, CRISP safeguards democratic systems and decision-making applications against coercion, manipulation, and other
+                vulnerabilities.
               </p>
               {/* <div className='flex cursor-pointer items-center space-x-2'>
                 <p className='text-lime-400 underline'>See what&apos;s happening under the hood</p>
@@ -35,9 +36,10 @@ const About: React.FC = () => {
           <div className='space-y-4'>
             <p className='text-base font-extrabold uppercase text-slate-600/50'>why is this important?</p>
             <p className='leading-8 text-slate-600'>
-              Open ballots are known to produce suboptimal outcomes, exposing participants to bribery and coercion. CRISP mitigates these 
-              risks and other vulnerabilities with secret, receipt-free ballots, fostering secure and impartial decision-making environments.
-              </p>
+              Open ballots are known to produce suboptimal outcomes, exposing participants to bribery and coercion. CRISP mitigates these
+              risks and other vulnerabilities with secret, receipt-free ballots, fostering secure and impartial decision-making
+              environments.
+            </p>
             {/* <div className='flex cursor-pointer items-center space-x-2'>
               <p className='text-lime-400 underline'>See what&apos;s happening under the hood</p>
               <img src={CircleIcon} className='h-[18] w-[18] ' />

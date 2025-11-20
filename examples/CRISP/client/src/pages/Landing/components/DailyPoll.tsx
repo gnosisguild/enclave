@@ -22,12 +22,7 @@ type DailyPollSectionProps = {
 }
 
 const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime }) => {
-  const {
-    user,
-    pollOptions,
-    setPollOptions,
-    roundState,
-  } = useVoteManagementContext()
+  const { user, pollOptions, setPollOptions, roundState } = useVoteManagementContext()
   const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
@@ -120,9 +115,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
                 disabled={noPollSelected || loading || !roundState || isEnded || isCastingVote}
                 onClick={castVote}
               >
-                {isCastingVote
-                      ? 'Processing Vote...'
-                      : 'Cast Vote'}
+                {isCastingVote ? 'Processing Vote...' : 'Cast Vote'}
               </button>
             </div>
           )}

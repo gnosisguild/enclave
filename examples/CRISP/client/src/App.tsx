@@ -22,10 +22,10 @@ const App: React.FC = () => {
   const { initialLoad } = useVoteManagementContext()
 
   useEffect(() => {
-      async function loadWasm() {
-        await initialLoad()
-      }
-      loadWasm()
+    async function loadWasm() {
+      await initialLoad()
+    }
+    loadWasm()
   }, [])
 
   return (

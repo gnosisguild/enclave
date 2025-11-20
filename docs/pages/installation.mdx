@@ -27,7 +27,8 @@ Or if you prefer `wget`:
 wget -qO- https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
 ```
 
-This script will download and install `enclaveup`, which is the standalone installer for the Enclave CLI.
+This script will download and install `enclaveup`, which is the standalone installer for the Enclave
+CLI.
 
 ## Using enclaveup
 
@@ -43,8 +44,8 @@ enclaveup install
 enclaveup install --system
 ```
 
-Running `enclaveup install` will install the latest version of the Enclave CLI.
-See `enclaveup --help` for more options.
+Running `enclaveup install` will install the latest version of the Enclave CLI. See
+`enclaveup --help` for more options.
 
 ## Manual Installation
 
@@ -59,18 +60,18 @@ If you prefer to install manually:
 
 ## Platform Support
 
-| Platform | Architecture | Status |
-|----------|-------------|---------|
-| Linux | x86_64 | ✅ Native binary |
-| macOS | Apple Silicon (M1/M2/M3) | ✅ Native binary |
-| macOS | Intel | ✅ Via Rosetta 2 |
+| Platform | Architecture             | Status           |
+| -------- | ------------------------ | ---------------- |
+| Linux    | x86_64                   | ✅ Native binary |
+| macOS    | Apple Silicon (M1/M2/M3) | ✅ Native binary |
+| macOS    | Intel                    | ✅ Via Rosetta 2 |
 
-*Note: Intel Macs automatically run Apple Silicon binaries through Rosetta 2 translation.*
-
+_Note: Intel Macs automatically run Apple Silicon binaries through Rosetta 2 translation._
 
 ### Building from Source
 
 If you need to build `enclave` from source:
+
 1. Ensure you have Rust installed (using [rustup](https://rustup.rs/))
 2. Clone the repository
 
@@ -101,4 +102,4 @@ Once you have the Enclave CLI installed, you're ready to:
 
 1. [Run your first E3 program](/quick-start)
 2. [Learn about E3 concepts](/what-is-e3)
-3. [Explore the architecture](/architecture-overview) 
+3. [Explore the architecture](/architecture-overview)

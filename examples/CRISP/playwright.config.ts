@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
-  testDir: "./test",
+  testDir: './test',
   timeout: 5 * 60 * 10000,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: 'http://localhost:3000',
     actionTimeout: 75 * 1000,
   },
   retries: 0,
@@ -18,16 +18,16 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   workers: process.env.CI ? 1 : undefined,
   // reporter: "html",
-  reporter: [["html"], ["list"]], // Add list reporter
+  reporter: [['html'], ['list']], // Add list reporter
 
   // Add support for ES modules
   projects: [
     {
-      name: "chromium",
+      name: 'chromium',
       use: {
-        ...devices["Desktop Chrome"],
+        ...devices['Desktop Chrome'],
         headless: true,
       },
     },
   ],
-});
+})

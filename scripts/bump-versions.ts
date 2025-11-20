@@ -40,11 +40,11 @@ class VersionBumper {
     if (this.options.dryRun) {
       console.log('📝 DRY RUN MODE - No changes will be made')
     }
-    
+
     try {
       // Validate version format
       this.validateVersion(this.newVersion)
-      
+
       // Get current version from root package.json or Cargo.toml
       this.oldVersion = this.getCurrentVersion()
       console.log(`📌 Current version: ${this.oldVersion || 'unknown'}`)
@@ -53,7 +53,7 @@ class VersionBumper {
       if (!this.options.skipGit && !this.options.dryRun) {
         this.checkGitStatus()
       }
-      
+
       // In dry-run mode, just show what would happen
       if (this.options.dryRun) {
         console.log('\n📋 Would perform the following actions:')
@@ -75,18 +75,18 @@ class VersionBumper {
           }
         }
         console.log('\n✅ Dry run complete. Run without --dry-run to perform these actions.')
-        return  
+        return
       }
-      
+
       // Bump Rust crates
       this.bumpRustCrates()
-      
+
       // Bump npm packages
       this.bumpNpmPackages()
-      
+
       // Update lock files
       this.updateLockFiles()
-      
+
       // Generate changelog
       this.generateChangelog()
 
@@ -94,7 +94,7 @@ class VersionBumper {
       if (!this.options.skipGit && !this.options.dryRun) {
         this.performGitOperations()
       }
-      
+
       console.log('\n✅ All versions bumped successfully!')
       console.log('\n📋 Summary:')
       console.log(`   Previous version: ${this.oldVersion || 'unknown'}`)
@@ -103,11 +103,11 @@ class VersionBumper {
       console.log(`   NPM packages: ✓`)
       console.log(`   Lock files: ✓`)
       console.log(`   Changelog: ✓`)
-      
+
       if (!this.options.skipGit && !this.options.dryRun) {
         console.log(`   Git commit: ✓`)
         console.log(`   Git tag: v${this.newVersion} ✓`)
-        
+
         if (!this.options.skipPush) {
           console.log(`   Git push: ✓`)
           console.log(`   Tag push: ✓`)
@@ -135,101 +135,103 @@ class VersionBumper {
   /**
    * Check git status for uncommitted changes
    */
-    private checkGitStatus(): void {
-      try {
-        const status = execSync('git status --porcelain', { 
-          cwd: this.rootDir,
-          encoding: 'utf-8'
-        }).trim()
-        
-        if (status) {
-          console.error('❌ Error: You have uncommitted changes.')
-          console.error('   Please commit or stash your changes before bumping versions.')
-          console.error('\n   Uncommitted files:')
-          console.error(status.split('\n').map(line => '   ' + line).join('\n'))
-          console.error('\n   To proceed anyway, use --skip-git flag')
-          process.exit(1)
-        }
-      } catch (error) {
-        console.warn('⚠️  Could not check git status')
-      }
-    }
+  private checkGitStatus(): void {
+    try {
+      const status = execSync('git status --porcelain', {
+        cwd: this.rootDir,
+        encoding: 'utf-8',
+      }).trim()
 
-    /**
+      if (status) {
+        console.error('❌ Error: You have uncommitted changes.')
+        console.error('   Please commit or stash your changes before bumping versions.')
+        console.error('\n   Uncommitted files:')
+        console.error(
+          status
+            .split('\n')
+            .map((line) => '   ' + line)
+            .join('\n'),
+        )
+        console.error('\n   To proceed anyway, use --skip-git flag')
+        process.exit(1)
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not check git status')
+    }
+  }
+
+  /**
    * Perform git operations (add, commit, tag, push)
    */
-    private performGitOperations(): void {
-      console.log('\n📝 Performing git operations...')
-      
-      try {
-        // Add all changes
-        console.log('   Adding changes...')
-        execSync('git add .', { cwd: this.rootDir })
-        
-        // Create commit message
-        const commitMessage = `chore(release): bump version to ${this.newVersion}
+  private performGitOperations(): void {
+    console.log('\n📝 Performing git operations...')
+
+    try {
+      // Add all changes
+      console.log('   Adding changes...')
+      execSync('git add .', { cwd: this.rootDir })
+
+      // Create commit message
+      const commitMessage = `chore(release): bump version to ${this.newVersion}
   
   - Updated all Rust crates to ${this.newVersion}
   - Updated all npm packages to ${this.newVersion}
   - Updated lock files
   - Generated CHANGELOG.md`
-        
-        // Commit changes
-        console.log('   Committing changes...')
-        execSync(`git commit -m "${commitMessage}"`, { 
-          cwd: this.rootDir,
-          stdio: 'pipe'
-        })
-        console.log(`   ✓ Committed with message: "chore(release): bump version to ${this.newVersion}"`)
-        
-        // Create tag
-        const tagName = `v${this.newVersion}`
-        console.log(`   Creating tag ${tagName}...`)
-        
-        // Check if it's a pre-release
-        const isPrerelease = this.newVersion.includes('-')
-        const tagMessage = isPrerelease 
-          ? `Pre-release ${this.newVersion}` 
-          : `Release ${this.newVersion}`
-        
-        execSync(`git tag -a ${tagName} -m "${tagMessage}"`, {
-          cwd: this.rootDir,
-          stdio: 'pipe'
-        })
-        console.log(`   ✓ Created tag: ${tagName}`)
-        
-        // Push changes and tag (unless --no-push was specified)
-        if (!this.options.skipPush) {
-          console.log('   Pushing to remote...')
-          
-          // Push commits
-          const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', {
-            cwd: this.rootDir,
-            encoding: 'utf8'
-          }).trim()
 
-          execSync(`git push origin ${currentBranch}`, {
-            cwd: this.rootDir,
-            stdio: 'pipe'
-          })
-          console.log(`   ✓ Pushed commits to ${currentBranch}`)
-          
-          // Push tag
-          execSync(`git push origin ${tagName}`, {
-            cwd: this.rootDir,
-            stdio: 'pipe'
-          })
-          console.log(`   ✓ Pushed tag ${tagName}`)
-        }
-        
-      } catch (error: any) {
-        console.error('❌ Error during git operations:', error.message)
-        console.error('\n💡 If the tag already exists, delete it first:')
-        console.error(`   git tag -d v${this.newVersion}`)
-        console.error(`   git push --delete origin v${this.newVersion}`)
-        throw error
+      // Commit changes
+      console.log('   Committing changes...')
+      execSync(`git commit -m "${commitMessage}"`, {
+        cwd: this.rootDir,
+        stdio: 'pipe',
+      })
+      console.log(`   ✓ Committed with message: "chore(release): bump version to ${this.newVersion}"`)
+
+      // Create tag
+      const tagName = `v${this.newVersion}`
+      console.log(`   Creating tag ${tagName}...`)
+
+      // Check if it's a pre-release
+      const isPrerelease = this.newVersion.includes('-')
+      const tagMessage = isPrerelease ? `Pre-release ${this.newVersion}` : `Release ${this.newVersion}`
+
+      execSync(`git tag -a ${tagName} -m "${tagMessage}"`, {
+        cwd: this.rootDir,
+        stdio: 'pipe',
+      })
+      console.log(`   ✓ Created tag: ${tagName}`)
+
+      // Push changes and tag (unless --no-push was specified)
+      if (!this.options.skipPush) {
+        console.log('   Pushing to remote...')
+
+        // Push commits
+        const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+          cwd: this.rootDir,
+          encoding: 'utf8',
+        }).trim()
+
+        execSync(`git push origin ${currentBranch}`, {
+          cwd: this.rootDir,
+          stdio: 'pipe',
+        })
+        console.log(`   ✓ Pushed commits to ${currentBranch}`)
+
+        // Push tag
+        execSync(`git push origin ${tagName}`, {
+          cwd: this.rootDir,
+          stdio: 'pipe',
+        })
+        console.log(`   ✓ Pushed tag ${tagName}`)
       }
+    } catch (error: any) {
+      console.error('❌ Error during git operations:', error.message)
+      console.error('\n💡 If the tag already exists, delete it first:')
+      console.error(`   git tag -d v${this.newVersion}`)
+      console.error(`   git push --delete origin v${this.newVersion}`)
+      throw error
     }
+  }
 
   /**
    * Get current version from the monorepo
@@ -244,7 +246,7 @@ class VersionBumper {
         return packageJson.version
       }
     }
-    
+
     // Try to get from root Cargo.toml workspace version
     const rootCargoPath = join(this.rootDir, 'Cargo.toml')
     if (existsSync(rootCargoPath)) {
@@ -254,7 +256,7 @@ class VersionBumper {
         return versionMatch[1]
       }
     }
-    
+
     return null
   }
 
@@ -263,33 +265,32 @@ class VersionBumper {
    */
   private generateChangelog(): void {
     console.log('\n📝 Generating changelog...')
-    
+
     try {
-        execSync('pnpm conventional-changelog --help', { 
-          stdio: 'ignore',
-          cwd: this.rootDir
-        })
-      
+      execSync('pnpm conventional-changelog --help', {
+        stdio: 'ignore',
+        cwd: this.rootDir,
+      })
+
       const changelogPath = join(this.rootDir, 'CHANGELOG.md')
-      
+
       if (!existsSync(changelogPath)) {
         // First time - generate entire changelog
         console.log('   Generating full changelog from git history...')
         execSync('npx conventional-changelog -p angular -i CHANGELOG.md -s -r 0', {
           cwd: this.rootDir,
-          stdio: 'inherit'
+          stdio: 'inherit',
         })
       } else {
         // Update existing changelog with changes since last release
         console.log('   Updating changelog with new changes...')
         execSync('npx conventional-changelog -p angular -i CHANGELOG.md -s', {
           cwd: this.rootDir,
-          stdio: 'inherit'
+          stdio: 'inherit',
         })
       }
-      
+
       console.log('   ✓ Changelog generated successfully')
-      
     } catch (error) {
       console.warn('   ⚠️  Could not generate changelog:', error)
       console.log('   Continuing without changelog...')
@@ -301,26 +302,26 @@ class VersionBumper {
    */
   private updateLockFiles(): void {
     console.log('\n🔒 Updating lock files...')
-    
+
     // Update Cargo.lock
     try {
       execSync('cargo update --workspace', {
         cwd: this.rootDir,
-        stdio: 'pipe'
+        stdio: 'pipe',
       })
       console.log('   ✓ Cargo.lock updated')
     } catch (error) {
       console.warn('   ⚠️  Could not update Cargo.lock')
     }
-    
+
     // Detect and update the appropriate Node.js lock file
     const pnpmLockPath = join(this.rootDir, 'pnpm-lock.yaml')
-    
+
     if (existsSync(pnpmLockPath)) {
       try {
         execSync('pnpm install --lockfile-only', {
           cwd: this.rootDir,
-          stdio: 'pipe'
+          stdio: 'pipe',
         })
         console.log('   ✓ pnpm-lock.yaml updated')
       } catch (error) {
@@ -344,14 +345,14 @@ class VersionBumper {
    */
   private bumpRustCrates(): void {
     console.log('\n🦀 Bumping Rust crate versions...')
-    
+
     // Update root Cargo.toml workspace version (this propagates to all crates)
     const rootCargoPath = join(this.rootDir, 'Cargo.toml')
     this.updateCargoToml(rootCargoPath)
-    
+
     // Update workspace dependencies in root Cargo.toml
     this.updateWorkspaceDependencies(rootCargoPath)
-    
+
     console.log('   ✓ All workspace crates updated via workspace.version')
   }
 
@@ -360,25 +361,25 @@ class VersionBumper {
    */
   private bumpNpmPackages(): void {
     console.log('\n📦 Bumping NPM package versions...')
-    
+
     // Update root package.json if it exists
     const rootPackagePath = join(this.rootDir, 'package.json')
     this.updatePackageJson(rootPackagePath)
     console.log('   ✓ Root package.json')
-    
+
     // Main packages to bump (excluding examples and templates)
     const packagesToBump = [
       'packages/enclave-sdk',
-      'packages/enclave-contracts', 
+      'packages/enclave-contracts',
       'packages/enclave-config',
       'packages/enclave-react',
-      'crates/wasm'
+      'crates/wasm',
     ]
-    
+
     for (const packagePath of packagesToBump) {
       const fullPath = join(this.rootDir, packagePath)
       const packageJsonPath = join(fullPath, 'package.json')
-  
+
       this.updatePackageJson(packageJsonPath)
       const packageName = this.getPackageName(packageJsonPath)
       console.log(`   ✓ ${packageName}`)
@@ -478,9 +479,9 @@ class VersionBumper {
   private updatePackageJson(filePath: string): void {
     const content = readFileSync(filePath, 'utf-8')
     const packageJson: PackageJson = JSON.parse(content)
-    
+
     packageJson.version = this.newVersion
-    
+
     // Write back with proper formatting
     writeFileSync(filePath, JSON.stringify(packageJson, null, 2) + '\n')
   }
@@ -498,14 +499,14 @@ class VersionBumper {
 // CLI interface
 function main() {
   const args = process.argv.slice(2)
-  
+
   // Parse options
   const options: BumpOptions = {}
   let version: string | null = null
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
-    
+
     if (arg === '--help' || arg === '-h') {
       showHelp()
       process.exit(0)
@@ -519,13 +520,13 @@ function main() {
       version = arg
     }
   }
-  
+
   if (!version) {
     console.error('❌ Error: Version is required')
     showHelp()
     process.exit(1)
   }
-  
+
   const bumper = new VersionBumper(version, options)
   bumper.bumpAll()
 }

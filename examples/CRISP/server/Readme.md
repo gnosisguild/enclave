@@ -1,6 +1,7 @@
 # CRISP Server
 
-This is a Rust-based server implementation for CRISP, which is built on top of the Enclave Protocol, which handles E3 (Encrypted Execution Environment) rounds and voting processes.
+This is a Rust-based server implementation for CRISP, which is built on top of the Enclave Protocol,
+which handles E3 (Encrypted Execution Environment) rounds and voting processes.
 
 ## Features
 
@@ -25,8 +26,7 @@ This is a Rust-based server implementation for CRISP, which is built on top of t
    cargo build --locked --release
    ```
 
-2. Set up environment variables:
-   Create a `.env` with the following content:
+2. Set up environment variables: Create a `.env` with the following content:
    ```
    PRIVATE_KEY=your_private_key
    HTTP_RPC_URL=your_http_rpc_url
@@ -60,7 +60,8 @@ To interact with the CRISP system using the CLI:
 cargo run --bin cli
 ```
 
-Follow the prompts to initialize new E3 rounds, activate rounds, participate in voting, or decrypt and publish results.
+Follow the prompts to initialize new E3 rounds, activate rounds, participate in voting, or decrypt
+and publish results.
 
 ## API Endpoints
 

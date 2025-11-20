@@ -6,6 +6,8 @@
   "jsxSingleQuote": true,
   "semi": false,
   "trailingComma": "all",
+  "bracketSpacing": true,
   "arrowParens": "always",
+  "proseWrap": "always",
   "plugins": ["prettier-plugin-tailwindcss"]
 }
