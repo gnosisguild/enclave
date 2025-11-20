@@ -159,7 +159,7 @@ footer {
 
   /* opacity-5 transition-all duration-300 ease-in-out placeholder:text-slate-600/50 focus:border-slate-600 focus:bg-opacity-20 focus:outline-none */
   .input {
-    @apply flex  h-12 w-full items-center rounded-lg border-2 border-slate-600/20 bg-slate-300/10 px-4 py-2 font-jakarta text-slate-600 focus:border-slate-300 focus:bg-white;
+    @apply flex h-12 w-full items-center rounded-lg border-2 border-slate-600/20 bg-slate-300/10 px-4 py-2 font-jakarta text-slate-600 focus:border-slate-300 focus:bg-white;
   }
 
   .input-search {

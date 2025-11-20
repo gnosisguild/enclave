@@ -4,21 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React from 'react';
-import PollCard from '@/components/Cards/PollCard';
-import { PollResult } from '@/model/poll.model';
-import { useVoteManagementContext } from '@/context/voteManagement';
-import { Link } from 'react-router-dom';
+import React from 'react'
+import PollCard from '@/components/Cards/PollCard'
+import { PollResult } from '@/model/poll.model'
+import { useVoteManagementContext } from '@/context/voteManagement'
+import { Link } from 'react-router-dom'
 
 type PastPollSectionProps = {
-  customLabel?: string;
-  useFullHeight?: boolean;
-  limit?: number;
-};
+  customLabel?: string
+  useFullHeight?: boolean
+  limit?: number
+}
 
 const PastPollSection: React.FC<PastPollSectionProps> = ({ customLabel = 'Past polls', useFullHeight = true, limit }) => {
-  const { pastPolls } = useVoteManagementContext();
-  const pollsToShow = limit ? pastPolls.slice(0, limit) : pastPolls;
+  const { pastPolls } = useVoteManagementContext()
+  const pollsToShow = limit ? pastPolls.slice(0, limit) : pastPolls
 
   return (
     <div className={`flex ${useFullHeight ? 'min-h-screen' : ''} w-screen flex-col items-center justify-center space-y-12 px-6 py-32`}>
@@ -32,7 +32,7 @@ const PastPollSection: React.FC<PastPollSectionProps> = ({ customLabel = 'Past p
         <button className='button-outlined button-max'>view all polls</button>
       </Link>
     </div>
-  );
-};
+  )
+}
 
-export default PastPollSection;
+export default PastPollSection

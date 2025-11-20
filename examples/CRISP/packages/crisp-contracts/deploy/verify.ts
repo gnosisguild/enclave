@@ -4,18 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import hre from "hardhat";
+import hre from 'hardhat'
 
-import { verifyContracts } from "@enclave-e3/contracts/scripts";
+import { verifyContracts } from '@enclave-e3/contracts/scripts'
 
 async function main() {
-  const { ethers } = await hre.network.connect();
-  const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const { ethers } = await hre.network.connect()
+  const [signer] = await ethers.getSigners()
+  const chain = (await signer.provider?.getNetwork())?.name ?? 'localhost'
 
-  verifyContracts(chain);
+  verifyContracts(chain)
 }
 
 main().catch((error) => {
-  console.error(error);
-});
+  console.error(error)
+})

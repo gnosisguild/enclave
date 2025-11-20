@@ -1,6 +1,11 @@
 # SAFE (Sponge API for Field Elements) Noir Library
 
-This package contains a complete implementation of the SAFE API in Noir as defined in the specification [SAFE (Sponge API for Field Elements) - A Toolbox for ZK Hash Applications](https://hackmd.io/bHgsH6mMStCVibM_wYvb2w#22-Sponge-state). SAFE provides a unified interface for cryptographic sponge functions that can be instantiated with various permutations to create hash functions, MACs, authenticated encryption schemes, and other cryptographic primitives for ZK proof systems.
+This package contains a complete implementation of the SAFE API in Noir as defined in the
+specification
+[SAFE (Sponge API for Field Elements) - A Toolbox for ZK Hash Applications](https://hackmd.io/bHgsH6mMStCVibM_wYvb2w#22-Sponge-state).
+SAFE provides a unified interface for cryptographic sponge functions that can be instantiated with
+various permutations to create hash functions, MACs, authenticated encryption schemes, and other
+cryptographic primitives for ZK proof systems.
 
 - START, ABSORB, SQUEEZE, FINISH operations following spec 2.4
 - Domain separation, tag computation, IO pattern validation
@@ -19,7 +24,8 @@ In your _Nargo.toml_ file, add this library as a dependency:
 safe = { tag = "v0.1.5", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/safe"}
 ```
 
-nb. the `tag` corresponds to the latest tag release of Enclave (`v0.1.5`). From `v0.1.6` you should remove `packages/` from `directory` field (ie., `circuits/crates/...`).
+nb. the `tag` corresponds to the latest tag release of Enclave (`v0.1.5`). From `v0.1.6` you should
+remove `packages/` from `directory` field (ie., `circuits/crates/...`).
 
 ## API Reference
 
@@ -29,13 +35,17 @@ The main sponge structure that implements the SAFE API.
 
 #### Methods
 
-- `start(io_pattern: [u32; L], domain_separator: [u8; 64]) -> SafeSponge<L>`: Initializes a new SAFE sponge instance with the given IO pattern and domain separator
+- `start(io_pattern: [u32; L], domain_separator: [u8; 64]) -> SafeSponge<L>`: Initializes a new SAFE
+  sponge instance with the given IO pattern and domain separator
 
-- `absorb(&mut self, input: [Field])`: Absorbs field elements into the sponge state, automatically validating against the IO pattern
+- `absorb(&mut self, input: [Field])`: Absorbs field elements into the sponge state, automatically
+  validating against the IO pattern
 
-- `squeeze(&mut self) -> Vec<Field>`: Extracts field elements from the sponge state according to the IO pattern
+- `squeeze(&mut self) -> Vec<Field>`: Extracts field elements from the sponge state according to the
+  IO pattern
 
-- `finish(&mut self)`: Finalizes the sponge instance, verifying all operations and clearing internal state
+- `finish(&mut self)`: Finalizes the sponge instance, verifying all operations and clearing internal
+  state
 
 ### IO Pattern Encoding
 
@@ -53,7 +63,8 @@ Examples:
 
 ### Domain Separation
 
-Each sponge instance requires a 64-byte domain separator for cross-protocol security. Different domain separators ensure that distinct applications behave like distinct functions.
+Each sponge instance requires a 64-byte domain separator for cross-protocol security. Different
+domain separators ensure that distinct applications behave like distinct functions.
 
 ## Compatibility
 

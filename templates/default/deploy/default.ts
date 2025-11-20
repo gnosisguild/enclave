@@ -4,53 +4,65 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/scripts";
-import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
-import hre from "hardhat";
+import { readDeploymentArgs, storeDeploymentArgs } from '@enclave-e3/contracts/scripts'
+import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
+import hre from 'hardhat'
 
 export const deployTemplate = async () => {
-  const { ethers } = await hre.network.connect();
-  const [owner] = await ethers.getSigners();
+  const { ethers } = await hre.network.connect()
+  const [owner] = await ethers.getSigners()
 
-  const chain = hre.globalOptions.network;
- 
-  const enclaveAddress = readDeploymentArgs("Enclave", chain)?.address;
+  const chain = hre.globalOptions.network
+
+  const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
   if (!enclaveAddress) {
-    throw new Error("Enclave address not found, it must be deployed first");
+    throw new Error('Enclave address not found, it must be deployed first')
   }
-  const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-  
-  const verifier = await ethers.deployContract("MockRISC0Verifier");
-  await verifier.waitForDeployment();
+  const enclave = EnclaveFactory.connect(enclaveAddress, owner)
 
-  storeDeploymentArgs({
-    address: await verifier.getAddress(),
-  }, "MockRISC0Verifier", chain);
+  const verifier = await ethers.deployContract('MockRISC0Verifier')
+  await verifier.waitForDeployment()
 
-  const imageId = await ethers.deployContract("ImageID");
-  await imageId.waitForDeployment();
-
-  storeDeploymentArgs({
-    address: await imageId.getAddress(),
-  }, "ImageID", chain);
-
-  const programId = await imageId.PROGRAM_ID();
-
-  const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId]);
-  await e3Program.waitForDeployment();
-
-  storeDeploymentArgs({
-    address: await e3Program.getAddress(),
-    constructorArgs: {
-      enclave: await enclave.getAddress(),
-      verifier: await verifier.getAddress(),
-      programId,
+  storeDeploymentArgs(
+    {
+      address: await verifier.getAddress(),
     },
-  }, "MyProgram", chain);
+    'MockRISC0Verifier',
+    chain,
+  )
 
-  const tx = await enclave.enableE3Program(await e3Program.getAddress());
+  const imageId = await ethers.deployContract('ImageID')
+  await imageId.waitForDeployment()
 
-  await tx.wait();
+  storeDeploymentArgs(
+    {
+      address: await imageId.getAddress(),
+    },
+    'ImageID',
+    chain,
+  )
 
-  console.log("E3 Program enabled for Enclave's template");
-};
+  const programId = await imageId.PROGRAM_ID()
+
+  const e3Program = await ethers.deployContract('MyProgram', [await enclave.getAddress(), await verifier.getAddress(), programId])
+  await e3Program.waitForDeployment()
+
+  storeDeploymentArgs(
+    {
+      address: await e3Program.getAddress(),
+      constructorArgs: {
+        enclave: await enclave.getAddress(),
+        verifier: await verifier.getAddress(),
+        programId,
+      },
+    },
+    'MyProgram',
+    chain,
+  )
+
+  const tx = await enclave.enableE3Program(await e3Program.getAddress())
+
+  await tx.wait()
+
+  console.log("E3 Program enabled for Enclave's template")
+}

@@ -11,7 +11,7 @@ import { List } from '@phosphor-icons/react'
 //Icons
 import { CalendarCheck, CheckFat, Notebook } from '@phosphor-icons/react'
 
-interface NavMenuProps { }
+interface NavMenuProps {}
 
 const NAV_MENU_OPTIONS = [
   {

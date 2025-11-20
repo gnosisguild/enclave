@@ -21,7 +21,6 @@
     "@types/node": "20.10.4",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "prettier": "^3.5.3",
     "typescript": "5.5.4"
   },
   "author": {

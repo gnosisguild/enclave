@@ -19,7 +19,8 @@ Initialize swarm
 docker swarm init
 ```
 
-NOTE: If you get an error about not being able to choose between IP addresses choose the more private IP address.
+NOTE: If you get an error about not being able to choose between IP addresses choose the more
+private IP address.
 
 ```
 docker swarm init --advertise-addr 10.49.0.5
@@ -153,4 +154,5 @@ Notice the line:
 enclave_cn2.1.zom4r645ophf@nixos    | 2024-12-19T23:47:08.582536Z  INFO enclave: COMPILATION ID: 'painfully_fluent_crane'
 ```
 
-This can help you identify which compilation you are looking at. This works by generating a unique ID based on the complication time.
+This can help you identify which compilation you are looking at. This works by generating a unique
+ID based on the complication time.
