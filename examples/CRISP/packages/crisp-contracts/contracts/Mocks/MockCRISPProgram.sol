@@ -14,7 +14,7 @@ import {LazyIMTData, InternalLazyIMT} from "@zk-kit/lazy-imt.sol/InternalLazyIMT
 
 import {HonkVerifier} from "../CRISPVerifier.sol";
 
-contract CRISPProgram is IE3Program, Ownable {
+contract MockCRISPProgram is IE3Program, Ownable {
     using InternalLazyIMT for LazyIMTData;
     /// @notice a structure that holds the round data
     struct RoundData {
