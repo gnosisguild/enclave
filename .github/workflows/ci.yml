@@ -689,7 +689,7 @@ jobs:
       - name: Test Template
         run: |
           cd templates/default
-          chmod 755 .enclave/generated/contracts .enclave/generated/tests
+          chmod 755 .enclave/generated/contracts tests
           chmod 644 .enclave/generated/contracts/ImageID.sol
           pnpm test:integration
 
