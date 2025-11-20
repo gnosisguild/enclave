@@ -39,9 +39,9 @@ contract CRISPProgram is IE3Program, Ownable {
     bytes32 public imageId;
 
     /// @notice the round data
-    RoundData public roundData;
+    mapping(uint256 e3Id => RoundData roundData) public roundsData;
     /// @notice whether the round data has been set
-    bool public isDataSet;
+    mapping(uint256 e3Id => bool isDataSet) public isRoundsDataSet;
 
     /// @notice Half of the largest minimum degree used to fit votes
     /// inside the plaintext polynomial
@@ -101,15 +101,15 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param _root The Merkle root to set.
     /// @param _token The governance token address.
     /// @param _balanceThreshold The minimum balance required.
-    function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold)
+    function setRoundData(uint256 _e3Id, uint256 _root, address _token, uint256 _balanceThreshold)
         external
         onlyOwner
     {
-        if (isDataSet) revert RoundDataAlreadySet();
+        if (isRoundsDataSet[_e3Id]) revert RoundDataAlreadySet();
 
-        isDataSet = true;
+        isRoundsDataSet[_e3Id] = true;
 
-        roundData = RoundData({
+        roundsData[_e3Id] = RoundData({
             token: _token,
             balanceThreshold: _balanceThreshold,
             censusMerkleRoot: _root
@@ -155,14 +155,13 @@ contract CRISPProgram is IE3Program, Ownable {
 
     /// @inheritdoc IE3Program
     function validateInput(uint256 e3Id, address, bytes memory data) external returns (bytes memory input) {
-    
         // it should only be called via Enclave for now
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
         );
         // We need to ensure that the CRISP admin set the merkle root of the census.
-        if (!isDataSet) revert RoundDataNotSet();
+        if (!isRoundsDataSet[e3Id]) revert RoundDataNotSet();
 
         if (data.length == 0) revert EmptyInputData();
 

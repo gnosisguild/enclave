@@ -25,7 +25,7 @@ sol! {
     #[derive(Debug)]
     #[sol(rpc)]
     contract CRISPProgram {
-        function setRoundData(uint256 _root, address _token, uint256 _balanceThreshold) external;
+        function setRoundData(uint256 e3_id, uint256 _root, address _token, uint256 _balanceThreshold) external;
     }
 }
 
@@ -78,13 +78,14 @@ impl CRISPContract {
     /// Set round data on the CRISPProgram contract
     pub async fn set_round_data(
         &self,
+        e3_id: U256,
         merkle_root: U256,
         token_address: Address,
         balance_threshold: U256,
     ) -> Result<TransactionReceipt> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
         let receipt = contract
-            .setRoundData(merkle_root, token_address, balance_threshold)
+            .setRoundData(e3_id, merkle_root, token_address, balance_threshold)
             .send()
             .await?
             .get_receipt()
