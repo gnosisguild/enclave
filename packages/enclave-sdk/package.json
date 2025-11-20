@@ -20,7 +20,7 @@
     "access": "public"
   },
   "scripts": {
-    "prebuild": "pnpm -C ../enclave-contracts build && pnpm wasm:build",
+    "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build",
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
