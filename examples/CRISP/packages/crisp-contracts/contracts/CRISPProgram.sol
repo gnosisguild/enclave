@@ -171,31 +171,15 @@ contract CRISPProgram is IE3Program, Ownable {
             (bytes, bytes, address)
         );
 
+        (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slot, vote);
+
         bytes32[] memory noirPublicInputs = new bytes32[](2);
 
         // Set public inputs for the proof. Order must match Noir circuit.
         noirPublicInputs[0] = bytes32(uint256(uint160(slot)));
+        // Pass isFirstVote flag to verifier (1 = first vote, 0 = re-vote)
+        noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
 
-        /// @notice we need to check whether the slot is empty.
-        /// @todo pass it to the verifier 
-        uint40 voteIndex = voteSlots[e3Id][slot];
-        uint256 oldCiphertext = votes[e3Id].elements[voteIndex];
-        // bool isFirstVote = oldCiphertext != 0;
-
-        {
-            if (oldCiphertext == 0) {
-                voteIndex = votes[e3Id].numberOfLeaves;
-    
-                /// @notice Store the vote index in the correct slot.
-                voteSlots[e3Id][slot] = voteIndex;
-                // Insert the leaf
-                votes[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
-            } else {
-                votes[e3Id]._update(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]), voteIndex);
-            }
-        }
-
-        noirPublicInputs[1] = bytes32(uint256(oldCiphertext != 0 ? 1 : 0));
         // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
 
         // Check if the ciphertext was encrypted correctly
@@ -207,6 +191,31 @@ contract CRISPProgram is IE3Program, Ownable {
         input = vote;
 
         emit InputPublished(e3Id, vote, voteIndex);
+    }
+
+    /// @notice Process a vote: insert or update in the merkle tree depending 
+    /// on whether it's the first vote or an override.
+    function _processVote(
+        uint256 e3Id,
+        address slot,
+        bytes memory vote
+    ) internal returns (uint40 voteIndex, bool isFirstVote) {
+        uint40 storedIndexPlusOne = voteSlots[e3Id][slot];
+        
+        // we treat the index 0 as not voted yet
+        // any valid index will be index + 1
+        if (storedIndexPlusOne == 0) {
+            // FIRST VOTE
+            isFirstVote = true;
+            voteIndex = votes[e3Id].numberOfLeaves;
+            voteSlots[e3Id][slot] = voteIndex + 1;
+            votes[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
+        } else {
+            // RE-VOTE
+            isFirstVote = false;
+            voteIndex = storedIndexPlusOne - 1;
+            votes[e3Id]._update(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]), voteIndex);
+        }
     }
 
     /// @notice Decode the tally from the plaintext output
