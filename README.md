@@ -36,9 +36,6 @@ pnpm i
 # Build the project
 pnpm build
 
-# Run tests
-pnpm test
-
 # Clean build artifacts
 pnpm clean
 ```
