@@ -36,7 +36,6 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("CiphernodeRegistryOwnable", function () {
   async function finalizeCommitteeAfterWindow(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
     e3Id: number,
   ): Promise<void> {
@@ -46,15 +45,10 @@ describe("CiphernodeRegistryOwnable", function () {
 
   async function setupOperatorForSortition(
     operator: Signer,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bondingRegistry: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     licenseToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     usdcToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ticketToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
   ): Promise<void> {
     const operatorAddress = await operator.getAddress();

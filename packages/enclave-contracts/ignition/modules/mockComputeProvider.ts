@@ -3,8 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("MockComputeProvider", (m) => {

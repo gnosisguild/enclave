@@ -12,7 +12,7 @@
     "bump:versions": "tsx scripts/bump-versions.ts",
     "clean": "tsx scripts/clean.ts",
     "compile": "pnpm build:ts && pnpm rust:build",
-    "lint": "pnpm evm:lint && pnpm rust:lint && pnpm noir:lint",
+    "lint": "eslint . && pnpm evm:lint && pnpm rust:lint && pnpm noir:lint",
     "format": "prettier --write \"**/*.{js,json,md,mdx,ts,tsx,yml,yaml,css}\"",
     "format:check": "prettier --check \"**/*.{js,json,md,mdx,ts,tsx,yml,yaml,css}\"",
     "check:license": "./scripts/check-license-headers.sh",

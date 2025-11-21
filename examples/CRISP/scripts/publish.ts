@@ -227,7 +227,7 @@ class CRISPPublisher {
         console.error('\n   To proceed anyway, use --skip-git flag')
         process.exit(1)
       }
-    } catch (error) {
+    } catch {
       console.warn('⚠️  Could not check git status')
     }
   }
@@ -292,7 +292,7 @@ class CRISPPublisher {
         stdio: 'pipe',
       })
       console.log('   ✓ pnpm-lock.yaml updated')
-    } catch (error) {
+    } catch {
       console.warn('   ⚠️  Could not update pnpm-lock.yaml')
     }
   }

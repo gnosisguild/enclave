@@ -11,8 +11,6 @@ import { List } from '@phosphor-icons/react'
 //Icons
 import { CalendarCheck, CheckFat, Notebook } from '@phosphor-icons/react'
 
-interface NavMenuProps {}
-
 const NAV_MENU_OPTIONS = [
   {
     name: 'Current Poll',
@@ -31,7 +29,7 @@ const NAV_MENU_OPTIONS = [
   },
 ]
 
-const NavMenu: React.FC<NavMenuProps> = () => {
+const NavMenu: React.FC = () => {
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState<boolean>(false)

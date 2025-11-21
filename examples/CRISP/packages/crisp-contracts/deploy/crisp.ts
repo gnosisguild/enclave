@@ -25,8 +25,8 @@ export const deployCRISPContracts = async () => {
 
   const chain = hre.globalOptions.network
 
-  const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER) ?? false
-  const useMockInputValidator = Boolean(process.env.USE_MOCK_INPUT_VALIDATOR) ?? false
+  const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER)
+  const useMockInputValidator = Boolean(process.env.USE_MOCK_INPUT_VALIDATOR)
 
   console.log('useMockVerifier', useMockVerifier)
 

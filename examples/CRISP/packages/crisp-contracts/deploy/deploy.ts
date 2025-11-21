@@ -29,7 +29,7 @@ const __dirname = path.dirname(__filename)
 export const deploy = async () => {
   const chain = hre.globalOptions.network
 
-  const shouldDeployEnclave = Boolean(process.env.DEPLOY_ENCLAVE) ?? false
+  const shouldDeployEnclave = Boolean(process.env.DEPLOY_ENCLAVE)
 
   if (shouldDeployEnclave) {
     await deployEnclave(true)

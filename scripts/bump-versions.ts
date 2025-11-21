@@ -155,7 +155,7 @@ class VersionBumper {
         console.error('\n   To proceed anyway, use --skip-git flag')
         process.exit(1)
       }
-    } catch (error) {
+    } catch {
       console.warn('⚠️  Could not check git status')
     }
   }
@@ -310,7 +310,7 @@ class VersionBumper {
         stdio: 'pipe',
       })
       console.log('   ✓ Cargo.lock updated')
-    } catch (error) {
+    } catch {
       console.warn('   ⚠️  Could not update Cargo.lock')
     }
 
@@ -324,7 +324,7 @@ class VersionBumper {
           stdio: 'pipe',
         })
         console.log('   ✓ pnpm-lock.yaml updated')
-      } catch (error) {
+      } catch {
         console.warn('   ⚠️  Could not update pnpm-lock.yaml')
       }
     }

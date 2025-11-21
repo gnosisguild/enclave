@@ -40,13 +40,29 @@ export default [
         },
       ],
       ...reactHooks.configs.recommended.rules,
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/purity': 'warn',
       'react-refresh/only-export-components': [
         'warn',
         {
           allowConstantExport: true,
         },
       ],
+      // todo: remove this use proper typing instead.
+      '@typescript-eslint/no-explicit-any': 'off',
       ...prettier.rules,
+    },
+  },
+  {
+    files: ['**/*.{spec,test}.{js,jsx,ts,tsx}', '**/test/**/*.{js,jsx,ts,tsx}', '**/tests/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.mocha,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-expressions': 'off',
     },
   },
 ]
