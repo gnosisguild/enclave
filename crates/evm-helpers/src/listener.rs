@@ -17,7 +17,7 @@ use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::sleep};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -114,7 +114,6 @@ impl EventListener {
         info!("block_listen_once()");
         let mut stream = self.provider.subscribe_blocks().await?.into_stream();
         while let Some(block) = stream.next().await {
-            info!("GOT BLOCK! {:?}", block);
             let handlers = self.block_handlers.read().await;
             for handler in handlers.iter() {
                 let fut = handler(&block);
@@ -150,9 +149,6 @@ impl EventListener {
             match operation().await {
                 Ok(_) => {
                     sleep(Duration::from_secs(1)).await;
-                    info!("\n**********************************************************");
-                    info!("Operation finished unexpectedly!\nRestarting...");
-                    info!("**********************************************************\n\n");
                 }
                 Err(e) => {
                     error!("\n**********************************************************");
@@ -161,11 +157,11 @@ impl EventListener {
                     sleep(Duration::from_secs(5)).await;
                 }
             }
+            warn!("Ongoing operation finished unexpectedly");
         }
     }
 
     pub fn start(&self) {
-        info!("Starting event listener!");
         self.start_listen_loop();
         self.start_block_listen_loop();
     }

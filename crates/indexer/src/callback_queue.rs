@@ -7,6 +7,7 @@
 use e3_evm_helpers::threshold_queue::{ThresholdItem, ThresholdQueue};
 use eyre::Result;
 use std::{future::Future, pin::Pin, sync::Arc};
+use tracing::info;
 
 /// Callback for CallbackQueue
 type Callback = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -78,7 +79,9 @@ impl CallbackQueue {
 
     /// Execute all pending callbacks up to and including the given time
     pub async fn execute_until_including(&self, time: u64) -> Result<()> {
+        info!("execute_until_including...");
         let handlers = self.queue.take_until_including(time);
+        info!("found {} handlers", handlers.len());
         for callback in handlers {
             callback().await?;
         }

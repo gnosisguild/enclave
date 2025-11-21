@@ -413,7 +413,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 let blockheight = block.number();
                 let callbacks = callbacks.clone();
                 async move {
-                    info!("on block: {}:{}", blockheight, timestamp);
+                    info!("ON BLOCK: {}:{}", blockheight, timestamp);
                     callbacks.execute_until_including(timestamp).await?;
                     Ok(())
                 }
