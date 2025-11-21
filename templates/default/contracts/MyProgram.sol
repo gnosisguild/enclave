@@ -16,7 +16,7 @@ contract MyProgram is IE3Program, Ownable {
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
-    uint8 public constant treeDepth = 20;
+    uint8 public constant TREE_DEPTH = 20;
 
     // State variables
     IEnclave public enclave;
@@ -71,7 +71,7 @@ contract MyProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        inputs[e3Id]._init(treeDepth);
+        inputs[e3Id]._init(TREE_DEPTH);
 
         return ENCRYPTION_SCHEME_ID;
     }

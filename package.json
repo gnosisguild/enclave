@@ -56,7 +56,6 @@
     "support:build": "cd crates/support && ./scripts/build.sh",
     "build": "pnpm compile",
     "wasm:build": "cd ./crates/wasm && pnpm build",
-    "release": "pnpm build && changeset publish",
     "build:ts": "pnpm evm:build && pnpm sdk:build && pnpm react:build",
     "template:build": "cd templates/default && pnpm compile"
   },
