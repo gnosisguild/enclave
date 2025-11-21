@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy_primitives::utils::parse_ether;
+use alloy_primitives::utils::{parse_ether, parse_units};
 use alloy_signer_local::PrivateKeySigner;
 use anyhow::{Context, Error, Result};
 use bincode::serialize;
@@ -160,16 +160,17 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
             .context("Failed to create new request")
         {
             Ok(req) => req.with_stdin(input_bytes).with_offer(
-                /// This auction begins with a flat period, allowing early bidding before the ramp-up begins.
-                /// The price then increases linearly to 0.03 ETH over 2 mins.
-                /// The maximum price of 0.03 ETH remains for 8 mins,
-                /// after which the price drops to 0 ETH for the expiry period of 10 mins.
+                // This auction begins with a flat period, allowing early bidding before the ramp-up begins.
+                // The price then increases linearly to 0.03 ETH over 2 mins.
+                // The maximum price of 0.03 ETH remains for 8 mins,
+                // after which the price drops to 0 ETH for the expiry period of 10 mins.
                 OfferParams::builder()
                     .min_price(parse_ether("0.001").unwrap()) // Minimum price in ETH
                     .max_price(parse_ether("0.03").unwrap()) // Maximum price in ETH
                     .timeout(20 * 60) // Total timeout in seconds (20 minutes)
                     .lock_timeout(10 * 60) // Lock timeout in seconds (10 minutes)
-                    .ramp_up_period(2 * 60), // Ramp up period in seconds (2 minutes)
+                    .ramp_up_period(2 * 60) // Ramp up period in seconds (2 minutes)
+                    .lock_collateral(parse_units("5", 18).unwrap()), // 5 ZKC
             ),
             Err(e) => {
                 return BoundlessOutput::Error {

@@ -74,16 +74,15 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
         return HttpResponse::BadRequest().json(format!("Unknown status: {}", incoming.status));
     }
 
-    // Validate that we have ciphertext and proof for completed status
-    if incoming.ciphertext.is_empty() || incoming.proof.is_empty() {
+    // Validate that we have ciphertext for completed status
+    // Proof is optional in dev mode
+    if incoming.ciphertext.is_empty() {
         error!(
-            "Missing ciphertext or proof for completed computation E3 ID: {}",
+            "Missing ciphertext for completed computation E3 ID: {}",
             incoming.e3_id
         );
-        return HttpResponse::BadRequest().json(format!(
-            "Missing ciphertext or proof for E3 ID: {}",
-            incoming.e3_id
-        ));
+        return HttpResponse::BadRequest()
+            .json(format!("Missing ciphertext for E3 ID: {}", incoming.e3_id));
     }
 
     // Create the contract
