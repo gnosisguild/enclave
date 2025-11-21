@@ -33,4 +33,12 @@ impl ProgramSupportApi for ProgramSupportDev {
         run_bash_script(&cwd, &script, &[]).await?;
         Ok(())
     }
+
+    async fn upload(&self) -> Result<()> {
+        let cwd = env::current_dir()?;
+        let script = cwd.join(".enclave/support/ctl/upload");
+        ensure_script_exists(&script).await?;
+        run_bash_script(&cwd, &script, &[]).await?;
+        Ok(())
+    }
 }
