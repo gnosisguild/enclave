@@ -10,6 +10,7 @@
   "scripts": {
     "compile": "forge compile",
     "cli": "bash ./scripts/cli.sh",
+    "lint": "eslint .",
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:build": "bash ./scripts/build.sh",
     "dev:up": "bash ./scripts/dev.sh",
@@ -32,6 +33,8 @@
     "setup:testnet": "bash ./scripts/setup_testnet.sh"
   },
   "devDependencies": {
+    "@enclave-e3/config": "^0",
+    "eslint": "^9.39.1",
     "@playwright/test": "1.52.0",
     "@synthetixio/synpress": "^4.1.0",
     "@synthetixio/synpress-cache": "^0.0.12",

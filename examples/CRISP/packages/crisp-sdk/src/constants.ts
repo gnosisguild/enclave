@@ -4,9 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { BFVParams } from './types'
-
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
 

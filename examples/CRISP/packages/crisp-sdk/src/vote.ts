@@ -68,7 +68,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
   validateVote(votingMode, vote, votingPower)
 
   switch (votingMode) {
-    case VotingMode.GOVERNANCE:
+    case VotingMode.GOVERNANCE: {
       const voteArray = []
       const length = bfvParams.degree
       const halfLength = length / 2
@@ -87,6 +87,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
         voteArray.push(i < offset ? '0' : noBinary[i - offset])
       }
       return voteArray
+    }
     default:
       throw new Error('Unsupported voting mode')
   }
@@ -99,7 +100,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
  */
 export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
   switch (votingMode) {
-    case VotingMode.GOVERNANCE:
+    case VotingMode.GOVERNANCE: {
       const HALF_D = tally.length / 2
       const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
       const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
@@ -127,6 +128,7 @@ export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
         yes,
         no,
       }
+    }
     default:
       throw new Error('Unsupported voting mode')
   }

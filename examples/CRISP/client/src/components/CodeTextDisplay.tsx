@@ -12,12 +12,10 @@ import PaperPurpleIcon from '@/assets/icons/paperPurple.svg'
 import FingerprintIcon from '@/assets/icons/fingerprint.svg'
 import FingerprintWhiteIcon from '@/assets/icons/fingerprintWhite.svg'
 
-interface CodeTextDisplayProps {}
-
 const selectedClass = 'border-slate-600/80 flex space-x-2 rounded-lg border-2 bg-white px-4 py-2'
 const unSelectedClass = 'flex space-x-2 rounded-lg border-2 border-slate-600/20 bg-[#B7BBC1] px-4 py-2'
 
-const CodeTextDisplay: React.FC<CodeTextDisplayProps> = () => {
+const CodeTextDisplay: React.FC = () => {
   const text = `import React from 'react'
 
   interface CardContentProps {
