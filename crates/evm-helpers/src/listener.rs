@@ -150,9 +150,14 @@ impl EventListener {
             match operation().await {
                 Ok(_) => {
                     sleep(Duration::from_secs(1)).await;
+                    info!("\n**********************************************************");
+                    info!("Operation finished unexpectedly!\nRestarting...");
+                    info!("**********************************************************\n\n");
                 }
                 Err(e) => {
+                    error!("\n**********************************************************");
                     error!("Error occurred: {}. Retrying in 5 seconds...", e);
+                    error!("**********************************************************\n\n");
                     sleep(Duration::from_secs(5)).await;
                 }
             }
