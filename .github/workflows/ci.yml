@@ -88,8 +88,8 @@ jobs:
       - name: 'Install the dependencies'
         run: 'pnpm install'
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Unit Tests
         run: 'cargo test --lib && cargo test --doc'
@@ -131,8 +131,8 @@ jobs:
       - name: 'Install the dependencies'
         run: 'pnpm install'
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Integration Tests
         run: 'cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture'
@@ -689,8 +689,8 @@ jobs:
       - name: Test Template
         run: |
           cd templates/default
-          chmod 755 contracts tests
-          chmod 644 contracts/ImageID.sol
+          chmod 755 .enclave/generated/contracts tests
+          chmod 644 .enclave/generated/contracts/ImageID.sol
           pnpm test:integration
 
   test_enclave_init:

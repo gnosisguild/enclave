@@ -30,7 +30,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
+mkdir -p "$(pwd)/.enclave/generated"/{contracts,tests}
 chmod -R 777 "$(pwd)/.enclave/caches"
+chmod -R 777 "$(pwd)/.enclave/generated"
 
 if [ -t 0 ]; then
     TTY_FLAGS="-it"
@@ -54,7 +56,7 @@ else
         --platform linux/amd64 \
         --add-host=host.local:host-gateway \
         -p 13151:13151 \
-        -v "$(pwd)/contracts:/app/contracts" \
+        -v "$(pwd)/.enclave/generated/contracts:/app/contracts:rw" \
         -v "$(pwd)/tests:/app/tests" \
         -v "$(pwd)/.enclave/caches/target:/app/target" \
         -v "$(pwd)/.enclave/caches/registry:/home/devuser/.cargo/registry" \
