@@ -143,15 +143,27 @@ impl<S: DataStore> DataStore for SharedStore<S> {
     }
 }
 
-#[derive(Clone)]
 /// Stores E3 event data on store for easy querying.
-pub struct EnclaveIndexer<S: DataStore> {
+pub struct EnclaveIndexer<S> {
     listener: EventListener,
     callbacks: CallbackQueue,
     contract: EnclaveContract<ReadOnly>,
     store: Arc<RwLock<S>>,
     contract_address: String,
     chain_id: u64,
+}
+
+impl<S> Clone for EnclaveIndexer<S> {
+    fn clone(&self) -> Self {
+        Self {
+            listener: self.listener.clone(),
+            callbacks: self.callbacks.clone(),
+            contract: self.contract.clone(),
+            store: self.store.clone(),
+            contract_address: self.contract_address.clone(),
+            chain_id: self.chain_id,
+        }
+    }
 }
 
 impl EnclaveIndexer<InMemoryStore> {
@@ -222,12 +234,19 @@ impl<S: DataStore> EnclaveIndexer<S> {
     }
 
     /// Register a callback for execution after the given timestap as returned by the chain.
-    pub fn dispatch_later<F, Fut>(&mut self, when: u64, handler: F)
+    pub fn dispatch_after_timestamp<F, Fut>(&mut self, when: u64, handler: F)
     where
-        F: Fn() -> Fut + Send + Sync + 'static,
+        F: Fn(SharedStore<S>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.callbacks.dispatch_later(when, handler);
+        let store = SharedStore::new(self.store.clone());
+        let handler = Arc::new(handler);
+
+        self.callbacks.push(when, move || {
+            let handler = Arc::clone(&handler);
+            let store = store.clone();
+            handler(store)
+        });
     }
 
     async fn register_e3_activated(&mut self) -> Result<()> {
@@ -240,7 +259,6 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 let db = SharedStore::new(db.clone());
                 let enclave_address = enclave_address.clone();
                 let contract = contract.clone();
-
                 async move {
                     println!(
                         "E3Activated: id={}, expiration={}, pubkey=0x{}...",
@@ -258,6 +276,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
                         u64_try_from(e3.startWindow[0])?,
                         u64_try_from(e3.startWindow[1])?,
                     ];
+
                     // NOTE: we are only saving protocol specific info
                     // here and not CRISP specific info so E3 corresponds to the solidity E3
                     let e3_obj = E3 {
@@ -360,7 +379,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn register_input_window_expired(&mut self) -> Result<()> {
+    async fn register_blocktime_callbacks(&mut self) -> Result<()> {
         let callbacks = self.callbacks.clone();
         self.listener
             .add_block_handler(move |block| {
@@ -380,7 +399,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
-        self.register_input_window_expired().await?;
+        self.register_blocktime_callbacks().await?;
         Ok(())
     }
 

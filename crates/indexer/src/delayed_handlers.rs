@@ -12,6 +12,7 @@ type AsyncCallback =
     Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 #[derive(Clone)]
+/// A callback that has an execute time associated with it
 pub struct TimedHandler {
     time: u64,
     handler: AsyncCallback,
@@ -50,30 +51,34 @@ impl Ord for TimedHandler {
 }
 
 #[derive(Clone)]
+/// A queue of callbacks that can be executed when a given timestamp has been passed
 pub struct CallbackQueue {
     queue: ThresholdQueue<TimedHandler>,
 }
 
 impl CallbackQueue {
+    /// Create a new queue
     pub fn new() -> Self {
         Self {
             queue: ThresholdQueue::new(),
         }
     }
 
-    pub fn dispatch_later<F, Fut>(&mut self, when: u64, handler: F)
+    /// Push a handler to the queue to be executed at or before the given time.
+    pub fn push<F, Fut>(&mut self, time: u64, handler: F)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         self.queue.insert(TimedHandler {
-            time: when,
+            time,
             handler: Arc::new(move || Box::pin(handler())),
         })
     }
 
-    pub async fn execute_until_including(&self, when: u64) -> Result<()> {
-        let handlers = self.queue.take_until_including(when);
+    /// Execute all pending callbacks up to and including the given time
+    pub async fn execute_until_including(&self, time: u64) -> Result<()> {
+        let handlers = self.queue.take_until_including(time);
         for handler in handlers {
             handler().await?;
         }
@@ -92,7 +97,7 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        queue.dispatch_later(100, move || {
+        queue.push(100, move || {
             let called = called_clone.clone();
             async move {
                 *called.lock().unwrap() = true;
@@ -110,7 +115,7 @@ mod tests {
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
-        queue.dispatch_later(100, move || {
+        queue.push(100, move || {
             let called = called_clone.clone();
             async move {
                 *called.lock().unwrap() = true;
@@ -128,7 +133,7 @@ mod tests {
         let counter = Arc::new(Mutex::new(0));
 
         let c1 = counter.clone();
-        queue.dispatch_later(50, move || {
+        queue.push(50, move || {
             let c = c1.clone();
             async move {
                 *c.lock().unwrap() += 1;
@@ -137,7 +142,7 @@ mod tests {
         });
 
         let c2 = counter.clone();
-        queue.dispatch_later(100, move || {
+        queue.push(100, move || {
             let c = c2.clone();
             async move {
                 *c.lock().unwrap() += 1;
@@ -146,7 +151,7 @@ mod tests {
         });
 
         let c3 = counter.clone();
-        queue.dispatch_later(150, move || {
+        queue.push(150, move || {
             let c = c3.clone();
             async move {
                 *c.lock().unwrap() += 1;
@@ -162,7 +167,7 @@ mod tests {
     async fn test_error_propagation() {
         let mut queue = CallbackQueue::new();
 
-        queue.dispatch_later(100, || async { Err(eyre::eyre!("test error")) });
+        queue.push(100, || async { Err(eyre::eyre!("test error")) });
 
         let result = queue.execute_until_including(100).await;
         assert!(result.is_err());

@@ -16,7 +16,8 @@ pub struct ThresholdQueue<T> {
     inner: Arc<RwLock<BinaryHeap<Reverse<T>>>>,
 }
 
-pub trait ThresholdItem {
+/// An item that can be added to a threshold queue
+pub trait ThresholdItem: Ord {
     type Item;
     fn within_threshold(&self, threshold: u64) -> bool;
     fn item(&self) -> Self::Item;
@@ -24,7 +25,7 @@ pub trait ThresholdItem {
 
 impl<T, U> ThresholdQueue<T>
 where
-    T: Ord + ThresholdItem<Item = U>,
+    T: ThresholdItem<Item = U>,
 {
     pub fn new() -> Self {
         Self {
