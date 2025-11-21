@@ -41,8 +41,8 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
     let incoming = data.into_inner();
 
     info!(
-        "Received program server result for E3 ID: {:?}, status: {:?}",
-        incoming.e3_id, incoming.status
+        "Received program server result for E3 ID: {:?}, status: {:?}, ciphertext len: {}, proof len: {}",
+        incoming.e3_id, incoming.status, incoming.ciphertext.len(), incoming.proof.len()
     );
 
     // Handle failed computation
@@ -74,15 +74,15 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
         return HttpResponse::BadRequest().json(format!("Unknown status: {}", incoming.status));
     }
 
-    // Validate that we have ciphertext for completed status
-    // Proof is optional in dev mode
-    if incoming.ciphertext.is_empty() {
-        error!(
-            "Missing ciphertext for completed computation E3 ID: {}",
+    if incoming.ciphertext.is_empty() && incoming.proof.is_empty() {
+        info!(
+            "Both ciphertext and proof are empty for E3 ID: {} - skipping chain publication",
             incoming.e3_id
         );
-        return HttpResponse::BadRequest()
-            .json(format!("Missing ciphertext for E3 ID: {}", incoming.e3_id));
+        return HttpResponse::Ok().json(format!(
+            "Computation completed for E3 ID: {}",
+            incoming.e3_id
+        ));
     }
 
     // Create the contract

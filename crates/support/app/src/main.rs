@@ -23,7 +23,12 @@ async fn call_webhook(
     ciphertext: Vec<u8>,
     error: Option<String>,
 ) -> anyhow::Result<()> {
-    println!("call_webhook() - status: {:?}", status);
+    println!(
+        "call_webhook() - status: {:?}, ciphertext len: {}, proof len: {}", 
+        status, 
+        ciphertext.len(), 
+        proof.len()
+    );
     let payload = WebhookPayload {
         e3_id,
         status,
@@ -50,7 +55,11 @@ async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Vec<u8>
         Ok((boundless_output, ciphertext)) => {
             match boundless_output {
                 e3_support_host::BoundlessOutput::Success { seal, .. } => {
-                    println!("have result from computation!");
+                    println!(
+                        "have result from computation! seal len: {}, ciphertext len: {}", 
+                        seal.len(), 
+                        ciphertext.len()
+                    );
                     Ok((seal, ciphertext))
                 }
                 e3_support_host::BoundlessOutput::Error { error } => {
