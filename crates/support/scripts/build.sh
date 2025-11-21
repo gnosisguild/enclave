@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 PKG=ghcr.io/gnosisguild/e3-support
-GIT_SHA=$(git rev-parse --short HEAD)
+GIT_SHA=$(git rev-parse --short=9 HEAD)
 
 # Separate --push from other arguments
 PUSH=false

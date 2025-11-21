@@ -6,11 +6,18 @@
 
 import { readDeploymentArgs, storeDeploymentArgs } from '@enclave-e3/contracts/scripts'
 import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
+import { readFileSync } from 'fs'
 
 import { ContractFactory } from 'ethers'
 import hre from 'hardhat'
 
-const IMAGE_ID = '0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2'
+const imageIdContent = readFileSync('../../.enclave/generated/contracts/ImageID.sol', 'utf-8')
+const match = imageIdContent.match(/bytes32 public constant PROGRAM_ID = bytes32\((0x[a-fA-F0-9]+)\)/)
+const IMAGE_ID = match ? match[1] : null
+
+if (!IMAGE_ID) {
+  throw new Error('IMAGE_ID not found')
+}
 
 export const deployCRISPContracts = async () => {
   const { ethers } = await hre.network.connect()

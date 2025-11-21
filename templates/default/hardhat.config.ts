@@ -75,6 +75,9 @@ const config: HardhatUserConfig = {
     outDir: './types',
     tsNocheck: false,
   },
+  paths: {
+    sources: ['./contracts', './.enclave/generated/contracts'],
+  },
   networks: {
     hardhat: {
       type: 'edr-simulated',
