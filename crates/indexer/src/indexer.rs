@@ -26,6 +26,7 @@ use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tracing::info;
 
 type E3Id = u64;
 
@@ -408,8 +409,10 @@ impl<S: DataStore> EnclaveIndexer<S> {
         self.listener
             .add_block_handler(move |block| {
                 let timestamp = block.timestamp();
+                let blockheight = block.number();
                 let callbacks = callbacks.clone();
                 async move {
+                    info!("on block: {}:{}", blockheight, timestamp);
                     callbacks.execute_until_including(timestamp).await?;
                     Ok(())
                 }
