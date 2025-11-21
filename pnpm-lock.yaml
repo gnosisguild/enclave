@@ -200,9 +200,6 @@ importers:
         specifier: ^2.14.16
         version: 2.19.2(@tanstack/query-core@5.90.6)(@tanstack/react-query@5.90.6(react@18.3.1))(@types/react@18.3.26)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(immer@10.0.2)(react@18.3.1)(typescript@5.8.3)(utf-8-validate@5.0.10)(viem@2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12))(ws@7.5.10(bufferutil@4.0.9)(utf-8-validate@5.0.10))(zod@4.1.12)
     devDependencies:
-      '@enclave-e3/config':
-        specifier: ^0
-        version: link:../../../packages/enclave-config
       '@tailwindcss/typography':
         specifier: ^0.5.12
         version: 0.5.19(tailwindcss@3.4.18(tsx@4.20.6))
@@ -801,9 +798,6 @@ importers:
         specifier: ^2.14.16
         version: 2.19.2(@tanstack/query-core@5.90.6)(@tanstack/react-query@5.90.6(react@18.3.1))(@types/react@18.3.26)(bufferutil@4.0.9)(fastestsmallesttextencoderdecoder@1.0.22)(immer@10.0.2)(react@18.3.1)(typescript@5.8.3)(utf-8-validate@5.0.10)(viem@2.38.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@4.1.12))(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))(zod@4.1.12)
     devDependencies:
-      '@enclave-e3/config':
-        specifier: ^0
-        version: link:../../../packages/enclave-config
       '@tailwindcss/typography':
         specifier: ^0.5.12
         version: 0.5.19(tailwindcss@3.4.18(tsx@4.20.6))
