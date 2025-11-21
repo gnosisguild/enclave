@@ -74,7 +74,6 @@ export interface ContractInstances {
 }
 
 // Unified Event System
-// TODO: bad practice to use TypeScript enums - should use discriminated unions instead.
 export enum EnclaveEventType {
   // E3 Lifecycle Events
   E3_REQUESTED = 'E3Requested',
@@ -101,7 +100,6 @@ export enum EnclaveEventType {
   INITIALIZED = 'Initialized',
 }
 
-// TODO: bad practice to use TypeScript enums - should use discriminated unions instead.
 export enum RegistryEventType {
   // Committee Management
   COMMITTEE_REQUESTED = 'CommitteeRequested',
@@ -116,14 +114,8 @@ export enum RegistryEventType {
   INITIALIZED = 'Initialized',
 }
 
-// Events that don't come from the contracts but are part of the protocol
-// TODO: bad practice to use TypeScript enums - should use discriminated unions instead.
-export enum ArtificialEventType {
-  E3_INPUT_PUBLISH_WINDOW_EXPIRED = 'E3InputPublishWindowExpired',
-}
-
 // Union type for all events
-export type AllEventTypes = EnclaveEventType | RegistryEventType | ArtificialEventType
+export type AllEventTypes = EnclaveEventType | RegistryEventType
 
 // Event data interfaces based on TypeChain types
 export interface E3 {
