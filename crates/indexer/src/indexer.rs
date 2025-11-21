@@ -405,6 +405,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
     }
 
     async fn register_blocktime_callback_handler(&mut self) -> Result<()> {
+        info!("register_blocktime_callback_handler()...");
         let callbacks = self.callbacks.clone();
         self.listener
             .add_block_handler(move |block| {

@@ -17,7 +17,7 @@ use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::RwLock, time::sleep};
-use tracing::error;
+use tracing::{error, info};
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -76,6 +76,7 @@ impl EventListener {
         F: Fn(&Header) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
+        info!("add_block_handler");
         self.block_handlers
             .write()
             .await
@@ -83,6 +84,7 @@ impl EventListener {
     }
 
     async fn listen_once(&self) -> Result<()> {
+        info!("listen_once()");
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -109,8 +111,10 @@ impl EventListener {
     }
 
     async fn block_listen_once(&self) -> Result<()> {
+        info!("block_listen_once()");
         let mut stream = self.provider.subscribe_blocks().await?.into_stream();
         while let Some(block) = stream.next().await {
+            info!("GOT BLOCK! {:?}", block);
             let handlers = self.block_handlers.read().await;
             for handler in handlers.iter() {
                 let fut = handler(&block);
@@ -125,11 +129,13 @@ impl EventListener {
     }
 
     fn start_block_listen_loop(&self) {
+        info!("start_block_listen_loop");
         let this = self.clone();
         tokio::spawn(async move { this.retry_loop(|| this.block_listen_once()).await });
     }
 
     fn start_listen_loop(&self) {
+        info!("start_listen_loop");
         let this = self.clone();
         tokio::spawn(async move { this.retry_loop(|| this.listen_once()).await });
     }
@@ -154,6 +160,7 @@ impl EventListener {
     }
 
     pub fn start(&self) {
+        info!("Starting event listener!");
         self.start_listen_loop();
         self.start_block_listen_loop();
     }
