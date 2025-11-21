@@ -41,9 +41,50 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
     let incoming = data.into_inner();
 
     info!(
-        "Received program server result for E3 ID: {:?}",
-        incoming.e3_id
+        "Received program server result for E3 ID: {:?}, status: {:?}",
+        incoming.e3_id, incoming.status
     );
+
+    // Handle failed computation
+    if incoming.status == "failed" {
+        let error_msg = incoming
+            .error
+            .unwrap_or_else(|| "Unknown error".to_string());
+        error!(
+            "Computation failed for E3 ID: {}. Error: {}",
+            incoming.e3_id, error_msg
+        );
+
+        // TODO: Update E3 state to indicate computation failed
+        // TODO: Handle ciphernode rewards for partial work
+        // TODO: Emit on-chain event if needed
+
+        return HttpResponse::Ok().json(format!(
+            "Computation failed for E3 ID: {}. Error: {}",
+            incoming.e3_id, error_msg
+        ));
+    }
+
+    // Handle successful computation
+    if incoming.status != "completed" {
+        error!(
+            "Unknown status '{}' for E3 ID: {}",
+            incoming.status, incoming.e3_id
+        );
+        return HttpResponse::BadRequest().json(format!("Unknown status: {}", incoming.status));
+    }
+
+    // Validate that we have ciphertext and proof for completed status
+    if incoming.ciphertext.is_empty() || incoming.proof.is_empty() {
+        error!(
+            "Missing ciphertext or proof for completed computation E3 ID: {}",
+            incoming.e3_id
+        );
+        return HttpResponse::BadRequest().json(format!(
+            "Missing ciphertext or proof for E3 ID: {}",
+            incoming.e3_id
+        ));
+    }
 
     // Create the contract
     let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
@@ -55,7 +96,7 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
     {
         Ok(contract) => contract,
         Err(e) => {
-            info!("Failed to create contract: {:?}", e);
+            error!("Failed to create contract: {:?}", e);
             return HttpResponse::InternalServerError()
                 .json(format!("Failed to create contract: {}", e));
         }
