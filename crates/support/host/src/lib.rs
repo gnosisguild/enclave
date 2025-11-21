@@ -83,33 +83,31 @@ fn fake_prove(input: &ComputeInput) -> BoundlessOutput {
     }
 }
 
-/// Boundless proving
+fn to_output_error<E: std::fmt::Display>(e: E) -> BoundlessOutput {
+    BoundlessOutput::Error {
+        error: e.to_string(),
+    }
+}
+
 async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
+    match boundless_prove_inner(input).await {
+        Ok(output) => output,
+        Err(e) => to_output_error(e),
+    }
+}
+
+async fn boundless_prove_inner(input: &ComputeInput) -> Result<BoundlessOutput> {
     println!("Submitting proof request to Boundless...");
 
-    let rpc_url = match std::env::var("RPC_URL")
-        .context("RPC_URL not set")
-        .and_then(|url| url.parse().context("Invalid RPC_URL"))
-    {
-        Ok(url) => url,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: e.to_string(),
-            }
-        }
-    };
+    let rpc_url = std::env::var("RPC_URL")
+        .context("RPC_URL not set")?
+        .parse()
+        .context("Invalid RPC_URL")?;
 
-    let private_key: PrivateKeySigner = match std::env::var("PRIVATE_KEY")
-        .context("PRIVATE_KEY not set")
-        .and_then(|key| key.parse().context("Invalid PRIVATE_KEY"))
-    {
-        Ok(key) => key,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: e.to_string(),
-            }
-        }
-    };
+    let private_key: PrivateKeySigner = std::env::var("PRIVATE_KEY")
+        .context("PRIVATE_KEY not set")?
+        .parse()
+        .context("Invalid PRIVATE_KEY")?;
 
     let storage_provider = match storage_provider_from_env() {
         Ok(provider) => Some(provider),
@@ -119,47 +117,30 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
         }
     };
 
-    let client = match Client::builder()
+    let client = Client::builder()
         .with_rpc_url(rpc_url)
         .with_private_key(private_key)
         .with_storage_provider(storage_provider)
         .build()
         .await
-    {
-        Ok(client) => client,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: format!("Failed to build Boundless client: {}", e),
-            }
-        }
-    };
+        .context("Failed to build Boundless client")?;
 
-    let input_bytes = match encode_input(&serialize(input).unwrap()) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: format!("Failed to encode input: {}", e),
-            }
-        }
-    };
+    let input_bytes = encode_input(&serialize(input).unwrap())
+        .context("Failed to encode input")?;
+    
     let program_url = std::env::var("PROGRAM_URL").ok();
 
     let request = if let Some(url) = program_url {
         println!("Using pre-uploaded program: {}", url);
-        let parsed_url = match url.parse::<Url>() {
-            Ok(url) => url,
-            Err(e) => {
-                return BoundlessOutput::Error {
-                    error: format!("Failed to parse program URL: {}", e),
-                }
-            }
-        };
-        match client
+        let parsed_url = url.parse::<Url>()
+            .context("Failed to parse program URL")?;
+        
+        client
             .new_request()
             .with_program_url(parsed_url)
-            .context("Failed to create new request")
-        {
-            Ok(req) => req.with_stdin(input_bytes).with_offer(
+            .context("Failed to create new request")?
+            .with_stdin(input_bytes)
+            .with_offer(
                 // This auction begins with a flat period, allowing early bidding before the ramp-up begins.
                 // The price then increases linearly to 0.03 ETH over 2 mins.
                 // The maximum price of 0.03 ETH remains for 8 mins,
@@ -171,13 +152,7 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
                     .lock_timeout(10 * 60) // Lock timeout in seconds (10 minutes)
                     .ramp_up_period(2 * 60) // Ramp up period in seconds (2 minutes)
                     .lock_collateral(parse_units("5", 18).unwrap()), // 5 ZKC
-            ),
-            Err(e) => {
-                return BoundlessOutput::Error {
-                    error: e.to_string(),
-                }
-            }
-        }
+            )
     } else {
         println!(
             "Warning: Uploading {}MB program at runtime",
@@ -192,20 +167,14 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
     let onchain =
         std::env::var("BOUNDLESS_ONCHAIN").unwrap_or_else(|_| "true".to_string()) == "true";
 
-    let (request_id, expires_at) = match if onchain {
+    let (request_id, expires_at) = if onchain {
         println!("Submitting onchain...");
         client.submit_onchain(request).await
     } else {
         println!("Submitting offchain...");
         client.submit_offchain(request).await
-    } {
-        Ok(result) => result,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: format!("Failed to submit request: {}", e),
-            }
-        }
-    };
+    }
+    .context("Failed to submit request")?;
 
     println!("Request ID: {:x}, waiting for fulfillment...", request_id);
 
@@ -215,18 +184,14 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
     {
         Ok(fulfillment) => fulfillment,
         Err(ClientError::MarketError(MarketError::RequestHasExpired(_))) => {
-            return BoundlessOutput::Error {
+            return Ok(BoundlessOutput::Error {
                 error: format!(
                     "Boundless request expired: no prover picked up the request. Request ID: {:x}",
                     request_id
                 ),
-            };
+            });
         }
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: format!("Failed to wait for fulfillment: {}", e),
-            };
-        }
+        Err(e) => return Err(e).context("Failed to wait for fulfillment")?,
     };
 
     println!("Proof received from Boundless!");
@@ -234,26 +199,20 @@ async fn boundless_prove(input: &ComputeInput) -> BoundlessOutput {
     let (_, journal) = match data {
         Ok(FulfillmentData::ImageIdAndJournal(image_id, journal)) => (image_id, journal),
         _ => {
-            return BoundlessOutput::Error {
+            return Ok(BoundlessOutput::Error {
                 error: "Invalid fulfillment data".to_string(),
-            }
+            });
         }
     };
 
-    let decoded_journal: ComputeResult = match bincode::deserialize(&journal) {
-        Ok(result) => result,
-        Err(e) => {
-            return BoundlessOutput::Error {
-                error: format!("Failed to decode journal: {}", e),
-            }
-        }
-    };
+    let decoded_journal: ComputeResult = bincode::deserialize(&journal)
+        .context("Failed to decode journal")?;
 
-    BoundlessOutput::Success {
+    Ok(BoundlessOutput::Success {
         result: decoded_journal,
         bytes: journal.to_vec(),
         seal: fulfillment.seal.to_vec(),
-    }
+    })
 }
 
 pub fn run_compute(
