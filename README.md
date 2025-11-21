@@ -48,28 +48,32 @@ pnpm clean
 
 ### Testing
 
-**⚠️ Important:** Always run tests through pnpm scripts, not directly via `cargo test` or other build tools. The pnpm scripts ensure necessary setup steps are executed (e.g., building required binaries, setting up test environments) that may be skipped when running tests directly.
+**⚠️ Important:** Always run tests through pnpm scripts, not directly via `cargo test` or other
+build tools. The pnpm scripts ensure necessary setup steps are executed (e.g., building required
+binaries, setting up test environments) that may be skipped when running tests directly.
 
 #### Test Scripts
 
 The monorepo provides several test scripts for different components:
 
 - **`pnpm test`** - Runs all tests across the entire monorepo:
-
   - EVM/Smart contract tests (`evm:test`)
   - Rust crate tests (`rust:test`)
   - SDK tests (`sdk:test`)
   - Noir circuit tests (`noir:test`)
 
-- **`pnpm rust:test`** - Runs all Rust crate tests in the `crates/` directory. This script runs tests for all crates in the workspace, not just ciphernode-related crates.
+- **`pnpm rust:test`** - Runs all Rust crate tests in the `crates/` directory. This script runs
+  tests for all crates in the workspace, not just ciphernode-related crates.
 
 - **`pnpm evm:test`** - Runs tests for the EVM smart contracts in `packages/enclave-contracts`.
 
 - **`pnpm sdk:test`** - Runs tests for the TypeScript SDK in `packages/enclave-sdk`.
 
-- **`pnpm noir:test`** - Runs tests for Noir circuits in the `circuits/` directory using `nargo test`.
+- **`pnpm noir:test`** - Runs tests for Noir circuits in the `circuits/` directory using
+  `nargo test`.
 
-- **`pnpm test:integration`** - Runs integration tests from `tests/integration/`. These tests may require prebuilt binaries and can be run with `--no-prebuild` if binaries are already available.
+- **`pnpm test:integration`** - Runs integration tests from `tests/integration/`. These tests may
+  require prebuilt binaries and can be run with `--no-prebuild` if binaries are already available.
 
 #### Running Individual Test Suites
 
