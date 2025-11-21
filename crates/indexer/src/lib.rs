@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod delayed_handlers;
 mod indexer;
 pub mod models;
 mod repo;

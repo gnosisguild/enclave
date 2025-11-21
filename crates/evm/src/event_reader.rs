@@ -33,6 +33,9 @@ pub enum EnclaveEvmEvent {
         event: EnclaveEvent,
         block: Option<u64>,
     },
+    // Log {
+    //     data,topic, chain_id, address
+    // }
 }
 
 impl EnclaveEvmEvent {
@@ -182,6 +185,8 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     }
 }
 
+// TODO:
+// - extract and combine all filters
 #[instrument(name = "evm_event_reader", skip_all)]
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,

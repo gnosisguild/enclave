@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
+    consensus::Header,
     network::Ethereum,
     primitives::{Address, B256},
     providers::{Provider, ProviderBuilder},
@@ -14,17 +15,23 @@ use alloy::{
 use eyre::Result;
 use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
-use tokio::{sync::RwLock, task::JoinHandle};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
+use tokio::{sync::RwLock, time::sleep};
+use tracing::error;
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
+type BlockHandler =
+    Box<dyn Fn(&Header) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+
 #[derive(Clone)]
+/// Listens for contract events
 pub struct EventListener {
     provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
+    block_handlers: Arc<RwLock<Vec<BlockHandler>>>,
 }
 
 impl EventListener {
@@ -33,6 +40,7 @@ impl EventListener {
             provider,
             filter,
             handlers: Arc::new(RwLock::new(HashMap::new())),
+            block_handlers: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -63,7 +71,18 @@ impl EventListener {
             .push(wrapped_handler);
     }
 
-    async fn listen(&self) -> Result<()> {
+    pub async fn add_block_handler<F, Fut>(&mut self, handler: F)
+    where
+        F: Fn(&Header) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.block_handlers
+            .write()
+            .await
+            .push(Box::new(move |h: &Header| Box::pin(handler(h))));
+    }
+
+    async fn listen_once(&self) -> Result<()> {
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -89,9 +108,54 @@ impl EventListener {
         Ok(())
     }
 
-    pub fn start(&self) -> JoinHandle<Result<()>> {
+    async fn block_listen_once(&self) -> Result<()> {
+        let mut stream = self.provider.subscribe_blocks().await?.into_stream();
+        while let Some(block) = stream.next().await {
+            let handlers = self.block_handlers.read().await;
+            for handler in handlers.iter() {
+                let fut = handler(&block);
+                tokio::spawn(async move {
+                    if let Err(e) = fut.await {
+                        eprintln!("Error processing block: {:?}", e);
+                    }
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn start_block_listen_loop(&self) {
         let this = self.clone();
-        tokio::spawn(async move { this.listen().await })
+        tokio::spawn(async move { this.retry_loop(|| this.block_listen_once()).await });
+    }
+
+    fn start_listen_loop(&self) {
+        let this = self.clone();
+        tokio::spawn(async move { this.retry_loop(|| this.listen_once()).await });
+    }
+
+    async fn retry_loop<F, Fut, E>(&self, mut operation: F)
+    where
+        F: FnMut() -> Fut,
+        Fut: Future<Output = Result<(), E>>,
+        E: std::fmt::Display,
+    {
+        loop {
+            match operation().await {
+                Ok(_) => {
+                    sleep(Duration::from_secs(1)).await;
+                }
+                Err(e) => {
+                    error!("Error occurred: {}. Retrying in 5 seconds...", e);
+                    sleep(Duration::from_secs(5)).await;
+                }
+            }
+        }
+    }
+
+    pub fn start(&self) {
+        self.start_listen_loop();
+        self.start_block_listen_loop();
     }
 
     pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
@@ -101,5 +165,23 @@ impl EventListener {
             .address(address)
             .from_block(BlockNumberOrTag::Latest);
         Ok(EventListener::new(provider, filter))
+    }
+}
+
+async fn retry_with_backoff<F, Fut>(mut f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<()>>,
+{
+    loop {
+        match f().await {
+            Ok(_) => {
+                sleep(Duration::from_secs(1)).await;
+            }
+            Err(e) => {
+                error!("Error occurred: {}. Retrying in 5 seconds...", e);
+                sleep(Duration::from_secs(5)).await;
+            }
+        }
     }
 }

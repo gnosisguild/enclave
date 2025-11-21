@@ -107,6 +107,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                         let bus = act.bus.clone();
                         let e3_id_clone = e3_id_for_async.clone();
 
+                        // XXX: refactor to use blockchain time
                         let handle = ctx.run_later(
                             Duration::from_secs(seconds_until_deadline),
                             move |act, _ctx| {

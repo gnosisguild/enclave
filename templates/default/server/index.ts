@@ -143,6 +143,7 @@ async function handleE3ActivatedEvent(event: any) {
     def.resolve()
   }
 
+  // XXX: This needs to be based off blocktime and driven by an event from the sdk
   const currentTime = BigInt(Math.floor(Date.now() / 1000))
   const sleepSeconds = expiration > currentTime ? Number(expiration - currentTime) : 0
 
@@ -155,6 +156,10 @@ async function handleE3ActivatedEvent(event: any) {
     console.log(`⚡ E3 ${e3Id} already expired, processing immediately...`)
     await runProgram(e3Id)
   }
+}
+
+async function handleE3InputWindowExpired(event: any) {
+  ///
 }
 
 async function handleInputPublishedEvent(event: any) {
@@ -188,6 +193,7 @@ async function setupEventListeners() {
 
   sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent)
   sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, handleInputPublishedEvent)
+  // sdk.onEnclaveEvent(EnclaveEventType.E3_INPUT_WINDOW_EXPIRED, handleE3InputWindowExpired);
 
   console.log('✅ Event listeners set up successfully')
 }

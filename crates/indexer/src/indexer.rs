@@ -4,19 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::delayed_handlers::CallbackQueue;
 use crate::E3Repository;
 
 use super::{models::E3, DataStore};
-use alloy::hex;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
+use alloy::{consensus::BlockHeader, hex};
 use async_trait::async_trait;
 use e3_evm_helpers::{
     contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
     events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
+// TODO: Remove eyre in favour of thiserror
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
@@ -24,7 +26,6 @@ use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
 
 type E3Id = u64;
 
@@ -143,8 +144,10 @@ impl<S: DataStore> DataStore for SharedStore<S> {
 }
 
 #[derive(Clone)]
+/// Stores E3 event data on store for easy querying.
 pub struct EnclaveIndexer<S: DataStore> {
     listener: EventListener,
+    callbacks: CallbackQueue,
     contract: EnclaveContract<ReadOnly>,
     store: Arc<RwLock<S>>,
     contract_address: String,
@@ -182,6 +185,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let mut instance = Self {
             store: Arc::new(RwLock::new(store)),
             contract,
+            callbacks: CallbackQueue::new(),
             listener,
             contract_address,
             chain_id,
@@ -215,6 +219,15 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 async move { handler(e, store).await }
             })
             .await;
+    }
+
+    /// Register a callback for execution after the given timestap as returned by the chain.
+    pub fn dispatch_later<F, Fut>(&mut self, when: u64, handler: F)
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.callbacks.dispatch_later(when, handler);
     }
 
     async fn register_e3_activated(&mut self) -> Result<()> {
@@ -347,15 +360,31 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
+    async fn register_input_window_expired(&mut self) -> Result<()> {
+        let callbacks = self.callbacks.clone();
+        self.listener
+            .add_block_handler(move |block| {
+                let timestamp = block.timestamp();
+                let callbacks = callbacks.clone();
+                async move {
+                    callbacks.execute_until_including(timestamp).await?;
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
     async fn setup_listeners(&mut self) -> Result<()> {
         self.register_e3_activated().await?;
         self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        self.register_input_window_expired().await?;
         Ok(())
     }
 
-    pub fn start(&self) -> JoinHandle<Result<()>> {
+    pub fn start(&self) {
         self.listener.start()
     }
 

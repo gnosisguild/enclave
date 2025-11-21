@@ -2906,6 +2906,7 @@ dependencies = [
  "futures-util",
  "once_cell",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

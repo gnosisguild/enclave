@@ -450,36 +450,6 @@ export class EnclaveSDK {
     this.eventListener.cleanup()
   }
 
-  /**
-   * Update SDK configuration
-   */
-  // TODO: We should delete this as we don't want a stateful client.
-  public updateConfig(newConfig: Partial<SDKConfig>): void {
-    if (newConfig.publicClient) {
-      this.config.publicClient = newConfig.publicClient
-      this.eventListener = new EventListener(newConfig.publicClient)
-    }
-
-    if (newConfig.walletClient) {
-      this.config.walletClient = newConfig.walletClient
-    }
-
-    if (newConfig.contracts) {
-      this.config.contracts = {
-        ...this.config.contracts,
-        ...newConfig.contracts,
-      }
-    }
-
-    if (newConfig.chainId) {
-      this.config.chainId = newConfig.chainId
-    }
-
-    this.contractClient = new ContractClient(this.config.publicClient, this.config.walletClient, this.config.contracts)
-
-    this.initialized = false
-  }
-
   public static create(options: {
     rpcUrl: string
     contracts: {

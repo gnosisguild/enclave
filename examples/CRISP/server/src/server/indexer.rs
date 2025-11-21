@@ -198,6 +198,9 @@ pub async fn register_e3_activated(
                     .await?;
 
                 // Calculate expiration time to sleep until
+                // XXX: This should not happen like this. During E3Activated the EnclaveIndexer
+                // should calculate the expired timestamp and listen for each block. When a block
+                // is broadcast that has the expected timestamp we then trigger an event
                 let now = get_current_timestamp_rpc().await?;
                 info!("[e3_id={}] Current time before sleep: {}", e3_id, now);
                 let wait_duration = if expiration > now {
@@ -211,6 +214,12 @@ pub async fn register_e3_activated(
                     info!("[e3_id={}] Expired E3", e3_id);
                     Duration::ZERO
                 };
+
+                /*
+                 * indexer.dispatch_after(expiration, move async |block| {
+                 *   // rest of the computation
+                 * })
+                 */
                 if !wait_duration.is_zero() {
                     sleep(wait_duration).await;
                 }
@@ -367,6 +376,7 @@ pub async fn register_committee_published(
                 info!("[e3_id={}] Wait duration: {:?}", event.e3Id, wait_duration);
 
                 // Sleep until start time
+                // XXX: refactor to use blocktime
                 if !wait_duration.is_zero() {
                     sleep(wait_duration).await;
                 }
