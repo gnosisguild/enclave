@@ -71,6 +71,7 @@ impl CallbackQueue {
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
+        info!("ADDING CALLBACK TO time={}", time);
         self.queue.push(TimedCallback {
             time,
             callback: Arc::new(move || Box::pin(callback())),
