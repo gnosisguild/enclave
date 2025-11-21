@@ -8,21 +8,21 @@ use e3_evm_helpers::threshold_queue::{ThresholdItem, ThresholdQueue};
 use eyre::Result;
 use std::{future::Future, pin::Pin, sync::Arc};
 
-type AsyncCallback =
-    Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+/// Callback for CallbackQueue
+type Callback = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
 #[derive(Clone)]
 /// A callback that has an execute time associated with it
-pub struct TimedHandler {
+pub struct TimedCallback {
     time: u64,
-    handler: AsyncCallback,
+    callback: Callback,
 }
 
-impl ThresholdItem for TimedHandler {
-    type Item = AsyncCallback;
+impl ThresholdItem for TimedCallback {
+    type Item = Callback;
 
     fn item(&self) -> Self::Item {
-        self.handler.clone()
+        self.callback.clone()
     }
 
     fn within_threshold(&self, threshold: u64) -> bool {
@@ -30,21 +30,21 @@ impl ThresholdItem for TimedHandler {
     }
 }
 
-impl Eq for TimedHandler {}
+impl Eq for TimedCallback {}
 
-impl PartialEq for TimedHandler {
+impl PartialEq for TimedCallback {
     fn eq(&self, other: &Self) -> bool {
         self.time == other.time
     }
 }
 
-impl PartialOrd for TimedHandler {
+impl PartialOrd for TimedCallback {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for TimedHandler {
+impl Ord for TimedCallback {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.time.cmp(&other.time)
     }
@@ -53,7 +53,7 @@ impl Ord for TimedHandler {
 #[derive(Clone)]
 /// A queue of callbacks that can be executed when a given timestamp has been passed
 pub struct CallbackQueue {
-    queue: ThresholdQueue<TimedHandler>,
+    queue: ThresholdQueue<TimedCallback>,
 }
 
 impl CallbackQueue {
@@ -64,23 +64,23 @@ impl CallbackQueue {
         }
     }
 
-    /// Push a handler to the queue to be executed at or before the given time.
-    pub fn push<F, Fut>(&mut self, time: u64, handler: F)
+    /// Push a callback to the queue to be executed at or before the given time.
+    pub fn push<F, Fut>(&mut self, time: u64, callback: F)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.queue.push(TimedHandler {
+        self.queue.push(TimedCallback {
             time,
-            handler: Arc::new(move || Box::pin(handler())),
+            callback: Arc::new(move || Box::pin(callback())),
         })
     }
 
     /// Execute all pending callbacks up to and including the given time
     pub async fn execute_until_including(&self, time: u64) -> Result<()> {
         let handlers = self.queue.take_until_including(time);
-        for handler in handlers {
-            handler().await?;
+        for callback in handlers {
+            callback().await?;
         }
         Ok(())
     }
