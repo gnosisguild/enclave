@@ -10,7 +10,7 @@ import { Log, PublicClient } from 'viem'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
 import { callFheRunner } from './runner'
-import { ProgramEventType, RawInputPublishedEvent, type InputPublishedEvent } from './types'
+import { ProgramEventType, RawInputPublishedEvent } from './types'
 import { MyProgram__factory } from '../types/factories/contracts'
 
 interface E3Session {
