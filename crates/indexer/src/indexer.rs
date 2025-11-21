@@ -237,18 +237,18 @@ impl<S: DataStore> EnclaveIndexer<S> {
     }
 
     /// Register a callback for execution after the given timestap as returned by the blockchain.
-    pub fn dispatch_after_timestamp<F, Fut>(&mut self, when: u64, handler: F)
+    pub fn dispatch_after_timestamp<F, Fut>(&mut self, when: u64, callback: F)
     where
         F: Fn(SharedStore<S>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         let store = SharedStore::new(self.store.clone());
-        let handler = Arc::new(handler);
+        let callback = Arc::new(callback);
 
         self.callbacks.push(when, move || {
-            let handler = Arc::clone(&handler);
+            let callback = Arc::clone(&callback);
             let store = store.clone();
-            handler(store)
+            callback(store)
         });
     }
 
@@ -403,7 +403,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn register_blocktime_callbacks(&mut self) -> Result<()> {
+    async fn register_blocktime_callback_handler(&mut self) -> Result<()> {
         let callbacks = self.callbacks.clone();
         self.listener
             .add_block_handler(move |block| {
@@ -423,7 +423,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
-        self.register_blocktime_callbacks().await?;
+        self.register_blocktime_callback_handler().await?;
         Ok(())
     }
 }

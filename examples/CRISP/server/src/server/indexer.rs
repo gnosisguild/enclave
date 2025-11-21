@@ -15,6 +15,7 @@ use crate::server::{
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
+use e3_sdk::indexer::SharedStore;
 use e3_sdk::{
     bfv_helpers::decode_bytes_to_vec_u64,
     evm_helpers::{
@@ -31,15 +32,13 @@ use e3_sdk::{
 };
 use evm_helpers::CRISPContractFactory;
 use eyre::Context;
+use eyre::Result;
 use log::info;
 use num_bigint::BigUint;
-use std::error::Error;
 use std::time::Duration;
 use tokio::time::sleep;
 
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
-
-pub async fn register_e3_requested(
+async fn register_e3_requested(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     // E3Requested
@@ -178,7 +177,7 @@ pub async fn register_e3_requested(
     Ok(indexer)
 }
 
-pub async fn register_e3_activated(
+async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     let indexer_clone = indexer.clone();
@@ -199,45 +198,8 @@ pub async fn register_e3_activated(
                     .set_current_round(CurrentRound { id: e3_id })
                     .await?;
 
-                indexer.dispatch_after_timestamp(expiration, move |store| async move {
-                    let mut repo = CrispE3Repository::new(store.clone(), e3_id);
-                    let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
-                    repo.update_status("Expired").await?;
-                    if repo.get_vote_count().await? > 0 {
-                        info!("[e3_id={}] Starting computation for E3", e3_id);
-                        repo.update_status("Computing").await?;
-                        let (id, status) = run_compute(
-                            e3_id,
-                            e3.e3_params,
-                            e3.ciphertext_inputs,
-                            format!("{}/state/add-result", CONFIG.enclave_server_url),
-                        )
-                        .await
-                        .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
-                        if id != e3_id {
-                            return Err(eyre::eyre!(
-                                "Computation request returned unexpected E3 ID: expected {}, got {}",
-                                e3_id,
-                                id
-                            ).into());
-                        };
-                        if status != "processing" {
-                            return Err(eyre::eyre!(
-                                "Computation request failed with status: {}",
-                                status
-                            ).into());
-                        };
-                        info!("[e3_id={}] Request Computation for E3", e3_id);
-                        repo.update_status("PublishingCiphertext").await?;
-                    } else {
-                        info!(
-                            "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
-                            e3_id
-                        );
-                        repo.update_status("Finished").await?;
-                    }
-                    info!("[e3_id={}] E3 request handled successfully.", e3_id);
-                    Ok(())
+                indexer.dispatch_after_timestamp(expiration, move |store| {
+                    handle_e3_input_deadline_expiration(e3_id, store)
                 });
 
                 Ok(())
@@ -247,7 +209,49 @@ pub async fn register_e3_activated(
     Ok(indexer)
 }
 
-pub async fn register_ciphertext_output_published(
+async fn handle_e3_input_deadline_expiration(
+    e3_id: u64,
+    store: SharedStore<impl DataStore>,
+) -> Result<()> {
+    let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+    let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
+    repo.update_status("Expired").await?;
+    if repo.get_vote_count().await? > 0 {
+        info!("[e3_id={}] Starting computation for E3", e3_id);
+        repo.update_status("Computing").await?;
+        let (id, status) = run_compute(
+            e3_id,
+            e3.e3_params,
+            e3.ciphertext_inputs,
+            format!("{}/state/add-result", CONFIG.enclave_server_url),
+        )
+        .await
+        .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+        if id != e3_id {
+            return Err(eyre::eyre!(
+                "Computation request returned unexpected E3 ID: expected {}, got {}",
+                e3_id,
+                id
+            )
+            .into());
+        };
+        if status != "processing" {
+            return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+        };
+        info!("[e3_id={}] Request Computation for E3", e3_id);
+        repo.update_status("PublishingCiphertext").await?;
+    } else {
+        info!(
+            "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
+            e3_id
+        );
+        repo.update_status("Finished").await?;
+    }
+    info!("[e3_id={}] E3 request handled successfully.", e3_id);
+    Ok(())
+}
+
+async fn register_ciphertext_output_published(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     // CiphertextOutputPublished
@@ -265,7 +269,7 @@ pub async fn register_ciphertext_output_published(
     Ok(indexer)
 }
 
-pub async fn register_plaintext_output_published(
+async fn register_plaintext_output_published(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     // PlaintextOutputPublished

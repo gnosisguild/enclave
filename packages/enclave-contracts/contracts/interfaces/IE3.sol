@@ -18,7 +18,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @param requestBlock Block number when the E3 computation was requested
  * @param startWindow Start window for the computation: index 0 is minimum block, index 1 is the maximum block
  * @param duration Duration of the E3 computation in blocks or time units
- * @param expiration Timestamp when committee duties expire and computation is considered failed
+ * @param expiration Timestamp when input deadline has expired and computation should commence
  * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
  * @param e3Program Address of the E3 Program contract that validates and verifies the computation
  * @param e3ProgramParams ABI encoded computation parameters specific to the E3 program

@@ -26,7 +26,7 @@ interface IEnclave {
 
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
     /// @param e3Id ID of the E3.
-    /// @param expiration Timestamp when committee duties expire.
+    /// @param expiration Timestamp when input deadline has expired.
     /// @param committeePublicKey Public key of the committee.
     event E3Activated(
         uint256 e3Id,
