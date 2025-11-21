@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::delayed_handlers::CallbackQueue;
+use crate::callback_queue::CallbackQueue;
 use crate::E3Repository;
 
 use super::{models::E3, DataStore};
@@ -143,7 +143,7 @@ impl<S: DataStore> DataStore for SharedStore<S> {
     }
 }
 
-/// Stores E3 event data on store for easy querying.
+/// Stores E3 event data on a datastore (persisted or otherwise) for easy querying.
 pub struct EnclaveIndexer<S> {
     listener: EventListener,
     callbacks: CallbackQueue,
@@ -187,6 +187,7 @@ impl EnclaveIndexer<InMemoryStore> {
 }
 
 impl<S: DataStore> EnclaveIndexer<S> {
+    /// Try to create a new EnclaveIndexer
     pub async fn new(
         listener: EventListener,
         contract: EnclaveContract<ReadOnly>,
@@ -206,6 +207,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(instance)
     }
 
+    /// Try to create a new EnclaveIndexer from an endpoint and an address
     pub async fn from_endpoint_address(
         ws_url: &str,
         contract_address: &str,
@@ -216,6 +218,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         EnclaveIndexer::new(listener, contract, store).await
     }
 
+    /// Add a new Solidity event handler to the indexer
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
@@ -233,7 +236,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .await;
     }
 
-    /// Register a callback for execution after the given timestap as returned by the chain.
+    /// Register a callback for execution after the given timestap as returned by the blockchain.
     pub fn dispatch_after_timestamp<F, Fut>(&mut self, when: u64, handler: F)
     where
         F: Fn(SharedStore<S>) -> Fut + Send + Sync + 'static,
@@ -247,6 +250,27 @@ impl<S: DataStore> EnclaveIndexer<S> {
             let store = store.clone();
             handler(store)
         });
+    }
+
+    /// Start listening
+    pub fn start(&self) {
+        self.listener.start()
+    }
+
+    /// Get E3 data by ID
+    pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
+        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
+        Ok(e3)
+    }
+
+    /// Get a handle to the listener
+    pub fn get_listener(&self) -> EventListener {
+        self.listener.clone()
+    }
+
+    /// Get a handle to the store
+    pub fn get_store(&self) -> SharedStore<S> {
+        SharedStore::new(self.store.clone())
     }
 
     async fn register_e3_activated(&mut self) -> Result<()> {
@@ -401,23 +425,6 @@ impl<S: DataStore> EnclaveIndexer<S> {
         self.register_plaintext_output_published().await?;
         self.register_blocktime_callbacks().await?;
         Ok(())
-    }
-
-    pub fn start(&self) {
-        self.listener.start()
-    }
-
-    pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
-        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
-        Ok(e3)
-    }
-
-    pub fn get_listener(&self) -> EventListener {
-        self.listener.clone()
-    }
-
-    pub fn get_store(&self) -> SharedStore<S> {
-        SharedStore::new(self.store.clone())
     }
 }
 

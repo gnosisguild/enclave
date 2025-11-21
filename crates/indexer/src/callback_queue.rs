@@ -70,7 +70,7 @@ impl CallbackQueue {
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.queue.insert(TimedHandler {
+        self.queue.push(TimedHandler {
             time,
             handler: Arc::new(move || Box::pin(handler())),
         })

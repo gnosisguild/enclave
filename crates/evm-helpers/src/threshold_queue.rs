@@ -10,8 +10,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-/// An implementation of a ThresholdQueue
 #[derive(Clone)]
+/// An implementation of a ThresholdQueue
 pub struct ThresholdQueue<T> {
     inner: Arc<RwLock<BinaryHeap<Reverse<T>>>>,
 }
@@ -27,19 +27,22 @@ impl<T, U> ThresholdQueue<T>
 where
     T: ThresholdItem<Item = U>,
 {
+    /// Create a new ThresholdQueue
     pub fn new() -> Self {
         Self {
             inner: Arc::new(RwLock::new(BinaryHeap::new())),
         }
     }
 
-    pub fn insert(&self, item: T) {
+    /// Push an item onto the queue
+    pub fn push(&self, item: T) {
         self.inner
             .write()
             .expect("Poisoned write in ThresholdQueue")
             .push(Reverse(item));
     }
 
+    /// Keep taking items off the queue until `item.within_threshold(threshold)` returns false
     pub fn take_until_including(&self, threshold: u64) -> Vec<T::Item> {
         let mut found = Vec::new();
         let mut inner = self
