@@ -198,7 +198,9 @@ async fn register_e3_activated(
                     .set_current_round(CurrentRound { id: e3_id })
                     .await?;
 
+                info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
                 indexer.dispatch_after_timestamp(expiration, move |store| {
+                    info!("Running....");
                     handle_e3_input_deadline_expiration(e3_id, store)
                 });
 
