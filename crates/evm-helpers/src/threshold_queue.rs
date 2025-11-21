@@ -107,13 +107,13 @@ mod tests {
     #[test]
     fn test_collection_is_ordered() {
         let queue = ThresholdQueue::new();
-        queue.insert(ThreshItem { val: 111, rank: 25 });
-        queue.insert(ThreshItem {
+        queue.push(ThreshItem { val: 111, rank: 25 });
+        queue.push(ThreshItem {
             val: 666,
             rank: 100,
         });
-        queue.insert(ThreshItem { val: 444, rank: 70 });
-        queue.insert(ThreshItem { val: 222, rank: 26 });
+        queue.push(ThreshItem { val: 444, rank: 70 });
+        queue.push(ThreshItem { val: 222, rank: 26 });
         let items = queue.take_until_including(70);
 
         assert_eq!(items, vec![111, 222, 444]);
