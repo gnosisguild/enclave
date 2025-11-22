@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::sol;
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -163,9 +164,6 @@ pub struct E3 {
     pub ciphertext_output: Vec<u8>,
     pub plaintext_output: Vec<u8>,
 
-    // Ciphertext Inputs
-    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-
     // Emojis
     pub emojis: [String; 2],
 
@@ -184,6 +182,7 @@ pub struct E3Crisp {
     pub token_holder_hashes: Vec<String>,
     pub token_address: String,
     pub balance_threshold: String,
+    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
 }
 
 impl From<E3> for WebResultRequest {

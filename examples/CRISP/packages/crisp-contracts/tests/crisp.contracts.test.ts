@@ -20,6 +20,8 @@ import {
 import { expect } from 'chai'
 import type { HonkVerifier, MockEnclave } from '../types'
 
+import { CRISPProgram__factory as CRISPProgramFactory } from '../types'
+
 let zkInputsGenerator = ZKInputsGenerator.withDefaults()
 let publicKey = zkInputsGenerator.generatePublicKey()
 const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
@@ -27,16 +29,27 @@ const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64
 describe('CRISP Contracts', function () {
   const nonZeroAddress = '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d'
 
+  let poseidonT3Address: string
+
+  before(async () => {
+    const { ethers } = await network.connect()
+
+    const poseidonT3 = await ethers.deployContract('PoseidonT3')
+    await poseidonT3.waitForDeployment()
+    poseidonT3Address = await poseidonT3.getAddress()
+  })
+
   describe('deployment', () => {
     it('should deploy the contracts', async () => {
       const { ethers } = await network.connect()
-      /*
-                IEnclave _enclave,
-                IRiscZeroVerifier _verifier,
-                HonkVerifier _honkVerifier,
-                bytes32 _imageId
-            */
-      const program = await ethers.deployContract('CRISPProgram', [nonZeroAddress, nonZeroAddress, nonZeroAddress, zeroHash])
+
+      const programFactory = await ethers.getContractFactory(
+        CRISPProgramFactory.abi,
+        CRISPProgramFactory.linkBytecode({
+          'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
+        }),
+      )
+      const program = await programFactory.deploy(nonZeroAddress, nonZeroAddress, nonZeroAddress, zeroHash)
 
       expect(await program.getAddress()).to.not.equal(zeroAddress)
     })
@@ -47,12 +60,14 @@ describe('CRISP Contracts', function () {
       const { ethers } = await network.connect()
       const mockEnclave = (await ethers.deployContract('MockEnclave')) as MockEnclave
 
-      const program = await ethers.deployContract('CRISPProgram', [
-        await mockEnclave.getAddress(),
-        nonZeroAddress,
-        nonZeroAddress,
-        zeroHash,
-      ])
+      const programFactory = await ethers.getContractFactory(
+        CRISPProgramFactory.abi,
+        CRISPProgramFactory.linkBytecode({
+          'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
+        }),
+      )
+
+      const program = await programFactory.deploy(await mockEnclave.getAddress(), nonZeroAddress, nonZeroAddress, zeroHash)
 
       // 2 * 2 + 1 * 1 = 5 Y
       // 2 * 1 + 0 * 1 = 2 N
