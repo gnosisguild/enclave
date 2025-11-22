@@ -34,12 +34,12 @@ impl ComputeInput {
             "Ciphertext hash mismatch"
         );
 
-        let merkle_root = MerkleTree {
-            leaf_hashes: self.leaf_hashes.clone(),
-        }
-        .build_tree()
-        .root()
-        .unwrap();
+        let merkle_root = MerkleTree::new()
+            .with_defaults()
+            .with_leaf_hashes(self.leaf_hashes.clone())
+            .build_tree()
+            .root()
+            .unwrap();
 
         ComputeResult {
             ciphertext_hash: processed_hash,

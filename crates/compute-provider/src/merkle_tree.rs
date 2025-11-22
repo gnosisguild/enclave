@@ -6,22 +6,55 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
-use lean_imt::LeanIMT;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use num_traits::Num;
 use sha3::{Digest, Keccak256};
+use zk_kit_imt::imt::IMT;
 use std::str::FromStr;
 
 pub struct MerkleTree {
     pub leaf_hashes: Vec<String>,
+    pub arity: usize, 
+    pub zero_value: String,
+    pub depth: usize,
 }
 
 impl MerkleTree {
     pub fn new() -> Self {
         Self {
             leaf_hashes: Vec::new(),
+            arity: 0,
+            zero_value: 0.to_string(),
+            depth: 0,
         }
+    }
+
+    pub fn with_defaults(mut self) -> Self {
+        self.arity = 2;
+        self.zero_value = "0".to_string();
+        self.depth = 20;
+        self
+    }   
+
+    pub fn with_depth(mut self, depth: usize) -> Self {
+        self.depth = depth;
+        self
+    }
+
+    pub fn with_arity(mut self, arity: usize) -> Self {
+        self.arity = arity;
+        self
+    }
+
+    pub fn with_zero_value(mut self, zero_value: String) -> Self {
+        self.zero_value = zero_value;
+        self
+    }
+
+    pub fn with_leaf_hashes(mut self, leaf_hashes: Vec<String>) -> Self {
+        self.leaf_hashes = leaf_hashes;
+        self
     }
 
     pub fn compute_leaf_hashes(&mut self, data: &[(Vec<u8>, u64)]) {
@@ -60,9 +93,12 @@ impl MerkleTree {
         hex::encode(result_hash.to_bytes_be())
     }
 
-    pub fn build_tree(&self) -> LeanIMT {
-        let mut tree = LeanIMT::new(Self::poseidon_hash);
-        tree.insert_many(self.leaf_hashes.clone()).unwrap();
-        tree
+    pub fn build_tree(&self) -> IMT {
+        let mut tree = IMT::new(Self::poseidon_hash, self.depth, self.zero_value.clone(), self.arity, vec![]).unwrap();
+        for leaf in &self.leaf_hashes {
+            tree.insert(leaf.clone()).unwrap();
+        }
+
+        tree 
     }
 }
