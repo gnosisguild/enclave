@@ -681,8 +681,8 @@ jobs:
         run: |
           cd templates/default
           pnpm compile
-          chmod 755 contracts tests
-          chmod 644 contracts/ImageID.sol
+          chmod 755 .enclave/generated/contracts tests
+          chmod 644 .enclave/generated/contracts/ImageID.sol
           pnpm test:integration
 
   test_enclave_init:
