@@ -389,13 +389,25 @@ pub async fn start_indexer(
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
+    info!("== START INDEXER! ==");
+
     let readonly_contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+
+    let enclave_contract_listener = EventListener::create_contract_listener_from_provider(
+        contract_address,
+        readonly_contract.get_provider(),
+    )?;
 
     let readwrite_contract =
         EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?;
 
-    let enclave_contract_listener =
-        EventListener::create_contract_listener(ws_url, contract_address).await?;
+    // Registry Listener
+    let registry_contract_listener = EventListener::create_contract_listener_from_provider(
+        registry_address,
+        readonly_contract.get_provider(),
+    )?;
+    let mut registry_listener =
+        register_committee_published(registry_contract_listener, readwrite_contract).await?;
 
     // CRISP indexer
     let crisp_indexer =
@@ -403,14 +415,9 @@ pub async fn start_indexer(
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
-    let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
+    let mut crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
     crisp_indexer.start();
 
-    // Registry Listener
-    let registry_contract_listener =
-        EventListener::create_contract_listener(&ws_url, registry_address).await?;
-    let registry_listener =
-        register_committee_published(registry_contract_listener, readwrite_contract).await?;
     registry_listener.start();
 
     Ok(())

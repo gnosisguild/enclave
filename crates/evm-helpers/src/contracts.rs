@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::network::NetworkWallet;
 use alloy::providers::fillers::BlobGasFiller;
+use alloy::providers::WalletProvider;
 use alloy::{
     network::{Ethereum, EthereumWallet},
     primitives::{Address, Bytes, U256},
@@ -206,6 +208,8 @@ impl EnclaveContract<ReadWrite> {
     pub fn address(&self) -> &Address {
         &self.contract_address
     }
+
+    // pub fn create_new_read_contract()
 }
 
 impl EnclaveContract<ReadOnly> {
@@ -261,18 +265,26 @@ impl EnclaveContractFactory {
         contract_address: &str,
         private_key: &str,
     ) -> Result<EnclaveContract<ReadWrite>> {
-        let contract_address = contract_address.parse()?;
-
         let signer: PrivateKeySigner = private_key.parse()?;
-        let wallet_address = signer.address();
         let wallet = EthereumWallet::from(signer);
-        let provider = ProviderBuilder::new()
-            .wallet(wallet)
-            .connect(http_rpc_url)
-            .await?;
+        let provider = Arc::new(
+            ProviderBuilder::new()
+                .wallet(wallet)
+                .connect(http_rpc_url)
+                .await?,
+        );
+        EnclaveContractFactory::create_write_from_provider(contract_address, provider)
+    }
 
+    pub fn create_write_from_provider(
+        contract_address: &str,
+        provider: Arc<EnclaveWriteProvider>,
+    ) -> Result<EnclaveContract<ReadWrite>> {
+        let contract_address = contract_address.parse()?;
+        let wallet = provider.wallet();
+        let wallet_address = wallet.default_signer().address();
         Ok(EnclaveContract::<ReadWrite> {
-            provider: Arc::new(provider),
+            provider,
             contract_address,
             wallet_address: Some(wallet_address),
             _marker: PhantomData,
@@ -284,12 +296,17 @@ impl EnclaveContractFactory {
         http_rpc_url: &str,
         contract_address: &str,
     ) -> Result<EnclaveContract<ReadOnly>> {
+        let provider = Arc::new(ProviderBuilder::new().connect(http_rpc_url).await?);
+        EnclaveContractFactory::create_read_from_provider(contract_address, provider)
+    }
+
+    pub fn create_read_from_provider(
+        contract_address: &str,
+        provider: Arc<EnclaveReadOnlyProvider>,
+    ) -> Result<EnclaveContract<ReadOnly>> {
         let contract_address = contract_address.parse()?;
-
-        let provider = ProviderBuilder::new().connect(http_rpc_url).await?;
-
         Ok(EnclaveContract::<ReadOnly> {
-            provider: Arc::new(provider),
+            provider,
             contract_address,
             wallet_address: None,
             _marker: PhantomData,

@@ -19,6 +19,8 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Durat
 use tokio::{sync::RwLock, time::sleep};
 use tracing::{error, info, warn};
 
+use crate::contracts::{EnclaveContractFactory, EnclaveReadOnlyProvider};
+
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
 
@@ -32,6 +34,8 @@ pub struct EventListener {
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
     block_handlers: Arc<RwLock<Vec<BlockHandler>>>,
+    event_started: bool,
+    block_started: bool,
 }
 
 impl EventListener {
@@ -41,6 +45,8 @@ impl EventListener {
             filter,
             handlers: Arc::new(RwLock::new(HashMap::new())),
             block_handlers: Arc::new(RwLock::new(Vec::new())),
+            event_started: false,
+            block_started: false,
         }
     }
 
@@ -83,8 +89,8 @@ impl EventListener {
             .push(Box::new(move |h: &Header| Box::pin(handler(h))));
     }
 
-    async fn listen_once(&self) -> Result<()> {
-        info!("listen_once()");
+    async fn event_listen_once(&self) -> Result<()> {
+        info!("event_listen_once()");
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -127,16 +133,29 @@ impl EventListener {
         Ok(())
     }
 
-    fn start_block_listen_loop(&self) {
+    fn ensure_block_listen_loop(&mut self) {
         info!("start_block_listen_loop");
+        self.block_started = true;
         let this = self.clone();
-        tokio::spawn(async move { this.retry_loop(|| this.block_listen_once()).await });
+        tokio::spawn(async move {
+            let len = { this.block_handlers.read().await.len() };
+
+            if len > 0 {
+                this.retry_loop(|| this.block_listen_once()).await;
+            }
+        });
     }
 
-    fn start_listen_loop(&self) {
-        info!("start_listen_loop");
+    fn ensure_event_listen_loop(&mut self) {
+        info!("ensure_event_listen_loop");
+        self.event_started = true;
         let this = self.clone();
-        tokio::spawn(async move { this.retry_loop(|| this.listen_once()).await });
+        tokio::spawn(async move {
+            let len = { this.handlers.read().await.len() };
+            if len > 0 {
+                this.retry_loop(|| this.event_listen_once()).await;
+            }
+        });
     }
 
     async fn retry_loop<F, Fut, E>(&self, mut operation: F)
@@ -161,35 +180,24 @@ impl EventListener {
         }
     }
 
-    pub fn start(&self) {
-        self.start_listen_loop();
-        self.start_block_listen_loop();
+    pub fn start(&mut self) {
+        self.ensure_event_listen_loop();
+        self.ensure_block_listen_loop();
     }
 
     pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
         let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
+        EventListener::create_contract_listener_from_provider(contract_address, provider)
+    }
+
+    pub fn create_contract_listener_from_provider(
+        contract_address: &str,
+        provider: Arc<EnclaveReadOnlyProvider>,
+    ) -> Result<Self> {
         let address = contract_address.parse::<Address>()?;
         let filter = Filter::new()
             .address(address)
             .from_block(BlockNumberOrTag::Latest);
         Ok(EventListener::new(provider, filter))
-    }
-}
-
-async fn retry_with_backoff<F, Fut>(mut f: F)
-where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = Result<()>>,
-{
-    loop {
-        match f().await {
-            Ok(_) => {
-                sleep(Duration::from_secs(1)).await;
-            }
-            Err(e) => {
-                error!("Error occurred: {}. Retrying in 5 seconds...", e);
-                sleep(Duration::from_secs(5)).await;
-            }
-        }
     }
 }

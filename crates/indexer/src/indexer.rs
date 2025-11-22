@@ -256,7 +256,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
     }
 
     /// Start listening
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         self.listener.start()
     }
 
