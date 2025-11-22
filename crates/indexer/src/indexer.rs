@@ -4,19 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::callback_queue::CallbackQueue;
 use crate::E3Repository;
 
 use super::{models::E3, DataStore};
-use alloy::hex;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
+use alloy::{consensus::BlockHeader, hex};
 use async_trait::async_trait;
 use e3_evm_helpers::{
     contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
     events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
+// TODO: Remove eyre in favour of thiserror
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
@@ -24,7 +26,7 @@ use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use tracing::info;
 
 type E3Id = u64;
 
@@ -142,13 +144,27 @@ impl<S: DataStore> DataStore for SharedStore<S> {
     }
 }
 
-#[derive(Clone)]
-pub struct EnclaveIndexer<S: DataStore> {
+/// Stores E3 event data on a datastore (persisted or otherwise) for easy querying.
+pub struct EnclaveIndexer<S> {
     listener: EventListener,
+    callbacks: CallbackQueue,
     contract: EnclaveContract<ReadOnly>,
     store: Arc<RwLock<S>>,
     contract_address: String,
     chain_id: u64,
+}
+
+impl<S> Clone for EnclaveIndexer<S> {
+    fn clone(&self) -> Self {
+        Self {
+            listener: self.listener.clone(),
+            callbacks: self.callbacks.clone(),
+            contract: self.contract.clone(),
+            store: self.store.clone(),
+            contract_address: self.contract_address.clone(),
+            chain_id: self.chain_id,
+        }
+    }
 }
 
 impl EnclaveIndexer<InMemoryStore> {
@@ -172,6 +188,7 @@ impl EnclaveIndexer<InMemoryStore> {
 }
 
 impl<S: DataStore> EnclaveIndexer<S> {
+    /// Try to create a new EnclaveIndexer
     pub async fn new(
         listener: EventListener,
         contract: EnclaveContract<ReadOnly>,
@@ -182,6 +199,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let mut instance = Self {
             store: Arc::new(RwLock::new(store)),
             contract,
+            callbacks: CallbackQueue::new(),
             listener,
             contract_address,
             chain_id,
@@ -190,6 +208,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(instance)
     }
 
+    /// Try to create a new EnclaveIndexer from an endpoint and an address
     pub async fn from_endpoint_address(
         ws_url: &str,
         contract_address: &str,
@@ -200,6 +219,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         EnclaveIndexer::new(listener, contract, store).await
     }
 
+    /// Add a new Solidity event handler to the indexer
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
@@ -217,6 +237,45 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .await;
     }
 
+    /// Register a callback for execution after the given timestap as returned by the blockchain.
+    pub fn dispatch_after_timestamp<F, Fut>(&mut self, when: u64, callback: F)
+    where
+        F: Fn(SharedStore<S>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        info!("%%%%% ***** >>>>>> dispatch_after_timestamp time={}", when);
+        let store = SharedStore::new(self.store.clone());
+        let callback = Arc::new(callback);
+
+        self.callbacks.push(when, move || {
+            info!("Running callback: time={}", when);
+            let callback = Arc::clone(&callback);
+            let store = store.clone();
+            callback(store)
+        });
+    }
+
+    /// Start listening
+    pub fn start(&mut self) {
+        self.listener.start()
+    }
+
+    /// Get E3 data by ID
+    pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
+        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
+        Ok(e3)
+    }
+
+    /// Get a handle to the listener
+    pub fn get_listener(&self) -> EventListener {
+        self.listener.clone()
+    }
+
+    /// Get a handle to the store
+    pub fn get_store(&self) -> SharedStore<S> {
+        SharedStore::new(self.store.clone())
+    }
+
     async fn register_e3_activated(&mut self) -> Result<()> {
         let db = self.store.clone();
         let contract = self.contract.clone();
@@ -227,7 +286,6 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 let db = SharedStore::new(db.clone());
                 let enclave_address = enclave_address.clone();
                 let contract = contract.clone();
-
                 async move {
                     println!(
                         "E3Activated: id={}, expiration={}, pubkey=0x{}...",
@@ -245,6 +303,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
                         u64_try_from(e3.startWindow[0])?,
                         u64_try_from(e3.startWindow[1])?,
                     ];
+
                     // NOTE: we are only saving protocol specific info
                     // here and not CRISP specific info so E3 corresponds to the solidity E3
                     let e3_obj = E3 {
@@ -347,29 +406,31 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
+    async fn register_blocktime_callback_handler(&mut self) -> Result<()> {
+        info!("register_blocktime_callback_handler()...");
+        let callbacks = self.callbacks.clone();
+        self.listener
+            .add_block_handler(move |block| {
+                let timestamp = block.timestamp();
+                let blockheight = block.number();
+                let callbacks = callbacks.clone();
+                async move {
+                    info!("ON BLOCK: {}:{}", blockheight, timestamp);
+                    callbacks.execute_until_including(timestamp).await?;
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
     async fn setup_listeners(&mut self) -> Result<()> {
         self.register_e3_activated().await?;
         self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        self.register_blocktime_callback_handler().await?;
         Ok(())
-    }
-
-    pub fn start(&self) -> JoinHandle<Result<()>> {
-        self.listener.start()
-    }
-
-    pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
-        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
-        Ok(e3)
-    }
-
-    pub fn get_listener(&self) -> EventListener {
-        self.listener.clone()
-    }
-
-    pub fn get_store(&self) -> SharedStore<S> {
-        SharedStore::new(self.store.clone())
     }
 }
 

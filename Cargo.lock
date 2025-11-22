@@ -2906,6 +2906,7 @@ dependencies = [
  "futures-util",
  "once_cell",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2957,6 +2958,7 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

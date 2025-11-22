@@ -44,6 +44,7 @@ pub struct ProcessingResponse {
     pub e3_id: u64,
 }
 
+/// Run the computation remotely
 pub async fn run_compute(
     e3_id: u64,
     params: Vec<u8>,
