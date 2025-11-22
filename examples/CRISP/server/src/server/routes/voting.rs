@@ -7,7 +7,7 @@
 use crate::server::{
     app_data::AppData,
     database::SledDB,
-    models::{EncryptedVote, VoteResponse, VoteResponseStatus},
+    models::{VoteRequest, VoteResponse, VoteResponseStatus},
     repo::CrispE3Repository,
     CONFIG,
 };
@@ -30,35 +30,35 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 ///
 /// # Arguments
 ///
-/// * `EncryptedVote` - The vote data to be broadcast
+/// * `VoteRequest` - The vote data to be broadcast
 ///
 /// # Returns
 ///
 /// * A JSON response indicating the success or failure of the operation
 async fn broadcast_encrypted_vote(
-    data: web::Json<EncryptedVote>,
+    data: web::Json<VoteRequest>,
     store: web::Data<AppData>,
 ) -> impl Responder {
-    let vote = data.into_inner();
-    info!("[e3_id={}] Broadcasting encrypted vote", vote.round_id);
+    let vote_request = data.into_inner();
+    info!("[e3_id={}] Broadcasting encrypted vote", vote_request.round_id);
     // Validate and update vote status
     let has_voted = match store
-        .e3(vote.round_id)
-        .has_voted(vote.address.clone())
+        .e3(vote_request.round_id)
+        .has_voted(vote_request.address.clone())
         .await
     {
         Ok(voted) => voted,
         Err(e) => {
             error!(
                 "[e3_id={}] Database error checking vote status: {:?}",
-                vote.round_id, e
+                vote_request.round_id, e
             );
             return HttpResponse::InternalServerError().json("Internal server error");
         }
     };
 
     if has_voted {
-        info!("[e3_id={}] User has already voted", vote.round_id);
+        info!("[e3_id={}] User has already voted", vote_request.round_id);
         return HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::UserAlreadyVoted,
             tx_hash: None,
@@ -66,22 +66,28 @@ async fn broadcast_encrypted_vote(
         });
     }
 
-    let mut repo = store.e3(vote.round_id);
+    let mut repo = store.e3(vote_request.round_id);
 
-    if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
+    if let Err(e) = repo.insert_voter_address(vote_request.address.clone()).await {
         error!(
             "[e3_id={}] Database error inserting voter: {:?}",
-            vote.round_id, e
+            vote_request.round_id, e
         );
         return HttpResponse::InternalServerError().json("Internal server error");
     }
 
-    let address: Address = vote.address.parse().expect("Invalid address");
+    let address: Address = vote_request.address.parse().expect("Invalid address");
 
-    let e3_id = U256::from(vote.round_id);
+
+    let e3_id = U256::from(vote_request.round_id);
     let params_value = DynSolValue::Tuple(vec![
-        DynSolValue::Bytes(vote.proof),
-        DynSolValue::Bytes(vote.enc_vote_bytes),
+        DynSolValue::Bytes(vote_request.proof),
+        DynSolValue::Array(
+            vote_request.vote
+                .into_iter()
+                .map(|arr| DynSolValue::FixedBytes(arr.into(), 32))
+                .collect(),
+        ),
         DynSolValue::Address(address),
     ]);
 
@@ -99,7 +105,7 @@ async fn broadcast_encrypted_vote(
         Err(e) => {
             error!(
                 "[e3_id={}] Database error checking vote status: {:?}",
-                vote.round_id, e
+                vote_request.round_id, e
             );
             return HttpResponse::InternalServerError().json("Internal server error");
         }
@@ -107,14 +113,14 @@ async fn broadcast_encrypted_vote(
 
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => {
-            info!("[e3_id={}] Vote broadcasted successfully", vote.round_id);
+            info!("[e3_id={}] Vote broadcasted successfully", vote_request.round_id);
             HttpResponse::Ok().json(VoteResponse {
                 status: VoteResponseStatus::Success,
                 tx_hash: Some(hash.transaction_hash.to_string()),
                 message: Some("Vote Successful".to_string()),
             })
         }
-        Err(e) => handle_vote_error(e, repo, &vote.address).await,
+        Err(e) => handle_vote_error(e, repo, &vote_request.address).await,
     }
 }
 

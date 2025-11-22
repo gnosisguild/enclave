@@ -12,6 +12,7 @@ import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest } from '@/model/vote.model'
+import { hexToBytes } from 'viem'
 
 export const useVoteCasting = () => {
   const { user, roundState, votingRound, encryptVote, broadcastVote, setTxUrl } = useVoteManagementContext()
@@ -57,7 +58,7 @@ export const useVoteCasting = () => {
 
         const voteRequest: BroadcastVoteRequest = {
           round_id: roundState.id,
-          enc_vote_bytes: Array.from(voteEncrypted.vote),
+          enc_vote_bytes: voteEncrypted.vote.map((h) => Array.from(hexToBytes(h as `0x${string}`))),
           proof: Array.from(voteEncrypted.proof),
           address: user.address,
         }
