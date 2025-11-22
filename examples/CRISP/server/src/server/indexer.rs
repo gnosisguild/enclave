@@ -180,11 +180,13 @@ async fn register_e3_requested(
 async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
+    info!("** register_e3_activated");
     let indexer_clone = indexer.clone();
     // E3Activated
     indexer
         .add_event_handler(move |event: E3Activated, store| {
-            let mut indexer = indexer_clone.clone();
+            info!("E3Activated!");
+            let mut indexer_clone = indexer_clone.clone();
             async move {
                 let e3_id = event.e3Id.to::<u64>();
                 let mut repo = CrispE3Repository::new(store.clone(), e3_id);
@@ -199,7 +201,7 @@ async fn register_e3_activated(
                     .await?;
 
                 info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
-                indexer.dispatch_after_timestamp(expiration, move |store| {
+                indexer_clone.dispatch_after_timestamp(expiration, move |store| {
                     info!("Running....");
                     handle_e3_input_deadline_expiration(e3_id, store)
                 });

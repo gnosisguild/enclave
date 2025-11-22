@@ -243,7 +243,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         F: Fn(SharedStore<S>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        info!("dispatch_after_timestamp time={}", when);
+        info!("%%%%% ***** >>>>>> dispatch_after_timestamp time={}", when);
         let store = SharedStore::new(self.store.clone());
         let callback = Arc::new(callback);
 
