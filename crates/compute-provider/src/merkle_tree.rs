@@ -10,12 +10,12 @@ use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use num_traits::Num;
 use sha3::{Digest, Keccak256};
-use zk_kit_imt::imt::IMT;
 use std::str::FromStr;
+use zk_kit_imt::imt::IMT;
 
 pub struct MerkleTree {
     pub leaf_hashes: Vec<String>,
-    pub arity: usize, 
+    pub arity: usize,
     pub zero_value: String,
     pub depth: usize,
 }
@@ -35,7 +35,7 @@ impl MerkleTree {
         self.zero_value = "0".to_string();
         self.depth = 20;
         self
-    }   
+    }
 
     pub fn with_depth(mut self, depth: usize) -> Self {
         self.depth = depth;
@@ -94,11 +94,18 @@ impl MerkleTree {
     }
 
     pub fn build_tree(&self) -> IMT {
-        let mut tree = IMT::new(Self::poseidon_hash, self.depth, self.zero_value.clone(), self.arity, vec![]).unwrap();
+        let mut tree = IMT::new(
+            Self::poseidon_hash,
+            self.depth,
+            self.zero_value.clone(),
+            self.arity,
+            vec![],
+        )
+        .unwrap();
         for leaf in &self.leaf_hashes {
             tree.insert(leaf.clone()).unwrap();
         }
 
-        tree 
+        tree
     }
 }
