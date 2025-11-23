@@ -9,6 +9,7 @@ use alloy::{
     primitives::{Bytes, Uint},
     sol,
 };
+use e3_evm_helpers::contracts::ReadOnly;
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
 use helpers::setup_fake_enclave;
@@ -28,11 +29,14 @@ async fn test_indexer() -> Result<()> {
     let address = address.to_string();
     let endpoint = endpoint.to_string();
 
-    let mut indexer =
-        EnclaveIndexer::<InMemoryStore>::from_endpoint_address_in_mem(&endpoint, &address).await?;
+    let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
+        &endpoint, &address,
+    )
+    .await?;
 
     indexer
-        .add_event_handler(move |_: InputPublished, mut store| async move {
+        .add_event_handler(move |_: InputPublished, ctx| async move {
+            let mut store = ctx.store();
             store
                 .modify("input_count", |counter: Option<u64>| {
                     Some(counter.map_or(1, |c| c + 1))
