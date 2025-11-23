@@ -160,7 +160,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&payload).expect("Failed to serialize");
-        let expected = r#"{"e3_id":12345,"ciphertext":"0x0123456789abcdef","proof":"0xdeadbeef"}"#;
+        let expected = r#"{"e3_id":12345,"status":"completed","ciphertext":"0x0123456789abcdef","proof":"0xdeadbeef"}"#;
 
         assert_eq!(json, expected);
     }
