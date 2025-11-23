@@ -11,7 +11,7 @@ use anyhow::Result;
 use e3_compute_provider::FHEInputs;
 use serde::Serialize;
 use std::{future::Future, pin::Pin, sync::Arc};
-use types::{ComputeRequest, WebhookPayload};
+use types::{ComputationStatus, ComputeRequest, WebhookPayload};
 
 #[derive(Serialize, Debug)]
 struct ProcessingResponse {
@@ -138,24 +138,44 @@ pub struct AppConfig {
 async fn call_webhook(
     callback_url: &str,
     e3_id: u64,
+    status: ComputationStatus,
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
+    error: Option<String>,
 ) -> Result<()> {
-    println!("call_webhook()");
+    println!(
+        "call_webhook() - status: {:?}, ciphertext len: {}, proof len: {}",
+        status,
+        ciphertext.len(),
+        proof.len()
+    );
     let payload = WebhookPayload {
         e3_id,
+        status,
         ciphertext,
         proof,
+        error,
     };
+
     println!("callback_url: {}", callback_url);
 
-    reqwest::Client::new()
+    let response = reqwest::Client::new()
         .post(callback_url)
         .json(&payload)
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
 
+    println!("Webhook response status: {}", response.status());
+    if !response.status().is_success() {
+        let error_body = response.text().await?;
+        println!("Webhook error response: {}", error_body);
+        return Err(anyhow::anyhow!(
+            "Webhook failed with status and body: {}",
+            error_body
+        ));
+    }
+
+    response.error_for_status()?;
     println!("✓ Webhook called successfully for E3 {}", e3_id);
     Ok(())
 }
@@ -163,11 +183,13 @@ async fn call_webhook(
 async fn handle_webhook_delivery(
     e3_id: u64,
     callback_url: &str,
+    status: ComputationStatus,
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
+    error: Option<String>,
 ) -> Result<()> {
     println!("handle_webhook_delivery()");
-    call_webhook(callback_url, e3_id, proof, ciphertext).await?;
+    call_webhook(callback_url, e3_id, status, proof, ciphertext, error).await?;
     println!("✓ Webhook sent successfully for E3 {}", e3_id);
     Ok(())
 }
@@ -178,12 +200,39 @@ async fn process_computation_background(
     callback_url: &str,
     fhe_inputs: FHEInputs,
 ) -> Result<()> {
-    let (proof, ciphertext) = runner(fhe_inputs).await?;
-    println!("computation finished!");
-    println!("handling webhook delivery...");
-    handle_webhook_delivery(e3_id, callback_url, proof, ciphertext).await?;
-    println!("✓ Computation completed for E3 {}", e3_id);
-    Ok(())
+    match runner(fhe_inputs).await {
+        Ok((proof, ciphertext)) => {
+            println!("computation finished!");
+            println!("handling webhook delivery...");
+            handle_webhook_delivery(
+                e3_id,
+                callback_url,
+                ComputationStatus::Completed,
+                proof,
+                ciphertext,
+                None,
+            )
+            .await?;
+            println!("✓ Computation completed for E3 {}", e3_id);
+            Ok(())
+        }
+        Err(e) => {
+            let error_msg = e.to_string();
+            eprintln!("Computation failed for E3 {}: {}", e3_id, error_msg);
+
+            handle_webhook_delivery(
+                e3_id,
+                callback_url,
+                ComputationStatus::Failed,
+                vec![],
+                vec![],
+                Some(format!("Compute failed: {}", error_msg)),
+            )
+            .await?;
+
+            Err(e)
+        }
+    }
 }
 
 async fn handle_compute(

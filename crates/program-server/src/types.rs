@@ -24,16 +24,26 @@ pub struct ComputeRequest {
     pub callback_url: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ComputationStatus {
+    Completed,
+    Failed,
+}
+
 #[derive(Derivative, Serialize)]
 #[derivative(Debug)]
 pub struct WebhookPayload {
     pub e3_id: u64,
+    pub status: ComputationStatus,
     #[serde(serialize_with = "serialize_as_hex")]
     #[derivative(Debug = "ignore")]
     pub ciphertext: Vec<u8>,
     #[serde(serialize_with = "serialize_as_hex")]
     #[derivative(Debug = "ignore")]
     pub proof: Vec<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 fn serialize_as_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -71,7 +81,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{ComputeRequest, WebhookPayload};
+    use crate::{types::ComputationStatus, ComputeRequest, WebhookPayload};
 
     #[test]
     fn test_deserialize_compute_request() {
@@ -145,6 +155,8 @@ mod tests {
             e3_id: 12345,
             ciphertext: vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
             proof: vec![0xde, 0xad, 0xbe, 0xef],
+            status: ComputationStatus::Completed,
+            error: None,
         };
 
         let json = serde_json::to_string(&payload).expect("Failed to serialize");

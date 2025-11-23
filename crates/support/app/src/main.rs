@@ -36,13 +36,26 @@ async fn call_webhook(
         proof,
         error,
     };
+    
+    let json_payload = serde_json::to_string_pretty(&payload)?;
+    println!("Sending webhook payload:");
+    println!("{}", json_payload);
     println!("callback_url: {}", callback_url);
-    reqwest::Client::new()
+    
+    let response = reqwest::Client::new()
         .post(callback_url)
         .json(&payload)
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
+    
+    println!("Webhook response status: {}", response.status());
+    if !response.status().is_success() {
+        let error_body = response.text().await?;
+        println!("Webhook error response: {}", error_body);
+        return Err(anyhow::anyhow!("Webhook failed with status and body: {}", error_body));
+    }
+    
+    response.error_for_status()?;
     println!("✓ Webhook called successfully for E3 {}", e3_id);
     Ok(())
 }
