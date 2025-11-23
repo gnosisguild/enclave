@@ -35,18 +35,26 @@ sol!(
 
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
-    let (contract, address, contract2, address2, endpoint, _anvil) = setup_two_contracts().await?;
-    let address = address.to_string();
-    let endpoint = endpoint.to_string();
+    const E3_ID: u64 = 10;
+    const THRESHOLD: u64 = 10;
+    const INDEXER_DELAY_MS: u64 = 10;
+
+    let (
+        enclave_contract,
+        enclave_address,
+        emit_logs_contract,
+        emit_logs_address,
+        endpoint,
+        _anvil,
+    ) = setup_two_contracts().await?;
 
     let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
-        &endpoint,
-        &[&address, &address2],
+        &endpoint.to_string(),
+        &[&enclave_address.to_string(), &emit_logs_address.to_string()],
     )
     .await?;
 
-    let published: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
-
+    // Track InputPublished event count in store
     indexer
         .add_event_handler(move |_: InputPublished, ctx| async move {
             let mut store = ctx.store();
@@ -55,47 +63,47 @@ async fn test_indexer() -> Result<()> {
                     Some(counter.map_or(1, |c| c + 1))
                 })
                 .await?;
-
             Ok(())
         })
         .await;
 
-    let published_clone = published.clone();
+    // Collect PublishMessage events
+    let captured_messages: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+    let captured_messages_for_handler = captured_messages.clone();
+
     indexer
         .add_event_handler(move |msg: PublishMessage, _ctx| {
-            let published_clone = published_clone.clone();
+            // Collect message
+            let messages = captured_messages_for_handler.clone();
             async move {
-                let mut guard = published_clone.lock().unwrap();
-                guard.push(msg.value);
+                messages.lock().unwrap().push(msg.value);
                 Ok(())
             }
         })
         .await;
 
-    // Start tracking state
     let _ = indexer.start();
 
-    // E3Activated
-    let e3_id = 10;
+    let public_key = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let input_data = "Random data that wont actually be a string".to_string();
+    let input_data_bytes = Bytes::from(input_data.clone().into_bytes());
+    let ciphertext_output_data = vec![9, 8, 7, 6, 5, 4, 3, 2, 1];
 
-    let pubkey = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-    contract
+    enclave_contract
         .emitE3Activated(
-            Uint::from(e3_id),
-            Uint::from(10),
-            Bytes::from(pubkey.clone()),
+            Uint::from(E3_ID),
+            Uint::from(THRESHOLD),
+            Bytes::from(public_key.clone()),
         )
         .send()
         .await?
         .watch()
         .await?;
 
-    // InputPublished
-    let data = "Random data that wont actually be a string".to_string();
-    contract
+    enclave_contract
         .emitInputPublished(
-            Uint::from(e3_id),
-            Bytes::from(data.clone().into_bytes()),
+            Uint::from(E3_ID),
+            input_data_bytes.clone(),
             Uint::from(1111),
             Uint::from(1),
         )
@@ -104,19 +112,18 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-    // Here we check that we can emit events on a second contract and have the indexer still listen
-    // for it
-    contract2
+    // Sending message from logs contract which indexer is listening to
+    emit_logs_contract
         .emitPublishMessage("Hello from contract2!".into())
         .send()
         .await?
         .watch()
         .await?;
 
-    contract
+    enclave_contract
         .emitInputPublished(
-            Uint::from(e3_id),
-            Bytes::from(data.clone().into_bytes()),
+            Uint::from(E3_ID),
+            input_data_bytes.clone(),
             Uint::from(2222),
             Uint::from(2),
         )
@@ -125,10 +132,10 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-    contract
+    enclave_contract
         .emitInputPublished(
-            Uint::from(e3_id),
-            Bytes::from(data.clone().into_bytes()),
+            Uint::from(E3_ID),
+            input_data_bytes.clone(),
             Uint::from(3333),
             Uint::from(3),
         )
@@ -137,39 +144,54 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-    sleep(Duration::from_millis(10)).await;
-    let published_clone = published.clone();
-    let published_guard = published_clone.lock().unwrap();
+    sleep(Duration::from_millis(INDEXER_DELAY_MS)).await;
+
+    let messages_from_second_contract = captured_messages.lock().unwrap();
     assert_eq!(
-        published_guard.iter().cloned().collect::<Vec<_>>(),
+        messages_from_second_contract
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>(),
         vec!["Hello from contract2!".to_string()]
     );
-    assert_eq!(indexer.get_e3(e3_id).await?.ciphertext_inputs.len(), 3);
+    drop(messages_from_second_contract);
+
+    let e3_state = indexer.get_e3(E3_ID).await?;
+    let expected_input_count = 3;
+
     assert_eq!(
-        indexer.get_e3(e3_id).await?.ciphertext_inputs,
-        vec![
-            (Bytes::from(data.clone().into_bytes()).to_vec(), 1),
-            (Bytes::from(data.clone().into_bytes()).to_vec(), 2),
-            (Bytes::from(data.clone().into_bytes()).to_vec(), 3),
-        ]
+        e3_state.ciphertext_inputs.len(),
+        expected_input_count as usize
     );
 
-    let ciphertext_output = vec![9, 8, 7, 6, 5, 4, 3, 2, 1];
-    contract
-        .emitCiphertextOutputPublished(Uint::from(e3_id), Bytes::from(ciphertext_output.clone()))
+    let expected_inputs = vec![
+        (input_data_bytes.to_vec(), 1),
+        (input_data_bytes.to_vec(), 2),
+        (input_data_bytes.to_vec(), 3),
+    ];
+    assert_eq!(e3_state.ciphertext_inputs, expected_inputs);
+
+    enclave_contract
+        .emitCiphertextOutputPublished(
+            Uint::from(E3_ID),
+            Bytes::from(ciphertext_output_data.clone()),
+        )
         .send()
         .await?
         .watch()
         .await?;
 
-    sleep(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(INDEXER_DELAY_MS)).await;
 
-    let e3 = indexer.get_e3(e3_id).await?;
-
-    assert_eq!(e3.ciphertext_output, ciphertext_output);
+    let e3_state_after_output = indexer.get_e3(E3_ID).await?;
+    assert_eq!(
+        e3_state_after_output.ciphertext_output,
+        ciphertext_output_data
+    );
 
     let store = indexer.get_store();
-    let val = store.get::<u64>("input_count").await?.unwrap();
-    assert_eq!(val, 3);
+    let total_inputs_processed = store.get::<u64>("input_count").await?.unwrap();
+    assert_eq!(total_inputs_processed, expected_input_count);
+
     Ok(())
 }
