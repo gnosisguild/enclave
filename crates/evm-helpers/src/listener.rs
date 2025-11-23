@@ -94,6 +94,7 @@ impl EventListener {
         tokio::spawn(async move { this.listen().await })
     }
 
+    /// Create a contract listener that will listen to events from all addresses.
     pub async fn create_contract_listener(ws_url: &str, addresses: &[&str]) -> Result<Self> {
         let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
 
