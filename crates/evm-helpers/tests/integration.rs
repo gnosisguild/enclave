@@ -25,9 +25,9 @@ async fn test_event_listener() -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
     let (tx_addr, mut rx_addr) = tokio::sync::mpsc::channel::<String>(10);
 
-    let mut event_listener = EventListener::create_contract_listener(
+    let event_listener = EventListener::create_contract_listener(
         &anvil.ws_endpoint(),
-        &contract.address().to_string(),
+        &[&contract.address().to_string()],
     )
     .await?;
 
@@ -104,9 +104,9 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     let (contract, _, _, anvil) = setup_logs_contract().await?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
 
-    let mut event_listener = EventListener::create_contract_listener(
+    let event_listener = EventListener::create_contract_listener(
         &anvil.ws_endpoint(),
-        &contract.address().to_string(),
+        &[&contract.address().to_string()],
     )
     .await?;
 

@@ -36,7 +36,7 @@ impl EventListener {
         }
     }
 
-    pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
+    pub async fn add_event_handler<E, F, Fut>(&self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
         F: Fn(E) -> Fut + Send + Sync + 'static,
@@ -94,9 +94,13 @@ impl EventListener {
         tokio::spawn(async move { this.listen().await })
     }
 
-    pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
+    pub async fn create_contract_listener(ws_url: &str, addresses: &[&str]) -> Result<Self> {
         let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
-        let address = contract_address.parse::<Address>()?;
+
+        let address = addresses
+            .iter()
+            .map(|a| a.parse::<Address>().map_err(|e| eyre::eyre!("{e}")))
+            .collect::<Result<Vec<_>>>()?;
         let filter = Filter::new()
             .address(address)
             .from_block(BlockNumberOrTag::Latest);
