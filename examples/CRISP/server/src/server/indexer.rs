@@ -402,7 +402,7 @@ pub async fn start_indexer(
     private_key: &str,
 ) -> Result<()> {
     // CRISP indexer
-    let crisp_indexer = EnclaveIndexer::new_write(
+    let crisp_indexer = EnclaveIndexer::new_with_write_contract(
         ws_url,
         contract_address,
         registry_address,

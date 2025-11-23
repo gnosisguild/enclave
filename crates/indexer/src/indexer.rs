@@ -232,7 +232,7 @@ impl EnclaveIndexer<InMemoryStore, ReadOnly> {
 
 impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
     /// Creates a new EnclaveIndexer with a writeable contract.
-    pub async fn new_write(
+    pub async fn new_with_write_contract(
         ws_url: &str,
         contract_address: &str,
         registry_address: &str,
