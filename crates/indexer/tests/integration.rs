@@ -12,9 +12,13 @@ use alloy::{
 use e3_evm_helpers::contracts::ReadOnly;
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
-use helpers::setup_fake_enclave;
-use std::time::Duration;
+use helpers::setup_two_contracts;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::time::sleep;
+use EmitLogs::PublishMessage;
 use Enclave::InputPublished;
 
 sol!(
@@ -23,16 +27,25 @@ sol!(
     "tests/fixtures/fake_enclave.json"
 );
 
+sol!(
+    #[sol(rpc)]
+    EmitLogs,
+    "tests/fixtures/emit_logs.json"
+);
+
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
-    let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
+    let (contract, address, contract2, address2, endpoint, _anvil) = setup_two_contracts().await?;
     let address = address.to_string();
     let endpoint = endpoint.to_string();
 
     let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
-        &endpoint, &address,
+        &endpoint,
+        &[&address, &address2],
     )
     .await?;
+
+    let published: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
 
     indexer
         .add_event_handler(move |_: InputPublished, ctx| async move {
@@ -44,6 +57,18 @@ async fn test_indexer() -> Result<()> {
                 .await?;
 
             Ok(())
+        })
+        .await;
+
+    let published_clone = published.clone();
+    indexer
+        .add_event_handler(move |msg: PublishMessage, _ctx| {
+            let published_clone = published_clone.clone();
+            async move {
+                let mut guard = published_clone.lock().unwrap();
+                guard.push(msg.value);
+                Ok(())
+            }
         })
         .await;
 
@@ -79,6 +104,15 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
+    // Here we check that we can emit events on a second contract and have the indexer still listen
+    // for it
+    contract2
+        .emitPublishMessage("Hello from contract2!".into())
+        .send()
+        .await?
+        .watch()
+        .await?;
+
     contract
         .emitInputPublished(
             Uint::from(e3_id),
@@ -104,7 +138,12 @@ async fn test_indexer() -> Result<()> {
         .await?;
 
     sleep(Duration::from_millis(10)).await;
-
+    let published_clone = published.clone();
+    let published_guard = published_clone.lock().unwrap();
+    assert_eq!(
+        published_guard.iter().cloned().collect::<Vec<_>>(),
+        vec!["Hello from contract2!".to_string()]
+    );
     assert_eq!(indexer.get_e3(e3_id).await?.ciphertext_inputs.len(), 3);
     assert_eq!(
         indexer.get_e3(e3_id).await?.ciphertext_inputs,

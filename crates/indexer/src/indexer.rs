@@ -206,10 +206,10 @@ impl<R: ProviderType> EnclaveIndexer<InMemoryStore, R> {
 impl EnclaveIndexer<InMemoryStore, ReadOnly> {
     pub async fn from_endpoint_address_in_mem(
         ws_url: &str,
-        contract_address: &str,
+        contract_address: &[&str],
     ) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, &[contract_address]).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, contract_address[0]).await?;
         EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(listener, contract).await
     }
     pub async fn from_endpoint_address(
