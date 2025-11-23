@@ -268,6 +268,8 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Ok(instance)
     }
 
+    /// Listen for contract events from all contracts.
+    /// Callback will provide the event and a context object.
     pub async fn add_event_handler<E, F, Fut>(&self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
