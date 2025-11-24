@@ -198,54 +198,42 @@ async fn test_indexer() -> Result<()> {
 
 mod memory_leak {
 
-    use e3_evm_helpers::{contracts::ProviderType, listener::EventListener};
+    use e3_evm_helpers::{contracts::EnclaveContractFactory, listener::EventListener};
 
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     // Track how many instances exist
-    static INDEXER_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static LISTENER_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static CONTEXT_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static CREATE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    // Wrapper types that track creation/destruction
-    struct TrackedIndexer<S: DataStore, R: ProviderType> {
-        inner: EnclaveIndexer<S, R>,
-    }
+    #[derive(Clone)]
+    struct LeakDetector(Arc<DropCounter>);
 
-    impl<S: DataStore, R: ProviderType> Drop for TrackedIndexer<S, R> {
+    struct DropCounter;
+
+    impl Drop for DropCounter {
         fn drop(&mut self) {
-            INDEXER_COUNT.fetch_sub(1, Ordering::SeqCst);
-            println!("Dropped TrackedIndexer");
+            DROP_COUNT.fetch_add(1, Ordering::SeqCst);
         }
     }
 
-    struct TrackedListener {
-        inner: EventListener,
-    }
-
-    impl Drop for TrackedListener {
-        fn drop(&mut self) {
-            LISTENER_COUNT.fetch_sub(1, Ordering::SeqCst);
-            println!("Dropped TrackedListener");
+    impl LeakDetector {
+        fn new() -> Self {
+            CREATE_COUNT.fetch_add(1, Ordering::SeqCst);
+            Self(Arc::new(DropCounter))
         }
     }
 
-    impl Clone for TrackedListener {
-        fn clone(&self) -> Self {
-            LISTENER_COUNT.fetch_add(1, Ordering::SeqCst);
-            Self {
-                inner: self.inner.clone(),
-            }
-        }
-    }
+    async fn create_indexer() -> Result<EnclaveIndexer<InMemoryStore, ReadOnly>> {
+        let (_, enclave_address, _, _, endpoint, _anvil) = setup_two_contracts().await?;
 
-    async fn create_test_indexer() -> Result<EnclaveIndexer<InMemoryStore, ReadOnly>> {
-        EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
-            "ws://example.com",
-            &[""],
-        )
-        .await
+        // Create indexer
+        let listener =
+            EventListener::create_contract_listener(&endpoint, &[&enclave_address]).await?;
+        let contract = EnclaveContractFactory::create_read(&endpoint, &enclave_address).await?;
+
+        EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(listener, contract).await
     }
 
     #[tokio::test]
@@ -256,59 +244,41 @@ mod memory_leak {
 
         }
 
-        let (_, enclave_address, _, _, endpoint, _anvil) = setup_two_contracts().await?;
+        DROP_COUNT.store(0, Ordering::SeqCst);
+        CREATE_COUNT.store(0, Ordering::SeqCst);
 
-        // Reset counters
-        INDEXER_COUNT.store(0, Ordering::SeqCst);
-        LISTENER_COUNT.store(0, Ordering::SeqCst);
-        CONTEXT_COUNT.store(0, Ordering::SeqCst);
+        {
+            // Add an event handler that captures context
+            let indexer = create_indexer().await?;
+            let detector = LeakDetector::new();
 
-        // Create indexer
-        let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
-            &endpoint,
-            &[&enclave_address],
-        )
-        .await?;
+            indexer
+                .add_event_handler(move |event: TestEvent, ctx| {
+                    let _captured = detector.clone();
+                    async move {
+                        // This closure captures ctx, which contains a listener clone
+                        println!("Event received: {:?}", event);
+                        Ok(())
+                    }
+                })
+                .await;
+        }
 
-        INDEXER_COUNT.fetch_add(1, Ordering::SeqCst);
-
-        println!("Created indexer");
-        println!("Indexer count: {}", INDEXER_COUNT.load(Ordering::SeqCst));
-        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
-
-        // Add an event handler that captures context
-        indexer
-            .add_event_handler(|event: TestEvent, ctx| async move {
-                // This closure captures ctx, which contains a listener clone
-                println!("Event received: {:?}", event);
-                Ok(())
-            })
-            .await;
-
-        println!("Added handler");
-        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
-
-        // Drop the indexer
-        drop(indexer);
-
-        println!("Dropped indexer");
-        println!("Indexer count: {}", INDEXER_COUNT.load(Ordering::SeqCst));
-        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
-
-        // Force garbage collection attempts
+        // Delay to ensure everything is dropped.
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        // Check if everything was cleaned up
+        let created = CREATE_COUNT.load(Ordering::SeqCst);
+        let dropped = DROP_COUNT.load(Ordering::SeqCst);
+
+        println!("Created: {}, Dropped: {}", created, dropped);
+
+        // This assertion will FAIL if there's a leak
         assert_eq!(
-            INDEXER_COUNT.load(Ordering::SeqCst),
-            0,
-            "Indexer was not dropped!"
+            created, dropped,
+            "Memory leak detected! Created {} objects but only dropped {}",
+            created, dropped
         );
-        assert_eq!(
-            LISTENER_COUNT.load(Ordering::SeqCst),
-            0,
-            "Listener was not dropped - MEMORY LEAK!"
-        );
+
         Ok(())
     }
 }
