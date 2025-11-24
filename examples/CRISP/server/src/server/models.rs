@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::sol;
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
