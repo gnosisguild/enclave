@@ -16,6 +16,7 @@
     "dev:up": "bash ./scripts/dev.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
+    "test:contracts": "pnpm -C packages/crisp-contracts test",
     "ciphernode:add": "pnpm -C packages/crisp-contracts ciphernode:add",
     "ciphernode:mint:tokens": "pnpm -C packages/crisp-contracts ciphernode:mint:tokens",
     "ciphernode:add:self": "pnpm -C packages/crisp-contracts ciphernode:add:self",
