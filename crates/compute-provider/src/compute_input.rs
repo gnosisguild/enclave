@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::ciphertext_output::ComputeResult;
-use crate::merkle_tree::MerkleTree;
+use crate::merkle_tree_builder::MerkleTreeBuilder;
 use sha3::{Digest, Keccak256};
 
 pub type FHEProcessor = fn(&FHEInputs) -> Vec<u8>;
@@ -34,7 +34,7 @@ impl ComputeInput {
             "Ciphertext hash mismatch"
         );
 
-        let merkle_root = MerkleTree::new()
+        let merkle_root = MerkleTreeBuilder::new()
             .with_defaults()
             .with_leaf_hashes(self.leaf_hashes.clone())
             .build_tree()

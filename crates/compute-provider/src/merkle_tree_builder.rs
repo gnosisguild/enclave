@@ -13,14 +13,14 @@ use sha3::{Digest, Keccak256};
 use std::str::FromStr;
 use zk_kit_imt::imt::IMT;
 
-pub struct MerkleTree {
+pub struct MerkleTreeBuilder {
     pub leaf_hashes: Vec<String>,
     pub arity: usize,
     pub zero_value: String,
     pub depth: usize,
 }
 
-impl MerkleTree {
+impl MerkleTreeBuilder {
     pub fn new() -> Self {
         Self {
             leaf_hashes: Vec::new(),

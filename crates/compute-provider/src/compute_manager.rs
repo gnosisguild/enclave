@@ -6,7 +6,7 @@
 
 use crate::ciphertext_output::ComputeProvider;
 use crate::compute_input::{ComputeInput, FHEInputs};
-use crate::merkle_tree::MerkleTree;
+use crate::merkle_tree_builder::MerkleTreeBuilder;
 use crate::FHEProcessor;
 use rayon::prelude::*;
 use sha3::{Digest, Keccak256};
@@ -56,7 +56,7 @@ where
     }
 
     fn start_sequential(&mut self) -> (P::Output, Vec<u8>) {
-        let mut tree_handler = MerkleTree::new();
+        let mut tree_handler = MerkleTreeBuilder::new();
         tree_handler.compute_leaf_hashes(&self.input.fhe_inputs.ciphertexts);
         self.input.leaf_hashes = tree_handler.leaf_hashes.clone();
 
@@ -83,7 +83,7 @@ where
         let tally_results: Vec<(P::Output, Vec<u8>, String)> = chunks
             .into_par_iter()
             .map(|chunk| {
-                let mut tree_handler = MerkleTree::new();
+                let mut tree_handler = MerkleTreeBuilder::new();
                 tree_handler.compute_leaf_hashes(&chunk);
                 let merkle_root = tree_handler.build_tree().root().unwrap();
 
