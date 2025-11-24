@@ -278,11 +278,23 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     {
         let handler = Arc::new(handler);
         let ctx = Arc::new(IndexerContext::from_indexer(self));
+        // In order to avoid a memory leak we create a weak reference here
+        let ctx_weak = Arc::downgrade(&ctx);
+
         self.listener
             .add_event_handler(move |e: E| {
                 let handler = Arc::clone(&handler);
-                let ctx = ctx.clone();
-                async move { handler(e, ctx).await }
+                let ctx_weak = ctx_weak.clone();
+
+                async move {
+                    // We check the weak reference if it can be upgraded
+                    // if not it must have been destroyed
+                    if let Some(ctx) = ctx_weak.upgrade() {
+                        handler(e, ctx).await
+                    } else {
+                        Ok(())
+                    }
+                }
             })
             .await;
     }

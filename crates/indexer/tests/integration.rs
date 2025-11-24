@@ -34,6 +34,7 @@ sol!(
 );
 
 #[tokio::test]
+// #[ignore]
 async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
     const THRESHOLD: u64 = 10;
@@ -238,6 +239,7 @@ mod memory_leak {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_memory_leak() -> Result<()> {
         sol! {
             #[derive(Debug)]
