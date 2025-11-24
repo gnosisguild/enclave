@@ -251,9 +251,6 @@ importers:
       '@zk-kit/lazy-imt.sol':
         specifier: 2.0.0-beta.12
         version: 2.0.0-beta.12
-      '@zk-kit/lean-imt.sol':
-        specifier: 2.0.0
-        version: 2.0.0
       poseidon-solidity:
         specifier: ^0.0.5
         version: 0.0.5
