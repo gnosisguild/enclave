@@ -6,7 +6,7 @@
 
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
 use e3_compute_provider::FHEInputs;
-use e3_support_types::{ComputeRequest, WebhookPayload};
+use e3_support_types::{ComputationStatus, ComputeRequest, WebhookPayload};
 use serde::Serialize;
 
 #[derive(Serialize, Debug)]
@@ -18,53 +18,75 @@ struct ProcessingResponse {
 async fn call_webhook(
     callback_url: &str,
     e3_id: u64,
+    status: ComputationStatus,
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
+    error: Option<String>,
 ) -> anyhow::Result<()> {
-    println!("call_webhook()");
+    println!(
+        "call_webhook() - status: {:?}, ciphertext len: {}, proof len: {}", 
+        status, 
+        ciphertext.len(), 
+        proof.len()
+    );
     let payload = WebhookPayload {
         e3_id,
+        status,
         ciphertext,
         proof,
+        error,
     };
+    
+    let json_payload = serde_json::to_string_pretty(&payload)?;
+    println!("Sending webhook payload:");
+    println!("{}", json_payload);
     println!("callback_url: {}", callback_url);
-    reqwest::Client::new()
+    
+    let response = reqwest::Client::new()
         .post(callback_url)
         .json(&payload)
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
+    
+    println!("Webhook response status: {}", response.status());
+    if !response.status().is_success() {
+        let error_body = response.text().await?;
+        println!("Webhook error response: {}", error_body);
+        return Err(anyhow::anyhow!("Webhook failed with status and body: {}", error_body));
+    }
+    
+    response.error_for_status()?;
     println!("✓ Webhook called successfully for E3 {}", e3_id);
     Ok(())
 }
 
-#[cfg(feature = "risc0")]
 async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     println!("running computation...");
-    let (risc0_output, ciphertext) =
-        tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs)).await??;
-    println!("have result from computation!");
-    let proof: Vec<u8> = risc0_output.seal.into();
-    Ok((proof, ciphertext))
-}
-
-#[cfg(not(feature = "risc0"))]
-async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
-    println!("NOOP: risc0 feature not enabled, skipping actual computation");
-    // Return dummy data
-    Ok((vec![0u8; 32], vec![1u8; 64]))
-}
-
-async fn handle_webhook_delivery(
-    e3_id: u64,
-    callback_url: &str,
-    proof: Vec<u8>,
-    ciphertext: Vec<u8>,
-) -> anyhow::Result<()> {
-    println!("handle_webhook_delivery()");
-    call_webhook(callback_url, e3_id, proof, ciphertext).await?;
-    println!("✓ Webhook sent successfully for E3 {}", e3_id);
-    Ok(())
+    let result = tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs)).await?;
+    
+    match result {
+        Ok((boundless_output, ciphertext)) => {
+            match boundless_output {
+                e3_support_host::BoundlessOutput::Success { seal, .. } => {
+                    println!(
+                        "have result from computation! seal len: {}, ciphertext len: {}", 
+                        seal.len(), 
+                        ciphertext.len()
+                    );
+                    Ok((seal, ciphertext))
+                }
+                e3_support_host::BoundlessOutput::Error { error } => {
+                    Err(anyhow::anyhow!("Boundless request failed: {}", error))
+                }
+            }
+        }
+        Err(e3_support_host::ComputeError::BoundlessFailed(msg)) => {
+            Err(anyhow::anyhow!("Boundless request failed: {}", msg))
+        }
+        Err(e3_support_host::ComputeError::Other(msg)) => {
+            Err(anyhow::anyhow!("Computation error: {}", msg))
+        }
+    }
 }
 
 async fn process_computation_background(
@@ -72,12 +94,39 @@ async fn process_computation_background(
     callback_url: &str,
     fhe_inputs: FHEInputs,
 ) -> anyhow::Result<()> {
-    let (proof, ciphertext) = run_computation_async(fhe_inputs).await?;
-    println!("computation finished!");
-    println!("handling webhook delivery...");
-    handle_webhook_delivery(e3_id, callback_url, proof, ciphertext).await?;
-    println!("✓ Computation completed for E3 {}", e3_id);
-    Ok(())
+    match run_computation_async(fhe_inputs).await {
+        Ok((proof, ciphertext)) => {
+            println!("computation finished!");
+            println!("handling webhook delivery...");
+            call_webhook(
+                callback_url,
+                e3_id,
+                ComputationStatus::Completed,
+                proof,
+                ciphertext,
+                None,
+            )
+            .await?;
+            println!("Computation completed for E3 {}", e3_id);
+            Ok(())
+        }
+        Err(e) => {
+            let error_msg = e.to_string();
+            eprintln!("Computation failed for E3 {}: {}", e3_id, error_msg);
+            
+            call_webhook(
+                callback_url,
+                e3_id,
+                ComputationStatus::Failed,
+                vec![],
+                vec![],
+                Some(format!("Compute failed: {}", error_msg)),
+            )
+            .await?;
+            
+            Err(e)
+        }
+    }
 }
 
 async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpResponse> {

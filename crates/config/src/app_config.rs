@@ -91,21 +91,41 @@ impl Default for NodeDefinition {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct BoundlessConfig {
+    /// RPC URL for blockchain (e.g., Sepolia)
+    pub rpc_url: String,
+    /// Private key for submitting requests
+    pub private_key: String,
+    /// Pinata JWT for uploading programs/inputs
+    #[serde(default)]
+    pub pinata_jwt: Option<String>,
+    /// Pre-uploaded program URL (if program is already on IPFS)
+    #[serde(default)]
+    pub program_url: Option<String>,
+    /// Submit requests onchain (true) or offchain (false)
+    #[serde(default = "default_true")]
+    pub onchain: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Risc0Config {
-    #[serde(default)]
-    pub bonsai_api_key: Option<String>,
-    #[serde(default)]
-    pub bonsai_api_url: Option<String>,
+    /// Dev mode: 0 = production, 1 = dev mode (fake proofs)
     #[serde(default)]
     pub risc0_dev_mode: u8,
+    /// Boundless configuration
+    #[serde(default)]
+    pub boundless: Option<BoundlessConfig>,
 }
 
 impl Default for Risc0Config {
     fn default() -> Self {
         Risc0Config {
-            bonsai_api_key: None,
-            bonsai_api_url: None,
-            risc0_dev_mode: 0,
+            risc0_dev_mode: 1, // Default to dev mode for safety
+            boundless: None,
         }
     }
 }
@@ -491,8 +511,6 @@ node:
 
 program:
   risc0:
-    bonsai_api_key: "12345678"
-    bonsai_api_url: "http://my.api.com"
     risc0_dev_mode: 0
 
 nodes:
@@ -530,9 +548,8 @@ nodes:
             assert_eq!(
                 config.program().risc0(),
                 Some(&Risc0Config {
-                    bonsai_api_key: Some("12345678".to_string()),
-                    bonsai_api_url: Some("http://my.api.com".to_string()),
                     risc0_dev_mode: 0,
+                    boundless: None,
                 })
             );
             assert!(config.peers().is_empty());
