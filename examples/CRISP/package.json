@@ -12,7 +12,6 @@
     "cli": "bash ./scripts/cli.sh",
     "lint": "eslint .",
     "dev:setup": "bash ./scripts/setup.sh",
-    "dev:build": "bash ./scripts/build.sh",
     "dev:up": "bash ./scripts/dev.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
