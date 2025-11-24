@@ -40,94 +40,86 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl Responder {
     let incoming = data.into_inner();
 
-    info!(
-        "Received program server result for E3 ID: {:?}, status: {:?}, ciphertext len: {}, proof len: {}",
-        incoming.e3_id, incoming.status, incoming.ciphertext.len(), incoming.proof.len()
-    );
+    match incoming {
+        WebhookPayload::Failed { e3_id, error } => {
+            error!("Computation failed for E3 ID: {}. Error: {}", e3_id, error);
 
-    // Handle failed computation
-    if incoming.status == "failed" {
-        let error_msg = incoming
-            .error
-            .unwrap_or_else(|| "Unknown error".to_string());
-        error!(
-            "Computation failed for E3 ID: {}. Error: {}",
-            incoming.e3_id, error_msg
-        );
+            // TODO: Update E3 state to indicate computation failed
+            // TODO: Handle ciphernode rewards for partial work
+            // TODO: Emit on-chain event if needed
 
-        // TODO: Update E3 state to indicate computation failed
-        // TODO: Handle ciphernode rewards for partial work
-        // TODO: Emit on-chain event if needed
-
-        return HttpResponse::Ok().json(format!(
-            "Computation failed for E3 ID: {}. Error: {}",
-            incoming.e3_id, error_msg
-        ));
-    }
-
-    // Handle successful computation
-    if incoming.status != "completed" {
-        error!(
-            "Unknown status '{}' for E3 ID: {}",
-            incoming.status, incoming.e3_id
-        );
-        return HttpResponse::BadRequest().json(format!("Unknown status: {}", incoming.status));
-    }
-
-    if incoming.ciphertext.is_empty() && incoming.proof.is_empty() {
-        info!(
-            "Both ciphertext and proof are empty for E3 ID: {} - skipping chain publication",
-            incoming.e3_id
-        );
-        return HttpResponse::Ok().json(format!(
-            "Computation completed for E3 ID: {}",
-            incoming.e3_id
-        ));
-    }
-
-    // Create the contract
-    let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
-        &CONFIG.http_rpc_url,
-        &CONFIG.enclave_address,
-        &CONFIG.private_key,
-    )
-    .await
-    {
-        Ok(contract) => contract,
-        Err(e) => {
-            error!("Failed to create contract: {:?}", e);
-            return HttpResponse::InternalServerError()
-                .json(format!("Failed to create contract: {}", e));
+            HttpResponse::Ok().json(format!(
+                "Computation failed for E3 ID: {}. Error: {}",
+                e3_id, error
+            ))
         }
-    };
+        WebhookPayload::Completed {
+            e3_id,
+            ciphertext,
+            proof,
+        } => {
+            info!(
+                "Received program server result for E3 ID: {}, ciphertext len: {}, proof len: {}",
+                e3_id,
+                ciphertext.len(),
+                proof.len()
+            );
 
-    // Try the direct call
-    let tx_result = contract
-        .publish_ciphertext_output(
-            U256::from(incoming.e3_id),
-            Bytes::from(incoming.ciphertext.clone()),
-            Bytes::from(incoming.proof.clone()),
-        )
-        .await;
+            // In dev mode, proof might be empty
+            if ciphertext.is_empty() && proof.is_empty() {
+                info!(
+                    "Both ciphertext and proof are empty for E3 ID: {} - skipping chain publication",
+                    e3_id
+                );
+                return HttpResponse::Ok()
+                    .json(format!("Computation completed for E3 ID: {}", e3_id));
+            }
 
-    let pending_tx = match tx_result {
-        Ok(tx) => tx,
-        Err(e) => {
-            error!("Failed to send transaction: {:?}", e);
-            return HttpResponse::InternalServerError()
-                .json(format!("Failed to send transaction: {}", e));
+            // Create the contract
+            let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
+                &CONFIG.http_rpc_url,
+                &CONFIG.enclave_address,
+                &CONFIG.private_key,
+            )
+            .await
+            {
+                Ok(contract) => contract,
+                Err(e) => {
+                    error!("Failed to create contract: {:?}", e);
+                    return HttpResponse::InternalServerError()
+                        .json(format!("Failed to create contract: {}", e));
+                }
+            };
+
+            // Try the direct call
+            let tx_result = contract
+                .publish_ciphertext_output(
+                    U256::from(e3_id),
+                    Bytes::from(ciphertext.clone()),
+                    Bytes::from(proof.clone()),
+                )
+                .await;
+
+            let pending_tx = match tx_result {
+                Ok(tx) => tx,
+                Err(e) => {
+                    error!("Failed to send transaction: {:?}", e);
+                    return HttpResponse::InternalServerError()
+                        .json(format!("Failed to send transaction: {}", e));
+                }
+            };
+
+            info!(
+                "Ciphertext output published successfully for E3 ID: {} with tx: {}",
+                e3_id, pending_tx.transaction_hash
+            );
+
+            HttpResponse::Ok().json(format!(
+                "Ciphertext output published successfully for E3 ID: {}",
+                e3_id
+            ))
         }
-    };
-
-    info!(
-        "Ciphertext output published successfully for E3 ID: {} with tx: {}",
-        incoming.e3_id, pending_tx.transaction_hash
-    );
-
-    HttpResponse::Ok().json(format!(
-        "Ciphertext output published successfully for E3 ID: {}",
-        incoming.e3_id
-    ))
+    }
 }
 
 /// Get the result for a given round

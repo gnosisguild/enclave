@@ -8,19 +8,23 @@ use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Derivative, Deserialize)]
+#[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]
-pub struct WebhookPayload {
-    pub e3_id: u64,
-    pub status: String, // "completed" or "failed"
-    #[serde(deserialize_with = "deserialize_hex_string_optional", default)]
-    #[derivative(Debug = "ignore")]
-    pub ciphertext: Vec<u8>,
-    #[serde(deserialize_with = "deserialize_hex_string_optional", default)]
-    #[derivative(Debug = "ignore")]
-    pub proof: Vec<u8>,
-    #[serde(default)]
-    pub error: Option<String>,
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum WebhookPayload {
+    Completed {
+        e3_id: u64,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        ciphertext: Vec<u8>,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        proof: Vec<u8>,
+    },
+    Failed {
+        e3_id: u64,
+        error: String,
+    },
 }
 
 pub fn deserialize_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -30,20 +34,6 @@ where
     let s: String = Deserialize::deserialize(deserializer)?;
     let hex_str = s.strip_prefix("0x").unwrap_or(&s);
     hex::decode(hex_str).map_err(serde::de::Error::custom)
-}
-
-pub fn deserialize_hex_string_optional<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: Option<String> = Option::deserialize(deserializer)?;
-    match s {
-        Some(hex_str) => {
-            let hex_str = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
-            hex::decode(hex_str).map_err(serde::de::Error::custom)
-        }
-        None => Ok(Vec::new()),
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

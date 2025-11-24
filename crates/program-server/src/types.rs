@@ -24,26 +24,25 @@ pub struct ComputeRequest {
     pub callback_url: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum ComputationStatus {
-    Completed,
-    Failed,
-}
-
-#[derive(Derivative, Serialize)]
+#[derive(Derivative, Serialize, Deserialize)]
 #[derivative(Debug)]
-pub struct WebhookPayload {
-    pub e3_id: u64,
-    pub status: ComputationStatus,
-    #[serde(serialize_with = "serialize_as_hex")]
-    #[derivative(Debug = "ignore")]
-    pub ciphertext: Vec<u8>,
-    #[serde(serialize_with = "serialize_as_hex")]
-    #[derivative(Debug = "ignore")]
-    pub proof: Vec<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum WebhookPayload {
+    Completed {
+        e3_id: u64,
+        #[serde(serialize_with = "serialize_as_hex")]
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        ciphertext: Vec<u8>,
+        #[serde(serialize_with = "serialize_as_hex")]
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        proof: Vec<u8>,
+    },
+    Failed {
+        e3_id: u64,
+        error: String,
+    },
 }
 
 fn serialize_as_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -81,7 +80,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{types::ComputationStatus, ComputeRequest, WebhookPayload};
+    use crate::{ComputeRequest, WebhookPayload};
 
     #[test]
     fn test_deserialize_compute_request() {
@@ -150,17 +149,28 @@ mod tests {
     }
 
     #[test]
-    fn test_webhook_payload_serialization() {
-        let payload = WebhookPayload {
+    fn test_webhook_payload_serialization_completed() {
+        let payload = WebhookPayload::Completed {
             e3_id: 12345,
             ciphertext: vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
             proof: vec![0xde, 0xad, 0xbe, 0xef],
-            status: ComputationStatus::Completed,
-            error: None,
         };
 
         let json = serde_json::to_string(&payload).expect("Failed to serialize");
-        let expected = r#"{"e3_id":12345,"status":"completed","ciphertext":"0x0123456789abcdef","proof":"0xdeadbeef"}"#;
+        let expected = r#"{"status":"completed","e3_id":12345,"ciphertext":"0x0123456789abcdef","proof":"0xdeadbeef"}"#;
+
+        assert_eq!(json, expected);
+    }
+
+    #[test]
+    fn test_webhook_payload_serialization_failed() {
+        let payload = WebhookPayload::Failed {
+            e3_id: 12345,
+            error: "Computation failed".to_string(),
+        };
+
+        let json = serde_json::to_string(&payload).expect("Failed to serialize");
+        let expected = r#"{"status":"failed","e3_id":12345,"error":"Computation failed"}"#;
 
         assert_eq!(json, expected);
     }
