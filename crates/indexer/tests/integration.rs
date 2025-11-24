@@ -34,7 +34,6 @@ sol!(
 );
 
 #[tokio::test]
-// #[ignore]
 async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
     const THRESHOLD: u64 = 10;
@@ -204,7 +203,6 @@ mod memory_leak {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    // Track how many instances exist
     static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
     static CREATE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -230,7 +228,6 @@ mod memory_leak {
     async fn create_indexer() -> Result<EnclaveIndexer<InMemoryStore, ReadOnly>> {
         let (_, enclave_address, _, _, endpoint, _anvil) = setup_two_contracts().await?;
 
-        // Create indexer
         let listener =
             EventListener::create_contract_listener(&endpoint, &[&enclave_address]).await?;
         let contract = EnclaveContractFactory::create_read(&endpoint, &enclave_address).await?;
@@ -256,10 +253,10 @@ mod memory_leak {
 
             indexer
                 .add_event_handler(move |event: TestEvent, _ctx| {
+                    // This closure captures a ref to detector
                     let _captured = detector.clone();
                     println!("{:?}", _captured.0);
                     async move {
-                        // This closure captures ctx, which contains a listener clone
                         println!("Event received: {:?}", event);
                         Ok(())
                     }
@@ -275,7 +272,7 @@ mod memory_leak {
 
         println!("Created: {}, Dropped: {}", created, dropped);
 
-        // This assertion will FAIL if there's a leak
+        // If the handler was dropped then the detector will be dropped too
         assert_eq!(
             created, dropped,
             "Memory leak detected! Created {} objects but only dropped {}",
