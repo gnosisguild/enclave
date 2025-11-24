@@ -194,9 +194,6 @@ jobs:
           toolchain: 1.86.0
           target: wasm32-unknown-unknown
 
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
-
       - name: 'Setup node'
         uses: actions/setup-node@v3
         with:
@@ -451,9 +448,6 @@ jobs:
         with:
           toolchain: v1.0.0-beta.15
 
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
-
       - name: Install yq
         run: |
           sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
@@ -612,9 +606,6 @@ jobs:
         with:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
 
       - name: Install node dependencies
         run: pnpm install
