@@ -24,32 +24,10 @@ impl MerkleTreeBuilder {
     pub fn new() -> Self {
         Self {
             leaf_hashes: Vec::new(),
-            arity: 0,
-            zero_value: 0.to_string(),
-            depth: 0,
+            arity: 2,
+            zero_value: "0".to_string(),
+            depth: 20,
         }
-    }
-
-    pub fn with_defaults(mut self) -> Self {
-        self.arity = 2;
-        self.zero_value = "0".to_string();
-        self.depth = 20;
-        self
-    }
-
-    pub fn with_depth(mut self, depth: usize) -> Self {
-        self.depth = depth;
-        self
-    }
-
-    pub fn with_arity(mut self, arity: usize) -> Self {
-        self.arity = arity;
-        self
-    }
-
-    pub fn with_zero_value(mut self, zero_value: String) -> Self {
-        self.zero_value = zero_value;
-        self
     }
 
     pub fn with_leaf_hashes(mut self, leaf_hashes: Vec<String>) -> Self {
@@ -102,6 +80,7 @@ impl MerkleTreeBuilder {
             vec![],
         )
         .unwrap();
+
         for leaf in &self.leaf_hashes {
             tree.insert(leaf.clone()).unwrap();
         }

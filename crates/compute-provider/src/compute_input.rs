@@ -35,7 +35,6 @@ impl ComputeInput {
         );
 
         let merkle_root = MerkleTreeBuilder::new()
-            .with_defaults()
             .with_leaf_hashes(self.leaf_hashes.clone())
             .build_tree()
             .root()
