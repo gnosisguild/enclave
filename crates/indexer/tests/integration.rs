@@ -195,3 +195,120 @@ async fn test_indexer() -> Result<()> {
 
     Ok(())
 }
+
+mod memory_leak {
+
+    use e3_evm_helpers::{contracts::ProviderType, listener::EventListener};
+
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Track how many instances exist
+    static INDEXER_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static LISTENER_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static CONTEXT_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    // Wrapper types that track creation/destruction
+    struct TrackedIndexer<S: DataStore, R: ProviderType> {
+        inner: EnclaveIndexer<S, R>,
+    }
+
+    impl<S: DataStore, R: ProviderType> Drop for TrackedIndexer<S, R> {
+        fn drop(&mut self) {
+            INDEXER_COUNT.fetch_sub(1, Ordering::SeqCst);
+            println!("Dropped TrackedIndexer");
+        }
+    }
+
+    struct TrackedListener {
+        inner: EventListener,
+    }
+
+    impl Drop for TrackedListener {
+        fn drop(&mut self) {
+            LISTENER_COUNT.fetch_sub(1, Ordering::SeqCst);
+            println!("Dropped TrackedListener");
+        }
+    }
+
+    impl Clone for TrackedListener {
+        fn clone(&self) -> Self {
+            LISTENER_COUNT.fetch_add(1, Ordering::SeqCst);
+            Self {
+                inner: self.inner.clone(),
+            }
+        }
+    }
+
+    async fn create_test_indexer() -> Result<EnclaveIndexer<InMemoryStore, ReadOnly>> {
+        EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
+            "ws://example.com",
+            &[""],
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn test_memory_leak() -> Result<()> {
+        sol! {
+            #[derive(Debug)]
+            event TestEvent();
+
+        }
+
+        let (_, enclave_address, _, _, endpoint, _anvil) = setup_two_contracts().await?;
+
+        // Reset counters
+        INDEXER_COUNT.store(0, Ordering::SeqCst);
+        LISTENER_COUNT.store(0, Ordering::SeqCst);
+        CONTEXT_COUNT.store(0, Ordering::SeqCst);
+
+        // Create indexer
+        let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
+            &endpoint,
+            &[&enclave_address],
+        )
+        .await?;
+
+        INDEXER_COUNT.fetch_add(1, Ordering::SeqCst);
+
+        println!("Created indexer");
+        println!("Indexer count: {}", INDEXER_COUNT.load(Ordering::SeqCst));
+        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
+
+        // Add an event handler that captures context
+        indexer
+            .add_event_handler(|event: TestEvent, ctx| async move {
+                // This closure captures ctx, which contains a listener clone
+                println!("Event received: {:?}", event);
+                Ok(())
+            })
+            .await;
+
+        println!("Added handler");
+        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
+
+        // Drop the indexer
+        drop(indexer);
+
+        println!("Dropped indexer");
+        println!("Indexer count: {}", INDEXER_COUNT.load(Ordering::SeqCst));
+        println!("Listener count: {}", LISTENER_COUNT.load(Ordering::SeqCst));
+
+        // Force garbage collection attempts
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Check if everything was cleaned up
+        assert_eq!(
+            INDEXER_COUNT.load(Ordering::SeqCst),
+            0,
+            "Indexer was not dropped!"
+        );
+        assert_eq!(
+            LISTENER_COUNT.load(Ordering::SeqCst),
+            0,
+            "Listener was not dropped - MEMORY LEAK!"
+        );
+        Ok(())
+    }
+}
