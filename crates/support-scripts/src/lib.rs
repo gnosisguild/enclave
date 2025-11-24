@@ -26,6 +26,11 @@ pub async fn program_start(program_config: ProgramConfig, is_dev: Option<bool>) 
     ProgramSupport::new(program_config, is_dev).start().await
 }
 
+/// Upload the compiled program to Pinata IPFS
+pub async fn program_upload(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {
+    ProgramSupport::new(program_config, is_dev).upload().await
+}
+
 /// Open up a shell in the docker container
 pub async fn program_shell() -> Result<()> {
     let cwd = env::current_dir()?;
