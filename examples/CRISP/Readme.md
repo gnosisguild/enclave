@@ -90,7 +90,7 @@ You need to setup your environment variables for `client/` and `server/`. Just c
 `.env.default` as `.env` and overwrite with your values the following variables (you can leave the
 others initialized with the default values).
 
-`pnpm dev:setup` already make a copy of the env files for you.
+`pnpm dev:setup` already makes a copy of the env files for you.
 
 The addresses will be displayed after successfully running the `pnpm dev:up` command in a log that
 will look like the following:
