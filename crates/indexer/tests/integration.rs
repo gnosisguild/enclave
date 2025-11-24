@@ -210,6 +210,7 @@ mod memory_leak {
     #[derive(Clone)]
     struct LeakDetector(Arc<DropCounter>);
 
+    #[derive(Debug)]
     struct DropCounter;
 
     impl Drop for DropCounter {
@@ -253,8 +254,9 @@ mod memory_leak {
             let detector = LeakDetector::new();
 
             indexer
-                .add_event_handler(move |event: TestEvent, ctx| {
+                .add_event_handler(move |event: TestEvent, _ctx| {
                     let _captured = detector.clone();
+                    println!("{:?}", _captured.0);
                     async move {
                         // This closure captures ctx, which contains a listener clone
                         println!("Event received: {:?}", event);
