@@ -146,14 +146,9 @@ impl<S: DataStore> DataStore for SharedStore<S> {
 
 #[derive(Clone)]
 pub struct EnclaveIndexer<S: DataStore, R: ProviderType> {
-    listener: EventListener,
-    contract: EnclaveContract<R>,
-    store: Arc<RwLock<S>>,
-    contract_address: String,
-    chain_id: u64,
+    ctx: Arc<IndexerContext<S, R>>,
 }
 
-#[derive(Clone)]
 pub struct IndexerContext<S: DataStore, R: ProviderType> {
     store: SharedStore<S>,
     listener: EventListener,
@@ -163,16 +158,6 @@ pub struct IndexerContext<S: DataStore, R: ProviderType> {
 }
 
 impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
-    pub fn from_indexer(indexer: &EnclaveIndexer<S, R>) -> Self {
-        Self {
-            store: SharedStore::new(indexer.store.clone()),
-            contract: indexer.contract.clone(),
-            listener: indexer.listener.clone(),
-            contract_address: indexer.contract_address.clone(),
-            chain_id: indexer.chain_id,
-        }
-    }
-
     pub fn store(&self) -> SharedStore<S> {
         self.store.clone()
     }
@@ -258,11 +243,13 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         let chain_id = contract.provider.get_chain_id().await?;
         let contract_address = contract.address().to_string();
         let mut instance = Self {
-            store: Arc::new(RwLock::new(store)),
-            contract,
-            listener,
-            contract_address,
-            chain_id,
+            ctx: Arc::new(IndexerContext {
+                store: SharedStore::new(Arc::new(RwLock::new(store))),
+                contract,
+                listener,
+                contract_address,
+                chain_id,
+            }),
         };
         instance.setup_listeners().await?;
         Ok(instance)
@@ -277,11 +264,12 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         let handler = Arc::new(handler);
-        let ctx = Arc::new(IndexerContext::from_indexer(self));
+        let ctx = self.ctx.clone();
         // In order to avoid a memory leak we create a weak reference here
         let ctx_weak = Arc::downgrade(&ctx);
 
-        self.listener
+        self.ctx
+            .listener
             .add_event_handler(move |e: E| {
                 let handler = Arc::clone(&handler);
                 let ctx_weak = ctx_weak.clone();
@@ -292,6 +280,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     if let Some(ctx) = ctx_weak.upgrade() {
                         handler(e, ctx).await
                     } else {
+                        println!("Context was dropped!");
                         Ok(())
                     }
                 }
@@ -420,20 +409,20 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     }
 
     pub fn start(&self) -> JoinHandle<Result<()>> {
-        self.listener.start()
+        self.ctx.listener.start()
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
-        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
+        let (e3, _) = get_e3(self.ctx.store.inner.clone(), e3_id).await?;
         Ok(e3)
     }
 
     pub fn get_listener(&self) -> EventListener {
-        self.listener.clone()
+        self.ctx.listener.clone()
     }
 
     pub fn get_store(&self) -> SharedStore<S> {
-        SharedStore::new(self.store.clone())
+        self.ctx.store.clone()
     }
 }
 

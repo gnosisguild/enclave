@@ -239,7 +239,6 @@ mod memory_leak {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_memory_leak() -> Result<()> {
         sol! {
             #[derive(Debug)]
