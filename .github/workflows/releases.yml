@@ -183,9 +183,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
-
       - name: Determine npm tag
         id: npm_tag
         run: |
