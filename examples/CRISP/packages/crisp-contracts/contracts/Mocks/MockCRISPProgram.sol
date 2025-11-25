@@ -29,6 +29,9 @@ contract MockCRISPProgram is IE3Program, Ownable {
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
+    // The depth of the input merkle tree
+    uint8 public constant TREE_DEPTH = 20;
+
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
@@ -205,7 +208,7 @@ contract MockCRISPProgram is IE3Program, Ownable {
         returns (bool)
     {
         require(paramsHashes[e3Id] != bytes32(0), E3DoesNotExist());
-        bytes32 inputRoot = bytes32(votes[e3Id]._root());
+        bytes32 inputRoot = bytes32(votes[e3Id]._root(TREE_DEPTH));
         bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
         encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);
