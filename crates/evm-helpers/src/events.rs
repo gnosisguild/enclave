@@ -44,9 +44,6 @@ sol! {
     }
 
     #[derive(Debug)]
-    event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
-
-    #[derive(Debug)]
     event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
     #[derive(Debug)]

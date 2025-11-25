@@ -25,7 +25,6 @@ export type {
   // Event data types
   E3RequestedData,
   E3ActivatedData,
-  InputPublishedData,
   CiphertextOutputPublishedData,
   PlaintextOutputPublishedData,
   CiphernodeAddedData,

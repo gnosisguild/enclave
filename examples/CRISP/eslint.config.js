@@ -19,6 +19,8 @@ export default defineConfig([
     '**/artifacts/**',
     '**/types/**',
     '**/.cache-synpress/**',
+    '**/playwright-report/**',
+    'packages/crisp-zk-inputs/pkg/**',
   ]),
   {
     extends: [config],

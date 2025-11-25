@@ -16,7 +16,7 @@ use e3_evm_helpers::{
     contracts::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
     },
-    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
+    events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
     listener::EventListener,
 };
 use eyre::eyre;
@@ -26,7 +26,6 @@ use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
 use tracing::info;
 
 type E3Id = u64;
@@ -226,14 +225,15 @@ impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
     /// Creates a new EnclaveIndexer with a writeable contract.
     pub async fn new_with_write_contract(
         ws_url: &str,
-        contract_address: &str,
-        registry_address: &str,
+        addresses: &[&str], // First address must be contract_address
         store: S,
         private_key: &str,
     ) -> Result<Self> {
+        let Some(contract_address) = addresses.first() else {
+            return Err(eyre::eyre!("No addresses provided"));
+        };
         EnclaveIndexer::new(
-            EventListener::create_contract_listener(ws_url, &[contract_address, registry_address])
-                .await?,
+            EventListener::create_contract_listener(ws_url, addresses).await?,
             EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?,
             store,
         )
@@ -349,26 +349,6 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Ok(())
     }
 
-    async fn register_input_published(&mut self) -> Result<()> {
-        self.add_event_handler(move |e: InputPublished, ctx| async move {
-            let store = ctx.store();
-            println!(
-                "InputPublished: e3_id={}, index={}, data=0x{}...",
-                e.e3Id,
-                e.index,
-                hex::encode(&e.data[..8.min(e.data.len())])
-            );
-            let e3_id = u64_try_from(e.e3Id)?;
-
-            let mut repo = E3Repository::new(store, e3_id);
-            repo.insert_ciphertext_input(e.data.to_vec(), e.index.to::<u64>())
-                .await?;
-            Ok(())
-        })
-        .await;
-        Ok(())
-    }
-
     async fn register_ciphertext_output_published(&mut self) -> Result<()> {
         self.add_event_handler(move |e: CiphertextOutputPublished, ctx| async move {
             let store = ctx.store();
@@ -411,7 +391,6 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     async fn setup_listeners(&mut self) -> Result<()> {
         info!("Setting up listeners for EnclaveIndexer...");
         self.register_e3_activated().await?;
-        self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
         info!("Listeners have been setup!");

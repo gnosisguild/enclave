@@ -24,9 +24,9 @@ use e3_sdk::{
             PlaintextOutputPublished,
         },
     },
-    indexer::{DataStore, EnclaveIndexer},
+    indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
-use evm_helpers::CRISPContractFactory;
+use evm_helpers::{CRISPContractFactory, InputPublished};
 use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
@@ -142,6 +142,9 @@ pub async fn register_e3_requested(
                 let balance_threshold_bytes = balance_threshold.to_bytes_be();
                 let balance_threshold_u256 = U256::from_be_slice(&balance_threshold_bytes);
 
+                // Convert e3Id from u64 to U256
+                let e3_id_u256 = U256::from(e3_id);
+
                 info!(
                     "[e3_id={}] Calling setRoundData with root: {}, token: {}, threshold: {}",
                     e3_id, merkle_root_u256, token_address, balance_threshold_u256
@@ -158,7 +161,7 @@ pub async fn register_e3_requested(
                 })?;
 
                 let receipt = contract
-                    .set_round_data(merkle_root_u256, token_address, balance_threshold_u256)
+                    .set_round_data(e3_id_u256, merkle_root_u256, token_address, balance_threshold_u256)
                     .await
                     .with_context(|| {
                         format!("[e3_id={}] Failed to call setRoundData", e3_id)
@@ -220,10 +223,12 @@ pub async fn register_e3_activated(
                     info!("[e3_id={}] Starting computation for E3", e3_id);
                     repo.update_status("Computing").await?;
 
+                    let votes = repo.get_ciphertext_inputs().await?;
+
                     let (id, status) = run_compute(
                         e3_id,
                         e3.e3_params,
-                        e3.ciphertext_inputs,
+                        votes,
                         format!("{}/state/add-result", CONFIG.enclave_server_url),
                     )
                     .await
@@ -394,19 +399,43 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
     Ok(block.header.timestamp)
 }
 
+pub async fn register_input_published(
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
+    indexer
+        .add_event_handler(move |event: InputPublished, ctx| {
+            let e3_id = event.e3Id.to::<u64>();
+            let store = ctx.store();
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+            async move {
+                println!(
+                    "InputPublished: e3_id={}, index={}, data=0x{}...",
+                    event.e3Id,
+                    event.index,
+                    hex::encode(&event.vote[..8.min(event.vote.len())])
+                );
+
+                repo.insert_ciphertext_input(event.vote.to_vec(), event.index.to::<u64>())
+                    .await?;
+                Ok(())
+            }
+        })
+        .await;
+    Ok(indexer)
+}
+
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
     registry_address: &str,
-    store: impl DataStore,
+    crisp_address: &str,
+    store: SharedStore<impl DataStore>,
     private_key: &str,
 ) -> Result<()> {
     info!("CRISP: Creating indexer...");
-    // CRISP indexer
     let crisp_indexer = EnclaveIndexer::new_with_write_contract(
         ws_url,
-        contract_address,
-        registry_address,
+        &[contract_address, registry_address, crisp_address],
         store,
         private_key,
     )
@@ -418,9 +447,9 @@ pub async fn start_indexer(
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_committee_published(crisp_indexer).await?;
-
+    let crisp_indexer = register_input_published(crisp_indexer).await?;
     info!("CRISP: Indexer finished registering handlers!");
     crisp_indexer.listen().await?;
-    info!("Indexer listen loop has finished!");
+    info!("CRISP: Indexer listen loop has finished!");
     Ok(())
 }

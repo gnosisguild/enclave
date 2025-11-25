@@ -23,6 +23,7 @@
     "@enclave-e3/contracts": "workspace:*",
     "@enclave-e3/sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
+    "@zk-kit/lazy-imt.sol": "2.0.0-beta.12",
     "dotenv": "^16.4.5",
     "viem": "2.38.1",
     "yargs": "^18.0.0"
