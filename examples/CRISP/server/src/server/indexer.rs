@@ -401,6 +401,7 @@ pub async fn start_indexer(
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
+    info!("CRISP: Creating indexer...");
     // CRISP indexer
     let crisp_indexer = EnclaveIndexer::new_with_write_contract(
         ws_url,
@@ -410,12 +411,16 @@ pub async fn start_indexer(
         private_key,
     )
     .await?;
+    info!("CRISP: Indexer registering handlers...");
+
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_committee_published(crisp_indexer).await?;
-    crisp_indexer.start();
 
+    info!("CRISP: Indexer finished registering handlers!");
+    crisp_indexer.start();
+    info!("Start has been executed!");
     Ok(())
 }

@@ -27,6 +27,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tracing::info;
 
 type E3Id = u64;
 
@@ -149,6 +150,12 @@ pub struct EnclaveIndexer<S: DataStore, R: ProviderType> {
     ctx: Arc<IndexerContext<S, R>>,
 }
 
+impl<S: DataStore, R: ProviderType> Drop for EnclaveIndexer<S, R> {
+    fn drop(&mut self) {
+        info!("EnclaveIndexer is DROPPED");
+    }
+}
+
 pub struct IndexerContext<S: DataStore, R: ProviderType> {
     store: SharedStore<S>,
     listener: EventListener,
@@ -252,6 +259,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             }),
         };
         instance.setup_listeners().await?;
+        info!("EnclaveIndexer has been configured");
         Ok(instance)
     }
 
@@ -401,14 +409,17 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     }
 
     async fn setup_listeners(&mut self) -> Result<()> {
+        info!("Setting up listeners for EnclaveIndexer...");
         self.register_e3_activated().await?;
         self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        info!("Listeners have been setup!");
         Ok(())
     }
 
     pub fn start(&self) -> JoinHandle<Result<()>> {
+        info!("Starting EnclaveIndexer...");
         self.ctx.listener.start()
     }
 
