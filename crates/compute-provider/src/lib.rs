@@ -7,7 +7,7 @@
 mod ciphertext_output;
 mod compute_input;
 mod compute_manager;
-mod merkle_tree;
+mod merkle_tree_builder;
 
 pub use ciphertext_output::*;
 pub use compute_input::*;

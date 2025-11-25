@@ -43,6 +43,7 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 &CONFIG.ws_rpc_url,
                 &CONFIG.enclave_address,
                 &CONFIG.ciphernode_registry_address,
+                &CONFIG.e3_program_address,
                 db.clone(),
                 &CONFIG.private_key,
             )

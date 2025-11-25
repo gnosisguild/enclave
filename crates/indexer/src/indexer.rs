@@ -14,7 +14,7 @@ use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use e3_evm_helpers::{
     contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
-    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
+    events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
     listener::EventListener,
 };
 use eyre::eyre;
@@ -276,30 +276,6 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn register_input_published(&mut self) -> Result<()> {
-        let store = self.store.clone();
-        self.listener
-            .add_event_handler(move |e: InputPublished| {
-                let store = SharedStore::new(store.clone());
-                async move {
-                    println!(
-                        "InputPublished: e3_id={}, index={}, data=0x{}...",
-                        e.e3Id,
-                        e.index,
-                        hex::encode(&e.data[..8.min(e.data.len())])
-                    );
-                    let e3_id = u64_try_from(e.e3Id)?;
-
-                    let mut repo = E3Repository::new(store, e3_id);
-                    repo.insert_ciphertext_input(e.data.to_vec(), e.index.to::<u64>())
-                        .await?;
-                    Ok(())
-                }
-            })
-            .await;
-        Ok(())
-    }
-
     async fn register_ciphertext_output_published(&mut self) -> Result<()> {
         let store = self.store.clone();
         self.listener
@@ -349,7 +325,6 @@ impl<S: DataStore> EnclaveIndexer<S> {
 
     async fn setup_listeners(&mut self) -> Result<()> {
         self.register_e3_activated().await?;
-        self.register_input_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
         Ok(())

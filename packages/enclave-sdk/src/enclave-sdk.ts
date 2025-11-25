@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Abi, type Hash, type Log, WalletClient, createPublicClient, createWalletClient, http, webSocket } from 'viem'
+import { type Abi, type Hash, type Log, PublicClient, WalletClient, createPublicClient, createWalletClient, http, webSocket } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { hardhat, mainnet, monadTestnet, sepolia } from 'viem/chains'
 import initializeWasm from '@enclave-e3/wasm/init'
@@ -48,6 +48,7 @@ export class EnclaveSDK {
   private initialized = false
   private protocol: FheProtocol
   private protocolParams?: ProtocolParams
+  private publicClient: PublicClient
 
   // TODO: use zod for config validation
   constructor(private config: SDKConfig) {
@@ -79,6 +80,8 @@ export class EnclaveSDK {
     if (config.protocolParams) {
       this.protocolParams = config.protocolParams
     }
+
+    this.publicClient = config.publicClient
   }
 
   /**
@@ -94,6 +97,14 @@ export class EnclaveSDK {
     } catch (error) {
       throw new SDKError(`Failed to initialize SDK: ${error}`, 'SDK_INITIALIZATION_FAILED')
     }
+  }
+
+  /**
+   * Get the public client used by the SDK
+   * @returns The public client
+   */
+  public getPublicClient = (): PublicClient => {
+    return this.publicClient
   }
 
   public async getBfvParamsSet(name: ProtocolParamsName): Promise<ProtocolParams> {
