@@ -9,7 +9,10 @@ use alloy::sol;
 use e3_evm_helpers::listener::EventListener;
 use eyre::Result;
 use helpers::setup_logs_contract;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time::sleep;
 
 sol!(
@@ -25,11 +28,13 @@ async fn test_event_listener() -> Result<()> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
     let (tx_addr, mut rx_addr) = tokio::sync::mpsc::channel::<String>(10);
 
-    let event_listener = EventListener::create_contract_listener(
-        &anvil.ws_endpoint(),
-        &[&contract.address().to_string()],
-    )
-    .await?;
+    let event_listener = Arc::new(
+        EventListener::create_contract_listener(
+            &anvil.ws_endpoint(),
+            &[&contract.address().to_string()],
+        )
+        .await?,
+    );
 
     event_listener
         .add_event_handler(move |event: EmitLogs::ValueChanged| {
@@ -51,7 +56,8 @@ async fn test_event_listener() -> Result<()> {
         })
         .await;
 
-    event_listener.start();
+    let spawn_event_listener = event_listener.clone();
+    let _ = tokio::spawn(async move { spawn_event_listener.listen().await });
 
     contract
         .setValue("hello".to_string())
@@ -104,11 +110,13 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     let (contract, _, _, anvil) = setup_logs_contract().await?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
 
-    let event_listener = EventListener::create_contract_listener(
-        &anvil.ws_endpoint(),
-        &[&contract.address().to_string()],
-    )
-    .await?;
+    let event_listener = Arc::new(
+        EventListener::create_contract_listener(
+            &anvil.ws_endpoint(),
+            &[&contract.address().to_string()],
+        )
+        .await?,
+    );
 
     let tx1 = tx.clone();
     event_listener
@@ -140,7 +148,8 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
         })
         .await;
 
-    event_listener.start();
+    let spawn_event_listener = event_listener.clone();
+    let _ = tokio::spawn(async move { spawn_event_listener.listen().await });
 
     // Events should be returned roughly in this order:
     // 0ms : one
