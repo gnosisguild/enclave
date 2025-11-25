@@ -8,16 +8,23 @@ use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Derivative, Deserialize)]
+#[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]
-pub struct WebhookPayload {
-    pub e3_id: u64,
-    #[serde(deserialize_with = "deserialize_hex_string")]
-    #[derivative(Debug = "ignore")]
-    pub ciphertext: Vec<u8>,
-    #[serde(deserialize_with = "deserialize_hex_string")]
-    #[derivative(Debug = "ignore")]
-    pub proof: Vec<u8>,
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum WebhookPayload {
+    Completed {
+        e3_id: u64,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        ciphertext: Vec<u8>,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        proof: Vec<u8>,
+    },
+    Failed {
+        e3_id: u64,
+        error: String,
+    },
 }
 
 pub fn deserialize_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>

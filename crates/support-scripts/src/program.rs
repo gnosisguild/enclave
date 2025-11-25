@@ -48,4 +48,11 @@ impl ProgramSupportApi for ProgramSupport {
             ProgramSupport::Risc0(s) => s.start().await,
         }
     }
+
+    async fn upload(&self) -> Result<()> {
+        match self {
+            ProgramSupport::Dev(s) => s.upload().await,
+            ProgramSupport::Risc0(s) => s.upload().await,
+        }
+    }
 }
