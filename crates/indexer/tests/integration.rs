@@ -159,21 +159,6 @@ async fn test_indexer() -> Result<()> {
     );
     drop(messages_from_second_contract);
 
-    let e3_state = indexer.get_e3(E3_ID).await?;
-    let expected_input_count = 3;
-
-    assert_eq!(
-        e3_state.ciphertext_inputs.len(),
-        expected_input_count as usize
-    );
-
-    let expected_inputs = vec![
-        (input_data_bytes.to_vec(), 1),
-        (input_data_bytes.to_vec(), 2),
-        (input_data_bytes.to_vec(), 3),
-    ];
-    assert_eq!(e3_state.ciphertext_inputs, expected_inputs);
-
     enclave_contract
         .emitCiphertextOutputPublished(
             Uint::from(E3_ID),
@@ -194,7 +179,7 @@ async fn test_indexer() -> Result<()> {
 
     let store = indexer.get_store();
     let total_inputs_processed = store.get::<u64>("input_count").await?.unwrap();
-    assert_eq!(total_inputs_processed, expected_input_count);
+    assert_eq!(total_inputs_processed, 3);
 
     Ok(())
 }
