@@ -308,19 +308,15 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let crypto_params = self.params.crypto_params();
 
         for i in 0..L {
-            let qi = crypto_params.qis[i];
-
-            let mut zero = 0;
             // Check each coefficient satisfies the CRT relationship
             for j in 0..N {
-                let e0_coeff = self.e0.coefficients[j];
-                let e0i_coeff = self.e0is[i].coefficients[j];
-                let quotient_coeff = self.e0_quotients[i].coefficients[j];
-
                 // Verify: e0_coeff = e0i_coeff + quotient_coeff * qi
-                zero += e0_coeff - (e0i_coeff + quotient_coeff * qi);
+                assert(
+                    self.e0.coefficients[j]
+                        == self.e0is[i].coefficients[j]
+                            + self.e0_quotients[i].coefficients[j] * crypto_params.qis[i],
+                );
             }
-            assert(zero == 0);
         }
     }
 
