@@ -8,16 +8,23 @@ use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Derivative, Deserialize)]
+#[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]
-pub struct WebhookPayload {
-    pub e3_id: u64,
-    #[serde(deserialize_with = "deserialize_hex_string")]
-    #[derivative(Debug = "ignore")]
-    pub ciphertext: Vec<u8>,
-    #[serde(deserialize_with = "deserialize_hex_string")]
-    #[derivative(Debug = "ignore")]
-    pub proof: Vec<u8>,
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum WebhookPayload {
+    Completed {
+        e3_id: u64,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        ciphertext: Vec<u8>,
+        #[serde(deserialize_with = "deserialize_hex_string")]
+        #[derivative(Debug = "ignore")]
+        proof: Vec<u8>,
+    },
+    Failed {
+        e3_id: u64,
+        error: String,
+    },
 }
 
 pub fn deserialize_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -75,7 +82,6 @@ pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
     pub proof: Vec<u8>,
-    pub public_inputs: Vec<[u8; 32]>,
     pub address: String,
 }
 
@@ -164,9 +170,6 @@ pub struct E3 {
     pub ciphertext_output: Vec<u8>,
     pub plaintext_output: Vec<u8>,
 
-    // Ciphertext Inputs
-    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-
     // Emojis
     pub emojis: [String; 2],
 
@@ -185,6 +188,7 @@ pub struct E3Crisp {
     pub token_holder_hashes: Vec<String>,
     pub token_address: String,
     pub balance_threshold: String,
+    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
 }
 
 impl From<E3> for WebResultRequest {

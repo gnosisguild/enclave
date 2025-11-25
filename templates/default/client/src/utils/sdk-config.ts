@@ -17,6 +17,7 @@ export function getEnclaveSDKConfig() {
     contracts: {
       enclave: contracts.enclave,
       ciphernodeRegistry: contracts.ciphernodeRegistry,
+      feeToken: contracts.feeToken,
     },
     protocol: FheProtocol.BFV,
   }

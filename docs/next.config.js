@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const nextra = require('nextra')
 
 const withNextra = nextra({

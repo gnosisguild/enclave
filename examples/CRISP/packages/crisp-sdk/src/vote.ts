@@ -68,7 +68,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
   validateVote(votingMode, vote, votingPower)
 
   switch (votingMode) {
-    case VotingMode.GOVERNANCE:
+    case VotingMode.GOVERNANCE: {
       const voteArray = []
       const length = bfvParams.degree
       const halfLength = length / 2
@@ -87,6 +87,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
         voteArray.push(i < offset ? '0' : noBinary[i - offset])
       }
       return voteArray
+    }
     default:
       throw new Error('Unsupported voting mode')
   }
@@ -99,7 +100,7 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: big
  */
 export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
   switch (votingMode) {
-    case VotingMode.GOVERNANCE:
+    case VotingMode.GOVERNANCE: {
       const HALF_D = tally.length / 2
       const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
       const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
@@ -127,6 +128,7 @@ export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
         yes,
         no,
       }
+    }
     default:
       throw new Error('Unsupported voting mode')
   }
@@ -281,7 +283,7 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness } = await noir.execute(crispInputs as any)
-  const proof = await backend.generateProof(witness, { keccak: true })
+  const proof = await backend.generateProof(witness, { keccakZK: true })
 
   await backend.destroy()
 
@@ -295,7 +297,7 @@ export const generateProofWithReturnValue = async (
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
 
   const { witness, returnValue } = await noir.execute(crispInputs as any)
-  const proof = await backend.generateProof(witness, { keccak: true })
+  const proof = await backend.generateProof(witness, { keccakZK: true })
 
   await backend.destroy()
 
@@ -313,7 +315,7 @@ export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Pr
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
 
-  const isValid = await backend.verifyProof(proof, { keccak: true })
+  const isValid = await backend.verifyProof(proof, { keccakZK: true })
 
   await backend.destroy()
 

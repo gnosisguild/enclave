@@ -3,13 +3,18 @@
     <img src="./enclave.png" alt="Enclave" width="100%">
   </picture>
 
-[![Docs][docs-badge]][docs] [![Github Actions][gha-badge]][gha] [![Hardhat][hardhat-badge]][hardhat] [![License: LGPL v3][license-badge]][license]
+[![Docs][docs-badge]][docs] [![Github Actions][gha-badge]][gha] [![Hardhat][hardhat-badge]][hardhat]
+[![License: LGPL v3][license-badge]][license]
 
 </div>
 
 # Enclave
 
-This is the monorepo for Enclave, an open-source protocol for Collaborative Confidential Compute. Enclave leverages the combination of Fully Homomorphic Encryption (FHE), Zero Knowledge Proofs (ZKPs), and Multi-Party Computation (MPC) to enable Encrypted Execution Environments (E3) with integrity and privacy guarantees rooted in cryptography and economics, rather than hardware and attestations.
+This is the monorepo for Enclave, an open-source protocol for Collaborative Confidential Compute.
+Enclave leverages the combination of Fully Homomorphic Encryption (FHE), Zero Knowledge Proofs
+(ZKPs), and Multi-Party Computation (MPC) to enable Encrypted Execution Environments (E3) with
+integrity and privacy guarantees rooted in cryptography and economics, rather than hardware and
+attestations.
 
 ## Quick Start
 
@@ -27,7 +32,8 @@ See [CONTRIBUTING.md][contributing].
 
 ## Development
 
-This section covers the essential commands for setting up and working with the Enclave codebase locally.
+This section covers the essential commands for setting up and working with the Enclave codebase
+locally.
 
 ```bash
 # Install dependencies
@@ -36,11 +42,59 @@ pnpm i
 # Build the project
 pnpm build
 
-# Run tests
-pnpm test
-
 # Clean build artifacts
 pnpm clean
+```
+
+### Testing
+
+**⚠️ Important:** Always run tests through pnpm scripts, not directly via `cargo test` or other
+build tools. The pnpm scripts ensure necessary setup steps are executed (e.g., building required
+binaries, setting up test environments) that may be skipped when running tests directly.
+
+#### Test Scripts
+
+The monorepo provides several test scripts for different components:
+
+- **`pnpm test`** - Runs all tests across the entire monorepo:
+  - EVM/Smart contract tests (`evm:test`)
+  - Rust crate tests (`rust:test`)
+  - SDK tests (`sdk:test`)
+  - Noir circuit tests (`noir:test`)
+
+- **`pnpm rust:test`** - Runs all Rust crate tests in the `crates/` directory. This script runs
+  tests for all crates in the workspace, not just ciphernode-related crates.
+
+- **`pnpm evm:test`** - Runs tests for the EVM smart contracts in `packages/enclave-contracts`.
+
+- **`pnpm sdk:test`** - Runs tests for the TypeScript SDK in `packages/enclave-sdk`.
+
+- **`pnpm noir:test`** - Runs tests for Noir circuits in the `circuits/` directory using
+  `nargo test`.
+
+- **`pnpm test:integration`** - Runs integration tests from `tests/integration/`. These tests may
+  require prebuilt binaries and can be run with `--no-prebuild` if binaries are already available.
+
+#### Running Individual Test Suites
+
+```bash
+# Run only Rust crate tests
+pnpm rust:test
+
+# Run only EVM/smart contract tests
+pnpm evm:test
+
+# Run only SDK tests
+pnpm sdk:test
+
+# Run only Noir circuit tests
+pnpm noir:test
+
+# Run only integration tests
+pnpm test:integration
+
+# Run integration tests without prebuild step (if binaries already exist)
+pnpm test:integration --no-prebuild
 ```
 
 ### Contributors
@@ -139,7 +193,8 @@ This workspace's minimum supported rustc version is 1.86.0.
 
 ## Architecture
 
-Enclave employs a modular architecture involving numerous actors and participants. The sequence diagram below offers a high-level overview of the protocol, but necessarily omits most detail.
+Enclave employs a modular architecture involving numerous actors and participants. The sequence
+diagram below offers a high-level overview of the protocol, but necessarily omits most detail.
 
 ```mermaid
 sequenceDiagram
@@ -187,7 +242,8 @@ sequenceDiagram
 
 ### Overview
 
-Enclave uses a unified versioning strategy where all packages (Rust crates and npm packages) share the same version number. Releases are triggered by git tags and follow semantic versioning.
+Enclave uses a unified versioning strategy where all packages (Rust crates and npm packages) share
+the same version number. Releases are triggered by git tags and follow semantic versioning.
 
 ### Quick Release
 
@@ -208,7 +264,8 @@ pnpm bump:versions 1.0.0
 
 #### 1. Development Phase
 
-Developers work on features and fixes, committing with [conventional commits](https://www.conventionalcommits.org/):
+Developers work on features and fixes, committing with
+[conventional commits](https://www.conventionalcommits.org/):
 
 ```bash
 git commit -m "feat: add new encryption module"
@@ -241,7 +298,8 @@ This command automatically:
 - ✅ Pushes commits and tag to GitHub
 - ✅ **Triggers automated release workflow**
 
-Please ensure you are in release branch before running the command. For example, `git checkout -b chore/release-v1.0.0-beta.1`.
+Please ensure you are in release branch before running the command. For example,
+`git checkout -b chore/release-v1.0.0-beta.1`.
 
 #### 3. Alternative: Manual Review Before Push
 
@@ -359,7 +417,8 @@ For maintainers doing a release:
 - [ ] Decide version number (major/minor/patch)
 - [ ] Run: `pnpm bump:versions X.Y.Z`
 - [ ] Monitor GitHub Actions for successful deployment
-- [ ] Verify packages on [npm](https://www.npmjs.com/org/enclave) and [crates.io](https://crates.io/search?q=enclave)
+- [ ] Verify packages on [npm](https://www.npmjs.com/org/enclave) and
+      [crates.io](https://crates.io/search?q=enclave)
 - [ ] Check GitHub release page for binaries and changelog
 - [ ] Announce release (Discord/Twitter/etc)
 
@@ -407,11 +466,13 @@ If a release has issues:
 
 ## 📊 Version History
 
-Check our [Releases page](https://github.com/gnosisguild/enclave/releases) for full version history and changelogs.
+Check our [Releases page](https://github.com/gnosisguild/enclave/releases) for full version history
+and changelogs.
 
 ## Security and Liability
 
-This repo is provided WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+This repo is provided WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.
 
 ## License
 

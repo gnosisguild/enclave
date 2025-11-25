@@ -41,7 +41,6 @@ export async function getProxyAdmin(
  * @throws Error if owner doesn't match
  */
 export async function verifyProxyAdminOwner(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   proxyAdmin: any,
   expectedOwner: string,
 ): Promise<void> {

@@ -1962,12 +1962,14 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "crisp-constants",
  "derivative",
  "dialoguer",
  "dotenvy",
  "e3-compute-provider",
  "e3-sdk",
  "env_logger",
+ "evm-helpers",
  "eyre",
  "fhe",
  "fhe-traits",
@@ -1984,6 +1986,13 @@ dependencies = [
  "sled",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "crisp-constants"
+version = "0.1.0"
+dependencies = [
+ "e3-sdk",
 ]
 
 [[package]]
@@ -2276,6 +2285,7 @@ dependencies = [
  "rayon",
  "serde",
  "sha3",
+ "zk-kit-imt",
 ]
 
 [[package]]
@@ -2485,6 +2495,15 @@ name = "ethnum"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca81e6b4777c89fd810c25a4be2b1bd93ea034fbe58e6a75216a34c6b82c539b"
+
+[[package]]
+name = "evm-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "eyre",
+ "tokio",
+]
 
 [[package]]
 name = "eyre"
@@ -6533,6 +6552,8 @@ name = "zk-inputs"
 version = "0.1.0"
 dependencies = [
  "bigint-poly",
+ "crisp-constants",
+ "e3-sdk",
  "eyre",
  "fhe",
  "fhe-math",
@@ -6548,6 +6569,16 @@ dependencies = [
  "serde_json",
  "zkfhe-greco",
  "zkfhe-shared",
+]
+
+[[package]]
+name = "zk-kit-imt"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
+dependencies = [
+ "hex",
+ "tiny-keccak",
 ]
 
 [[package]]

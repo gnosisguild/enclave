@@ -1,14 +1,14 @@
 node:
-  address: "${ADDRESS}"
+  address: '${ADDRESS}'
   quic_port: ${QUIC_PORT}
   peers:
-    - "/dns4/cn1/udp/9091/quic-v1"
-    - "/dns4/cn3/udp/9093/quic-v1"
-    - "/dns4/aggregator/udp/9094/quic-v1"
+    - '/dns4/cn1/udp/9091/quic-v1'
+    - '/dns4/cn3/udp/9093/quic-v1'
+    - '/dns4/aggregator/udp/9094/quic-v1'
 chains:
-  - name: "sepolia"
-    rpc_url: "${RPC_URL}"
+  - name: 'sepolia'
+    rpc_url: '${RPC_URL}'
     contracts:
-      enclave: "${SEPOLIA_ENCLAVE_ADDRESS}"
-      ciphernode_registry: "${SEPOLIA_CIPHERNODE_REGISTRY_ADDRESS}"
-      bonding_registry: "${SEPOLIA_BONDING_REGISTRY}"
+      enclave: '${SEPOLIA_ENCLAVE_ADDRESS}'
+      ciphernode_registry: '${SEPOLIA_CIPHERNODE_REGISTRY_ADDRESS}'
+      bonding_registry: '${SEPOLIA_BONDING_REGISTRY}'

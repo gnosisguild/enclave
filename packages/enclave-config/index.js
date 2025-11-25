@@ -4,4 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-console.log("This is not designed to be run like this.");
+console.log('This is not designed to be run like this.')

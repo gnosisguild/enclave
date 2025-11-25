@@ -6,13 +6,14 @@
   "jsxSingleQuote": true,
   "semi": false,
   "trailingComma": "all",
+  "bracketSpacing": true,
   "arrowParens": "always",
+  "proseWrap": "always",
   "overrides": [
     {
       "files": ["*.mdx", "*.md"],
       "options": {
-        "printWidth": 100,
-        "proseWrap": "always"
+        "printWidth": 100
       }
     }
   ]

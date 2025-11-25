@@ -66,7 +66,7 @@ export const storeDeploymentArgs = (
       deployments = JSON.parse(
         fs.readFileSync(deploymentsFile, "utf8"),
       ) as Deployments;
-    } catch (error) {
+    } catch {
       console.warn("Failed to parse existing deployments file, starting fresh");
       deployments = {};
     }
@@ -120,7 +120,7 @@ export const readAllDeployments = (): Deployments => {
 
   try {
     return JSON.parse(fs.readFileSync(deploymentsFile, "utf8")) as Deployments;
-  } catch (error) {
+  } catch {
     console.warn("Failed to parse deployments file");
     return {};
   }

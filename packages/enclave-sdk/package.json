@@ -20,7 +20,7 @@
     "access": "public"
   },
   "scripts": {
-    "prebuild": "cd ../enclave-contracts && pnpm build && cd ../../crates/wasm && pnpm build",
+    "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build",
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
@@ -37,8 +37,8 @@
     "vite-plugin-dts": "^4.5.3"
   },
   "dependencies": {
-    "@aztec/bb.js": "^0.82.2",
-    "@noir-lang/noir_js": "1.0.0-beta.3",
+    "@aztec/bb.js": "3.0.0-nightly.20251104",
+    "@noir-lang/noir_js": "1.0.0-beta.15",
     "@enclave-e3/wasm": "workspace:*",
     "@enclave-e3/contracts": "workspace:*",
     "comlink": "^4.4.2",

@@ -5,17 +5,17 @@ on:
       - dev
       - main
     paths:
-      - "Cargo.*"
-      - "crates/**"
-      - "packages/enclave-contracts/contracts/**"
+      - 'Cargo.*'
+      - 'crates/**'
+      - 'packages/enclave-contracts/contracts/**'
   pull_request:
     branches:
       - dev
       - main
     paths:
-      - "Cargo.*"
-      - "crates/**"
-      - "packages/enclave-contracts/contracts/**"
+      - 'Cargo.*'
+      - 'crates/**'
+      - 'packages/enclave-contracts/contracts/**'
 
 env:
   DOCKERFILE_PATH: crates/Dockerfile

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import type React from 'react'
 import { ReactNode } from 'react'
 import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound, EncryptedVote } from '@/model/vote.model'
 import { Poll, PollRequestResult, PollResult } from '@/model/poll.model'

@@ -23,13 +23,23 @@ pub struct ComputeRequest {
     pub callback_url: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ComputationStatus {
+    Completed,
+    Failed,
+}
+
 #[derive(Serialize, Debug)]
 pub struct WebhookPayload {
     pub e3_id: u64,
+    pub status: ComputationStatus,
     #[serde(serialize_with = "serialize_as_hex")]
     pub ciphertext: Vec<u8>,
     #[serde(serialize_with = "serialize_as_hex")]
     pub proof: Vec<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 fn serialize_as_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>

@@ -1,14 +1,14 @@
 # NOTE: there has been a change and the rustwasm org is no more and the repository moved which
 # seems to have broken various things so this is an attempt to install directly from the binary download on github
-name: "Install wasm-pack"
-description: "Install wasm-pack from GitHub releases"
+name: 'Install wasm-pack'
+description: 'Install wasm-pack from GitHub releases'
 inputs:
   version:
-    description: "wasm-pack version to install"
+    description: 'wasm-pack version to install'
     required: false
-    default: "v0.13.1"
+    default: 'v0.13.1'
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Install wasm-pack
       shell: bash

@@ -10,8 +10,8 @@
  * React hooks and utilities for Enclave SDK
  */
 
-export { useEnclaveSDK } from "./useEnclaveSDK";
-export type { UseEnclaveSDKConfig, UseEnclaveSDKReturn } from "./useEnclaveSDK";
+export { useEnclaveSDK } from './useEnclaveSDK'
+export type { UseEnclaveSDKConfig, UseEnclaveSDKReturn } from './useEnclaveSDK'
 
 // Re-export commonly used types from the main SDK for convenience
 export type {
@@ -20,13 +20,12 @@ export type {
   EnclaveEvent,
   E3RequestedData,
   E3ActivatedData,
-  InputPublishedData,
   CiphertextOutputPublishedData,
   PlaintextOutputPublishedData,
   CiphernodeAddedData,
   CiphernodeRemovedData,
   CommitteeRequestedData,
   CommitteePublishedData,
-} from "@enclave-e3/sdk";
+} from '@enclave-e3/sdk'
 
-export { EnclaveEventType, RegistryEventType } from "@enclave-e3/sdk";
+export { EnclaveEventType, RegistryEventType } from '@enclave-e3/sdk'

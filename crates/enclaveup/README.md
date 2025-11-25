@@ -20,7 +20,8 @@ wget -qO- https://raw.githubusercontent.com/gnosisguild/enclave/main/install | b
 
 ### Manual Installation
 
-1. Download the appropriate binary for your platform from the [releases page](https://github.com/gnosisguild/enclave/releases)
+1. Download the appropriate binary for your platform from the
+   [releases page](https://github.com/gnosisguild/enclave/releases)
 2. Extract the binary and place it in your PATH (e.g., `~/.local/bin` or `/usr/local/bin`)
 3. Make sure the binary is executable: `chmod +x enclaveup`
 
@@ -76,11 +77,11 @@ The binary will be available at `target/release/enclaveup`.
 
 ## Platform Support
 
-| Platform | Architecture | Status |
-|----------|-------------|---------|
-| Linux | x86_64 | ✅ Native binary |
-| macOS | Apple Silicon (M1/M2/M3) | ✅ Native binary |
-| macOS | Intel | ✅ Via Rosetta 2* |
+| Platform | Architecture             | Status             |
+| -------- | ------------------------ | ------------------ |
+| Linux    | x86_64                   | ✅ Native binary   |
+| macOS    | Apple Silicon (M1/M2/M3) | ✅ Native binary   |
+| macOS    | Intel                    | ✅ Via Rosetta 2\* |
 
 \* Intel Macs automatically run Apple Silicon binaries through Rosetta 2 translation
 
@@ -89,10 +90,12 @@ The binary will be available at `target/release/enclaveup`.
 The installer expects GitHub releases to contain assets with this naming pattern:
 
 **For Enclave CLI:**
+
 - `enclave-linux-x86_64.tar.gz`
 - `enclave-macos-aarch64.tar.gz`
 
 **For enclaveup itself:**
+
 - `enclaveup-linux-x86_64.tar.gz`
 - `enclaveup-macos-aarch64.tar.gz`
 

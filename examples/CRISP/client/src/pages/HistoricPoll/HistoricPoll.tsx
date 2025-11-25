@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import PollCard from '@/components/Cards/PollCard'
 import { PollResult } from '@/model/poll.model'
 import LoadingAnimation from '@/components/LoadingAnimation'
@@ -49,13 +49,14 @@ const HistoricPoll: React.FC = () => {
     setVisiblePolls(newVisiblePolls)
   }, [page, pastPolls])
 
-  const handleScroll = useCallback(
-    debounce(() => {
-      const { scrollTop, clientHeight, scrollHeight } = document.documentElement
-      if (scrollTop + clientHeight >= scrollHeight && !loadingMore && pastPolls.length > visiblePolls.length) {
-        loadMorePolls()
-      }
-    }, 200),
+  const handleScroll = useMemo(
+    () =>
+      debounce(() => {
+        const { scrollTop, clientHeight, scrollHeight } = document.documentElement
+        if (scrollTop + clientHeight >= scrollHeight && !loadingMore && pastPolls.length > visiblePolls.length) {
+          loadMorePolls()
+        }
+      }, 200),
     [loadMorePolls, loadingMore, pastPolls.length, visiblePolls.length],
   )
 

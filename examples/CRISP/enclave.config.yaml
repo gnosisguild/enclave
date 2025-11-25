@@ -1,29 +1,32 @@
 chains:
-  - name: "hardhat"
-    rpc_url: "ws://localhost:8545"
+  - name: localhost
+    rpc_url: ws://localhost:8545
     contracts:
       e3_program:
         address: "0xc5a5C42992dECbae36851359345FE25997F5C42d"
-        deploy_block: 1 # Set to actual deploy block
+        deploy_block: 1
       enclave:
         address: "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
-        deploy_block: 1 # Set to actual deploy block
+        deploy_block: 13
       ciphernode_registry:
         address: "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
-        deploy_block: 1 # Set to actual deploy block
+        deploy_block: 11
       bonding_registry:
         address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-        deploy_block: 1 # Set to actual deploy block
+        deploy_block: 8
       fee_token:
         address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-        deploy_block: 1 # Set to actual deploy block
-
+        deploy_block: 4
 program:
   dev: true
   # risc0:
-  #   risc0_dev_mode: 1 # 0 = real groth16 proofs, 1 = fake proofs (dev mode)
-  #   bonsai_api_key: xxxxxxxxxxxxxxxx
-  #   bonsai_api_url: xxxxxxxxxxxxxxxx
+  #   risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode (fake proofs)
+  #   boundless:
+  #     rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"
+  #     private_key: "PRIVATE_KEY" # Use env vars for secrets
+  #     pinata_jwt: "PINATA_JWT" # For uploading programs
+  #     program_url: "https://gateway.pinata.cloud/ipfs/QmNMRAB7DW43JSmENfzGmD96G6sqaeBBNfTVrrq5WQae3D" # Pre-uploaded program
+  #     onchain: true # true = onchain requests, false = offchain
 
 nodes:
   cn1:
@@ -58,3 +61,4 @@ nodes:
     autopassword: true
     role:
       type: aggregator
+

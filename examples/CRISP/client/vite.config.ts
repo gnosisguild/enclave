@@ -12,7 +12,9 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
-process.env.NO_HOT && console.log('Running without HMR')
+if (process.env.NO_HOT) {
+  console.log('Running without HMR')
+}
 // const development: boolean = !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
 export default defineConfig({
   base: '/',
@@ -22,7 +24,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: { target: 'esnext' },
-    exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@noir-lang/noir_js', '@aztec/bb.js'],
+    exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@noir-lang/noir_js'],
   },
   resolve: {
     alias: {

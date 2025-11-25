@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "compile": "hardhat compile",
+    "lint": "eslint .",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy": "pnpm clean:deployments && hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
@@ -22,11 +23,14 @@
     "@enclave-e3/contracts": "workspace:*",
     "@enclave-e3/sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
+    "@zk-kit/lazy-imt.sol": "2.0.0-beta.12",
     "dotenv": "^16.4.5",
     "viem": "2.38.1",
     "yargs": "^18.0.0"
   },
   "devDependencies": {
+    "@enclave-e3/config": "^0",
+    "eslint": "^9.39.1",
     "@nomicfoundation/hardhat-ethers": "4",
     "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
     "@nomicfoundation/hardhat-ignition": "^3.0.0",

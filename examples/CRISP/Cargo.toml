@@ -4,7 +4,9 @@ members = [
   ".enclave/support/dev",
   "program",
   "crates/zk-inputs",
-  "crates/zk-inputs-wasm"
+  "crates/zk-inputs-wasm",
+  "crates/evm_helpers",
+  "crates/crisp-constants"
 ]
 resolver = "3"
 
@@ -17,7 +19,9 @@ repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
 e3-user-program = { path = "./program" }
+crisp-constants = { path = "./crates/crisp-constants" }
 
+alloy = { version = "=1.0.41", features = ["full", "rpc-types-eth"] }
 alloy-primitives = { version = "=1.3.0", default-features = false, features = [
     "rlp",
     "serde",
@@ -32,7 +36,7 @@ derivative = "=2.2.0"
 e3-compute-provider = { path = "../../crates/compute-provider" }
 e3-program-server = { path = "../../crates/program-server" }
 e3-bfv-helpers = { path = "../../crates/bfv-helpers" }
-e3-sdk = { path = "../../crates/sdk" }
+e3-sdk = { path = "../../crates/sdk", default-features = false }
 eyre = "=0.6.12"
 env_logger = "=0.11.8"
 hex = { version = "=0.4.3" }

@@ -49,6 +49,7 @@ self.onmessage = async function (event) {
           isFirstVote: true,
         })
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { proof, returnValue } = await generateProofWithReturnValue(inputs)
 
         // TODO: returnValue is the encrypted vote. We need to convert it from Noir format to BFV format
@@ -59,7 +60,7 @@ self.onmessage = async function (event) {
           success: true,
           encryptedVote: {
             vote: encryptedVote,
-            proofData: proof,
+            proof: proof.proof,
           },
         })
       } catch (error) {

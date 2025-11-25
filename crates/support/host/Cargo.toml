@@ -9,16 +9,20 @@ bytemuck = { workspace = true }
 serde = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
+alloy-signer-local = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 methods = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
 risc0-zkvm = { workspace = true }
 tokio = { workspace = true }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "632766e4ed1ceeccdeb023a56f16413a33be6f46" }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 e3-user-program = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }
+boundless-market = { workspace = true }
+url = { workspace = true }
+dotenvy = { workspace = true }

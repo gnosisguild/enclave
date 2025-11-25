@@ -9,7 +9,6 @@ import { BroadcastVoteRequest, BroadcastVoteResponse, CurrentRound, VoteStateLit
 import { useApi } from '../generic/useFetchApi'
 import { PollRequestResult } from '@/model/poll.model'
 
-
 const ENCLAVE_API = import.meta.env.VITE_ENCLAVE_API
 
 if (!ENCLAVE_API) handleGenericError('useEnclaveServer', { name: 'ENCLAVE_API', message: 'Missing env VITE_ENCLAVE_API' })

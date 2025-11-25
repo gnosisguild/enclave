@@ -23,7 +23,6 @@ export interface EnclaveArgs {
   registry?: string;
   bondingRegistry?: string;
   feeToken?: string;
-  poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -39,7 +38,6 @@ export const deployAndSaveEnclave = async ({
   registry,
   bondingRegistry,
   feeToken,
-  poseidonT3Address,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
   const { ethers } = await hre.network.connect();
@@ -76,14 +74,7 @@ export const deployAndSaveEnclave = async ({
     return { enclave: enclaveContract };
   }
 
-  const enclaveFactory = await ethers.getContractFactory(
-    EnclaveFactory.abi,
-    EnclaveFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
-        poseidonT3Address,
-    }),
-    signer,
-  );
+  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
 
   const enclave = await enclaveFactory.deploy();
   await enclave.waitForDeployment();
@@ -143,11 +134,9 @@ export const deployAndSaveEnclave = async ({
  * @returns The upgraded Enclave contract (same proxy address)
  */
 export const upgradeAndSaveEnclave = async ({
-  poseidonT3Address,
   ownerAddress,
   hre,
 }: {
-  poseidonT3Address: string;
   ownerAddress: string;
   hre: HardhatRuntimeEnvironment;
 }): Promise<{ enclave: Enclave; implementationAddress: string }> => {
@@ -168,14 +157,7 @@ export const upgradeAndSaveEnclave = async ({
   );
   console.log("Auto-deployed ProxyAdmin address:", autoProxyAdminAddress);
 
-  const enclaveFactory = await ethers.getContractFactory(
-    EnclaveFactory.abi,
-    EnclaveFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
-        poseidonT3Address,
-    }),
-    signer,
-  );
+  const enclaveFactory = await ethers.getContractFactory("Enclave", signer);
 
   const newImplementation = await enclaveFactory.deploy();
   await newImplementation.waitForDeployment();

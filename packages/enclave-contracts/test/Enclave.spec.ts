@@ -62,7 +62,6 @@ describe("Enclave", function () {
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
   const setupAndPublishCommittee = async (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
     e3Id: number,
     nodes: string[],
@@ -94,15 +93,10 @@ describe("Enclave", function () {
 
   async function setupOperatorForSortition(
     operator: Signer,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bondingRegistry: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     licenseToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     usdcToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ticketToken: any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     registry: any,
   ): Promise<void> {
     const operatorAddress = await operator.getAddress();
@@ -1437,124 +1431,6 @@ describe("Enclave", function () {
       expect(await enclave.publishInput.staticCall(0, inputData)).to.equal(
         true,
       );
-    });
-
-    it("adds inputHash to merkle tree", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
-
-      const tree = new LeanIMT(hash);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const e3Id = 0;
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(e3Id, data);
-
-      tree.insert(hash(BigInt(ethers.keccak256(inputData)), BigInt(0)));
-
-      await enclave.publishInput(e3Id, inputData);
-      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
-
-      const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
-      tree.insert(hash(BigInt(ethers.keccak256(secondInputData)), BigInt(1)));
-      await enclave.publishInput(e3Id, secondInputData);
-      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
-    });
-    it("emits InputPublished event", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const e3Id = 0;
-
-      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(e3Id, data);
-      const expectedHash = hash(BigInt(ethers.keccak256(inputData)), BigInt(0));
-
-      await expect(enclave.publishInput(e3Id, inputData))
-        .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, inputData, expectedHash, 0);
-    });
-    it("increases the input count", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const inputData = "0x12345678";
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(0, data);
-      await enclave.publishInput(0, inputData);
-
-      expect(await enclave.getInputsLength(0)).to.equal(1n);
     });
   });
 

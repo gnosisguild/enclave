@@ -17,9 +17,9 @@ on:
 env:
   DOCKERFILE_PATH: crates/support/Dockerfile
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
-  HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
-  HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
-  PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
+  HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
+  PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
   RUST_BACKTRACE: 1
 
 permissions:
@@ -27,6 +27,30 @@ permissions:
   packages: write
 
 jobs:
+  crisp_rust_unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.86.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+
+        # We must install foundry in order to be able to test anvil
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
+      - name: Run CRISP Unit Tests
+        working-directory: ./examples/CRISP
+        run: 'cargo test'
+
   rust_unit:
     runs-on: ubuntu-latest
     steps:
@@ -48,7 +72,7 @@ jobs:
           && sudo apt-get install -y solc
 
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
-      - name: "Setup node"
+      - name: 'Setup node'
         uses: actions/setup-node@v3
         with:
           node-version: 22
@@ -59,16 +83,16 @@ jobs:
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
+          path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
-      - name: "Install the dependencies"
-        run: "pnpm install"
+      - name: 'Install the dependencies'
+        run: 'pnpm install'
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Unit Tests
-        run: "cargo test --lib && cargo test --doc"
+        run: 'cargo test --lib && cargo test --doc'
 
   rust_integration:
     runs-on: ubuntu-latest
@@ -91,7 +115,7 @@ jobs:
           && sudo apt-get install -y solc
 
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
-      - name: "Setup node"
+      - name: 'Setup node'
         uses: actions/setup-node@v3
         with:
           node-version: 22
@@ -102,16 +126,16 @@ jobs:
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
+          path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
-      - name: "Install the dependencies"
-        run: "pnpm install"
+      - name: 'Install the dependencies'
+        run: 'pnpm install'
 
-      - name: Checking code format ciphernode
-        run: pnpm ciphernode:lint
+      - name: Checking code format rust
+        run: pnpm rust:lint
 
       - name: Run Integration Tests
-        run: "cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture"
+        run: 'cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture'
 
   build_e3_support_risc0:
     runs-on: ubuntu-latest
@@ -159,10 +183,10 @@ jobs:
             type=gha,mode=max,scope=buildcache
 
   test_contracts:
-    runs-on: "ubuntu-latest"
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: "Check out the repo"
-        uses: "actions/checkout@v4"
+      - name: 'Check out the repo'
+        uses: 'actions/checkout@v4'
 
       - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
@@ -170,10 +194,7 @@ jobs:
           toolchain: 1.86.0
           target: wasm32-unknown-unknown
 
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
-
-      - name: "Setup node"
+      - name: 'Setup node'
         uses: actions/setup-node@v3
         with:
           node-version: 22
@@ -184,52 +205,52 @@ jobs:
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
+          path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: "Install the dependencies"
-        run: "pnpm install"
+      - name: 'Install the dependencies'
+        run: 'pnpm install'
 
-      - name: "Lint the code"
-        run: "pnpm evm:lint"
+      - name: 'Lint the code'
+        run: 'pnpm evm:lint'
 
-      - name: "Add lint summary"
+      - name: 'Add lint summary'
         run: |
           echo "## Lint results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-      - name: "Test the contracts and generate the coverage report"
-        run: "pnpm coverage"
+      - name: 'Test the contracts and generate the coverage report'
+        run: 'pnpm coverage'
 
-      - name: "Add test summary"
+      - name: 'Add test summary'
         run: |
           echo "## Test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   test_net:
-    runs-on: "ubuntu-latest"
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: "Check out the repo"
-        uses: "actions/checkout@v4"
-      - name: "Setup node"
+      - name: 'Check out the repo'
+        uses: 'actions/checkout@v4'
+      - name: 'Setup node'
         uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
-      - name: "Run network tests"
-        run: "pnpm test:integration net --no-prebuild"
-      - name: "Add test summary"
+      - name: 'Run network tests'
+        run: 'pnpm test:integration net --no-prebuild'
+      - name: 'Add test summary'
         run: |
           echo "## Network test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
-    runs-on: "ubuntu-latest"
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: "Check out the repo"
-        uses: "actions/checkout@v4"
-      - name: "Setup node"
+      - name: 'Check out the repo'
+        uses: 'actions/checkout@v4'
+      - name: 'Setup node'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -242,34 +263,34 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
+          toolchain: v1.0.0-beta.15
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
+          path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
-      - name: "Install the dependencies"
-        run: "pnpm install"
-      - name: "Lint the code"
-        run: "pnpm lint"
-      - name: "Add lint summary"
+      - name: 'Install the dependencies'
+        run: 'pnpm install'
+      - name: 'Lint the code'
+        run: 'pnpm lint'
+      - name: 'Add lint summary'
         run: |
           echo "## Lint results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-      - name: "Run prebuild"
-        run: "pnpm test:integration prebuild"
-      - name: "Verify build artifacts exist"
+      - name: 'Run prebuild'
+        run: 'pnpm test:integration prebuild'
+      - name: 'Verify build artifacts exist'
         run: |
           echo "Checking for build artifacts:"
           ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
           ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
-      - name: "Upload build artifacts"
+      - name: 'Upload build artifacts'
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
@@ -280,15 +301,15 @@ jobs:
 
   ciphernode_integration_test:
     needs: [integration_prebuild, build_enclave_cli]
-    runs-on: "ubuntu-latest"
+    runs-on: 'ubuntu-latest'
     strategy:
       matrix:
         test-suite: [base, persist]
       fail-fast: false
     steps:
-      - name: "Check out the repo"
-        uses: "actions/checkout@v4"
-      - name: "Setup node"
+      - name: 'Check out the repo'
+        uses: 'actions/checkout@v4'
+      - name: 'Setup node'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -301,26 +322,26 @@ jobs:
       - name: Cache node modules
         uses: actions/cache@v4
         with:
-          path: "**/node_modules"
+          path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
-      - name: "Install the dependencies"
-        run: "pnpm install"
-      - name: "Download build artifacts"
+      - name: 'Install the dependencies'
+        run: 'pnpm install'
+      - name: 'Download build artifacts'
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
           path: target/debug/
-      - name: "Download enclave binary"
+      - name: 'Download enclave binary'
         uses: actions/download-artifact@v4
         with:
           name: enclave-binary
           path: ~/.cargo/bin/
-      - name: "Download SDK artifacts"
+      - name: 'Download SDK artifacts'
         uses: actions/download-artifact@v4
         with:
           name: sdk-artifacts
           path: ./
-      - name: "Verify downloaded artifacts"
+      - name: 'Verify downloaded artifacts'
         run: |
           echo "Checking for required artifacts:"
           ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
@@ -328,14 +349,14 @@ jobs:
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
           ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
-      - name: "Set executable permissions"
+      - name: 'Set executable permissions'
         run: |
           chmod +x target/debug/fake_encrypt
           chmod +x target/debug/pack_e3_params
           chmod +x ~/.cargo/bin/enclave
-      - name: "Run ${{ matrix.test-suite }} tests"
-        run: "pnpm test:integration ${{ matrix.test-suite }} --no-prebuild"
-      - name: "Add test summary"
+      - name: 'Run ${{ matrix.test-suite }} tests'
+        run: 'pnpm test:integration ${{ matrix.test-suite }} --no-prebuild'
+      - name: 'Add test summary'
         run: |
           echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
@@ -404,7 +425,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -425,10 +446,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
-
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
+          toolchain: v1.0.0-beta.15
 
       - name: Install yq
         run: |
@@ -497,7 +515,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.3
+          toolchain: v1.0.0-beta.15
 
       - name: Check formatting
         working-directory: ./circuits
@@ -580,7 +598,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Install pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Rust
@@ -588,9 +606,6 @@ jobs:
         with:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        uses: ./.github/actions/install-wasm-pack
 
       - name: Install node dependencies
         run: pnpm install
@@ -625,7 +640,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Install pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Rust
@@ -665,8 +680,9 @@ jobs:
       - name: Test Template
         run: |
           cd templates/default
-          chmod 755 contracts tests
-          chmod 644 contracts/ImageID.sol
+          pnpm compile
+          chmod 755 .enclave/generated/contracts tests
+          chmod 644 .enclave/generated/contracts/ImageID.sol
           pnpm test:integration
 
   test_enclave_init:
@@ -676,7 +692,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -731,9 +747,9 @@ jobs:
           use_username: false
           columns_per_row: 6
           collaborators: direct
-          commit_message: "docs(contributor): contrib-readme-action has updated readme"
-          committer_username: "github-actions[bot]"
-          committer_email: "github-actions[bot]@users.noreply.github.com"
+          commit_message: 'docs(contributor): contrib-readme-action has updated readme'
+          committer_username: 'github-actions[bot]'
+          committer_email: 'github-actions[bot]@users.noreply.github.com'
           auto_detect_branch_protection: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
