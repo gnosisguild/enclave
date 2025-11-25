@@ -199,7 +199,7 @@ async fn test_indexer() -> Result<()> {
     Ok(())
 }
 
-mod memory_leak {
+mod test_memory_leak {
 
     use e3_evm_helpers::{contracts::EnclaveContractFactory, listener::EventListener};
 
