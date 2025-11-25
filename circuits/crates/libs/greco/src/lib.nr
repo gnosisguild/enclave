@@ -292,7 +292,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs
     }
 
-    /// Performs coefficient-wise CRT consistency check for e1 polynomial.
+    /// Performs coefficient-wise CRT consistency check for e0 polynomial.
     ///
     /// Verifies that for each CRT basis i and each coefficient j:
     /// e0.coefficients[j] = e0is[i].coefficients[j] + e0_quotients[i].coefficients[j] * qi
@@ -310,6 +310,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         for i in 0..L {
             let qi = crypto_params.qis[i];
 
+            let mut zero = 0;
             // Check each coefficient satisfies the CRT relationship
             for j in 0..N {
                 let e0_coeff = self.e0.coefficients[j];
@@ -317,9 +318,9 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
                 let quotient_coeff = self.e0_quotients[i].coefficients[j];
 
                 // Verify: e0_coeff = e0i_coeff + quotient_coeff * qi
-                let zero = e0_coeff - e0i_coeff + quotient_coeff * qi;
-                zero.assert_max_bit_size::<1>();
+                zero += e0_coeff - (e0i_coeff + quotient_coeff * qi);
             }
+            assert(zero == 0);
         }
     }
 
