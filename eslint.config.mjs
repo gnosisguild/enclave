@@ -21,6 +21,7 @@ export default defineConfig([
     '**/.cargo/**',
     '**/.enclave/**',
     '**/test-results/**',
+    '**/playwright-report/**',
     // Generated WASM bindings
     '**/pkg/**',
   ]),

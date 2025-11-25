@@ -78,7 +78,6 @@ export enum EnclaveEventType {
   // E3 Lifecycle Events
   E3_REQUESTED = 'E3Requested',
   E3_ACTIVATED = 'E3Activated',
-  INPUT_PUBLISHED = 'InputPublished',
   CIPHERTEXT_OUTPUT_PUBLISHED = 'CiphertextOutputPublished',
   PLAINTEXT_OUTPUT_PUBLISHED = 'PlaintextOutputPublished',
 
@@ -147,13 +146,6 @@ export interface E3ActivatedData {
   committeePublicKey: string
 }
 
-export interface InputPublishedData {
-  e3Id: bigint
-  data: string
-  inputHash: bigint
-  index: bigint
-}
-
 export interface CiphertextOutputPublishedData {
   e3Id: bigint
   ciphertextOutput: string
@@ -200,7 +192,6 @@ export interface CommitteeFinalizedData {
 export interface EnclaveEventData {
   [EnclaveEventType.E3_REQUESTED]: E3RequestedData
   [EnclaveEventType.E3_ACTIVATED]: E3ActivatedData
-  [EnclaveEventType.INPUT_PUBLISHED]: InputPublishedData
   [EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED]: CiphertextOutputPublishedData
   [EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED]: PlaintextOutputPublishedData
   [EnclaveEventType.E3_PROGRAM_ENABLED]: { e3Program: string }

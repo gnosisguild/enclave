@@ -17,6 +17,7 @@ export function getCheckedEnvVars() {
     RPC_URL: ensureEnv('RPC_URL'),
     ENCLAVE_CONTRACT: ensureEnv('ENCLAVE_ADDRESS'),
     CIPHERNODE_REGISTRY_CONTRACT: ensureEnv('REGISTRY_ADDRESS'),
+    E3_PROGRAM_ADDRESS: ensureEnv('E3_PROGRAM_ADDRESS'),
     FEE_TOKEN_CONTRACT: ensureEnv('FEE_TOKEN_ADDRESS'),
     PRIVATE_KEY: ensureEnv('PRIVATE_KEY'),
     CHAIN_ID: parseInt(ensureEnv('CHAIN_ID')),

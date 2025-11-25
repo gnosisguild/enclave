@@ -124,7 +124,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
     feeToken: feeTokenAddress,
-    poseidonT3Address: poseidonT3,
     hre,
   });
   const enclaveAddress = await enclave.getAddress();
