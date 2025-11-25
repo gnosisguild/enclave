@@ -329,7 +329,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// This function implements the core zero-knowledge proof by checking:
     /// 1. Binary constraint on k1 polynomial
     /// 2. Range constraints on all polynomials coefficients
-    /// 3. CRT consistency for e1 polynomial
+    /// 3. CRT consistency for e0 polynomial
     /// 4. Correct encryption equations
     ///
     /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold
@@ -352,7 +352,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 
-        // Step 2: Check CRT consistency for e1 polynomial
+        // Step 2: Check CRT consistency for e0 polynomial
         self.check_e0_crt_consistency();
 
         // Step 3: Generate Fiat-Shamir challenges
