@@ -11,6 +11,7 @@ echo "sdk"
 (cd packages/crisp-sdk && pnpm install && pnpm build)
 echo "evm"
 (cd ../../packages/enclave-contracts && pnpm compile)
+(cd packages/crisp-contracts && pnpm compile)
 echo "server"
 (cd ./server && [[ ! -f .env ]] && cp .env.example .env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "client"
@@ -22,4 +23,3 @@ if [[ ! -f ~/.cargo/bin/enclave ]]; then
 else
   echo "enclave CLI already installed, skipping build"
 fi
-echo "Skipping circuit compilation - using pre-compiled circuits"

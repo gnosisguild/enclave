@@ -3,8 +3,21 @@
 This directory contains the Solidity contracts for CRISP - Coercion-Resistant Impartial Selection
 Protocol.
 
-Contracts are built and tested with [forge], which is part of the [Foundry] toolkit. Tests are
-defined in the `tests` directory in the root of this template.
+Contracts are built and tested with [Hardhat](https://hardhat.org). Tests are defined in the `test` directory.
+
+## Running Tests
+
+To run contract tests from the CRISP example root (`examples/CRISP/`):
+
+```bash
+pnpm test:contracts
+```
+
+Alternatively, you can run tests directly from this directory:
+
+```bash
+pnpm test
+```
 
 ## CRISP Program
 
