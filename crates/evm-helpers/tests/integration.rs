@@ -5,14 +5,19 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod helpers;
-use alloy::sol;
-use e3_evm_helpers::listener::EventListener;
+use alloy::consensus::BlockHeader;
+use alloy::providers::ext::AnvilApi;
+use alloy::{node_bindings::Anvil, providers::ProviderBuilder, sol};
+use e3_evm_helpers::block_listener;
+use e3_evm_helpers::{block_listener::BlockListener, event_listener::EventListener};
 use eyre::Result;
 use helpers::setup_logs_contract;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::Mutex;
+
 use tokio::time::sleep;
 
 sol!(
@@ -199,6 +204,50 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     assert_eq!(rx.recv().await.unwrap(), "two");
     assert_eq!(rx.recv().await.unwrap(), "three");
     assert_eq!(rx.recv().await.unwrap(), "four");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_block_listener() -> Result<()> {
+    let anvil = Anvil::new().try_spawn()?;
+    let provider = Arc::new(ProviderBuilder::new().connect(&anvil.ws_endpoint()).await?);
+    let block_listener = Arc::new(BlockListener::new(provider.clone()));
+    let events: Arc<Mutex<Vec<u64>>> = Arc::new(Mutex::new(vec![]));
+    let events_handler = events.clone();
+
+    // Save each block number to a vector.
+    block_listener
+        .add_block_handler(move |block| {
+            let events = events_handler.clone();
+            let blockheight = block.number();
+            async move {
+                let mut events = events.lock().await;
+                events.push(blockheight);
+                Ok(())
+            }
+        })
+        .await;
+
+    // Start up a listener
+    let listen_handle = tokio::spawn(async move {
+        let _ = block_listener.listen().await;
+    });
+
+    // Give the listener time to start
+    sleep(Duration::from_millis(100)).await;
+
+    // Mine a few blocks
+    provider.anvil_mine(Some(5), None).await?;
+
+    // Wait for the block to be processed
+    sleep(Duration::from_secs(1)).await;
+
+    // Cancel the listener
+    listen_handle.abort();
+
+    let guard = events.lock().await;
+    assert_eq!(*guard, vec![1, 2, 3, 4, 5]);
 
     Ok(())
 }

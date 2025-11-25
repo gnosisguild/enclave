@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::{consensus::Header, network::Ethereum, providers::Provider};
+use alloy::{network::Ethereum, providers::Provider, rpc::types::Header};
 use eyre::Result;
 use futures::stream::StreamExt;
 use std::{future::Future, pin::Pin, sync::Arc};
@@ -28,7 +28,7 @@ impl BlockListener {
         }
     }
 
-    pub async fn add_block_handler<B, F, Fut>(&self, handler: F)
+    pub async fn add_block_handler<F, Fut>(&self, handler: F)
     where
         F: Fn(&Header) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,

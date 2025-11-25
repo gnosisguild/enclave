@@ -186,7 +186,7 @@ async fn test_indexer() -> Result<()> {
 
 mod test_memory_leak {
 
-    use e3_evm_helpers::{contracts::EnclaveContractFactory, listener::EventListener};
+    use e3_evm_helpers::{contracts::EnclaveContractFactory, event_listener::EventListener};
 
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
