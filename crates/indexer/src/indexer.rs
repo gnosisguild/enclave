@@ -23,10 +23,10 @@ use e3_evm_helpers::{
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
-use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
+use std::{future::Future, time::Duration};
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, time::sleep};
 use tracing::{error, info, warn};
 
 type E3Id = u64;
@@ -407,21 +407,28 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
 
     pub async fn listen(&self) -> Result<()> {
         info!("Starting EnclaveIndexer listening...");
-        tokio::select! {
-            res = self.ctx.event_listener.listen() => {
-                match res {
-                    Ok(_) => warn!("EventListener curiously halted naturally."),
-                    Err(e) => error!("EventListener halted with an error: {e}")
+        loop {
+            let res = tokio::select! {
+                res = self.ctx.event_listener.listen() => {
+                    match &res {
+                        Ok(_) => warn!("EventListener curiously halted naturally."),
+                        Err(e) => error!("EventListener halted with an error: {e}")
+                    };
+                    res
                 }
-            }
-            res = self.ctx.block_listener.listen() => {
-                match res {
-                    Ok(_) => warn!("BlockListener curiously halted naturally."),
-                    Err(e) => error!("BlockListener halted with an error: {e}")
+                res = self.ctx.block_listener.listen() => {
+                    match &res {
+                        Ok(_) => warn!("BlockListener curiously halted naturally."),
+                        Err(e) => error!("BlockListener halted with an error: {e}")
+                    };
+                    res
                 }
-            }
+            };
+
+            let secs = res.map(|_| 1).unwrap_or(5);
+            warn!("Restarting listeners in {}s...", secs);
+            sleep(Duration::from_secs(secs)).await
         }
-        Ok(())
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
