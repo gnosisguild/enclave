@@ -48,11 +48,13 @@ async fn test_indexer() -> Result<()> {
         _anvil,
     ) = setup_two_contracts().await?;
 
-    let indexer = EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
-        &endpoint.to_string(),
-        &[&enclave_address.to_string(), &emit_logs_address.to_string()],
-    )
-    .await?;
+    let indexer = Arc::new(
+        EnclaveIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(
+            &endpoint.to_string(),
+            &[&enclave_address.to_string(), &emit_logs_address.to_string()],
+        )
+        .await?,
+    );
 
     // Track InputPublished event count in store
     indexer
@@ -82,7 +84,8 @@ async fn test_indexer() -> Result<()> {
         })
         .await;
 
-    let _ = indexer.start();
+    let indexer_listening = indexer.clone();
+    let _ = tokio::spawn(async move { indexer_listening.listen().await });
 
     let public_key = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
     let input_data = "Random data that wont actually be a string".to_string();
