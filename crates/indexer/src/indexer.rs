@@ -418,9 +418,9 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Ok(())
     }
 
-    pub fn start(&self) -> JoinHandle<Result<()>> {
-        info!("Starting EnclaveIndexer...");
-        self.ctx.listener.start()
+    pub async fn listen(&self) -> Result<()> {
+        info!("Starting EnclaveIndexer listening...");
+        self.ctx.listener.listen().await
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {

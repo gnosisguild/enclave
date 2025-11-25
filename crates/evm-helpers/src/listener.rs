@@ -16,6 +16,7 @@ use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 use tokio::{sync::RwLock, task::JoinHandle};
+use tracing::info;
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -25,6 +26,12 @@ pub struct EventListener {
     provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
+}
+
+impl Drop for EventListener {
+    fn drop(&mut self) {
+        info!("Event Listener was DROPPED");
+    }
 }
 
 impl EventListener {
@@ -63,7 +70,7 @@ impl EventListener {
             .push(wrapped_handler);
     }
 
-    async fn listen(&self) -> Result<()> {
+    pub async fn listen(&self) -> Result<()> {
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -87,11 +94,6 @@ impl EventListener {
             }
         }
         Ok(())
-    }
-
-    pub fn start(&self) -> JoinHandle<Result<()>> {
-        let this = self.clone();
-        tokio::spawn(async move { this.listen().await })
     }
 
     /// Create a contract listener that will listen to events from all addresses.

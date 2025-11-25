@@ -420,7 +420,7 @@ pub async fn start_indexer(
     let crisp_indexer = register_committee_published(crisp_indexer).await?;
 
     info!("CRISP: Indexer finished registering handlers!");
-    crisp_indexer.start();
-    info!("Start has been executed!");
+    crisp_indexer.listen().await?;
+    info!("Indexer listen loop has finished!");
     Ok(())
 }
