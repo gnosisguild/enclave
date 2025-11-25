@@ -27,9 +27,9 @@ use e3_sdk::{
         },
         listener::EventListener,
     },
-    indexer::{DataStore, EnclaveIndexer},
+    indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
-use evm_helpers::CRISPContractFactory;
+use evm_helpers::{CRISPContractFactory, InputPublished};
 use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
@@ -144,6 +144,9 @@ pub async fn register_e3_requested(
                 let balance_threshold_bytes = balance_threshold.to_bytes_be();
                 let balance_threshold_u256 = U256::from_be_slice(&balance_threshold_bytes);
 
+                // Convert e3Id from u64 to U256
+                let e3_id_u256 = U256::from(e3_id);
+
                 info!(
                     "[e3_id={}] Calling setRoundData with root: {}, token: {}, threshold: {}",
                     e3_id, merkle_root_u256, token_address, balance_threshold_u256
@@ -160,7 +163,7 @@ pub async fn register_e3_requested(
                 })?;
 
                 let receipt = contract
-                    .set_round_data(merkle_root_u256, token_address, balance_threshold_u256)
+                    .set_round_data(e3_id_u256, merkle_root_u256, token_address, balance_threshold_u256)
                     .await
                     .with_context(|| {
                         format!("[e3_id={}] Failed to call setRoundData", e3_id)
@@ -221,10 +224,12 @@ pub async fn register_e3_activated(
                     info!("[e3_id={}] Starting computation for E3", e3_id);
                     repo.update_status("Computing").await?;
 
+                    let votes = repo.get_ciphertext_inputs().await?;
+
                     let (id, status) = run_compute(
                         e3_id,
                         e3.e3_params,
-                        e3.ciphertext_inputs,
+                        votes,
                         format!("{}/state/add-result", CONFIG.enclave_server_url),
                     )
                     .await
@@ -394,11 +399,38 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
     Ok(block.header.timestamp)
 }
 
+pub async fn register_input_published(
+    mut listener: EventListener,
+    store: SharedStore<impl DataStore>
+) -> Result<EventListener> {
+    listener
+        .add_event_handler(move |event: InputPublished| {
+
+            let e3_id = event.e3Id.to::<u64>();
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+            async move {
+                println!(
+                    "InputPublished: e3_id={}, index={}, data=0x{}...",
+                    event.e3Id,
+                    event.index,
+                    hex::encode(&event.vote[..8.min(event.vote.len())])
+                );
+
+                repo.insert_ciphertext_input(event.vote.to_vec(), event.index.to::<u64>())
+                    .await?;
+                Ok(())
+            }
+        })
+        .await;
+    Ok(listener)
+}
+
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
     registry_address: &str,
-    store: impl DataStore,
+    crisp_address: &str,
+    store: SharedStore<impl DataStore>,
     private_key: &str,
 ) -> Result<()> {
     let readonly_contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
@@ -411,7 +443,7 @@ pub async fn start_indexer(
 
     // CRISP indexer
     let crisp_indexer =
-        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
+        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store.clone()).await?;
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
@@ -422,8 +454,13 @@ pub async fn start_indexer(
     let registry_contract_listener =
         EventListener::create_contract_listener(&ws_url, registry_address).await?;
     let registry_listener =
-        register_committee_published(registry_contract_listener, readwrite_contract).await?;
+        register_committee_published(registry_contract_listener, readwrite_contract.clone()).await?;
     registry_listener.start();
+
+    // CRISP Listener
+    let crisp_contract_listener = EventListener::create_contract_listener(ws_url, crisp_address).await?;
+    let crisp_listener = register_input_published(crisp_contract_listener, store).await?;
+    crisp_listener.start();
 
     Ok(())
 }

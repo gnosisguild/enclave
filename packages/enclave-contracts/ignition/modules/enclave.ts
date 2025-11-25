@@ -13,13 +13,7 @@ export default buildModule("Enclave", (m) => {
   const bondingRegistry = m.getParameter("bondingRegistry");
   const feeToken = m.getParameter("feeToken");
 
-  const poseidonT3 = m.library("PoseidonT3");
-
-  const enclaveImpl = m.contract("Enclave", [], {
-    libraries: {
-      PoseidonT3: poseidonT3,
-    },
-  });
+  const enclaveImpl = m.contract("Enclave", []);
 
   const initData = m.encodeFunctionCall(enclaveImpl, "initialize", [
     owner,

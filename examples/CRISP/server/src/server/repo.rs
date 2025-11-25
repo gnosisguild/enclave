@@ -91,6 +91,21 @@ impl<S: DataStore> CrispE3Repository<S> {
         self.set_crisp(e3_crisp).await
     }
 
+    pub async fn insert_ciphertext_input(&mut self, vote: Vec<u8>, index: u64) -> Result<()> {
+        let key = self.crisp_key();
+
+        self.store.modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.ciphertext_inputs.push((vote.clone(), index));
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+
+        Ok(())
+    }
+
     pub async fn initialize_round(
         &mut self,
         token_address: String,
@@ -106,6 +121,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             token_holder_hashes: vec![],
             token_address,
             balance_threshold,
+            ciphertext_inputs: vec![],
         })
         .await
     }
@@ -120,8 +136,8 @@ impl<S: DataStore> CrispE3Repository<S> {
     }
 
     pub async fn get_vote_count(&self) -> Result<u64> {
-        let e3 = self.get_e3().await?;
-        Ok(u64::try_from(e3.ciphertext_inputs.len())?)
+        let e3_crisp = self.get_crisp().await?;
+        Ok(u64::try_from(e3_crisp.ciphertext_inputs.len())?)
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -189,7 +205,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             status: e3_crisp.status,
             chain_id: e3.chain_id,
             duration: e3.duration,
-            vote_count: u64::try_from(e3.ciphertext_inputs.len())?,
+            vote_count: u64::try_from(e3_crisp.ciphertext_inputs.len())?,
             start_time: e3_crisp.start_time,
             start_block: e3.request_block,
             enclave_address: e3.enclave_address,
@@ -199,6 +215,11 @@ impl<S: DataStore> CrispE3Repository<S> {
         })
     }
 
+    pub async fn get_ciphertext_inputs(&self) -> Result<Vec<(Vec<u8>, u64)>> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.ciphertext_inputs)
+    }
+    
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())

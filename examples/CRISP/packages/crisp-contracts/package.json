@@ -41,7 +41,7 @@
   "dependencies": {
     "@enclave-e3/contracts": "workspace:*",
     "@excubiae/contracts": "^0.4.0",
-    "@zk-kit/lean-imt.sol": "2.0.0",
+    "@zk-kit/lazy-imt.sol": "2.0.0-beta.12",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"
   },

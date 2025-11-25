@@ -34,6 +34,7 @@ contract MockE3Program is IE3Program {
     }
 
     function validateInput(
+        uint256,
         address sender,
         bytes memory data
     ) external pure returns (bytes memory input) {
