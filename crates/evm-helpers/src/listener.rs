@@ -15,7 +15,7 @@ use eyre::Result;
 use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::sync::RwLock;
 use tracing::info;
 
 type EventHandler =
@@ -26,12 +26,6 @@ pub struct EventListener {
     provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
-}
-
-impl Drop for EventListener {
-    fn drop(&mut self) {
-        info!("Event Listener was DROPPED");
-    }
 }
 
 impl EventListener {

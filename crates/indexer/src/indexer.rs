@@ -197,26 +197,23 @@ impl<R: ProviderType> EnclaveIndexer<InMemoryStore, R> {
 impl EnclaveIndexer<InMemoryStore, ReadOnly> {
     /// Creates an `EnclaveIndexer` with an in-memory store.
     ///
-    /// Note: `contract_addresses[0]` must be the enclave contract address.
-    pub async fn from_endpoint_address_in_mem(
-        ws_url: &str,
-        contract_addresses: &[&str],
-    ) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_addresses[0]).await?;
+    /// Note: `addresses[0]` must be the enclave contract address.
+    pub async fn from_endpoint_address_in_mem(ws_url: &str, addresses: &[&str]) -> Result<Self> {
+        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
         EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(listener, contract).await
     }
 
     /// Creates an `EnclaveIndexer` with a provided in-memory store.
     ///
-    /// Note: `contract_addresses[0]` must be the enclave contract address.
+    /// Note: `addresses[0]` must be the enclave contract address.
     pub async fn from_endpoint_address(
         ws_url: &str,
-        contract_addresses: &[&str],
+        addresses: &[&str],
         store: InMemoryStore,
     ) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_addresses[0]).await?;
+        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
         EnclaveIndexer::new(listener, contract, store).await
     }
 }
