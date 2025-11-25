@@ -20,7 +20,11 @@ pub struct ThresholdQueue<T> {
 /// An item that can be added to a threshold queue
 pub trait ThresholdItem: Ord {
     type Item;
+
+    /// Defines what it means to be withing the threshold eg self.myprop <= threshold
     fn within_threshold(&self, threshold: u64) -> bool;
+
+    /// Access the inner item this wraps
     fn item(&self) -> Self::Item;
 }
 
