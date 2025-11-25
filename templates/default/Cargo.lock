@@ -1105,11 +1105,15 @@ dependencies = [
  "fhe-math",
  "fhe-traits",
  "fhe-util",
+ "itertools 0.14.0",
+ "ndarray",
  "num-bigint",
+ "num-traits",
  "rand 0.8.5",
  "strum",
  "thiserror",
  "zkfhe-greco",
+ "zkfhe-shared",
 ]
 
 [[package]]
