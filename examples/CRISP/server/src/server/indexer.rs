@@ -15,6 +15,7 @@ use crate::server::{
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
+use e3_sdk::indexer::IndexerContext;
 use e3_sdk::{
     bfv_helpers::decode_bytes_to_vec_u64,
     evm_helpers::{
@@ -31,6 +32,7 @@ use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -350,41 +352,30 @@ pub async fn register_committee_published(
                 let now = get_current_timestamp_rpc().await?;
                 info!("[e3_id={}] Current time: {}", event.e3Id, now);
 
-                //////////////////////////////////////////////////////
-                // XXX: FIX ME
+                let later_event = event.clone();
+                ctx.do_later(start_time, move |_, ctx| {
+                    let event = later_event.clone();
+                    handle_committee_time_expired(event, ctx)
+                });
 
-                // Calculate wait duration
-                let wait_duration = if start_time > now {
-                    let secs = start_time - now;
-                    info!(
-                        "[e3_id={}] Need to wait {} seconds until activation",
-                        event.e3Id, secs
-                    );
-                    Duration::from_secs(secs)
-                } else {
-                    info!("[e3_id={}] Activating E3", event.e3Id);
-                    Duration::ZERO
-                };
-                info!("[e3_id={}] Wait duration: {:?}", event.e3Id, wait_duration);
-
-                // Sleep until start time
-                if !wait_duration.is_zero() {
-                    sleep(wait_duration).await;
-                }
-
-                ///////////////////////////////////////////////////////
-
-                // If not activated activate
-                let tx = contract.activate(event.e3Id, event.publicKey).await?;
-                info!(
-                    "[e3_id={}] E3 activated with tx: {:?}",
-                    event.e3Id, tx.transaction_hash
-                );
                 Ok(())
             }
         })
         .await;
     Ok(indexer)
+}
+
+async fn handle_committee_time_expired(
+    event: CommitteePublished,
+    ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
+) -> eyre::Result<()> {
+    // If not activated activate
+    let tx = ctx.contract().activate(event.e3Id, event.publicKey).await?;
+    info!(
+        "[e3_id={}] E3 activated with tx: {:?}",
+        event.e3Id, tx.transaction_hash
+    );
+    Ok(())
 }
 
 pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
