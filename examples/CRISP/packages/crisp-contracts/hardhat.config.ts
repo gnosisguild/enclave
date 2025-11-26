@@ -72,10 +72,6 @@ const config: HardhatUserConfig = {
       chainId: chainIds.hardhat,
       type: 'edr-simulated',
       chainType: 'l1',
-      mining: {
-        auto: true,
-        interval: 1000, // mine a block every 1 second
-      },
     },
     ganache: {
       accounts: {
