@@ -68,7 +68,7 @@ impl CallbackQueue {
     }
 
     /// Push a callback to the queue to be executed at or before the given time.
-    pub fn push<F, Fut>(&mut self, time: u64, callback: F)
+    pub fn push<F, Fut>(&self, time: u64, callback: F)
     where
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,

@@ -4,9 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::E3Repository;
-
 use super::{models::E3, DataStore};
+use crate::callback_queue::CallbackQueue;
+use crate::E3Repository;
+use alloy::consensus::BlockHeader;
 use alloy::hex;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
@@ -163,6 +164,7 @@ pub struct IndexerContext<S: DataStore, R: ProviderType> {
     contract: EnclaveContract<R>,
     contract_address: String,
     chain_id: u64,
+    callbacks: CallbackQueue,
 }
 
 impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
@@ -187,6 +189,21 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
 
     pub fn chain_id(&self) -> u64 {
         self.chain_id
+    }
+
+    pub async fn do_later<B, F, Fut>(self: &Arc<Self>, timestamp: u64, callback: F)
+    where
+        F: Fn(Arc<Self>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        let callback = Arc::new(callback);
+        let ctx = Arc::clone(self);
+        self.callbacks.push(timestamp, move || {
+            info!("Running callback: time={}", timestamp);
+            let callback = Arc::clone(&callback);
+            let ctx = Arc::clone(&ctx);
+            callback(ctx)
+        })
     }
 }
 
@@ -264,6 +281,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 block_listener,
                 contract_address,
                 chain_id,
+                callbacks: CallbackQueue::new(),
             }),
         };
         instance.setup_listeners().await?;
@@ -396,11 +414,30 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Ok(())
     }
 
+    async fn register_blocktime_callback_handler(&mut self) -> Result<()> {
+        let callbacks = self.ctx.callbacks.clone();
+        self.ctx
+            .block_listener
+            .add_block_handler(move |block| {
+                let timestamp = block.timestamp();
+                let blockheight = block.number();
+                let callbacks = callbacks.clone();
+                async move {
+                    info!("ON BLOCK: {}:{}", blockheight, timestamp);
+                    callbacks.execute_until_including(timestamp).await?;
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
     async fn setup_listeners(&mut self) -> Result<()> {
         info!("Setting up listeners for EnclaveIndexer...");
         self.register_e3_activated().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        self.register_blocktime_callback_handler().await?;
         info!("Listeners have been setup!");
         Ok(())
     }
