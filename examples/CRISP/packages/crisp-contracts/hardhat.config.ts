@@ -69,14 +69,13 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic,
       },
-      url: 'http://localhost:8545',
       chainId: chainIds.hardhat,
-      type: 'http',
-      // chainType: 'l1',
-      // mining: {
-      //   auto: true,
-      //   interval: 1000, // mine a block every 1 second
-      // },
+      type: 'edr-simulated',
+      chainType: 'l1',
+      mining: {
+        auto: true,
+        interval: 1000, // mine a block every 1 second
+      },
     },
     ganache: {
       accounts: {
