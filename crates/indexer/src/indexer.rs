@@ -191,9 +191,13 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
         self.chain_id
     }
 
-    pub async fn do_later<B, F, Fut>(self: &Arc<Self>, timestamp: u64, callback: F)
+    /// Schedule a callback to execute as or after a block with the given timestamp is processed.
+    ///
+    /// Useful for handling deadlines or expirations. The callback receives the scheduled
+    /// timestamp and a reference to the indexer context.
+    pub fn do_later<F, Fut>(self: &Arc<Self>, timestamp: u64, callback: F)
     where
-        F: Fn(Arc<Self>) -> Fut + Send + Sync + 'static,
+        F: Fn(u64, Arc<Self>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         let callback = Arc::new(callback);
@@ -202,7 +206,10 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
             info!("Running callback: time={}", timestamp);
             let callback = Arc::clone(&callback);
             let ctx = Arc::clone(&ctx);
-            callback(ctx)
+            async move {
+                callback(timestamp, ctx).await?;
+                Ok(())
+            }
         })
     }
 }
