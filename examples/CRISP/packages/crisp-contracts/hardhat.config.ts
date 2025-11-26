@@ -65,7 +65,7 @@ const config: HardhatUserConfig = {
   plugins: [hardhatTypechainPlugin, hardhatEthersChaiMatchers, hardhatNetworkHelpers, hardhatToolboxMochaEthersPlugin, hardhatVerify],
   tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
   networks: {
-    localhost: {
+    default: {
       accounts: {
         mnemonic,
       },
