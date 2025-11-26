@@ -16,7 +16,6 @@ pub struct Config {
     pub private_key: String,
     pub http_rpc_url: String,
     pub ws_rpc_url: String,
-    pub rpc_polling: bool,
     pub enclave_address: String,
     pub e3_program_address: String,
     pub ciphernode_registry_address: String,
