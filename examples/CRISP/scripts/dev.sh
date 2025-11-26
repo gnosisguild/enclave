@@ -35,6 +35,6 @@ pnpm concurrently \
   -ks first \
   --names "ANVIL,DEPLOY" \
   --prefix-colors "blue,green" \
-  "cd packages/crisp-contracts && anvil --block-time 1" \
+  "cd packages/crisp-contracts && pnpm hardhat --network localhost" \
   "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 
