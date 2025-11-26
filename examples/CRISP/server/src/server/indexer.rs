@@ -199,75 +199,68 @@ pub async fn register_e3_activated(
                     .set_current_round(CurrentRound { id: e3_id })
                     .await?;
 
-                // Calculate expiration time to sleep until
-                let now = get_current_timestamp_rpc().await?;
-                info!("[e3_id={}] Current time before sleep: {}", e3_id, now);
-                let wait_duration = if expiration > now {
-                    let secs = expiration - now;
-                    info!(
-                        "[e3_id={}] Need to wait {} seconds until expiration",
-                        e3_id, secs
-                    );
-                    Duration::from_secs(secs)
-                } else {
-                    info!("[e3_id={}] Expired E3", e3_id);
-                    Duration::ZERO
-                };
-                if !wait_duration.is_zero() {
-                    sleep(wait_duration).await;
-                }
-                let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
-                repo.update_status("Expired").await?;
-
-                if repo.get_vote_count().await? > 0 {
-                    info!("[e3_id={}] Starting computation for E3", e3_id);
-                    repo.update_status("Computing").await?;
-
-                    let votes = repo.get_ciphertext_inputs().await?;
-
-                    let (id, status) = run_compute(
-                        e3_id,
-                        e3.e3_params,
-                        votes,
-                        format!("{}/state/add-result", CONFIG.enclave_server_url),
-                    )
-                    .await
-                    .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
-
-                    if id != e3_id {
-                        return Err(eyre::eyre!(
-                            "Computation request returned unexpected E3 ID: expected {}, got {}",
-                            e3_id,
-                            id
-                        )
-                        .into());
-                    }
-
-                    if status != "processing" {
-                        return Err(eyre::eyre!(
-                            "Computation request failed with status: {}",
-                            status
-                        )
-                        .into());
-                    }
-
-                    info!("[e3_id={}] Request Computation for E3", e3_id);
-
-                    repo.update_status("PublishingCiphertext").await?;
-                } else {
-                    info!(
-                        "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
-                        e3_id
-                    );
-                    repo.update_status("Finished").await?;
-                }
-                info!("[e3_id={}] E3 request handled successfully.", e3_id);
-
+                info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
+                ctx.do_later(expiration, move |_, ctx| {
+                    info!("Running....");
+                    handle_e3_input_deadline_expiration(e3_id, ctx.store())
+                });
                 Ok(())
             }
         })
         .await;
     Ok(indexer)
+}
+
+async fn handle_e3_input_deadline_expiration(
+    e3_id: u64,
+    store: SharedStore<impl DataStore>,
+) -> eyre::Result<()> {
+    let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+    let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
+
+    repo.update_status("Expired").await?;
+
+    if repo.get_vote_count().await? > 0 {
+        info!("[e3_id={}] Starting computation for E3", e3_id);
+        repo.update_status("Computing").await?;
+
+        let votes = repo.get_ciphertext_inputs().await?;
+
+        let (id, status) = run_compute(
+            e3_id,
+            e3.e3_params,
+            votes,
+            format!("{}/state/add-result", CONFIG.enclave_server_url),
+        )
+        .await
+        .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+
+        if id != e3_id {
+            return Err(eyre::eyre!(
+                "Computation request returned unexpected E3 ID: expected {}, got {}",
+                e3_id,
+                id
+            )
+            .into());
+        }
+
+        if status != "processing" {
+            return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+        }
+
+        info!("[e3_id={}] Request Computation for E3", e3_id);
+
+        repo.update_status("PublishingCiphertext").await?;
+    } else {
+        info!(
+            "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
+            e3_id
+        );
+        repo.update_status("Finished").await?;
+    }
+    info!("[e3_id={}] E3 request handled successfully.", e3_id);
+
+    Ok(())
 }
 
 pub async fn register_ciphertext_output_published(
@@ -357,6 +350,9 @@ pub async fn register_committee_published(
                 let now = get_current_timestamp_rpc().await?;
                 info!("[e3_id={}] Current time: {}", event.e3Id, now);
 
+                //////////////////////////////////////////////////////
+                // XXX: FIX ME
+
                 // Calculate wait duration
                 let wait_duration = if start_time > now {
                     let secs = start_time - now;
@@ -375,6 +371,8 @@ pub async fn register_committee_published(
                 if !wait_duration.is_zero() {
                     sleep(wait_duration).await;
                 }
+
+                ///////////////////////////////////////////////////////
 
                 // If not activated activate
                 let tx = contract.activate(event.e3Id, event.publicKey).await?;
