@@ -77,6 +77,15 @@ const config: HardhatUserConfig = {
         interval: 1000,
       },
     },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      type: 'http',
+      url: 'http://localhost:8545',
+      timeout: 60000,
+    },
     ganache: {
       accounts: {
         mnemonic,
