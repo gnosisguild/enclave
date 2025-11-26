@@ -164,8 +164,8 @@ pub trait EnclaveWrite {
 }
 
 /// Generic type to represent different provider types
-pub trait ProviderType: Send {
-    type Provider: Provider + Send + Sync + 'static;
+pub trait ProviderType: Clone + Send + Sync + 'static {
+    type Provider: Provider + Clone + Send + Sync + 'static;
 }
 
 /// Marker type for read-only provider
@@ -190,6 +190,15 @@ pub struct EnclaveContract<T: ProviderType> {
     _marker: PhantomData<T>,
 }
 
+impl<R: ProviderType> EnclaveContract<R> {
+    pub fn address(&self) -> &Address {
+        &self.contract_address
+    }
+    pub fn get_provider(&self) -> Arc<R::Provider> {
+        self.provider.clone()
+    }
+}
+
 impl EnclaveContract<ReadWrite> {
     pub async fn new(
         http_rpc_url: &str,
@@ -197,14 +206,6 @@ impl EnclaveContract<ReadWrite> {
         contract_address: &str,
     ) -> Result<EnclaveContract<ReadWrite>> {
         EnclaveContractFactory::create_write(http_rpc_url, contract_address, private_key).await
-    }
-
-    pub fn get_provider(&self) -> Arc<EnclaveWriteProvider> {
-        self.provider.clone()
-    }
-
-    pub fn address(&self) -> &Address {
-        &self.contract_address
     }
 }
 
@@ -214,14 +215,6 @@ impl EnclaveContract<ReadOnly> {
         contract_address: &str,
     ) -> Result<EnclaveContract<ReadOnly>> {
         EnclaveContractFactory::create_read(http_rpc_url, contract_address).await
-    }
-
-    pub fn get_provider(&self) -> Arc<EnclaveReadOnlyProvider> {
-        self.provider.clone()
-    }
-
-    pub fn address(&self) -> &Address {
-        &self.contract_address
     }
 }
 
