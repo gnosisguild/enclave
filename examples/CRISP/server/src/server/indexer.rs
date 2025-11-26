@@ -33,8 +33,6 @@ use log::info;
 use num_bigint::BigUint;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
