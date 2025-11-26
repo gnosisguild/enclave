@@ -423,7 +423,7 @@ pub async fn register_input_published(
 }
 
 pub async fn start_indexer(
-    ws_url: &str,
+    url: &str,
     contract_address: &str,
     registry_address: &str,
     crisp_address: &str,
@@ -432,7 +432,7 @@ pub async fn start_indexer(
 ) -> Result<()> {
     info!("CRISP: Creating indexer...");
     let crisp_indexer = EnclaveIndexer::new_with_write_contract(
-        ws_url,
+        url,
         &[contract_address, registry_address, crisp_address],
         store,
         private_key,

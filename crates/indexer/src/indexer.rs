@@ -229,9 +229,9 @@ impl EnclaveIndexer<InMemoryStore, ReadOnly> {
     /// Creates an `EnclaveIndexer` with an in-memory store.
     ///
     /// Note: `addresses[0]` must be the enclave contract address.
-    pub async fn from_endpoint_address_in_mem(ws_url: &str, addresses: &[&str]) -> Result<Self> {
-        let event_listener = EventListener::create_contract_listener(ws_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
+    pub async fn from_endpoint_address_in_mem(rpc_url: &str, addresses: &[&str]) -> Result<Self> {
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
         EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(event_listener, contract)
             .await
     }
@@ -240,12 +240,12 @@ impl EnclaveIndexer<InMemoryStore, ReadOnly> {
     ///
     /// Note: `addresses[0]` must be the enclave contract address.
     pub async fn from_endpoint_address(
-        ws_url: &str,
+        rpc_url: &str,
         addresses: &[&str],
         store: InMemoryStore,
     ) -> Result<Self> {
-        let event_listener = EventListener::create_contract_listener(ws_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
         EnclaveIndexer::new(event_listener, contract, store).await
     }
 }
@@ -253,7 +253,7 @@ impl EnclaveIndexer<InMemoryStore, ReadOnly> {
 impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
     /// Creates a new EnclaveIndexer with a writeable contract.
     pub async fn new_with_write_contract(
-        ws_url: &str,
+        rpc_url: &str,
         addresses: &[&str], // First address must be contract_address
         store: S,
         private_key: &str,
@@ -261,10 +261,10 @@ impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
         let Some(contract_address) = addresses.first() else {
             return Err(eyre::eyre!("No addresses provided"));
         };
-        let event_listener = EventListener::create_contract_listener(ws_url, addresses).await?;
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
         EnclaveIndexer::new(
             event_listener,
-            EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?,
+            EnclaveContractFactory::create_write(rpc_url, contract_address, private_key).await?,
             store,
         )
         .await

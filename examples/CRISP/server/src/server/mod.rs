@@ -39,8 +39,14 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tokio::spawn({
         let db = db.clone();
         async move {
+            let url = if CONFIG.rpc_polling {
+                &CONFIG.http_rpc_url
+            } else {
+                &CONFIG.ws_rpc_url
+            };
+
             if let Err(e) = start_indexer(
-                &CONFIG.ws_rpc_url,
+                url,
                 &CONFIG.enclave_address,
                 &CONFIG.ciphernode_registry_address,
                 &CONFIG.e3_program_address,
