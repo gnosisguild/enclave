@@ -22,7 +22,7 @@ type EventHandler =
 
 #[derive(Clone)]
 pub struct EventListener {
-    provider: Arc<dyn Provider<Ethereum>>, // should this be Ethereum?
+    provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
 }
