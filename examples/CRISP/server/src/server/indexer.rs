@@ -201,7 +201,6 @@ pub async fn register_e3_activated(
 
                 info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
                 ctx.do_later(expiration, move |_, ctx| {
-                    info!("Running....");
                     handle_e3_input_deadline_expiration(e3_id, ctx.store())
                 });
                 Ok(())
