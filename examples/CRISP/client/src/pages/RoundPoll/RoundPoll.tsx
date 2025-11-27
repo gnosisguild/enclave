@@ -38,10 +38,7 @@ const RoundPoll: React.FC = () => {
     loadRound()
   }, [parsedRoundId, getRoundStateLite])
 
-  const endTime = useMemo(
-    () => (roundState ? convertTimestampToDate(roundState.start_time, roundState.duration) : null),
-    [roundState],
-  )
+  const endTime = useMemo(() => (roundState ? convertTimestampToDate(roundState.start_time, roundState.duration) : null), [roundState])
 
   const title = `Round #${roundId}`
 
@@ -61,4 +58,3 @@ const RoundPoll: React.FC = () => {
 }
 
 export default RoundPoll
-
