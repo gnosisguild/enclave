@@ -3,7 +3,8 @@
 This directory contains the Solidity contracts for CRISP - Coercion-Resistant Impartial Selection
 Protocol.
 
-Contracts are built and tested with [Hardhat](https://hardhat.org). Tests are defined in the `test` directory.
+Contracts are built and tested with [Hardhat](https://hardhat.org). Tests are defined in the `test`
+directory.
 
 ## Running Tests
 

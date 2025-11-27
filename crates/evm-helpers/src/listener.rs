@@ -15,7 +15,8 @@ use eyre::Result;
 use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::sync::RwLock;
+use tracing::info;
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -36,7 +37,7 @@ impl EventListener {
         }
     }
 
-    pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
+    pub async fn add_event_handler<E, F, Fut>(&self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
         F: Fn(E) -> Fut + Send + Sync + 'static,
@@ -63,7 +64,7 @@ impl EventListener {
             .push(wrapped_handler);
     }
 
-    async fn listen(&self) -> Result<()> {
+    pub async fn listen(&self) -> Result<()> {
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -89,14 +90,14 @@ impl EventListener {
         Ok(())
     }
 
-    pub fn start(&self) -> JoinHandle<Result<()>> {
-        let this = self.clone();
-        tokio::spawn(async move { this.listen().await })
-    }
-
-    pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
+    /// Create a contract listener that will listen to events from all addresses.
+    pub async fn create_contract_listener(ws_url: &str, addresses: &[&str]) -> Result<Self> {
         let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
-        let address = contract_address.parse::<Address>()?;
+
+        let address = addresses
+            .iter()
+            .map(|a| a.parse::<Address>().map_err(|e| eyre::eyre!("{e}")))
+            .collect::<Result<Vec<_>>>()?;
         let filter = Filter::new()
             .address(address)
             .from_block(BlockNumberOrTag::Latest);

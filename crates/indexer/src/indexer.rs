@@ -13,7 +13,9 @@ use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use e3_evm_helpers::{
-    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
+    contracts::{
+        EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
+    },
     events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
     listener::EventListener,
 };
@@ -24,7 +26,7 @@ use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use tracing::info;
 
 type E3Id = u64;
 
@@ -143,208 +145,271 @@ impl<S: DataStore> DataStore for SharedStore<S> {
 }
 
 #[derive(Clone)]
-pub struct EnclaveIndexer<S: DataStore> {
+pub struct EnclaveIndexer<S: DataStore, R: ProviderType> {
+    ctx: Arc<IndexerContext<S, R>>,
+}
+
+impl<S: DataStore, R: ProviderType> Drop for EnclaveIndexer<S, R> {
+    fn drop(&mut self) {
+        info!("EnclaveIndexer is DROPPED");
+    }
+}
+
+pub struct IndexerContext<S: DataStore, R: ProviderType> {
+    store: SharedStore<S>,
     listener: EventListener,
-    contract: EnclaveContract<ReadOnly>,
-    store: Arc<RwLock<S>>,
+    contract: EnclaveContract<R>,
     contract_address: String,
     chain_id: u64,
 }
 
-impl EnclaveIndexer<InMemoryStore> {
+impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
+    pub fn store(&self) -> SharedStore<S> {
+        self.store.clone()
+    }
+
+    pub fn listener(&self) -> EventListener {
+        self.listener.clone()
+    }
+    pub fn contract(&self) -> EnclaveContract<R> {
+        self.contract.clone()
+    }
+    pub fn enclave_address(&self) -> String {
+        self.contract_address.clone()
+    }
+
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+}
+
+impl<R: ProviderType> EnclaveIndexer<InMemoryStore, R> {
     pub async fn new_with_in_mem_store(
         listener: EventListener,
-        contract: EnclaveContract<ReadOnly>,
-    ) -> Result<EnclaveIndexer<InMemoryStore>> {
+        contract: EnclaveContract<R>,
+    ) -> Result<EnclaveIndexer<InMemoryStore, R>> {
         let store = InMemoryStore::new();
 
         EnclaveIndexer::new(listener, contract, store).await
     }
+}
 
-    pub async fn from_endpoint_address_in_mem(
+impl EnclaveIndexer<InMemoryStore, ReadOnly> {
+    /// Creates an `EnclaveIndexer` with an in-memory store.
+    ///
+    /// Note: `addresses[0]` must be the enclave contract address.
+    pub async fn from_endpoint_address_in_mem(ws_url: &str, addresses: &[&str]) -> Result<Self> {
+        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
+        EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(listener, contract).await
+    }
+
+    /// Creates an `EnclaveIndexer` with a provided in-memory store.
+    ///
+    /// Note: `addresses[0]` must be the enclave contract address.
+    pub async fn from_endpoint_address(
         ws_url: &str,
-        contract_address: &str,
-    ) -> Result<EnclaveIndexer<InMemoryStore>> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
-        EnclaveIndexer::<InMemoryStore>::new_with_in_mem_store(listener, contract).await
+        addresses: &[&str],
+        store: InMemoryStore,
+    ) -> Result<Self> {
+        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
+        EnclaveIndexer::new(listener, contract, store).await
     }
 }
 
-impl<S: DataStore> EnclaveIndexer<S> {
+impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
+    /// Creates a new EnclaveIndexer with a writeable contract.
+    pub async fn new_with_write_contract(
+        ws_url: &str,
+        addresses: &[&str], // First address must be contract_address
+        store: S,
+        private_key: &str,
+    ) -> Result<Self> {
+        let Some(contract_address) = addresses.first() else {
+            return Err(eyre::eyre!("No addresses provided"));
+        };
+        EnclaveIndexer::new(
+            EventListener::create_contract_listener(ws_url, addresses).await?,
+            EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?,
+            store,
+        )
+        .await
+    }
+}
+
+impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     pub async fn new(
         listener: EventListener,
-        contract: EnclaveContract<ReadOnly>,
+        contract: EnclaveContract<R>,
         store: S,
     ) -> Result<Self> {
         let chain_id = contract.provider.get_chain_id().await?;
         let contract_address = contract.address().to_string();
         let mut instance = Self {
-            store: Arc::new(RwLock::new(store)),
-            contract,
-            listener,
-            contract_address,
-            chain_id,
+            ctx: Arc::new(IndexerContext {
+                store: SharedStore::new(Arc::new(RwLock::new(store))),
+                contract,
+                listener,
+                contract_address,
+                chain_id,
+            }),
         };
         instance.setup_listeners().await?;
+        info!("EnclaveIndexer has been configured");
         Ok(instance)
     }
 
-    pub async fn from_endpoint_address(
-        ws_url: &str,
-        contract_address: &str,
-        store: S,
-    ) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
-        EnclaveIndexer::new(listener, contract, store).await
-    }
-
-    pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
+    /// Listen for contract events from all contracts.
+    /// Callback will provide the event and a context object.
+    pub async fn add_event_handler<E, F, Fut>(&self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
-        F: Fn(E, SharedStore<S>) -> Fut + Send + Sync + 'static,
+        F: Fn(E, Arc<IndexerContext<S, R>>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        let store = SharedStore::new(self.store.clone());
         let handler = Arc::new(handler);
-        self.listener
+        let ctx = self.ctx.clone();
+        // In order to avoid a memory leak we create a weak reference here
+        let ctx_weak = Arc::downgrade(&ctx);
+
+        self.ctx
+            .listener
             .add_event_handler(move |e: E| {
                 let handler = Arc::clone(&handler);
-                let store = store.clone();
-                async move { handler(e, store).await }
+                let ctx_weak = ctx_weak.clone();
+
+                async move {
+                    // We check the weak reference if it can be upgraded
+                    // if not it must have been destroyed
+                    if let Some(ctx) = ctx_weak.upgrade() {
+                        handler(e, ctx).await
+                    } else {
+                        println!("Context was dropped!");
+                        Ok(())
+                    }
+                }
             })
             .await;
     }
 
     async fn register_e3_activated(&mut self) -> Result<()> {
-        let db = self.store.clone();
-        let contract = self.contract.clone();
-        let chain_id = self.chain_id;
-        let enclave_address = self.contract_address.clone();
-        self.listener
-            .add_event_handler(move |e: E3Activated| {
-                let db = SharedStore::new(db.clone());
-                let enclave_address = enclave_address.clone();
-                let contract = contract.clone();
+        self.add_event_handler(move |e: E3Activated, ctx| {
+            async move {
+                let contract = ctx.contract();
+                let db = ctx.store();
+                let enclave_address = ctx.enclave_address();
+                println!(
+                    "E3Activated: id={}, expiration={}, pubkey=0x{}...",
+                    e.e3Id,
+                    e.expiration,
+                    hex::encode(&e.committeePublicKey[..8.min(e.committeePublicKey.len())])
+                );
+                let e3_id = u64_try_from(e.e3Id)?;
+                let e3 = contract.get_e3(e.e3Id).await?;
+                let duration = u64_try_from(e3.duration)?;
+                let expiration = u64_try_from(e.expiration)?;
+                let seed = e3.seed.to_be_bytes();
+                let request_block = u64_try_from(e3.requestBlock)?;
+                let start_window = [
+                    u64_try_from(e3.startWindow[0])?,
+                    u64_try_from(e3.startWindow[1])?,
+                ];
+                // NOTE: we are only saving protocol specific info
+                // here and not CRISP specific info so E3 corresponds to the solidity E3
+                let e3_obj = E3 {
+                    chain_id: ctx.chain_id(),
+                    ciphertext_inputs: vec![],
+                    ciphertext_output: vec![],
+                    committee_public_key: e.committeePublicKey.to_vec(),
+                    duration,
+                    custom_params: e3.customParams.to_vec(),
+                    e3_params: e3.e3ProgramParams.to_vec(),
+                    enclave_address,
+                    encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
+                    expiration,
+                    id: e3_id,
+                    plaintext_output: vec![],
+                    request_block,
+                    seed,
+                    start_window,
+                    threshold: e3.threshold,
+                };
 
-                async move {
-                    println!(
-                        "E3Activated: id={}, expiration={}, pubkey=0x{}...",
-                        e.e3Id,
-                        e.expiration,
-                        hex::encode(&e.committeePublicKey[..8.min(e.committeePublicKey.len())])
-                    );
-                    let e3_id = u64_try_from(e.e3Id)?;
-                    let e3 = contract.get_e3(e.e3Id).await?;
-                    let duration = u64_try_from(e3.duration)?;
-                    let expiration = u64_try_from(e.expiration)?;
-                    let seed = e3.seed.to_be_bytes();
-                    let request_block = u64_try_from(e3.requestBlock)?;
-                    let start_window = [
-                        u64_try_from(e3.startWindow[0])?,
-                        u64_try_from(e3.startWindow[1])?,
-                    ];
-                    // NOTE: we are only saving protocol specific info
-                    // here and not CRISP specific info so E3 corresponds to the solidity E3
-                    let e3_obj = E3 {
-                        chain_id,
-                        ciphertext_inputs: vec![],
-                        ciphertext_output: vec![],
-                        committee_public_key: e.committeePublicKey.to_vec(),
-                        duration,
-                        custom_params: e3.customParams.to_vec(),
-                        e3_params: e3.e3ProgramParams.to_vec(),
-                        enclave_address,
-                        encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                        expiration,
-                        id: e3_id,
-                        plaintext_output: vec![],
-                        request_block,
-                        seed,
-                        start_window,
-                        threshold: e3.threshold,
-                    };
+                let mut repo = E3Repository::new(db, e3_id);
 
-                    let mut repo = E3Repository::new(db, e3_id);
-
-                    repo.set_e3(e3_obj).await?;
-                    Ok(())
-                }
-            })
-            .await;
+                repo.set_e3(e3_obj).await?;
+                Ok(())
+            }
+        })
+        .await;
         Ok(())
     }
 
     async fn register_ciphertext_output_published(&mut self) -> Result<()> {
-        let store = self.store.clone();
-        self.listener
-            .add_event_handler(move |e: CiphertextOutputPublished| {
-                let store = SharedStore::new(store.clone());
-                async move {
-                    println!(
-                        "CiphertextOutputPublished: e3_id={}, output=0x{}...",
-                        e.e3Id,
-                        hex::encode(&e.ciphertextOutput[..8.min(e.ciphertextOutput.len())])
-                    );
-                    let e3_id = u64_try_from(e.e3Id)?;
+        self.add_event_handler(move |e: CiphertextOutputPublished, ctx| async move {
+            let store = ctx.store();
+            println!(
+                "CiphertextOutputPublished: e3_id={}, output=0x{}...",
+                e.e3Id,
+                hex::encode(&e.ciphertextOutput[..8.min(e.ciphertextOutput.len())])
+            );
+            let e3_id = u64_try_from(e.e3Id)?;
 
-                    let mut repo = E3Repository::new(store, e3_id);
-                    repo.set_ciphertext_output(e.ciphertextOutput.to_vec())
-                        .await?;
+            let mut repo = E3Repository::new(store, e3_id);
+            repo.set_ciphertext_output(e.ciphertextOutput.to_vec())
+                .await?;
 
-                    Ok(())
-                }
-            })
-            .await;
+            Ok(())
+        })
+        .await;
         Ok(())
     }
 
     async fn register_plaintext_output_published(&mut self) -> Result<()> {
-        let store = self.store.clone();
-        self.listener
-            .add_event_handler(move |e: PlaintextOutputPublished| {
-                let store = SharedStore::new(store.clone());
-                async move {
-                    println!(
-                        "PlaintextOutputPublished: e3_id={}, output=0x{}...",
-                        e.e3Id,
-                        hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())])
-                    );
-                    let e3_id = u64_try_from(e.e3Id)?;
-                    let mut repo = E3Repository::new(store, e3_id);
-                    repo.set_plaintext_output(e.plaintextOutput.to_vec())
-                        .await?;
+        self.add_event_handler(move |e: PlaintextOutputPublished, ctx| async move {
+            let store = ctx.store();
+            println!(
+                "PlaintextOutputPublished: e3_id={}, output=0x{}...",
+                e.e3Id,
+                hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())])
+            );
+            let e3_id = u64_try_from(e.e3Id)?;
+            let mut repo = E3Repository::new(store, e3_id);
+            repo.set_plaintext_output(e.plaintextOutput.to_vec())
+                .await?;
 
-                    Ok(())
-                }
-            })
-            .await;
+            Ok(())
+        })
+        .await;
         Ok(())
     }
 
     async fn setup_listeners(&mut self) -> Result<()> {
+        info!("Setting up listeners for EnclaveIndexer...");
         self.register_e3_activated().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        info!("Listeners have been setup!");
         Ok(())
     }
 
-    pub fn start(&self) -> JoinHandle<Result<()>> {
-        self.listener.start()
+    pub async fn listen(&self) -> Result<()> {
+        info!("Starting EnclaveIndexer listening...");
+        self.ctx.listener.listen().await
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
-        let (e3, _) = get_e3(self.store.clone(), e3_id).await?;
+        let (e3, _) = get_e3(self.ctx.store.inner.clone(), e3_id).await?;
         Ok(e3)
     }
 
     pub fn get_listener(&self) -> EventListener {
-        self.listener.clone()
+        self.ctx.listener.clone()
     }
 
     pub fn get_store(&self) -> SharedStore<S> {
-        SharedStore::new(self.store.clone())
+        self.ctx.store.clone()
     }
 }
 
