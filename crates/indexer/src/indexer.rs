@@ -4,29 +4,31 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::E3Repository;
-
 use super::{models::E3, DataStore};
+use crate::callback_queue::CallbackQueue;
+use crate::E3Repository;
+use alloy::consensus::BlockHeader;
 use alloy::hex;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use e3_evm_helpers::{
+    block_listener::BlockListener,
     contracts::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
     },
+    event_listener::EventListener,
     events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
-    listener::EventListener,
 };
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
-use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
+use std::{future::Future, time::Duration};
 use thiserror::Error;
-use tokio::sync::RwLock;
-use tracing::info;
+use tokio::{sync::RwLock, time::sleep};
+use tracing::{error, info, warn};
 
 type E3Id = u64;
 
@@ -157,10 +159,12 @@ impl<S: DataStore, R: ProviderType> Drop for EnclaveIndexer<S, R> {
 
 pub struct IndexerContext<S: DataStore, R: ProviderType> {
     store: SharedStore<S>,
-    listener: EventListener,
+    event_listener: EventListener,
+    block_listener: BlockListener,
     contract: EnclaveContract<R>,
     contract_address: String,
     chain_id: u64,
+    callbacks: CallbackQueue,
 }
 
 impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
@@ -168,9 +172,14 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
         self.store.clone()
     }
 
-    pub fn listener(&self) -> EventListener {
-        self.listener.clone()
+    pub fn event_listener(&self) -> EventListener {
+        self.event_listener.clone()
     }
+
+    pub fn block_listener(&self) -> BlockListener {
+        self.block_listener.clone()
+    }
+
     pub fn contract(&self) -> EnclaveContract<R> {
         self.contract.clone()
     }
@@ -181,16 +190,38 @@ impl<S: DataStore, R: ProviderType> IndexerContext<S, R> {
     pub fn chain_id(&self) -> u64 {
         self.chain_id
     }
+
+    /// Schedule a callback to execute as or after a block with the given timestamp is processed.
+    ///
+    /// Useful for handling deadlines or expirations. The callback receives the scheduled
+    /// timestamp and a reference to the indexer context.
+    pub fn do_later<F, Fut>(self: &Arc<Self>, timestamp: u64, callback: F)
+    where
+        F: Fn(u64, Arc<Self>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        let callback = Arc::new(callback);
+        let ctx = Arc::clone(self);
+        self.callbacks.push(timestamp, move || {
+            info!("Running callback: time={}", timestamp);
+            let callback = Arc::clone(&callback);
+            let ctx = Arc::clone(&ctx);
+            async move {
+                callback(timestamp, ctx).await?;
+                Ok(())
+            }
+        })
+    }
 }
 
 impl<R: ProviderType> EnclaveIndexer<InMemoryStore, R> {
     pub async fn new_with_in_mem_store(
-        listener: EventListener,
+        event_listener: EventListener,
         contract: EnclaveContract<R>,
     ) -> Result<EnclaveIndexer<InMemoryStore, R>> {
         let store = InMemoryStore::new();
 
-        EnclaveIndexer::new(listener, contract, store).await
+        EnclaveIndexer::new(event_listener, contract, store).await
     }
 }
 
@@ -198,30 +229,31 @@ impl EnclaveIndexer<InMemoryStore, ReadOnly> {
     /// Creates an `EnclaveIndexer` with an in-memory store.
     ///
     /// Note: `addresses[0]` must be the enclave contract address.
-    pub async fn from_endpoint_address_in_mem(ws_url: &str, addresses: &[&str]) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
-        EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(listener, contract).await
+    pub async fn from_endpoint_address_in_mem(rpc_url: &str, addresses: &[&str]) -> Result<Self> {
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
+        EnclaveIndexer::<InMemoryStore, ReadOnly>::new_with_in_mem_store(event_listener, contract)
+            .await
     }
 
     /// Creates an `EnclaveIndexer` with a provided in-memory store.
     ///
     /// Note: `addresses[0]` must be the enclave contract address.
     pub async fn from_endpoint_address(
-        ws_url: &str,
+        rpc_url: &str,
         addresses: &[&str],
         store: InMemoryStore,
     ) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, addresses).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, addresses[0]).await?;
-        EnclaveIndexer::new(listener, contract, store).await
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
+        let contract = EnclaveContractFactory::create_read(rpc_url, addresses[0]).await?;
+        EnclaveIndexer::new(event_listener, contract, store).await
     }
 }
 
 impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
     /// Creates a new EnclaveIndexer with a writeable contract.
     pub async fn new_with_write_contract(
-        ws_url: &str,
+        rpc_url: &str,
         addresses: &[&str], // First address must be contract_address
         store: S,
         private_key: &str,
@@ -229,9 +261,10 @@ impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
         let Some(contract_address) = addresses.first() else {
             return Err(eyre::eyre!("No addresses provided"));
         };
+        let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;
         EnclaveIndexer::new(
-            EventListener::create_contract_listener(ws_url, addresses).await?,
-            EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?,
+            event_listener,
+            EnclaveContractFactory::create_write(rpc_url, contract_address, private_key).await?,
             store,
         )
         .await
@@ -240,19 +273,22 @@ impl<S: DataStore> EnclaveIndexer<S, ReadWrite> {
 
 impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     pub async fn new(
-        listener: EventListener,
+        event_listener: EventListener,
         contract: EnclaveContract<R>,
         store: S,
     ) -> Result<Self> {
         let chain_id = contract.provider.get_chain_id().await?;
         let contract_address = contract.address().to_string();
+        let block_listener = BlockListener::new(event_listener.provider());
         let mut instance = Self {
             ctx: Arc::new(IndexerContext {
                 store: SharedStore::new(Arc::new(RwLock::new(store))),
                 contract,
-                listener,
+                event_listener,
+                block_listener,
                 contract_address,
                 chain_id,
+                callbacks: CallbackQueue::new(),
             }),
         };
         instance.setup_listeners().await?;
@@ -274,7 +310,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         let ctx_weak = Arc::downgrade(&ctx);
 
         self.ctx
-            .listener
+            .event_listener
             .add_event_handler(move |e: E| {
                 let handler = Arc::clone(&handler);
                 let ctx_weak = ctx_weak.clone();
@@ -285,7 +321,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     if let Some(ctx) = ctx_weak.upgrade() {
                         handler(e, ctx).await
                     } else {
-                        println!("Context was dropped!");
+                        warn!("Context was dropped!");
                         Ok(())
                     }
                 }
@@ -349,7 +385,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     async fn register_ciphertext_output_published(&mut self) -> Result<()> {
         self.add_event_handler(move |e: CiphertextOutputPublished, ctx| async move {
             let store = ctx.store();
-            println!(
+            info!(
                 "CiphertextOutputPublished: e3_id={}, output=0x{}...",
                 e.e3Id,
                 hex::encode(&e.ciphertextOutput[..8.min(e.ciphertextOutput.len())])
@@ -369,7 +405,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     async fn register_plaintext_output_published(&mut self) -> Result<()> {
         self.add_event_handler(move |e: PlaintextOutputPublished, ctx| async move {
             let store = ctx.store();
-            println!(
+            info!(
                 "PlaintextOutputPublished: e3_id={}, output=0x{}...",
                 e.e3Id,
                 hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())])
@@ -385,27 +421,63 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
         Ok(())
     }
 
+    async fn register_blocktime_callback_handler(&mut self) -> Result<()> {
+        let callbacks = self.ctx.callbacks.clone();
+        self.ctx
+            .block_listener
+            .add_block_handler(move |block| {
+                let timestamp = block.timestamp();
+                let blockheight = block.number();
+                let callbacks = callbacks.clone();
+                async move {
+                    info!("ON BLOCK: {}:{}", blockheight, timestamp);
+                    callbacks.execute_until_including(timestamp).await?;
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
     async fn setup_listeners(&mut self) -> Result<()> {
         info!("Setting up listeners for EnclaveIndexer...");
         self.register_e3_activated().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
+        self.register_blocktime_callback_handler().await?;
         info!("Listeners have been setup!");
         Ok(())
     }
 
     pub async fn listen(&self) -> Result<()> {
         info!("Starting EnclaveIndexer listening...");
-        self.ctx.listener.listen().await
+        loop {
+            let res = tokio::select! {
+                res = self.ctx.event_listener.listen() => {
+                    match &res {
+                        Ok(_) => warn!("EventListener curiously halted naturally."),
+                        Err(e) => error!("EventListener halted with an error: {e}")
+                    };
+                    res
+                }
+                res = self.ctx.block_listener.listen() => {
+                    match &res {
+                        Ok(_) => warn!("BlockListener curiously halted naturally."),
+                        Err(e) => error!("BlockListener halted with an error: {e}")
+                    };
+                    res
+                }
+            };
+
+            let secs = res.map(|_| 1).unwrap_or(5);
+            warn!("Restarting listeners in {}s...", secs);
+            sleep(Duration::from_secs(secs)).await
+        }
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
         let (e3, _) = get_e3(self.ctx.store.inner.clone(), e3_id).await?;
         Ok(e3)
-    }
-
-    pub fn get_listener(&self) -> EventListener {
-        self.ctx.listener.clone()
     }
 
     pub fn get_store(&self) -> SharedStore<S> {
