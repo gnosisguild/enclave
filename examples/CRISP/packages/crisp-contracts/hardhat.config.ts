@@ -73,7 +73,7 @@ const config: HardhatUserConfig = {
       type: 'edr-simulated',
       chainType: 'l1',
       mining: {
-        auto: false,
+        auto: true,
         interval: 1000,
       },
     },
