@@ -17,7 +17,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::Mutex;
-
 use tokio::time::sleep;
 
 sol!(
