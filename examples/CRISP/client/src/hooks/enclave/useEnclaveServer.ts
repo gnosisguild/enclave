@@ -37,8 +37,7 @@ export const useEnclaveServer = () => {
   const broadcastVote = (vote: BroadcastVoteRequest) => fetchData<BroadcastVoteResponse, BroadcastVoteRequest>(BroadcastVote, 'post', vote)
   const getWebResult = () => fetchData<PollRequestResult[], void>(GetWebAllResult, 'get')
   const getWebResultByRound = (round_id: number) => fetchData<PollRequestResult, { round_id: number }>(GetWebResult, 'post', { round_id })
-  const getVoteStatus = (request: VoteStatusRequest) =>
-    fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
+  const getVoteStatus = (request: VoteStatusRequest) => fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
 
   return {
     isLoading,
