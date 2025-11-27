@@ -5,7 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { handleGenericError } from '@/utils/handle-generic-error'
-import { BroadcastVoteRequest, BroadcastVoteResponse, CurrentRound, VoteStateLite } from '@/model/vote.model'
+import {
+  BroadcastVoteRequest,
+  BroadcastVoteResponse,
+  CurrentRound,
+  VoteStateLite,
+  VoteStatusRequest,
+  VoteStatusResponse,
+} from '@/model/vote.model'
 import { useApi } from '../generic/useFetchApi'
 import { PollRequestResult } from '@/model/poll.model'
 
@@ -19,16 +26,19 @@ const EnclaveEndpoints = {
   GetWebResult: `${ENCLAVE_API}/state/result`,
   GetWebAllResult: `${ENCLAVE_API}/state/all`,
   BroadcastVote: `${ENCLAVE_API}/voting/broadcast`,
+  GetVoteStatus: `${ENCLAVE_API}/voting/status`,
 } as const
 
 export const useEnclaveServer = () => {
-  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult } = EnclaveEndpoints
+  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult, GetVoteStatus } = EnclaveEndpoints
   const { fetchData, isLoading } = useApi()
   const getCurrentRound = () => fetchData<CurrentRound>(GetCurrentRound)
   const getRoundStateLite = (round_id: number) => fetchData<VoteStateLite, { round_id: number }>(GetRoundStateLite, 'post', { round_id })
   const broadcastVote = (vote: BroadcastVoteRequest) => fetchData<BroadcastVoteResponse, BroadcastVoteRequest>(BroadcastVote, 'post', vote)
   const getWebResult = () => fetchData<PollRequestResult[], void>(GetWebAllResult, 'get')
   const getWebResultByRound = (round_id: number) => fetchData<PollRequestResult, { round_id: number }>(GetWebResult, 'post', { round_id })
+  const getVoteStatus = (request: VoteStatusRequest) =>
+    fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
 
   return {
     isLoading,
@@ -37,5 +47,6 @@ export const useEnclaveServer = () => {
     getCurrentRound,
     getRoundStateLite,
     broadcastVote,
+    getVoteStatus,
   }
 }

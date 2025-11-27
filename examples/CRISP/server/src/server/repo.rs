@@ -94,7 +94,8 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn insert_ciphertext_input(&mut self, vote: Vec<u8>, index: u64) -> Result<()> {
         let key = self.crisp_key();
 
-        self.store.modify(&key, |e3_obj: Option<E3Crisp>| {
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
                     e.ciphertext_inputs.push((vote.clone(), index));
                     e
@@ -219,7 +220,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(e3_crisp.ciphertext_inputs)
     }
-    
+
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())

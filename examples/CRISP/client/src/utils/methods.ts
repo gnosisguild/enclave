@@ -17,7 +17,7 @@ export const markWinner = (options: PollOption[]) => {
 
 export const convertTimestampToDate = (timestamp: number, secondsToAdd: number = 0): Date => {
   const date = new Date(timestamp * 1000)
-  date.setSeconds(date.getMinutes() + secondsToAdd)
+  date.setSeconds(date.getSeconds() + secondsToAdd)
   return date
 }
 
@@ -48,7 +48,7 @@ export const formatDate = (isoDateString: string): string => {
     hour12: true,
   })
 
-  return `${dateFormatter.format(date)} -  ${timeFormatter.format(date)}`
+  return `${dateFormatter.format(date)} - ${timeFormatter.format(date)}`
 }
 
 export const convertPollData = (request: PollRequestResult[]): PollResult[] => {
@@ -113,9 +113,9 @@ export const convertVoteStateLite = (voteState: VoteStateLite): PollResult => {
   }
 }
 
-export const debounce = (func: (...args: any[]) => void, wait: number) => {
+export const debounce = <T extends (...args: any[]) => void>(func: T, wait: number) => {
   let timeout: ReturnType<typeof setTimeout>
-  return (...args: any[]) => {
+  return (...args: Parameters<T>) => {
     clearTimeout(timeout)
     timeout = setTimeout(() => func(...args), wait)
   }
