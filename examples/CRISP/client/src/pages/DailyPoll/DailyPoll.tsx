@@ -4,33 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { Fragment, useEffect, useState } from 'react'
+import React, { Fragment, useMemo } from 'react'
 import DailyPollSection from '@/pages/Landing/components/DailyPoll'
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { convertTimestampToDate } from '@/utils/methods'
 
 const DailyPoll: React.FC = () => {
-  const { existNewRound, roundState } = useVoteManagementContext()
-  const [newRoundLoading, setNewRoundLoading] = useState<boolean>(false)
-  const endTime = roundState && convertTimestampToDate(roundState?.start_time, roundState?.duration)
+  const { roundState, isLoading } = useVoteManagementContext()
+  const endTime = useMemo(() => (roundState ? convertTimestampToDate(roundState.start_time, roundState.duration) : null), [roundState])
 
-  useEffect(() => {
-    const checkRound = async () => {
-      setNewRoundLoading(true)
-      await existNewRound()
-    }
-    checkRound()
-  }, [])
-
-  useEffect(() => {
-    if (roundState) {
-      setNewRoundLoading(false)
-    }
-  }, [roundState])
+  const loading = isLoading || !roundState
 
   return (
     <Fragment>
-      <DailyPollSection loading={newRoundLoading} endTime={endTime} />
+      <DailyPollSection loading={loading} endTime={endTime} />
     </Fragment>
   )
 }

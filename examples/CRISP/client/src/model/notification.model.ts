@@ -6,6 +6,9 @@
 
 export interface NotificationAlert {
   message: string
-  type: 'success' | 'danger'
+  type: 'success' | 'danger' | 'warning' | 'info'
   linkUrl?: string
+  persistent?: boolean
+  id?: string
+  duration?: number
 }

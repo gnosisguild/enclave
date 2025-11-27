@@ -14,6 +14,7 @@ import DailyPoll from '@/pages/DailyPoll/DailyPoll'
 import HistoricPoll from '@/pages/HistoricPoll/HistoricPoll'
 import About from '@/pages/About/About'
 import PollResult from '@/pages/PollResult/PollResult'
+import RoundPoll from '@/pages/RoundPoll'
 import useScrollToTop from '@/hooks/generic/useScrollToTop'
 import { useVoteManagementContext } from '@/context/voteManagement'
 
@@ -37,6 +38,7 @@ const App: React.FC = () => {
             <Route path='/' element={<Landing />} />
             <Route path='/about' element={<About />} />
             <Route path='/current' element={<DailyPoll />} />
+            <Route path='/round/:roundId' element={<RoundPoll />} />
             <Route path='/historic' element={<HistoricPoll />} />
             <Route path='/result/:roundId/:type?' element={<PollResult />} />
             <Route path='*' element={<Navigate to='/' replace />} />
