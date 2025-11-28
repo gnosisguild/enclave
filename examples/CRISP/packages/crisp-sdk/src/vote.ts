@@ -13,6 +13,8 @@ import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
 import { privateKeyToAccount } from 'viem/accounts'
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from "viem/utils"
+import { Hex } from 'viem'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -320,4 +322,20 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   await backend.destroy()
 
   return isValid
+}
+
+/**
+ * Encode the proof data into a format that can be used by the CRISP program in Solidity
+ * to validate the proof.
+ * @param proof The proof data.
+ * @returns The encoded proof data as a hex string.
+ */
+export const encodeSolidityProof = (proof: ProofData): Hex => {
+  const vote = proof.publicInputs.slice(2) as `0x${string}`[]
+  const slotAddress = getAddress(numberToHex(BigInt(proof.publicInputs[0]), { size: 20 }))
+
+  return encodeAbiParameters(
+     parseAbiParameters('bytes, bytes32[], address'),
+       [bytesToHex(proof.proof), vote, slotAddress]
+     )
 }

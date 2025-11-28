@@ -142,7 +142,7 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external returns (bytes memory input) {
+  function validateInput(uint256 e3Id, address, bytes memory data) external {
     // it should only be called via Enclave for now
     require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
     // We need to ensure that the CRISP admin set the merkle root of the census.
@@ -150,34 +150,36 @@ contract CRISPProgram is IE3Program, Ownable {
 
     if (data.length == 0) revert EmptyInputData();
 
-    (bytes memory noirProof, bytes memory vote, address slot) = abi.decode(data, (bytes, bytes, address));
+    (bytes memory noirProof, bytes32[] memory vote, address slotAddress) = abi.decode(data, (bytes, bytes32[], address));
 
-    (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slot, vote);
+    bytes memory voteBytes = abi.encode(vote);
 
-    bytes32[] memory noirPublicInputs = new bytes32[](2);
+    (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slotAddress, voteBytes);
+
+    bytes32[] memory noirPublicInputs = new bytes32[](2 + vote.length);
 
     // Set public inputs for the proof. Order must match Noir circuit.
-    noirPublicInputs[0] = bytes32(uint256(uint160(slot)));
+    noirPublicInputs[0] = bytes32(uint256(uint160(slotAddress)));
     // Pass isFirstVote flag to verifier (1 = first vote, 0 = re-vote)
     noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
 
-    // noirPublicInputs[x] = bytes32(roundData.censusMerkleRoot);
+    // Set the encrypted vote to the noir public inputs.
+    for (uint256 i = 0; i < vote.length; i++) {
+      noirPublicInputs[i + 2] = vote[i];
+    }
 
     // Check if the ciphertext was encrypted correctly
     if (!HONK_VERIFIER.verify(noirProof, noirPublicInputs)) {
       revert InvalidNoirProof();
     }
 
-    // return the vote so that it can be stored in Enclave's input merkle tree
-    input = vote;
-
-    emit InputPublished(e3Id, vote, voteIndex);
+    emit InputPublished(e3Id, voteBytes, voteIndex);
   }
 
   /// @notice Process a vote: insert or update in the merkle tree depending
   /// on whether it's the first vote or an override.
-  function _processVote(uint256 e3Id, address slot, bytes memory vote) internal returns (uint40 voteIndex, bool isFirstVote) {
-    uint40 storedIndexPlusOne = voteSlots[e3Id][slot];
+  function _processVote(uint256 e3Id, address slotAddress, bytes memory vote) internal returns (uint40 voteIndex, bool isFirstVote) {
+    uint40 storedIndexPlusOne = voteSlots[e3Id][slotAddress];
 
     // we treat the index 0 as not voted yet
     // any valid index will be index + 1
@@ -185,7 +187,7 @@ contract CRISPProgram is IE3Program, Ownable {
       // FIRST VOTE
       isFirstVote = true;
       voteIndex = votes[e3Id].numberOfLeaves;
-      voteSlots[e3Id][slot] = voteIndex + 1;
+      voteSlots[e3Id][slotAddress] = voteIndex + 1;
       votes[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
     } else {
       // RE-VOTE
