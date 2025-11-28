@@ -74,9 +74,10 @@ macro_rules! impl_from_event {
         $(
             impl From<$variant> for EnclaveEvent {
                 fn from(data: $variant) -> Self {
-                    EnclaveEvent::$variant {
-                        id: EventId::hash(data.clone()),
-                        data: data.clone(),
+                    let id = EventId::hash(&data);
+                    EnclaveEvent {
+                        payload: EnclaveEventData::$variant(data),
+                        id
                     }
                 }
             }
@@ -84,114 +85,42 @@ macro_rules! impl_from_event {
     };
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EnclaveEventData {
+    KeyshareCreated(KeyshareCreated),
+    E3Requested(E3Requested),
+    PublicKeyAggregated(PublicKeyAggregated),
+    CiphertextOutputPublished(CiphertextOutputPublished),
+    DecryptionshareCreated(DecryptionshareCreated),
+    PlaintextAggregated(PlaintextAggregated),
+    PublishDocumentRequested(PublishDocumentRequested),
+    CiphernodeSelected(CiphernodeSelected),
+    CiphernodeAdded(CiphernodeAdded),
+    CiphernodeRemoved(CiphernodeRemoved),
+    TicketBalanceUpdated(TicketBalanceUpdated),
+    ConfigurationUpdated(ConfigurationUpdated),
+    OperatorActivationChanged(OperatorActivationChanged),
+    CommitteePublished(CommitteePublished),
+    CommitteeRequested(CommitteeRequested),
+    CommitteeFinalizeRequested(CommitteeFinalizeRequested),
+    CommitteeFinalized(CommitteeFinalized),
+    TicketGenerated(TicketGenerated),
+    TicketSubmitted(TicketSubmitted),
+    PlaintextOutputPublished(PlaintextOutputPublished),
+    EnclaveError(EnclaveError),
+    E3RequestComplete(E3RequestComplete),
+    Shutdown(Shutdown),
+    DocumentReceived(DocumentReceived),
+    ThresholdShareCreated(ThresholdShareCreated),
+    /// This is a test event to use in testing
+    TestEvent(TestEvent),
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub enum EnclaveEvent {
-    KeyshareCreated {
-        id: EventId,
-        data: KeyshareCreated,
-    },
-    E3Requested {
-        id: EventId,
-        data: E3Requested,
-    },
-    PublicKeyAggregated {
-        id: EventId,
-        data: PublicKeyAggregated,
-    },
-    CiphertextOutputPublished {
-        id: EventId,
-        data: CiphertextOutputPublished,
-    },
-    DecryptionshareCreated {
-        id: EventId,
-        data: DecryptionshareCreated,
-    },
-    PlaintextAggregated {
-        id: EventId,
-        data: PlaintextAggregated,
-    },
-    PublishDocumentRequested {
-        id: EventId,
-        data: PublishDocumentRequested,
-    },
-    CiphernodeSelected {
-        id: EventId,
-        data: CiphernodeSelected,
-    },
-    CiphernodeAdded {
-        id: EventId,
-        data: CiphernodeAdded,
-    },
-    CiphernodeRemoved {
-        id: EventId,
-        data: CiphernodeRemoved,
-    },
-    TicketBalanceUpdated {
-        id: EventId,
-        data: TicketBalanceUpdated,
-    },
-    ConfigurationUpdated {
-        id: EventId,
-        data: ConfigurationUpdated,
-    },
-    OperatorActivationChanged {
-        id: EventId,
-        data: OperatorActivationChanged,
-    },
-    CommitteePublished {
-        id: EventId,
-        data: CommitteePublished,
-    },
-    CommitteeRequested {
-        id: EventId,
-        data: CommitteeRequested,
-    },
-    CommitteeFinalizeRequested {
-        id: EventId,
-        data: CommitteeFinalizeRequested,
-    },
-    CommitteeFinalized {
-        id: EventId,
-        data: CommitteeFinalized,
-    },
-    TicketGenerated {
-        id: EventId,
-        data: TicketGenerated,
-    },
-    TicketSubmitted {
-        id: EventId,
-        data: TicketSubmitted,
-    },
-    PlaintextOutputPublished {
-        id: EventId,
-        data: PlaintextOutputPublished,
-    },
-    EnclaveError {
-        id: EventId,
-        data: EnclaveError,
-    },
-    E3RequestComplete {
-        id: EventId,
-        data: E3RequestComplete,
-    },
-    Shutdown {
-        id: EventId,
-        data: Shutdown,
-    },
-    DocumentReceived {
-        id: EventId,
-        data: DocumentReceived,
-    },
-    ThresholdShareCreated {
-        id: EventId,
-        data: ThresholdShareCreated,
-    },
-    /// This is a test event to use in testing
-    TestEvent {
-        id: EventId,
-        data: TestEvent,
-    },
+pub struct EnclaveEvent {
+    id: EventId,
+    payload: EnclaveEventData,
 }
 
 impl EnclaveEvent {
@@ -225,8 +154,8 @@ impl ErrorEvent for EnclaveEvent {
     type Error = EnclaveError;
     type ErrorType = EnclaveErrorType;
     fn as_error(&self) -> Option<&Self::Error> {
-        match self {
-            EnclaveEvent::EnclaveError { data, .. } => Some(data),
+        match self.payload {
+            EnclaveEventData::EnclaveError(ref data) => Some(data),
             _ => None,
         }
     }
@@ -238,88 +167,33 @@ impl ErrorEvent for EnclaveEvent {
 
 impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
-        match value {
-            EnclaveEvent::KeyshareCreated { id, .. } => id,
-            EnclaveEvent::E3Requested { id, .. } => id,
-            EnclaveEvent::PublicKeyAggregated { id, .. } => id,
-            EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
-            EnclaveEvent::DecryptionshareCreated { id, .. } => id,
-            EnclaveEvent::PlaintextAggregated { id, .. } => id,
-            EnclaveEvent::PublishDocumentRequested { id, .. } => id,
-            EnclaveEvent::CiphernodeSelected { id, .. } => id,
-            EnclaveEvent::CiphernodeAdded { id, .. } => id,
-            EnclaveEvent::CiphernodeRemoved { id, .. } => id,
-            EnclaveEvent::TicketBalanceUpdated { id, .. } => id,
-            EnclaveEvent::ConfigurationUpdated { id, .. } => id,
-            EnclaveEvent::OperatorActivationChanged { id, .. } => id,
-            EnclaveEvent::CommitteePublished { id, .. } => id,
-            EnclaveEvent::CommitteeRequested { id, .. } => id,
-            EnclaveEvent::CommitteeFinalizeRequested { id, .. } => id,
-            EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
-            EnclaveEvent::EnclaveError { id, .. } => id,
-            EnclaveEvent::E3RequestComplete { id, .. } => id,
-            EnclaveEvent::Shutdown { id, .. } => id,
-            EnclaveEvent::TestEvent { id, .. } => id,
-            EnclaveEvent::DocumentReceived { id, .. } => id,
-            EnclaveEvent::ThresholdShareCreated { id, .. } => id,
-            EnclaveEvent::CommitteeFinalized { id, .. } => id,
-            EnclaveEvent::TicketGenerated { id, .. } => id,
-            EnclaveEvent::TicketSubmitted { id, .. } => id,
-        }
+        value.id
     }
 }
 
 impl EnclaveEvent {
     pub fn get_e3_id(&self) -> Option<E3id> {
-        match self.clone() {
-            EnclaveEvent::KeyshareCreated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::E3Requested { data, .. } => Some(data.e3_id),
-            EnclaveEvent::PublicKeyAggregated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => Some(data.e3_id),
-            EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
-            EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => Some(data.e3_id),
-            EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteeFinalized { data, .. } => Some(data.e3_id),
-            EnclaveEvent::TicketGenerated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::TicketSubmitted { data, .. } => Some(data.e3_id),
+        match self.payload {
+            EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id),
+            EnclaveEventData::E3Requested(ref data) => Some(data.e3_id),
+            EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id),
+            EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id),
+            EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id),
+            EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id),
+            EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id),
+            EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id),
+            EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id),
+            EnclaveEventData::CommitteeRequested(ref data) => Some(data.e3_id),
+            EnclaveEventData::CommitteeFinalizeRequested(ref data) => Some(data.e3_id),
+            EnclaveEventData::PlaintextOutputPublished(ref data) => Some(data.e3_id),
+            EnclaveEventData::CommitteeFinalized(ref data) => Some(data.e3_id),
+            EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id),
+            EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id),
             _ => None,
         }
     }
-    pub fn get_data(&self) -> String {
-        match self.clone() {
-            EnclaveEvent::KeyshareCreated { data, .. } => format!("{}", data),
-            EnclaveEvent::E3Requested { data, .. } => format!("{}", data),
-            EnclaveEvent::PublicKeyAggregated { data, .. } => format!("{}", data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => format!("{}", data),
-            EnclaveEvent::DecryptionshareCreated { data, .. } => format!("{}", data),
-            EnclaveEvent::PlaintextAggregated { data, .. } => format!("{}", data),
-            EnclaveEvent::PublishDocumentRequested { data, .. } => format!("{}", data),
-            EnclaveEvent::CiphernodeSelected { data, .. } => format!("{}", data),
-            EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
-            EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
-            EnclaveEvent::TicketBalanceUpdated { data, .. } => format!("{:?}", data),
-            EnclaveEvent::ConfigurationUpdated { data, .. } => format!("{:?}", data),
-            EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
-            EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
-            EnclaveEvent::CommitteeRequested { data, .. } => format!("{:?}", data),
-            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => format!("{:?}", data),
-            EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
-            EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
-            EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
-            EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
-            EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
-            EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
-            EnclaveEvent::DocumentReceived { data, .. } => format!("{:?}", data),
-            EnclaveEvent::CommitteeFinalized { data, .. } => format!("{:?}", data),
-            EnclaveEvent::TicketGenerated { data, .. } => format!("{:?}", data),
-            EnclaveEvent::TicketSubmitted { data, .. } => format!("{:?}", data),
-            // _ => "<omitted>".to_string(),
-        }
+    pub fn get_data(&self) -> &EnclaveEventData {
+        &self.payload
     }
 }
 
@@ -370,7 +244,7 @@ impl TryFrom<&EnclaveEvent> for EnclaveError {
 impl TryFrom<EnclaveEvent> for EnclaveError {
     type Error = anyhow::Error;
     fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
-        if let EnclaveEvent::EnclaveError { data, .. } = value.clone() {
+        if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
             Ok(data)
         } else {
             return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
@@ -380,7 +254,7 @@ impl TryFrom<EnclaveEvent> for EnclaveError {
 
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{}({})", self.event_type(), self.get_data()))
+        f.write_str(&format!("{:?}", self))
     }
 }
 
