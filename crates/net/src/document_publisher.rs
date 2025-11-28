@@ -462,7 +462,7 @@ impl Handler<EnclaveEvent> for EventConverter {
 
 impl Handler<ThresholdShareCreated> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ThresholdShareCreated, _ctx: &mut Self::Context) -> Self::Result {
         match self.handle_threshold_share_created(msg) {
             Ok(_) => (),
             Err(err) => error!("{err}"),
@@ -472,7 +472,7 @@ impl Handler<ThresholdShareCreated> for EventConverter {
 
 impl Handler<DocumentReceived> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: DocumentReceived, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: DocumentReceived, _ctx: &mut Self::Context) -> Self::Result {
         match self.handle_document_received(msg) {
             Ok(_) => (),
             Err(err) => error!("{err}"),
