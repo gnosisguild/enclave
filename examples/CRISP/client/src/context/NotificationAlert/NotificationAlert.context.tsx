@@ -11,7 +11,6 @@ import { NotificationAlert } from '@/model/notification.model'
 import ToastAlert from '@/components/ToastAlert'
 
 const MAX_TOASTS = 5
-const DEFAULT_DURATION = 5000
 
 const generateToastId = (): string => `toast-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
@@ -34,28 +33,18 @@ const NotificationAlertProvider = ({ children }: NotificationAlertProviderProps)
     }
   }, [])
 
-  const showToast = useCallback(
-    (toast: NotificationAlert) => {
-      const toastWithId: NotificationAlert = {
-        ...toast,
-        id: toast.id || generateToastId(),
-      }
+  const showToast = useCallback((toast: NotificationAlert) => {
+    const toastWithId: NotificationAlert = {
+      ...toast,
+      id: toast.id || generateToastId(),
+    }
 
-      setToasts((prev) => {
-        const newToasts = prev.length >= MAX_TOASTS ? prev.slice(1) : prev
+    setToasts((prev) => {
+      const newToasts = prev.length >= MAX_TOASTS ? prev.slice(1) : prev
 
-        return [...newToasts, toastWithId]
-      })
-
-      if (!toast.persistent) {
-        const duration = toast.duration || DEFAULT_DURATION
-        setTimeout(() => {
-          closeToast(toastWithId.id)
-        }, duration)
-      }
-    },
-    [closeToast],
-  )
+      return [...newToasts, toastWithId]
+    })
+  }, [])
 
   const clearAllToasts = useCallback(() => {
     setToasts([])
@@ -87,6 +76,7 @@ const NotificationAlertProvider = ({ children }: NotificationAlertProviderProps)
             message={toast.message}
             type={toast.type}
             persistent={toast.persistent}
+            duration={toast.duration}
             onClose={() => closeToast(toast.id)}
           />
         ))}

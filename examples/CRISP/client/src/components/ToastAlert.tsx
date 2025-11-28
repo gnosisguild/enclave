@@ -14,19 +14,23 @@ type ToastAlertProps = {
   message: string
   onClose: () => void
   persistent?: boolean
+  duration?: number
   id?: string
 }
 
-const ToastAlert: React.FC<ToastAlertProps> = ({ message, type, linkUrl, onClose, persistent = false }) => {
+const DEFAULT_DURATION = 5000
+
+const ToastAlert: React.FC<ToastAlertProps> = ({ message, type, linkUrl, onClose, persistent = false, duration }) => {
   useEffect(() => {
     if (persistent) return
 
+    const timerDuration = duration || DEFAULT_DURATION
     const timer = setTimeout(() => {
       onClose()
-    }, 5000) // Toast will close after 5 seconds
+    }, timerDuration)
 
     return () => clearTimeout(timer) // Clean up the timer
-  }, [onClose, persistent])
+  }, [onClose, persistent, duration])
 
   const alertStyles = {
     success: {
