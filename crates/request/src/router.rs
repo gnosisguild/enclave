@@ -21,6 +21,7 @@ use e3_data::RepositoriesFactory;
 use e3_data::Repository;
 use e3_data::Snapshot;
 use e3_events::E3RequestComplete;
+use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
 use e3_events::{E3id, EnclaveEvent, EventBus, Subscribe};
 use serde::Deserialize;
@@ -147,9 +148,9 @@ impl Actor for E3Router {
 impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        // If we are shuttomg down then bail on anything else
-        if let EnclaveEvent::Shutdown { data, .. } = msg {
-            ctx.notify(data);
+        // If we are shutting down then bail on anything else
+        if let EnclaveEventData::Shutdown(data) = msg.get_data() {
+            ctx.notify(data.clone());
             return;
         }
 
@@ -179,8 +180,8 @@ impl Handler<EnclaveEvent> for E3Router {
 
         context.forward_message(&msg, &mut self.buffer);
 
-        match &msg {
-            EnclaveEvent::PlaintextAggregated { .. } => {
+        match msg.into_data() {
+            EnclaveEventData::PlaintextAggregated(_) => {
                 // Here we are detemining that by receiving the PlaintextAggregated event our request is
                 // complete and we can notify everyone. This might change as we consider other factors
                 // when determining if the request is complete
@@ -191,7 +192,7 @@ impl Handler<EnclaveEvent> for E3Router {
                 // Send to bus so all other actors can react to a request being complete.
                 self.bus.do_send(event);
             }
-            EnclaveEvent::E3RequestComplete { .. } => {
+            EnclaveEventData::E3RequestComplete(_) => {
                 // Note this will be sent above to the children who can kill themselves based on
                 // the event
                 self.contexts.remove(&e3_id);

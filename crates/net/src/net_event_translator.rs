@@ -15,6 +15,7 @@ use actix::prelude::*;
 use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
+use e3_events::EnclaveEventData;
 use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
@@ -99,11 +100,11 @@ impl NetEventTranslator {
     /// as static means we can keep this maintained here but use this rule elsewhere
     pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
         // Add a list of events allowed to be forwarded to libp2p
-        match event {
-            EnclaveEvent::DecryptionshareCreated { .. } => true,
-            EnclaveEvent::KeyshareCreated { .. } => true,
-            EnclaveEvent::PlaintextAggregated { .. } => true,
-            EnclaveEvent::PublicKeyAggregated { .. } => true,
+        match event.get_data() {
+            EnclaveEventData::DecryptionshareCreated(_) => true,
+            EnclaveEventData::KeyshareCreated(_) => true,
+            EnclaveEventData::PlaintextAggregated(_) => true,
+            EnclaveEventData::PublicKeyAggregated(_) => true,
             _ => false,
         }
     }

@@ -174,26 +174,29 @@ impl From<EnclaveEvent> for EventId {
 impl EnclaveEvent {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self.payload {
-            EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id),
-            EnclaveEventData::E3Requested(ref data) => Some(data.e3_id),
-            EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id),
-            EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id),
-            EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id),
-            EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id),
-            EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id),
-            EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id),
-            EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id),
-            EnclaveEventData::CommitteeRequested(ref data) => Some(data.e3_id),
-            EnclaveEventData::CommitteeFinalizeRequested(ref data) => Some(data.e3_id),
-            EnclaveEventData::PlaintextOutputPublished(ref data) => Some(data.e3_id),
-            EnclaveEventData::CommitteeFinalized(ref data) => Some(data.e3_id),
-            EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id),
-            EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id),
+            EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeRequested(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeFinalizeRequested(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PlaintextOutputPublished(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::CommitteeFinalized(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
     pub fn get_data(&self) -> &EnclaveEventData {
         &self.payload
+    }
+    pub fn into_data(self) -> EnclaveEventData {
+        self.payload
     }
 }
 

@@ -9,6 +9,7 @@ use actix::prelude::*;
 use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
+use e3_events::EnclaveEventData;
 use e3_events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
     ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, EventBus, OperatorActivationChanged,
@@ -231,15 +232,15 @@ impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CiphernodeRemoved { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::TicketBalanceUpdated { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::OperatorActivationChanged { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::ConfigurationUpdated { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CommitteePublished { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::PlaintextOutputPublished { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data.clone()),
+        match msg.into_data() {
+            EnclaveEventData::CiphernodeAdded(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CiphernodeRemoved(data) => ctx.notify(data.clone()),
+            EnclaveEventData::TicketBalanceUpdated(data) => ctx.notify(data.clone()),
+            EnclaveEventData::OperatorActivationChanged(data) => ctx.notify(data.clone()),
+            EnclaveEventData::ConfigurationUpdated(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CommitteePublished(data) => ctx.notify(data.clone()),
+            EnclaveEventData::PlaintextOutputPublished(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data.clone()),
             _ => (),
         }
     }

@@ -15,7 +15,7 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
@@ -43,7 +43,7 @@ const ERROR_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator 
 impl E3Extension for PlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
-        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
 
@@ -163,7 +163,7 @@ const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator bec
 impl E3Extension for PublicKeyAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the publickey aggregator with deps on E3Requested
-        let EnclaveEvent::E3Requested { data, .. } = evt else {
+        let EnclaveEventData::E3Requested(data) = evt.get_data() else {
             return;
         };
 
@@ -274,7 +274,7 @@ const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlain
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
-        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
 

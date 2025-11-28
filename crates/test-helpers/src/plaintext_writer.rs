@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, EventBus, Subscribe};
+use e3_events::{EnclaveEvent, EnclaveEventData, EventBus, Subscribe};
 use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
 use tracing::{error, info};
 
@@ -37,7 +37,7 @@ impl Actor for PlaintextWriter {
 impl Handler<EnclaveEvent> for PlaintextWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        if let EnclaveEvent::PlaintextAggregated { data, .. } = msg.clone() {
+        if let EnclaveEventData::PlaintextAggregated(data) = msg.into_data() {
             let Some(decrypted) = data.decrypted_output.first() else {
                 error!("Decrypted output must not be empty!");
                 return;

@@ -6,7 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EventBus, Shutdown, Subscribe,
+    CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EnclaveEventData, EventBus,
+    Shutdown, Subscribe,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -47,9 +48,9 @@ impl Actor for CommitteeFinalizer {
 impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CommitteeRequested { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+        match msg.into_data() {
+            EnclaveEventData::CommitteeRequested(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }

@@ -14,7 +14,9 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{
+    BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventId, Subscribe,
+};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
@@ -291,7 +293,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> 
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        if let EnclaveEvent::Shutdown { .. } = msg {
+        if let EnclaveEventData::Shutdown(_) = msg.into_data() {
             if let Some(shutdown) = self.shutdown_tx.take() {
                 let _ = shutdown.send(());
             }

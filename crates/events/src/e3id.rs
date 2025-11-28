@@ -9,7 +9,7 @@ use alloy_primitives::ruint::ParseError;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id {
     id: String,
     chain_id: u64,
