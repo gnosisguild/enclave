@@ -16,7 +16,6 @@ use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::info;
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -90,9 +89,13 @@ impl EventListener {
         Ok(())
     }
 
+    pub fn provider(&self) -> Arc<dyn Provider<Ethereum>> {
+        self.provider.clone()
+    }
+
     /// Create a contract listener that will listen to events from all addresses.
-    pub async fn create_contract_listener(ws_url: &str, addresses: &[&str]) -> Result<Self> {
-        let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
+    pub async fn create_contract_listener(rpc_url: &str, addresses: &[&str]) -> Result<Self> {
+        let provider = Arc::new(ProviderBuilder::new().connect(rpc_url).await?);
 
         let address = addresses
             .iter()

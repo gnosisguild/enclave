@@ -250,7 +250,7 @@ pub struct EnclaveContractFactory;
 impl EnclaveContractFactory {
     /// Create a write-capable contract
     pub async fn create_write(
-        http_rpc_url: &str,
+        rpc_url: &str,
         contract_address: &str,
         private_key: &str,
     ) -> Result<EnclaveContract<ReadWrite>> {
@@ -261,7 +261,7 @@ impl EnclaveContractFactory {
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
             .wallet(wallet)
-            .connect(http_rpc_url)
+            .connect(rpc_url)
             .await?;
 
         Ok(EnclaveContract::<ReadWrite> {
@@ -274,12 +274,12 @@ impl EnclaveContractFactory {
 
     /// Create a read-only contract
     pub async fn create_read(
-        http_rpc_url: &str,
+        rpc_url: &str,
         contract_address: &str,
     ) -> Result<EnclaveContract<ReadOnly>> {
         let contract_address = contract_address.parse()?;
 
-        let provider = ProviderBuilder::new().connect(http_rpc_url).await?;
+        let provider = ProviderBuilder::new().connect(rpc_url).await?;
 
         Ok(EnclaveContract::<ReadOnly> {
             provider: Arc::new(provider),

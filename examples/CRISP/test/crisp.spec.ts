@@ -84,7 +84,8 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   const e3id = await runCliInit()
   log(`Got e3 id: ${e3id}`)
 
-  await page.goto('/')
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.waitForLoadState('load')
 
   log(`ensureHomePageLoaded...`)
   await ensureHomePageLoaded(page)
