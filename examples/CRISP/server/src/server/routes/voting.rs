@@ -126,7 +126,16 @@ async fn broadcast_encrypted_vote(
         }
     }
 
-    let address: Address = vote.address.parse().expect("Invalid address");
+    let address: Address = match vote.address.parse() {
+        Ok(addr) => addr,
+        Err(_) => {
+            error!(
+                "[e3_id={}] Invalid address format: {}",
+                vote.round_id, vote.address
+            );
+            return HttpResponse::BadRequest().json("Invalid address format");
+        }
+    };
 
     let e3_id = U256::from(vote.round_id);
     let params_value = DynSolValue::Tuple(vec![

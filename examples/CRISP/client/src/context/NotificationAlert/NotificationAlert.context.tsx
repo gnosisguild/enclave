@@ -29,7 +29,7 @@ const NotificationAlertProvider = ({ children }: NotificationAlertProviderProps)
         if (nonPersistentIndex !== -1) {
           return prev.filter((_, i) => i !== nonPersistentIndex)
         }
-        return prev.slice(1)
+        return prev
       })
     }
   }, [])
