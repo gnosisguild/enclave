@@ -61,6 +61,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [votingStep, setVotingStep] = useState<VotingStep>('idle')
+  const [lastActiveStep, setLastActiveStep] = useState<VotingStep | null>(null)
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleVoteEncryption = useCallback(
@@ -73,6 +74,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
   const resetVotingState = useCallback(() => {
     setVotingStep('idle')
+    setLastActiveStep(null)
     setStepMessage('')
     setIsLoading(false)
   }, [])
@@ -101,6 +103,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       try {
         // Step 1: Signing
         setVotingStep('signing')
+        setLastActiveStep('signing')
         setStepMessage('Please sign the message in your wallet...')
         const message = `Vote for round ${roundState.id}`
 
@@ -117,6 +120,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
         // Step 2: Encrypting vote
         setVotingStep('encrypting')
+        setLastActiveStep('encrypting')
         setStepMessage('')
 
         const voteEncrypted = await handleVoteEncryption(pollSelected, user.address, signature, message)
@@ -126,12 +130,14 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
         // Step 3: Generating proof
         setVotingStep('generating_proof')
+        setLastActiveStep('generating_proof')
 
         // small delay for UX
         await new Promise((resolve) => setTimeout(resolve, 500))
 
         // Step 4: Broadcasting
         setVotingStep('broadcasting')
+        setLastActiveStep('broadcasting')
 
         const voteRequest: BroadcastVoteRequest = {
           round_id: roundState.id,
@@ -212,6 +218,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     castVoteWithProof,
     isLoading,
     votingStep,
+    lastActiveStep,
     stepMessage,
     resetVotingState,
     hasVotedInCurrentRound,

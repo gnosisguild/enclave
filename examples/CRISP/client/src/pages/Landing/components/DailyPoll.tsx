@@ -29,7 +29,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
-  const { castVoteWithProof, isLoading: isCastingVote, votingStep, stepMessage } = useVoteCasting()
+  const { castVoteWithProof, isLoading: isCastingVote, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
   const statusClass = !isEnded ? 'lime' : 'red'
 
@@ -103,7 +103,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
               <CountdownTimer endTime={endTime} />
             </div>
           )}
-          {isCastingVote && <VotingStepIndicator step={votingStep} message={stepMessage} />}
+          {isCastingVote && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
           {loading && !isCastingVote && <LoadingAnimation isLoading={loading} />}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (

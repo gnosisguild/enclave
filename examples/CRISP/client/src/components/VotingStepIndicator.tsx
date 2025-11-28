@@ -11,6 +11,7 @@ import { CheckIcon, CircleNotchIcon, WarningIcon, PencilSimpleIcon, LockIcon, Br
 type VotingStepIndicatorProps = {
   step: VotingStep
   message: string
+  lastActiveStep?: VotingStep | null
 }
 
 const steps: { key: VotingStep; label: string; icon: React.ElementType }[] = [
@@ -20,14 +21,14 @@ const steps: { key: VotingStep; label: string; icon: React.ElementType }[] = [
   { key: 'broadcasting', label: 'Broadcast', icon: BroadcastIcon },
 ]
 
-const VotingStepIndicator: React.FC<VotingStepIndicatorProps> = ({ step, message }) => {
+const VotingStepIndicator: React.FC<VotingStepIndicatorProps> = ({ step, message, lastActiveStep }) => {
   const getStepStatus = (stepKey: VotingStep) => {
     const stepOrder = steps.map((s) => s.key)
-    const currentIndex = stepOrder.indexOf(step)
+    const currentIndex = step === 'error' ? stepOrder.indexOf(lastActiveStep ?? 'signing') : stepOrder.indexOf(step)
     const stepIndex = stepOrder.indexOf(stepKey)
 
     if (step === 'complete') return 'complete'
-    if (step === 'error') return currentIndex >= stepIndex ? 'error' : 'pending'
+    if (step === 'error') return stepIndex <= currentIndex ? 'error' : 'pending'
     if (stepIndex < currentIndex) return 'complete'
     if (stepIndex === currentIndex) return 'active'
     return 'pending'
