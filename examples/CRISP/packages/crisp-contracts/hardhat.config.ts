@@ -65,13 +65,26 @@ const config: HardhatUserConfig = {
   plugins: [hardhatTypechainPlugin, hardhatEthersChaiMatchers, hardhatNetworkHelpers, hardhatToolboxMochaEthersPlugin, hardhatVerify],
   tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
   networks: {
-    localhost: {
+    default: {
       accounts: {
         mnemonic,
       },
       chainId: chainIds.hardhat,
       type: 'edr-simulated',
       chainType: 'l1',
+      mining: {
+        auto: true,
+        interval: 1000,
+      },
+    },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      type: 'http',
+      url: 'http://localhost:8545',
+      timeout: 60000,
     },
     ganache: {
       accounts: {
