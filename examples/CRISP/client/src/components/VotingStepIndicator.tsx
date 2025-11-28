@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useRef, useEffect } from 'react'
+import React from 'react'
 import { VotingStep } from '@/hooks/voting/useVoteCasting'
 import { CheckIcon, CircleNotchIcon, WarningIcon, PencilSimpleIcon, LockIcon, BroadcastIcon, ShieldCheckIcon } from '@phosphor-icons/react'
 
@@ -21,31 +21,13 @@ const steps: { key: VotingStep; label: string; icon: React.ElementType }[] = [
 ]
 
 const VotingStepIndicator: React.FC<VotingStepIndicatorProps> = ({ step, message }) => {
-  const lastActiveStepRef = useRef<VotingStep>('signing')
-
-  useEffect(() => {
-    const stepOrder = steps.map((s) => s.key)
-    if (step !== 'error' && step !== 'complete' && step !== 'idle' && stepOrder.includes(step)) {
-      lastActiveStepRef.current = step
-    }
-  }, [step])
-
   const getStepStatus = (stepKey: VotingStep) => {
     const stepOrder = steps.map((s) => s.key)
-    let currentIndex: number
-
-    if (step === 'error') {
-      currentIndex = stepOrder.indexOf(lastActiveStepRef.current)
-    } else {
-      currentIndex = stepOrder.indexOf(step)
-    }
-
+    const currentIndex = stepOrder.indexOf(step)
     const stepIndex = stepOrder.indexOf(stepKey)
 
     if (step === 'complete') return 'complete'
-    if (step === 'error') {
-      return stepIndex <= currentIndex ? 'error' : 'pending'
-    }
+    if (step === 'error') return currentIndex >= stepIndex ? 'error' : 'pending'
     if (stepIndex < currentIndex) return 'complete'
     if (stepIndex === currentIndex) return 'active'
     return 'pending'
