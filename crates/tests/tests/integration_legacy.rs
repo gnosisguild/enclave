@@ -13,6 +13,7 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
+use e3_events::EnclaveEventData;
 use e3_events::GetEvents;
 use e3_events::{
     CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
@@ -32,12 +33,11 @@ use e3_test_helpers::{
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::SharedRng;
-use fhe::bfv::Encoding;
 use fhe::{
     bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
-use fhe_traits::{FheDecoder, Serialize};
+use fhe_traits::Serialize;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
@@ -235,8 +235,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let aggregated_event: Vec<_> = history
         .into_iter()
-        .filter_map(|e| match e {
-            EnclaveEvent::PublicKeyAggregated { data, .. } => Some(data),
+        .filter_map(|e| match e.into_data() {
+            EnclaveEventData::PublicKeyAggregated(data) => Some(data),
             _ => None,
         })
         .collect();
@@ -269,8 +269,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let actual = history
         .into_iter()
-        .filter_map(|e| match e {
-            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
+        .filter_map(|e| match e.into_data() {
+            EnclaveEventData::PlaintextAggregated(data) => Some(data),
             _ => None,
         })
         .collect::<Vec<_>>()
@@ -395,8 +395,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     // get the public key from history.
     let pubkey: PublicKey = history
         .iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::KeyshareCreated { data, .. } => {
+        .filter_map(|evt| match evt.get_data() {
+            EnclaveEventData::KeyshareCreated(data) => {
                 PublicKeyShare::deserialize(&data.pubkey, &params, crpoly.clone()).ok()
             }
             _ => None,
@@ -424,8 +424,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     let actual = history
         .into_iter()
-        .filter_map(|e| match e {
-            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data),
+        .filter_map(|e| match e.into_data() {
+            EnclaveEventData::PlaintextAggregated(data) => Some(data),
             _ => None,
         })
         .collect::<Vec<_>>()

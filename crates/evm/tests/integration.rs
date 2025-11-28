@@ -17,7 +17,8 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
-    new_event_bus_with_history, EnclaveEvent, GetEvents, HistoryCollector, Shutdown, TestEvent,
+    new_event_bus_with_history, EnclaveEvent, EnclaveEventData, GetEvents, HistoryCollector,
+    Shutdown, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;
@@ -54,8 +55,8 @@ async fn get_msgs(history_collector: &Addr<HistoryCollector<EnclaveEvent>>) -> R
         .await?;
     let msgs: Vec<String> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -121,8 +122,8 @@ async fn evm_reader() -> Result<()> {
 
     let msgs: Vec<_> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -200,8 +201,8 @@ async fn ensure_historical_events() -> Result<()> {
 
     let msgs: Vec<_> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();

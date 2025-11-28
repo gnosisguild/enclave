@@ -99,7 +99,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_single_callback_executes() {
-        let mut queue = CallbackQueue::new();
+        let queue = CallbackQueue::new();
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
@@ -117,7 +117,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_callback_not_executed_before_threshold() {
-        let mut queue = CallbackQueue::new();
+        let queue = CallbackQueue::new();
         let called = Arc::new(Mutex::new(false));
         let called_clone = called.clone();
 
@@ -135,7 +135,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_callbacks_execute() {
-        let mut queue = CallbackQueue::new();
+        let queue = CallbackQueue::new();
         let counter = Arc::new(Mutex::new(0));
 
         let c1 = counter.clone();
@@ -171,7 +171,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_error_propagation() {
-        let mut queue = CallbackQueue::new();
+        let queue = CallbackQueue::new();
 
         queue.push(100, || async { Err(eyre::eyre!("test error")) });
 

@@ -11,11 +11,10 @@ use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
 use e3_bfv_helpers::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
 use e3_utils::utility_types::ArcBytes;
-use fhe::bfv::{Encoding, Plaintext};
+use fhe::bfv::Plaintext;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
 use fhe_traits::DeserializeParametrized;
-use fhe_traits::FheDecoder;
 use tracing::info;
 
 /// Shamir shares for a single party to decrypt a batch of ciphertexts.
