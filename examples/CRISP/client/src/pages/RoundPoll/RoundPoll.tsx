@@ -18,25 +18,26 @@ const RoundPoll: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   const parsedRoundId = roundId ? parseInt(roundId, 10) : null
+  const isValidRoundId = parsedRoundId !== null && !isNaN(parsedRoundId)
 
   // If this is the current round, redirect to /current
   useEffect(() => {
-    if (parsedRoundId !== null && currentRoundId !== null && parsedRoundId === currentRoundId) {
+    if (isValidRoundId && currentRoundId !== null && parsedRoundId === currentRoundId) {
       navigate('/current', { replace: true })
     }
-  }, [parsedRoundId, currentRoundId, navigate])
+  }, [isValidRoundId, parsedRoundId, currentRoundId, navigate])
 
   // Load the specific round
   useEffect(() => {
     const loadRound = async () => {
-      if (parsedRoundId !== null) {
+      if (isValidRoundId && parsedRoundId !== null) {
         setLoading(true)
         await getRoundStateLite(parsedRoundId)
         setLoading(false)
       }
     }
     loadRound()
-  }, [parsedRoundId, getRoundStateLite])
+  }, [isValidRoundId, parsedRoundId, getRoundStateLite])
 
   const endTime = useMemo(() => (roundState ? convertTimestampToDate(roundState.start_time, roundState.duration) : null), [roundState])
 

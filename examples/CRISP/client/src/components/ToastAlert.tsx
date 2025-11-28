@@ -59,7 +59,7 @@ const ToastAlert: React.FC<ToastAlertProps> = ({ message, type, linkUrl, onClose
   const IconComponent = currentAlertStyle.icon
 
   return (
-    <div className='toast-alert transform transition-transform animate-in slide-in-from-left-5'>
+    <div className='toast-alert relative transform transition-transform animate-in slide-in-from-left-5 pointer-events-auto'>
       <div
         className={`shadow-toast min-w-[366px] max-w-[500px] flex items-center rounded-[16px] border-2 ${currentAlertStyle.container} bg-white px-6 py-3`}
       >
