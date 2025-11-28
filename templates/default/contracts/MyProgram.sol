@@ -77,9 +77,9 @@ contract MyProgram is IE3Program, Ownable {
     }
 
     /// @notice Validates input
+    /// @param e3Id The E3 program ID
     /// @param sender The account that is submitting the input.
     /// @param data The input to be verified.
-    /// @return input The input data.
     function validateInput(
         uint256 e3Id,
         address sender,
