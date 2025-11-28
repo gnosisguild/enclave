@@ -6,7 +6,7 @@
 
 import type React from 'react'
 import { ReactNode } from 'react'
-import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound, EncryptedVote } from '@/model/vote.model'
+import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound } from '@/model/vote.model'
 import { Poll, PollRequestResult, PollResult } from '@/model/poll.model'
 
 export type VoteManagementContextType = {
@@ -28,13 +28,7 @@ export type VoteManagementContextType = {
   getPastPolls: () => Promise<void>
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
-  encryptVote: (
-    voteId: bigint,
-    publicKey: Uint8Array,
-    address: string,
-    signature: string,
-    message: string,
-  ) => Promise<EncryptedVote | undefined>
+  generateProof: (voteId: bigint, publicKey: Uint8Array, address: string, signature: string, message: string) => Promise<string | undefined>
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>
   setPastPolls: React.Dispatch<React.SetStateAction<PollResult[]>>

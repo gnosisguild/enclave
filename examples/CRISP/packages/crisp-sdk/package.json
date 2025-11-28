@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/sdk",
-  "version": "0.2.3-test",
+  "version": "0.3.0-test",
   "type": "module",
   "author": {
     "name": "gnosisguild",

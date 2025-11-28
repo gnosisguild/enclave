@@ -122,9 +122,10 @@ contracts will call the `validateInput()` function on your Program contract.
 
 ```solidity
 function validateInput(
+        uint256 e3Id,
         address sender,
         bytes memory params
-    ) external returns (bytes memory input);
+    ) external;
 ```
 
 At a minimum, this function should validate a proof that the given ciphertext is a valid encryption

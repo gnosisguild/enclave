@@ -73,17 +73,17 @@ your Data Provider. The function should be implemented in the E3 Program contrac
 
 - **Data Decoding**: Decode encrypted input data to its intended format.
 - **ZKP Verification**: Verify any associated ZKPs to ensure input correctness.
-- **Input Acceptance**: Return validated input for inclusion in the computation.
+- **Input Validation**: Validate the input data and revert if invalid.
 
 **Example:**
 
 ```solidity
 pragma solidity >=0.8.27;
 
-function validateInput(address sender, bytes memory data) external returns (bytes memory input) {
+function validateInput(uint256 e3Id, address sender, bytes memory data) external {
     // Decode the input data
     // Verify associated ZKPs
-    // Return the validated input
-    return data; // Placeholder: replace with actual validated input
+    // Revert if validation fails
+    if (data.length == 0) revert EmptyInputData();
 }
 ```

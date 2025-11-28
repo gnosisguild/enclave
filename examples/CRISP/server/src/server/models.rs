@@ -78,10 +78,9 @@ pub struct CTRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct EncryptedVote {
+pub struct VoteRequest {
     pub round_id: u64,
-    pub enc_vote_bytes: Vec<u8>,
-    pub proof: Vec<u8>,
+    pub encoded_proof: String,
     pub address: String,
 }
 

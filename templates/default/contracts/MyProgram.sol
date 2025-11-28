@@ -63,7 +63,7 @@ contract MyProgram is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32) {
+    ) external override returns (bytes32) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
@@ -77,20 +77,18 @@ contract MyProgram is IE3Program, Ownable {
     }
 
     /// @notice Validates input
+    /// @param e3Id The E3 program ID
     /// @param sender The account that is submitting the input.
     /// @param data The input to be verified.
-    /// @return input The input data.
     function validateInput(
         uint256 e3Id,
         address sender,
         bytes memory data
-    ) external returns (bytes memory input) {
+    ) external {
         if (data.length == 0) revert EmptyInputData();
 
         // You can add your own validation logic here.
         // EXAMPLE: https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol
-
-        input = data;
 
         uint256 index = inputs[e3Id].numberOfLeaves;
         inputs[e3Id]._insert(PoseidonT3.hash([uint256(keccak256(data)), index]));

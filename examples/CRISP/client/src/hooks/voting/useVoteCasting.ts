@@ -14,19 +14,19 @@ import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest } from '@/model/vote.model'
 
 export const useVoteCasting = () => {
-  const { user, roundState, votingRound, encryptVote, broadcastVote, setTxUrl } = useVoteManagementContext()
+  const { user, roundState, votingRound, generateProof, broadcastVote, setTxUrl } = useVoteManagementContext()
 
   const { signMessageAsync } = useSignMessage()
   const { showToast } = useNotificationAlertContext()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
-  const handleVoteEncryption = useCallback(
+  const handleProofGeneration = useCallback(
     async (vote: Poll, address: string, signature: string, message: string) => {
-      if (!votingRound) throw new Error('No voting round available for encryption')
-      return encryptVote(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, message)
+      if (!votingRound) throw new Error('No voting round available for proof generation')
+      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, message)
     },
-    [encryptVote, votingRound],
+    [generateProof, votingRound],
   )
 
   const castVoteWithProof = useCallback(
@@ -50,15 +50,14 @@ export const useVoteCasting = () => {
       const signature = await signMessageAsync({ message })
 
       try {
-        const voteEncrypted = await handleVoteEncryption(pollSelected, user.address, signature, message)
-        if (!voteEncrypted) {
-          throw new Error('Failed to encrypt vote.')
+        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, message)
+        if (!encodedProof) {
+          throw new Error('Failed to generate proof.')
         }
 
         const voteRequest: BroadcastVoteRequest = {
           round_id: roundState.id,
-          enc_vote_bytes: Array.from(voteEncrypted.vote),
-          proof: Array.from(voteEncrypted.proof),
+          encoded_proof: encodedProof,
           address: user.address,
         }
 
@@ -106,7 +105,7 @@ export const useVoteCasting = () => {
         setIsLoading(false)
       }
     },
-    [user, roundState, votingRound, encryptVote, broadcastVote, setTxUrl, showToast, navigate, handleVoteEncryption, signMessageAsync],
+    [user, roundState, votingRound, generateProof, broadcastVote, setTxUrl, showToast, navigate, handleProofGeneration, signMessageAsync],
   )
 
   return { castVoteWithProof, isLoading }

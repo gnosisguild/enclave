@@ -6,18 +6,19 @@
 
 import {
   encryptVoteAndGenerateCRISPInputs,
-  generateProofWithReturnValue,
+  generateProof,
   VotingMode,
   encodeVote,
   encryptVote,
   generateMerkleProof,
   hashLeaf,
+  encodeSolidityProof,
 } from '@crisp-e3/sdk'
 
 self.onmessage = async function (event) {
   const { type, data } = event.data
   switch (type) {
-    case 'encrypt_vote':
+    case 'generate_proof':
       try {
         const { voteId, publicKey, address, signature, message } = data
 
@@ -49,22 +50,16 @@ self.onmessage = async function (event) {
           isFirstVote: true,
         })
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { proof, returnValue } = await generateProofWithReturnValue(inputs)
-
-        // TODO: returnValue is the encrypted vote. We need to convert it from Noir format to BFV format
-        // instead of using the encryptVote function (which should be removed from the SDK).
+        const proof = await generateProof(inputs)
+        const encodedProof = encodeSolidityProof(proof)
 
         self.postMessage({
-          type: 'encrypt_vote',
+          type: 'generate_proof',
           success: true,
-          encryptedVote: {
-            vote: encryptedVote,
-            proof: proof.proof,
-          },
+          encodedProof,
         })
       } catch (error) {
-        self.postMessage({ type: 'encrypt_vote', success: false, error: error.message })
+        self.postMessage({ type: 'generate_proof', success: false, error: error.message })
       }
       break
 

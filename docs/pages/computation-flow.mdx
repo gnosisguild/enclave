@@ -63,9 +63,10 @@ During this phase, Data Providers — who may include individual users, applicat
 
    ```solidity
    function validateInput(
+      uint256 e3Id,
       address sender,
       bytes memory data
-   ) external returns (bytes memory input);
+   ) external;
    ```
 
 ### Phase 4: Execution
