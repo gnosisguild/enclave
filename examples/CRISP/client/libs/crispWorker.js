@@ -56,7 +56,7 @@ self.onmessage = async function (event) {
         self.postMessage({
           type: 'generate_proof',
           success: true,
-          encodedProof
+          encodedProof,
         })
       } catch (error) {
         self.postMessage({ type: 'generate_proof', success: false, error: error.message })
