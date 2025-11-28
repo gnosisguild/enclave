@@ -77,14 +77,20 @@ async fn broadcast_encrypted_vote(
     
     // encoded_proof is already encoded in JavaScript, just decode from hex
     let hex_str = vote_request.encoded_proof.strip_prefix("0x").unwrap_or(&vote_request.encoded_proof);
-    let encoded_proof = Bytes::from(
-        hex::decode(hex_str)
-            .map_err(|e| {
-                error!("[e3_id={}] Failed to decode encoded_proof: {:?}", vote_request.round_id, e);
-                e
-            })
-            .expect("Invalid hex encoded proof")
-    );
+    let encoded_proof = match hex::decode(hex_str) {
+        Ok(decoded) => Bytes::from(decoded),
+        Err(e) => {
+            error!(
+                "[e3_id={}] Failed to decode encoded_proof: {:?}",
+                vote_request.round_id, e
+            );
+            return HttpResponse::BadRequest().json(VoteResponse {
+                status: VoteResponseStatus::FailedBroadcast,
+                tx_hash: None,
+                message: Some("Invalid hex encoded proof".to_string()),
+            });
+        }
+    };
 
     // Broadcast vote to blockchain
     let contract = match EnclaveContract::new(
