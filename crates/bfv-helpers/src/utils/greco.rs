@@ -255,16 +255,13 @@ pub fn abi_decode_greco_ciphertext(
 ///
 /// # Returns
 /// Serialized BFV ciphertext bytes ready to be used with `Ciphertext::from_bytes`
-pub fn abi_decode_greco_to_bfv_bytes(
-    bytes: &[u8],
-    params: &Arc<BfvParameters>,
-) -> Result<Vec<u8>> {
+pub fn abi_decode_greco_to_bfv_bytes(bytes: &[u8], params: &Arc<BfvParameters>) -> Result<Vec<u8>> {
     let degree = params.degree();
     let num_moduli = params.moduli().len();
-    
+
     let (ct0is, ct1is) = abi_decode_greco_ciphertext(bytes, num_moduli, degree)?;
     let ciphertext = greco_to_bfv_ciphertext(&ct0is, &ct1is, params)?;
-    
+
     use fhe_traits::Serialize;
     Ok(ciphertext.to_bytes())
 }
@@ -390,18 +387,18 @@ mod tests {
         use num_bigint::Sign;
         let (sign, bytes_be) = bigint.to_bytes_be();
         let mut result = [0u8; 32];
-        
+
         if sign == Sign::Minus {
             // For negative numbers, convert to two's complement
             let mut abs_bytes = vec![0u8; 32];
             let start_idx = 32usize.saturating_sub(bytes_be.len());
             abs_bytes[start_idx..].copy_from_slice(&bytes_be);
-            
+
             // Invert all bits
             for i in 0..32 {
                 result[i] = !abs_bytes[i];
             }
-            
+
             // Add 1
             let mut carry = 1u16;
             for i in (0..32).rev() {
@@ -414,7 +411,7 @@ mod tests {
             let start_idx = 32usize.saturating_sub(bytes_be.len());
             result[start_idx..].copy_from_slice(&bytes_be);
         }
-        
+
         result
     }
 
@@ -446,26 +443,20 @@ mod tests {
 
         // Convert greco coefficients to bytes32[] and ABI-encode
         let mut bytes32_array = Vec::new();
-        
+
         // Add ct0is coefficients
         for modulus_coeffs in original_ct0is {
             for coeff in modulus_coeffs {
                 let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(
-                    FixedBytes::from(bytes32),
-                    32,
-                ));
+                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
             }
         }
-        
+
         // Add ct1is coefficients
         for modulus_coeffs in original_ct1is {
             for coeff in modulus_coeffs {
                 let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(
-                    FixedBytes::from(bytes32),
-                    32,
-                ));
+                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
             }
         }
 
@@ -483,7 +474,9 @@ mod tests {
         assert_eq!(decoded_ct0is.len(), original_ct0is.len());
         assert_eq!(decoded_ct1is.len(), original_ct1is.len());
 
-        for (mod_idx, (decoded_ct0, original_ct0)) in decoded_ct0is.iter().zip(original_ct0is.iter()).enumerate() {
+        for (mod_idx, (decoded_ct0, original_ct0)) in
+            decoded_ct0is.iter().zip(original_ct0is.iter()).enumerate()
+        {
             assert_eq!(decoded_ct0.len(), original_ct0.len());
             for (decoded_coeff, original_coeff) in decoded_ct0.iter().zip(original_ct0.iter()) {
                 assert_eq!(
@@ -494,7 +487,9 @@ mod tests {
             }
         }
 
-        for (mod_idx, (decoded_ct1, original_ct1)) in decoded_ct1is.iter().zip(original_ct1is.iter()).enumerate() {
+        for (mod_idx, (decoded_ct1, original_ct1)) in
+            decoded_ct1is.iter().zip(original_ct1is.iter()).enumerate()
+        {
             assert_eq!(decoded_ct1.len(), original_ct1.len());
             for (decoded_coeff, original_coeff) in decoded_ct1.iter().zip(original_ct1.iter()) {
                 assert_eq!(
@@ -526,32 +521,27 @@ mod tests {
         let (original_ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
 
         let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &original_ct, &pk, &params).unwrap();
+            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &original_ct, &pk, &params)
+                .unwrap();
 
         let standard_vectors = greco_vectors.standard_form();
 
         // Convert greco coefficients to bytes32[] and ABI-encode
         let mut bytes32_array = Vec::new();
-        
+
         // Add ct0is coefficients
         for modulus_coeffs in &standard_vectors.ct0is {
             for coeff in modulus_coeffs {
                 let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(
-                    FixedBytes::from(bytes32),
-                    32,
-                ));
+                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
             }
         }
-        
+
         // Add ct1is coefficients
         for modulus_coeffs in &standard_vectors.ct1is {
             for coeff in modulus_coeffs {
                 let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(
-                    FixedBytes::from(bytes32),
-                    32,
-                ));
+                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
             }
         }
 
