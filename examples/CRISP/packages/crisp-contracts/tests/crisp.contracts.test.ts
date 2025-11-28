@@ -99,7 +99,7 @@ describe('CRISP Contracts', function () {
       expect(isValid).to.be.true
     })
 
-    it.only('should validate input correctly', async function () {
+    it('should validate input correctly', async function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
