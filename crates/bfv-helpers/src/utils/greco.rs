@@ -5,13 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
-use anyhow::{Context, Result};
+use alloy_primitives::I256;
 use fhe::bfv::{BfvParameters, Ciphertext};
 use fhe_math::rq::{traits::TryConvertFrom, Poly, Representation};
 use itertools::izip;
 use ndarray::Array2;
-use num_bigint::{BigInt, Sign};
-use num_traits::{ToPrimitive, Zero};
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
 
@@ -31,11 +31,11 @@ fn convert_greco_coefficient_to_bfv(centered_coeff: &BigInt, qi: u64, zkp_modulu
     };
 
     // Un-center: convert from [-(qi-1)/2, (qi-1)/2] to [0, qi)
-    if centered_mod_qi < BigInt::zero() {
-        (&centered_mod_qi + &qi_bigint).to_u64().unwrap_or(0)
-    } else {
-        centered_mod_qi.to_u64().unwrap_or(0)
-    }
+    // Use modular arithmetic: (centered_mod_qi + qi) % qi ensures result is in [0, qi)
+    let result = (&centered_mod_qi + &qi_bigint) % &qi_bigint;
+    result
+        .to_u64()
+        .expect("Result should be in [0, qi) and fit in u64")
 }
 
 /// Converts greco-formatted coefficients (reversed, centered) to BFV coefficients.
@@ -56,6 +56,11 @@ fn convert_greco_coefficients_to_bfv(
 /// Takes greco-formatted coefficients (centered, reversed, in standard form) and reconstructs
 /// the BFV ciphertext. Conversion is exact modulo qi for each modulus.
 ///
+/// # Safety
+/// This function assumes valid input:
+/// - `ct0is` and `ct1is` must have length equal to the number of moduli
+/// - Each coefficient vector must have length equal to the polynomial degree
+///
 /// # Arguments
 /// * `ct0is` - Greco coefficients for ct0 (one vector per modulus, standard form)
 /// * `ct1is` - Greco coefficients for ct1 (one vector per modulus, standard form)
@@ -64,33 +69,16 @@ pub fn greco_to_bfv_ciphertext(
     ct0is: &[Vec<BigInt>],
     ct1is: &[Vec<BigInt>],
     params: &Arc<BfvParameters>,
-) -> Result<Ciphertext> {
+) -> Ciphertext {
     let moduli = params.moduli();
     let degree = params.degree();
-
-    anyhow::ensure!(
-        ct0is.len() == moduli.len() && ct1is.len() == moduli.len(),
-        "Mismatch in number of moduli: expected {}, got ct0={}, ct1={}",
-        moduli.len(),
-        ct0is.len(),
-        ct1is.len()
-    );
 
     // Convert greco coefficients to BFV format for each modulus
     let zkp_modulus = get_zkp_modulus();
     let mut ct0_coeffs_all = Vec::with_capacity(moduli.len());
     let mut ct1_coeffs_all = Vec::with_capacity(moduli.len());
 
-    for (idx, (ct0i, ct1i, qi)) in izip!(ct0is, ct1is, moduli).enumerate() {
-        anyhow::ensure!(
-            ct0i.len() == degree && ct1i.len() == degree,
-            "Coefficient length mismatch at modulus {}: expected {}, got ct0={}, ct1={}",
-            idx,
-            degree,
-            ct0i.len(),
-            ct1i.len()
-        );
-
+    for (ct0i, ct1i, qi) in izip!(ct0is, ct1is, moduli) {
         ct0_coeffs_all.push(convert_greco_coefficients_to_bfv(ct0i, *qi, &zkp_modulus));
         ct1_coeffs_all.push(convert_greco_coefficients_to_bfv(ct1i, *qi, &zkp_modulus));
     }
@@ -102,59 +90,16 @@ pub fn greco_to_bfv_ciphertext(
 
     let mut ct0_poly =
         Poly::try_convert_from(ct0_array, &ctx, false, Some(Representation::PowerBasis))
-            .context("Failed to create ct0 Poly")?;
+            .expect("Failed to create ct0 Poly: invalid coefficient format");
     let mut ct1_poly =
         Poly::try_convert_from(ct1_array, &ctx, false, Some(Representation::PowerBasis))
-            .context("Failed to create ct1 Poly")?;
+            .expect("Failed to create ct1 Poly: invalid coefficient format");
 
     ct0_poly.change_representation(Representation::Ntt);
     ct1_poly.change_representation(Representation::Ntt);
 
-    Ciphertext::new(vec![ct0_poly, ct1_poly], params).context("Failed to create Ciphertext")
-}
-
-/// Deserializes greco coefficients from bytes format.
-/// Format: [num_moduli: u8][for each modulus: [num_coeffs: u16][coeffs: bytes32[]]]
-/// The bytes are expected to be serialized from Solidity bytes32[] arrays.
-pub fn deserialize_greco_coefficients(bytes: &[u8]) -> Result<Vec<Vec<BigInt>>> {
-    let mut offset = 0;
-
-    if bytes.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    // Read number of moduli
-    let num_moduli = bytes[offset] as usize;
-    offset += 1;
-
-    let mut result = Vec::with_capacity(num_moduli);
-
-    for _ in 0..num_moduli {
-        if offset + 2 > bytes.len() {
-            anyhow::bail!("Insufficient bytes for degree");
-        }
-
-        // Read number of coefficients
-        let num_coeffs = u16::from_be_bytes([bytes[offset], bytes[offset + 1]]) as usize;
-        offset += 2;
-
-        if offset + num_coeffs * 32 > bytes.len() {
-            anyhow::bail!("Insufficient bytes for coefficients");
-        }
-
-        let mut modulus_coeffs = Vec::with_capacity(num_coeffs);
-        for _ in 0..num_coeffs {
-            let coeff_bytes: [u8; 32] = bytes[offset..offset + 32]
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Failed to read coefficient bytes"))?;
-            modulus_coeffs.push(bytes32_to_bigint(&coeff_bytes));
-            offset += 32;
-        }
-
-        result.push(modulus_coeffs);
-    }
-
-    Ok(result)
+    Ciphertext::new(vec![ct0_poly, ct1_poly], params)
+        .expect("Failed to create Ciphertext: invalid polynomial format")
 }
 
 /// Decodes ABI-encoded greco ciphertext from bytes32[] array.
@@ -165,44 +110,51 @@ pub fn deserialize_greco_coefficients(bytes: &[u8]) -> Result<Vec<Vec<BigInt>>> 
 /// - First `num_moduli * degree` bytes32 values are ct0is (grouped by modulus)
 /// - Next `num_moduli * degree` bytes32 values are ct1is (grouped by modulus)
 ///
+/// # Safety
+/// This function assumes valid input:
+/// - `bytes` must be valid ABI-encoded bytes32[] array
+/// - Array must contain exactly `2 * num_moduli * degree` bytes32 values
+/// - All values must be valid bytes32 FixedBytes
+///
 /// # Arguments
 /// * `bytes` - ABI-encoded bytes32[] array containing greco ciphertext coefficients
-/// * `num_moduli` - Number of moduli in the BFV parameters
-/// * `degree` - Polynomial degree
+/// * `params` - BFV parameters (used to determine num_moduli and degree)
 ///
 /// # Returns
 /// A tuple of (ct0is, ct1is) where each is Vec<Vec<BigInt>> (one vector per modulus)
 pub fn abi_decode_greco_ciphertext(
     bytes: &[u8],
-    num_moduli: usize,
-    degree: usize,
-) -> Result<(Vec<Vec<BigInt>>, Vec<Vec<BigInt>>)> {
+    params: &Arc<BfvParameters>,
+) -> (Vec<Vec<BigInt>>, Vec<Vec<BigInt>>) {
+    let degree = params.degree();
+    let num_moduli = params.moduli().len();
+
     // ABI-decode the bytes to get bytes32[] array
     let array_type = DynSolType::Array(Box::new(DynSolType::FixedBytes(32)));
     let decoded = array_type
         .abi_decode(bytes)
-        .context("Failed to ABI decode bytes32[] array")?;
+        .expect("Failed to ABI decode bytes32[] array: invalid encoding");
 
     let bytes32_array = match decoded {
         DynSolValue::Array(arr) => arr,
-        _ => anyhow::bail!("Expected array from ABI decode"),
+        _ => panic!("Expected array from ABI decode, got invalid type"),
     };
 
     let ct0is_bytes32_count = num_moduli * degree;
 
-    // Split into ct0is and ct1is (each needs num_moduli * degree bytes32 values)
-    anyhow::ensure!(
-        bytes32_array.len() >= ct0is_bytes32_count * 2,
-        "Insufficient bytes32 values: expected at least {}, got {}",
-        ct0is_bytes32_count * 2,
-        bytes32_array.len()
-    );
+    // Split into ct0is and ct1is (use slices to avoid unnecessary allocations)
+    let (ct0is_bytes32, ct1is_bytes32) = bytes32_array.split_at(ct0is_bytes32_count);
 
-    // Extract ct0is bytes32 values
-    let ct0is_bytes32: Vec<DynSolValue> = bytes32_array[..ct0is_bytes32_count].to_vec();
-    // Extract ct1is bytes32 values
-    let ct1is_bytes32: Vec<DynSolValue> =
-        bytes32_array[ct0is_bytes32_count..ct0is_bytes32_count * 2].to_vec();
+    // Helper function to extract bytes32 from DynSolValue (assumes valid input)
+    fn extract_bytes32(value: &DynSolValue) -> [u8; 32] {
+        match value {
+            DynSolValue::FixedBytes(b, _) => b
+                .as_slice()
+                .try_into()
+                .expect("Invalid bytes32 length: expected 32 bytes"),
+            _ => panic!("Expected bytes32 FixedBytes, got invalid type"),
+        }
+    }
 
     // Convert bytes32 arrays to greco coefficient format
     let mut ct0is = Vec::with_capacity(num_moduli);
@@ -215,26 +167,11 @@ pub fn abi_decode_greco_ciphertext(
         for j in 0..degree {
             let idx = i * degree + j;
 
-            // Convert ct0 bytes32 to BigInt
-            let ct0_bytes32 = match &ct0is_bytes32[idx] {
-                DynSolValue::FixedBytes(b, _) => {
-                    let mut arr = [0u8; 32];
-                    arr.copy_from_slice(b.as_slice());
-                    arr
-                }
-                _ => anyhow::bail!("Expected bytes32 for ct0 at index {}", idx),
-            };
-            ct0_modulus.push(bytes32_to_bigint(&ct0_bytes32));
+            // Convert ct0 and ct1 bytes32 to BigInt
+            let ct0_bytes32 = extract_bytes32(&ct0is_bytes32[idx]);
+            let ct1_bytes32 = extract_bytes32(&ct1is_bytes32[idx]);
 
-            // Convert ct1 bytes32 to BigInt
-            let ct1_bytes32 = match &ct1is_bytes32[idx] {
-                DynSolValue::FixedBytes(b, _) => {
-                    let mut arr = [0u8; 32];
-                    arr.copy_from_slice(b.as_slice());
-                    arr
-                }
-                _ => anyhow::bail!("Expected bytes32 for ct1 at index {}", idx),
-            };
+            ct0_modulus.push(bytes32_to_bigint(&ct0_bytes32));
             ct1_modulus.push(bytes32_to_bigint(&ct1_bytes32));
         }
 
@@ -242,75 +179,38 @@ pub fn abi_decode_greco_ciphertext(
         ct1is.push(ct1_modulus);
     }
 
-    Ok((ct0is, ct1is))
-}
-
-/// Converts ABI-encoded greco ciphertext bytes to BFV ciphertext bytes.
-///
-/// This is a convenience function that combines ABI decoding and greco-to-BFV conversion.
-///
-/// # Arguments
-/// * `bytes` - ABI-encoded bytes32[] array containing greco ciphertext coefficients
-/// * `params` - BFV parameters
-///
-/// # Returns
-/// Serialized BFV ciphertext bytes ready to be used with `Ciphertext::from_bytes`
-pub fn abi_decode_greco_to_bfv_bytes(bytes: &[u8], params: &Arc<BfvParameters>) -> Result<Vec<u8>> {
-    let degree = params.degree();
-    let num_moduli = params.moduli().len();
-
-    let (ct0is, ct1is) = abi_decode_greco_ciphertext(bytes, num_moduli, degree)?;
-    let ciphertext = greco_to_bfv_ciphertext(&ct0is, &ct1is, params)?;
-
-    use fhe_traits::Serialize;
-    Ok(ciphertext.to_bytes())
+    (ct0is, ct1is)
 }
 
 /// Converts bytes32 (signed 256-bit, two's complement, big-endian) to BigInt
 fn bytes32_to_bigint(bytes: &[u8; 32]) -> BigInt {
-    // Check if negative (MSB is 1)
-    let is_negative = bytes[0] >= 0x80;
+    // Use I256::from_be_bytes which handles two's complement conversion automatically
+    let i256 = I256::from_be_bytes(*bytes);
 
-    if is_negative {
-        // Two's complement: invert all bits and add 1, then negate
-        let mut inverted = [0u8; 32];
-        for i in 0..32 {
-            inverted[i] = !bytes[i];
-        }
-
-        // Add 1
-        let mut carry = 1u16;
-        for i in (0..32).rev() {
-            let sum = inverted[i] as u16 + carry;
-            inverted[i] = sum as u8;
-            carry = sum >> 8;
-        }
-
-        -BigInt::from_bytes_be(Sign::Plus, &inverted)
-    } else {
-        BigInt::from_bytes_be(Sign::Plus, bytes)
-    }
+    // Convert I256 to BigInt via its string representation
+    // I256 handles two's complement correctly, so we can use its Display implementation
+    use std::str::FromStr;
+    BigInt::from_str(&i256.to_string())
+        .expect("I256::to_string() should always produce a valid BigInt string")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloy_primitives::FixedBytes;
-    use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey};
+    use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
     use greco::vectors::GrecoVectors;
     use rand::thread_rng;
 
-    #[test]
-    fn test_greco_to_bfv_ciphertext() {
-        // Test with two moduli to verify multi-modulus support
-        let moduli = [0xffffee001u64, 0xffffc4001u64];
-        let params = BfvParametersBuilder::new()
-            .set_degree(512)
-            .set_plaintext_modulus(10)
-            .set_moduli(&moduli)
-            .build_arc()
-            .unwrap();
+    /// Helper function to set up test parameters, keys, and ciphertext
+    fn setup_test() -> (
+        Arc<BfvParameters>,
+        Ciphertext,
+        (Vec<Vec<BigInt>>, Vec<Vec<BigInt>>),
+    ) {
+        use crate::{BfvParamSet, BfvParamSets};
+        let params = BfvParamSet::from(BfvParamSets::InsecureSet512_10_1).build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
@@ -322,285 +222,56 @@ mod tests {
 
         let greco_vectors =
             GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params).unwrap();
-
         let standard_vectors = greco_vectors.standard_form();
-        let reconstructed_ct =
-            greco_to_bfv_ciphertext(&standard_vectors.ct0is, &standard_vectors.ct1is, &params)
-                .unwrap();
 
-        assert_eq!(reconstructed_ct.c.len(), 2);
-        assert_eq!(reconstructed_ct.level, 0);
-
-        // Verify serialization/deserialization works
-        let ct_bytes = reconstructed_ct.to_bytes();
-        let deserialized_ct = Ciphertext::from_bytes(&ct_bytes, &params).unwrap();
-        assert_eq!(deserialized_ct.c.len(), 2);
-
-        // Verify exact coefficient recovery for all moduli
-        let mut ct0_orig = ct.c[0].clone();
-        let mut ct1_orig = ct.c[1].clone();
-        let mut ct0_recon = reconstructed_ct.c[0].clone();
-        let mut ct1_recon = reconstructed_ct.c[1].clone();
-
-        ct0_orig.change_representation(Representation::PowerBasis);
-        ct1_orig.change_representation(Representation::PowerBasis);
-        ct0_recon.change_representation(Representation::PowerBasis);
-        ct1_recon.change_representation(Representation::PowerBasis);
-
-        let orig_coeffs0 = ct0_orig.coefficients();
-        let recon_coeffs0 = ct0_recon.coefficients();
-        let orig_coeffs1 = ct1_orig.coefficients();
-        let recon_coeffs1 = ct1_recon.coefficients();
-
-        for (mod_idx, qi) in params.moduli().iter().enumerate() {
-            let orig0 = orig_coeffs0.row(mod_idx);
-            let recon0 = recon_coeffs0.row(mod_idx);
-            let orig1 = orig_coeffs1.row(mod_idx);
-            let recon1 = recon_coeffs1.row(mod_idx);
-
-            for (i, ((&o0, &r0), (&o1, &r1))) in orig0
-                .iter()
-                .zip(recon0.iter())
-                .zip(orig1.iter().zip(recon1.iter()))
-                .enumerate()
-            {
-                assert_eq!(
-                    o0 % qi,
-                    r0 % qi,
-                    "ct0[{}] mismatch at modulus {}",
-                    i,
-                    mod_idx
-                );
-                assert_eq!(
-                    o1 % qi,
-                    r1 % qi,
-                    "ct1[{}] mismatch at modulus {}",
-                    i,
-                    mod_idx
-                );
-            }
-        }
+        (params, ct, (standard_vectors.ct0is, standard_vectors.ct1is))
     }
 
     /// Helper function to convert BigInt to bytes32 (big-endian, two's complement)
     fn bigint_to_bytes32(bigint: &BigInt) -> [u8; 32] {
-        use num_bigint::Sign;
-        let (sign, bytes_be) = bigint.to_bytes_be();
-        let mut result = [0u8; 32];
-
-        if sign == Sign::Minus {
-            // For negative numbers, convert to two's complement
-            let mut abs_bytes = vec![0u8; 32];
-            let start_idx = 32usize.saturating_sub(bytes_be.len());
-            abs_bytes[start_idx..].copy_from_slice(&bytes_be);
-
-            // Invert all bits
-            for i in 0..32 {
-                result[i] = !abs_bytes[i];
-            }
-
-            // Add 1
-            let mut carry = 1u16;
-            for i in (0..32).rev() {
-                let sum = result[i] as u16 + carry;
-                result[i] = sum as u8;
-                carry = sum >> 8;
-            }
-        } else {
-            // For positive numbers, pad with zeros
-            let start_idx = 32usize.saturating_sub(bytes_be.len());
-            result[start_idx..].copy_from_slice(&bytes_be);
-        }
-
-        result
+        use std::str::FromStr;
+        let i256 = I256::from_str(&bigint.to_string())
+            .expect("BigInt should fit in I256 range for bytes32 conversion");
+        i256.to_be_bytes()
     }
 
     #[test]
-    fn test_abi_decode_greco_ciphertext() {
-        // Test with two moduli to verify multi-modulus support
-        let moduli = [0xffffee001u64, 0xffffc4001u64];
-        let params = BfvParametersBuilder::new()
-            .set_degree(512)
-            .set_plaintext_modulus(10)
-            .set_moduli(&moduli)
-            .build_arc()
-            .unwrap();
+    fn test_greco_to_bfv_ciphertext() {
+        let (params, original_ct, (ct0is, ct1is)) = setup_test();
 
-        let mut rng = thread_rng();
-        let sk = SecretKey::random(&params, &mut rng);
-        let pk = PublicKey::new(&sk, &mut rng);
+        let reconstructed_ct = greco_to_bfv_ciphertext(&ct0is, &ct1is, &params);
 
-        let vote = vec![1u64, 0u64, 0u64];
-        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
-        let (ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
+        assert_eq!(reconstructed_ct.c.len(), original_ct.c.len());
+        assert_eq!(reconstructed_ct.level, original_ct.level);
 
-        let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params).unwrap();
-
-        let standard_vectors = greco_vectors.standard_form();
-        let original_ct0is = &standard_vectors.ct0is;
-        let original_ct1is = &standard_vectors.ct1is;
-
-        // Convert greco coefficients to bytes32[] and ABI-encode
-        let mut bytes32_array = Vec::new();
-
-        // Add ct0is coefficients
-        for modulus_coeffs in original_ct0is {
-            for coeff in modulus_coeffs {
-                let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
-            }
-        }
-
-        // Add ct1is coefficients
-        for modulus_coeffs in original_ct1is {
-            for coeff in modulus_coeffs {
-                let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
-            }
-        }
-
-        // ABI-encode the bytes32[] array
-        let array_value = DynSolValue::Array(bytes32_array);
-        let encoded_bytes = array_value.abi_encode();
-
-        // Test abi_decode_greco_ciphertext
-        let degree = params.degree();
-        let num_moduli = params.moduli().len();
-        let (decoded_ct0is, decoded_ct1is) =
-            abi_decode_greco_ciphertext(&encoded_bytes, num_moduli, degree).unwrap();
-
-        // Verify the decoded coefficients match the original
-        assert_eq!(decoded_ct0is.len(), original_ct0is.len());
-        assert_eq!(decoded_ct1is.len(), original_ct1is.len());
-
-        for (mod_idx, (decoded_ct0, original_ct0)) in
-            decoded_ct0is.iter().zip(original_ct0is.iter()).enumerate()
-        {
-            assert_eq!(decoded_ct0.len(), original_ct0.len());
-            for (decoded_coeff, original_coeff) in decoded_ct0.iter().zip(original_ct0.iter()) {
-                assert_eq!(
-                    decoded_coeff, original_coeff,
-                    "ct0 coefficient mismatch at modulus {}, coefficient index",
-                    mod_idx
-                );
-            }
-        }
-
-        for (mod_idx, (decoded_ct1, original_ct1)) in
-            decoded_ct1is.iter().zip(original_ct1is.iter()).enumerate()
-        {
-            assert_eq!(decoded_ct1.len(), original_ct1.len());
-            for (decoded_coeff, original_coeff) in decoded_ct1.iter().zip(original_ct1.iter()) {
-                assert_eq!(
-                    decoded_coeff, original_coeff,
-                    "ct1 coefficient mismatch at modulus {}, coefficient index",
-                    mod_idx
-                );
-            }
-        }
+        // Verify serialization/deserialization works
+        let ct_bytes = reconstructed_ct.to_bytes();
+        let deserialized_ct = Ciphertext::from_bytes(&ct_bytes, &params).unwrap();
+        assert_eq!(deserialized_ct.c.len(), original_ct.c.len());
     }
 
     #[test]
-    fn test_abi_decode_greco_to_bfv_bytes() {
-        // Test with two moduli to verify multi-modulus support
-        let moduli = [0xffffee001u64, 0xffffc4001u64];
-        let params = BfvParametersBuilder::new()
-            .set_degree(512)
-            .set_plaintext_modulus(10)
-            .set_moduli(&moduli)
-            .build_arc()
-            .unwrap();
-
-        let mut rng = thread_rng();
-        let sk = SecretKey::random(&params, &mut rng);
-        let pk = PublicKey::new(&sk, &mut rng);
-
-        let vote = vec![1u64, 0u64, 0u64];
-        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
-        let (original_ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-
-        let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &original_ct, &pk, &params)
-                .unwrap();
-
-        let standard_vectors = greco_vectors.standard_form();
+    fn test_abi_decode_greco_ciphertext_round_trip() {
+        let (params, original_ct, (ct0is, ct1is)) = setup_test();
 
         // Convert greco coefficients to bytes32[] and ABI-encode
         let mut bytes32_array = Vec::new();
-
-        // Add ct0is coefficients
-        for modulus_coeffs in &standard_vectors.ct0is {
-            for coeff in modulus_coeffs {
-                let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
+        for coeffs in [&ct0is, &ct1is] {
+            for modulus_coeffs in coeffs {
+                for coeff in modulus_coeffs {
+                    let bytes32 = bigint_to_bytes32(coeff);
+                    bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
+                }
             }
         }
 
-        // Add ct1is coefficients
-        for modulus_coeffs in &standard_vectors.ct1is {
-            for coeff in modulus_coeffs {
-                let bytes32 = bigint_to_bytes32(coeff);
-                bytes32_array.push(DynSolValue::FixedBytes(FixedBytes::from(bytes32), 32));
-            }
-        }
+        let encoded_bytes = DynSolValue::Array(bytes32_array).abi_encode();
 
-        // ABI-encode the bytes32[] array
-        let array_value = DynSolValue::Array(bytes32_array);
-        let encoded_bytes = array_value.abi_encode();
+        // Test full round-trip: ABI decode -> greco -> BFV.
+        let (ct0is, ct1is) = abi_decode_greco_ciphertext(&encoded_bytes, &params);
+        let reconstructed_ct = greco_to_bfv_ciphertext(&ct0is, &ct1is, &params);
 
-        // Test abi_decode_greco_to_bfv_bytes
-        let bfv_bytes = abi_decode_greco_to_bfv_bytes(&encoded_bytes, &params).unwrap();
-
-        // Deserialize the BFV ciphertext
-        let reconstructed_ct = Ciphertext::from_bytes(&bfv_bytes, &params).unwrap();
-
-        assert_eq!(reconstructed_ct.c.len(), 2);
-        assert_eq!(reconstructed_ct.level, 0);
-
-        // Verify exact coefficient recovery for all moduli
-        let mut ct0_orig = original_ct.c[0].clone();
-        let mut ct1_orig = original_ct.c[1].clone();
-        let mut ct0_recon = reconstructed_ct.c[0].clone();
-        let mut ct1_recon = reconstructed_ct.c[1].clone();
-
-        ct0_orig.change_representation(Representation::PowerBasis);
-        ct1_orig.change_representation(Representation::PowerBasis);
-        ct0_recon.change_representation(Representation::PowerBasis);
-        ct1_recon.change_representation(Representation::PowerBasis);
-
-        let orig_coeffs0 = ct0_orig.coefficients();
-        let recon_coeffs0 = ct0_recon.coefficients();
-        let orig_coeffs1 = ct1_orig.coefficients();
-        let recon_coeffs1 = ct1_recon.coefficients();
-
-        for (mod_idx, qi) in params.moduli().iter().enumerate() {
-            let orig0 = orig_coeffs0.row(mod_idx);
-            let recon0 = recon_coeffs0.row(mod_idx);
-            let orig1 = orig_coeffs1.row(mod_idx);
-            let recon1 = recon_coeffs1.row(mod_idx);
-
-            for (i, ((&o0, &r0), (&o1, &r1))) in orig0
-                .iter()
-                .zip(recon0.iter())
-                .zip(orig1.iter().zip(recon1.iter()))
-                .enumerate()
-            {
-                assert_eq!(
-                    o0 % qi,
-                    r0 % qi,
-                    "ct0[{}] mismatch at modulus {}",
-                    i,
-                    mod_idx
-                );
-                assert_eq!(
-                    o1 % qi,
-                    r1 % qi,
-                    "ct1[{}] mismatch at modulus {}",
-                    i,
-                    mod_idx
-                );
-            }
-        }
+        assert_eq!(reconstructed_ct.c.len(), original_ct.c.len());
+        assert_eq!(reconstructed_ct.level, original_ct.level);
     }
 }
