@@ -6,8 +6,7 @@
 
 import { CRISP_SERVER_TOKEN_TREE_ENDPOINT } from './constants'
 
-import ERC20Votes from './ERC20Votes.json'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, parseAbi } from 'viem'
 import { localhost, sepolia } from 'viem/chains'
 
 /**
@@ -64,7 +63,7 @@ export const getBalanceAt = async (voterAddress: string, tokenAddress: string, s
 
   const balance = (await publicClient.readContract({
     address: tokenAddress as `0x${string}`,
-    abi: ERC20Votes.abi,
+    abi: parseAbi(['function getPastVotes(address, uint256) view returns (uint256)']),
     functionName: 'getPastVotes',
     args: [voterAddress as `0x${string}`, BigInt(snapshotBlock)],
   })) as bigint
@@ -99,7 +98,7 @@ export const getTotalSupplyAt = async (tokenAddress: string, snapshotBlock: numb
 
   const totalSupply = (await publicClient.readContract({
     address: tokenAddress as `0x${string}`,
-    abi: ERC20Votes.abi,
+    abi: parseAbi(['function getPastTotalSupply(uint256) view returns (uint256)']),
     functionName: 'getPastTotalSupply',
     args: [BigInt(snapshotBlock)],
   })) as bigint
