@@ -103,7 +103,7 @@ async fn broadcast_encrypted_vote(
         Ok(c) => c,
         Err(e) => {
             error!(
-                "[e3_id={}] Database error checking vote status: {:?}",
+                "[e3_id={}] Contract creation failed: {:?}",
                 vote_request.round_id, e
             );
             return HttpResponse::InternalServerError().json("Internal server error");
