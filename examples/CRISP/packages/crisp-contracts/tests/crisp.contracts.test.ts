@@ -17,7 +17,7 @@ import {
   encodeSolidityProof,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
-import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers, abiCoder } from './utils'
+import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers } from './utils'
 
 let zkInputsGenerator = ZKInputsGenerator.withDefaults()
 let publicKey = zkInputsGenerator.generatePublicKey()
