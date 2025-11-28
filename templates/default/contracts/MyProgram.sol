@@ -63,7 +63,7 @@ contract MyProgram is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32) {
+    ) external override returns (bytes32) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
