@@ -12,10 +12,7 @@ use crate::server::{
     CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::{
-    dyn_abi::DynSolValue,
-    primitives::{Address, Bytes, U256},
-};
+use alloy::primitives::{Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
 use log::{error, info};
@@ -76,22 +73,18 @@ async fn broadcast_encrypted_vote(
         return HttpResponse::InternalServerError().json("Internal server error");
     }
 
-    let address: Address = vote_request.address.parse().expect("Invalid address");
-
-
     let e3_id = U256::from(vote_request.round_id);
-    let params_value = DynSolValue::Tuple(vec![
-        DynSolValue::Bytes(vote_request.proof),
-        DynSolValue::Array(
-            vote_request.vote
-                .into_iter()
-                .map(|arr| DynSolValue::FixedBytes(arr.into(), 32))
-                .collect(),
-        ),
-        DynSolValue::Address(address),
-    ]);
-
-    let encoded_params = Bytes::from(params_value.abi_encode_params());
+    
+    // encoded_proof is already encoded in JavaScript, just decode from hex
+    let hex_str = vote_request.encoded_proof.strip_prefix("0x").unwrap_or(&vote_request.encoded_proof);
+    let encoded_proof = Bytes::from(
+        hex::decode(hex_str)
+            .map_err(|e| {
+                error!("[e3_id={}] Failed to decode encoded_proof: {:?}", vote_request.round_id, e);
+                e
+            })
+            .expect("Invalid hex encoded proof")
+    );
 
     // Broadcast vote to blockchain
     let contract = match EnclaveContract::new(
@@ -111,7 +104,7 @@ async fn broadcast_encrypted_vote(
         }
     };
 
-    match contract.publish_input(e3_id, encoded_params).await {
+    match contract.publish_input(e3_id, encoded_proof).await {
         Ok(hash) => {
             info!("[e3_id={}] Vote broadcasted successfully", vote_request.round_id);
             HttpResponse::Ok().json(VoteResponse {
