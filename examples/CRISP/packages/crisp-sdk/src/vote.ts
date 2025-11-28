@@ -13,7 +13,7 @@ import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
 import { privateKeyToAccount } from 'viem/accounts'
-import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from "viem/utils"
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
 
 /**
@@ -334,8 +334,5 @@ export const encodeSolidityProof = (proof: ProofData): Hex => {
   const vote = proof.publicInputs.slice(2) as `0x${string}`[]
   const slotAddress = getAddress(numberToHex(BigInt(proof.publicInputs[0]), { size: 20 }))
 
-  return encodeAbiParameters(
-     parseAbiParameters('bytes, bytes32[], address'),
-       [bytesToHex(proof.proof), vote, slotAddress]
-     )
+  return encodeAbiParameters(parseAbiParameters('bytes, bytes32[], address'), [bytesToHex(proof.proof), vote, slotAddress])
 }
