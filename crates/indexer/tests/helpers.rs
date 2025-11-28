@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::Arc;
+
 // helpers.rs
 use alloy::{
     network::Ethereum,
@@ -38,6 +40,23 @@ pub async fn setup_fake_enclave() -> Result<(
     let contract = Enclave::deploy(provider).await?;
     let address = contract.address().to_string();
     Ok((contract, address, endpoint, anvil))
+}
+
+pub async fn setup_two_contracts() -> Result<(
+    EnclaveInstance<impl Provider>,
+    String,
+    EmitLogsInstance<impl Provider>,
+    String,
+    String,
+    AnvilInstance,
+)> {
+    let (provider, endpoint, anvil) = setup_provider().await?;
+    let provider = Arc::new(provider);
+    let contract1 = Enclave::deploy(provider.clone()).await?;
+    let contract2 = EmitLogsInstance::deploy(provider.clone()).await?;
+    let address1 = contract1.address().to_string();
+    let address2 = contract2.address().to_string();
+    Ok((contract1, address1, contract2, address2, endpoint, anvil))
 }
 
 pub async fn setup_provider() -> Result<(impl Provider, String, AnvilInstance)> {

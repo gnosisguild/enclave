@@ -90,22 +90,9 @@ You need to setup your environment variables for `client/` and `server/`. Just c
 `.env.default` as `.env` and overwrite with your values the following variables (you can leave the
 others initialized with the default values).
 
-### Client
+`pnpm dev:setup` already makes a copy of the env files for you.
 
-```bash
-VITE_E3_PROGRAM_ADDRESS=0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1 # Default E3 program address
-```
-
-### Server
-
-```bash
-ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPProgram Contract Address
-```
-
-These address will be displayed after successfully running the `pnpm dev:up` command in a log that
+The addresses will be displayed after successfully running the `pnpm dev:up` command in a log that
 will look like the following:
 
 ```bash
@@ -139,16 +126,6 @@ This will start all CRISP components:
 - Compile all ZK circuits
 - Ciphernodes network
 - CRISP applications (server, client)
-
-Additionally, other specific commands are:
-
-```bash
-# Rebuild crates, compiles contracts and build the client app
-pnpm dev:build
-
-# Invoke the Server CLI
-pnpm cli
-```
 
 Once everything is running, you can:
 

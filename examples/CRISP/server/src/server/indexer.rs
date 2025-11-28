@@ -15,17 +15,15 @@ use crate::server::{
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
+use e3_sdk::indexer::IndexerContext;
 use e3_sdk::{
     bfv_helpers::decode_bytes_to_vec_u64,
     evm_helpers::{
-        contracts::{
-            EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
-        },
+        contracts::{EnclaveRead, EnclaveWrite, ReadWrite},
         events::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
             PlaintextOutputPublished,
         },
-        listener::EventListener,
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
@@ -34,17 +32,17 @@ use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
 use std::error::Error;
-use std::time::Duration;
-use tokio::time::sleep;
+use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 pub async fn register_e3_requested(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
     // E3Requested
     indexer
-        .add_event_handler(move |event: E3Requested, store| {
+        .add_event_handler(move |event: E3Requested, ctx| {
+            let store = ctx.store();
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
 
@@ -182,11 +180,12 @@ pub async fn register_e3_requested(
 }
 
 pub async fn register_e3_activated(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
     // E3Activated
     indexer
-        .add_event_handler(move |event: E3Activated, store| {
+        .add_event_handler(move |event: E3Activated, ctx| {
+            let store = ctx.store();
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             let mut current_round_repo = CurrentRoundRepository::new(store);
@@ -200,70 +199,10 @@ pub async fn register_e3_activated(
                     .set_current_round(CurrentRound { id: e3_id })
                     .await?;
 
-                // Calculate expiration time to sleep until
-                let now = get_current_timestamp_rpc().await?;
-                info!("[e3_id={}] Current time before sleep: {}", e3_id, now);
-                let wait_duration = if expiration > now {
-                    let secs = expiration - now;
-                    info!(
-                        "[e3_id={}] Need to wait {} seconds until expiration",
-                        e3_id, secs
-                    );
-                    Duration::from_secs(secs)
-                } else {
-                    info!("[e3_id={}] Expired E3", e3_id);
-                    Duration::ZERO
-                };
-                if !wait_duration.is_zero() {
-                    sleep(wait_duration).await;
-                }
-                let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
-                repo.update_status("Expired").await?;
-
-                if repo.get_vote_count().await? > 0 {
-                    info!("[e3_id={}] Starting computation for E3", e3_id);
-                    repo.update_status("Computing").await?;
-
-                    let votes = repo.get_ciphertext_inputs().await?;
-
-                    let (id, status) = run_compute(
-                        e3_id,
-                        e3.e3_params,
-                        votes,
-                        format!("{}/state/add-result", CONFIG.enclave_server_url),
-                    )
-                    .await
-                    .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
-
-                    if id != e3_id {
-                        return Err(eyre::eyre!(
-                            "Computation request returned unexpected E3 ID: expected {}, got {}",
-                            e3_id,
-                            id
-                        )
-                        .into());
-                    }
-
-                    if status != "processing" {
-                        return Err(eyre::eyre!(
-                            "Computation request failed with status: {}",
-                            status
-                        )
-                        .into());
-                    }
-
-                    info!("[e3_id={}] Request Computation for E3", e3_id);
-
-                    repo.update_status("PublishingCiphertext").await?;
-                } else {
-                    info!(
-                        "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
-                        e3_id
-                    );
-                    repo.update_status("Finished").await?;
-                }
-                info!("[e3_id={}] E3 request handled successfully.", e3_id);
-
+                info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
+                ctx.do_later(expiration, move |_, ctx| {
+                    handle_e3_input_deadline_expiration(e3_id, ctx.store())
+                });
                 Ok(())
             }
         })
@@ -271,12 +210,65 @@ pub async fn register_e3_activated(
     Ok(indexer)
 }
 
+async fn handle_e3_input_deadline_expiration(
+    e3_id: u64,
+    store: SharedStore<impl DataStore>,
+) -> eyre::Result<()> {
+    let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+    let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
+
+    repo.update_status("Expired").await?;
+
+    if repo.get_vote_count().await? > 0 {
+        info!("[e3_id={}] Starting computation for E3", e3_id);
+        repo.update_status("Computing").await?;
+
+        let votes = repo.get_ciphertext_inputs().await?;
+
+        let (id, status) = run_compute(
+            e3_id,
+            e3.e3_params,
+            votes,
+            format!("{}/state/add-result", CONFIG.enclave_server_url),
+        )
+        .await
+        .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+
+        if id != e3_id {
+            return Err(eyre::eyre!(
+                "Computation request returned unexpected E3 ID: expected {}, got {}",
+                e3_id,
+                id
+            )
+            .into());
+        }
+
+        if status != "processing" {
+            return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+        }
+
+        info!("[e3_id={}] Request Computation for E3", e3_id);
+
+        repo.update_status("PublishingCiphertext").await?;
+    } else {
+        info!(
+            "[e3_id={}] E3 has no votes to decrypt. Setting status to Finished.",
+            e3_id
+        );
+        repo.update_status("Finished").await?;
+    }
+    info!("[e3_id={}] E3 request handled successfully.", e3_id);
+
+    Ok(())
+}
+
 pub async fn register_ciphertext_output_published(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
     // CiphertextOutputPublished
     indexer
-        .add_event_handler(move |event: CiphertextOutputPublished, store| {
+        .add_event_handler(move |event: CiphertextOutputPublished, ctx| {
+            let store = ctx.store();
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
@@ -290,11 +282,12 @@ pub async fn register_ciphertext_output_published(
 }
 
 pub async fn register_plaintext_output_published(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
     // PlaintextOutputPublished
     indexer
-        .add_event_handler(move |event: PlaintextOutputPublished, store| {
+        .add_event_handler(move |event: PlaintextOutputPublished, ctx| {
+            let store = ctx.store();
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
@@ -332,14 +325,13 @@ pub async fn register_plaintext_output_published(
 }
 
 pub async fn register_committee_published(
-    mut listener: EventListener,
-    contract: EnclaveContract<ReadWrite>,
-) -> Result<EventListener> {
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
     // CommitteePublished
-    listener
-        .add_event_handler(move |event: CommitteePublished| {
-            let contract = contract.clone();
+    indexer
+        .add_event_handler(move |event: CommitteePublished, ctx| {
             async move {
+                let contract = ctx.contract();
                 // We need to do this to ensure this is idempotent.
                 // TODO: conserve bandwidth and check for E3AlreadyActivated error instead of
                 // making two calls to contract
@@ -357,36 +349,30 @@ pub async fn register_committee_published(
                 let now = get_current_timestamp_rpc().await?;
                 info!("[e3_id={}] Current time: {}", event.e3Id, now);
 
-                // Calculate wait duration
-                let wait_duration = if start_time > now {
-                    let secs = start_time - now;
-                    info!(
-                        "[e3_id={}] Need to wait {} seconds until activation",
-                        event.e3Id, secs
-                    );
-                    Duration::from_secs(secs)
-                } else {
-                    info!("[e3_id={}] Activating E3", event.e3Id);
-                    Duration::ZERO
-                };
-                info!("[e3_id={}] Wait duration: {:?}", event.e3Id, wait_duration);
+                let later_event = event.clone();
+                ctx.do_later(start_time, move |_, ctx| {
+                    let event = later_event.clone();
+                    handle_committee_time_expired(event, ctx)
+                });
 
-                // Sleep until start time
-                if !wait_duration.is_zero() {
-                    sleep(wait_duration).await;
-                }
-
-                // If not activated activate
-                let tx = contract.activate(event.e3Id, event.publicKey).await?;
-                info!(
-                    "[e3_id={}] E3 activated with tx: {:?}",
-                    event.e3Id, tx.transaction_hash
-                );
                 Ok(())
             }
         })
         .await;
-    Ok(listener)
+    Ok(indexer)
+}
+
+async fn handle_committee_time_expired(
+    event: CommitteePublished,
+    ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
+) -> eyre::Result<()> {
+    // If not activated activate
+    let tx = ctx.contract().activate(event.e3Id, event.publicKey).await?;
+    info!(
+        "[e3_id={}] E3 activated with tx: {:?}",
+        event.e3Id, tx.transaction_hash
+    );
+    Ok(())
 }
 
 pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
@@ -400,13 +386,12 @@ pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
 }
 
 pub async fn register_input_published(
-    mut listener: EventListener,
-    store: SharedStore<impl DataStore>
-) -> Result<EventListener> {
-    listener
-        .add_event_handler(move |event: InputPublished| {
-
+    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
+) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
+    indexer
+        .add_event_handler(move |event: InputPublished, ctx| {
             let e3_id = event.e3Id.to::<u64>();
+            let store = ctx.store();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             async move {
                 println!(
@@ -422,45 +407,35 @@ pub async fn register_input_published(
             }
         })
         .await;
-    Ok(listener)
+    Ok(indexer)
 }
 
 pub async fn start_indexer(
-    ws_url: &str,
+    url: &str,
     contract_address: &str,
     registry_address: &str,
     crisp_address: &str,
     store: SharedStore<impl DataStore>,
     private_key: &str,
 ) -> Result<()> {
-    let readonly_contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+    info!("CRISP: Creating indexer...");
+    let crisp_indexer = EnclaveIndexer::new_with_write_contract(
+        url,
+        &[contract_address, registry_address, crisp_address],
+        store,
+        private_key,
+    )
+    .await?;
+    info!("CRISP: Indexer registering handlers...");
 
-    let readwrite_contract =
-        EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?;
-
-    let enclave_contract_listener =
-        EventListener::create_contract_listener(ws_url, contract_address).await?;
-
-    // CRISP indexer
-    let crisp_indexer =
-        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store.clone()).await?;
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
-    crisp_indexer.start();
-
-    // Registry Listener
-    let registry_contract_listener =
-        EventListener::create_contract_listener(&ws_url, registry_address).await?;
-    let registry_listener =
-        register_committee_published(registry_contract_listener, readwrite_contract.clone()).await?;
-    registry_listener.start();
-
-    // CRISP Listener
-    let crisp_contract_listener = EventListener::create_contract_listener(ws_url, crisp_address).await?;
-    let crisp_listener = register_input_published(crisp_contract_listener, store).await?;
-    crisp_listener.start();
-
+    let crisp_indexer = register_committee_published(crisp_indexer).await?;
+    let crisp_indexer = register_input_published(crisp_indexer).await?;
+    info!("CRISP: Indexer finished registering handlers!");
+    crisp_indexer.listen().await?;
+    info!("CRISP: Indexer listen loop has finished!");
     Ok(())
 }

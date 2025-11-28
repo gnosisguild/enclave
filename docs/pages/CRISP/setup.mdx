@@ -128,50 +128,29 @@ the script again (they must match).
 The fastest way to get CRISP running is using the scripts provided in the `scripts/` directory:
 
 ```bash
-# Install dependencies
-pnpm install
-
 # Setup and build the development environment
 pnpm dev:setup
 
-# Start all services (Anvil, Ciphernodes, Applications)
+# Start all services (Hardhat, Ciphernodes, Applications)
 pnpm dev:up
-
-# Clean up all artifacts and generated output (e.g., builds)
-# This must be run from enclave root (do cd ../../ if you are inside examples/CRISP)
-pnpm clean
 ```
 
 This will start all CRISP components:
 
-- Anvil (local blockchain)
+- Hardhat (local blockchain)
 - Deploy all contracts
 - Compile all ZK circuits
 - Ciphernodes network
 - CRISP applications (server, client)
 
-```bash
-# Build the development containers
-pnpm dev:setup
-
-# Start all services
-pnpm dev:up
-
-# Rebuild containers
-pnpm dev:build
-
-# Invoke the Server CLI
-pnpm cli
-```
-
 Once everything is running, you can:
 
 1. Navigate `http://localhost:3000` for the client interface
-2. Add the Anvil private key to your wallet:
+2. Add the Hardhat private key to your wallet:
    `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
 3. Press `Connect Wallet` button and complete the association with your MetaMask account
-4. Switch to `Anvil` local network (this will be handled automatically by the app. You just need to
-   press on the connected account on the frontend and select the network. Then, complete the
+4. Switch to `Hardhat` local network (this will be handled automatically by the app. You just need
+   to press on the connected account on the frontend and select the network. Then, complete the
    configuration on MetaMask pop-up).
 5. Open a new terminal, run `pnpm cli` and start a new E3 Round.
 6. Refresh and interact with the round following the Client interface.
