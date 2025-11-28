@@ -9,6 +9,7 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "proseWrap": "always",
+  "plugins": ["prettier-plugin-solidity"],
   "overrides": [
     {
       "files": ["*.mdx", "*.md"],
