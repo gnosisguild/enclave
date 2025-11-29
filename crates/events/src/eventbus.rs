@@ -19,17 +19,22 @@ use tracing::info;
 /// Trait that must be implemented by events used with EventBus
 pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
     type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
+
+    /// Payload for the Event
+    type Data;
+
     fn event_type(&self) -> String;
     fn event_id(&self) -> Self::Id;
+    fn get_data(&self) -> &Self::Data;
+    fn into_data(self) -> Self::Data;
 }
 
 /// Trait for events that contain an error
 pub trait ErrorEvent: Event {
-    type Error: Clone;
-    type ErrorType;
+    /// Error type associated with this event
+    type ErrType;
 
-    fn as_error(&self) -> Option<&Self::Error>;
-    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self;
+    fn from_error(err_type: Self::ErrType, error: impl Into<String>) -> Self;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -89,11 +94,14 @@ impl<E: Event> EventBus<E> {
         source.do_send(Subscribe::new("*", addr.clone().recipient()));
         addr
     }
+
     pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
         source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
         addr
     }
+
+    // pub fn manager<M>(source: Addr<EventBus<E>>) -> M {}
 
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
         source.do_send(Subscribe::new("*", dest.clone().recipient()))
@@ -295,7 +303,7 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
 }
 
 #[derive(Message)]
-#[rtype(result = "Vec<E::Error>")]
+#[rtype(result = "Vec<E::Data>")]
 pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
 
 impl<E: ErrorEvent> GetErrors<E> {
@@ -310,18 +318,18 @@ impl<E: ErrorEvent> GetErrors<E> {
 
 /// Trait to send errors directly to the bus
 pub trait BusError<E: ErrorEvent> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error);
+    fn err(&self, err_type: E::ErrType, err: anyhow::Error);
 }
 
 impl<E: ErrorEvent> BusError<E> for Addr<EventBus<E>> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, err))
+    fn err(&self, err_type: E::ErrType, err: anyhow::Error) {
+        self.do_send(E::from_error(err_type, &err.to_string()))
     }
 }
 
 impl<E: ErrorEvent> BusError<E> for Recipient<E> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, err))
+    fn err(&self, err_type: E::ErrType, err: anyhow::Error) {
+        self.do_send(E::from_error(err_type, &err.to_string()))
     }
 }
 

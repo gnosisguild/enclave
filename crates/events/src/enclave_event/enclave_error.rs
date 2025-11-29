@@ -9,8 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 pub trait FromError {
-    type Error;
-    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
+    fn from_error(err_type: EnclaveErrorType, error: impl Into<String>) -> Self;
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -39,20 +38,19 @@ pub enum EnclaveErrorType {
 }
 
 impl EnclaveError {
-    pub fn new(err_type: EnclaveErrorType, message: &str) -> Self {
+    pub fn new(err_type: EnclaveErrorType, message: impl Into<String>) -> Self {
         Self {
             err_type,
-            message: message.to_string(),
+            message: message.into(),
         }
     }
 }
 
 impl FromError for EnclaveError {
-    type Error = anyhow::Error;
-    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
+    fn from_error(err_type: EnclaveErrorType, error: impl Into<String>) -> Self {
         Self {
             err_type,
-            message: error.to_string(),
+            message: error.into(),
         }
     }
 }

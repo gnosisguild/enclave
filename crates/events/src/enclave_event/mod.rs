@@ -61,7 +61,7 @@ pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
-use crate::{E3id, ErrorEvent, Event, EventId};
+use crate::{E3id, ErrorEvent, ErrorFactory, Event, EventFactory, EventId};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -136,6 +136,9 @@ impl EnclaveEvent {
 
 impl Event for EnclaveEvent {
     type Id = EventId;
+    type Data = EnclaveEventData;
+    // type FromError = anyhow::Error;
+    // type ErrType = EnclaveErrorType;
 
     fn event_type(&self) -> String {
         let name: &'static str = (&self.payload).into();
@@ -145,20 +148,25 @@ impl Event for EnclaveEvent {
     fn event_id(&self) -> Self::Id {
         self.get_id()
     }
+
+    fn get_data(&self) -> &EnclaveEventData {
+        &self.payload
+    }
+    fn into_data(self) -> EnclaveEventData {
+        self.payload
+    }
 }
 
 impl ErrorEvent for EnclaveEvent {
-    type Error = EnclaveError;
-    type ErrorType = EnclaveErrorType;
-    fn as_error(&self) -> Option<&Self::Error> {
-        match self.payload {
-            EnclaveEventData::EnclaveError(ref data) => Some(data),
-            _ => None,
-        }
-    }
+    type ErrType = EnclaveErrorType;
 
-    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self {
-        EventFactory::new().create_err(err_type, error)
+    fn from_error(err_type: Self::ErrType, msg: impl Into<String>) -> Self {
+        let payload = EnclaveError::new(err_type, msg);
+        let id = EventId::hash(&payload);
+        EnclaveEvent {
+            payload: payload.into(),
+            id,
+        }
     }
 }
 
@@ -188,12 +196,6 @@ impl EnclaveEvent {
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
-    }
-    pub fn get_data(&self) -> &EnclaveEventData {
-        &self.payload
-    }
-    pub fn into_data(self) -> EnclaveEventData {
-        self.payload
     }
 }
 
@@ -226,16 +228,6 @@ impl_into_event_data!(
     ThresholdShareCreated
 );
 
-impl FromError for EnclaveEvent {
-    type Error = anyhow::Error;
-    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
-        // Errors will always be local - we can get away here with just making an instance of the
-        // factory using the defautl hlc until we remove all instances of this and just use factory
-        // methods. We should avoid creating a factory to create an event however.
-        EventFactory::new().create_err(err_type, error)
-    }
-}
-
 impl TryFrom<&EnclaveEvent> for EnclaveError {
     type Error = anyhow::Error;
     fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
@@ -261,34 +253,34 @@ impl fmt::Display for EnclaveEvent {
 }
 
 #[derive(Clone)]
-pub struct EventFactory {
+pub struct EnclaveEventFactory {
     // TODO: hlc: Arc<Hlc>,
 }
 
-impl EventFactory {
+impl EnclaveEventFactory {
     pub fn new() -> Self {
         Self {}
     }
+}
 
-    pub fn create_local(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent {
+impl EventFactory<EnclaveEvent> for EnclaveEventFactory {
+    fn create_local(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent {
         let payload = data.into();
         let id = EventId::hash(&payload);
         // hcl.tick(); NOTE: we may need to handle the error from hlc here and add try_create_local
         EnclaveEvent { id, payload }
     }
 
-    pub fn create_remote(
-        &self,
-        data: impl Into<EnclaveEventData>,
-        _remote_ts: u128,
-    ) -> EnclaveEvent {
+    fn create_receive(&self, data: impl Into<EnclaveEventData>, _remote_ts: u128) -> EnclaveEvent {
         let payload = data.into();
         let id = EventId::hash(&payload);
         // hcl.receive(remote_ts)?;
         EnclaveEvent { id, payload }
     }
+}
 
-    pub fn create_err(&self, err_type: EnclaveErrorType, error: anyhow::Error) -> EnclaveEvent {
+impl ErrorFactory<EnclaveEvent> for EnclaveEventFactory {
+    fn create_err(&self, err_type: EnclaveErrorType, error: impl Into<String>) -> EnclaveEvent {
         let payload = EnclaveError::from_error(err_type, error);
         self.create_local(payload)
     }

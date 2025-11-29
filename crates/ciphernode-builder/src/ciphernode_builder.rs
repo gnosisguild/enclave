@@ -16,7 +16,9 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{
+    EnclaveEvent, EnclaveEventDispatcher, EnclaveEventFactory, EventBus, EventBusConfig,
+};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -281,6 +283,10 @@ impl CiphernodeBuilder {
             // Nothing specified
             None => Self::create_local_bus(),
         };
+
+        // Setup an event dispatcher
+        let dispatcher =
+            EnclaveEventDispatcher::new(local_bus, Arc::new(EnclaveEventFactory::new()));
 
         // History collector for taking historical events for analysis and testing
         let history = if self.testmode_history {
