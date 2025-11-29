@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -165,7 +165,7 @@ pub struct Hlc {
     /// Maximum drift amount
     max_drift: u64,
     /// An injectable function to pass in a system clock for testing
-    clock: Option<fn() -> u64>,
+    clock: Option<Arc<dyn Fn() -> u64 + Send + Sync>>,
 }
 
 struct HlcInner {
@@ -199,8 +199,11 @@ impl Hlc {
         self
     }
 
-    pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
-        self.clock = Some(clock);
+    pub fn with_clock<F>(mut self, clock: F) -> Self
+    where
+        F: Send + Sync + 'static + Fn() -> u64,
+    {
+        self.clock = Some(Arc::new(clock));
         self
     }
 
@@ -219,7 +222,7 @@ impl Hlc {
 
     fn now_physical(&self) -> Result<u64, HlcError> {
         match self.clock {
-            Some(f) => Ok(f()),
+            Some(ref f) => Ok(f()),
             None => Hlc::system_now(),
         }
     }
@@ -333,174 +336,213 @@ mod tests {
 
     proptest! {
 
-        #[test]
-        fn roundtrip(ts in arb_timestamp()) {
-            let packed = ts.pack();
-            let unpacked = HlcTimestamp::unpack(packed);
-            prop_assert_eq!(ts, unpacked);
-        }
+          #[test]
+          fn roundtrip(ts in arb_timestamp()) {
+              let packed = ts.pack();
+              let unpacked = HlcTimestamp::unpack(packed);
+              prop_assert_eq!(ts, unpacked);
+          }
 
-        #[test]
-        fn roundtrip_slice(ts in arb_timestamp()) {
-            let packed = ts.pack();
-            let unpacked = HlcTimestamp::unpack_slice(&packed).unwrap();
-            prop_assert_eq!(ts, unpacked);
-        }
+          #[test]
+          fn roundtrip_slice(ts in arb_timestamp()) {
+              let packed = ts.pack();
+              let unpacked = HlcTimestamp::unpack_slice(&packed).unwrap();
+              prop_assert_eq!(ts, unpacked);
+          }
 
-        #[test]
-        fn unpack_rejects_wrong_length(bytes in prop::collection::vec(any::<u8>(), 0..100)) {
-            if bytes.len() != 16 {
-                prop_assert!(HlcTimestamp::unpack_slice(&bytes).is_err());
-            }
-        }
-
-
-        #[test]
-        fn ordering_total(a in arb_timestamp(), b in arb_timestamp()) {
-            let lt = a < b;
-            let eq = a == b;
-            let gt = a > b;
-            prop_assert_eq!(
-                (lt as u8) + (eq as u8) + (gt as u8),
-                1,
-                "exactly one ordering relation must hold"
-            );
-        }
-
-        #[test]
-        fn ordering_antisymmetric(a in arb_timestamp(), b in arb_timestamp()) {
-            if a < b {
-                prop_assert!(!(b < a));
-            }
-            if a > b {
-                prop_assert!(!(b > a));
-            }
-        }
-
-        #[test]
-        fn ordering_transitive(a in arb_timestamp(), b in arb_timestamp(), c in arb_timestamp()) {
-            if a < b && b < c {
-                prop_assert!(a < c);
-            }
-            if a > b && b > c {
-                prop_assert!(a > c);
-            }
-        }
-
-        #[test]
-        fn ordering_reflexive(a in arb_timestamp()) {
-            prop_assert!(a == a);
-            prop_assert!(a <= a);
-            prop_assert!(a >= a);
-        }
-
-        #[test]
-        fn packed_ordering_matches(a in arb_timestamp(), b in arb_timestamp()) {
-            let packed_a = a.pack();
-            let packed_b = b.pack();
-            prop_assert_eq!(a.cmp(&b), packed_a.cmp(&packed_b));
-        }
+          #[test]
+          fn unpack_rejects_wrong_length(bytes in prop::collection::vec(any::<u8>(), 0..100)) {
+              if bytes.len() != 16 {
+                  prop_assert!(HlcTimestamp::unpack_slice(&bytes).is_err());
+              }
+          }
 
 
-        #[test]
-        fn tick_monotonic(ts in arb_reasonable_timestamp()) {
-            let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
-            let before = hlc.get();
-            let after = hlc.tick().unwrap();
-            prop_assert!(after > before, "tick must produce greater timestamp");
-        }
+          #[test]
+          fn ordering_total(a in arb_timestamp(), b in arb_timestamp()) {
+              let lt = a < b;
+              let eq = a == b;
+              let gt = a > b;
+              prop_assert_eq!(
+                  (lt as u8) + (eq as u8) + (gt as u8),
+                  1,
+                  "exactly one ordering relation must hold"
+              );
+          }
 
-        #[test]
-        fn sequential_ticks_increase(ts in arb_reasonable_timestamp(), n in 1usize..100) {
-            let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
-            let mut prev = hlc.tick().unwrap();
-            for _ in 0..n {
-                let next = hlc.tick().unwrap();
-                prop_assert!(next > prev, "sequential ticks must increase");
-                prev = next;
-            }
-        }
+          #[test]
+          fn ordering_antisymmetric(a in arb_timestamp(), b in arb_timestamp()) {
+              if a < b {
+                  prop_assert!(!(b < a));
+              }
+              if a > b {
+                  prop_assert!(!(b > a));
+              }
+          }
 
-        #[test]
-        fn tick_preserves_node(ts in arb_reasonable_timestamp()) {
-            let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
-            let after = hlc.tick().unwrap();
-            prop_assert_eq!(after.node, ts.node);
-        }
+          #[test]
+          fn ordering_transitive(a in arb_timestamp(), b in arb_timestamp(), c in arb_timestamp()) {
+              if a < b && b < c {
+                  prop_assert!(a < c);
+              }
+              if a > b && b > c {
+                  prop_assert!(a > c);
+              }
+          }
+
+          #[test]
+          fn ordering_reflexive(a in arb_timestamp()) {
+              prop_assert!(a == a);
+              prop_assert!(a <= a);
+              prop_assert!(a >= a);
+          }
+
+          #[test]
+          fn packed_ordering_matches(a in arb_timestamp(), b in arb_timestamp()) {
+              let packed_a = a.pack();
+              let packed_b = b.pack();
+              prop_assert_eq!(a.cmp(&b), packed_a.cmp(&packed_b));
+          }
 
 
-        #[test]
-        fn receive_advances_past_local(
-            local in arb_reasonable_timestamp(),
-            remote in arb_reasonable_timestamp()
-        ) {
-            let hlc = Hlc::with_state(local.ts, local.counter, local.node)
-                .with_max_drift(u64::MAX);
-            let before = hlc.get();
-            let after = hlc.receive(&remote).unwrap();
-            prop_assert!(after > before, "receive must advance past local");
-        }
+          #[test]
+          fn tick_monotonic(ts in arb_reasonable_timestamp()) {
+              let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
+              let before = hlc.get();
+              let after = hlc.tick().unwrap();
+              prop_assert!(after > before, "tick must produce greater timestamp");
+          }
 
-        #[test]
-        fn receive_advances_past_remote(
-            local in arb_reasonable_timestamp(),
-            remote in arb_reasonable_timestamp()
-        ) {
-            let hlc = Hlc::with_state(local.ts, local.counter, local.node)
-                .with_max_drift(u64::MAX);
-            let after = hlc.receive(&remote).unwrap();
-            prop_assert!(after > remote, "receive must advance past remote");
-        }
+          #[test]
+          fn sequential_ticks_increase(ts in arb_reasonable_timestamp(), n in 1usize..100) {
+              let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
+              let mut prev = hlc.tick().unwrap();
+              for _ in 0..n {
+                  let next = hlc.tick().unwrap();
+                  prop_assert!(next > prev, "sequential ticks must increase");
+                  prev = next;
+              }
+          }
 
-        #[test]
-        fn receive_preserves_node(
-            local in arb_reasonable_timestamp(),
-            remote in arb_reasonable_timestamp()
-        ) {
-            let hlc = Hlc::with_state(local.ts, local.counter, local.node)
-                .with_max_drift(u64::MAX);
-            let after = hlc.receive(&remote).unwrap();
-            prop_assert_eq!(after.node, local.node);
-        }
+          #[test]
+          fn tick_preserves_node(ts in arb_reasonable_timestamp()) {
+              let hlc = Hlc::with_state(ts.ts, ts.counter, ts.node);
+              let after = hlc.tick().unwrap();
+              prop_assert_eq!(after.node, ts.node);
+          }
 
-        #[test]
-        fn receive_never_regresses_ts(
-            local in arb_reasonable_timestamp(),
-            remote in arb_reasonable_timestamp()
-        ) {
-            let hlc = Hlc::with_state(local.ts, local.counter, local.node)
-                .with_max_drift(u64::MAX);
-            let before_ts = hlc.get().ts;
-            let after = hlc.receive(&remote).unwrap();
-            prop_assert!(after.ts >= before_ts, "receive must not regress timestamp");
-        }
 
-        #[test]
-        fn receive_rejects_excessive_drift(node in any::<u32>(), drift in 1u64..1_000_000) {
-            let max_drift = 60_000_000u64; // 60 seconds
-            let hlc = Hlc::new(node).with_max_drift(max_drift);
-            let now = Hlc::system_now().unwrap();
+          #[test]
+          fn receive_advances_past_local(
+              local in arb_reasonable_timestamp(),
+              remote in arb_reasonable_timestamp()
+          ) {
+              let hlc = Hlc::with_state(local.ts, local.counter, local.node)
+                  .with_max_drift(u64::MAX);
+              let before = hlc.get();
+              let after = hlc.receive(&remote).unwrap();
+              prop_assert!(after > before, "receive must advance past local");
+          }
 
-            let future_remote = HlcTimestamp::new(now + max_drift + drift, 0, node + 1);
-            let result = hlc.receive(&future_remote);
+          #[test]
+          fn receive_advances_past_remote(
+              local in arb_reasonable_timestamp(),
+              remote in arb_reasonable_timestamp()
+          ) {
+              let hlc = Hlc::with_state(local.ts, local.counter, local.node)
+                  .with_max_drift(u64::MAX);
+              let after = hlc.receive(&remote).unwrap();
+              prop_assert!(after > remote, "receive must advance past remote");
+          }
 
-            prop_assert!(
-                matches!(result, Err(HlcError::DriftExceeded { .. })),
-                "should reject timestamp too far in future"
-            );
-        }
+          #[test]
+          fn receive_preserves_node(
+              local in arb_reasonable_timestamp(),
+              remote in arb_reasonable_timestamp()
+          ) {
+              let hlc = Hlc::with_state(local.ts, local.counter, local.node)
+                  .with_max_drift(u64::MAX);
+              let after = hlc.receive(&remote).unwrap();
+              prop_assert_eq!(after.node, local.node);
+          }
 
-        #[test]
-        fn receive_accepts_within_drift(node in any::<u32>(), offset in 0u64..60_000_000) {
-            let max_drift = 60_000_000u64;
-            let hlc = Hlc::new(node).with_max_drift(max_drift);
-            let now = Hlc::system_now().unwrap();
+          #[test]
+          fn receive_never_regresses_ts(
+              local in arb_reasonable_timestamp(),
+              remote in arb_reasonable_timestamp()
+          ) {
+              let hlc = Hlc::with_state(local.ts, local.counter, local.node)
+                  .with_max_drift(u64::MAX);
+              let before_ts = hlc.get().ts;
+              let after = hlc.receive(&remote).unwrap();
+              prop_assert!(after.ts >= before_ts, "receive must not regress timestamp");
+          }
 
-            let remote = HlcTimestamp::new(now + offset, 0, node + 1);
-            let result = hlc.receive(&remote);
+          #[test]
+          fn receive_rejects_excessive_drift(node in any::<u32>(), drift in 1u64..1_000_000) {
+              let max_drift = 60_000_000u64; // 60 seconds
+              let hlc = Hlc::new(node).with_max_drift(max_drift);
+              let now = Hlc::system_now().unwrap();
 
-            prop_assert!(result.is_ok(), "should accept timestamp within drift");
-        }
+              let future_remote = HlcTimestamp::new(now + max_drift + drift, 0, node + 1);
+              let result = hlc.receive(&future_remote);
+
+              prop_assert!(
+                  matches!(result, Err(HlcError::DriftExceeded { .. })),
+                  "should reject timestamp too far in future"
+              );
+          }
+
+          #[test]
+          fn receive_accepts_within_drift(node in any::<u32>(), offset in 0u64..60_000_000) {
+              let max_drift = 60_000_000u64;
+              let hlc = Hlc::new(node).with_max_drift(max_drift);
+              let now = Hlc::system_now().unwrap();
+
+              let remote = HlcTimestamp::new(now + offset, 0, node + 1);
+              let result = hlc.receive(&remote);
+
+              prop_assert!(result.is_ok(), "should accept timestamp within drift");
+          }
+
+
+
+
+
+    #[test]
+      fn test_receive_when_now_is_max_should_not_advance_timestamp_prop(
+          local_ts in 0u64..1_000_000_000,
+          local_counter in any::<u32>(),
+          remote_ts in 0u64..1_000_000_000,
+          remote_counter in any::<u32>(),
+          local_node in any::<u32>(),
+          remote_node in any::<u32>(),
+      ) {
+          // Ensure `now` is strictly greater than both local_ts and remote_ts
+          let now = local_ts.max(remote_ts).saturating_add(1);
+
+          let hlc = Hlc::with_state(local_ts, local_counter, local_node)
+              .with_clock(move || now);
+
+          let remote = HlcTimestamp {
+              ts: remote_ts,
+              counter: remote_counter,
+              node: remote_node,
+          };
+
+          let result = hlc.receive(&remote).unwrap();
+
+          // When physical time is the max, the HLC should use `now` as the timestamp
+          // with counter reset to 0 - it should NOT advance beyond `now`
+          prop_assert_eq!(
+              result.ts, now,
+              "timestamp should equal physical time, not physical time + 1"
+          );
+          prop_assert_eq!(
+              result.counter, 0,
+              "counter should reset to 0 when physical time advances"
+          );
+      }
     }
 
     #[test]
@@ -693,31 +735,6 @@ mod tests {
             all_timestamps.len(),
             unique.len(),
             "all timestamps must be unique under mixed operations"
-        );
-    }
-
-    #[test]
-    fn test_receive_when_now_is_max_should_not_advance_timestamp() {
-        // Set up: physical time (1000) is greater than both local (500) and remote (600)
-        let hlc = Hlc::with_state(500, 5, 1).with_clock(|| 1000);
-
-        let remote = HlcTimestamp {
-            ts: 600,
-            counter: 10,
-            node: 2,
-        };
-
-        let result = hlc.receive(&remote).unwrap();
-
-        // When physical time is the max, the HLC should use `now` as the timestamp
-        // with counter reset to 0 - it should NOT advance to now + 1
-        assert_eq!(
-            result.ts, 1000,
-            "timestamp should be physical time, not physical time + 1"
-        );
-        assert_eq!(
-            result.counter, 0,
-            "counter should reset to 0 when physical time advances"
         );
     }
 }
