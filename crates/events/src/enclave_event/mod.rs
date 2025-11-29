@@ -69,17 +69,13 @@ use std::{
     hash::Hash,
 };
 
-/// Macro to help define From traits for EnclaveEvent
-macro_rules! impl_from_event {
+/// Macro to help define From traits for EnclaveEventData
+macro_rules! impl_into_event_data {
     ($($variant:ident),*) => {
         $(
-            impl From<$variant> for EnclaveEvent {
-                fn from(data: $variant) -> Self {
-                    let id = EventId::hash(&data);
-                    EnclaveEvent {
-                        payload: EnclaveEventData::$variant(data),
-                        id
-                    }
+            impl Into<EnclaveEventData> for $variant {
+                fn into(self) -> EnclaveEventData {
+                    EnclaveEventData::$variant(self)
                 }
             }
         )*
@@ -162,7 +158,7 @@ impl ErrorEvent for EnclaveEvent {
     }
 
     fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self {
-        EnclaveEvent::from(EnclaveError::new(err_type, error.to_string().as_str()))
+        EventFactory::new().create_err(err_type, error)
     }
 }
 
@@ -201,7 +197,7 @@ impl EnclaveEvent {
     }
 }
 
-impl_from_event!(
+impl_into_event_data!(
     KeyshareCreated,
     E3Requested,
     PublicKeyAggregated,
@@ -233,8 +229,10 @@ impl_from_event!(
 impl FromError for EnclaveEvent {
     type Error = anyhow::Error;
     fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
-        let error_event = EnclaveError::from_error(err_type, error);
-        EnclaveEvent::from(error_event)
+        // Errors will always be local - we can get away here with just making an instance of the
+        // factory using the defautl hlc until we remove all instances of this and just use factory
+        // methods. We should avoid creating a factory to create an event however.
+        EventFactory::new().create_err(err_type, error)
     }
 }
 
@@ -259,5 +257,39 @@ impl TryFrom<EnclaveEvent> for EnclaveError {
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{:?}", self))
+    }
+}
+
+#[derive(Clone)]
+pub struct EventFactory {
+    // TODO: hlc: Arc<Hlc>,
+}
+
+impl EventFactory {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn create_local(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent {
+        let payload = data.into();
+        let id = EventId::hash(&payload);
+        // hcl.tick(); NOTE: we may need to handle the error from hlc here and add try_create_local
+        EnclaveEvent { id, payload }
+    }
+
+    pub fn create_remote(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        _remote_ts: u128,
+    ) -> EnclaveEvent {
+        let payload = data.into();
+        let id = EventId::hash(&payload);
+        // hcl.receive(remote_ts)?;
+        EnclaveEvent { id, payload }
+    }
+
+    pub fn create_err(&self, err_type: EnclaveErrorType, error: anyhow::Error) -> EnclaveEvent {
+        let payload = EnclaveError::from_error(err_type, error);
+        self.create_local(payload)
     }
 }

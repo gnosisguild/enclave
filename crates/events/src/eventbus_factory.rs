@@ -60,7 +60,7 @@ impl EventBusFactory {
 
         event_bus
     }
-    pub fn get_error_collector<E: ErrorEvent>(&self) -> Addr<HistoryCollector<E>> {
+    pub fn get_error_collector<E: Event>(&self) -> Addr<HistoryCollector<E>> {
         let type_id = TypeId::of::<E>();
         let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
 
