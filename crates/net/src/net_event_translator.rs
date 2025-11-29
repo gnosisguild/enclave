@@ -16,6 +16,7 @@ use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::EnclaveEventData;
+use e3_events::Event;
 use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;

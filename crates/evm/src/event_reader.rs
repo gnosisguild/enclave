@@ -14,6 +14,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
+use e3_events::Event;
 use e3_events::{
     BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventId, Subscribe,
 };

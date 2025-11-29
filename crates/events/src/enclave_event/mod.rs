@@ -54,6 +54,7 @@ pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
+use strum::IntoStaticStr;
 pub use test_event::*;
 pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
@@ -85,7 +86,7 @@ macro_rules! impl_from_event {
     };
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, IntoStaticStr, Serialize, Deserialize)]
 pub enum EnclaveEventData {
     KeyshareCreated(KeyshareCreated),
     E3Requested(E3Requested),
@@ -141,8 +142,8 @@ impl Event for EnclaveEvent {
     type Id = EventId;
 
     fn event_type(&self) -> String {
-        let s = format!("{:?}", self);
-        extract_enclave_event_name(&s).to_string()
+        let name: &'static str = (&self.payload).into();
+        name.to_string()
     }
 
     fn event_id(&self) -> Self::Id {
@@ -258,22 +259,5 @@ impl TryFrom<EnclaveEvent> for EnclaveError {
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{:?}", self))
-    }
-}
-
-fn extract_enclave_event_name(s: &str) -> &str {
-    let bytes = s.as_bytes();
-    for (i, &item) in bytes.iter().enumerate() {
-        if item == b' ' || item == b'(' {
-            return &s[..i];
-        }
-    }
-    s
-}
-
-impl EnclaveEvent {
-    pub fn event_type(&self) -> String {
-        let s = format!("{:?}", self);
-        extract_enclave_event_name(&s).to_string()
     }
 }
