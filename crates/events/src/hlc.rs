@@ -272,15 +272,24 @@ impl Hlc {
         let mut inner = self.inner.lock().unwrap();
         let max_ts = inner.ts.max(remote.ts).max(now);
 
+        // When physical time is the max, just reset counter to 0
+        if max_ts == now && max_ts != inner.ts && max_ts != remote.ts {
+            inner.ts = now;
+            inner.counter = 0;
+            return Ok(HlcTimestamp {
+                ts: inner.ts,
+                counter: inner.counter,
+                node: self.node,
+            });
+        }
+
         let new_counter = if max_ts == inner.ts && max_ts == remote.ts {
             inner.counter.max(remote.counter)
         } else if max_ts == inner.ts {
             inner.counter
-        } else if max_ts == remote.ts {
-            remote.counter
         } else {
-            // now is max; set to MAX so the +1 below wraps to 0
-            u32::MAX
+            // max_ts == remote.ts
+            remote.counter
         };
 
         // Increment counter, handling overflow
@@ -684,6 +693,31 @@ mod tests {
             all_timestamps.len(),
             unique.len(),
             "all timestamps must be unique under mixed operations"
+        );
+    }
+
+    #[test]
+    fn test_receive_when_now_is_max_should_not_advance_timestamp() {
+        // Set up: physical time (1000) is greater than both local (500) and remote (600)
+        let hlc = Hlc::with_state(500, 5, 1).with_clock(|| 1000);
+
+        let remote = HlcTimestamp {
+            ts: 600,
+            counter: 10,
+            node: 2,
+        };
+
+        let result = hlc.receive(&remote).unwrap();
+
+        // When physical time is the max, the HLC should use `now` as the timestamp
+        // with counter reset to 0 - it should NOT advance to now + 1
+        assert_eq!(
+            result.ts, 1000,
+            "timestamp should be physical time, not physical time + 1"
+        );
+        assert_eq!(
+            result.counter, 0,
+            "counter should reset to 0 when physical time advances"
         );
     }
 }
