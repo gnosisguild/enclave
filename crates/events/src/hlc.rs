@@ -53,8 +53,8 @@ impl HlcTimestamp {
     /// ```
     ///
     /// This format uses simple fixed-width integers rather than bit-packing,
-    /// making it trivial to reimplement in other languages (TypeScript, Python, etc.)
-    /// without any bit manipulation. Big-endian preserves lexicographic sort order.
+    /// making it trivial to reimplement in other languages (Go, TypeScript, Python, etc.)
+    /// without fancy bit packing. Big-endian preserves lexicographic sort order.
     pub fn pack(&self) -> [u8; 16] {
         let mut buf = [0u8; 16];
         buf[0..8].copy_from_slice(&self.ts.to_be_bytes());
