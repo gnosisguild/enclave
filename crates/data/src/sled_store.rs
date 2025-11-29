@@ -113,7 +113,7 @@ impl Handler<Get> for SledStore {
 impl Handler<EnclaveEvent> for SledStore {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        if let EnclaveEventData::Shutdown { .. } = msg.get_data() {
+        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
             let _db = self.db.take(); // db will be dropped
             ctx.stop()
         }
