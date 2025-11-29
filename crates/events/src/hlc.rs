@@ -28,6 +28,7 @@ pub enum HlcError {
     CounterOverflow { ts: u64 },
 }
 
+/// HLC timestamp
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HlcTimestamp {
     pub ts: u64,
@@ -69,6 +70,16 @@ impl HlcTimestamp {
             counter: u32::from_be_bytes(bytes[8..12].try_into().unwrap()),
             node: u32::from_be_bytes(bytes[12..16].try_into().unwrap()),
         }
+    }
+
+    /// Converts to u128, preserving sort order.
+    pub fn to_u128(&self) -> u128 {
+        u128::from_be_bytes(self.pack())
+    }
+
+    /// Reconstructs from a u128 created by `to_u128()`.
+    pub fn from_u128(n: u128) -> Self {
+        Self::unpack(n.to_be_bytes())
     }
 
     /// Unpacks the HLC timestamp from a slice that is expected to be a 128bit big-endian representation.
@@ -469,6 +480,16 @@ mod tests {
 
             prop_assert!(result.is_ok(), "should accept timestamp within drift");
         }
+    }
+
+    #[test]
+    fn u128_roundtrip_and_ordering() {
+        let a = HlcTimestamp::new(100, 5, 1);
+        let b = HlcTimestamp::new(100, 5, 2);
+
+        assert_eq!(a, HlcTimestamp::from_u128(a.to_u128()));
+        assert_eq!(b, HlcTimestamp::from_u128(b.to_u128()));
+        assert!(a.to_u128() < b.to_u128());
     }
 
     #[test]
