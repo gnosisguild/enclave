@@ -11,8 +11,8 @@ use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
     CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated, E3Requested, E3id,
-    EnclaveEvent, EventBus, EventBusConfig, OperatorActivationChanged, PlaintextAggregated,
-    TicketBalanceUpdated,
+    EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, OperatorActivationChanged,
+    PlaintextAggregated, TicketBalanceUpdated,
 };
 use e3_multithread::{GetReport, Multithread};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
@@ -322,9 +322,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // First we get the public key
     println!("Getting public key");
-    let Some(EnclaveEvent::PublicKeyAggregated {
-        data: pubkey_event, ..
-    }) = h.last().clone()
+    let Some(EnclaveEventData::PublicKeyAggregated(pubkey_event)) = h.last().map(|e| e.get_data())
     else {
         panic!("Was expecting event to be PublicKeyAggregated");
     };
@@ -391,14 +389,10 @@ async fn test_trbfv_actor() -> Result<()> {
         publishing_ct_timer.elapsed(),
     ));
 
-    let Some(EnclaveEvent::PlaintextAggregated {
-        data:
-            PlaintextAggregated {
-                decrypted_output: plaintext,
-                ..
-            },
+    let Some(EnclaveEventData::PlaintextAggregated(PlaintextAggregated {
+        decrypted_output: plaintext,
         ..
-    }) = h.last()
+    })) = h.last().map(|e| e.get_data())
     else {
         bail!("bad event")
     };

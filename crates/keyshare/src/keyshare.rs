@@ -10,7 +10,8 @@ use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
-    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, FromError,
+    KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
 use e3_utils::utility_types::ArcBytes;
@@ -76,11 +77,11 @@ impl Handler<EnclaveEvent> for Keyshare {
     type Result = ();
 
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut actix::Context<Self>) -> Self::Result {
-        match event {
-            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { .. } => ctx.notify(Die),
+        match event.into_data() {
+            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
+            EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(_) => ctx.notify(Die),
             _ => (),
         }
     }

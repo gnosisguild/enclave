@@ -4,14 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::simulate_libp2p_net;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
+use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
-use tokio::time::timeout;
-
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
-
-use crate::simulate_libp2p_net;
+use tokio::time::timeout;
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =

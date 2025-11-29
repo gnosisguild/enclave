@@ -10,8 +10,8 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
 use e3_events::{
-    ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, PlaintextAggregated,
-    Seed,
+    ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventBus,
+    PlaintextAggregated, Seed,
 };
 use e3_multithread::Multithread;
 use e3_sortition::{GetNodesForE3, Sortition};
@@ -235,9 +235,9 @@ impl Actor for ThresholdPlaintextAggregator {
 impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+        match msg.into_data() {
+            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
             _ => (),
         }
     }

@@ -61,7 +61,7 @@ pub fn resolve_config_path<P: Into<PathBuf>>(
 mod tests {
     use super::resolve_config_path;
     use anyhow::Result;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     #[test]
     fn test_resolve_cli() -> Result<()> {

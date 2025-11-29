@@ -8,7 +8,8 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
+    Die, E3id, EnclaveEvent, EnclaveEventData, EventBus, KeyshareCreated, OrderedSet,
+    PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodesForE3, Sortition};
@@ -136,9 +137,9 @@ impl Actor for PublicKeyAggregator {
 impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::KeyshareCreated { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+        match msg.into_data() {
+            EnclaveEventData::KeyshareCreated(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
             _ => (),
         }
     }

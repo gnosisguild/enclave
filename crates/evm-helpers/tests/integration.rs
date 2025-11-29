@@ -8,7 +8,6 @@ mod helpers;
 use alloy::consensus::BlockHeader;
 use alloy::providers::ext::AnvilApi;
 use alloy::{node_bindings::Anvil, providers::ProviderBuilder, sol};
-use e3_evm_helpers::block_listener;
 use e3_evm_helpers::{block_listener::BlockListener, event_listener::EventListener};
 use eyre::Result;
 use helpers::setup_logs_contract;

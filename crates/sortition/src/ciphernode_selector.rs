@@ -11,8 +11,8 @@ use actix::prelude::*;
 use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
-    CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EventBus, Shutdown,
-    Subscribe, TicketGenerated, TicketId,
+    CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EnclaveEventData, EventBus,
+    Shutdown, Subscribe, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
@@ -65,10 +65,10 @@ impl CiphernodeSelector {
 impl Handler<EnclaveEvent> for CiphernodeSelector {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::E3Requested { data, .. } => ctx.notify(data),
-            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+        match msg.into_data() {
+            EnclaveEventData::E3Requested(data) => ctx.notify(data),
+            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }

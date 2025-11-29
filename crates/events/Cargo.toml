@@ -21,6 +21,7 @@ futures-util = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
+strum = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 e3-crypto = { workspace = true }

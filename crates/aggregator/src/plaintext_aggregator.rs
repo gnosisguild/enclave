@@ -8,8 +8,8 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
-    Seed,
+    DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventBus, OrderedSet,
+    PlaintextAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
 use e3_sortition::{GetNodeIndex, Sortition};
@@ -145,9 +145,9 @@ impl Actor for PlaintextAggregator {
 impl Handler<EnclaveEvent> for PlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+        match msg.into_data() {
+            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
             _ => (),
         }
     }

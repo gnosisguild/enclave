@@ -10,8 +10,8 @@ use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse,
-    DecryptionshareCreated, E3id, EnclaveEvent, EventBus, KeyshareCreated, PartyId, ThresholdShare,
-    ThresholdShareCreated,
+    DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EventBus, KeyshareCreated,
+    PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -754,10 +754,10 @@ impl ThresholdKeyshare {
 impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
-            EnclaveEvent::ThresholdShareCreated { data, .. } => {
+        match msg.into_data() {
+            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
+            EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
+            EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
             }
             _ => (),

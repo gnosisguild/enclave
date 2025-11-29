@@ -19,8 +19,8 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
     BusError, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
-    EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
-    TicketId,
+    EnclaveEventData, EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe,
+    TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -312,25 +312,25 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::PublicKeyAggregated { data, .. } => {
+        match msg.into_data() {
+            EnclaveEventData::PublicKeyAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::CommitteeFinalizeRequested { data, .. } => {
+            EnclaveEventData::CommitteeFinalizeRequested(data) => {
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::TicketGenerated { data, .. } => {
+            EnclaveEventData::TicketGenerated(data) => {
                 // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }

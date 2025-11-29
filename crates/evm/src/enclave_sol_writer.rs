@@ -17,6 +17,7 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
 use e3_events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use e3_events::{EnclaveEvent, EventBus};
@@ -73,14 +74,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::PlaintextAggregated { data, .. } => {
+        match msg.into_data() {
+            EnclaveEventData::PlaintextAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }
