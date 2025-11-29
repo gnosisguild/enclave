@@ -109,6 +109,18 @@ impl PartialOrd for HlcTimestamp {
     }
 }
 
+impl From<HlcTimestamp> for u128 {
+    fn from(value: HlcTimestamp) -> Self {
+        value.to_u128()
+    }
+}
+
+impl From<u128> for HlcTimestamp {
+    fn from(value: u128) -> Self {
+        HlcTimestamp::from_u128(value)
+    }
+}
+
 /// A Hybrid Logical Clock for generating monotonically increasing, globally unique timestamps.
 ///
 /// HLCs combine physical time with logical counters to ensure timestamps always increase,
@@ -129,15 +141,15 @@ impl PartialOrd for HlcTimestamp {
 /// let ts3 = hlc.receive(&remote)?;
 /// assert!(ts3 > remote);
 ///
-/// // Pack to bytes for storage/transmission
-/// let bytes: [u8; 16] = ts3.pack();
+/// // Pack to u128 for storage/transmission
+/// let ts2_num: u128 = ts2.into();
+/// let ts3_num: u128 = ts3.into();
+///
+/// // Ordering is preserved!
+/// assert!(ts3_num > ts2_num);
 ///
 /// // Unpack from bytes
-/// let restored = HlcTimestamp::unpack(bytes);
-/// assert_eq!(ts3, restored);
-///
-/// // Unpack from slice (fallible)
-/// let restored = HlcTimestamp::unpack_slice(&bytes)?;
+/// let restored: HlcTimestamp = ts3_num.into();
 /// assert_eq!(ts3, restored);
 ///
 /// // Packed bytes preserve sort order
