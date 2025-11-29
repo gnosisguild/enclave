@@ -1,44 +1,59 @@
-use std::sync::Arc;
-
 use actix::{Addr, Recipient};
 
 use crate::{ErrorEvent, Event, EventBus, Subscribe};
 
+/// Trait to create events
 pub trait EventFactory<E: Event> {
     fn create_local(&self, data: impl Into<E::Data>) -> E;
     fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E;
 }
 
+/// Trait create errors
 pub trait ErrorFactory<E: ErrorEvent> {
     fn create_err(&self, err_type: E::ErrType, error: impl Into<String>) -> E;
 }
 
+/// Trait to dispatch events
 pub trait EventDispatcher<E: Event> {
     fn dispatch(&self, data: impl Into<E::Data>);
     fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128);
 }
 
+/// Trait to subscribe to events
 pub trait EventSubscriber<E: Event> {
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
 }
 
-pub trait FullFactory<E: ErrorEvent>: ErrorFactory<E> + EventFactory<E> {}
-
-pub struct EventManager<E: Event, F> {
-    bus: Addr<EventBus<E>>,
-    factory: Arc<F>,
+/// Trait to create an event with a timestamp from its associated type data
+pub trait EventConstructorWithTimestamp: Event + Sized {
+    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
 }
 
-impl<E: Event, F> EventManager<E, F> {
-    pub fn new(bus: Addr<EventBus<E>>, factory: Arc<F>) -> Self {
-        Self { bus, factory }
+pub trait ErrorEventConstructor: ErrorEvent + Sized {
+    fn new_error(err_type: Self::ErrType, error: impl Into<String>) -> Self;
+}
+
+pub trait ManagedEvent: ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor {}
+
+impl<E> ManagedEvent for E where
+    E: ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor
+{
+}
+
+#[derive(Clone)]
+pub struct EventManager<E: Event> {
+    bus: Addr<EventBus<E>>,
+}
+
+impl<E: Event> EventManager<E> {
+    pub fn new(bus: Addr<EventBus<E>>) -> Self {
+        Self { bus }
     }
 }
 
-impl<E, F> EventDispatcher<E> for EventManager<E, F>
+impl<E> EventDispatcher<E> for EventManager<E>
 where
-    E: Event,
-    F: EventFactory<E>,
+    E: ManagedEvent,
 {
     fn dispatch(&self, data: impl Into<E::Data>) {
         let evt = self.create_local(data);
@@ -51,30 +66,24 @@ where
     }
 }
 
-impl<E, F> EventFactory<E> for EventManager<E, F>
-where
-    E: Event,
-    F: EventFactory<E>,
-{
+impl<E: EventConstructorWithTimestamp> EventFactory<E> for EventManager<E> {
     fn create_local(&self, data: impl Into<E::Data>) -> E {
-        self.factory.create_local(data)
+        E::new_with_timestamp(data.into(), 0)
     }
 
     fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E {
-        self.factory.create_receive(data, ts)
+        E::new_with_timestamp(data.into(), ts)
     }
 }
 
-impl<E: ErrorEvent, F: ErrorFactory<E>> ErrorFactory<E> for EventManager<E, F> {
+impl<E: ErrorEventConstructor> ErrorFactory<E> for EventManager<E> {
     fn create_err(&self, err_type: E::ErrType, error: impl Into<String>) -> E {
-        self.factory.create_err(err_type, error)
+        E::new_error(err_type, error)
     }
 }
 
-impl<E: Event, F> EventSubscriber<E> for EventManager<E, F> {
+impl<E: Event> EventSubscriber<E> for EventManager<E> {
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>) {
         self.bus.do_send(Subscribe::new(event_type, recipient))
     }
 }
-
-impl<E: ErrorEvent, F: FullFactory<E>> FullFactory<E> for EventManager<E, F> {}

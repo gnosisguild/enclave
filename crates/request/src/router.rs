@@ -23,7 +23,7 @@ use e3_data::Snapshot;
 use e3_events::E3RequestComplete;
 use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
-use e3_events::{E3id, EnclaveEvent, EventBus, Subscribe};
+use e3_events::{E3id, EnclaveEvent, Event, EventBus, Subscribe};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;

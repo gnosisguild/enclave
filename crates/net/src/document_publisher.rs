@@ -15,8 +15,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     BusError, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
-    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, PartyId,
-    PublishDocumentRequested, Subscribe, ThresholdShareCreated,
+    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, EventBus,
+    PartyId, PublishDocumentRequested, Subscribe, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;

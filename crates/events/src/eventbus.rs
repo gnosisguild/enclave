@@ -12,6 +12,8 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use tracing::info;
 
+use crate::EventManager;
+
 //////////////////////////////////////////////////////////////////////////////
 // Core Traits
 //////////////////////////////////////////////////////////////////////////////
@@ -101,7 +103,9 @@ impl<E: Event> EventBus<E> {
         addr
     }
 
-    // pub fn manager<M>(source: Addr<EventBus<E>>) -> M {}
+    pub fn manager(source: Addr<EventBus<E>>) -> EventManager<E> {
+        EventManager::new(source)
+    }
 
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
         source.do_send(Subscribe::new("*", dest.clone().recipient()))

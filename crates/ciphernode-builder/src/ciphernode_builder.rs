@@ -17,7 +17,8 @@ use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
 use e3_events::{
-    EnclaveEvent, EnclaveEventDispatcher, EnclaveEventFactory, EventBus, EventBusConfig,
+    EnclaveEvent, EnclaveEventDispatcher, EnclaveEventFactory, ErrorEvent, EventBus,
+    EventBusConfig, EventDispatcher, EventFactory, FullFactory, TestEvent,
 };
 use e3_evm::{
     helpers::{
@@ -285,8 +286,7 @@ impl CiphernodeBuilder {
         };
 
         // Setup an event dispatcher
-        let dispatcher =
-            EnclaveEventDispatcher::new(local_bus, Arc::new(EnclaveEventFactory::new()));
+        let dispatcher = EventBus::manager(local_bus, Arc::new(EnclaveEventFactory::new()));
 
         // History collector for taking historical events for analysis and testing
         let history = if self.testmode_history {

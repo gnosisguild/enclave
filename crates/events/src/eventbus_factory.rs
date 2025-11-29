@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::EnclaveEvent;
-use crate::ErrorEvent;
 use crate::Event;
 use crate::EventBus;
 use crate::HistoryCollector;

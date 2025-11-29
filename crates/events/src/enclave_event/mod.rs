@@ -61,7 +61,9 @@ pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
-use crate::{E3id, ErrorEvent, ErrorFactory, Event, EventFactory, EventId};
+use crate::{
+    E3id, ErrorEvent, ErrorEventConstructor, Event, EventConstructorWithTimestamp, EventId,
+};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -252,26 +254,8 @@ impl fmt::Display for EnclaveEvent {
     }
 }
 
-#[derive(Clone)]
-pub struct EnclaveEventFactory {
-    // TODO: hlc: Arc<Hlc>,
-}
-
-impl EnclaveEventFactory {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl EventFactory<EnclaveEvent> for EnclaveEventFactory {
-    fn create_local(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent {
-        let payload = data.into();
-        let id = EventId::hash(&payload);
-        // hcl.tick(); NOTE: we may need to handle the error from hlc here and add try_create_local
-        EnclaveEvent { id, payload }
-    }
-
-    fn create_receive(&self, data: impl Into<EnclaveEventData>, _remote_ts: u128) -> EnclaveEvent {
+impl EventConstructorWithTimestamp for EnclaveEvent {
+    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
         // hcl.receive(remote_ts)?;
@@ -279,9 +263,11 @@ impl EventFactory<EnclaveEvent> for EnclaveEventFactory {
     }
 }
 
-impl ErrorFactory<EnclaveEvent> for EnclaveEventFactory {
-    fn create_err(&self, err_type: EnclaveErrorType, error: impl Into<String>) -> EnclaveEvent {
+impl ErrorEventConstructor for EnclaveEvent {
+    fn new_error(err_type: EnclaveErrorType, error: impl Into<String>) -> Self {
         let payload = EnclaveError::from_error(err_type, error);
-        self.create_local(payload)
+        let id = EventId::hash(&payload);
+        let payload = payload.into();
+        EnclaveEvent { id, payload }
     }
 }
