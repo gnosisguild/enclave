@@ -158,9 +158,9 @@ impl From<u128> for HlcTimestamp {
 /// # }
 /// ```
 pub struct Hlc {
-    /// Mutext to the inner state
+    /// Inner state guarded by mutex
     inner: Mutex<HlcInner>,
-    /// Out node id
+    /// Our node id
     node: u32,
     /// Maximum drift amount
     max_drift: u64,
