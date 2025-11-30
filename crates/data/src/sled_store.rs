@@ -8,8 +8,7 @@ use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{
-    get_enclave_event_manager, prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent,
-    EnclaveEventData,
+    get_enclave_bus_handle, prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
 };
 use once_cell::sync::Lazy;
 use sled::Db;
@@ -48,7 +47,7 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: get_enclave_event_manager(),
+            bus: get_enclave_bus_handle(),
         })
     }
 }

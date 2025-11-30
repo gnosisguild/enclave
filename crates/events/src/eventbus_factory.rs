@@ -92,6 +92,6 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
-pub fn get_enclave_event_manager() -> BusHandle<EnclaveEvent> {
+pub fn get_enclave_bus_handle() -> BusHandle<EnclaveEvent> {
     EventBus::manager(get_enclave_event_bus())
 }
