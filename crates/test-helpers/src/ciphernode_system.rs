@@ -197,7 +197,7 @@ mod tests {
     use super::*;
     use actix::prelude::*;
     use e3_data::InMemStore;
-    use e3_events::{EventBus, EventBusConfig};
+    use e3_events::{EventBus, EventBusConfig, EventManager};
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -205,6 +205,7 @@ mod tests {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
+        let bus = EventManager::new(bus);
 
         Ok(CiphernodeHandle {
             address,

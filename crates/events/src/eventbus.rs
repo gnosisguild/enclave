@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::EventManager;
+use crate::{prelude::*, EventManager, ManagedEvent};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -134,6 +134,12 @@ impl<E: Event> Handler<E> for EventBus<E> {
         // TODO: workshop to work out best display format
         tracing::info!(">>> {}", event);
         self.track(event);
+    }
+}
+
+impl<E: ManagedEvent> From<Addr<EventBus<E>>> for EventManager<E> {
+    fn from(value: Addr<EventBus<E>>) -> Self {
+        EventManager::new(value)
     }
 }
 
@@ -415,11 +421,11 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: Event>() -> (Addr<EventBus<E>>, Addr<HistoryCollector<E>>) {
-    let bus = EventBus::<E>::default().start();
+pub fn new_event_bus_with_history<E: ManagedEvent>() -> (EventManager<E>, Addr<HistoryCollector<E>>)
+{
+    let bus: EventManager<E> = EventBus::<E>::default().start().into();
 
     let history = HistoryCollector::new().start();
-
-    bus.do_send(Subscribe::new("*", history.clone().recipient()));
+    bus.subscribe("*", history.clone().recipient());
     (bus, history)
 }

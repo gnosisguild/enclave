@@ -72,7 +72,7 @@ pub fn create_crp_bytes_params(
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
-    Addr<EventBus<EnclaveEvent>>,
+    EventManager<EnclaveEvent>,
     SharedRng,
     Seed,
     Arc<BfvParameters>,
@@ -95,7 +95,7 @@ pub fn get_common_setup(
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
-    Ok((bus, rng, seed, params, crpoly, errors, history))
+    Ok((bus.into(), rng, seed, params, crpoly, errors, history))
 }
 
 /// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus

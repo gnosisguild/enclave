@@ -10,9 +10,9 @@ use anyhow::{bail, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
-    CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated, E3Requested, E3id,
-    EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, OperatorActivationChanged,
-    PlaintextAggregated, TicketBalanceUpdated,
+    prelude::*, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated, E3Requested,
+    E3id, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, EventManager,
+    OperatorActivationChanged, PlaintextAggregated, TicketBalanceUpdated,
 };
 use e3_multithread::{GetReport, Multithread};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
@@ -33,37 +33,34 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 }
 
 async fn setup_score_sortition_environment(
-    bus: &actix::Addr<EventBus<EnclaveEvent>>,
+    bus: &EventManager<EnclaveEvent>,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
-    bus.send(EnclaveEvent::from(ConfigurationUpdated {
+    bus.dispatch(ConfigurationUpdated {
         parameter: "ticketPrice".to_string(),
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    }))
-    .await?;
+    });
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
         adder.add(addr).await?;
 
-        bus.send(EnclaveEvent::from(TicketBalanceUpdated {
+        bus.dispatch(TicketBalanceUpdated {
             operator: addr.clone(),
             delta: I256::try_from(1_000_000_000u64).unwrap(),
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        }))
-        .await?;
+        });
 
-        bus.send(EnclaveEvent::from(OperatorActivationChanged {
+        bus.dispatch(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        }))
-        .await?;
+        });
     }
 
     Ok(())
@@ -121,7 +118,10 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    let bus: EventManager<EnclaveEvent> =
+        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+            .start()
+            .into();
 
     // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (
@@ -181,7 +181,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(&bus)
+                .testmode_with_forked_bus(&bus.bus())
                 .with_logging()
                 .build()
                 .await
@@ -194,7 +194,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_injected_multithread(multithread.clone())
                 .with_trbfv()
                 .with_sortition_score()
-                .testmode_with_forked_bus(&bus)
+                .testmode_with_forked_bus(&bus.bus())
                 .with_logging()
                 .build()
                 .await
@@ -238,9 +238,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    let event = EnclaveEvent::from(e3_requested);
-
-    bus.do_send(event);
+    bus.dispatch(e3_requested);
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -262,12 +260,11 @@ async fn test_trbfv_actor() -> Result<()> {
 
     println!("Emitting CommitteeFinalized with {} nodes", committee.len());
 
-    bus.send(EnclaveEvent::from(CommitteeFinalized {
+    bus.dispatch(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
-    }))
-    .await?;
+    });
 
     let committee_finalized_timer = Instant::now();
 
@@ -359,12 +356,12 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Created the event
     println!("Publishing CiphertextOutputPublished...");
-    let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
+    let ciphertext_published_event = CiphertextOutputPublished {
         ciphertext_output: ciphertexts,
         e3_id: e3_id.clone(),
-    });
+    };
 
-    bus.send(ciphertext_published_event.clone()).await?;
+    bus.dispatch(ciphertext_published_event.clone());
 
     println!("CiphertextOutputPublished event has been dispatched!");
 
