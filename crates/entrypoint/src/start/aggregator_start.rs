@@ -10,7 +10,7 @@ use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
-use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
+use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus, EventManager};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use e3_test_helpers::{PlaintextWriter, PublicKeyWriter};
 use rand::SeedableRng;
@@ -28,7 +28,7 @@ pub async fn execute(
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
     experimental_trbfv: bool,
-) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
+) -> Result<(EventManager<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
     let bus = get_enclave_event_bus();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(config, &bus)?;

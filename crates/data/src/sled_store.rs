@@ -8,8 +8,8 @@ use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{
-    get_enclave_event_bus, BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event,
-    EventBus, Subscribe,
+    get_enclave_event_manager, prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+    EventManager,
 };
 use once_cell::sync::Lazy;
 use sled::Db;
@@ -22,7 +22,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
 }
 
 impl Actor for SledStore {
@@ -30,7 +30,7 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new(bus: &EventManager<EnclaveEvent>, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(PathBuf::from(path))?;
 
@@ -40,7 +40,7 @@ impl SledStore {
         }
         .start();
 
-        bus.do_send(Subscribe::new("Shutdown", store.clone().into()));
+        bus.subscribe("Shutdown", store.clone().into());
 
         Ok(store)
     }
@@ -48,7 +48,7 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: get_enclave_event_bus(),
+            bus: get_enclave_event_manager(),
         })
     }
 }

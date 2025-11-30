@@ -4,40 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::traits::{ErrorEvent, Event};
+use crate::EventManager;
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Display;
-use std::hash::Hash;
 use std::marker::PhantomData;
 use tracing::info;
-
-use crate::EventManager;
-
-//////////////////////////////////////////////////////////////////////////////
-// Core Traits
-//////////////////////////////////////////////////////////////////////////////
-
-/// Trait that must be implemented by events used with EventBus
-pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
-    type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
-
-    /// Payload for the Event
-    type Data;
-
-    fn event_type(&self) -> String;
-    fn event_id(&self) -> Self::Id;
-    fn get_data(&self) -> &Self::Data;
-    fn into_data(self) -> Self::Data;
-}
-
-/// Trait for events that contain an error
-pub trait ErrorEvent: Event {
-    /// Error type associated with this event
-    type ErrType;
-
-    fn from_error(err_type: Self::ErrType, error: impl Into<String>) -> Self;
-}
 
 //////////////////////////////////////////////////////////////////////////////
 // Configuration
@@ -313,27 +286,6 @@ pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
 impl<E: ErrorEvent> GetErrors<E> {
     pub fn new() -> Self {
         Self(PhantomData)
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Error Bus Trait
-//////////////////////////////////////////////////////////////////////////////
-
-/// Trait to send errors directly to the bus
-pub trait BusError<E: ErrorEvent> {
-    fn err(&self, err_type: E::ErrType, err: anyhow::Error);
-}
-
-impl<E: ErrorEvent> BusError<E> for Addr<EventBus<E>> {
-    fn err(&self, err_type: E::ErrType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, &err.to_string()))
-    }
-}
-
-impl<E: ErrorEvent> BusError<E> for Recipient<E> {
-    fn err(&self, err_type: E::ErrType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, &err.to_string()))
     }
 }
 

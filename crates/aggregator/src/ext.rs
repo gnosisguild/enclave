@@ -15,7 +15,9 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus};
+use e3_events::{
+    BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventManager,
+};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
@@ -23,12 +25,12 @@ use e3_sortition::Sortition;
 
 #[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     sortition: Addr<Sortition>,
 }
 
 impl PlaintextAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &EventManager<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -143,12 +145,12 @@ impl E3Extension for PlaintextAggregatorExtension {
 }
 
 pub struct PublicKeyAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     sortition: Addr<Sortition>,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &EventManager<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -249,14 +251,14 @@ impl E3Extension for PublicKeyAggregatorExtension {
 }
 
 pub struct ThresholdPlaintextAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     sortition: Addr<Sortition>,
     multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
     pub fn create(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         multithread: &Addr<Multithread>,
     ) -> Box<Self> {

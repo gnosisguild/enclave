@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, EnclaveEventData, EventBus, Subscribe};
+use e3_events::{EnclaveEvent, EnclaveEventData, EventBus, EventManager, Subscribe};
 use tracing::info;
 
 pub struct PublicKeyWriter {
@@ -16,7 +16,7 @@ pub struct PublicKeyWriter {
 }
 
 impl PublicKeyWriter {
-    pub fn attach(path: &PathBuf, bus: Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+    pub fn attach(path: &PathBuf, bus: EventManager<EnclaveEvent>) -> Addr<Self> {
         let addr = Self {
             path: path.to_owned(),
         }

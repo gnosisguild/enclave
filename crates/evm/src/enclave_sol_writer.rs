@@ -18,6 +18,7 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_events::EnclaveEventData;
+use e3_events::EventManager;
 use e3_events::Shutdown;
 use e3_events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use e3_events::{EnclaveEvent, EventBus};
@@ -33,12 +34,12 @@ sol!(
 pub struct EnclaveSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -50,7 +51,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {

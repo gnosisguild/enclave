@@ -19,8 +19,8 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
     BusError, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
-    EnclaveEventData, EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe,
-    TicketGenerated, TicketId,
+    EnclaveEventData, EventBus, EventManager, OrderedSet, PublicKeyAggregated, Seed, Shutdown,
+    Subscribe, TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -218,7 +218,7 @@ pub struct CiphernodeRegistrySolReader;
 impl CiphernodeRegistrySolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -250,12 +250,12 @@ impl CiphernodeRegistrySolReader {
 pub struct CiphernodeRegistrySolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
     pub async fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -267,7 +267,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         is_aggregator: bool,
@@ -513,7 +513,7 @@ pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -537,7 +537,7 @@ impl CiphernodeRegistrySol {
     }
 
     pub async fn attach_writer<P>(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         is_aggregator: bool,

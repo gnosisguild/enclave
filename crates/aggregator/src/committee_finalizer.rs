@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use e3_events::{
     CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EnclaveEventData, EventBus,
-    Shutdown, Subscribe,
+    EventManager, Shutdown, Subscribe,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -16,19 +16,19 @@ use tracing::{error, info};
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn new(bus: &EventManager<EnclaveEvent>) -> Self {
         Self {
             bus: bus.clone(),
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+    pub fn attach(bus: &EventManager<EnclaveEvent>) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.do_send(Subscribe::new(

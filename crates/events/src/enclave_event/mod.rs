@@ -62,7 +62,8 @@ pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
 use crate::{
-    E3id, ErrorEvent, ErrorEventConstructor, Event, EventConstructorWithTimestamp, EventId,
+    traits::{ErrorEvent, ErrorEventConstructor, Event, EventConstructorWithTimestamp},
+    E3id, EventId,
 };
 use actix::Message;
 use serde::{Deserialize, Serialize};
@@ -161,8 +162,9 @@ impl Event for EnclaveEvent {
 
 impl ErrorEvent for EnclaveEvent {
     type ErrType = EnclaveErrorType;
+    type FromError = anyhow::Error;
 
-    fn from_error(err_type: Self::ErrType, msg: impl Into<String>) -> Self {
+    fn from_error(err_type: Self::ErrType, msg: impl Into<Self::FromError>) -> Self {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
         EnclaveEvent {
@@ -264,8 +266,8 @@ impl EventConstructorWithTimestamp for EnclaveEvent {
 }
 
 impl ErrorEventConstructor for EnclaveEvent {
-    fn new_error(err_type: EnclaveErrorType, error: impl Into<String>) -> Self {
-        let payload = EnclaveError::from_error(err_type, error);
+    fn new_error(err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) -> Self {
+        let payload = EnclaveError::from_error(err_type, error.into().to_string());
         let id = EventId::hash(&payload);
         let payload = payload.into();
         EnclaveEvent { id, payload }

@@ -11,7 +11,7 @@ use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
-use e3_events::get_enclave_event_bus;
+use e3_events::{get_enclave_event_bus, EventManager};
 use e3_events::{EnclaveEvent, EventBus};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use rand::SeedableRng;
@@ -27,7 +27,7 @@ pub async fn execute(
     config: &AppConfig,
     address: Address,
     experimental_trbfv: bool,
-) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
+) -> Result<(EventManager<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
     let bus = get_enclave_event_bus();

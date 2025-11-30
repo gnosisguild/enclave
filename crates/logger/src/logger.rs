@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, EnclaveEventData, Event, EventBus, Subscribe};
+use e3_events::{prelude::Event, EnclaveEvent, EnclaveEventData, EventBus, Subscribe};
 use std::marker::PhantomData;
 use tracing::{error, info};
 

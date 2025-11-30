@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
 use e3_events::{
-    BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus,
+    BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventManager,
 };
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use e3_utils::SharedRng;
@@ -21,11 +21,11 @@ pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
 /// TODO: move these to each package with access on MyStruct::launcher()
 pub struct FheExtension {
     rng: SharedRng,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
 }
 
 impl FheExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, rng: &SharedRng) -> Box<Self> {
+    pub fn create(bus: &EventManager<EnclaveEvent>, rng: &SharedRng) -> Box<Self> {
         Box::new(Self {
             rng: rng.clone(),
             bus: bus.clone(),

@@ -12,9 +12,10 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::traits::Event;
 use crate::EnclaveEvent;
-use crate::Event;
 use crate::EventBus;
+use crate::EventManager;
 use crate::HistoryCollector;
 use crate::Subscribe;
 
@@ -89,4 +90,8 @@ pub fn get_enclave_event_bus() -> Addr<EventBus<EnclaveEvent>> {
 
 pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
+}
+
+pub fn get_enclave_event_manager() -> EventManager<EnclaveEvent> {
+    EventBus::manager(get_enclave_event_bus())
 }

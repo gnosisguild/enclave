@@ -1,0 +1,71 @@
+use actix::{Message, Recipient};
+use std::fmt::Display;
+use std::hash::Hash;
+
+/// Trait that must be implemented by events used with EventBus
+pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
+    type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
+
+    /// Payload for the Event
+    type Data;
+
+    fn event_type(&self) -> String;
+    fn event_id(&self) -> Self::Id;
+    fn get_data(&self) -> &Self::Data;
+    fn into_data(self) -> Self::Data;
+}
+
+/// Trait for events that contain an error
+pub trait ErrorEvent: Event {
+    /// Error type associated with this event
+    type ErrType;
+    type FromError;
+
+    fn from_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
+}
+
+/// Trait to create events
+pub trait EventFactory<E: Event> {
+    fn create_local(&self, data: impl Into<E::Data>) -> E;
+    fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E;
+}
+
+/// Trait create errors
+pub trait ErrorFactory<E: ErrorEvent> {
+    fn create_err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
+}
+
+/// Trait to dispatch events
+pub trait EventDispatcher<E: Event> {
+    fn dispatch(&self, data: impl Into<E::Data>);
+    fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+}
+
+/// Trait for dispatching errors
+pub trait ErrorDispatcher<E: ErrorEvent> {
+    fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>);
+}
+
+/// Trait to subscribe to events
+pub trait EventSubscriber<E: Event> {
+    fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
+}
+
+/// Trait to create an event with a timestamp from its associated type data
+pub trait EventConstructorWithTimestamp: Event + Sized {
+    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
+}
+
+pub trait ErrorEventConstructor: ErrorEvent + Sized {
+    fn new_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
+}
+
+pub trait ManagedEvent:
+    Sized + ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor
+{
+}
+
+impl<E> ManagedEvent for E where
+    E: Sized + Event + ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor
+{
+}

@@ -14,10 +14,10 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use e3_events::Event;
 use e3_events::{
     BusError, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventId, Subscribe,
 };
+use e3_events::{Event, EventManager};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
@@ -56,7 +56,7 @@ pub struct EvmEventReaderParams<P> {
     contract_address: Address,
     start_block: Option<u64>,
     processor: Recipient<EnclaveEvmEvent>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     state: Persistable<EvmEventReaderState>,
     rpc_url: String,
 }
@@ -85,7 +85,7 @@ pub struct EvmEventReader<P> {
     /// Processor to forward events an actor
     processor: Recipient<EnclaveEvmEvent>,
     /// Event bus for error propagation only
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
     /// The RPC URL for the provider
@@ -115,7 +115,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
         contract_address: &str,
         start_block: Option<u64>,
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         repository: &Repository<EvmEventReaderState>,
         rpc_url: String,
     ) -> Result<Addr<Self>> {
@@ -193,7 +193,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
-    bus: &Addr<EventBus<EnclaveEvent>>,
+    bus: &EventManager<EnclaveEvent>,
     rpc_url: String,
 ) {
     let chain_id = provider.chain_id();

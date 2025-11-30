@@ -17,7 +17,8 @@ use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
-use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::EventManager;
+use e3_events::{CorrelationId, EnclaveEvent, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -32,7 +33,7 @@ use tracing::{error, info, instrument, trace};
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
 pub struct NetEventTranslator {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
@@ -50,7 +51,7 @@ struct LibP2pEvent(pub Vec<u8>);
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
     pub fn new(
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: EventManager<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         topic: &str,
     ) -> Self {
@@ -63,7 +64,7 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
@@ -113,7 +114,7 @@ impl NetEventTranslator {
     /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
     pub async fn setup_with_interface(
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: EventManager<EnclaveEvent>,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,

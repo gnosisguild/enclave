@@ -22,6 +22,7 @@ use e3_data::Repository;
 use e3_data::Snapshot;
 use e3_events::E3RequestComplete;
 use e3_events::EnclaveEventData;
+use e3_events::EventManager;
 use e3_events::Shutdown;
 use e3_events::{E3id, EnclaveEvent, Event, EventBus, Subscribe};
 use serde::Deserialize;
@@ -103,19 +104,19 @@ pub struct E3Router {
     /// A buffer for events to send to the
     buffer: EventBuffer,
     /// The EventBus
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     /// A repository for storing snapshots
     store: Repository<E3RouterSnapshot>,
 }
 
 pub struct E3RouterParams {
     extensions: Arc<Vec<Box<dyn E3Extension>>>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     store: Repository<E3RouterSnapshot>,
 }
 
 impl E3Router {
-    pub fn builder(bus: &Addr<EventBus<EnclaveEvent>>, store: DataStore) -> E3RouterBuilder {
+    pub fn builder(bus: &EventManager<EnclaveEvent>, store: DataStore) -> E3RouterBuilder {
         let repositories = store.repositories();
         let builder = E3RouterBuilder {
             bus: bus.clone(),
@@ -280,7 +281,7 @@ impl FromSnapshotWithParams for E3Router {
 
 /// Builder for E3Router
 pub struct E3RouterBuilder {
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: EventManager<EnclaveEvent>,
     pub extensions: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
 }

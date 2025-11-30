@@ -38,10 +38,10 @@ pub enum EnclaveErrorType {
 }
 
 impl EnclaveError {
-    pub fn new(err_type: EnclaveErrorType, message: impl Into<String>) -> Self {
+    pub fn new(err_type: EnclaveErrorType, message: impl Into<anyhow::Error>) -> Self {
         Self {
             err_type,
-            message: message.into(),
+            message: message.into().to_string(),
         }
     }
 }

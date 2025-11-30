@@ -10,8 +10,8 @@ use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse,
-    DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EventBus, KeyshareCreated,
-    PartyId, ThresholdShare, ThresholdShareCreated,
+    DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EventBus, EventManager,
+    KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -269,14 +269,14 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
 }
 
 pub struct ThresholdKeyshareParams {
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: EventManager<EnclaveEvent>,
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
 }
 
 pub struct ThresholdKeyshare {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,

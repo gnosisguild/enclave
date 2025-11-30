@@ -12,7 +12,9 @@ mod event_manager;
 mod eventbus;
 mod eventbus_factory;
 mod ordered_set;
+pub mod prelude;
 mod seed;
+mod traits;
 
 pub use correlation_id::*;
 pub use e3id::*;
@@ -23,3 +25,4 @@ pub use eventbus::*;
 pub use eventbus_factory::*;
 pub use ordered_set::*;
 pub use seed::*;
+pub use traits::*;

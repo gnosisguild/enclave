@@ -15,7 +15,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
+    CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, EventManager, HistoryCollector, Seed,
+    Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -158,13 +159,13 @@ pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
 /// Test helper to add addresses to the committee by creating events on the event bus
 #[derive(Clone, Debug)]
 pub struct AddToCommittee {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     count: usize,
     chain_id: u64,
 }
 
 impl AddToCommittee {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, chain_id: u64) -> Self {
+    pub fn new(bus: &EventManager<EnclaveEvent>, chain_id: u64) -> Self {
         Self {
             bus: bus.clone(),
             chain_id,

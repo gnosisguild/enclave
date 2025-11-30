@@ -14,9 +14,9 @@ use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    BusError, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
-    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, EventBus,
-    PartyId, PublishDocumentRequested, Subscribe, ThresholdShareCreated,
+    prelude::*, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
+    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, EventManager,
+    PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -40,7 +40,7 @@ const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 /// bus
 pub struct DocumentPublisher {
     /// Enclave EventBus
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
@@ -55,7 +55,7 @@ pub struct DocumentPublisher {
 impl DocumentPublisher {
     /// Create a new NetEventTranslator actor
     pub fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -81,7 +81,7 @@ impl DocumentPublisher {
 
     /// Setup the DocumentPublisher and start listening for GossipEvents
     pub fn setup(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &EventManager<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -90,7 +90,7 @@ impl DocumentPublisher {
         let addr = Self::new(bus, tx, rx, topic).start();
         EventConverter::setup(bus);
         // Listen on all events
-        bus.do_send(Subscribe::new("*", addr.clone().recipient()));
+        bus.subscribe("*", addr.clone().recipient());
 
         // Forward gossip data from NetEvent
         tokio::spawn({
@@ -253,7 +253,7 @@ pub async fn handle_publish_document_requested(
 pub async fn handle_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
     ids: HashMap<E3id, PartyId>,
     event: DocumentPublishedNotification,
 ) -> Result<()> {
@@ -280,10 +280,10 @@ pub async fn handle_document_published_notification(
     .await?;
 
     debug!("Sending received event...");
-    bus.do_send(EnclaveEvent::from(DocumentReceived {
+    bus.dispatch(DocumentReceived {
         meta: event.meta,
         value,
-    }));
+    });
 
     Ok(())
 }
@@ -374,7 +374,7 @@ async fn broadcast_document_published_notification(
 
 /// Convert between ThresholdShareCreated and DocumentPublished events
 pub struct EventConverter {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: EventManager<EnclaveEvent>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -399,13 +399,13 @@ impl ReceivableDocument {
 }
 
 impl EventConverter {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn new(bus: &EventManager<EnclaveEvent>) -> Self {
         Self { bus: bus.clone() }
     }
-    pub fn setup(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+    pub fn setup(bus: &EventManager<EnclaveEvent>) -> Addr<Self> {
         let addr = Self::new(bus).start();
-        bus.do_send(Subscribe::new("ThresholdShareCreated", addr.clone().into()));
-        bus.do_send(Subscribe::new("DocumentReceived", addr.clone().into()));
+        bus.subscribe("ThresholdShareCreated", addr.clone().into());
+        bus.subscribe("DocumentReceived", addr.clone().into());
         addr
     }
     /// Local node created a threshold share. Send it as a published document
@@ -423,24 +423,22 @@ impl EventConverter {
             None,
         );
         self.bus
-            .do_send(EnclaveEvent::from(PublishDocumentRequested::new(
-                meta, value,
-            )));
+            .dispatch(PublishDocumentRequested::new(meta, value));
         Ok(())
     }
     /// Received document externally
     pub fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
         warn!("Converting DocumentReceived...");
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
-        let event = EnclaveEvent::from(match receivable {
+        let event = match receivable {
             ReceivableDocument::ThresholdShareCreated(evt) => ThresholdShareCreated {
                 external: true,
                 e3_id: evt.e3_id,
                 share: evt.share,
             },
-        });
+        };
 
-        self.bus.do_send(event);
+        self.bus.dispatch(event);
         Ok(())
     }
 }
@@ -490,7 +488,8 @@ mod tests {
     use anyhow::{bail, Result};
     use e3_events::{
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
-        EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
+        EventBusConfig, EventManager, GetEvents, HistoryCollector, PublishDocumentRequested,
+        TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use tokio::{
@@ -501,7 +500,7 @@ mod tests {
 
     fn setup_test() -> (
         DefaultGuard,
-        Addr<EventBus<EnclaveEvent>>,
+        EventManager<EnclaveEvent>,
         mpsc::Sender<NetCommand>,
         mpsc::Receiver<NetCommand>,
         broadcast::Sender<NetEvent>,
@@ -520,14 +519,14 @@ mod tests {
         let guard = tracing::subscriber::set_default(subscriber);
 
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let bus = EventBus::manager(bus);
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
         let history = HistoryCollector::<EnclaveEvent>::new().start();
         let error = HistoryCollector::<EnclaveEvent>::new().start();
-        bus.do_send(Subscribe::new("*", history.clone().recipient()));
-        bus.do_send(Subscribe::new("EnclaveError", error.clone().recipient()));
-
+        bus.subscribe("*", history.clone().recipient());
+        bus.subscribe("EnclaveError", error.clone().recipient());
         let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
         (
@@ -544,10 +543,10 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // 1. Send a request to publish
-        bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
+        bus.dispatch(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        }));
+        });
 
         // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
         let Some(NetCommand::DhtPutRecord {
@@ -618,12 +617,12 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+        bus.dispatch(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        }));
+        });
 
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
@@ -680,10 +679,10 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // Send a request to publish
-        bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
+        bus.dispatch(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        }));
+        });
 
         for _ in 0..4 {
             // Expect retry
@@ -730,12 +729,12 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+        bus.do_send(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        }));
+        });
 
         // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(
