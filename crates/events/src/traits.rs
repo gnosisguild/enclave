@@ -9,7 +9,9 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 /// Trait that must be implemented by events used with EventBus
-pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
+pub trait Event:
+    Message<Result = ()> + Clone + Display + Send + Sync + Unpin + Sized + 'static
+{
     type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
 
     /// Payload for the Event
@@ -64,16 +66,6 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
     fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
 }
 
-pub trait ErrorEventConstructor: ErrorEvent + Sized {
-    fn new_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
-}
+pub trait CompositeEvent: ErrorEvent + EventConstructorWithTimestamp {}
 
-pub trait ManagedEvent:
-    Sized + ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor
-{
-}
-
-impl<E> ManagedEvent for E where
-    E: Sized + Event + ErrorEvent + EventConstructorWithTimestamp + ErrorEventConstructor
-{
-}
+impl<E> CompositeEvent for E where E: Sized + Event + ErrorEvent + EventConstructorWithTimestamp {}

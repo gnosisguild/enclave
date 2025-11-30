@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, ManagedEvent};
+use crate::{prelude::*, BusHandle, CompositeEvent};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -137,7 +137,7 @@ impl<E: Event> Handler<E> for EventBus<E> {
     }
 }
 
-impl<E: ManagedEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
+impl<E: CompositeEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
     fn from(value: Addr<EventBus<E>>) -> Self {
         BusHandle::new(value)
     }
@@ -421,7 +421,8 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: ManagedEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>) {
+pub fn new_event_bus_with_history<E: CompositeEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
+{
     let bus: BusHandle<E> = EventBus::<E>::default().start().into();
 
     let history = HistoryCollector::new().start();

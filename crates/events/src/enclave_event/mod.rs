@@ -62,7 +62,7 @@ pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
 use crate::{
-    traits::{ErrorEvent, ErrorEventConstructor, Event, EventConstructorWithTimestamp},
+    traits::{ErrorEvent, Event, EventConstructorWithTimestamp},
     E3id, EventId,
 };
 use actix::Message;
@@ -263,19 +263,10 @@ impl fmt::Display for EnclaveEvent {
 }
 
 impl EventConstructorWithTimestamp for EnclaveEvent {
-    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
+    fn new_with_timestamp(data: Self::Data, _ts: u128) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
         // hcl.receive(remote_ts)?;
-        EnclaveEvent { id, payload }
-    }
-}
-
-impl ErrorEventConstructor for EnclaveEvent {
-    fn new_error(err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) -> Self {
-        let payload = EnclaveError::from_error(err_type, error.into().to_string());
-        let id = EventId::hash(&payload);
-        let payload = payload.into();
         EnclaveEvent { id, payload }
     }
 }

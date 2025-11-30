@@ -8,10 +8,10 @@ use actix::{Addr, Recipient};
 
 use crate::{
     traits::{
-        ErrorDispatcher, ErrorEventConstructor, ErrorFactory, Event, EventConstructorWithTimestamp,
-        EventDispatcher, EventFactory, EventSubscriber, ManagedEvent,
+        CompositeEvent, ErrorDispatcher, ErrorEventConstructor, ErrorFactory, Event,
+        EventConstructorWithTimestamp, EventDispatcher, EventFactory, EventSubscriber,
     },
-    EventBus, Subscribe,
+    ErrorEvent, EventBus, Subscribe,
 };
 
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ impl<E: Event> BusHandle<E> {
     }
 }
 
-impl<E: ManagedEvent> EventDispatcher<E> for BusHandle<E> {
+impl<E: CompositeEvent> EventDispatcher<E> for BusHandle<E> {
     fn dispatch(&self, data: impl Into<E::Data>) {
         let evt = self.create_local(data);
         self.bus.do_send(evt);
@@ -47,7 +47,7 @@ impl<E: ManagedEvent> EventDispatcher<E> for BusHandle<E> {
 
 impl<E> ErrorDispatcher<E> for BusHandle<E>
 where
-    E: ManagedEvent,
+    E: CompositeEvent,
 {
     fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) {
         let evt = self.create_err(err_type, error);
@@ -65,9 +65,9 @@ impl<E: EventConstructorWithTimestamp> EventFactory<E> for BusHandle<E> {
     }
 }
 
-impl<E: ErrorEventConstructor> ErrorFactory<E> for BusHandle<E> {
+impl<E: ErrorEvent> ErrorFactory<E> for BusHandle<E> {
     fn create_err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
-        E::new_error(err_type, error)
+        E::from_error(err_type, error)
     }
 }
 
