@@ -517,9 +517,10 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+        let bus: BusHandle<EnclaveEvent> =
+            EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+                .start()
+                .into();
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
