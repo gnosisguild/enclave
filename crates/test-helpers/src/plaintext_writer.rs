@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, EnclaveEventData, EventBus, EventManager, Subscribe};
+use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, EventManager};
 use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
 use tracing::{error, info};
 
@@ -22,10 +22,7 @@ impl PlaintextWriter {
             path: path.to_owned(),
         }
         .start();
-        bus.do_send(Subscribe {
-            listener: addr.clone().recipient(),
-            event_type: "PlaintextAggregated".to_string(),
-        });
+        bus.subscribe("PlaintextAggregated", addr.clone().recipient());
         addr
     }
 }

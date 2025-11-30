@@ -6,8 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EnclaveEventData, EventBus,
-    EventManager, Shutdown, Subscribe,
+    prelude::*, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EnclaveEventData,
+    EventManager, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -31,11 +31,10 @@ impl CommitteeFinalizer {
     pub fn attach(bus: &EventManager<EnclaveEvent>) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
-        bus.do_send(Subscribe::new(
-            "CommitteeRequested",
+        bus.subscribe_all(
+            &["CommitteeRequested", "Shutdown"],
             addr.clone().recipient(),
-        ));
-        bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));
+        );
 
         addr
     }
@@ -113,9 +112,9 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                bus.do_send(EnclaveEvent::from(CommitteeFinalizeRequested {
+                                bus.dispatch(CommitteeFinalizeRequested {
                                     e3_id: e3_id_clone.clone(),
-                                }));
+                                });
 
                                 act.pending_committees.remove(&e3_id_clone.to_string());
                             },

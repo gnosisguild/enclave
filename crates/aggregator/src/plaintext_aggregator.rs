@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventBus, EventManager,
+    prelude::*, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventManager,
     OrderedSet, PlaintextAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
@@ -234,12 +234,12 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         self.set_decryption(decrypted_output.clone())?;
 
         // Dispatch the PlaintextAggregated event
-        let event = EnclaveEvent::from(PlaintextAggregated {
+        let event = PlaintextAggregated {
             decrypted_output: vec![ArcBytes::from_bytes(&decrypted_output)],
             e3_id: self.e3_id.clone(),
-        });
+        };
 
-        self.bus.do_send(event);
+        self.bus.dispatch(event);
 
         Ok(())
     }

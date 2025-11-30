@@ -76,9 +76,9 @@ use std::{
 macro_rules! impl_into_event_data {
     ($($variant:ident),*) => {
         $(
-            impl Into<EnclaveEventData> for $variant {
-                fn into(self) -> EnclaveEventData {
-                    EnclaveEventData::$variant(self)
+            impl From<$variant> for EnclaveEventData {
+                fn from(data:$variant) -> Self {
+                    EnclaveEventData::$variant(data)
                 }
             }
         )*
@@ -116,6 +116,13 @@ pub enum EnclaveEventData {
     TestEvent(TestEvent),
 }
 
+impl EnclaveEventData {
+    pub fn event_type(&self) -> String {
+        let name: &'static str = self.into();
+        name.to_string()
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct EnclaveEvent {
@@ -144,8 +151,7 @@ impl Event for EnclaveEvent {
     // type ErrType = EnclaveErrorType;
 
     fn event_type(&self) -> String {
-        let name: &'static str = (&self.payload).into();
-        name.to_string()
+        self.payload.event_type()
     }
 
     fn event_id(&self) -> Self::Id {

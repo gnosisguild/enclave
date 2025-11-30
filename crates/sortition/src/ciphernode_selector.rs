@@ -11,8 +11,8 @@ use actix::prelude::*;
 use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
-    CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EnclaveEventData, EventBus,
-    EventManager, Shutdown, Subscribe, TicketGenerated, TicketId,
+    prelude::*, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
+    EnclaveEventData, EventManager, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
@@ -51,12 +51,9 @@ impl CiphernodeSelector {
     ) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus, sortition, address, data_store).start();
 
-        bus.do_send(Subscribe::new("E3Requested", addr.clone().recipient()));
-        bus.do_send(Subscribe::new(
-            "CommitteeFinalized",
-            addr.clone().recipient(),
-        ));
-        bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));
+        bus.subscribe("E3Requested", addr.clone().recipient());
+        bus.subscribe("CommitteeFinalized", addr.clone().recipient());
+        bus.subscribe("Shutdown", addr.clone().recipient());
 
         addr
     }
@@ -112,11 +109,11 @@ impl Handler<E3Requested> for CiphernodeSelector {
                         ticket_id = tid,
                         "Ticket generated for score sortition"
                     );
-                    bus.do_send(EnclaveEvent::from(TicketGenerated {
+                    bus.dispatch(TicketGenerated {
                         e3_id: data.e3_id.clone(),
                         ticket_id: TicketId::Score(tid),
                         node: address.clone(),
-                    }));
+                    });
                 }
             } else {
                 info!("This node is not selected");
@@ -168,7 +165,7 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
-            bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+            bus.dispatch(CiphernodeSelected {
                 party_id: party_id as u64,
                 e3_id,
                 threshold_m: e3_meta.threshold_m,
@@ -177,7 +174,7 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 error_size: e3_meta.error_size,
                 params: e3_meta.params,
                 seed: e3_meta.seed,
-            }));
+            });
         })
     }
 }

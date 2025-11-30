@@ -10,8 +10,8 @@ use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    BusError, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, EventBus, OperatorActivationChanged,
+    prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
+    ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, OperatorActivationChanged,
     PlaintextOutputPublished, Seed, Subscribe, TicketBalanceUpdated,
 };
 use e3_events::{EnclaveEventData, EventManager};
@@ -193,20 +193,19 @@ impl Sortition {
         .start();
 
         // Subscribe to all relevant events
-        bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
-        bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
-        bus.do_send(Subscribe::new("TicketBalanceUpdated", addr.clone().into()));
-        bus.do_send(Subscribe::new(
-            "OperatorActivationChanged",
+        bus.subscribe_all(
+            &[
+                "CiphernodeAdded",
+                "CiphernodeRemoved",
+                "TicketBalanceUpdated",
+                "OperatorActivationChanged",
+                "ConfigurationUpdated",
+                "CommitteePublished",
+                "PlaintextOutputPublished",
+                "CommitteeFinalized",
+            ],
             addr.clone().into(),
-        ));
-        bus.do_send(Subscribe::new("ConfigurationUpdated", addr.clone().into()));
-        bus.do_send(Subscribe::new("CommitteePublished", addr.clone().into()));
-        bus.do_send(Subscribe::new(
-            "PlaintextOutputPublished",
-            addr.clone().into(),
-        ));
-        bus.do_send(Subscribe::new("CommitteeFinalized", addr.clone().into()));
+        );
 
         info!("Sortition actor started");
         Ok(addr)

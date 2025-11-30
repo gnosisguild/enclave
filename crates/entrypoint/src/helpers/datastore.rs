@@ -6,12 +6,12 @@
 
 use std::path::PathBuf;
 
-use actix::{Actor, Addr};
+use actix::Actor;
 use anyhow::Result;
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus, EventManager};
+use e3_events::{get_enclave_event_manager, EnclaveEvent, EventManager};
 
 pub fn get_sled_store(bus: &EventManager<EnclaveEvent>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())
@@ -31,7 +31,7 @@ pub fn setup_datastore(config: &AppConfig, bus: &EventManager<EnclaveEvent>) -> 
 }
 
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
-    let bus = get_enclave_event_bus();
+    let bus = get_enclave_event_manager();
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
 }

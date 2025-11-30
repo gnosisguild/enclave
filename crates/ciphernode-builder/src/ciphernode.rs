@@ -6,13 +6,13 @@
 
 use actix::Addr;
 use e3_data::{DataStore, InMemStore, StoreAddr};
-use e3_events::{EnclaveEvent, EventBus, HistoryCollector};
+use e3_events::{EnclaveEvent, EventBus, EventManager, HistoryCollector};
 
 #[derive(Clone, Debug)]
 pub struct CiphernodeHandle {
     pub address: String,
     pub store: DataStore,
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: EventManager<EnclaveEvent>,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
 }
@@ -21,7 +21,7 @@ impl CiphernodeHandle {
     pub fn new(
         address: String,
         store: DataStore,
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: EventManager<EnclaveEvent>,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     ) -> Self {
@@ -35,7 +35,7 @@ impl CiphernodeHandle {
     }
 
     pub fn bus(&self) -> Addr<EventBus<EnclaveEvent>> {
-        self.bus.clone()
+        self.bus.bus()
     }
 
     pub fn history(&self) -> Option<Addr<HistoryCollector<EnclaveEvent>>> {

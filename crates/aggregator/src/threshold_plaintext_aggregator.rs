@@ -10,7 +10,7 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
 use e3_events::{
-    ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventBus,
+    prelude::*, ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData,
     EventManager, PlaintextAggregated, Seed,
 };
 use e3_multithread::Multithread;
@@ -336,13 +336,13 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                     act.set_decryption(plaintext.clone())?;
 
                     // Dispatch the PlaintextAggregated event
-                    let event = EnclaveEvent::from(PlaintextAggregated {
+                    let event = PlaintextAggregated {
                         decrypted_output: plaintext, // Extracting here for now
                         e3_id: act.e3_id.clone(),
-                    });
+                    };
 
                     info!("Dispatching plaintext event {:?}", event);
-                    act.bus.do_send(event);
+                    act.bus.dispatch(event);
                     Ok(())
                 }),
         )

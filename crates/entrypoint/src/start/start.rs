@@ -4,15 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Addr;
 use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
-use e3_events::{get_enclave_event_bus, EventManager};
-use e3_events::{EnclaveEvent, EventBus};
+use e3_events::{get_enclave_event_manager, EnclaveEvent};
+use e3_events::{prelude::*, EventManager};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -30,14 +29,14 @@ pub async fn execute(
 ) -> Result<(EventManager<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
-    let bus = get_enclave_event_bus();
+    let bus = get_enclave_event_manager();
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
 
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(&address.to_string())
-        .with_source_bus(&bus)
+        .with_source_bus(&bus.bus())
         .with_datastore(store)
         .with_sortition_score()
         .with_chains(&config.chains())

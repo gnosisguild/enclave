@@ -4,9 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Recipient;
 use anyhow::Result;
-use e3_events::{EnclaveEvent, Shutdown};
+use e3_events::{prelude::*, EnclaveEvent, EventManager, Shutdown};
 use std::time::Duration;
 use tokio::{
     select,
@@ -15,7 +14,10 @@ use tokio::{
 };
 use tracing::{error, info};
 
-pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, mut handle: JoinHandle<Result<()>>) {
+pub async fn listen_for_shutdown(
+    bus: EventManager<EnclaveEvent>,
+    mut handle: JoinHandle<Result<()>>,
+) {
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
     select! {
@@ -23,7 +25,10 @@ pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, mut handle: JoinH
             info!("SIGTERM received, initiating graceful shutdown...");
 
             // Stop the actor system
-            let _ = bus.send(EnclaveEvent::from(Shutdown)).await;
+            bus.dispatch(Shutdown);
+
+            // Wait for all events to propagate
+            tokio::time::sleep(Duration::from_secs(2)).await;
 
             // Abort the spawned task
             handle.abort();

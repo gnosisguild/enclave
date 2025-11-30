@@ -9,9 +9,9 @@ use anyhow::{anyhow, Result};
 use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
-    BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
-    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventBus, EventManager,
-    FromError, KeyshareCreated,
+    prelude::*, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
+    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventManager, FromError,
+    KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
 use e3_utils::utility_types::ArcBytes;
@@ -95,27 +95,24 @@ impl Handler<CiphernodeSelected> for Keyshare {
 
         // generate keyshare
         let Ok((secret, pubkey)) = self.fhe.generate_keyshare() else {
-            self.bus.do_send(EnclaveEvent::from_error(
+            self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!("Error creating Keyshare for {e3_id}"),
-            ));
+            );
             return;
         };
 
         // Save secret on state
         if let Err(err) = self.set_secret(secret) {
-            self.bus.do_send(EnclaveEvent::from_error(
-                EnclaveErrorType::KeyGeneration,
-                err,
-            ))
+            self.bus.err(EnclaveErrorType::KeyGeneration, err)
         };
 
         // Broadcast the KeyshareCreated message
-        self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
+        self.bus.dispatch(KeyshareCreated {
             pubkey,
             e3_id,
             node: self.address.clone(),
-        }));
+        });
     }
 }
 
@@ -159,12 +156,12 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
-        self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
+        self.bus.dispatch(DecryptionshareCreated {
             party_id: 0, // Not used
             e3_id,
             decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],
             node: self.address.clone(),
-        }));
+        });
     }
 }
 

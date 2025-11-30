@@ -18,9 +18,9 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    BusError, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
-    EnclaveEventData, EventBus, EventManager, OrderedSet, PublicKeyAggregated, Seed, Shutdown,
-    Subscribe, TicketGenerated, TicketId,
+    prelude::*, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType,
+    EnclaveEvent, EnclaveEventData, EventManager, EventSubscriber, OrderedSet, PublicKeyAggregated,
+    Seed, Shutdown, TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -53,10 +53,10 @@ impl From<CiphernodeAddedWithChainId> for e3_events::CiphernodeAdded {
     }
 }
 
-impl From<CiphernodeAddedWithChainId> for EnclaveEvent {
+impl From<CiphernodeAddedWithChainId> for EnclaveEventData {
     fn from(value: CiphernodeAddedWithChainId) -> Self {
         let payload: e3_events::CiphernodeAdded = value.into();
-        EnclaveEvent::from(payload)
+        EnclaveEventData::from(payload)
     }
 }
 
@@ -81,10 +81,10 @@ impl From<CiphernodeRemovedWithChainId> for e3_events::CiphernodeRemoved {
     }
 }
 
-impl From<CiphernodeRemovedWithChainId> for EnclaveEvent {
+impl From<CiphernodeRemovedWithChainId> for EnclaveEventData {
     fn from(value: CiphernodeRemovedWithChainId) -> Self {
         let payload: e3_events::CiphernodeRemoved = value.into();
-        EnclaveEvent::from(payload)
+        EnclaveEventData::from(payload)
     }
 }
 
@@ -103,10 +103,10 @@ impl From<CommitteeRequestedWithChainId> for e3_events::CommitteeRequested {
     }
 }
 
-impl From<CommitteeRequestedWithChainId> for EnclaveEvent {
+impl From<CommitteeRequestedWithChainId> for EnclaveEventData {
     fn from(value: CommitteeRequestedWithChainId) -> Self {
         let payload: e3_events::CommitteeRequested = value.into();
-        EnclaveEvent::from(payload)
+        EnclaveEventData::from(payload)
     }
 }
 
@@ -127,10 +127,10 @@ impl From<CommitteeFinalizedWithChainId> for CommitteeFinalized {
     }
 }
 
-impl From<CommitteeFinalizedWithChainId> for EnclaveEvent {
+impl From<CommitteeFinalizedWithChainId> for EnclaveEventData {
     fn from(value: CommitteeFinalizedWithChainId) -> Self {
         let payload: e3_events::CommitteeFinalized = value.into();
-        EnclaveEvent::from(payload)
+        EnclaveEventData::from(payload)
     }
 }
 
@@ -148,21 +148,21 @@ impl From<TicketSubmittedWithChainId> for e3_events::TicketSubmitted {
     }
 }
 
-impl From<TicketSubmittedWithChainId> for EnclaveEvent {
+impl From<TicketSubmittedWithChainId> for EnclaveEventData {
     fn from(value: TicketSubmittedWithChainId) -> Self {
         let payload: e3_events::TicketSubmitted = value.into();
-        EnclaveEvent::from(payload)
+        EnclaveEventData::from(payload)
     }
 }
 
-pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data) else {
                 error!("Error parsing event CiphernodeAdded after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(CiphernodeAddedWithChainId(
+            Some(EnclaveEventData::from(CiphernodeAddedWithChainId(
                 event, chain_id,
             )))
         }
@@ -171,7 +171,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event CiphernodeRemoved after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(CiphernodeRemovedWithChainId(
+            Some(EnclaveEventData::from(CiphernodeRemovedWithChainId(
                 event, chain_id,
             )))
         }
@@ -180,7 +180,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event CommitteeRequested after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(CommitteeRequestedWithChainId(
+            Some(EnclaveEventData::from(CommitteeRequestedWithChainId(
                 event, chain_id,
             )))
         }
@@ -189,7 +189,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event CommitteeFinalized after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(CommitteeFinalizedWithChainId(
+            Some(EnclaveEventData::from(CommitteeFinalizedWithChainId(
                 event, chain_id,
             )))
         }
@@ -198,7 +198,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event TicketSubmitted after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(TicketSubmittedWithChainId(
+            Some(EnclaveEventData::from(TicketSubmittedWithChainId(
                 event, chain_id,
             )))
         }
@@ -277,26 +277,21 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             .start();
 
         if is_aggregator {
-            let _ = bus
-                .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
-                .await;
-            let _ = bus
-                .send(Subscribe::new(
-                    "CommitteeFinalizeRequested",
-                    addr.clone().into(),
-                ))
-                .await;
+            bus.subscribe_all(
+                &["PublicKeyAggregated", "CommitteeFinalizeRequested"],
+                addr.clone().into(),
+            )
         }
 
-        // Subscribe to TicketGenerated for ticket submission
-        let _ = bus
-            .send(Subscribe::new("TicketGenerated", addr.clone().into()))
-            .await;
-
-        // Stop gracefully on shutdown
-        let _ = bus
-            .send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await;
+        bus.subscribe_all(
+            &[
+                // Subscribe to TicketGenerated for ticket submission
+                "TicketGenerated",
+                // Stop gracefully on shutdown
+                "Shutdown",
+            ],
+            addr.clone().into(),
+        );
 
         Ok(addr)
     }

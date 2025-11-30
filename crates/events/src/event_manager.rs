@@ -8,7 +8,7 @@ use crate::{
     EventBus, Subscribe,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EventManager<E: Event> {
     bus: Addr<EventBus<E>>,
 }
@@ -16,6 +16,10 @@ pub struct EventManager<E: Event> {
 impl<E: Event> EventManager<E> {
     pub fn new(bus: Addr<EventBus<E>>) -> Self {
         Self { bus }
+    }
+
+    pub fn bus(&self) -> Addr<EventBus<E>> {
+        self.bus.clone()
     }
 }
 
@@ -28,6 +32,10 @@ impl<E: ManagedEvent> EventDispatcher<E> for EventManager<E> {
     fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128) {
         let evt = self.create_receive(data, ts);
         self.bus.do_send(evt)
+    }
+
+    fn naked_dispatch(&self, event: E) {
+        self.bus.do_send(event);
     }
 }
 
@@ -60,5 +68,12 @@ impl<E: ErrorEventConstructor> ErrorFactory<E> for EventManager<E> {
 impl<E: Event> EventSubscriber<E> for EventManager<E> {
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>) {
         self.bus.do_send(Subscribe::new(event_type, recipient))
+    }
+
+    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>) {
+        for event_type in event_types.into_iter() {
+            self.bus
+                .do_send(Subscribe::new(*event_type, recipient.clone()));
+        }
     }
 }

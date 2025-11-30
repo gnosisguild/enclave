@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, EnclaveEventData, EventBus, EventManager, Subscribe};
+use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, EventManager, EventSubscriber};
 use tracing::info;
 
 pub struct PublicKeyWriter {
@@ -21,10 +21,7 @@ impl PublicKeyWriter {
             path: path.to_owned(),
         }
         .start();
-        bus.do_send(Subscribe {
-            listener: addr.clone().recipient(),
-            event_type: "PublicKeyAggregated".to_string(),
-        });
+        bus.subscribe("PublicKeyAggregated", addr.clone().recipient());
         addr
     }
 }

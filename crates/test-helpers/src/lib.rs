@@ -15,8 +15,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, EventManager, HistoryCollector, Seed,
-    Subscribe,
+    CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, EventDispatcher,
+    EventManager, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -172,19 +172,19 @@ impl AddToCommittee {
             count: 0,
         }
     }
-    pub async fn add(&mut self, address: &str) -> Result<EnclaveEvent> {
-        let evt = EnclaveEvent::from(CiphernodeAdded {
+    pub async fn add(&mut self, address: &str) -> Result<EnclaveEventData> {
+        let evt = CiphernodeAdded {
             chain_id: self.chain_id,
             address: address.to_owned(),
             index: self.count,
             num_nodes: self.count + 1,
-        });
+        };
 
         self.count += 1;
 
-        self.bus.send(evt.clone()).await?;
+        self.bus.dispatch(evt.clone());
 
-        Ok(evt)
+        Ok(evt.into())
     }
 }
 

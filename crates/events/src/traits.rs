@@ -39,6 +39,7 @@ pub trait ErrorFactory<E: ErrorEvent> {
 pub trait EventDispatcher<E: Event> {
     fn dispatch(&self, data: impl Into<E::Data>);
     fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+    fn naked_dispatch(&self, event: E);
 }
 
 /// Trait for dispatching errors
@@ -49,6 +50,7 @@ pub trait ErrorDispatcher<E: ErrorEvent> {
 /// Trait to subscribe to events
 pub trait EventSubscriber<E: Event> {
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
+    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>);
 }
 
 /// Trait to create an event with a timestamp from its associated type data

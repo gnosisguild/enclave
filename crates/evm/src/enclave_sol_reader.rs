@@ -13,7 +13,7 @@ use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{E3id, EnclaveEvent, EventBus, EventManager};
+use e3_events::{prelude::*, E3id, EnclaveEvent, EnclaveEventData, EventManager};
 use e3_utils::utility_types::ArcBytes;
 use num_bigint::BigUint;
 use tracing::{error, info, trace};
@@ -44,10 +44,10 @@ impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     }
 }
 
-impl From<E3RequestedWithChainId> for EnclaveEvent {
+impl From<E3RequestedWithChainId> for EnclaveEventData {
     fn from(value: E3RequestedWithChainId) -> Self {
         let payload: e3_events::E3Requested = value.into();
-        EnclaveEvent::from(payload)
+        payload.into()
     }
 }
 
@@ -64,30 +64,32 @@ impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputP
     }
 }
 
-impl From<CiphertextOutputPublishedWithChainId> for EnclaveEvent {
+impl From<CiphertextOutputPublishedWithChainId> for EnclaveEventData {
     fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
         let payload: e3_events::CiphertextOutputPublished = value.into();
-        EnclaveEvent::from(payload)
+        payload.into()
     }
 }
 
-pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::E3Requested::decode_log_data(data) else {
                 error!("Error parsing event E3Requested after topic matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(E3RequestedWithChainId(event, chain_id)))
+            Some(EnclaveEventData::from(E3RequestedWithChainId(
+                event, chain_id,
+            )))
         }
         Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data) else {
                 error!("Error parsing event CiphertextOutputPublished after topic matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(CiphertextOutputPublishedWithChainId(
-                event, chain_id,
-            )))
+            Some(EnclaveEventData::from(
+                CiphertextOutputPublishedWithChainId(event, chain_id),
+            ))
         }
         _topic => {
             trace!(

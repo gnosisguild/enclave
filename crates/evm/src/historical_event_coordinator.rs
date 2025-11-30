@@ -6,13 +6,13 @@
 
 use crate::EnclaveEvmEvent;
 use actix::prelude::*;
-use e3_events::{EnclaveEvent, EventBus, EventManager};
+use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, EventManager};
 use tracing::info;
 
 #[derive(Clone)]
 struct BufferedEvent {
     block: u64,
-    event: EnclaveEvent,
+    event: EnclaveEventData,
 }
 
 /// Message to start forwarding buffered events after all readers have registered
@@ -60,7 +60,7 @@ impl HistoricalEventCoordinator {
 
         let count = self.buffered_events.len();
         for BufferedEvent { event, .. } in self.buffered_events.drain(..) {
-            self.target.do_send(event);
+            self.target.dispatch(event);
         }
 
         info!(
@@ -108,13 +108,10 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
             EnclaveEvmEvent::Event { event, block } => {
                 if !self.started || !self.all_readers_complete() {
                     if let Some(block) = block {
-                        self.buffered_events.push(BufferedEvent {
-                            block,
-                            event: event.clone(),
-                        });
+                        self.buffered_events.push(BufferedEvent { block, event });
                     }
                 } else {
-                    self.target.do_send(event);
+                    self.target.dispatch(event);
                 }
             }
         }

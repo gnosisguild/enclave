@@ -729,7 +729,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.do_send(CiphernodeSelected {
+        bus.dispatch(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,

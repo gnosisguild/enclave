@@ -17,11 +17,12 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use e3_events::prelude::*;
+use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::EventManager;
 use e3_events::Shutdown;
-use e3_events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
-use e3_events::{EnclaveEvent, EventBus};
+use e3_events::{E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use tracing::info;
 
 sol!(
@@ -56,13 +57,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-
-        bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
-            .await?;
-
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
-
+        bus.subscribe_all(&["PlaintextAggregated", "Shutdown"], addr.clone().into());
         Ok(addr)
     }
 }
