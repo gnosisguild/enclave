@@ -9,7 +9,7 @@ use actix::{Addr, Recipient};
 use crate::{
     traits::{
         CompositeEvent, ErrorDispatcher, ErrorFactory, Event, EventConstructorWithTimestamp,
-        EventDispatcher, EventFactory, EventSubscriber,
+        EventFactory, EventPublisher, EventSubscriber,
     },
     ErrorEvent, EventBus, Subscribe,
 };
@@ -29,13 +29,13 @@ impl<E: Event> BusHandle<E> {
     }
 }
 
-impl<E: CompositeEvent> EventDispatcher<E> for BusHandle<E> {
-    fn dispatch(&self, data: impl Into<E::Data>) {
+impl<E: CompositeEvent> EventPublisher<E> for BusHandle<E> {
+    fn publish(&self, data: impl Into<E::Data>) {
         let evt = self.event_from(data);
         self.bus.do_send(evt);
     }
 
-    fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128) {
+    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) {
         let evt = self.event_from_remote_source(data, ts);
         self.bus.do_send(evt)
     }
@@ -50,7 +50,7 @@ where
     E: CompositeEvent,
 {
     fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) {
-        let evt = self.err_from(err_type, error);
+        let evt = self.event_from_error(err_type, error);
         self.bus.do_send(evt);
     }
 }
@@ -68,7 +68,7 @@ impl<E: EventConstructorWithTimestamp> EventFactory<E> for BusHandle<E> {
 }
 
 impl<E: ErrorEvent> ErrorFactory<E> for BusHandle<E> {
-    fn err_from(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
+    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
         E::from_error(err_type, error)
     }
 }

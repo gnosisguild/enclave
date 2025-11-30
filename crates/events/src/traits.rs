@@ -40,18 +40,24 @@ pub trait EventFactory<E: Event> {
 
 /// Trait create errors
 pub trait ErrorFactory<E: ErrorEvent> {
-    fn err_from(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
+    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
 }
 
 /// Trait to dispatch events
-pub trait EventDispatcher<E: Event> {
-    fn dispatch(&self, data: impl Into<E::Data>);
-    fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+pub trait EventPublisher<E: Event> {
+    /// Create a new event from the given event data, apply a local HLC timestamp and dispatch it
+    /// to the event bus. This method should be used for events that have originated locally.
+    fn publish(&self, data: impl Into<E::Data>);
+    /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
+    /// event ordering. This method should be used for events that originated from remote sources.
+    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+    /// Dispatch the given event without applying any HLC transformation
     fn naked_dispatch(&self, event: E);
 }
 
 /// Trait for dispatching errors
 pub trait ErrorDispatcher<E: ErrorEvent> {
+    /// Dispatch the error to the event bus apply a local HCL
     fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>);
 }
 
@@ -63,6 +69,7 @@ pub trait EventSubscriber<E: Event> {
 
 /// Trait to create an event with a timestamp from its associated type data
 pub trait EventConstructorWithTimestamp: Event + Sized {
+    /// Create an event passing attaching a specific timestamp.
     fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
 }
 

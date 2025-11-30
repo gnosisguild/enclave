@@ -60,7 +60,7 @@ impl HistoricalEventCoordinator {
 
         let count = self.buffered_events.len();
         for BufferedEvent { event, .. } in self.buffered_events.drain(..) {
-            self.target.dispatch(event);
+            self.target.publish(event);
         }
 
         info!(
@@ -111,7 +111,7 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
                         self.buffered_events.push(BufferedEvent { block, event });
                     }
                 } else {
-                    self.target.dispatch(event);
+                    self.target.publish(event);
                 }
             }
         }

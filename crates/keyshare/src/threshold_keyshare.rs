@@ -526,7 +526,7 @@ impl ThresholdKeyshare {
             .map(|s| PvwEncrypted::new(s.decrypt(&self.cipher)?))
             .collect::<Result<_>>()?;
 
-        self.bus.dispatch(ThresholdShareCreated {
+        self.bus.publish(ThresholdShareCreated {
             e3_id,
             share: Arc::new(ThresholdShare {
                 party_id,
@@ -630,7 +630,7 @@ impl ThresholdKeyshare {
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
-        self.bus.dispatch(KeyshareCreated {
+        self.bus.publish(KeyshareCreated {
             pubkey: current.pk_share,
             e3_id,
             node: address,
@@ -697,7 +697,7 @@ impl ThresholdKeyshare {
         };
 
         // send the decryption share
-        self.bus.dispatch(event);
+        self.bus.publish(event);
 
         // mark as complete
         self.state.try_mutate(|s| {

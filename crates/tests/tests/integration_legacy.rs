@@ -124,7 +124,7 @@ async fn setup_score_sortition_environment(
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
-    bus.dispatch(ConfigurationUpdated {
+    bus.publish(ConfigurationUpdated {
         parameter: "ticketPrice".to_string(),
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
@@ -135,7 +135,7 @@ async fn setup_score_sortition_environment(
     for addr in eth_addrs {
         adder.add(addr).await?;
 
-        bus.dispatch(TicketBalanceUpdated {
+        bus.publish(TicketBalanceUpdated {
             operator: addr.clone(),
             delta: I256::try_from(1_000_000_000u64).unwrap(),
             new_balance: U256::from(1_000_000_000u64),
@@ -143,7 +143,7 @@ async fn setup_score_sortition_environment(
             chain_id,
         });
 
-        bus.dispatch(OperatorActivationChanged {
+        bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
@@ -202,13 +202,13 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     println!("Sending E3 event...");
     // Send the computation requested event
-    bus.dispatch(e3_request_event.clone());
+    bus.publish(e3_request_event.clone());
 
     // Test that we cannot send the same event twice
-    bus.dispatch(e3_request_event.clone());
+    bus.publish(e3_request_event.clone());
 
     // Finalize committee with all available nodes
-    bus.dispatch(CommitteeFinalized {
+    bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: eth_addrs.clone(),
         chain_id: 1,
@@ -258,7 +258,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.dispatch(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone());
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(6))
@@ -306,7 +306,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         };
 
         // Send e3request
-        bus.dispatch(E3Requested {
+        bus.publish(E3Requested {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             threshold_n: 2,
@@ -315,7 +315,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             ..E3Requested::default()
         });
 
-        bus.dispatch(CommitteeFinalized {
+        bus.publish(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
             chain_id: 1,
@@ -331,7 +331,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         assert_eq!(errors.len(), 0);
 
         // SEND SHUTDOWN!
-        bus.dispatch(Shutdown);
+        bus.publish(Shutdown);
 
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
@@ -400,7 +400,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     // Publish the ciphertext
     let raw_plaintext = vec![vec![1234, 567890]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
-    bus.dispatch(CiphertextOutputPublished {
+    bus.publish(CiphertextOutputPublished {
         ciphertext_output: ciphertext
             .iter()
             .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
@@ -495,9 +495,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         ..CiphernodeSelected::default()
     };
 
-    bus.dispatch(evt_1.clone());
-    bus.dispatch(evt_2.clone());
-    bus.dispatch(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
+    bus.publish(evt_1.clone());
+    bus.publish(evt_2.clone());
+    bus.publish(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
 
     // check the history of the event bus
     let history = history_collector
@@ -540,7 +540,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     setup_score_sortition_environment(&bus, &eth_addrs, 2).await?;
 
     // Send the computation requested event
-    bus.dispatch(E3Requested {
+    bus.publish(E3Requested {
         e3_id: E3id::new("1234", 1),
         threshold_m: 3,
         threshold_n: 3,
@@ -549,7 +549,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     });
 
-    bus.dispatch(CommitteeFinalized {
+    bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
         chain_id: 1,
@@ -577,7 +577,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     );
 
     // Send the computation requested event
-    bus.dispatch(E3Requested {
+    bus.publish(E3Requested {
         e3_id: E3id::new("1234", 2),
         threshold_m: 3,
         threshold_n: 3,
@@ -586,7 +586,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     });
 
-    bus.dispatch(CommitteeFinalized {
+    bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
         chain_id: 2,

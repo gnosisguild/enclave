@@ -342,7 +342,7 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                     };
 
                     info!("Dispatching plaintext event {:?}", event);
-                    act.bus.dispatch(event);
+                    act.bus.publish(event);
                     Ok(())
                 }),
         )

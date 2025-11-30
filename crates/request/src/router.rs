@@ -192,7 +192,7 @@ impl Handler<EnclaveEvent> for E3Router {
                 };
 
                 // Send to bus so all other actors can react to a request being complete.
-                self.bus.dispatch(event);
+                self.bus.publish(event);
             }
             EnclaveEventData::E3RequestComplete(_) => {
                 // Note this will be sent above to the children who can kill themselves based on

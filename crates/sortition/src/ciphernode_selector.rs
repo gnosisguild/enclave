@@ -109,7 +109,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
                         ticket_id = tid,
                         "Ticket generated for score sortition"
                     );
-                    bus.dispatch(TicketGenerated {
+                    bus.publish(TicketGenerated {
                         e3_id: data.e3_id.clone(),
                         ticket_id: TicketId::Score(tid),
                         node: address.clone(),
@@ -165,7 +165,7 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
-            bus.dispatch(CiphernodeSelected {
+            bus.publish(CiphernodeSelected {
                 party_id: party_id as u64,
                 e3_id,
                 threshold_m: e3_meta.threshold_m,

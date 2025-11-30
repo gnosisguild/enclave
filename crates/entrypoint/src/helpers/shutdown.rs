@@ -22,7 +22,7 @@ pub async fn listen_for_shutdown(bus: BusHandle<EnclaveEvent>, mut handle: JoinH
             info!("SIGTERM received, initiating graceful shutdown...");
 
             // Stop the actor system
-            bus.dispatch(Shutdown);
+            bus.publish(Shutdown);
 
             // Wait for all events to propagate
             tokio::time::sleep(Duration::from_secs(2)).await;

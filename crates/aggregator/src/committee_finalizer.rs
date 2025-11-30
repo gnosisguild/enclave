@@ -112,7 +112,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                bus.dispatch(CommitteeFinalizeRequested {
+                                bus.publish(CommitteeFinalizeRequested {
                                     e3_id: e3_id_clone.clone(),
                                 });
 

@@ -229,7 +229,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                         e3_id: msg.e3_id.clone(),
                         nodes: OrderedSet::from(nodes),
                     };
-                    act.bus.dispatch(event);
+                    act.bus.publish(event);
                     Ok(())
                 }),
         )

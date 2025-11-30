@@ -37,7 +37,7 @@ async fn setup_score_sortition_environment(
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
-    bus.dispatch(ConfigurationUpdated {
+    bus.publish(ConfigurationUpdated {
         parameter: "ticketPrice".to_string(),
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
@@ -48,7 +48,7 @@ async fn setup_score_sortition_environment(
     for addr in eth_addrs {
         adder.add(addr).await?;
 
-        bus.dispatch(TicketBalanceUpdated {
+        bus.publish(TicketBalanceUpdated {
             operator: addr.clone(),
             delta: I256::try_from(1_000_000_000u64).unwrap(),
             new_balance: U256::from(1_000_000_000u64),
@@ -56,7 +56,7 @@ async fn setup_score_sortition_environment(
             chain_id,
         });
 
-        bus.dispatch(OperatorActivationChanged {
+        bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
@@ -238,7 +238,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    bus.dispatch(e3_requested);
+    bus.publish(e3_requested);
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -260,7 +260,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     println!("Emitting CommitteeFinalized with {} nodes", committee.len());
 
-    bus.dispatch(CommitteeFinalized {
+    bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
@@ -361,7 +361,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.dispatch(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone());
 
     println!("CiphertextOutputPublished event has been dispatched!");
 

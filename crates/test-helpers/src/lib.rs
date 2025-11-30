@@ -16,7 +16,7 @@ use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventDispatcher, HistoryCollector, Seed, Subscribe,
+    EventPublisher, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -182,7 +182,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.dispatch(evt.clone());
+        self.bus.publish(evt.clone());
 
         Ok(evt.into())
     }

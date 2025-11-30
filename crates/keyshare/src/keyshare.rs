@@ -108,7 +108,7 @@ impl Handler<CiphernodeSelected> for Keyshare {
         };
 
         // Broadcast the KeyshareCreated message
-        self.bus.dispatch(KeyshareCreated {
+        self.bus.publish(KeyshareCreated {
             pubkey,
             e3_id,
             node: self.address.clone(),
@@ -156,7 +156,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
-        self.bus.dispatch(DecryptionshareCreated {
+        self.bus.publish(DecryptionshareCreated {
             party_id: 0, // Not used
             e3_id,
             decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],

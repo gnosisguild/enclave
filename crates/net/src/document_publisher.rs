@@ -280,7 +280,7 @@ pub async fn handle_document_published_notification(
     .await?;
 
     debug!("Sending received event...");
-    bus.dispatch(DocumentReceived {
+    bus.publish(DocumentReceived {
         meta: event.meta,
         value,
     });
@@ -422,8 +422,7 @@ impl EventConverter {
             vec![],
             None,
         );
-        self.bus
-            .dispatch(PublishDocumentRequested::new(meta, value));
+        self.bus.publish(PublishDocumentRequested::new(meta, value));
         Ok(())
     }
     /// Received document externally
@@ -438,7 +437,7 @@ impl EventConverter {
             },
         };
 
-        self.bus.dispatch(event);
+        self.bus.publish(event);
         Ok(())
     }
 }
@@ -543,7 +542,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // 1. Send a request to publish
-        bus.dispatch(PublishDocumentRequested {
+        bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         });
@@ -617,7 +616,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.dispatch(CiphernodeSelected {
+        bus.publish(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
@@ -679,7 +678,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // Send a request to publish
-        bus.dispatch(PublishDocumentRequested {
+        bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         });
@@ -729,7 +728,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.dispatch(CiphernodeSelected {
+        bus.publish(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
