@@ -8,8 +8,8 @@ use actix::{Addr, Recipient};
 
 use crate::{
     traits::{
-        CompositeEvent, ErrorDispatcher, ErrorEventConstructor, ErrorFactory, Event,
-        EventConstructorWithTimestamp, EventDispatcher, EventFactory, EventSubscriber,
+        CompositeEvent, ErrorDispatcher, ErrorFactory, Event, EventConstructorWithTimestamp,
+        EventDispatcher, EventFactory, EventSubscriber,
     },
     ErrorEvent, EventBus, Subscribe,
 };
