@@ -10,8 +10,7 @@ use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    Die, E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, FromError,
-    KeyshareCreated,
+    Die, E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
 use e3_utils::utility_types::ArcBytes;
