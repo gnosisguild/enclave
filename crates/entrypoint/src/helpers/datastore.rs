@@ -11,9 +11,9 @@ use anyhow::Result;
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::{get_enclave_event_manager, EnclaveEvent, EventManager};
+use e3_events::{get_enclave_event_manager, EnclaveEvent, BusHandle};
 
-pub fn get_sled_store(bus: &EventManager<EnclaveEvent>, db_file: &PathBuf) -> Result<DataStore> {
+pub fn get_sled_store(bus: &BusHandle<EnclaveEvent>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())
 }
 
@@ -21,7 +21,7 @@ pub fn get_in_mem_store() -> DataStore {
     (&InMemStore::new(true).start()).into()
 }
 
-pub fn setup_datastore(config: &AppConfig, bus: &EventManager<EnclaveEvent>) -> Result<DataStore> {
+pub fn setup_datastore(config: &AppConfig, bus: &BusHandle<EnclaveEvent>) -> Result<DataStore> {
     let store: DataStore = if !config.use_in_mem_store() {
         get_sled_store(&bus, &config.db_file())?
     } else {

@@ -9,7 +9,7 @@ use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{
     get_enclave_event_manager, prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-    EventManager,
+    BusHandle,
 };
 use once_cell::sync::Lazy;
 use sled::Db;
@@ -22,7 +22,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 impl Actor for SledStore {
@@ -30,7 +30,7 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &EventManager<EnclaveEvent>, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new(bus: &BusHandle<EnclaveEvent>, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(PathBuf::from(path))?;
 

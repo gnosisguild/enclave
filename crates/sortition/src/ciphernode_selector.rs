@@ -12,13 +12,13 @@ use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
     prelude::*, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
-    EnclaveEventData, EventManager, Shutdown, TicketGenerated, TicketId,
+    EnclaveEventData, BusHandle, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
 
 pub struct CiphernodeSelector {
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     address: String,
     data_store: DataStore,
@@ -30,7 +30,7 @@ impl Actor for CiphernodeSelector {
 
 impl CiphernodeSelector {
     pub fn new(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,
@@ -44,7 +44,7 @@ impl CiphernodeSelector {
     }
 
     pub fn attach(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,

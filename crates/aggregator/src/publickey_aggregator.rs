@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, Die, E3id, EnclaveEvent, EnclaveEventData, EventManager, KeyshareCreated,
+    prelude::*, Die, E3id, EnclaveEvent, EnclaveEventData, BusHandle, KeyshareCreated,
     OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -59,7 +59,7 @@ struct NotifyNetwork {
 
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
@@ -67,7 +67,7 @@ pub struct PublicKeyAggregator {
 
 pub struct PublicKeyAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: EventManager<EnclaveEvent>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }

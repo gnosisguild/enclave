@@ -14,7 +14,7 @@ use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
 use e3_events::EnclaveEventData;
-use e3_events::EventManager;
+use e3_events::BusHandle;
 use e3_events::GetEvents;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,
@@ -47,7 +47,7 @@ use tokio::sync::{broadcast, Mutex};
 use tokio::time::sleep;
 
 async fn setup_local_ciphernode(
-    bus: &EventManager<EnclaveEvent>,
+    bus: &BusHandle<EnclaveEvent>,
     rng: &SharedRng,
     logging: bool,
     addr: &str,
@@ -102,7 +102,7 @@ fn generate_pk_shares(
 }
 
 async fn create_local_ciphernodes(
-    bus: &EventManager<EnclaveEvent>,
+    bus: &BusHandle<EnclaveEvent>,
     rng: &SharedRng,
     count: u32,
     cipher: &Arc<Cipher>,
@@ -120,7 +120,7 @@ async fn create_local_ciphernodes(
 }
 
 async fn setup_score_sortition_environment(
-    bus: &EventManager<EnclaveEvent>,
+    bus: &BusHandle<EnclaveEvent>,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
@@ -443,7 +443,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus: EventManager<EnclaveEvent> =
+    let bus: BusHandle<EnclaveEvent> =
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
             .start()
             .into();
@@ -620,7 +620,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus: EventManager<EnclaveEvent> =
+    let bus: BusHandle<EnclaveEvent> =
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
             .start()
             .into();

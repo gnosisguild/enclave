@@ -16,7 +16,7 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EnclaveEventData, EventManager};
+use e3_events::{EnclaveEvent, EnclaveEventData, BusHandle};
 use tracing::{error, info, trace};
 
 sol!(
@@ -145,7 +145,7 @@ pub struct BondingRegistrySolReader;
 impl BondingRegistrySolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -179,7 +179,7 @@ pub struct BondingRegistrySol;
 impl BondingRegistrySol {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

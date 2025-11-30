@@ -12,14 +12,14 @@ use actix::{Addr, Recipient};
 use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus, EventManager};
+use e3_events::{EnclaveEvent, EventBus, BusHandle};
 
 pub struct EnclaveSol;
 
 impl EnclaveSol {
     pub async fn attach<R, W>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         read_provider: EthProvider<R>,
         write_provider: EthProvider<W>,
         contract_address: &str,

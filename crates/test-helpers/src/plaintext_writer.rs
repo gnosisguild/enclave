@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, EventManager};
+use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, BusHandle};
 use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
 use tracing::{error, info};
 
@@ -17,7 +17,7 @@ pub struct PlaintextWriter {
 }
 
 impl PlaintextWriter {
-    pub fn attach(path: &PathBuf, bus: EventManager<EnclaveEvent>) -> Addr<Self> {
+    pub fn attach(path: &PathBuf, bus: BusHandle<EnclaveEvent>) -> Addr<Self> {
         let addr = Self {
             path: path.to_owned(),
         }

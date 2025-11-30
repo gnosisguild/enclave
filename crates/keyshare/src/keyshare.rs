@@ -10,7 +10,7 @@ use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
-    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventManager, FromError,
+    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, BusHandle, FromError,
     KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
@@ -20,7 +20,7 @@ use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     secret: Persistable<Vec<u8>>,
     address: String,
     cipher: Arc<Cipher>,
@@ -31,7 +31,7 @@ impl Actor for Keyshare {
 }
 
 pub struct KeyshareParams {
-    pub bus: EventManager<EnclaveEvent>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub secret: Persistable<Vec<u8>>,
     pub fhe: Arc<Fhe>,
     pub address: String,

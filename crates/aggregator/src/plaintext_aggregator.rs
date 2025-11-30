@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, EventManager,
+    prelude::*, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, BusHandle,
     OrderedSet, PlaintextAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
@@ -72,7 +72,7 @@ struct ComputeAggregate {
 #[deprecated = "To be replaced by ThresholdPlaintextAggregator"]
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PlaintextAggregatorState>,
@@ -80,7 +80,7 @@ pub struct PlaintextAggregator {
 
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: EventManager<EnclaveEvent>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }

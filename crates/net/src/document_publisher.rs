@@ -15,7 +15,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
-    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, EventManager,
+    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, BusHandle,
     PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
@@ -40,7 +40,7 @@ const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 /// bus
 pub struct DocumentPublisher {
     /// Enclave EventBus
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
@@ -55,7 +55,7 @@ pub struct DocumentPublisher {
 impl DocumentPublisher {
     /// Create a new NetEventTranslator actor
     pub fn new(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -81,7 +81,7 @@ impl DocumentPublisher {
 
     /// Setup the DocumentPublisher and start listening for GossipEvents
     pub fn setup(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -253,7 +253,7 @@ pub async fn handle_publish_document_requested(
 pub async fn handle_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     ids: HashMap<E3id, PartyId>,
     event: DocumentPublishedNotification,
 ) -> Result<()> {
@@ -374,7 +374,7 @@ async fn broadcast_document_published_notification(
 
 /// Convert between ThresholdShareCreated and DocumentPublished events
 pub struct EventConverter {
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -399,10 +399,10 @@ impl ReceivableDocument {
 }
 
 impl EventConverter {
-    pub fn new(bus: &EventManager<EnclaveEvent>) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
         Self { bus: bus.clone() }
     }
-    pub fn setup(bus: &EventManager<EnclaveEvent>) -> Addr<Self> {
+    pub fn setup(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
@@ -488,7 +488,7 @@ mod tests {
     use anyhow::{bail, Result};
     use e3_events::{
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
-        EventBusConfig, EventManager, GetEvents, HistoryCollector, PublishDocumentRequested,
+        EventBusConfig, BusHandle, GetEvents, HistoryCollector, PublishDocumentRequested,
         TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
@@ -500,7 +500,7 @@ mod tests {
 
     fn setup_test() -> (
         DefaultGuard,
-        EventManager<EnclaveEvent>,
+        BusHandle<EnclaveEvent>,
         mpsc::Sender<NetCommand>,
         mpsc::Receiver<NetCommand>,
         broadcast::Sender<NetEvent>,

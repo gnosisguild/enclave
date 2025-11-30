@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, EventManager, ManagedEvent};
+use crate::{prelude::*, BusHandle, ManagedEvent};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -76,8 +76,8 @@ impl<E: Event> EventBus<E> {
         addr
     }
 
-    pub fn manager(source: Addr<EventBus<E>>) -> EventManager<E> {
-        EventManager::new(source)
+    pub fn manager(source: Addr<EventBus<E>>) -> BusHandle<E> {
+        BusHandle::new(source)
     }
 
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
@@ -137,9 +137,9 @@ impl<E: Event> Handler<E> for EventBus<E> {
     }
 }
 
-impl<E: ManagedEvent> From<Addr<EventBus<E>>> for EventManager<E> {
+impl<E: ManagedEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
     fn from(value: Addr<EventBus<E>>) -> Self {
-        EventManager::new(value)
+        BusHandle::new(value)
     }
 }
 
@@ -421,9 +421,9 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: ManagedEvent>() -> (EventManager<E>, Addr<HistoryCollector<E>>)
+pub fn new_event_bus_with_history<E: ManagedEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
 {
-    let bus: EventManager<E> = EventBus::<E>::default().start().into();
+    let bus: BusHandle<E> = EventBus::<E>::default().start().into();
 
     let history = HistoryCollector::new().start();
     bus.subscribe("*", history.clone().recipient());

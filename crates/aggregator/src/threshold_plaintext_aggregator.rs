@@ -11,7 +11,7 @@ use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData,
-    EventManager, PlaintextAggregated, Seed,
+    BusHandle, PlaintextAggregated, Seed,
 };
 use e3_multithread::Multithread;
 use e3_sortition::{GetNodesForE3, Sortition};
@@ -122,7 +122,7 @@ pub struct ComputeAggregate {
 
 pub struct ThresholdPlaintextAggregator {
     multithread: Addr<Multithread>,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<ThresholdPlaintextAggregatorState>,
@@ -130,7 +130,7 @@ pub struct ThresholdPlaintextAggregator {
 
 pub struct ThresholdPlaintextAggregatorParams {
     pub multithread: Addr<Multithread>,
-    pub bus: EventManager<EnclaveEvent>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }

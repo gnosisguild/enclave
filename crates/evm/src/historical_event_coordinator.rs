@@ -6,7 +6,7 @@
 
 use crate::EnclaveEvmEvent;
 use actix::prelude::*;
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, EventManager};
+use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, BusHandle};
 use tracing::info;
 
 #[derive(Clone)]
@@ -30,13 +30,13 @@ pub struct HistoricalEventCoordinator {
     /// Buffered events during historical sync
     buffered_events: Vec<BufferedEvent>,
     /// Target to forward events to (typically EventBus)
-    target: EventManager<EnclaveEvent>,
+    target: BusHandle<EnclaveEvent>,
     /// Whether we've started forwarding (after Start message)
     started: bool,
 }
 
 impl HistoricalEventCoordinator {
-    pub fn new(target: EventManager<EnclaveEvent>) -> Self {
+    pub fn new(target: BusHandle<EnclaveEvent>) -> Self {
         Self {
             registered_count: 0,
             completed_count: 0,
@@ -46,7 +46,7 @@ impl HistoricalEventCoordinator {
         }
     }
 
-    pub fn setup(target: EventManager<EnclaveEvent>) -> Addr<Self> {
+    pub fn setup(target: BusHandle<EnclaveEvent>) -> Addr<Self> {
         Self::new(target).start()
     }
 

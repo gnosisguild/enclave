@@ -20,7 +20,7 @@ use anyhow::Result;
 use e3_events::prelude::*;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
-use e3_events::EventManager;
+use e3_events::BusHandle;
 use e3_events::Shutdown;
 use e3_events::{E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use tracing::info;
@@ -35,12 +35,12 @@ sol!(
 pub struct EnclaveSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -52,7 +52,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     }
 
     pub async fn attach(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {

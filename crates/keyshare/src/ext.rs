@@ -13,21 +13,21 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventManager};
+use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, BusHandle};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     address: String,
     cipher: Arc<Cipher>,
 }
 
 impl KeyshareExtension {
     pub fn create(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         address: &str,
         cipher: &Arc<Cipher>,
     ) -> Box<Self> {
@@ -121,7 +121,7 @@ impl E3Extension for KeyshareExtension {
 }
 
 pub struct ThresholdKeyshareExtension {
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     cipher: Arc<Cipher>,
     address: String,
     multithread: Addr<Multithread>,
@@ -129,7 +129,7 @@ pub struct ThresholdKeyshareExtension {
 
 impl ThresholdKeyshareExtension {
     pub fn create(
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         address: &str,

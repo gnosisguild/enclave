@@ -13,7 +13,7 @@ use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{prelude::*, E3id, EnclaveEvent, EnclaveEventData, EventManager};
+use e3_events::{prelude::*, E3id, EnclaveEvent, EnclaveEventData, BusHandle};
 use e3_utils::utility_types::ArcBytes;
 use num_bigint::BigUint;
 use tracing::{error, info, trace};
@@ -107,7 +107,7 @@ pub struct EnclaveSolReader;
 impl EnclaveSolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &EventManager<EnclaveEvent>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

@@ -16,7 +16,7 @@ use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
     CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, EventDispatcher,
-    EventManager, HistoryCollector, Seed, Subscribe,
+    BusHandle, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -72,7 +72,7 @@ pub fn create_crp_bytes_params(
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
-    EventManager<EnclaveEvent>,
+    BusHandle<EnclaveEvent>,
     SharedRng,
     Seed,
     Arc<BfvParameters>,
@@ -159,13 +159,13 @@ pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
 /// Test helper to add addresses to the committee by creating events on the event bus
 #[derive(Clone, Debug)]
 pub struct AddToCommittee {
-    bus: EventManager<EnclaveEvent>,
+    bus: BusHandle<EnclaveEvent>,
     count: usize,
     chain_id: u64,
 }
 
 impl AddToCommittee {
-    pub fn new(bus: &EventManager<EnclaveEvent>, chain_id: u64) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>, chain_id: u64) -> Self {
         Self {
             bus: bus.clone(),
             chain_id,

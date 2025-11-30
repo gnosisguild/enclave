@@ -11,7 +11,7 @@ use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::{get_enclave_event_manager, EnclaveEvent};
-use e3_events::{prelude::*, EventManager};
+use e3_events::{prelude::*, BusHandle};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -26,7 +26,7 @@ pub async fn execute(
     config: &AppConfig,
     address: Address,
     experimental_trbfv: bool,
-) -> Result<(EventManager<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
+) -> Result<(BusHandle<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
     let bus = get_enclave_event_manager();
