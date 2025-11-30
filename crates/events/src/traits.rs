@@ -35,12 +35,12 @@ pub trait ErrorEvent: Event {
 /// Trait to create events
 pub trait EventFactory<E: Event> {
     fn event_from(&self, data: impl Into<E::Data>) -> E;
-    fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E;
+    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E;
 }
 
 /// Trait create errors
 pub trait ErrorFactory<E: ErrorEvent> {
-    fn create_err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
+    fn err_from(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
 }
 
 /// Trait to dispatch events

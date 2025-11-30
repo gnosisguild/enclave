@@ -36,7 +36,7 @@ impl<E: CompositeEvent> EventDispatcher<E> for BusHandle<E> {
     }
 
     fn dispatch_from_remote(&self, data: impl Into<E::Data>, ts: u128) {
-        let evt = self.create_receive(data, ts);
+        let evt = self.event_from_remote_source(data, ts);
         self.bus.do_send(evt)
     }
 
@@ -50,23 +50,25 @@ where
     E: CompositeEvent,
 {
     fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) {
-        let evt = self.create_err(err_type, error);
+        let evt = self.err_from(err_type, error);
         self.bus.do_send(evt);
     }
 }
 
 impl<E: EventConstructorWithTimestamp> EventFactory<E> for BusHandle<E> {
     fn event_from(&self, data: impl Into<E::Data>) -> E {
+        // TODO: add self.hcl.tick()
         E::new_with_timestamp(data.into(), 0)
     }
 
-    fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E {
+    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E {
+        // TODO: add self.hcl.receive(ts)
         E::new_with_timestamp(data.into(), ts)
     }
 }
 
 impl<E: ErrorEvent> ErrorFactory<E> for BusHandle<E> {
-    fn create_err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
+    fn err_from(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
         E::from_error(err_type, error)
     }
 }
