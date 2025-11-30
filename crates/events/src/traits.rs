@@ -34,7 +34,7 @@ pub trait ErrorEvent: Event {
 
 /// Trait to create events
 pub trait EventFactory<E: Event> {
-    fn create_local(&self, data: impl Into<E::Data>) -> E;
+    fn event_from(&self, data: impl Into<E::Data>) -> E;
     fn create_receive(&self, data: impl Into<E::Data>, ts: u128) -> E;
 }
 

@@ -31,7 +31,7 @@ impl<E: Event> BusHandle<E> {
 
 impl<E: CompositeEvent> EventDispatcher<E> for BusHandle<E> {
     fn dispatch(&self, data: impl Into<E::Data>) {
-        let evt = self.create_local(data);
+        let evt = self.event_from(data);
         self.bus.do_send(evt);
     }
 
@@ -56,7 +56,7 @@ where
 }
 
 impl<E: EventConstructorWithTimestamp> EventFactory<E> for BusHandle<E> {
-    fn create_local(&self, data: impl Into<E::Data>) -> E {
+    fn event_from(&self, data: impl Into<E::Data>) -> E {
         E::new_with_timestamp(data.into(), 0)
     }
 

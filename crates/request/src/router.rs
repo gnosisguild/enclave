@@ -210,7 +210,7 @@ impl Handler<EnclaveEvent> for E3Router {
 impl Handler<Shutdown> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
-        let shutdown_evt = self.bus.create_local(msg);
+        let shutdown_evt = self.bus.event_from(msg);
         for (_, ctx) in self.contexts.iter() {
             ctx.forward_message_now(&shutdown_evt)
         }

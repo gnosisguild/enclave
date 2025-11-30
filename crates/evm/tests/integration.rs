@@ -269,7 +269,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     // Ensure shutdown doesn't cause event to be lost.
     sleep(Duration::from_millis(10)).await;
-    addr1.send(bus.create_local(Shutdown)).await?;
+    addr1.send(bus.event_from(Shutdown)).await?;
 
     for msg in ["these", "are", "not", "lost"] {
         contract
