@@ -93,5 +93,5 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
 }
 
 pub fn get_enclave_bus_handle() -> BusHandle<EnclaveEvent> {
-    EventBus::manager(get_enclave_event_bus())
+    get_enclave_event_bus().into()
 }

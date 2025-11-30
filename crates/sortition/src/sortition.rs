@@ -12,7 +12,7 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
     ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, Subscribe, TicketBalanceUpdated,
+    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use serde::{Deserialize, Serialize};

@@ -209,10 +209,3 @@ pub fn encrypt_ciphertext(
         .collect::<Result<Vec<Ciphertext>>>()?;
     Ok((ciphertext, plaintext))
 }
-
-fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
-    let len = input.len();
-    let mut cop = input.to_vec();
-    cop.extend(std::iter::repeat(pad).take(total - len));
-    cop
-}

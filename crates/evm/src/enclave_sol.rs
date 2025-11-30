@@ -8,11 +8,11 @@ use crate::{
     enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
     event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent,
 };
-use actix::{Addr, Recipient};
+use actix::Recipient;
 use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{BusHandle, EnclaveEvent, EventBus};
+use e3_events::{BusHandle, EnclaveEvent};
 
 pub struct EnclaveSol;
 

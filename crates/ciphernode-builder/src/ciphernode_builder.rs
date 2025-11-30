@@ -16,7 +16,7 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{prelude::*, EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -298,8 +298,8 @@ impl CiphernodeBuilder {
             None
         };
 
-        // Setup an event dispatcher
-        let dispatcher = EventBus::manager(local_bus);
+        // Get a handle from the event bus
+        let bus = local_bus.into();
 
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);
@@ -321,7 +321,7 @@ impl CiphernodeBuilder {
         let default_backend = self.sortition_backend.clone();
 
         let sortition = Sortition::attach(
-            &dispatcher,
+            &bus,
             repositories.sortition(),
             repositories.node_state(),
             repositories.finalized_committees(),
@@ -329,12 +329,12 @@ impl CiphernodeBuilder {
         )
         .await?;
 
-        CiphernodeSelector::attach(&dispatcher, &sortition, &addr, &store);
+        CiphernodeSelector::attach(&bus, &sortition, &addr, &store);
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
-        let coordinator = HistoricalEventCoordinator::setup(dispatcher.clone());
+        let coordinator = HistoricalEventCoordinator::setup(bus.clone());
         let processor = coordinator.clone().recipient();
 
         // TODO: gather an async handle from the event readers that closes when they shutdown and
@@ -351,7 +351,7 @@ impl CiphernodeBuilder {
                     .await?;
                 EnclaveSol::attach(
                     &processor,
-                    &dispatcher,
+                    &bus,
                     read_provider.clone(),
                     write_provider.clone(),
                     &chain.contracts.enclave.address(),
@@ -366,7 +366,7 @@ impl CiphernodeBuilder {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 EnclaveSolReader::attach(
                     &processor,
-                    &dispatcher,
+                    &bus,
                     read_provider.clone(),
                     &chain.contracts.enclave.address(),
                     &repositories.enclave_sol_reader(read_provider.chain_id()),
@@ -380,7 +380,7 @@ impl CiphernodeBuilder {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 BondingRegistrySol::attach(
                     &processor,
-                    &dispatcher,
+                    &bus,
                     read_provider.clone(),
                     &chain.contracts.bonding_registry.address(),
                     &repositories.bonding_registry_reader(read_provider.chain_id()),
@@ -394,7 +394,7 @@ impl CiphernodeBuilder {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 CiphernodeRegistrySol::attach(
                     &processor,
-                    &dispatcher,
+                    &bus,
                     read_provider.clone(),
                     &chain.contracts.ciphernode_registry.address(),
                     &repositories.ciphernode_registry_reader(read_provider.chain_id()),
@@ -409,7 +409,7 @@ impl CiphernodeBuilder {
                 {
                     Ok(write_provider) => {
                         let _writer = CiphernodeRegistrySol::attach_writer(
-                            &dispatcher,
+                            &bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
                             self.pubkey_agg,
@@ -419,7 +419,7 @@ impl CiphernodeBuilder {
 
                         if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
                             info!("Attaching CommitteeFinalizer for score sortition");
-                            e3_aggregator::CommitteeFinalizer::attach(&dispatcher);
+                            e3_aggregator::CommitteeFinalizer::attach(&bus);
                         }
                     }
                     Err(e) => error!(
@@ -434,13 +434,13 @@ impl CiphernodeBuilder {
         coordinator.do_send(CoordinatorStart);
 
         // E3 specific setup
-        let mut e3_builder = E3Router::builder(&dispatcher, store.clone());
+        let mut e3_builder = E3Router::builder(&bus, store.clone());
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let multithread = self.ensure_multithread();
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
-                &dispatcher,
+                &bus,
                 &self.cipher,
                 &multithread,
                 &addr,
@@ -452,30 +452,24 @@ impl CiphernodeBuilder {
             || self.plaintext_agg
         {
             info!("Setting up FheExtension");
-            e3_builder = e3_builder.with(FheExtension::create(&dispatcher, &self.rng))
+            e3_builder = e3_builder.with(FheExtension::create(&bus, &self.rng))
         }
 
         if self.pubkey_agg {
             info!("Setting up PublicKeyAggregationExtension");
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(
-                &dispatcher,
-                &sortition,
-            ))
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus, &sortition))
         }
 
         if self.plaintext_agg {
             info!("Setting up PlaintextAggregationExtension (legacy)");
-            e3_builder = e3_builder.with(PlaintextAggregatorExtension::create(
-                &dispatcher,
-                &sortition,
-            ))
+            e3_builder = e3_builder.with(PlaintextAggregatorExtension::create(&bus, &sortition))
         }
 
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
             let multithread = self.ensure_multithread();
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &dispatcher,
+                &bus,
                 &sortition,
                 &multithread,
             ))
@@ -483,8 +477,7 @@ impl CiphernodeBuilder {
 
         if matches!(self.keyshare, Some(KeyshareKind::NonThreshold)) {
             info!("Setting up KeyshareExtension (legacy)!");
-            e3_builder =
-                e3_builder.with(KeyshareExtension::create(&dispatcher, &addr, &self.cipher))
+            e3_builder = e3_builder.with(KeyshareExtension::create(&bus, &addr, &self.cipher))
         }
         info!("building...");
         e3_builder.build().await?;
@@ -492,7 +485,7 @@ impl CiphernodeBuilder {
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
             store,
-            dispatcher,
+            bus,
             history,
             errors,
         ))

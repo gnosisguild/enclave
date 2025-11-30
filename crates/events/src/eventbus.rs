@@ -76,10 +76,6 @@ impl<E: Event> EventBus<E> {
         addr
     }
 
-    pub fn manager(source: Addr<EventBus<E>>) -> BusHandle<E> {
-        BusHandle::new(source)
-    }
-
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
         source.do_send(Subscribe::new("*", dest.clone().recipient()))
     }
