@@ -14,7 +14,7 @@ use e3_events::{
     ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, OperatorActivationChanged,
     PlaintextOutputPublished, Seed, Subscribe, TicketBalanceUpdated,
 };
-use e3_events::{EnclaveEventData, BusHandle};
+use e3_events::{BusHandle, EnclaveEventData};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;

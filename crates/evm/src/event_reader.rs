@@ -15,7 +15,7 @@ use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventId};
-use e3_events::{Event, BusHandle};
+use e3_events::{BusHandle, Event};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;

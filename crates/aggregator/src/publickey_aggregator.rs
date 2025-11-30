@@ -8,8 +8,8 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, Die, E3id, EnclaveEvent, EnclaveEventData, BusHandle, KeyshareCreated,
-    OrderedSet, PublicKeyAggregated, Seed,
+    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
+    PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodesForE3, Sortition};

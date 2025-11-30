@@ -13,9 +13,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::traits::Event;
+use crate::BusHandle;
 use crate::EnclaveEvent;
 use crate::EventBus;
-use crate::BusHandle;
 use crate::HistoryCollector;
 use crate::Subscribe;
 

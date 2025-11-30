@@ -12,7 +12,7 @@ use actix::{Addr, Recipient};
 use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus, BusHandle};
+use e3_events::{BusHandle, EnclaveEvent, EventBus};
 
 pub struct EnclaveSol;
 

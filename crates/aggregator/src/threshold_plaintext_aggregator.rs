@@ -10,8 +10,8 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData,
-    BusHandle, PlaintextAggregated, Seed,
+    prelude::*, BusHandle, ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent,
+    EnclaveEventData, PlaintextAggregated, Seed,
 };
 use e3_multithread::Multithread;
 use e3_sortition::{GetNodesForE3, Sortition};

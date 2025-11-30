@@ -421,8 +421,7 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: ManagedEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
-{
+pub fn new_event_bus_with_history<E: ManagedEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>) {
     let bus: BusHandle<E> = EventBus::<E>::default().start().into();
 
     let history = HistoryCollector::new().start();

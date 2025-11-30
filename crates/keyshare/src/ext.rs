@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, BusHandle};
+use e3_events::{prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
@@ -26,11 +26,7 @@ pub struct KeyshareExtension {
 }
 
 impl KeyshareExtension {
-    pub fn create(
-        bus: &BusHandle<EnclaveEvent>,
-        address: &str,
-        cipher: &Arc<Cipher>,
-    ) -> Box<Self> {
+    pub fn create(bus: &BusHandle<EnclaveEvent>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),

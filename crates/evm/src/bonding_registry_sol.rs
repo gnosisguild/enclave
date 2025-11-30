@@ -16,7 +16,7 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EnclaveEventData, BusHandle};
+use e3_events::{BusHandle, EnclaveEvent, EnclaveEventData};
 use tracing::{error, info, trace};
 
 sol!(

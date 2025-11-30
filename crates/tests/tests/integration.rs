@@ -10,8 +10,8 @@ use anyhow::{bail, Result};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_crypto::Cipher;
 use e3_events::{
-    prelude::*, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated, E3Requested,
-    E3id, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, BusHandle,
+    prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
+    E3Requested, E3id, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
     OperatorActivationChanged, PlaintextAggregated, TicketBalanceUpdated,
 };
 use e3_multithread::{GetReport, Multithread};

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_events::{prelude::*, EnclaveEvent, BusHandle, Shutdown};
+use e3_events::{prelude::*, BusHandle, EnclaveEvent, Shutdown};
 use std::time::Duration;
 use tokio::{
     select,
@@ -14,10 +14,7 @@ use tokio::{
 };
 use tracing::{error, info};
 
-pub async fn listen_for_shutdown(
-    bus: BusHandle<EnclaveEvent>,
-    mut handle: JoinHandle<Result<()>>,
-) {
+pub async fn listen_for_shutdown(bus: BusHandle<EnclaveEvent>, mut handle: JoinHandle<Result<()>>) {
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
     select! {

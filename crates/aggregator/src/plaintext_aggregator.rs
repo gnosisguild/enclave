@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData, BusHandle,
+    prelude::*, BusHandle, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData,
     OrderedSet, PlaintextAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};

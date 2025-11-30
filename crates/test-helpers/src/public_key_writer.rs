@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, BusHandle, EventSubscriber};
+use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber};
 use tracing::info;
 
 pub struct PublicKeyWriter {

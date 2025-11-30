@@ -14,9 +14,9 @@ use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    prelude::*, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta, DocumentReceived,
-    E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData, Event, BusHandle,
-    PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
+    DocumentReceived, E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+    Event, PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -487,9 +487,9 @@ mod tests {
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
-        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
-        EventBusConfig, BusHandle, GetEvents, HistoryCollector, PublishDocumentRequested,
-        TakeEvents,
+        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
+        EnclaveEvent, EventBus, EventBusConfig, GetEvents, HistoryCollector,
+        PublishDocumentRequested, TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use tokio::{

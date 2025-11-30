@@ -15,8 +15,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig, EventDispatcher,
-    BusHandle, HistoryCollector, Seed, Subscribe,
+    BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
+    EventDispatcher, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};

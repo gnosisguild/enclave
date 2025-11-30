@@ -11,8 +11,8 @@ use actix::prelude::*;
 use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
-    prelude::*, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
-    EnclaveEventData, BusHandle, Shutdown, TicketGenerated, TicketId,
+    prelude::*, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
+    EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;

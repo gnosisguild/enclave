@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, BusHandle};
+use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData};
 use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
 use tracing::{error, info};
 

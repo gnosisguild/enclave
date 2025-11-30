@@ -16,9 +16,9 @@ use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::prelude::*;
+use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
-use e3_events::BusHandle;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
@@ -51,11 +51,7 @@ struct LibP2pEvent(pub Vec<u8>);
 
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
-    pub fn new(
-        bus: &BusHandle<EnclaveEvent>,
-        tx: &mpsc::Sender<NetCommand>,
-        topic: &str,
-    ) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),

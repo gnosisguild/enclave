@@ -6,8 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EnclaveEventData,
-    BusHandle, Shutdown,
+    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent,
+    EnclaveEventData, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;

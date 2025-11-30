@@ -18,9 +18,9 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    prelude::*, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType,
-    EnclaveEvent, EnclaveEventData, BusHandle, EventSubscriber, OrderedSet, PublicKeyAggregated,
-    Seed, Shutdown, TicketGenerated, TicketId,
+    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType,
+    EnclaveEvent, EnclaveEventData, EventSubscriber, OrderedSet, PublicKeyAggregated, Seed,
+    Shutdown, TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 

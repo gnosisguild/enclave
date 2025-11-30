@@ -13,8 +13,8 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
-use e3_events::EnclaveEventData;
 use e3_events::BusHandle;
+use e3_events::EnclaveEventData;
 use e3_events::GetEvents;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,

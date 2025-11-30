@@ -8,8 +8,8 @@ use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{
-    get_enclave_event_manager, prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-    BusHandle,
+    get_enclave_event_manager, prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent,
+    EnclaveEventData,
 };
 use once_cell::sync::Lazy;
 use sled::Db;

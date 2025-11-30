@@ -6,7 +6,7 @@
 
 use actix::Addr;
 use e3_data::{DataStore, InMemStore, StoreAddr};
-use e3_events::{EnclaveEvent, EventBus, BusHandle, HistoryCollector};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, HistoryCollector};
 
 #[derive(Clone, Debug)]
 pub struct CiphernodeHandle {

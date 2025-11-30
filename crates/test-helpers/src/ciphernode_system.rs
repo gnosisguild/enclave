@@ -197,7 +197,7 @@ mod tests {
     use super::*;
     use actix::prelude::*;
     use e3_data::InMemStore;
-    use e3_events::{EventBus, EventBusConfig, BusHandle};
+    use e3_events::{BusHandle, EventBus, EventBusConfig};
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test

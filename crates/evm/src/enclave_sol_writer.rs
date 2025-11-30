@@ -18,9 +18,9 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_events::prelude::*;
+use e3_events::BusHandle;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
-use e3_events::BusHandle;
 use e3_events::Shutdown;
 use e3_events::{E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use tracing::info;

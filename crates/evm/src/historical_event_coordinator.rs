@@ -6,7 +6,7 @@
 
 use crate::EnclaveEvmEvent;
 use actix::prelude::*;
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData, BusHandle};
+use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData};
 use tracing::info;
 
 #[derive(Clone)]
