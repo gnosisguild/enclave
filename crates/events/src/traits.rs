@@ -32,38 +32,52 @@ pub trait ErrorEvent: Event {
     fn from_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
 }
 
-/// Trait to create events
+/// An EventFactory creates events
 pub trait EventFactory<E: Event> {
+    /// Create a new event from the given event data, apply a local HLC timestamp.
+    ///
+    /// This method should be used for events that have originated locally.
     fn event_from(&self, data: impl Into<E::Data>) -> E;
+    /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
+    /// event ordering.
+    ///
+    /// This method should be used for events that originated from remote sources.
     fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E;
 }
 
-/// Trait create errors
+/// An ErrorFactory creates errors.
 pub trait ErrorFactory<E: ErrorEvent> {
+    /// Create an error event from the given error.
     fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
 }
 
-/// Trait to dispatch events
+/// An EventPublisher publishes events on it's internal EventBus
 pub trait EventPublisher<E: Event> {
-    /// Create a new event from the given event data, apply a local HLC timestamp and dispatch it
-    /// to the event bus. This method should be used for events that have originated locally.
+    /// Create a new event from the given event data, apply a local HLC timestamp and publish it
+    /// to the event bus.
+    ///
+    /// This method should be used for events that have originated locally.
     fn publish(&self, data: impl Into<E::Data>);
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
-    /// event ordering. This method should be used for events that originated from remote sources.
+    /// event ordering and publish it.
+    ///
+    /// This method should be used for events that originated from remote sources.
     fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128);
-    /// Dispatch the given event without applying any HLC transformation
+    /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
 }
 
-/// Trait for dispatching errors
+/// Trait for dispatching errors to an inner event bus
 pub trait ErrorDispatcher<E: ErrorEvent> {
-    /// Dispatch the error to the event bus apply a local HCL
+    /// Dispatch the error to the event bus.
     fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>);
 }
 
 /// Trait to subscribe to events
 pub trait EventSubscriber<E: Event> {
+    /// Subscribe the recipient to events matching the given event type
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
+    /// Subscribe the recipient to events matching any of the given event types
     fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>);
 }
 
