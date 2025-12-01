@@ -441,6 +441,7 @@ pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
     e3_id: E3id,
     ticket_number: u64,
 ) -> Result<TransactionReceipt> {
+    info!("Calling: contract.submitTicket(..)");
     let e3_id: U256 = e3_id.try_into()?;
     let ticket_number = U256::from(ticket_number);
     let from_address = provider.provider().default_signer_address();
@@ -462,6 +463,7 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
     contract_address: Address,
     e3_id: E3id,
 ) -> Result<TransactionReceipt> {
+    info!("Calling: contract.finalizeCommittee(..)");
     let e3_id: U256 = e3_id.try_into()?;
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider
@@ -482,6 +484,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
     nodes: OrderedSet<String>,
     public_key: Vec<u8>,
 ) -> Result<TransactionReceipt> {
+    info!("Calling: contract.publishCommittee(..)");
     let e3_id: U256 = e3_id.try_into()?;
     let public_key = Bytes::from(public_key);
     let nodes_vec: Vec<Address> = nodes
