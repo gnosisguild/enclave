@@ -11,6 +11,7 @@ mod enclave_event;
 mod event_id;
 mod eventbus;
 mod eventbus_factory;
+pub mod hlc;
 mod ordered_set;
 pub mod prelude;
 mod seed;

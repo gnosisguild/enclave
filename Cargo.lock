@@ -2864,9 +2864,11 @@ dependencies = [
  "e3-utils",
  "futures-util",
  "once_cell",
+ "proptest",
  "serde",
  "sha2",
  "strum",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
