@@ -66,7 +66,7 @@ fn main(
 
     // Calculate the Merkle root.
     let merkle_root_calculated = get_merkle_root(
-        address,
+        slot_address,
         balance,
         merkle_proof_length,
         merkle_proof_indices,
@@ -112,11 +112,12 @@ fn main(
     // Ensure that the ciphertext is valid
     assert(is_greco_valid);
 
+    // Verify the correct Merkle root.
+    assert(merkle_root_calculated == merkle_root);
+
     // If the voter is eligible to vote, output the ciphertext.
     // Otherwise, output the sum of the ciphertexts.
-    if (is_signature_valid == true)
-        & (merkle_root_calculated == merkle_root)
-        & (slot_address == address) {
+    if (is_signature_valid == true) & (slot_address == address) {
         // Verify the correct coefficient values and that the vote is <= balance
         check_coefficient_values_with_balance(k1, params.crypto_params().q_mod_t, balance);
 
