@@ -280,11 +280,18 @@ export const generateMaskVote = async (
   }
 }
 
-export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
+export const generateWitness = async (crispInputs: CRISPCircuitInputs): Promise<Uint8Array> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
 
   const { witness } = await noir.execute(crispInputs as any)
+
+  return witness
+}
+
+export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
+  const witness = await generateWitness(crispInputs)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
+
   const proof = await backend.generateProof(witness, { keccakZK: true })
 
   await backend.destroy()
@@ -292,32 +299,8 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   return proof
 }
 
-export const generateProofWithReturnValue = async (
-  crispInputs: CRISPCircuitInputs,
-): Promise<{ returnValue: unknown; proof: ProofData }> => {
-  const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
-
-  const { witness, returnValue } = await noir.execute(crispInputs as any)
-  const proof = await backend.generateProof(witness, { keccakZK: true })
-
-  await backend.destroy()
-
-  return { returnValue, proof }
-}
-
-export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Promise<{ returnValue: unknown }> => {
-  const noir = new Noir(circuit as CompiledCircuit)
-
-  const { returnValue } = await noir.execute(crispInputs as any)
-
-  return { returnValue }
-}
-
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
-
-  console.log('OPTIMAL_THREAD_COUNT', OPTIMAL_THREAD_COUNT)
 
   const isValid = await backend.verifyProof(proof, { keccakZK: true })
 

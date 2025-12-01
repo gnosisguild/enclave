@@ -13,8 +13,7 @@ import {
   encryptVoteAndGenerateCRISPInputs,
   generateMaskVote,
   generateProof,
-  generateProofWithReturnValue,
-  getCircuitOutputValue,
+  generateWitness,
   validateVote,
   verifyProof,
 } from '../src/vote'
@@ -23,7 +22,6 @@ import { generateMerkleProof, hashLeaf, MAXIMUM_VOTE_VALUE } from '../src'
 
 import { LEAVES, merkleProof, MESSAGE, SIGNATURE, testAddress, VOTE, votingPowerLeaf } from './constants'
 import { privateKeyToAccount } from 'viem/accounts'
-import { compareCoefficientsArrays } from './utils'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -291,10 +289,15 @@ describe('Vote', () => {
 
       let maskVote = await generateMaskVote(publicKey, encryptedVote, merkleProof.proof.root, testAddress, true)
 
-      const { returnValue } = await generateProofWithReturnValue(maskVote)
+      const proof = await generateProof(maskVote)
 
-      expect(compareCoefficientsArrays(maskVote.ct0is, (returnValue as any[])[0])).toBe(true)
-      expect(compareCoefficientsArrays(maskVote.ct1is, (returnValue as any[])[1])).toBe(true)
+      const outputCiphertext = proof.publicInputs.slice(2).map(BigInt)
+      const inputCiphertext = [
+        ...maskVote.ct0is.flatMap((ct) => ct.coefficients).map(BigInt),
+        ...maskVote.ct1is.flatMap((ct) => ct.coefficients).map(BigInt),
+      ]
+
+      expect(outputCiphertext).toEqual(inputCiphertext)
     })
 
     it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 100000 }, async () => {
@@ -305,10 +308,15 @@ describe('Vote', () => {
 
       let maskVote = await generateMaskVote(publicKey, encryptedVote, merkleProof.proof.root, testAddress, false)
 
-      const { returnValue } = await generateProofWithReturnValue(maskVote)
+      const proof = await generateProof(maskVote)
 
-      expect(compareCoefficientsArrays(maskVote.sum_ct0is, (returnValue as any[])[0])).toBe(true)
-      expect(compareCoefficientsArrays(maskVote.sum_ct1is, (returnValue as any[])[1])).toBe(true)
+      const outputCiphertext = proof.publicInputs.slice(2).map(BigInt)
+      const inputCiphertext = [
+        ...maskVote.sum_ct0is.flatMap((ct) => ct.coefficients).map(BigInt),
+        ...maskVote.sum_ct1is.flatMap((ct) => ct.coefficients).map(BigInt),
+      ]
+
+      expect(outputCiphertext).toEqual(inputCiphertext)
     })
 
     it('should throw when the signature is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
@@ -337,7 +345,7 @@ describe('Vote', () => {
       // invalidate signature
       inputs.signature[0] = '0'
 
-      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
+      await expect(generateWitness(inputs)).rejects.toThrow()
     })
 
     it('should throw when the merkle tree inclusion proof is invalid and it is a vote (no masking)', { timeout: 100000 }, async () => {
@@ -366,7 +374,7 @@ describe('Vote', () => {
       // invalidate merkle root
       inputs.merkle_root = '0'
 
-      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
+      await expect(generateWitness(inputs)).rejects.toThrow()
     })
 
     it('should succeed when the vote is the maximum value supported', { timeout: 100000 }, async () => {
@@ -433,7 +441,7 @@ describe('Vote', () => {
       // set balance to 0
       inputs.balance = '0'
 
-      await expect(getCircuitOutputValue(inputs)).rejects.toThrow()
+      await expect(generateWitness(inputs)).rejects.toThrow()
     })
   })
 })
