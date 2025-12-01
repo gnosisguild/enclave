@@ -12,6 +12,7 @@ import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest } from '@/model/vote.model'
+import { SIGNATURE_MESSAGE } from '@crisp-e3/sdk'
 
 export const useVoteCasting = () => {
   const { user, roundState, votingRound, generateProof, broadcastVote, setTxUrl } = useVoteManagementContext()
@@ -22,9 +23,9 @@ export const useVoteCasting = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
   const handleProofGeneration = useCallback(
-    async (vote: Poll, address: string, signature: string, message: string) => {
+    async (vote: Poll, address: string, signature: string) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, message)
+      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature)
     },
     [generateProof, votingRound],
   )
@@ -46,11 +47,10 @@ export const useVoteCasting = () => {
       console.log('Processing vote...')
 
       // For now just sign and do not do nothing with the signature
-      const message = `Vote for round ${roundState.id}`
-      const signature = await signMessageAsync({ message })
+      const signature = await signMessageAsync({ message: SIGNATURE_MESSAGE })
 
       try {
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, message)
+        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature)
         if (!encodedProof) {
           throw new Error('Failed to generate proof.')
         }

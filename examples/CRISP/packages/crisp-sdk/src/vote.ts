@@ -5,282 +5,126 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
+import { BFVParams, type CircuitInputs, type IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE, OPTIMAL_THREAD_COUNT } from './constants'
-import { extractSignature } from './signature'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE } from './constants'
+import { extractSignatureComponents } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-import { privateKeyToAccount } from 'viem/accounts'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
 
 /**
- * This utility function calculates the first valid index for vote options
- * based on the total voting power and degree.
- * @dev This is needed to calculate the decoded plaintext
- * @dev Also, we will need to check in the circuit that anything within these indices is
- * either 0 or 1.
- * @param totalVotingPower The maximum vote amount (if a single voter had all of the power)
- * @param degree The degree of the polynomial
+ * Encode a vote.
+ * @param vote The vote to encode.
+ * @param bfvParams The BFV parameters to use for encoding.
+ * @returns The encoded vote as a BigInt64Array.
  */
-export const calculateValidIndicesForPlaintext = (totalVotingPower: bigint, degree: number): { yesIndex: number; noIndex: number } => {
-  // Sanity check: degree must be even and positive
-  if (degree <= 0 || degree % 2 !== 0) {
-    throw new Error('Degree must be a positive even number')
+export const encodeVote = (vote: IVote, bfvParams: BFVParams): BigInt64Array => {
+  const voteArray = []
+  const length = bfvParams.degree
+  const halfLength = length / 2
+  const yesBinary = toBinary(vote.yes).split('')
+  const noBinary = toBinary(vote.no).split('')
+
+  // Fill first half with 'yes' binary representation (pad with leading 0s if needed)
+  for (let i = 0; i < halfLength; i++) {
+    const offset = halfLength - yesBinary.length
+    voteArray.push(i < offset ? '0' : yesBinary[i - offset])
   }
 
-  // Calculate the number of bits needed to represent the total voting power
-  const bitsNeeded = totalVotingPower.toString(2).length
-
-  const halfLength = Math.floor(degree / 2)
-
-  // Check if bits needed exceed half the degree
-  if (bitsNeeded > halfLength) {
-    throw new Error('Total voting power exceeds maximum representable votes for the given degree')
+  // Fill second half with 'no' binary representation (pad with leading 0s if needed)
+  for (let i = 0; i < length - halfLength; i++) {
+    const offset = length - halfLength - noBinary.length
+    voteArray.push(i < offset ? '0' : noBinary[i - offset])
   }
 
-  // For "yes": right-align in first half
-  // Start index = (half length) - (bits needed)
-  const yesIndex = halfLength - bitsNeeded
+  return BigInt64Array.from(voteArray.map(BigInt))
+}
 
-  // For "no": right-align in second half
-  // Start index = (full length) - (bits needed)
-  const noIndex = degree - bitsNeeded
+/**
+ * Decode an encoded tally into its decimal representation.
+ * @param tally The encoded tally to decode.
+ * @returns The decoded tally as an IVote.
+ */
+export const decodeTally = (tally: string[]): IVote => {
+  const HALF_D = tally.length / 2
+  const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
+  const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
+
+  // Extract only the relevant parts of the tally
+  const yesBinary = tally.slice(START_INDEX_Y, HALF_D)
+  const noBinary = tally.slice(START_INDEX_N, tally.length)
+
+  let yes = 0n
+  let no = 0n
+
+  // Convert yes votes (from START_INDEX_Y to HALF_D)
+  for (let i = 0; i < yesBinary.length; i += 1) {
+    const weight = 2n ** BigInt(yesBinary.length - 1 - i)
+    yes += BigInt(yesBinary[i]) * weight
+  }
+
+  // Convert no votes (from START_INDEX_N to D)
+  for (let i = 0; i < noBinary.length; i += 1) {
+    const weight = 2n ** BigInt(noBinary.length - 1 - i)
+    no += BigInt(noBinary[i]) * weight
+  }
 
   return {
-    yesIndex: yesIndex,
-    noIndex: noIndex,
+    yes,
+    no,
   }
 }
 
-/**
- * Encode a vote based on the voting mode
- * @param vote The vote to encode
- * @param votingMode The voting mode to use for encoding
- * @param votingPower The voting power of the voter
- * @param bfvParams The BFV parameters to use for encoding
- * @returns The encoded vote as a string
- */
-export const encodeVote = (vote: IVote, votingMode: VotingMode, votingPower: bigint): string[] => {
+export const encryptVote = (vote: IVote, publicKey: Uint8Array): Uint8Array => {
   const zkInputsGenerator = ZKInputsGenerator.withDefaults()
-  const bfvParams = zkInputsGenerator.getBFVParams() as BFVParams
+  const bfvParams = zkInputsGenerator.getBFVParams()
 
-  validateVote(votingMode, vote, votingPower)
+  const encodedVote = encodeVote(vote, bfvParams)
 
-  switch (votingMode) {
-    case VotingMode.GOVERNANCE: {
-      const voteArray = []
-      const length = bfvParams.degree
-      const halfLength = length / 2
-      const yesBinary = toBinary(vote.yes).split('')
-      const noBinary = toBinary(vote.no).split('')
-
-      // Fill first half with 'yes' binary representation (pad with leading 0s if needed)
-      for (let i = 0; i < halfLength; i++) {
-        const offset = halfLength - yesBinary.length
-        voteArray.push(i < offset ? '0' : yesBinary[i - offset])
-      }
-
-      // Fill second half with 'no' binary representation (pad with leading 0s if needed)
-      for (let i = 0; i < length - halfLength; i++) {
-        const offset = length - halfLength - noBinary.length
-        voteArray.push(i < offset ? '0' : noBinary[i - offset])
-      }
-      return voteArray
-    }
-    default:
-      throw new Error('Unsupported voting mode')
-  }
+  return zkInputsGenerator.encryptVote(publicKey, encodedVote)
 }
 
-/**
- * Given an encoded tally, decode it into its decimal representation
- * @param tally The encoded tally to decode
- * @param votingMode The voting mode
- */
-export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
-  switch (votingMode) {
-    case VotingMode.GOVERNANCE: {
-      const HALF_D = tally.length / 2
-      const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
-      const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
-
-      // Extract only the relevant parts of the tally
-      const yesBinary = tally.slice(START_INDEX_Y, HALF_D)
-      const noBinary = tally.slice(START_INDEX_N, tally.length)
-
-      let yes = 0n
-      let no = 0n
-
-      // Convert yes votes (from START_INDEX_Y to HALF_D)
-      for (let i = 0; i < yesBinary.length; i += 1) {
-        const weight = 2n ** BigInt(yesBinary.length - 1 - i)
-        yes += BigInt(yesBinary[i]) * weight
-      }
-
-      // Convert no votes (from START_INDEX_N to D)
-      for (let i = 0; i < noBinary.length; i += 1) {
-        const weight = 2n ** BigInt(noBinary.length - 1 - i)
-        no += BigInt(noBinary[i]) * weight
-      }
-
-      return {
-        yes,
-        no,
-      }
-    }
-    default:
-      throw new Error('Unsupported voting mode')
-  }
-}
-
-/**
- * Validate whether a vote is valid for a given voting mode
- * @param votingMode The voting mode to validate against
- * @param vote The vote to validate
- * @param votingPower The voting power of the voter
- */
-export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: bigint) => {
-  switch (votingMode) {
-    case VotingMode.GOVERNANCE:
-      if (vote.yes > 0n && vote.no > 0n) {
-        throw new Error('Invalid vote for GOVERNANCE mode: cannot spread votes between options')
-      }
-
-      if (vote.yes > votingPower || vote.no > votingPower) {
-        throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
-      }
-
-      if (vote.yes > MAXIMUM_VOTE_VALUE || vote.no > MAXIMUM_VOTE_VALUE) {
-        throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds maximum allowed value')
-      }
-  }
-}
-
-export const encryptVote = async (encodedVote: string[], publicKey: Uint8Array): Promise<Uint8Array> => {
-  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
-
-  const vote = BigInt64Array.from(encodedVote.map(BigInt))
-
-  return zkInputsGenerator.encryptVote(publicKey, vote)
-}
-
-export const generatePublicKey = async (): Promise<Uint8Array> => {
+export const generatePublicKey = (): Uint8Array => {
   const zkInputsGenerator = ZKInputsGenerator.withDefaults()
   return zkInputsGenerator.generatePublicKey()
 }
 
-/**
- * This is a wrapper around enclave-e3/sdk encryption functions as CRISP circuit will require some more
- * input values which generic Greco do not need.
- * @param encodedVote The encoded vote as string array
- * @param publicKey The public key to use for encryption
- * @param previousCiphertext The previous ciphertext to use for addition operation
- * @param bfvParams The BFV parameters to use for encryption
- * @param merkleData The merkle proof data
- * @param message The message that was signed
- * @param signature The signature of the message
- * @param balance The voter's balance
- * @param slotAddress The voter's slot address
- * @param isFirstVote Whether this is the first vote for this slot
- * @returns The CRISP circuit inputs
- */
-export const encryptVoteAndGenerateCRISPInputs = async ({
-  encodedVote,
-  publicKey,
-  previousCiphertext,
-  merkleData,
-  message,
-  signature,
-  balance,
-  slotAddress,
-  isFirstVote,
-}: EncryptVoteAndGenerateCRISPInputsParams): Promise<CRISPCircuitInputs> => {
+export const generateCircuitInputs = async (proofInputs: VoteProofInputs): Promise<CircuitInputs> => {
   const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
-
   const bfvParams = zkInputsGenerator.getBFVParams() as BFVParams
 
-  if (encodedVote.length !== bfvParams.degree) {
-    throw new RangeError(`encodedVote length ${encodedVote.length} does not match BFV degree ${bfvParams.degree}`)
-  }
+  const encodedVote = encodeVote(proofInputs.vote, bfvParams)
 
-  const vote = BigInt64Array.from(encodedVote.map(BigInt))
+  let crispInputs = await zkInputsGenerator.generateInputs(
+    // If no previous ciphertext is provided, a placeholder ciphertext vote will be generated.
+    // This is safe because the circuit will not check the ciphertext addition if
+    // the previous ciphertext is not provided (is_first_vote is true).
+    proofInputs.previousCiphertext || encryptVote({ yes: 0n, no: 0n }, proofInputs.publicKey),
+    proofInputs.publicKey,
+    encodedVote,
+  )
 
-  const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
+  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(proofInputs.signature)
 
-  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(message, signature)
+  crispInputs.hashed_message = Array.from(messageHash).map((b) => b.toString())
+  crispInputs.public_key_x = Array.from(publicKeyX).map((b) => b.toString())
+  crispInputs.public_key_y = Array.from(publicKeyY).map((b) => b.toString())
+  crispInputs.signature = Array.from(signature).map((b) => b.toString())
+  crispInputs.slot_address = proofInputs.slotAddress.toLowerCase()
+  crispInputs.balance = proofInputs.balance.toString()
+  crispInputs.is_first_vote = !proofInputs.previousCiphertext
+  crispInputs.merkle_root = proofInputs.merkleProof.proof.root.toString()
+  crispInputs.merkle_proof_length = proofInputs.merkleProof.length.toString()
+  crispInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
+  crispInputs.merkle_proof_siblings = proofInputs.merkleProof.proof.siblings.map((s) => s.toString())
 
-  return {
-    ...crispInputs,
-    hashed_message: Array.from(hashed_message).map((b) => b.toString()),
-    public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
-    public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
-    signature: Array.from(extractedSignature).map((b) => b.toString()),
-    merkle_proof_length: merkleData.length.toString(),
-    merkle_proof_indices: merkleData.indices.map((i) => i.toString()),
-    merkle_proof_siblings: merkleData.proof.siblings.map((s) => s.toString()),
-    merkle_root: merkleData.proof.root.toString(),
-    slot_address: slotAddress,
-    balance: balance.toString(),
-    is_first_vote: isFirstVote,
-  }
+  return crispInputs
 }
 
-/**
- * A function to generate the data required to mask a vote
- * @param voter The voter's address
- * @param publicKey The voter's public key
- * @param previousCiphertext The previous ciphertext
- * @param merkleRoot The merkle root of the census tree
- * @param slotAddress The voter's slot address
- * @param isFirstVote Whether this is the first vote for this slot
- * @returns The CRISP circuit inputs for a mask vote
- */
-export const generateMaskVote = async (
-  publicKey: Uint8Array,
-  previousCiphertext: Uint8Array,
-  merkleRoot: bigint,
-  slotAddress: string,
-  isFirstVote: boolean,
-): Promise<CRISPCircuitInputs> => {
-  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
-
-  const plaintextVote: IVote = {
-    yes: 0n,
-    no: 0n,
-  }
-
-  const encodedVote = encodeVote(plaintextVote, VotingMode.GOVERNANCE, 0n)
-
-  const vote = BigInt64Array.from(encodedVote.map(BigInt))
-
-  const crispInputs = (await zkInputsGenerator.generateInputs(previousCiphertext, publicKey, vote)) as CRISPCircuitInputs
-
-  // hardhat default private key
-  const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
-  const account = privateKeyToAccount(privateKey)
-  const signature = await account.signMessage({ message: MESSAGE })
-  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(MESSAGE, signature)
-
-  return {
-    ...crispInputs,
-    hashed_message: Array.from(hashed_message).map((b) => b.toString()),
-    public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
-    public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
-    signature: Array.from(extractedSignature).map((b) => b.toString()),
-    merkle_proof_indices: Array.from({ length: 20 }, () => '0'),
-    merkle_proof_siblings: Array.from({ length: 20 }, () => '0'),
-    merkle_proof_length: '1',
-    merkle_root: merkleRoot.toString(),
-    slot_address: slotAddress,
-    balance: '0',
-    is_first_vote: isFirstVote,
-  }
-}
-
-export const generateWitness = async (crispInputs: CRISPCircuitInputs): Promise<Uint8Array> => {
+export const generateWitness = async (crispInputs: CircuitInputs): Promise<Uint8Array> => {
   const noir = new Noir(circuit as CompiledCircuit)
 
   const { witness } = await noir.execute(crispInputs as any)
@@ -288,7 +132,7 @@ export const generateWitness = async (crispInputs: CRISPCircuitInputs): Promise<
   return witness
 }
 
-export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
+export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofData> => {
   const witness = await generateWitness(crispInputs)
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
 
@@ -297,6 +141,34 @@ export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<Pr
   await backend.destroy()
 
   return proof
+}
+
+export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
+  if (voteProofInputs.vote.yes > voteProofInputs.balance || voteProofInputs.vote.no > voteProofInputs.balance) {
+    throw new Error('Invalid vote: vote exceeds balance')
+  }
+
+  if (voteProofInputs.vote.yes > MAXIMUM_VOTE_VALUE || voteProofInputs.vote.no > MAXIMUM_VOTE_VALUE) {
+    throw new Error('Invalid vote: vote exceeds maximum allowed value')
+  }
+
+  if (voteProofInputs.vote.yes < 0n || voteProofInputs.vote.no < 0n) {
+    throw new Error('Invalid vote: vote is negative')
+  }
+
+  const crispInputs = await generateCircuitInputs(voteProofInputs)
+
+  return generateProof(crispInputs)
+}
+
+export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs) => {
+  const crispInputs = await generateCircuitInputs({
+    ...maskVoteProofInputs,
+    signature: FAKE_SIGNATURE,
+    vote: { yes: 0n, no: 0n },
+  })
+
+  return generateProof(crispInputs)
 }
 
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {

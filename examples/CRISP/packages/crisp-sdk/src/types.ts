@@ -65,17 +65,6 @@ export interface IMerkleProof {
 }
 
 /**
- * Enum representing the voting modes
- */
-export enum VotingMode {
-  /**
-   *  Governance voting requires to spend all credits on one option 
-      they cannot be split
-   */
-  GOVERNANCE = 'GOVERNANCE',
-}
-
-/**
  * Interface representing a vote with power for 'yes' and 'no'
  */
 export interface IVote {
@@ -130,9 +119,9 @@ export interface GrecoParams {
 }
 
 /**
- * The inputs required for the CRISP circuit
+ * The inputs required for the CRISP circuit.
  */
-export interface CRISPCircuitInputs {
+export interface CircuitInputs {
   // Ciphertext Addition Section.
   prev_ct0is: Polynomial[]
   prev_ct1is: Polynomial[]
@@ -174,48 +163,21 @@ export interface CRISPCircuitInputs {
   is_first_vote: boolean
 }
 
-/**
- * Interface representing the BFV parameters
- */
 export interface BFVParams {
   degree: number
   plaintextModulus: bigint
   moduli: BigInt64Array
 }
 
-/**
- * Interface representing the inputs for Noir signature verification
- */
-export interface NoirSignatureInputs {
-  /**
-   * X coordinate of the public key
-   */
-  pub_key_x: Uint8Array
-  /**
-   * Y coordinate of the public key
-   */
-  pub_key_y: Uint8Array
-  /**
-   * The signature to verify
-   */
-  signature: Uint8Array
-  /**
-   * The hashed message that was signed
-   */
-  hashed_message: Uint8Array
-}
-
-/**
- * Parameters for encryptVoteAndGenerateCRISPInputs function
- */
-export interface EncryptVoteAndGenerateCRISPInputsParams {
-  encodedVote: string[]
+export interface MaskVoteProofInputs {
+  previousCiphertext?: Uint8Array
+  merkleProof: IMerkleProof
   publicKey: Uint8Array
-  previousCiphertext: Uint8Array
-  signature: `0x${string}`
-  message: string
-  merkleData: IMerkleProof
   balance: bigint
   slotAddress: string
-  isFirstVote: boolean
+}
+
+export interface VoteProofInputs extends MaskVoteProofInputs {
+  vote: IVote
+  signature: `0x${string}`
 }

@@ -6,13 +6,13 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { extractSignature } from '../src/signature'
-import { MESSAGE, SIGNATURE } from './constants'
+import { extractSignatureComponents } from '../src/signature'
+import { SIGNATURE } from './constants'
 
 describe('Signature', () => {
   describe('extractSignature', () => {
     it('should extract signature components correctly', async () => {
-      const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(MESSAGE, SIGNATURE)
+      const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignatureComponents(SIGNATURE)
 
       expect(hashed_message).toBeInstanceOf(Uint8Array)
       expect(pub_key_x).toBeInstanceOf(Uint8Array)

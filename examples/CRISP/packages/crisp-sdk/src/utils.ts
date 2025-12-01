@@ -16,8 +16,8 @@ import { MERKLE_TREE_MAX_DEPTH } from './constants'
  * @param balance The voter's balance
  * @returns The hashed leaf as a bigint
  */
-export const hashLeaf = (address: string, balance: string): bigint => {
-  return poseidon2([address, balance])
+export const hashLeaf = (address: string, balance: bigint): bigint => {
+  return poseidon2([address.toLowerCase(), balance])
 }
 
 /**
@@ -31,17 +31,12 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
 
 /**
  * Generate a Merkle proof for a given address to prove inclusion in the voters' list
- * @param threshold The minimum balance required to be eligible
  * @param balance The voter's balance
  * @param address The voter's address
  * @param leaves The leaves of the Merkle tree
  */
-export const generateMerkleProof = (threshold: bigint, balance: bigint, address: string, leaves: bigint[]): IMerkleProof => {
-  if (balance < threshold) {
-    throw new Error('Balance is below the threshold')
-  }
-
-  const leaf = hashLeaf(address, balance.toString())
+export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[]): IMerkleProof => {
+  const leaf = hashLeaf(address.toLowerCase(), balance)
 
   const index = leaves.findIndex((l) => l === leaf)
 

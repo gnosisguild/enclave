@@ -8,16 +8,6 @@ export * from './token'
 export * from './state'
 export * from './constants'
 export * from './utils'
-export * from './vote'
-export * from './signature'
+export { decodeTally, generateVoteProof, generateMaskVoteProof, verifyProof, encryptVote } from './vote'
 
-export { VotingMode } from './types'
-export type {
-  IRoundDetails,
-  IRoundDetailsResponse,
-  ITokenDetails,
-  IMerkleProof,
-  IVote,
-  CRISPCircuitInputs,
-  NoirSignatureInputs,
-} from './types'
+export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof, IVote, CircuitInputs } from './types'
