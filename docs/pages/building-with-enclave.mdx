@@ -19,21 +19,21 @@ maintaining the security and privacy guarantees of the protocol.
 
 ```solidity
 contract Enclave {
-    // address of the Ciphernode registry.
-    CiphernodeRegistry public ciphernodeRegistry;
+  // address of the Ciphernode registry.
+  CiphernodeRegistry public ciphernodeRegistry;
 
-    // Mapping of allowed E3 Programs.
-    mapping(IE3Program e3Program => bool allowed) public e3Programs;
+  // Mapping of allowed E3 Programs.
+  mapping(IE3Program e3Program => bool allowed) public e3Programs;
 
-    // Mapping of E3s.
-    mapping(uint256 e3Id => E3 e3) public e3s;
+  // Mapping of E3s.
+  mapping(uint256 e3Id => E3 e3) public e3s;
 
-    // Mapping of input merkle trees.
-    mapping(uint256 e3Id => LeanIMTData imt) public inputs;
+  // Mapping of input merkle trees.
+  mapping(uint256 e3Id => LeanIMTData imt) public inputs;
 
-    // Mapping of enabled encryption schemes.
-    mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
-        public decryptionVerifiers;
+  // Mapping of enabled encryption schemes.
+  mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
+    public decryptionVerifiers;
 }
 ```
 
@@ -121,10 +121,7 @@ Your E3 Program must include logic that validates user inputs. When publishing a
 contracts will call the `validateInput()` function on your Program contract.
 
 ```solidity
-function validateInput(
-        address sender,
-        bytes memory params
-    ) external returns (bytes memory input);
+function validateInput(address sender, bytes memory params) external returns (bytes memory input);
 ```
 
 At a minimum, this function should validate a proof that the given ciphertext is a valid encryption
@@ -140,27 +137,13 @@ to the E3's public key. It is also recommended to bundle in proofs to validate:
 ### Key Events
 
 ```solidity
-event E3Requested(
-    uint256 indexed e3Id,
-    address indexed requester,
-    address e3ProgramAddress
-);
+event E3Requested(uint256 indexed e3Id, address indexed requester, address e3ProgramAddress);
 
-event InputSubmitted(
-    uint256 indexed e3Id,
-    address indexed sender,
-    bytes32 inputHash
-);
+event InputSubmitted(uint256 indexed e3Id, address indexed sender, bytes32 inputHash);
 
-event CiphertextOutputPublished(
-    uint256 indexed e3Id,
-    bytes32 ciphertextHash
-);
+event CiphertextOutputPublished(uint256 indexed e3Id, bytes32 ciphertextHash);
 
-event PlaintextOutputPublished(
-    uint256 indexed e3Id,
-    bytes plaintext
-);
+event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintext);
 ```
 
 ### Result Publication Flow

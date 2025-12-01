@@ -9,11 +9,18 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "proseWrap": "always",
+  "plugins": ["prettier-plugin-solidity"],
   "overrides": [
     {
       "files": ["*.mdx", "*.md"],
       "options": {
         "printWidth": 100
+      }
+    },
+    {
+      "files": "*.sol",
+      "options": {
+        "singleQuote": false
       }
     }
   ]
