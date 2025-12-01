@@ -269,7 +269,7 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('should generate a proof for a masking user and verify it', { timeout: 180000 }, async () => {
+    it('should generate a proof for a masking user and verify it', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
@@ -283,7 +283,7 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 180000 }, async () => {
+    it('should return ciphertext if masking a vote and it is the first operation on the slot', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
@@ -297,7 +297,7 @@ describe('Vote', () => {
       expect(compareCoefficientsArrays(maskVote.ct1is, (returnValue as any[])[1])).toBe(true)
     })
 
-    it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 180000 }, async () => {
+    it('should return the sum if masking a vote and it is not the first operation on the slot', { timeout: 100000 }, async () => {
       const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
       const zkInputsGenerator = ZKInputsGenerator.withDefaults()
       const vote = BigInt64Array.from(encodedVote.map(BigInt))
@@ -379,7 +379,7 @@ describe('Vote', () => {
         no: 0n,
       }
 
-      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPower)
+      const encodedVote = encodeVote(VOTE, VotingMode.GOVERNANCE, votingPowerLeaf)
 
       // hardhat default private key
       const privateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
