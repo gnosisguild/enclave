@@ -11,6 +11,7 @@ use std::collections::HashSet;
 
 use crate::PublicKeyAggregator;
 
+/// Buffer KeyshareCreated events until CommitteeFinalized has been published
 pub struct KeyshareCreatedFilterBuffer {
     dest: Addr<PublicKeyAggregator>,
     committee: Option<HashSet<String>>,

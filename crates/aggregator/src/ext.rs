@@ -149,15 +149,11 @@ impl E3Extension for PlaintextAggregatorExtension {
 
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle<EnclaveEvent>,
-    sortition: Addr<Sortition>,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
-        Box::new(Self {
-            bus: bus.clone(),
-            sortition: sortition.clone(),
-        })
+    pub fn create(bus: &BusHandle<EnclaveEvent>) -> Box<Self> {
+        Box::new(Self { bus: bus.clone() })
     }
 }
 
@@ -193,13 +189,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
             meta.seed,
         )));
 
-        let value = create_publickey_aggregator(
-            fhe.clone(),
-            self.bus.clone(),
-            self.sortition.clone(),
-            e3_id,
-            sync_state,
-        );
+        let value = create_publickey_aggregator(fhe.clone(), self.bus.clone(), e3_id, sync_state);
 
         ctx.set_event_recipient("publickey", Some(value));
     }
@@ -230,7 +220,6 @@ impl E3Extension for PublicKeyAggregatorExtension {
         let value = create_publickey_aggregator(
             fhe.clone(),
             self.bus.clone(),
-            self.sortition.clone(),
             ctx.e3_id.clone(),
             sync_state,
         );
@@ -245,22 +234,13 @@ impl E3Extension for PublicKeyAggregatorExtension {
 fn create_publickey_aggregator(
     fhe: Arc<Fhe>,
     bus: BusHandle<EnclaveEvent>,
-    sortition: Addr<Sortition>,
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
 ) -> Recipient<EnclaveEvent> {
     KeyshareCreatedFilterBuffer::new(
-        PublicKeyAggregator::new(
-            PublicKeyAggregatorParams {
-                fhe,
-                bus,
-                sortition,
-                e3_id,
-            },
-            sync_state,
-        )
-        .start()
-        .into(),
+        PublicKeyAggregator::new(PublicKeyAggregatorParams { fhe, bus, e3_id }, sync_state)
+            .start()
+            .into(),
     )
     .start()
     .into()

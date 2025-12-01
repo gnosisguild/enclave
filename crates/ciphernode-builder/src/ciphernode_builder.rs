@@ -457,7 +457,7 @@ impl CiphernodeBuilder {
 
         if self.pubkey_agg {
             info!("Setting up PublicKeyAggregationExtension");
-            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus, &sortition))
+            e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus))
         }
 
         if self.plaintext_agg {
