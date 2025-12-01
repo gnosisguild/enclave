@@ -15,7 +15,7 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodesForE3, Sortition};
 use e3_utils::ArcBytes;
 use std::sync::Arc;
-use tracing::{error, info, trace};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -152,47 +152,27 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
 }
 
 impl Handler<KeyshareCreated> for PublicKeyAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
 
-    fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
-        let address = event.node.clone();
+    fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();
 
-        Box::pin(
-            self.sortition
-                .send(GetNodesForE3 {
-                    e3_id: e3_id.clone(),
-                    chain_id: e3_id.chain_id(),
-                })
-                .into_actor(self)
-                .map(move |res, act, ctx| {
-                    let nodes = res?;
+        if e3_id != self.e3_id {
+            error!("Wrong e3_id sent to aggregator. This should not happen.");
+            return Ok(());
+        }
 
-                    if !nodes.contains(&address) {
-                        trace!("Node {} not found in finalized committee", address);
-                        return Ok(());
-                    }
+        self.add_keyshare(pubkey)?;
 
-                    if e3_id != act.e3_id {
-                        error!("Wrong e3_id sent to aggregator. This should not happen.");
-                        return Ok(());
-                    }
+        if let Some(PublicKeyAggregatorState::Computing { keyshares }) = &self.state.get() {
+            ctx.notify(ComputeAggregate {
+                keyshares: keyshares.clone(),
+                e3_id,
+            })
+        }
 
-                    act.add_keyshare(pubkey)?;
-
-                    if let Some(PublicKeyAggregatorState::Computing { keyshares }) =
-                        &act.state.get()
-                    {
-                        ctx.notify(ComputeAggregate {
-                            keyshares: keyshares.clone(),
-                            e3_id,
-                        })
-                    }
-
-                    Ok(())
-                }),
-        )
+        Ok(())
     }
 }
 
@@ -222,6 +202,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
         info!("Notifying network of PublicKey");
         Box::pin(
             self.sortition
+                // TODO: we can probably ditch this by listening for CommitteeFinalized
                 .send(GetNodesForE3 {
                     e3_id: msg.e3_id.clone(),
                     chain_id: msg.e3_id.chain_id(),
