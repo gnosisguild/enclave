@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type EncryptVoteAndGenerateCRISPInputsParams, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE } from './constants'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MESSAGE, OPTIMAL_THREAD_COUNT } from './constants'
 import { extractSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
@@ -282,7 +282,7 @@ export const generateMaskVote = async (
 
 export const generateProof = async (crispInputs: CRISPCircuitInputs): Promise<ProofData> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
 
   const { witness } = await noir.execute(crispInputs as any)
   const proof = await backend.generateProof(witness, { keccakZK: true })
@@ -296,7 +296,7 @@ export const generateProofWithReturnValue = async (
   crispInputs: CRISPCircuitInputs,
 ): Promise<{ returnValue: unknown; proof: ProofData }> => {
   const noir = new Noir(circuit as CompiledCircuit)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: 4 })
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
 
   const { witness, returnValue } = await noir.execute(crispInputs as any)
   const proof = await backend.generateProof(witness, { keccakZK: true })
@@ -315,7 +315,9 @@ export const getCircuitOutputValue = async (crispInputs: CRISPCircuitInputs): Pr
 }
 
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode)
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
+
+  console.log('OPTIMAL_THREAD_COUNT', OPTIMAL_THREAD_COUNT)
 
   const isValid = await backend.verifyProof(proof, { keccakZK: true })
 
