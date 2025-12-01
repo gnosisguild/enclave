@@ -82,9 +82,10 @@ impl CallbackQueue {
 
     /// Execute all pending callbacks up to and including the given time
     pub async fn execute_until_including(&self, time: u64) -> Result<()> {
-        info!("execute_until_including...");
         let handlers = self.inner.take_until_including(time);
-        info!("found {} handlers", handlers.len());
+        if handlers.len() > 0 {
+            info!("found {} handlers", handlers.len());
+        }
         for callback in handlers {
             callback().await?;
         }
