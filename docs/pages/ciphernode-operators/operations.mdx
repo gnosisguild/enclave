@@ -53,14 +53,14 @@ chains:
 
 ### 2. Bootstrap Peers
 
-Add at least one bootstrap peer to join the network:
+Add the bootstrap peer to join the network:
 
 ```yaml
 node:
   address: '0xYourAddress'
   quic_port: 9201
   peers:
-    - '/dns4/bootstrap.enclave.gg/udp/9091/quic-v1'
+    - '/dnsaddr/bootstrap.enclave.gg'
   autonetkey: true
   autopassword: true
 ```
@@ -178,12 +178,17 @@ When your ciphernode receives `CiphertextOutputPublished`:
 
 ### Check Node Status
 
+View your node's logs depending on how you're running it:
+
 ```bash
-# View logs
+# If running as a systemd service
 journalctl -u enclave -f
 
-# Check if your node is running
+# If running directly or in a container, check the process
 ps aux | grep enclave
+
+# Or check container logs if using Docker
+docker logs -f <container_name>
 ```
 
 ### What to Watch For
