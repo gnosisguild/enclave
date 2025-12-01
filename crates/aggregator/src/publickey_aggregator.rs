@@ -15,7 +15,7 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodesForE3, Sortition};
 use e3_utils::ArcBytes;
 use std::sync::Arc;
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -104,7 +104,13 @@ impl PublicKeyAggregator {
             };
 
             keyshares.insert(keyshare);
+            info!(
+                "PublicKeyAggregator got keyshares {}/{}",
+                keyshares.len(),
+                threshold_n
+            );
             if keyshares.len() == *threshold_n {
+                info!("Computing aggregate public key...");
                 return Ok(PublicKeyAggregatorState::Computing {
                     keyshares: keyshares.clone(),
                 });
@@ -194,6 +200,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
     type Result = Result<()>;
 
     fn handle(&mut self, msg: ComputeAggregate, ctx: &mut Self::Context) -> Self::Result {
+        info!("Computing Aggregate PublicKey...");
         let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
             keyshares: msg.keyshares.clone(),
         })?;
@@ -212,6 +219,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
 impl Handler<NotifyNetwork> for PublicKeyAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: NotifyNetwork, _: &mut Self::Context) -> Self::Result {
+        info!("Notifying network of PublicKey");
         Box::pin(
             self.sortition
                 .send(GetNodesForE3 {
@@ -223,7 +231,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                     let nodes = res?;
 
                     let pubkey = msg.pubkey.clone();
-
+                    info!("Sending PublicKeyAggregated...");
                     let event = PublicKeyAggregated {
                         pubkey,
                         e3_id: msg.e3_id.clone(),
