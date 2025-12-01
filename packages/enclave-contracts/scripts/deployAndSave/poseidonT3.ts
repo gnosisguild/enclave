@@ -27,23 +27,26 @@ export const deployAndSavePoseidonT3 = async ({
     // probably on the hardhat network
     // fund the keyless account
     const [sender] = await ethers.getSigners();
-    await sender.sendTransaction({
+    let tx = await sender.sendTransaction({
       to: poseidon.proxy.from,
       value: poseidon.proxy.gas,
     });
+    await tx.wait();
 
     // then send the presigned transaction deploying the proxy
-    await ethers.provider.broadcastTransaction(poseidon.proxy.tx);
+    tx = await ethers.provider.broadcastTransaction(poseidon.proxy.tx);
+    await tx.wait();
     console.log(`Proxy deployed to: ${poseidon.proxy.address}`);
   }
 
   // Then deploy the hasher, if needed
   if ((await ethers.provider.getCode(poseidon.PoseidonT3.address)) === "0x") {
     const [sender] = await ethers.getSigners();
-    await sender.sendTransaction({
+    let tx = await sender.sendTransaction({
       to: poseidon.proxy.address,
       data: poseidon.PoseidonT3.data,
     });
+    await tx.wait();
 
     console.log(`PoseidonT3 deployed to: ${poseidon.PoseidonT3.address}`);
   }

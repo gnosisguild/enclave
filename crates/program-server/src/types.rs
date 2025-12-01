@@ -181,6 +181,6 @@ mod tests {
 "#;
 
         // Just dont crash
-        let payload: ComputeRequest = serde_json::from_str(json).unwrap();
+        let _payload: ComputeRequest = serde_json::from_str(json).unwrap();
     }
 }
