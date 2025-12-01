@@ -15,8 +15,10 @@ on:
       - main
       - dev
 env:
-  DOCKERFILE_PATH: crates/support/Dockerfile
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
+  SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
+  CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
+  SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
+  CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -143,44 +145,78 @@ jobs:
       image_tag: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Generate version tag
-        id: version
-        run: |
-          echo "version=$(git rev-parse --short=9 HEAD)" >> $GITHUB_OUTPUT
       - name: Generate tags
         id: tags
         run: |
-          VERSION=$(git rev-parse --short=9 HEAD)
-          TAGS="${{ env.IMAGE_NAME }}:$VERSION"
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            TAGS="$TAGS,${{ env.IMAGE_NAME }}:latest"
+          SHORT_SHA=$(git rev-parse --short=9 HEAD)
+          TAGS="${SUPPORT_IMAGE_NAME}:${SHORT_SHA}"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            TAGS="$TAGS,${SUPPORT_IMAGE_NAME}:main"
           fi
+
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
       - name: Set up BuildKit
         uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build image
         uses: docker/build-push-action@v5
         with:
           context: ./crates/support
-          file: ${{ env.DOCKERFILE_PATH }}
-          push: true
+          file: ${{ env.SUPPORT_DOCKERFILE_PATH }}
+          push: ${{ github.ref == 'refs/heads/main' }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: |
-            type=gha,scope=cargo-registry
-            type=gha,scope=cargo-git
-            type=gha,scope=cargo-target
-            type=gha,scope=buildcache
+            type=gha,scope=e3-support
           cache-to: |
-            type=gha,mode=max,scope=cargo-registry
-            type=gha,mode=max,scope=cargo-git
-            type=gha,mode=max,scope=cargo-target
-            type=gha,mode=max,scope=buildcache
+            type=gha,mode=max,scope=e3-support
+
+    build_ciphernode_image:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Generate tags
+        id: tags
+        run: |
+          SHORT_SHA=$(git rev-parse --short=9 HEAD)
+          TAGS="${CIPHERNODE_IMAGE_NAME}:${SHORT_SHA}"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            TAGS="$TAGS,${CIPHERNODE_IMAGE_NAME}:main"
+          fi
+
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+        - name: Set up Buildx
+          uses: docker/setup-buildx-action@v3
+
+        - name: Log in to GitHub Container Registry
+          if: github.ref == 'refs/heads/main'
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Build ciphernode image
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            file: ${{ env.CIPHERNODE_DOCKERFILE_PATH }}
+            push: ${{ github.ref == 'refs/heads/main' }}
+            tags: ${{ steps.tags.outputs.tags }}
+            cache-from: |
+              type=gha,scope=ciphernode
+            cache-to: |
+              type=gha,mode=max,scope=ciphernode
 
   test_contracts:
     runs-on: 'ubuntu-latest'

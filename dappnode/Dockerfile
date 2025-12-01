@@ -1,8 +1,8 @@
 # DAppNode Enclave Ciphernode Dockerfile
 # Uses official upstream image from GitHub Container Registry
-# For local testing: use Dockerfile.local instead
 
-FROM hmzakhalid/enclave-ciphernode:0.1.0 AS upstream
+ARG UPSTREAM_VERSION
+FROM ghcr.io/gnosisguild/ciphernode:${UPSTREAM_VERSION} AS upstream
 
 # Runtime image
 FROM debian:stable-slim

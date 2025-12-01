@@ -2,6 +2,7 @@
   "name": "enclave-ciphernode.public.dappnode.eth",
   "version": "0.1.0",
   "upstreamVersion": "0.1.5",
+  "upstreamArg": "UPSTREAM_VERSION",
   "upstreamRepo": "gnosisguild/enclave",
   "shortDescription": "Enclave Ciphernode - Run a node for confidential computing",
   "description": "Run an Enclave ciphernode to participate in the E3 (Encrypted Execution Environments) network.",
