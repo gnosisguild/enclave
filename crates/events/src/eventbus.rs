@@ -4,33 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::traits::{ErrorEvent, Event};
+use crate::{prelude::*, BusHandle, CompositeEvent};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Display;
-use std::hash::Hash;
 use std::marker::PhantomData;
 use tracing::info;
-
-//////////////////////////////////////////////////////////////////////////////
-// Core Traits
-//////////////////////////////////////////////////////////////////////////////
-
-/// Trait that must be implemented by events used with EventBus
-pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
-    type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
-    fn event_type(&self) -> String;
-    fn event_id(&self) -> Self::Id;
-}
-
-/// Trait for events that contain an error
-pub trait ErrorEvent: Event {
-    type Error: Clone;
-    type ErrorType;
-
-    fn as_error(&self) -> Option<&Self::Error>;
-    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self;
-}
 
 //////////////////////////////////////////////////////////////////////////////
 // Configuration
@@ -89,6 +69,7 @@ impl<E: Event> EventBus<E> {
         source.do_send(Subscribe::new("*", addr.clone().recipient()));
         addr
     }
+
     pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
         source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
@@ -149,6 +130,12 @@ impl<E: Event> Handler<E> for EventBus<E> {
         // TODO: workshop to work out best display format
         tracing::info!(">>> {}", event);
         self.track(event);
+    }
+}
+
+impl<E: CompositeEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
+    fn from(value: Addr<EventBus<E>>) -> Self {
+        BusHandle::new(value)
     }
 }
 
@@ -295,33 +282,12 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
 }
 
 #[derive(Message)]
-#[rtype(result = "Vec<E::Error>")]
+#[rtype(result = "Vec<E::Data>")]
 pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
 
 impl<E: ErrorEvent> GetErrors<E> {
     pub fn new() -> Self {
         Self(PhantomData)
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Error Bus Trait
-//////////////////////////////////////////////////////////////////////////////
-
-/// Trait to send errors directly to the bus
-pub trait BusError<E: ErrorEvent> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error);
-}
-
-impl<E: ErrorEvent> BusError<E> for Addr<EventBus<E>> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, err))
-    }
-}
-
-impl<E: ErrorEvent> BusError<E> for Recipient<E> {
-    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
-        self.do_send(E::from_error(err_type, err))
     }
 }
 
@@ -451,11 +417,11 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: Event>() -> (Addr<EventBus<E>>, Addr<HistoryCollector<E>>) {
-    let bus = EventBus::<E>::default().start();
+pub fn new_event_bus_with_history<E: CompositeEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
+{
+    let bus: BusHandle<E> = EventBus::<E>::default().start().into();
 
     let history = HistoryCollector::new().start();
-
-    bus.do_send(Subscribe::new("*", history.clone().recipient()));
+    bus.subscribe("*", history.clone().recipient());
     (bus, history)
 }

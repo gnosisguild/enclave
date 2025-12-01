@@ -2867,6 +2867,7 @@ dependencies = [
  "proptest",
  "serde",
  "sha2",
+ "strum",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -3118,6 +3119,7 @@ dependencies = [
  "num-bigint",
  "rand 0.8.5",
  "serde",
+ "tokio",
  "tracing",
 ]
 

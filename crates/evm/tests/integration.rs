@@ -17,7 +17,8 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
-    new_event_bus_with_history, EnclaveEvent, GetEvents, HistoryCollector, Shutdown, TestEvent,
+    new_event_bus_with_history, prelude::*, EnclaveEvent, EnclaveEventData, GetEvents,
+    HistoryCollector, Shutdown, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;
@@ -33,16 +34,19 @@ fn test_event_extractor(
     data: &LogData,
     topic: Option<&FixedBytes<32>>,
     _chain_id: u64,
-) -> Option<EnclaveEvent> {
+) -> Option<EnclaveEventData> {
     match topic {
         Some(&EmitLogs::ValueChanged::SIGNATURE_HASH) => {
             let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data) else {
                 return None;
             };
-            Some(EnclaveEvent::from(TestEvent {
-                msg: event.value,
-                entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests
-            }))
+            Some(
+                TestEvent {
+                    msg: event.value,
+                    entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests
+                }
+                .into(),
+            )
         }
         _ => None,
     }
@@ -54,8 +58,8 @@ async fn get_msgs(history_collector: &Addr<HistoryCollector<EnclaveEvent>>) -> R
         .await?;
     let msgs: Vec<String> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -121,8 +125,8 @@ async fn evm_reader() -> Result<()> {
 
     let msgs: Vec<_> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -200,8 +204,8 @@ async fn ensure_historical_events() -> Result<()> {
 
     let msgs: Vec<_> = history
         .into_iter()
-        .filter_map(|evt| match evt {
-            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+        .filter_map(|evt| match evt.into_data() {
+            EnclaveEventData::TestEvent(data) => Some(data.msg),
             _ => None,
         })
         .collect();
@@ -265,7 +269,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     // Ensure shutdown doesn't cause event to be lost.
     sleep(Duration::from_millis(10)).await;
-    addr1.send(EnclaveEvent::from(Shutdown)).await?;
+    addr1.send(bus.event_from(Shutdown)).await?;
 
     for msg in ["these", "are", "not", "lost"] {
         contract

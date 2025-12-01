@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 // helpers.rs
 use alloy::{
-    network::Ethereum,
     node_bindings::{Anvil, AnvilInstance},
     providers::{Provider, ProviderBuilder, WsConnect},
     signers::local::PrivateKeySigner,
@@ -29,18 +28,6 @@ sol!(
     EmitLogs,
     "tests/fixtures/emit_logs.json"
 );
-
-pub async fn setup_fake_enclave() -> Result<(
-    EnclaveInstance<impl Provider>,
-    String,
-    String,
-    AnvilInstance,
-)> {
-    let (provider, endpoint, anvil) = setup_provider().await?;
-    let contract = Enclave::deploy(provider).await?;
-    let address = contract.address().to_string();
-    Ok((contract, address, endpoint, anvil))
-}
 
 pub async fn setup_two_contracts() -> Result<(
     EnclaveInstance<impl Provider>,
