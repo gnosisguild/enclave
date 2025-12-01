@@ -88,13 +88,13 @@ Helpful getters:
 
 ## Post-exit
 
-- Securely wipe local secrets (`enclave nodes purge` and delete keystores)
+- Securely wipe local secrets (`enclave purge-all` to clear caches and databases, delete keystores)
 - Revoke RPC credentials and firewall openings
 - Document the exit reason for future audits or compliance
 
 ## Slashing prevention checklist
 
-- Keep `enclave jobs list` empty before scheduled maintenance so you do not abandon active work.
+- Monitor active jobs before scheduled maintenance to avoid abandoning active work.
 - Alert on `SlashProposed` events tagged with your operator address.
 - Archive CLI + RPC logs for every incident; you need them for appeals.
 - Double-check `isActive` after any ticket removal or license unbond to avoid accidental downtime.

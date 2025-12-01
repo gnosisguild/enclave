@@ -47,7 +47,7 @@ enclave config-set --rpc-url $RPC --eth-address $OPERATOR_ADDRESS
 
 # Store secrets (optional if using automation)
 enclave password set --password "$PASSWORD"
-enclave net keypair generate
+enclave net keypair
 enclave wallet set --private-key $OPERATOR_KEY
 ```
 
@@ -86,8 +86,8 @@ deployments, bake the steps into `ciphernode-entrypoint.sh` (see `deploy/`).
    - Commit `enclave.config.yaml` alongside deployment manifests
    - Store secrets in JSON (see `deploy/cn1.secrets.json`) and mount them securely
 
-> ℹ️ The CLI supports multiple named wallets. Use `enclave wallet list` to confirm the correct signer
-> is active before running bonding transactions.
+> The wallet private key is encrypted and stored in the config. Ensure you have set the correct
+> operator key with `enclave wallet set` before running bonding transactions.
 
 ## One-command bootstrap (optional)
 
