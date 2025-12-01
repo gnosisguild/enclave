@@ -46,14 +46,14 @@ contract FakeEnclave {
       startWindow: [uint256(18750100), uint256(18750200)],
       duration: 100,
       expiration: block.timestamp + 1 days,
-      encryptionSchemeId: bytes32(keccak256('AES-256-GCM')),
+      encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
       e3Program: 0x7F3E4df648B8Cb96C1D343be976b91B97CaD5c21,
       decryptionVerifier: 0x4B0D8c2E5f7a6c832f8b16d3aB0e7F5d9E9B24b1,
-      e3ProgramParams: abi.encode(42, 'testParams'),
-      customParams: abi.encode('custom_params'),
-      committeePublicKey: bytes32(keccak256('committee_public_key')),
-      ciphertextOutput: bytes32(keccak256('encrypted_data')),
-      plaintextOutput: abi.encode('decrypted_result')
+      e3ProgramParams: abi.encode(42, "testParams"),
+      customParams: abi.encode("custom_params"),
+      committeePublicKey: bytes32(keccak256("committee_public_key")),
+      ciphertextOutput: bytes32(keccak256("encrypted_data")),
+      plaintextOutput: abi.encode("decrypted_result")
     });
   }
 }

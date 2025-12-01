@@ -5,16 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import { IRiscZeroVerifier } from '@risc0/ethereum/contracts/IRiscZeroVerifier.sol';
-import { IE3Program } from '@enclave-e3/contracts/contracts/interfaces/IE3Program.sol';
-import { IEnclave } from '@enclave-e3/contracts/contracts/interfaces/IEnclave.sol';
-import { Ownable } from '@openzeppelin/contracts/access/Ownable.sol';
-import { LazyIMTData, InternalLazyIMT, PoseidonT3 } from '@zk-kit/lazy-imt.sol/InternalLazyIMT.sol';
+import { IRiscZeroVerifier } from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol";
+import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
+import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { LazyIMTData, InternalLazyIMT, PoseidonT3 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
 contract MyProgram is IE3Program, Ownable {
   using InternalLazyIMT for LazyIMTData;
   // Constants
-  bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256('fhe.rs:BFV');
+  bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
   uint8 public constant TREE_DEPTH = 20;
 

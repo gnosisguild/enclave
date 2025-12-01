@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity ^0.8.27;
 
-import { IRiscZeroVerifier, Receipt } from '@risc0/ethereum/contracts/IRiscZeroVerifier.sol';
+import { IRiscZeroVerifier, Receipt } from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol";
 
 contract MockRISC0Verifier is IRiscZeroVerifier {
   function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) public view override {}

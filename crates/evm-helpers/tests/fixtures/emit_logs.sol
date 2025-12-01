@@ -15,7 +15,7 @@ contract EmitLogs {
   uint256 count = 0;
 
   constructor() {
-    _value = '';
+    _value = "";
   }
 
   function getValue() public view returns (string memory) {
