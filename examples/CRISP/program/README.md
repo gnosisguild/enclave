@@ -18,12 +18,12 @@ graph TD
     server --HTTP--> program
   end
   subgraph thirdparty["3rd PARTY"]
-    bonsai
+    boundless
   end
   client --"HTTP"--> server
-  program ---> bonsai
+  program ---> boundless
 
-  bonsai["bonsai (risc0)"]
+  boundless["boundless (risc0)"]
 
   server --"publishInput()"--> evm
   subgraph evm["EVM"]
