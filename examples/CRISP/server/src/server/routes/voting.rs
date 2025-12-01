@@ -37,7 +37,10 @@ async fn broadcast_encrypted_vote(
     store: web::Data<AppData>,
 ) -> impl Responder {
     let vote_request = data.into_inner();
-    info!("[e3_id={}] Broadcasting encrypted vote", vote_request.round_id);
+    info!(
+        "[e3_id={}] Broadcasting encrypted vote",
+        vote_request.round_id
+    );
     // Validate and update vote status
     let has_voted = match store
         .e3(vote_request.round_id)
@@ -65,7 +68,10 @@ async fn broadcast_encrypted_vote(
 
     let mut repo = store.e3(vote_request.round_id);
 
-    if let Err(e) = repo.insert_voter_address(vote_request.address.clone()).await {
+    if let Err(e) = repo
+        .insert_voter_address(vote_request.address.clone())
+        .await
+    {
         error!(
             "[e3_id={}] Database error inserting voter: {:?}",
             vote_request.round_id, e
@@ -74,9 +80,12 @@ async fn broadcast_encrypted_vote(
     }
 
     let e3_id = U256::from(vote_request.round_id);
-    
+
     // encoded_proof is already encoded in JavaScript, just decode from hex
-    let hex_str = vote_request.encoded_proof.strip_prefix("0x").unwrap_or(&vote_request.encoded_proof);
+    let hex_str = vote_request
+        .encoded_proof
+        .strip_prefix("0x")
+        .unwrap_or(&vote_request.encoded_proof);
     let encoded_proof = match hex::decode(hex_str) {
         Ok(decoded) => Bytes::from(decoded),
         Err(e) => {
@@ -106,13 +115,18 @@ async fn broadcast_encrypted_vote(
                 "[e3_id={}] Contract creation failed: {:?}",
                 vote_request.round_id, e
             );
+            // Rollback voter insertion before returning error
+            let _ = handle_vote_error(e, repo, &vote_request.address).await;
             return HttpResponse::InternalServerError().json("Internal server error");
         }
     };
 
     match contract.publish_input(e3_id, encoded_proof).await {
         Ok(hash) => {
-            info!("[e3_id={}] Vote broadcasted successfully", vote_request.round_id);
+            info!(
+                "[e3_id={}] Vote broadcasted successfully",
+                vote_request.round_id
+            );
             HttpResponse::Ok().json(VoteResponse {
                 status: VoteResponseStatus::Success,
                 tx_hash: Some(hash.transaction_hash.to_string()),
