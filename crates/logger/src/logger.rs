@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{EnclaveEvent, Event, EventBus, Subscribe};
+use e3_events::{prelude::Event, EnclaveEvent, EnclaveEventData, EventBus, Subscribe};
 use std::marker::PhantomData;
 use tracing::{error, info};
 
@@ -48,8 +48,8 @@ impl<E: EventLogging> Handler<E> for SimpleLogger<E> {
 
 impl EventLogging for EnclaveEvent {
     fn log(&self, logger_name: &str) {
-        match self {
-            EnclaveEvent::EnclaveError { .. } => error!(event=%self, "ERROR!"),
+        match self.get_data() {
+            EnclaveEventData::EnclaveError(_) => error!(event=%self, "ERROR!"),
             _ => match self.get_e3_id() {
                 Some(e3_id) => {
                     println!("{logger_name}: {e3_id} Event Broadcasted");

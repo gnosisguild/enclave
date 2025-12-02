@@ -11,6 +11,10 @@ on:
       - 'v*.*.*-*' # Pre-release tags like v1.0.0-beta.1
 
 env:
+  CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
+  SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
+  CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
+  SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   MNEMONIC: 'test test test test test test test test test test test junk'
   INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   ETHERSCAN_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
@@ -66,6 +70,72 @@ jobs:
           fi
 
           echo "✅ All versions match: $VERSION"
+
+  build-ciphernode-image-release:
+    name: Build & Push ciphernode (release)
+    runs-on: ubuntu-latest
+    needs: validate-and-prepare
+    env:
+      CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push ciphernode release image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: crates/Dockerfile
+          push: true
+          tags: |
+            ${{ env.CIPHERNODE_IMAGE_NAME }}:${{ needs.validate-and-prepare.outputs.version }}
+            ${{ env.CIPHERNODE_IMAGE_NAME }}:latest
+          cache-from: |
+            type=gha,scope=ciphernode
+          cache-to: |
+            type=gha,mode=max,scope=ciphernode
+
+  build-e3-support-release:
+    name: Build & Push e3-support (release)
+    runs-on: ubuntu-latest
+    needs: validate-and-prepare
+    env:
+      SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push e3-support release image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crates/support
+          file: ${{ env.SUPPORT_DOCKERFILE_PATH }}
+          push: true
+          tags: |
+            ${{ env.SUPPORT_IMAGE_NAME }}:${{ needs.validate-and-prepare.outputs.version }}
+            ${{ env.SUPPORT_IMAGE_NAME }}:latest
+          cache-from: |
+            type=gha,scope=e3-support
+          cache-to: |
+            type=gha,mode=max,scope=e3-support
 
   build-binaries:
     name: Build Binaries (${{ matrix.os_name }}-${{ matrix.arch }})
@@ -217,7 +287,15 @@ jobs:
   create-github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [validate-and-prepare, build-binaries, publish-rust-crates, publish-npm-packages]
+    needs:
+      [
+        validate-and-prepare,
+        build-ciphernode-image-release,
+        build-e3-support-release,
+        build-binaries,
+        publish-rust-crates,
+        publish-npm-packages,
+      ]
     if: always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
     steps:
       - name: Checkout

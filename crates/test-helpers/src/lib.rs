@@ -15,7 +15,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
+    BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
+    EventPublisher, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -71,7 +72,7 @@ pub fn create_crp_bytes_params(
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
-    Addr<EventBus<EnclaveEvent>>,
+    BusHandle<EnclaveEvent>,
     SharedRng,
     Seed,
     Arc<BfvParameters>,
@@ -94,7 +95,7 @@ pub fn get_common_setup(
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
-    Ok((bus, rng, seed, params, crpoly, errors, history))
+    Ok((bus.into(), rng, seed, params, crpoly, errors, history))
 }
 
 /// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
@@ -158,32 +159,32 @@ pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
 /// Test helper to add addresses to the committee by creating events on the event bus
 #[derive(Clone, Debug)]
 pub struct AddToCommittee {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     count: usize,
     chain_id: u64,
 }
 
 impl AddToCommittee {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, chain_id: u64) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>, chain_id: u64) -> Self {
         Self {
             bus: bus.clone(),
             chain_id,
             count: 0,
         }
     }
-    pub async fn add(&mut self, address: &str) -> Result<EnclaveEvent> {
-        let evt = EnclaveEvent::from(CiphernodeAdded {
+    pub async fn add(&mut self, address: &str) -> Result<EnclaveEventData> {
+        let evt = CiphernodeAdded {
             chain_id: self.chain_id,
             address: address.to_owned(),
             index: self.count,
             num_nodes: self.count + 1,
-        });
+        };
 
         self.count += 1;
 
-        self.bus.send(evt.clone()).await?;
+        self.bus.publish(evt.clone());
 
-        Ok(evt)
+        Ok(evt.into())
     }
 }
 
@@ -207,11 +208,4 @@ pub fn encrypt_ciphertext(
         })
         .collect::<Result<Vec<Ciphertext>>>()?;
     Ok((ciphertext, plaintext))
-}
-
-fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
-    let len = input.len();
-    let mut cop = input.to_vec();
-    cop.extend(std::iter::repeat(pad).take(total - len));
-    cop
 }

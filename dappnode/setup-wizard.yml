@@ -1,0 +1,194 @@
+# DAppNode Setup Wizard - Enclave Ciphernode
+version: '2'
+fields:
+  - id: NETWORK
+    target:
+      type: environment
+      name: NETWORK
+      service: ciphernode
+    title: 'Network'
+    description: 'Select the network to connect to.'
+    enum:
+      - sepolia
+      - mainnet
+      - localhost
+    required: true
+
+  - id: RPC_URL
+    target:
+      type: environment
+      name: RPC_URL
+      service: ciphernode
+    title: 'RPC URL'
+    description: |
+      WebSocket RPC endpoint for the blockchain.
+
+      Examples:
+      - Sepolia: wss://ethereum-sepolia-rpc.publicnode.com
+      - Mainnet: wss://ethereum.publicnode.com
+      - Localhost: ws://localhost:8545
+    required: true
+    pattern: '^wss?://.*'
+    patternErrorMessage: 'Must be a WebSocket URL (wss:// or ws://)'
+
+  - id: NODE_ADDRESS
+    target:
+      type: environment
+      name: NODE_ADDRESS
+      service: ciphernode
+    title: 'Node Address'
+    description: 'Public address for this node (must match the private key below if set).'
+    required: true
+    pattern: '^0x[a-fA-F0-9]{40}$'
+    patternErrorMessage: 'Must be a valid 20-byte hex address (0x...)'
+
+  - id: PRIVATE_KEY
+    target:
+      type: environment
+      name: PRIVATE_KEY
+      service: ciphernode
+    title: 'Private Key'
+    description: 'Private key for this node. Must correspond to the Node Address above.'
+    secret: true
+    required: false
+    pattern: '^(0x[a-fA-F0-9]{64})?$'
+
+  # Node settings
+  - id: NODE_ROLE
+    target:
+      type: environment
+      name: NODE_ROLE
+      service: ciphernode
+    title: 'Node Role'
+    default: 'ciphernode'
+    description: |
+      - **ciphernode**: Participate in threshold decryption 
+      - **aggregator**: Coordinate operations
+    enum:
+      - ciphernode
+      - aggregator
+    required: false
+
+  # Contracts
+  - id: ENCLAVE_CONTRACT
+    target:
+      type: environment
+      name: ENCLAVE_CONTRACT
+      service: ciphernode
+    title: 'Enclave Contract Address'
+    description: 'Address of the Enclave contract on the selected network.'
+    required: true
+    pattern: '^0x[a-fA-F0-9]{40}$'
+    patternErrorMessage: 'Must be a valid Ethereum address (0x...)'
+
+  - id: CIPHERNODE_REGISTRY_CONTRACT
+    target:
+      type: environment
+      name: CIPHERNODE_REGISTRY_CONTRACT
+      service: ciphernode
+    title: 'Ciphernode Registry Contract'
+    description: 'Address of the CiphernodeRegistry contract.'
+    required: true
+    pattern: '^0x[a-fA-F0-9]{40}$'
+    patternErrorMessage: 'Must be a valid Ethereum address (0x...)'
+
+  - id: BONDING_REGISTRY_CONTRACT
+    target:
+      type: environment
+      name: BONDING_REGISTRY_CONTRACT
+      service: ciphernode
+    title: 'Bonding Registry Contract'
+    description: 'Address of the BondingRegistry contract.'
+    required: true
+    pattern: '^0x[a-fA-F0-9]{40}$'
+    patternErrorMessage: 'Must be a valid Ethereum address (0x...)'
+
+  - id: ENCLAVE_DEPLOY_BLOCK
+    target:
+      type: environment
+      name: ENCLAVE_DEPLOY_BLOCK
+      service: ciphernode
+    title: 'Enclave Deploy Block'
+    description: 'Block number where the Enclave contract was deployed.'
+    required: true
+    pattern: '^[0-9]+$'
+    patternErrorMessage: 'Must be a block number (integer).'
+
+  - id: CIPHERNODE_REGISTRY_DEPLOY_BLOCK
+    target:
+      type: environment
+      name: CIPHERNODE_REGISTRY_DEPLOY_BLOCK
+      service: ciphernode
+    title: 'Ciphernode Registry Deploy Block'
+    description: 'Block number where the CiphernodeRegistry contract was deployed.'
+    required: true
+    pattern: '^[0-9]+$'
+    patternErrorMessage: 'Must be a block number (integer).'
+
+  - id: BONDING_REGISTRY_DEPLOY_BLOCK
+    target:
+      type: environment
+      name: BONDING_REGISTRY_DEPLOY_BLOCK
+      service: ciphernode
+    title: 'Bonding Registry Deploy Block'
+    description: 'Block number where the BondingRegistry contract was deployed.'
+    required: true
+    pattern: '^[0-9]+$'
+    patternErrorMessage: 'Must be a block number (integer).'
+
+  - id: PEERS
+    target:
+      type: environment
+      name: PEERS
+      service: ciphernode
+    title: 'Bootstrap Peers'
+    description: |
+      Comma-separated peer addresses, e.g.:
+      /dns4/cn1/udp/9091/quic-v1, /dns4/cn2/udp/9092/quic-v1
+      Leave empty for auto-discovery.
+    required: false
+
+  # Secrets
+  - id: ENCRYPTION_PASSWORD
+    target:
+      type: environment
+      name: ENCRYPTION_PASSWORD
+      service: ciphernode
+    title: 'Encryption Password'
+    description: 'Password for local encryption. Leave empty to auto-generate.'
+    secret: true
+    required: false
+
+  - id: NETWORK_PRIVATE_KEY
+    target:
+      type: environment
+      name: NETWORK_PRIVATE_KEY
+      service: ciphernode
+    title: 'Network Private Key'
+    description: 'libp2p network key for consistent peer ID across restarts. Leave empty to auto-generate.'
+    secret: true
+    required: false
+    pattern: '^(0x[a-fA-F0-9]{64})?$'
+
+  # Advanced
+  - id: LOG_LEVEL
+    target:
+      type: environment
+      name: LOG_LEVEL
+      service: ciphernode
+    title: 'Log Level'
+    description: 'Log level for the ciphernode.'
+    enum:
+      - info
+      - debug
+      - trace
+    required: false
+
+  - id: EXTRA_OPTS
+    target:
+      type: environment
+      name: EXTRA_OPTS
+      service: ciphernode
+    title: 'Extra Options'
+    description: 'Additional CLI arguments passed to `enclave start`.'
+    required: false

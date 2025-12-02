@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::Arc;
+
+use crate::keyshare_created_filter_buffer::KeyshareCreatedFilterBuffer;
 use crate::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
     PlaintextRepositoryFactory, PublicKeyAggregator, PublicKeyAggregatorParams,
@@ -11,24 +14,26 @@ use crate::{
     ThresholdPlaintextAggregatorParams, ThresholdPlaintextAggregatorState,
     TrBfvPlaintextRepositoryFactory,
 };
-use actix::{Actor, Addr};
+use actix::{Actor, Addr, Recipient};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
+use e3_events::{prelude::*, E3id};
+use e3_events::{BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
+use e3_fhe::Fhe;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
 #[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
 }
 
 impl PlaintextAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &BusHandle<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -43,7 +48,7 @@ const ERROR_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator 
 impl E3Extension for PlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
-        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
 
@@ -143,16 +148,12 @@ impl E3Extension for PlaintextAggregatorExtension {
 }
 
 pub struct PublicKeyAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
-    sortition: Addr<Sortition>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
-        Box::new(Self {
-            bus: bus.clone(),
-            sortition: sortition.clone(),
-        })
+    pub fn create(bus: &BusHandle<EnclaveEvent>) -> Box<Self> {
+        Box::new(Self { bus: bus.clone() })
     }
 }
 
@@ -163,7 +164,7 @@ const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator bec
 impl E3Extension for PublicKeyAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the publickey aggregator with deps on E3Requested
-        let EnclaveEvent::E3Requested { data, .. } = evt else {
+        let EnclaveEventData::E3Requested(data) = evt.get_data() else {
             return;
         };
 
@@ -187,22 +188,10 @@ impl E3Extension for PublicKeyAggregatorExtension {
             meta.threshold_n,
             meta.seed,
         )));
-        ctx.set_event_recipient(
-            "publickey",
-            Some(
-                PublicKeyAggregator::new(
-                    PublicKeyAggregatorParams {
-                        fhe: fhe.clone(),
-                        bus: self.bus.clone(),
-                        sortition: self.sortition.clone(),
-                        e3_id,
-                    },
-                    sync_state,
-                )
-                .start()
-                .into(),
-            ),
-        );
+
+        let value = create_publickey_aggregator(fhe.clone(), self.bus.clone(), e3_id, sync_state);
+
+        ctx.set_event_recipient("publickey", Some(value));
     }
 
     async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
@@ -228,18 +217,12 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
             return Ok(());
         };
-
-        let value = PublicKeyAggregator::new(
-            PublicKeyAggregatorParams {
-                fhe: fhe.clone(),
-                bus: self.bus.clone(),
-                sortition: self.sortition.clone(),
-                e3_id: ctx.e3_id.clone(),
-            },
+        let value = create_publickey_aggregator(
+            fhe.clone(),
+            self.bus.clone(),
+            ctx.e3_id.clone(),
             sync_state,
-        )
-        .start()
-        .into();
+        );
 
         // send to context
         ctx.set_event_recipient("publickey", Some(value));
@@ -248,15 +231,30 @@ impl E3Extension for PublicKeyAggregatorExtension {
     }
 }
 
+fn create_publickey_aggregator(
+    fhe: Arc<Fhe>,
+    bus: BusHandle<EnclaveEvent>,
+    e3_id: E3id,
+    sync_state: Persistable<PublicKeyAggregatorState>,
+) -> Recipient<EnclaveEvent> {
+    KeyshareCreatedFilterBuffer::new(
+        PublicKeyAggregator::new(PublicKeyAggregatorParams { fhe, bus, e3_id }, sync_state)
+            .start()
+            .into(),
+    )
+    .start()
+    .into()
+}
+
 pub struct ThresholdPlaintextAggregatorExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
     pub fn create(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         multithread: &Addr<Multithread>,
     ) -> Box<Self> {
@@ -274,7 +272,7 @@ const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlain
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
-        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
             return;
         };
 

@@ -15,10 +15,10 @@ use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
 use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
-    bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
+    bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::{Deserialize, DeserializeParametrized, FheDecoder, Serialize};
+use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};

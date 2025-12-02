@@ -4,14 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::simulate_libp2p_net;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
+use e3_events::Event;
 use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
-use tokio::time::timeout;
-
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
-
-use crate::simulate_libp2p_net;
+use tokio::time::timeout;
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
@@ -198,7 +197,7 @@ mod tests {
     use super::*;
     use actix::prelude::*;
     use e3_data::InMemStore;
-    use e3_events::{EventBus, EventBusConfig};
+    use e3_events::{BusHandle, EventBus, EventBusConfig};
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -206,6 +205,7 @@ mod tests {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
+        let bus = BusHandle::new(bus);
 
         Ok(CiphernodeHandle {
             address,

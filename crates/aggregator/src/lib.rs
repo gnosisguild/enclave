@@ -6,6 +6,7 @@
 
 mod committee_finalizer;
 pub mod ext;
+mod keyshare_created_filter_buffer;
 mod plaintext_aggregator;
 mod publickey_aggregator;
 mod repo;

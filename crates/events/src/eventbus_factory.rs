@@ -12,9 +12,9 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::traits::Event;
+use crate::BusHandle;
 use crate::EnclaveEvent;
-use crate::ErrorEvent;
-use crate::Event;
 use crate::EventBus;
 use crate::HistoryCollector;
 use crate::Subscribe;
@@ -60,7 +60,7 @@ impl EventBusFactory {
 
         event_bus
     }
-    pub fn get_error_collector<E: ErrorEvent>(&self) -> Addr<HistoryCollector<E>> {
+    pub fn get_error_collector<E: Event>(&self) -> Addr<HistoryCollector<E>> {
         let type_id = TypeId::of::<E>();
         let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
 
@@ -90,4 +90,8 @@ pub fn get_enclave_event_bus() -> Addr<EventBus<EnclaveEvent>> {
 
 pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
+}
+
+pub fn get_enclave_bus_handle() -> BusHandle<EnclaveEvent> {
+    get_enclave_event_bus().into()
 }

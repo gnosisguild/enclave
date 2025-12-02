@@ -1,0 +1,33 @@
+# DAppNode Package - Git Ignore
+
+# Environment files with secrets
+.env
+*.env.local
+
+# Local test data
+data/
+
+# Build artifacts
+build_*/
+*.tar.xz
+*.txz
+
+# DAppNode SDK output
+releases/
+
+# Node modules (if any)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/

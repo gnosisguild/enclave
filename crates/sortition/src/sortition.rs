@@ -10,10 +10,11 @@ use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    BusError, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, EventBus, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, Subscribe, TicketBalanceUpdated,
+    prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
+    ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, OperatorActivationChanged,
+    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
+use e3_events::{BusHandle, EnclaveEventData};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
@@ -138,7 +139,7 @@ pub struct Sortition {
     /// Persistent map of `chain_id -> NodeStateStore`.
     node_state: Persistable<HashMap<u64, NodeStateStore>>,
     /// Event bus for error reporting and enclave event subscription.
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     /// Persistent map of finalized committees per E3
     finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
 }
@@ -147,7 +148,7 @@ pub struct Sortition {
 #[derive(Debug)]
 pub struct SortitionParams {
     /// Event bus address.
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     /// Persisted per-chain backend map.
     pub backends: Persistable<HashMap<u64, SortitionBackend>>,
     /// Node state store per chain
@@ -168,7 +169,7 @@ impl Sortition {
 
     #[instrument(name = "sortition_attach", skip_all)]
     pub async fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         backends_store: Repository<HashMap<u64, SortitionBackend>>,
         node_state_store: Repository<HashMap<u64, NodeStateStore>>,
         committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
@@ -192,20 +193,19 @@ impl Sortition {
         .start();
 
         // Subscribe to all relevant events
-        bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
-        bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
-        bus.do_send(Subscribe::new("TicketBalanceUpdated", addr.clone().into()));
-        bus.do_send(Subscribe::new(
-            "OperatorActivationChanged",
+        bus.subscribe_all(
+            &[
+                "CiphernodeAdded",
+                "CiphernodeRemoved",
+                "TicketBalanceUpdated",
+                "OperatorActivationChanged",
+                "ConfigurationUpdated",
+                "CommitteePublished",
+                "PlaintextOutputPublished",
+                "CommitteeFinalized",
+            ],
             addr.clone().into(),
-        ));
-        bus.do_send(Subscribe::new("ConfigurationUpdated", addr.clone().into()));
-        bus.do_send(Subscribe::new("CommitteePublished", addr.clone().into()));
-        bus.do_send(Subscribe::new(
-            "PlaintextOutputPublished",
-            addr.clone().into(),
-        ));
-        bus.do_send(Subscribe::new("CommitteeFinalized", addr.clone().into()));
+        );
 
         info!("Sortition actor started");
         Ok(addr)
@@ -231,15 +231,15 @@ impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CiphernodeRemoved { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::TicketBalanceUpdated { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::OperatorActivationChanged { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::ConfigurationUpdated { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CommitteePublished { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::PlaintextOutputPublished { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data.clone()),
+        match msg.into_data() {
+            EnclaveEventData::CiphernodeAdded(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CiphernodeRemoved(data) => ctx.notify(data.clone()),
+            EnclaveEventData::TicketBalanceUpdated(data) => ctx.notify(data.clone()),
+            EnclaveEventData::OperatorActivationChanged(data) => ctx.notify(data.clone()),
+            EnclaveEventData::ConfigurationUpdated(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CommitteePublished(data) => ctx.notify(data.clone()),
+            EnclaveEventData::PlaintextOutputPublished(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data.clone()),
             _ => (),
         }
     }

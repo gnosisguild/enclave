@@ -10,8 +10,8 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
 use e3_events::{
-    ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, PlaintextAggregated,
-    Seed,
+    prelude::*, BusHandle, ComputeRequest, DecryptionshareCreated, Die, E3id, EnclaveEvent,
+    EnclaveEventData, PlaintextAggregated, Seed,
 };
 use e3_multithread::Multithread;
 use e3_sortition::{GetNodesForE3, Sortition};
@@ -122,7 +122,7 @@ pub struct ComputeAggregate {
 
 pub struct ThresholdPlaintextAggregator {
     multithread: Addr<Multithread>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<ThresholdPlaintextAggregatorState>,
@@ -130,7 +130,7 @@ pub struct ThresholdPlaintextAggregator {
 
 pub struct ThresholdPlaintextAggregatorParams {
     pub multithread: Addr<Multithread>,
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }
@@ -235,9 +235,9 @@ impl Actor for ThresholdPlaintextAggregator {
 impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+        match msg.into_data() {
+            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
             _ => (),
         }
     }
@@ -336,13 +336,13 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                     act.set_decryption(plaintext.clone())?;
 
                     // Dispatch the PlaintextAggregated event
-                    let event = EnclaveEvent::from(PlaintextAggregated {
+                    let event = PlaintextAggregated {
                         decrypted_output: plaintext, // Extracting here for now
                         e3_id: act.e3_id.clone(),
-                    });
+                    };
 
                     info!("Dispatching plaintext event {:?}", event);
-                    act.bus.do_send(event);
+                    act.bus.publish(event);
                     Ok(())
                 }),
         )

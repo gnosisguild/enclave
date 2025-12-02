@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct OrderedSet<T: Ord>(BTreeSet<T>);
 
 impl<T: Ord> OrderedSet<T> {

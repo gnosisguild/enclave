@@ -19,6 +19,6 @@
 pragma solidity ^0.8.20;
 
 library Elf {
-    string public constant PROGRAM_PATH =
-        "/home/ace/main/gnosis/enclave/crates/support/target/riscv-guest/methods/guests/riscv32im-risc0-zkvm-elf/release/program.bin";
+  string public constant PROGRAM_PATH =
+    "/home/ace/main/gnosis/enclave/crates/support/target/riscv-guest/methods/guests/riscv32im-risc0-zkvm-elf/release/program.bin";
 }

@@ -20,9 +20,12 @@ use e3_data::FromSnapshotWithParams;
 use e3_data::RepositoriesFactory;
 use e3_data::Repository;
 use e3_data::Snapshot;
+use e3_events::prelude::*;
+use e3_events::BusHandle;
 use e3_events::E3RequestComplete;
+use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
-use e3_events::{E3id, EnclaveEvent, EventBus, Subscribe};
+use e3_events::{E3id, EnclaveEvent, Event};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -102,19 +105,19 @@ pub struct E3Router {
     /// A buffer for events to send to the
     buffer: EventBuffer,
     /// The EventBus
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     /// A repository for storing snapshots
     store: Repository<E3RouterSnapshot>,
 }
 
 pub struct E3RouterParams {
     extensions: Arc<Vec<Box<dyn E3Extension>>>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     store: Repository<E3RouterSnapshot>,
 }
 
 impl E3Router {
-    pub fn builder(bus: &Addr<EventBus<EnclaveEvent>>, store: DataStore) -> E3RouterBuilder {
+    pub fn builder(bus: &BusHandle<EnclaveEvent>, store: DataStore) -> E3RouterBuilder {
         let repositories = store.repositories();
         let builder = E3RouterBuilder {
             bus: bus.clone(),
@@ -147,9 +150,9 @@ impl Actor for E3Router {
 impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        // If we are shuttomg down then bail on anything else
-        if let EnclaveEvent::Shutdown { data, .. } = msg {
-            ctx.notify(data);
+        // If we are shutting down then bail on anything else
+        if let EnclaveEventData::Shutdown(data) = msg.get_data() {
+            ctx.notify(data.clone());
             return;
         }
 
@@ -179,19 +182,19 @@ impl Handler<EnclaveEvent> for E3Router {
 
         context.forward_message(&msg, &mut self.buffer);
 
-        match &msg {
-            EnclaveEvent::PlaintextAggregated { .. } => {
+        match msg.into_data() {
+            EnclaveEventData::PlaintextAggregated(_) => {
                 // Here we are detemining that by receiving the PlaintextAggregated event our request is
                 // complete and we can notify everyone. This might change as we consider other factors
                 // when determining if the request is complete
-                let event = EnclaveEvent::from(E3RequestComplete {
+                let event = E3RequestComplete {
                     e3_id: e3_id.clone(),
-                });
+                };
 
                 // Send to bus so all other actors can react to a request being complete.
-                self.bus.do_send(event);
+                self.bus.publish(event);
             }
-            EnclaveEvent::E3RequestComplete { .. } => {
+            EnclaveEventData::E3RequestComplete(_) => {
                 // Note this will be sent above to the children who can kill themselves based on
                 // the event
                 self.contexts.remove(&e3_id);
@@ -207,7 +210,7 @@ impl Handler<EnclaveEvent> for E3Router {
 impl Handler<Shutdown> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
-        let shutdown_evt = EnclaveEvent::from(msg);
+        let shutdown_evt = self.bus.event_from(msg);
         for (_, ctx) in self.contexts.iter() {
             ctx.forward_message_now(&shutdown_evt)
         }
@@ -279,7 +282,7 @@ impl FromSnapshotWithParams for E3Router {
 
 /// Builder for E3Router
 pub struct E3RouterBuilder {
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub extensions: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
 }
@@ -304,8 +307,7 @@ impl E3RouterBuilder {
         };
 
         let addr = e3r.start();
-        self.bus
-            .do_send(Subscribe::new("*", addr.clone().recipient()));
+        self.bus.subscribe("*", addr.clone().recipient());
         Ok(addr)
     }
 }

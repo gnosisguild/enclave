@@ -9,8 +9,8 @@ use anyhow::{anyhow, Result};
 use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
-    BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
-    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
+    Die, E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
 use e3_utils::utility_types::ArcBytes;
@@ -19,7 +19,7 @@ use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     secret: Persistable<Vec<u8>>,
     address: String,
     cipher: Arc<Cipher>,
@@ -30,7 +30,7 @@ impl Actor for Keyshare {
 }
 
 pub struct KeyshareParams {
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub secret: Persistable<Vec<u8>>,
     pub fhe: Arc<Fhe>,
     pub address: String,
@@ -76,11 +76,11 @@ impl Handler<EnclaveEvent> for Keyshare {
     type Result = ();
 
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut actix::Context<Self>) -> Self::Result {
-        match event {
-            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { .. } => ctx.notify(Die),
+        match event.into_data() {
+            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
+            EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(_) => ctx.notify(Die),
             _ => (),
         }
     }
@@ -94,27 +94,24 @@ impl Handler<CiphernodeSelected> for Keyshare {
 
         // generate keyshare
         let Ok((secret, pubkey)) = self.fhe.generate_keyshare() else {
-            self.bus.do_send(EnclaveEvent::from_error(
+            self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!("Error creating Keyshare for {e3_id}"),
-            ));
+            );
             return;
         };
 
         // Save secret on state
         if let Err(err) = self.set_secret(secret) {
-            self.bus.do_send(EnclaveEvent::from_error(
-                EnclaveErrorType::KeyGeneration,
-                err,
-            ))
+            self.bus.err(EnclaveErrorType::KeyGeneration, err)
         };
 
         // Broadcast the KeyshareCreated message
-        self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
+        self.bus.publish(KeyshareCreated {
             pubkey,
             e3_id,
             node: self.address.clone(),
-        }));
+        });
     }
 }
 
@@ -158,12 +155,12 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
-        self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
+        self.bus.publish(DecryptionshareCreated {
             party_id: 0, // Not used
             e3_id,
             decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],
             node: self.address.clone(),
-        }));
+        });
     }
 }
 

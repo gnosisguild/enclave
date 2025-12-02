@@ -18,7 +18,7 @@ use crate::formatters::hexf;
 
 pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
 pub struct ArcBytes(Arc<Vec<u8>>);
 
 impl ArcBytes {

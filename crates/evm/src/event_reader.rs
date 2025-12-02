@@ -14,7 +14,8 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventId};
+use e3_events::{BusHandle, Event};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
@@ -30,13 +31,13 @@ pub enum EnclaveEvmEvent {
     HistoricalSyncComplete,
     /// An actual event from the blockchain
     Event {
-        event: EnclaveEvent,
+        event: EnclaveEventData,
         block: Option<u64>,
     },
 }
 
 impl EnclaveEvmEvent {
-    pub fn new(event: EnclaveEvent, block: Option<u64>) -> Self {
+    pub fn new(event: EnclaveEventData, block: Option<u64>) -> Self {
         Self::Event { event, block }
     }
 
@@ -49,11 +50,11 @@ pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
 pub struct EvmEventReaderParams<P> {
     provider: EthProvider<P>,
-    extractor: ExtractorFn<EnclaveEvent>,
+    extractor: ExtractorFn<EnclaveEventData>,
     contract_address: Address,
     start_block: Option<u64>,
     processor: Recipient<EnclaveEvmEvent>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     state: Persistable<EvmEventReaderState>,
     rpc_url: String,
 }
@@ -71,7 +72,7 @@ pub struct EvmEventReader<P> {
     /// The contract address
     contract_address: Address,
     /// The Extractor function to determine which events to extract and convert to EnclaveEvents
-    extractor: ExtractorFn<EnclaveEvent>,
+    extractor: ExtractorFn<EnclaveEventData>,
     /// A shutdown receiver to listen to for shutdown signals sent to the loop this is only used
     /// internally. You should send the Shutdown signal to the reader directly or via the EventBus
     shutdown_rx: Option<oneshot::Receiver<()>>,
@@ -82,7 +83,7 @@ pub struct EvmEventReader<P> {
     /// Processor to forward events an actor
     processor: Recipient<EnclaveEvmEvent>,
     /// Event bus for error propagation only
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
     /// The RPC URL for the provider
@@ -108,11 +109,11 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
 
     pub async fn attach(
         provider: EthProvider<P>,
-        extractor: ExtractorFn<EnclaveEvent>,
+        extractor: ExtractorFn<EnclaveEventData>,
         contract_address: &str,
         start_block: Option<u64>,
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         repository: &Repository<EvmEventReaderState>,
         rpc_url: String,
     ) -> Result<Addr<Self>> {
@@ -136,7 +137,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
 
         processor.do_send(EnclaveEvmEvent::RegisterReader);
 
-        bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
+        bus.subscribe("Shutdown", addr.clone().into());
         Ok(addr)
     }
 }
@@ -187,10 +188,10 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: &Address,
     reader_addr: Addr<EvmEventReader<P>>,
-    extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
+    extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEventData>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
-    bus: &Addr<EventBus<EnclaveEvent>>,
+    bus: &BusHandle<EnclaveEvent>,
     rpc_url: String,
 ) {
     let chain_id = provider.chain_id();
@@ -258,7 +259,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                                     continue;
                                 };
 
-                                trace!("Extracted EVM Event: {}", event);
+                                trace!("Extracted EVM Event: {:?}", event);
                                 reader_addr.do_send(EnclaveEvmEvent::new(event, block_number));
                             }
                             None => break, // Stream ended
@@ -291,7 +292,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> 
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        if let EnclaveEvent::Shutdown { .. } = msg {
+        if let EnclaveEventData::Shutdown(_) = msg.into_data() {
             if let Some(shutdown) = self.shutdown_tx.take() {
                 let _ = shutdown.send(());
             }

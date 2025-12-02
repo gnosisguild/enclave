@@ -16,7 +16,7 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus};
+use e3_events::{BusHandle, EnclaveEvent, EnclaveEventData};
 use tracing::{error, info, trace};
 
 sol!(
@@ -40,10 +40,10 @@ impl From<TicketBalanceUpdatedWithChainId> for e3_events::TicketBalanceUpdated {
     }
 }
 
-impl From<TicketBalanceUpdatedWithChainId> for EnclaveEvent {
+impl From<TicketBalanceUpdatedWithChainId> for EnclaveEventData {
     fn from(value: TicketBalanceUpdatedWithChainId) -> Self {
         let payload: e3_events::TicketBalanceUpdated = value.into();
-        EnclaveEvent::from(payload)
+        Self::from(payload)
     }
 }
 
@@ -85,28 +85,28 @@ impl From<OperatorActivationChangedWithChainId> for e3_events::OperatorActivatio
     }
 }
 
-impl From<OperatorActivationChangedWithChainId> for EnclaveEvent {
+impl From<OperatorActivationChangedWithChainId> for EnclaveEventData {
     fn from(value: OperatorActivationChangedWithChainId) -> Self {
         let payload: e3_events::OperatorActivationChanged = value.into();
-        EnclaveEvent::from(payload)
+        Self::from(payload)
     }
 }
 
-impl From<ConfigurationUpdatedWithChainId> for EnclaveEvent {
+impl From<ConfigurationUpdatedWithChainId> for EnclaveEventData {
     fn from(value: ConfigurationUpdatedWithChainId) -> Self {
         let payload: e3_events::ConfigurationUpdated = value.into();
-        EnclaveEvent::from(payload)
+        Self::from(payload)
     }
 }
 
-pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&IBondingRegistry::TicketBalanceUpdated::SIGNATURE_HASH) => {
             let Ok(event) = IBondingRegistry::TicketBalanceUpdated::decode_log_data(data) else {
                 error!("Error parsing event TicketBalanceUpdated after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(TicketBalanceUpdatedWithChainId(
+            Some(EnclaveEventData::from(TicketBalanceUpdatedWithChainId(
                 event, chain_id,
             )))
         }
@@ -116,16 +116,16 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event OperatorActivationChanged after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(OperatorActivationChangedWithChainId(
-                event, chain_id,
-            )))
+            Some(EnclaveEventData::from(
+                OperatorActivationChangedWithChainId(event, chain_id),
+            ))
         }
         Some(&IBondingRegistry::ConfigurationUpdated::SIGNATURE_HASH) => {
             let Ok(event) = IBondingRegistry::ConfigurationUpdated::decode_log_data(data) else {
                 error!("Error parsing event ConfigurationUpdated after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(ConfigurationUpdatedWithChainId(
+            Some(EnclaveEventData::from(ConfigurationUpdatedWithChainId(
                 event, chain_id,
             )))
         }
@@ -145,7 +145,7 @@ pub struct BondingRegistrySolReader;
 impl BondingRegistrySolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -179,7 +179,7 @@ pub struct BondingRegistrySol;
 impl BondingRegistrySol {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

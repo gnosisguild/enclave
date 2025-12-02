@@ -17,9 +17,12 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use e3_events::prelude::*;
+use e3_events::BusHandle;
+use e3_events::EnclaveEvent;
+use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
-use e3_events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
-use e3_events::{EnclaveEvent, EventBus};
+use e3_events::{E3id, EnclaveErrorType, PlaintextAggregated};
 use tracing::info;
 
 sol!(
@@ -32,12 +35,12 @@ sol!(
 pub struct EnclaveSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -49,18 +52,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         provider: EthProvider<P>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-
-        bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
-            .await?;
-
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
-
+        bus.subscribe_all(&["PlaintextAggregated", "Shutdown"], addr.clone().into());
         Ok(addr)
     }
 }
@@ -73,14 +70,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::PlaintextAggregated { data, .. } => {
+        match msg.into_data() {
+            EnclaveEventData::PlaintextAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }

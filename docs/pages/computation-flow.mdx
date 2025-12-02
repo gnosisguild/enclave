@@ -62,10 +62,7 @@ During this phase, Data Providers — who may include individual users, applicat
    Program.
 
    ```solidity
-   function validateInput(
-      address sender,
-      bytes memory data
-   ) external returns (bytes memory input);
+   function validateInput(address sender, bytes memory data) external returns (bytes memory input);
    ```
 
 ### Phase 4: Execution
@@ -80,9 +77,9 @@ publishes the encrypted output back to Enclave contract.
 
    ```solidity
    function publishCiphertextOutput(
-      uint256 e3Id,
-      bytes memory ciphertextOutput,
-      bytes memory proof
+     uint256 e3Id,
+     bytes memory ciphertextOutput,
+     bytes memory proof
    ) external returns (bool success);
    ```
 

@@ -1,0 +1,46 @@
+version: '3.5'
+services:
+  ciphernode:
+    build:
+      context: .
+      args:
+        UPSTREAM_VERSION: 0.1.5
+    image: 'ciphernode.enclave-ciphernode.public.dappnode.eth:0.1.0'
+    restart: unless-stopped
+    volumes:
+      - 'ciphernode_data:/data'
+    ports:
+      - 37173:37173/udp
+    environment:
+      # Required
+      RPC_URL: ''
+      # Network & node config
+      NETWORK: 'sepolia'
+      NODE_ROLE: 'ciphernode'
+      NODE_ADDRESS: ''
+      QUIC_PORT: '37173'
+      PEERS: ''
+      LOG_LEVEL: 'info'
+      EXTRA_OPTS: ''
+      # Secrets
+      ENCRYPTION_PASSWORD: ''
+      NETWORK_PRIVATE_KEY: ''
+      PRIVATE_KEY: ''
+      # Contracts (variants override these)
+      ENCLAVE_CONTRACT: ''
+      CIPHERNODE_REGISTRY_CONTRACT: ''
+      BONDING_REGISTRY_CONTRACT: ''
+      ENCLAVE_DEPLOY_BLOCK: '0'
+      CIPHERNODE_REGISTRY_DEPLOY_BLOCK: '0'
+      BONDING_REGISTRY_DEPLOY_BLOCK: '0'
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'pgrep', '-f', 'enclave']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  ciphernode_data: {}

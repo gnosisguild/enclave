@@ -53,7 +53,7 @@ pub async fn execute(
         peer_id
     );
 
-    tokio::spawn(listen_for_shutdown(bus.into(), handle)).await?;
+    tokio::spawn(listen_for_shutdown(bus, handle)).await?;
 
     Ok(())
 }

@@ -80,6 +80,8 @@ impl NetInterface {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
+            .with_dns()
+            .map_err(|e| anyhow::anyhow!("Failed to enable DNS: {e}"))?
             .with_behaviour(|key| create_behaviour(key))?
             .build();
 
