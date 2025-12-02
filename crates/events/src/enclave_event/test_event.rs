@@ -14,6 +14,15 @@ pub struct TestEvent {
     pub entropy: u64,
 }
 
+impl TestEvent {
+    pub fn new(msg: &str, entropy: u64) -> Self {
+        Self {
+            msg: msg.to_owned(),
+            entropy,
+        }
+    }
+}
+
 #[cfg(test)]
 use std::fmt::{self, Display};
 
