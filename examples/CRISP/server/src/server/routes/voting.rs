@@ -121,7 +121,6 @@ async fn broadcast_encrypted_vote(
                 vote_request.round_id, e
             );
             // Rollback voter insertion before returning error
-            // Rollback voter insertion before returning error
             let _ = match repo.remove_voter_address(&vote_request.address).await {
                 Ok(_) => (),
                 Err(e) => error!("Error rolling back the vote: {e}"),
