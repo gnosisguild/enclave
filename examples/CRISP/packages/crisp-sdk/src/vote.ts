@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { BFVParams, type CircuitInputs, type IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
+import { type CircuitInputs, type IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE } from './constants'
 import { extractSignatureComponents } from './signature'
@@ -15,13 +15,16 @@ import circuit from '../../../circuits/target/crisp_circuit.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
 
+// Initialize the ZKInputsGenerator.
+const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
+
 /**
  * Encode a vote.
  * @param vote The vote to encode.
- * @param bfvParams The BFV parameters to use for encoding.
  * @returns The encoded vote as a BigInt64Array.
  */
-export const encodeVote = (vote: IVote, bfvParams: BFVParams): BigInt64Array => {
+export const encodeVote = (vote: IVote): BigInt64Array => {
+  const bfvParams = zkInputsGenerator.getBFVParams()
   const voteArray = []
   const length = bfvParams.degree
   const halfLength = length / 2
@@ -79,24 +82,17 @@ export const decodeTally = (tally: string[]): IVote => {
 }
 
 export const encryptVote = (vote: IVote, publicKey: Uint8Array): Uint8Array => {
-  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
-  const bfvParams = zkInputsGenerator.getBFVParams()
-
-  const encodedVote = encodeVote(vote, bfvParams)
+  const encodedVote = encodeVote(vote)
 
   return zkInputsGenerator.encryptVote(publicKey, encodedVote)
 }
 
 export const generatePublicKey = (): Uint8Array => {
-  const zkInputsGenerator = ZKInputsGenerator.withDefaults()
   return zkInputsGenerator.generatePublicKey()
 }
 
 export const generateCircuitInputs = async (proofInputs: VoteProofInputs): Promise<CircuitInputs> => {
-  const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
-  const bfvParams = zkInputsGenerator.getBFVParams() as BFVParams
-
-  const encodedVote = encodeVote(proofInputs.vote, bfvParams)
+  const encodedVote = encodeVote(proofInputs.vote)
 
   let crispInputs = await zkInputsGenerator.generateInputs(
     // If no previous ciphertext is provided, a placeholder ciphertext vote will be generated.

@@ -163,12 +163,6 @@ export interface CircuitInputs {
   is_first_vote: boolean
 }
 
-export interface BFVParams {
-  degree: number
-  plaintextModulus: bigint
-  moduli: BigInt64Array
-}
-
 export interface MaskVoteProofInputs {
   previousCiphertext?: Uint8Array
   merkleProof: IMerkleProof
