@@ -54,7 +54,7 @@ mod tests {
         event_data.iter().cloned().for_each(|d| bus.publish(d));
         let expected = event_data
             .into_iter()
-            .map(|d| EnclaveEvent::test_only_create_stored_event(d.clone().into(), 0, d.entropy))
+            .map(|d| EnclaveEvent::new_stored_event(d.clone().into(), 0, d.entropy))
             .collect::<Vec<_>>();
         let events = history.send(TakeEvents::new(3)).await?;
 
