@@ -12,8 +12,8 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EnclaveErrorType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, Stored, Subscribe,
-    Unstored,
+    EnclaveErrorType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector,
+    Stored, Subscribe, Unstored,
 };
 
 #[derive(Clone, Debug)]
@@ -30,6 +30,10 @@ impl BusHandle {
 
     pub fn bus(&self) -> Addr<EventBus<EnclaveEvent<Stored>>> {
         self.bus.clone()
+    }
+
+    pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Stored>>> {
+        EventBus::<EnclaveEvent<Stored>>::history(&self.bus)
     }
 }
 
