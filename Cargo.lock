@@ -2860,6 +2860,7 @@ dependencies = [
  "chrono",
  "derivative",
  "e3-crypto",
+ "e3-events",
  "e3-trbfv",
  "e3-utils",
  "futures-util",

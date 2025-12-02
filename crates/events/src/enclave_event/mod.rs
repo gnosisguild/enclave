@@ -185,8 +185,9 @@ impl EnclaveEvent<Unstored> {
     }
 }
 
+#[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Stored> {
-    pub fn test_only_create_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
+    pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
         EnclaveEvent::<Unstored>::new_with_timestamp(data, time).into_stored(seq)
     }
 }
