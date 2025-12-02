@@ -34,8 +34,8 @@ impl CiphernodeHandle {
         }
     }
 
-    pub fn bus(&self) -> Addr<EventBus<EnclaveEvent>> {
-        (*self.bus).clone()
+    pub fn bus(&self) -> &BusHandle {
+        &self.bus
     }
 
     pub fn history(&self) -> Option<Addr<HistoryCollector<EnclaveEvent>>> {
