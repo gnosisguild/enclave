@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, CompositeEvent, EnclaveEvent, Stored};
+use crate::{prelude::*, BusHandle, EnclaveEvent, Stored};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -70,7 +70,7 @@ impl<E: Event> EventBus<E> {
         addr
     }
 
-    pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
+    pub fn error<EE: Event>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
         source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
         addr
@@ -417,10 +417,8 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: CompositeEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
-{
-    let bus: BusHandle<E> = EventBus::<E>::default().start().into();
-
+pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Stored>>>) {
+    let bus: BusHandle = EventBus::<EnclaveEvent<Stored>>::default().start().into();
     let history = HistoryCollector::new().start();
     bus.subscribe("*", history.clone().recipient());
     (bus, history)

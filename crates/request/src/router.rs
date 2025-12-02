@@ -11,6 +11,7 @@ use crate::E3ContextSnapshot;
 use crate::E3MetaExtension;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
+use actix::Message;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
 use async_trait::async_trait;
@@ -151,8 +152,11 @@ impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         // If we are shutting down then bail on anything else
-        if let EnclaveEventData::Shutdown(data) = msg.get_data() {
-            ctx.notify(data.clone());
+        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+            for (_, ctx) in self.contexts.iter() {
+                ctx.forward_message_now(&msg)
+            }
+
             return;
         }
 
@@ -204,16 +208,6 @@ impl Handler<EnclaveEvent> for E3Router {
         }
 
         self.checkpoint();
-    }
-}
-
-impl Handler<Shutdown> for E3Router {
-    type Result = ();
-    fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
-        let shutdown_evt = self.bus.event_from(msg);
-        for (_, ctx) in self.contexts.iter() {
-            ctx.forward_message_now(&shutdown_evt)
-        }
     }
 }
 
@@ -311,3 +305,7 @@ impl E3RouterBuilder {
         Ok(addr)
     }
 }
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+struct EventWrapper<T>(T);
