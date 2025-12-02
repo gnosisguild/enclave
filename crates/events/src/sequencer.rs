@@ -42,7 +42,7 @@ mod tests {
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let bus: BusHandle = EventBus::<EnclaveEvent>::default().start().into();
+        let bus = BusHandle::new(EventBus::<EnclaveEvent>::default().start());
         let history = bus.history();
 
         let event_data = vec![
@@ -59,6 +59,11 @@ mod tests {
         let events = history.send(TakeEvents::new(3)).await?;
 
         assert_eq!(events, expected);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_hlc_events() -> anyhow::Result<()> {
         Ok(())
     }
 }

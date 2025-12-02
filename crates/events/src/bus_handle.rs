@@ -4,9 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::Arc;
+
 use actix::{Actor, Addr, Recipient};
+use derivative::Derivative;
 
 use crate::{
+    hlc::Hlc,
     sequencer::Sequencer,
     traits::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
@@ -16,16 +20,24 @@ use crate::{
     Stored, Subscribe, Unstored,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct BusHandle {
     consumer: Addr<EventBus<EnclaveEvent<Stored>>>,
     producer: Addr<Sequencer>,
+    #[derivative(Debug = "ignore")]
+    hlc: Arc<Hlc>,
 }
 
 impl BusHandle {
     pub fn new(consumer: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
         let producer = Sequencer::new(&consumer).start();
-        Self { consumer, producer }
+        let hlc = Hlc::default();
+        Self {
+            consumer,
+            producer,
+            hlc: Arc::new(hlc),
+        }
     }
 
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Stored>>> {
@@ -100,5 +112,17 @@ impl EventSubscriber<EnclaveEvent<Stored>> for BusHandle {
             self.consumer
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
+    }
+}
+
+impl Into<BusHandle> for Addr<EventBus<EnclaveEvent>> {
+    fn into(self) -> BusHandle {
+        BusHandle::new(self)
+    }
+}
+
+impl Into<BusHandle> for &Addr<EventBus<EnclaveEvent>> {
+    fn into(self) -> BusHandle {
+        BusHandle::new(self.clone())
     }
 }

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::hlc::Hlc;
 use crate::traits::{ErrorEvent, Event};
 use crate::{prelude::*, BusHandle, EnclaveEvent, Stored};
 use actix::prelude::*;
@@ -130,12 +131,6 @@ impl<E: Event> Handler<E> for EventBus<E> {
         // TODO: workshop to work out best display format
         tracing::info!(">>> {}", event);
         self.track(event);
-    }
-}
-
-impl From<Addr<EventBus<EnclaveEvent<Stored>>>> for BusHandle {
-    fn from(value: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
-        BusHandle::new(value)
     }
 }
 
@@ -418,7 +413,8 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 
 /// Function to help with testing when we want to maintain a vec of events
 pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Stored>>>) {
-    let bus: BusHandle = EventBus::<EnclaveEvent<Stored>>::default().start().into();
+    let consumer = EventBus::<EnclaveEvent<Stored>>::default().start();
+    let bus: BusHandle = BusHandle::new(consumer);
     let history = HistoryCollector::new().start();
     bus.subscribe("*", history.clone().recipient());
     (bus, history)

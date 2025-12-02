@@ -486,7 +486,7 @@ mod tests {
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
-        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
+        hlc::Hlc, BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
         EnclaveEvent, EventBus, EventBusConfig, GetEvents, HistoryCollector,
         PublishDocumentRequested, TakeEvents,
     };
@@ -517,9 +517,8 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+        let consumer = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let bus = BusHandle::new(consumer);
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);

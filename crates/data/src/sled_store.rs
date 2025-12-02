@@ -43,13 +43,6 @@ impl SledStore {
 
         Ok(store)
     }
-
-    pub fn from_db(db: SledDb) -> Result<Self> {
-        Ok(Self {
-            db: Some(db),
-            bus: get_enclave_bus_handle(),
-        })
-    }
 }
 
 impl Handler<Insert> for SledStore {
