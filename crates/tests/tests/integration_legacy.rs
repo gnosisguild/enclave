@@ -506,8 +506,14 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     assert_eq!(
         *msgs.lock().await,
         vec![
-            GossipData::GossipBytes(bus.event_from(evt_1.clone()).to_bytes()?),
-            GossipData::GossipBytes(bus.event_from(evt_2.clone()).to_bytes()?)
+            GossipData::GossipBytes(
+                EnclaveEvent::test_only_create_stored_event(evt_1.clone().into(), 0, 1)
+                    .to_bytes()?
+            ),
+            GossipData::GossipBytes(
+                EnclaveEvent::test_only_create_stored_event(evt_2.clone().into(), 0, 2)
+                    .to_bytes()?
+            )
         ], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );

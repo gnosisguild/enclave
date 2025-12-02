@@ -324,5 +324,5 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unstored> {
             payload,
             seq: (),
         }
-   }
-
+    }
+}
