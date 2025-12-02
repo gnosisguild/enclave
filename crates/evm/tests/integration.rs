@@ -270,7 +270,11 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     // Ensure shutdown doesn't cause event to be lost.
     sleep(Duration::from_millis(10)).await;
     addr1
-        .send(EnclaveEvent::<Unstored>::new_with_timestamp(Shutdown.into(), 4321).into_stored(42))
+        .send(EnclaveEvent::test_only_create_stored_event(
+            Shutdown.into(),
+            4321,
+            42,
+        ))
         .await?;
 
     for msg in ["these", "are", "not", "lost"] {

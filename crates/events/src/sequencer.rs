@@ -41,7 +41,7 @@ mod tests {
     use actix::Actor;
 
     #[actix::test]
-    async fn it_adds_numbers_to_events() -> anyhow::Result<()> {
+    async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
         let bus: BusHandle = EventBus::<EnclaveEvent>::default().start().into();
         let history = bus.history();
 
@@ -54,7 +54,7 @@ mod tests {
         event_data.iter().cloned().for_each(|d| bus.publish(d));
         let expected = event_data
             .into_iter()
-            .map(|d| EnclaveEvent::new_with_timestamp(d.clone().into(), 0).into_stored(d.entropy))
+            .map(|d| EnclaveEvent::test_only_create_stored_event(d.clone().into(), 0, d.entropy))
             .collect::<Vec<_>>();
         let events = history.send(TakeEvents::new(3)).await?;
 
