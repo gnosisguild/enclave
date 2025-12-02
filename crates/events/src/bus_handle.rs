@@ -78,8 +78,8 @@ impl ErrorDispatcher<EnclaveEvent<Unstored>> for BusHandle {
 
 impl EventFactory<EnclaveEvent<Unstored>> for BusHandle {
     fn event_from(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unstored> {
-        // TODO: add self.hcl.tick()
-        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), 0)
+        let ts = self.hlc.tick().unwrap(); // XXX:
+        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts.into())
     }
 
     fn event_from_remote_source(
@@ -87,8 +87,8 @@ impl EventFactory<EnclaveEvent<Unstored>> for BusHandle {
         data: impl Into<EnclaveEventData>,
         ts: u128,
     ) -> EnclaveEvent<Unstored> {
-        // TODO: add self.hcl.receive(ts)
-        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts)
+        let ts = self.hlc.receive(&ts.into()).unwrap(); // XXX:
+        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts.into())
     }
 }
 
