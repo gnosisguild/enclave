@@ -126,9 +126,9 @@ pub fn get_common_setup(
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
-        let source = &node.bus();
+        let source = node.bus().consumer();
         for (_, node) in nodes.iter().enumerate() {
-            let dest = &node.bus();
+            let dest = node.bus().consumer();
             if source != dest {
                 EventBus::pipe_filter(
                     source,

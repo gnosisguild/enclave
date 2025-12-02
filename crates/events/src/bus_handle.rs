@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::ops::Deref;
-
 use actix::{Actor, Addr, Recipient};
 
 use crate::{
@@ -20,48 +18,49 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct BusHandle {
-    bus: Addr<EventBus<EnclaveEvent<Stored>>>,
-    seq: Addr<Sequencer>,
+    consumer: Addr<EventBus<EnclaveEvent<Stored>>>,
+    producer: Addr<Sequencer>,
 }
 
 impl BusHandle {
-    pub fn new(bus: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
-        let seq = Sequencer::new(&bus).start();
-        Self { bus, seq }
+    pub fn new(consumer: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
+        let producer = Sequencer::new(&consumer).start();
+        Self { consumer, producer }
     }
 
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Stored>>> {
-        EventBus::<EnclaveEvent<Stored>>::history(&self.bus)
+        EventBus::<EnclaveEvent<Stored>>::history(&self.consumer)
     }
-}
 
-impl Deref for BusHandle {
-    type Target = Addr<EventBus<EnclaveEvent<Stored>>>;
-    fn deref(&self) -> &Self::Target {
-        &self.bus
+    pub fn producer(&self) -> &Addr<Sequencer> {
+        &self.producer
+    }
+
+    pub fn consumer(&self) -> &Addr<EventBus<EnclaveEvent<Stored>>> {
+        &self.consumer
     }
 }
 
 impl EventPublisher<EnclaveEvent<Unstored>> for BusHandle {
     fn publish(&self, data: impl Into<EnclaveEventData>) {
         let evt = self.event_from(data);
-        self.seq.do_send(evt);
+        self.producer.do_send(evt);
     }
 
     fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) {
         let evt = self.event_from_remote_source(data, ts);
-        self.seq.do_send(evt)
+        self.producer.do_send(evt)
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unstored>) {
-        self.seq.do_send(event);
+        self.producer.do_send(event);
     }
 }
 
 impl ErrorDispatcher<EnclaveEvent<Unstored>> for BusHandle {
     fn err(&self, err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) {
         let evt = self.event_from_error(err_type, error);
-        self.seq.do_send(evt);
+        self.producer.do_send(evt);
     }
 }
 
@@ -93,12 +92,12 @@ impl ErrorFactory<EnclaveEvent<Unstored>> for BusHandle {
 
 impl EventSubscriber<EnclaveEvent<Stored>> for BusHandle {
     fn subscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Stored>>) {
-        self.bus.do_send(Subscribe::new(event_type, recipient))
+        self.consumer.do_send(Subscribe::new(event_type, recipient))
     }
 
     fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<EnclaveEvent<Stored>>) {
         for event_type in event_types.into_iter() {
-            self.bus
+            self.consumer
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
     }
