@@ -12,7 +12,7 @@ use e3_events::{BusHandle, EnclaveEvent, EventBus, HistoryCollector};
 pub struct CiphernodeHandle {
     pub address: String,
     pub store: DataStore,
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
 }
@@ -21,7 +21,7 @@ impl CiphernodeHandle {
     pub fn new(
         address: String,
         store: DataStore,
-        bus: BusHandle<EnclaveEvent>,
+        bus: BusHandle,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     ) -> Self {

@@ -40,7 +40,7 @@ const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 /// bus
 pub struct DocumentPublisher {
     /// Enclave EventBus
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
@@ -55,7 +55,7 @@ pub struct DocumentPublisher {
 impl DocumentPublisher {
     /// Create a new NetEventTranslator actor
     pub fn new(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -81,7 +81,7 @@ impl DocumentPublisher {
 
     /// Setup the DocumentPublisher and start listening for GossipEvents
     pub fn setup(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -253,7 +253,7 @@ pub async fn handle_publish_document_requested(
 pub async fn handle_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     ids: HashMap<E3id, PartyId>,
     event: DocumentPublishedNotification,
 ) -> Result<()> {
@@ -374,7 +374,7 @@ async fn broadcast_document_published_notification(
 
 /// Convert between ThresholdShareCreated and DocumentPublished events
 pub struct EventConverter {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -399,10 +399,10 @@ impl ReceivableDocument {
 }
 
 impl EventConverter {
-    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
+    pub fn new(bus: &BusHandle) -> Self {
         Self { bus: bus.clone() }
     }
-    pub fn setup(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
@@ -499,7 +499,7 @@ mod tests {
 
     fn setup_test() -> (
         DefaultGuard,
-        BusHandle<EnclaveEvent>,
+        BusHandle,
         mpsc::Sender<NetCommand>,
         mpsc::Receiver<NetCommand>,
         broadcast::Sender<NetEvent>,
@@ -517,10 +517,9 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let bus: BusHandle<EnclaveEvent> =
-            EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-                .start()
-                .into();
+        let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+            .start()
+            .into();
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);

@@ -17,7 +17,7 @@ pub struct PlaintextWriter {
 }
 
 impl PlaintextWriter {
-    pub fn attach(path: &PathBuf, bus: BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn attach(path: &PathBuf, bus: BusHandle) -> Addr<Self> {
         let addr = Self {
             path: path.to_owned(),
         }

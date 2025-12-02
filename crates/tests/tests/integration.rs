@@ -33,7 +33,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 }
 
 async fn setup_score_sortition_environment(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
@@ -118,10 +118,9 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let bus: BusHandle<EnclaveEvent> =
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+        .start()
+        .into();
 
     // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (

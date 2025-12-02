@@ -56,14 +56,14 @@ struct ComputeAggregate {
 
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
 }
 
 pub struct PublicKeyAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub e3_id: E3id,
 }
 

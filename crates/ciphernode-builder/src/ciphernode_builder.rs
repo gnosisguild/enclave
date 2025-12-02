@@ -16,7 +16,7 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{EnclaveEvent, EventBus, EventBusConfig, Stored, Unstored};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,

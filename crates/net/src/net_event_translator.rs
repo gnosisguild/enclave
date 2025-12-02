@@ -34,7 +34,7 @@ use tracing::{error, info, instrument, trace};
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
 pub struct NetEventTranslator {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
@@ -51,7 +51,7 @@ struct LibP2pEvent(pub Vec<u8>);
 
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
-    pub fn new(bus: &BusHandle<EnclaveEvent>, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
+    pub fn new(bus: &BusHandle, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),
@@ -61,7 +61,7 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
@@ -108,7 +108,7 @@ impl NetEventTranslator {
     /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
     pub async fn setup_with_interface(
-        bus: BusHandle<EnclaveEvent>,
+        bus: BusHandle,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,

@@ -72,7 +72,7 @@ struct ComputeAggregate {
 #[deprecated = "To be replaced by ThresholdPlaintextAggregator"]
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PlaintextAggregatorState>,
@@ -80,7 +80,7 @@ pub struct PlaintextAggregator {
 
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }

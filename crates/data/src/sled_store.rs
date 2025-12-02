@@ -21,7 +21,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle, // Only used for Shutdown
 }
 
 impl Actor for SledStore {
@@ -29,7 +29,7 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &BusHandle<EnclaveEvent>, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new(bus: &BusHandle, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(PathBuf::from(path))?;
 
@@ -108,7 +108,6 @@ impl Handler<Get> for SledStore {
         }
     }
 }
-
 impl Handler<EnclaveEvent> for SledStore {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {

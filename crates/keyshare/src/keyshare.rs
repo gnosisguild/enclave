@@ -19,7 +19,7 @@ use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     secret: Persistable<Vec<u8>>,
     address: String,
     cipher: Arc<Cipher>,
@@ -30,7 +30,7 @@ impl Actor for Keyshare {
 }
 
 pub struct KeyshareParams {
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub secret: Persistable<Vec<u8>>,
     pub fhe: Arc<Fhe>,
     pub address: String,

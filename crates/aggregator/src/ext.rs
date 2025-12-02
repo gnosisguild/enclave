@@ -28,12 +28,12 @@ use e3_sortition::Sortition;
 
 #[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
 }
 
 impl PlaintextAggregatorExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -148,11 +148,11 @@ impl E3Extension for PlaintextAggregatorExtension {
 }
 
 pub struct PublicKeyAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>) -> Box<Self> {
+    pub fn create(bus: &BusHandle) -> Box<Self> {
         Box::new(Self { bus: bus.clone() })
     }
 }
@@ -233,7 +233,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
 fn create_publickey_aggregator(
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
 ) -> Recipient<EnclaveEvent> {
@@ -247,14 +247,14 @@ fn create_publickey_aggregator(
 }
 
 pub struct ThresholdPlaintextAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
     multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
     pub fn create(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         sortition: &Addr<Sortition>,
         multithread: &Addr<Multithread>,
     ) -> Box<Self> {

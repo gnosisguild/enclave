@@ -14,7 +14,7 @@ use tokio::{
 };
 use tracing::{error, info};
 
-pub async fn listen_for_shutdown(bus: BusHandle<EnclaveEvent>, mut handle: JoinHandle<Result<()>>) {
+pub async fn listen_for_shutdown(bus: BusHandle, mut handle: JoinHandle<Result<()>>) {
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
     select! {

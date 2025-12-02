@@ -20,11 +20,11 @@ pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
 /// TODO: move these to each package with access on MyStruct::launcher()
 pub struct FheExtension {
     rng: SharedRng,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 impl FheExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, rng: &SharedRng) -> Box<Self> {
+    pub fn create(bus: &BusHandle, rng: &SharedRng) -> Box<Self> {
         Box::new(Self {
             rng: rng.clone(),
             bus: bus.clone(),

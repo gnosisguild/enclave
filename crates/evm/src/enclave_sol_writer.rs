@@ -35,12 +35,12 @@ sol!(
 pub struct EnclaveSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -52,7 +52,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     }
 
     pub async fn attach(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {

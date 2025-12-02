@@ -139,7 +139,7 @@ pub struct Sortition {
     /// Persistent map of `chain_id -> NodeStateStore`.
     node_state: Persistable<HashMap<u64, NodeStateStore>>,
     /// Event bus for error reporting and enclave event subscription.
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     /// Persistent map of finalized committees per E3
     finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
 }
@@ -148,7 +148,7 @@ pub struct Sortition {
 #[derive(Debug)]
 pub struct SortitionParams {
     /// Event bus address.
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     /// Persisted per-chain backend map.
     pub backends: Persistable<HashMap<u64, SortitionBackend>>,
     /// Node state store per chain
@@ -169,7 +169,7 @@ impl Sortition {
 
     #[instrument(name = "sortition_attach", skip_all)]
     pub async fn attach(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         backends_store: Repository<HashMap<u64, SortitionBackend>>,
         node_state_store: Repository<HashMap<u64, NodeStateStore>>,
         committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,

@@ -26,7 +26,7 @@ pub async fn execute(
     config: &AppConfig,
     address: Address,
     experimental_trbfv: bool,
-) -> Result<(BusHandle<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
+) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
     let bus = get_enclave_bus_handle();
