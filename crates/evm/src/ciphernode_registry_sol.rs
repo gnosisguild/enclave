@@ -218,7 +218,7 @@ pub struct CiphernodeRegistrySolReader;
 impl CiphernodeRegistrySolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -250,12 +250,12 @@ impl CiphernodeRegistrySolReader {
 pub struct CiphernodeRegistrySolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
     pub async fn new(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -267,7 +267,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
     }
 
     pub async fn attach(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         is_aggregator: bool,
@@ -511,7 +511,7 @@ pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -535,7 +535,7 @@ impl CiphernodeRegistrySol {
     }
 
     pub async fn attach_writer<P>(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         is_aggregator: bool,

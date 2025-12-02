@@ -66,7 +66,7 @@ use crate::{
     E3id, EventId,
 };
 use actix::Message;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     fmt::{self},
     hash::Hash,
@@ -123,14 +123,45 @@ impl EnclaveEventData {
     }
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct EnclaveEvent {
-    id: EventId,
-    payload: EnclaveEventData,
+pub trait SeqState: Clone + std::fmt::Debug + 'static {
+    type Seq: Unpin
+        + Sync
+        + Send
+        + Serialize
+        + DeserializeOwned
+        + Clone
+        + PartialEq
+        + Eq
+        + Hash
+        + std::fmt::Debug;
 }
 
-impl EnclaveEvent {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Unstored;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Stored;
+
+impl SeqState for Unstored {
+    type Seq = ();
+}
+
+impl SeqState for Stored {
+    type Seq = u64;
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct EnclaveEvent<S: SeqState = Stored> {
+    id: EventId,
+    payload: EnclaveEventData,
+    seq: S::Seq,
+}
+
+impl<S> EnclaveEvent<S>
+where
+    S: SeqState,
+{
     pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
         bincode::serialize(self)
     }
@@ -140,15 +171,23 @@ impl EnclaveEvent {
     }
 
     pub fn get_id(&self) -> EventId {
-        self.clone().into()
+        self.into()
     }
 }
 
-impl Event for EnclaveEvent {
+impl EnclaveEvent<Unstored> {
+    pub fn into_stored(self, seq: u64) -> EnclaveEvent<Stored> {
+        EnclaveEvent::<Stored> {
+            id: self.id,
+            payload: self.payload,
+            seq,
+        }
+    }
+}
+
+impl<S: SeqState> Event for EnclaveEvent<S> {
     type Id = EventId;
     type Data = EnclaveEventData;
-    // type FromError = anyhow::Error;
-    // type ErrType = EnclaveErrorType;
 
     fn event_type(&self) -> String {
         self.payload.event_type()
@@ -166,7 +205,7 @@ impl Event for EnclaveEvent {
     }
 }
 
-impl ErrorEvent for EnclaveEvent {
+impl ErrorEvent for EnclaveEvent<Unstored> {
     type ErrType = EnclaveErrorType;
     type FromError = anyhow::Error;
 
@@ -176,17 +215,24 @@ impl ErrorEvent for EnclaveEvent {
         EnclaveEvent {
             payload: payload.into(),
             id,
+            seq: (),
         }
     }
 }
 
-impl From<EnclaveEvent> for EventId {
-    fn from(value: EnclaveEvent) -> Self {
+impl<S: SeqState> From<EnclaveEvent<S>> for EventId {
+    fn from(value: EnclaveEvent<S>) -> Self {
         value.id
     }
 }
 
-impl EnclaveEvent {
+impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
+    fn from(value: &EnclaveEvent<S>) -> Self {
+        value.id.clone()
+    }
+}
+
+impl<S: SeqState> EnclaveEvent<S> {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self.payload {
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
@@ -238,35 +284,42 @@ impl_into_event_data!(
     ThresholdShareCreated
 );
 
-impl TryFrom<&EnclaveEvent> for EnclaveError {
-    type Error = anyhow::Error;
-    fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
-        value.clone().try_into()
-    }
-}
+// impl TryFrom<&EnclaveEvent> for EnclaveError {
+//     type Error = anyhow::Error;
+//     fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
+//         value.clone().try_into()
+//     }
+// }
+//
+// impl TryFrom<EnclaveEvent> for EnclaveError {
+//     type Error = anyhow::Error;
+//     fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
+//         if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
+//             Ok(data)
+//         } else {
+//             return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
+//         }
+//     }
+// }
 
-impl TryFrom<EnclaveEvent> for EnclaveError {
-    type Error = anyhow::Error;
-    fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
-        if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
-            Ok(data)
-        } else {
-            return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
-        }
-    }
-}
-
-impl fmt::Display for EnclaveEvent {
+impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{:?}", self))
     }
 }
 
-impl EventConstructorWithTimestamp for EnclaveEvent {
+impl EventConstructorWithTimestamp for EnclaveEvent<Unstored> {
     fn new_with_timestamp(data: Self::Data, _ts: u128) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
         // hcl.receive(remote_ts)?;
-        EnclaveEvent { id, payload }
+        EnclaveEvent {
+            id,
+            payload,
+            seq: (),
+        }
     }
 }
+
+#[cfg(test)]
+mod tests {}

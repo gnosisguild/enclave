@@ -18,7 +18,7 @@ use e3_request::MetaRepositoryFactory;
 use tracing::info;
 
 pub struct CiphernodeSelector {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
     address: String,
     data_store: DataStore,
@@ -30,7 +30,7 @@ impl Actor for CiphernodeSelector {
 
 impl CiphernodeSelector {
     pub fn new(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,
@@ -44,7 +44,7 @@ impl CiphernodeSelector {
     }
 
     pub fn attach(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,

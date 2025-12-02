@@ -145,7 +145,7 @@ pub struct BondingRegistrySolReader;
 impl BondingRegistrySolReader {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -179,7 +179,7 @@ pub struct BondingRegistrySol;
 impl BondingRegistrySol {
     pub async fn attach<P>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

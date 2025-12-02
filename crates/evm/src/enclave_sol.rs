@@ -19,7 +19,7 @@ pub struct EnclaveSol;
 impl EnclaveSol {
     pub async fn attach<R, W>(
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         read_provider: EthProvider<R>,
         write_provider: EthProvider<W>,
         contract_address: &str,

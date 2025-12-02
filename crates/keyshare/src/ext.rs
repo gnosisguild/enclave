@@ -20,13 +20,13 @@ use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     address: String,
     cipher: Arc<Cipher>,
 }
 
 impl KeyshareExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
+    pub fn create(bus: &BusHandle, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
@@ -117,7 +117,7 @@ impl E3Extension for KeyshareExtension {
 }
 
 pub struct ThresholdKeyshareExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
     multithread: Addr<Multithread>,
@@ -125,7 +125,7 @@ pub struct ThresholdKeyshareExtension {
 
 impl ThresholdKeyshareExtension {
     pub fn create(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         address: &str,

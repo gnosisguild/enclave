@@ -16,7 +16,7 @@ pub struct PublicKeyWriter {
 }
 
 impl PublicKeyWriter {
-    pub fn attach(path: &PathBuf, bus: BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn attach(path: &PathBuf, bus: BusHandle) -> Addr<Self> {
         let addr = Self {
             path: path.to_owned(),
         }

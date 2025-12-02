@@ -27,7 +27,7 @@ pub async fn execute(
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
     experimental_trbfv: bool,
-) -> Result<(BusHandle<EnclaveEvent>, JoinHandle<Result<()>>, String)> {
+) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let bus = get_enclave_bus_handle();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(config, &bus)?;

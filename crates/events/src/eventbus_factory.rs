@@ -18,6 +18,7 @@ use crate::EnclaveEvent;
 use crate::EventBus;
 use crate::HistoryCollector;
 use crate::Subscribe;
+use crate::Unstored;
 
 // The singleton factory using once_cell
 pub struct EventBusFactory {
@@ -92,6 +93,6 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
-pub fn get_enclave_bus_handle() -> BusHandle<EnclaveEvent> {
+pub fn get_enclave_bus_handle() -> BusHandle {
     get_enclave_event_bus().into()
 }

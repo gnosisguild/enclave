@@ -269,14 +269,14 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
 }
 
 pub struct ThresholdKeyshareParams {
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
 }
 
 pub struct ThresholdKeyshare {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,

@@ -16,19 +16,19 @@ use tracing::{error, info};
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
+    pub fn new(bus: &BusHandle) -> Self {
         Self {
             bus: bus.clone(),
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn attach(bus: &BusHandle) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.subscribe_all(

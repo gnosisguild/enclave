@@ -4,24 +4,30 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Addr, Recipient};
+use std::marker::PhantomData;
+
+use actix::{Actor, Addr, Recipient};
 
 use crate::{
+    sequencer::Sequencer,
     traits::{
-        CompositeEvent, ErrorDispatcher, ErrorFactory, Event, EventConstructorWithTimestamp,
-        EventFactory, EventPublisher, EventSubscriber,
+        ErrorDispatcher, ErrorFactory, Event, EventConstructorWithTimestamp, EventFactory,
+        EventPublisher, EventSubscriber,
     },
-    ErrorEvent, EventBus, Subscribe,
+    EnclaveErrorType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, Stored, Subscribe,
+    Unstored,
 };
 
 #[derive(Clone, Debug)]
-pub struct BusHandle<E: Event> {
-    bus: Addr<EventBus<E>>,
+pub struct BusHandle {
+    bus: Addr<EventBus<EnclaveEvent<Stored>>>,
+    seq: Addr<Sequencer>,
 }
 
-impl<E: Event> BusHandle<E> {
-    pub fn new(bus: Addr<EventBus<E>>) -> Self {
-        Self { bus }
+impl BusHandle {
+    pub fn new(bus: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
+        let seq = Sequencer::new(&bus).start();
+        Self { bus, seq }
     }
 
     pub fn bus(&self) -> Addr<EventBus<E>> {
@@ -29,56 +35,53 @@ impl<E: Event> BusHandle<E> {
     }
 }
 
-impl<E: CompositeEvent> EventPublisher<E> for BusHandle<E> {
-    fn publish(&self, data: impl Into<E::Data>) {
+impl EventPublisher<EnclaveEvent<Unstored>> for BusHandle {
+    fn publish(&self, data: impl Into<EnclaveEventData>) {
         let evt = self.event_from(data);
-        self.bus.do_send(evt);
+        self.seq.do_send(evt);
     }
 
-    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) {
+    fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) {
         let evt = self.event_from_remote_source(data, ts);
-        self.bus.do_send(evt)
+        self.seq.do_send(evt)
     }
 
-    fn naked_dispatch(&self, event: E) {
-        self.bus.do_send(event);
+    fn naked_dispatch(&self, event: EnclaveEvent<Unstored>) {
+        self.seq.do_send(event);
     }
 }
 
-impl<E> ErrorDispatcher<E> for BusHandle<E>
-where
-    E: CompositeEvent,
-{
-    fn err(&self, err_type: E::ErrType, error: impl Into<E::FromError>) {
+impl ErrorDispatcher<EnclaveEvent<Unstored>> for BusHandle {
+    fn err(&self, err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) {
         let evt = self.event_from_error(err_type, error);
-        self.bus.do_send(evt);
+        self.seq.do_send(evt);
     }
 }
 
-impl<E: EventConstructorWithTimestamp> EventFactory<E> for BusHandle<E> {
-    fn event_from(&self, data: impl Into<E::Data>) -> E {
+impl EventFactory<EnclaveEvent<Unstored>> for BusHandle {
+    fn event_from(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unstored> {
         // TODO: add self.hcl.tick()
-        E::new_with_timestamp(data.into(), 0)
+        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), 0)
     }
 
     fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E {
         // TODO: add self.hcl.receive(ts)
-        E::new_with_timestamp(data.into(), ts)
+        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts)
     }
 }
 
-impl<E: ErrorEvent> ErrorFactory<E> for BusHandle<E> {
-    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E {
-        E::from_error(err_type, error)
+impl ErrorFactory<EnclaveEvent<Unstored>> for BusHandle {
+    fn event_from_error(&self, err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) -> E {
+        EnclaveEvent::<Unstored>::from_error(err_type, error)
     }
 }
 
-impl<E: Event> EventSubscriber<E> for BusHandle<E> {
-    fn subscribe(&self, event_type: &str, recipient: Recipient<E>) {
+impl<E: Event> EventSubscriber<EnclaveEvent<Stored>> for BusHandle {
+    fn subscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Stored>>) {
         self.bus.do_send(Subscribe::new(event_type, recipient))
     }
 
-    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>) {
+    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<EnclaveEvent<Stored>>) {
         for event_type in event_types.into_iter() {
             self.bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));

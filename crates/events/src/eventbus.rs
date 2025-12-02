@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, CompositeEvent};
+use crate::{prelude::*, BusHandle, CompositeEvent, EnclaveEvent, Stored};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -133,8 +133,8 @@ impl<E: Event> Handler<E> for EventBus<E> {
     }
 }
 
-impl<E: CompositeEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
-    fn from(value: Addr<EventBus<E>>) -> Self {
+impl From<Addr<EventBus<EnclaveEvent<Stored>>>> for BusHandle {
+    fn from(value: Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
         BusHandle::new(value)
     }
 }

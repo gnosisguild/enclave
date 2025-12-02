@@ -87,6 +87,6 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
     fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
 }
 
-pub trait CompositeEvent: ErrorEvent + EventConstructorWithTimestamp {}
+pub trait CompositeEvent: EventConstructorWithTimestamp {}
 
-impl<E> CompositeEvent for E where E: Sized + Event + ErrorEvent + EventConstructorWithTimestamp {}
+impl<E> CompositeEvent for E where E: Sized + Event + EventConstructorWithTimestamp {}

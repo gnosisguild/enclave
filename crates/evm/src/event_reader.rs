@@ -54,7 +54,7 @@ pub struct EvmEventReaderParams<P> {
     contract_address: Address,
     start_block: Option<u64>,
     processor: Recipient<EnclaveEvmEvent>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     state: Persistable<EvmEventReaderState>,
     rpc_url: String,
 }
@@ -83,7 +83,7 @@ pub struct EvmEventReader<P> {
     /// Processor to forward events an actor
     processor: Recipient<EnclaveEvmEvent>,
     /// Event bus for error propagation only
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
     /// The RPC URL for the provider
@@ -113,7 +113,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
         contract_address: &str,
         start_block: Option<u64>,
         processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         repository: &Repository<EvmEventReaderState>,
         rpc_url: String,
     ) -> Result<Addr<Self>> {
@@ -191,7 +191,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEventData>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     rpc_url: String,
 ) {
     let chain_id = provider.chain_id();
