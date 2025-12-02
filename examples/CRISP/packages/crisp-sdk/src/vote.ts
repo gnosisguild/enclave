@@ -7,13 +7,13 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
 import { toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE } from './constants'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { extractSignatureComponents } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
-import { Hex } from 'viem'
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, publicKeyToAddress } from 'viem/utils'
+import { Hex, recoverPublicKey } from 'viem'
 
 // Initialize the ZKInputsGenerator.
 const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
@@ -91,7 +91,7 @@ export const generatePublicKey = (): Uint8Array => {
   return zkInputsGenerator.generatePublicKey()
 }
 
-export const generateCircuitInputs = async (proofInputs: VoteProofInputs): Promise<CircuitInputs> => {
+export const generateCircuitInputs = async (proofInputs: VoteProofInputs & MaskVoteProofInputs): Promise<CircuitInputs> => {
   const encodedVote = encodeVote(proofInputs.vote)
 
   let crispInputs = await zkInputsGenerator.generateInputs(
@@ -152,7 +152,14 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     throw new Error('Invalid vote: vote is negative')
   }
 
-  const crispInputs = await generateCircuitInputs(voteProofInputs)
+  // The address slot of an actual vote always is the address of the public key that signed the message.
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature: voteProofInputs.signature })
+  const address = publicKeyToAddress(publicKey)
+
+  const crispInputs = await generateCircuitInputs({
+    ...voteProofInputs,
+    slotAddress: address,
+  })
 
   return generateProof(crispInputs)
 }

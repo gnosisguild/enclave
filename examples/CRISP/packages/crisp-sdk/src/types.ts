@@ -171,7 +171,10 @@ export interface MaskVoteProofInputs {
   slotAddress: string
 }
 
-export interface VoteProofInputs extends MaskVoteProofInputs {
+export interface VoteProofInputs {
+  merkleProof: IMerkleProof
+  publicKey: Uint8Array
+  balance: bigint
   vote: IVote
   signature: `0x${string}`
 }

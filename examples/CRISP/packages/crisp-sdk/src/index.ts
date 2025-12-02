@@ -8,6 +8,6 @@ export * from './token'
 export * from './state'
 export * from './constants'
 export * from './utils'
-export { decodeTally, generateVoteProof, generateMaskVoteProof, verifyProof, encryptVote } from './vote'
+export { decodeTally, generateVoteProof, generateMaskVoteProof, verifyProof } from './vote'
 
 export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof, IVote, CircuitInputs } from './types'

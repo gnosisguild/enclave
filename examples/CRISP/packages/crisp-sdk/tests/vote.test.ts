@@ -5,18 +5,28 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { SIGNATURE_MESSAGE, generateMerkleProof, hashLeaf, IVote, IMerkleProof } from '../src'
-import { decodeTally, encryptVote, generateVoteProof, generateMaskVoteProof, generatePublicKey, verifyProof } from '../src/vote'
-import { signMessage } from 'viem/accounts'
-import { Hex } from 'viem'
-import { ECDSA_PRIVATE_KEY } from './constants'
+import { SIGNATURE_MESSAGE, generateMerkleProof, hashLeaf, IVote, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
+import {
+  decodeTally,
+  encryptVote,
+  generateVoteProof,
+  generateMaskVoteProof,
+  generatePublicKey,
+  verifyProof,
+  encodeVote,
+  generateProof,
+  generateCircuitInputs,
+} from '../src/vote'
+import { publicKeyToAddress, signMessage } from 'viem/accounts'
+import { Hex, recoverPublicKey } from 'viem'
+import { ECDSA_PRIVATE_KEY, LEAVES } from './constants'
 
 describe('Vote', () => {
   let vote: IVote
   let signature: Hex
   let balance: bigint
+  let address: string
   let slotAddress: string
-  let merkleProof: IMerkleProof
   let publicKey: Uint8Array
   let previousCiphertext: Uint8Array
 
@@ -25,13 +35,14 @@ describe('Vote', () => {
     vote = { yes: 10n, no: 0n }
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
     balance = 100n
-    slotAddress = '0x58Ce9Da2B075732302AE95175c48891b305A40A4'
-    merkleProof = generateMerkleProof(balance, slotAddress, [0n, 1n, 2n, 3n, hashLeaf(slotAddress, balance)])
+    address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
+    // Address of the last leaf in the Merkle tree, used for mask votes.
+    slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
     previousCiphertext = encryptVote(vote, publicKey)
   })
 
-  describe('decode tally', () => {
+  describe('decodeTally', () => {
     it('Should decode an encoded tally into its decimal representation', () => {
       const tally = [
         '0',
@@ -99,19 +110,136 @@ describe('Vote', () => {
     })
   })
 
-  describe('generateVoteProof', () => {
-    it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
-      const voteProofInputs = {
+  describe('encodeVote', () => {
+    const decodeHalf = (encoded: BigInt64Array, isFirstHalf: boolean): bigint => {
+      const halfLength = encoded.length / 2
+      const half = Array.from(isFirstHalf ? encoded.slice(0, halfLength) : encoded.slice(halfLength))
+      const binaryString = half.map((b) => b.toString()).join('')
+      const trimmedBinary = binaryString.replace(/^0+/, '') || '0'
+      return BigInt('0b' + trimmedBinary)
+    }
+
+    it('Should encode yes vote correctly in the first half', () => {
+      const encoded = encodeVote({ yes: 10n, no: 0n })
+
+      expect(decodeHalf(encoded, true)).toBe(10n)
+    })
+
+    it('Should encode no vote correctly in the second half', () => {
+      const encoded = encodeVote({ yes: 0n, no: 5n })
+
+      expect(decodeHalf(encoded, false)).toBe(5n)
+    })
+
+    it('Should only contain binary digits (0 or 1)', () => {
+      const encoded = encodeVote({ yes: 255n, no: 128n })
+
+      expect(Array.from(encoded).every((b) => b >= 0n && b <= 1n)).toBe(true)
+    })
+  })
+
+  describe('generateProof', () => {
+    it('Should generate a proof where the output is the new ciphertext', { timeout: 100000 }, async () => {
+      // This test simulates a real vote (i.e. generateVoteProof).
+
+      // Using generateCircuitInputs directly to check the output of the circuit.
+      const merkleProof = generateMerkleProof(balance, address, LEAVES)
+      const crispInputs = await generateCircuitInputs({
         vote,
         publicKey,
-        previousCiphertext,
         signature,
         merkleProof,
         balance,
-        slotAddress,
-      }
+        slotAddress: address,
+      })
 
-      const proof = await generateVoteProof(voteProofInputs)
+      const proof = await generateProof(crispInputs)
+
+      expect(proof).toBeDefined()
+      expect(proof.proof).toBeDefined()
+      expect(proof.publicInputs).toBeDefined()
+
+      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
+
+      expect([...ct0is, ...ct1is]).toEqual(outputCiphertext)
+    })
+
+    it(
+      'Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote',
+      { timeout: 100000 },
+      async () => {
+        // This test simulates a mask vote (i.e. generateMaskVoteProof).
+
+        // Using generateCircuitInputs directly to check the output of the circuit.
+        const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+        const crispInputs = await generateCircuitInputs({
+          vote: { yes: 0n, no: 0n },
+          publicKey,
+          previousCiphertext,
+          signature: FAKE_SIGNATURE,
+          merkleProof,
+          balance,
+          slotAddress,
+        })
+
+        const proof = await generateProof(crispInputs)
+
+        expect(proof).toBeDefined()
+        expect(proof.proof).toBeDefined()
+        expect(proof.publicInputs).toBeDefined()
+
+        const sumCt0is = crispInputs.sum_ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+        const sumCt1is = crispInputs.sum_ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+        const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
+
+        expect([...sumCt0is, ...sumCt1is]).toEqual(outputCiphertext)
+      },
+    )
+
+    it(
+      'Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext',
+      { timeout: 100000 },
+      async () => {
+        // This test simulates a mask vote (i.e. generateMaskVoteProof).
+
+        // Using generateCircuitInputs directly to check the output of the circuit.
+        const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+        const crispInputs = await generateCircuitInputs({
+          vote: { yes: 0n, no: 0n },
+          publicKey,
+          signature: FAKE_SIGNATURE,
+          merkleProof,
+          balance,
+          slotAddress,
+        })
+
+        const proof = await generateProof(crispInputs)
+
+        expect(proof).toBeDefined()
+        expect(proof.proof).toBeDefined()
+        expect(proof.publicInputs).toBeDefined()
+
+        const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+        const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+        const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
+
+        expect([...ct0is, ...ct1is]).toEqual(outputCiphertext)
+      },
+    )
+  })
+
+  describe('generateVoteProof', () => {
+    it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
+      const merkleProof = generateMerkleProof(balance, address, LEAVES)
+      const proof = await generateVoteProof({
+        vote,
+        publicKey,
+        signature,
+        merkleProof,
+        balance,
+      })
 
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
@@ -125,6 +253,7 @@ describe('Vote', () => {
 
   describe('generateMaskVoteProof', () => {
     it('Should generate a valid mask vote proof', { timeout: 100000 }, async () => {
+      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
       const proof = await generateMaskVoteProof({
         balance,
         slotAddress,
