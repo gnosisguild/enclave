@@ -171,6 +171,7 @@ vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs
 libp2p = { version = "=0.54.1", features = [
   "gossipsub",
   "identify",
+  "dns",
   "kad",
   "macros",
   "mdns",

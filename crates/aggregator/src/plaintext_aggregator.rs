@@ -8,8 +8,8 @@ use actix::prelude::*;
 use anyhow::Result;
 use e3_data::Persistable;
 use e3_events::{
-    DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
-    Seed,
+    prelude::*, BusHandle, DecryptionshareCreated, Die, E3id, EnclaveEvent, EnclaveEventData,
+    OrderedSet, PlaintextAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
 use e3_sortition::{GetNodeIndex, Sortition};
@@ -72,7 +72,7 @@ struct ComputeAggregate {
 #[deprecated = "To be replaced by ThresholdPlaintextAggregator"]
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PlaintextAggregatorState>,
@@ -80,7 +80,7 @@ pub struct PlaintextAggregator {
 
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }
@@ -145,9 +145,9 @@ impl Actor for PlaintextAggregator {
 impl Handler<EnclaveEvent> for PlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+        match msg.into_data() {
+            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
             _ => (),
         }
     }
@@ -234,12 +234,12 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         self.set_decryption(decrypted_output.clone())?;
 
         // Dispatch the PlaintextAggregated event
-        let event = EnclaveEvent::from(PlaintextAggregated {
+        let event = PlaintextAggregated {
             decrypted_output: vec![ArcBytes::from_bytes(&decrypted_output)],
             e3_id: self.e3_id.clone(),
-        });
+        };
 
-        self.bus.do_send(event);
+        self.bus.publish(event);
 
         Ok(())
     }

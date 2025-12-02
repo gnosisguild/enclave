@@ -5,11 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{Fhe, FheRepositoryFactory};
-use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
-use e3_events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
+use e3_events::{
+    prelude::*, BusHandle, E3Requested, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use e3_utils::SharedRng;
 use std::sync::Arc;
@@ -19,11 +20,11 @@ pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
 /// TODO: move these to each package with access on MyStruct::launcher()
 pub struct FheExtension {
     rng: SharedRng,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
 }
 
 impl FheExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, rng: &SharedRng) -> Box<Self> {
+    pub fn create(bus: &BusHandle<EnclaveEvent>, rng: &SharedRng) -> Box<Self> {
         Box::new(Self {
             rng: rng.clone(),
             bus: bus.clone(),
@@ -37,7 +38,7 @@ const ERROR_FHE_FAILED_TO_DECODE: &str = "Failed to decode encoded FHE params";
 impl E3Extension for FheExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the fhe on Committee Requested
-        let EnclaveEvent::E3Requested { data, .. } = evt else {
+        let EnclaveEventData::E3Requested(data) = evt.get_data() else {
             return;
         };
 

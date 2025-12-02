@@ -13,24 +13,20 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use e3_events::{prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     address: String,
     cipher: Arc<Cipher>,
 }
 
 impl KeyshareExtension {
-    pub fn create(
-        bus: &Addr<EventBus<EnclaveEvent>>,
-        address: &str,
-        cipher: &Arc<Cipher>,
-    ) -> Box<Self> {
+    pub fn create(bus: &BusHandle<EnclaveEvent>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
@@ -46,7 +42,7 @@ const ERROR_KEYSHARE_FHE_MISSING: &str =
 impl E3Extension for KeyshareExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // if this is NOT a CiphernodeSelected event then ignore
-        let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
+        let EnclaveEventData::CiphernodeSelected(data) = evt.get_data() else {
             return;
         };
 
@@ -121,7 +117,7 @@ impl E3Extension for KeyshareExtension {
 }
 
 pub struct ThresholdKeyshareExtension {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     cipher: Arc<Cipher>,
     address: String,
     multithread: Addr<Multithread>,
@@ -129,7 +125,7 @@ pub struct ThresholdKeyshareExtension {
 
 impl ThresholdKeyshareExtension {
     pub fn create(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         address: &str,
@@ -147,7 +143,7 @@ impl ThresholdKeyshareExtension {
 impl E3Extension for ThresholdKeyshareExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // if this is NOT a CiphernodeSelected event then ignore
-        let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
+        let EnclaveEventData::CiphernodeSelected(data) = evt.get_data() else {
             return;
         };
 
