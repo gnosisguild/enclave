@@ -11,14 +11,14 @@ use actix::prelude::*;
 use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
-    CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent, EventBus, Shutdown,
-    Subscribe, TicketGenerated, TicketId,
+    prelude::*, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
+    EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
 
 pub struct CiphernodeSelector {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     sortition: Addr<Sortition>,
     address: String,
     data_store: DataStore,
@@ -30,7 +30,7 @@ impl Actor for CiphernodeSelector {
 
 impl CiphernodeSelector {
     pub fn new(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,
@@ -44,19 +44,16 @@ impl CiphernodeSelector {
     }
 
     pub fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         sortition: &Addr<Sortition>,
         address: &str,
         data_store: &DataStore,
     ) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus, sortition, address, data_store).start();
 
-        bus.do_send(Subscribe::new("E3Requested", addr.clone().recipient()));
-        bus.do_send(Subscribe::new(
-            "CommitteeFinalized",
-            addr.clone().recipient(),
-        ));
-        bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));
+        bus.subscribe("E3Requested", addr.clone().recipient());
+        bus.subscribe("CommitteeFinalized", addr.clone().recipient());
+        bus.subscribe("Shutdown", addr.clone().recipient());
 
         addr
     }
@@ -65,10 +62,10 @@ impl CiphernodeSelector {
 impl Handler<EnclaveEvent> for CiphernodeSelector {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::E3Requested { data, .. } => ctx.notify(data),
-            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+        match msg.into_data() {
+            EnclaveEventData::E3Requested(data) => ctx.notify(data),
+            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }
@@ -112,11 +109,11 @@ impl Handler<E3Requested> for CiphernodeSelector {
                         ticket_id = tid,
                         "Ticket generated for score sortition"
                     );
-                    bus.do_send(EnclaveEvent::from(TicketGenerated {
+                    bus.publish(TicketGenerated {
                         e3_id: data.e3_id.clone(),
                         ticket_id: TicketId::Score(tid),
                         node: address.clone(),
-                    }));
+                    });
                 }
             } else {
                 info!("This node is not selected");
@@ -168,7 +165,7 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
-            bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+            bus.publish(CiphernodeSelected {
                 party_id: party_id as u64,
                 e3_id,
                 threshold_m: e3_meta.threshold_m,
@@ -177,7 +174,7 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 error_size: e3_meta.error_size,
                 params: e3_meta.params,
                 seed: e3_meta.seed,
-            }));
+            });
         })
     }
 }
