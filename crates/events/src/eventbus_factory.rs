@@ -18,7 +18,6 @@ use crate::EnclaveEvent;
 use crate::EventBus;
 use crate::HistoryCollector;
 use crate::Subscribe;
-use crate::Unstored;
 
 // The singleton factory using once_cell
 pub struct EventBusFactory {

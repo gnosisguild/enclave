@@ -36,7 +36,7 @@ pub async fn execute(
 
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(&address.to_string())
-        .with_source_bus(&bus.bus())
+        .with_source_bus(&*bus)
         .with_datastore(store)
         .with_sortition_score()
         .with_chains(&config.chains())

@@ -18,7 +18,7 @@ use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     new_event_bus_with_history, prelude::*, EnclaveEvent, EnclaveEventData, GetEvents,
-    HistoryCollector, Shutdown, TestEvent, Unstored,
+    HistoryCollector, Shutdown, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;

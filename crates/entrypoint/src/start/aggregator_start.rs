@@ -35,7 +35,7 @@ pub async fn execute(
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
 
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
-        .with_source_bus(&bus.bus())
+        .with_source_bus(&*bus)
         .with_datastore(store)
         .with_chains(&config.chains())
         .with_sortition_score()
