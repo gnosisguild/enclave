@@ -185,6 +185,12 @@ impl EnclaveEvent<Unstored> {
     }
 }
 
+impl EnclaveEvent<Stored> {
+    pub fn test_only_create_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
+        EnclaveEvent::<Unstored>::new_with_timestamp(data, time).into_stored(seq)
+    }
+}
+
 impl<S: SeqState> Event for EnclaveEvent<S> {
     type Id = EventId;
     type Data = EnclaveEventData;
@@ -318,8 +324,5 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unstored> {
             payload,
             seq: (),
         }
-    }
-}
+   }
 
-#[cfg(test)]
-mod tests {}

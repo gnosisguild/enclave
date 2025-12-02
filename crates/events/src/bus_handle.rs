@@ -37,16 +37,6 @@ impl BusHandle {
     }
 }
 
-#[cfg(test)]
-impl BusHandle {
-    pub fn test_stored_event_from(
-        &self,
-        data: impl Into<EnclaveEventData>,
-    ) -> EnclaveEvent<Stored> {
-        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), 0).into_stored(42)
-    }
-}
-
 impl EventPublisher<EnclaveEvent<Unstored>> for BusHandle {
     fn publish(&self, data: impl Into<EnclaveEventData>) {
         let evt = self.event_from(data);
