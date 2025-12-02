@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use e3_data::{
     Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
 };
-use e3_events::{E3id, EnclaveEvent};
+use e3_events::{E3id, EnclaveEvent, Stored};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
@@ -91,7 +91,7 @@ impl E3Context {
         });
     }
 
-    pub fn forward_message_now(&self, msg: &EnclaveEvent) {
+    pub fn forward_message_now(&self, msg: &EnclaveEvent<Stored>) {
         self.recipients().into_iter().for_each(|(_, recipient)| {
             if let Some(act) = recipient {
                 act.do_send(msg.clone());

@@ -18,7 +18,7 @@ use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     new_event_bus_with_history, prelude::*, EnclaveEvent, EnclaveEventData, GetEvents,
-    HistoryCollector, Shutdown, TestEvent,
+    HistoryCollector, Shutdown, TestEvent, Unstored,
 };
 use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;
@@ -269,7 +269,9 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     // Ensure shutdown doesn't cause event to be lost.
     sleep(Duration::from_millis(10)).await;
-    addr1.send(bus.event_from(Shutdown)).await?;
+    addr1
+        .send(EnclaveEvent::<Unstored>::new_with_timestamp(Shutdown.into(), 4321).into_stored(42))
+        .await?;
 
     for msg in ["these", "are", "not", "lost"] {
         contract

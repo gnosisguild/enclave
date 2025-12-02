@@ -284,23 +284,23 @@ impl_into_event_data!(
     ThresholdShareCreated
 );
 
-// impl TryFrom<&EnclaveEvent> for EnclaveError {
-//     type Error = anyhow::Error;
-//     fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
-//         value.clone().try_into()
-//     }
-// }
-//
-// impl TryFrom<EnclaveEvent> for EnclaveError {
-//     type Error = anyhow::Error;
-//     fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
-//         if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
-//             Ok(data)
-//         } else {
-//             return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
-//         }
-//     }
-// }
+impl TryFrom<&EnclaveEvent<Stored>> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}
+
+impl TryFrom<EnclaveEvent<Stored>> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: EnclaveEvent<Stored>) -> Result<Self, Self::Error> {
+        if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
+            Ok(data)
+        } else {
+            return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
+        }
+    }
+}
 
 impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

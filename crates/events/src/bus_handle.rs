@@ -4,15 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::marker::PhantomData;
-
 use actix::{Actor, Addr, Recipient};
 
 use crate::{
     sequencer::Sequencer,
     traits::{
-        ErrorDispatcher, ErrorFactory, Event, EventConstructorWithTimestamp, EventFactory,
-        EventPublisher, EventSubscriber,
+        ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
+        EventSubscriber,
     },
     EnclaveErrorType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, Stored, Subscribe,
     Unstored,
@@ -30,8 +28,18 @@ impl BusHandle {
         Self { bus, seq }
     }
 
-    pub fn bus(&self) -> Addr<EventBus<E>> {
+    pub fn bus(&self) -> Addr<EventBus<EnclaveEvent<Stored>>> {
         self.bus.clone()
+    }
+}
+
+#[cfg(test)]
+impl BusHandle {
+    pub fn test_stored_event_from(
+        &self,
+        data: impl Into<EnclaveEventData>,
+    ) -> EnclaveEvent<Stored> {
+        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), 0).into_stored(42)
     }
 }
 
@@ -64,19 +72,27 @@ impl EventFactory<EnclaveEvent<Unstored>> for BusHandle {
         EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), 0)
     }
 
-    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E {
+    fn event_from_remote_source(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        ts: u128,
+    ) -> EnclaveEvent<Unstored> {
         // TODO: add self.hcl.receive(ts)
         EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts)
     }
 }
 
 impl ErrorFactory<EnclaveEvent<Unstored>> for BusHandle {
-    fn event_from_error(&self, err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) -> E {
+    fn event_from_error(
+        &self,
+        err_type: EnclaveErrorType,
+        error: impl Into<anyhow::Error>,
+    ) -> EnclaveEvent<Unstored> {
         EnclaveEvent::<Unstored>::from_error(err_type, error)
     }
 }
 
-impl<E: Event> EventSubscriber<EnclaveEvent<Stored>> for BusHandle {
+impl EventSubscriber<EnclaveEvent<Stored>> for BusHandle {
     fn subscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Stored>>) {
         self.bus.do_send(Subscribe::new(event_type, recipient))
     }
