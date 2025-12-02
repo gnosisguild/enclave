@@ -28,7 +28,7 @@ const HistoricPoll: React.FC = () => {
         behavior: 'smooth',
       })
       setLoadingMore(false)
-    }, 1000) // 1 second delay
+    }, 1000)
   }, [loadingMore, isLoading])
 
   useEffect(() => {
@@ -38,10 +38,11 @@ const HistoricPoll: React.FC = () => {
       }
       fetchPastPolls()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [votingRound])
 
   useEffect(() => {
-    setVisiblePolls(pastPolls.slice(0, 12)) // Initialize with the first 12 polls
+    setVisiblePolls(pastPolls.slice(0, 12))
   }, [pastPolls])
 
   useEffect(() => {
@@ -77,7 +78,7 @@ const HistoricPoll: React.FC = () => {
             <LoadingAnimation isLoading={isLoading} />
           </div>
         )}
-        {!pastPolls.length && !isLoading && <p className=' text-2xl font-bold text-slate-600/50 '>There are no historic polls.</p>}
+        {!pastPolls.length && !isLoading && <p className='text-2xl font-bold text-slate-600/50'>There are no historic polls.</p>}
         {visiblePolls.length > 0 && (
           <div className='mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 overflow-y-auto p-4 md:grid-cols-3'>
             {visiblePolls.map((pollResult: PollResult, index: number) => {
