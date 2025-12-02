@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, IMerkleProof, type IVote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
+import { type CircuitInputs, type IVote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { extractSignatureComponents } from './signature'
