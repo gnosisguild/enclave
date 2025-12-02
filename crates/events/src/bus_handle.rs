@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::ops::Deref;
+
 use actix::{Actor, Addr, Recipient};
 
 use crate::{
@@ -28,12 +30,15 @@ impl BusHandle {
         Self { bus, seq }
     }
 
-    pub fn bus(&self) -> Addr<EventBus<EnclaveEvent<Stored>>> {
-        self.bus.clone()
-    }
-
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Stored>>> {
         EventBus::<EnclaveEvent<Stored>>::history(&self.bus)
+    }
+}
+
+impl Deref for BusHandle {
+    type Target = Addr<EventBus<EnclaveEvent<Stored>>>;
+    fn deref(&self) -> &Self::Target {
+        &self.bus
     }
 }
 
