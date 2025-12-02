@@ -93,6 +93,11 @@ async fn broadcast_encrypted_vote(
                 "[e3_id={}] Failed to decode encoded_proof: {:?}",
                 vote_request.round_id, e
             );
+            // Rollback voter insertion before returning error
+            let _ = match repo.remove_voter_address(&vote_request.address).await {
+                Ok(_) => (),
+                Err(e) => error!("Error rolling back the vote: {e}"),
+            };
             return HttpResponse::BadRequest().json(VoteResponse {
                 status: VoteResponseStatus::FailedBroadcast,
                 tx_hash: None,
@@ -116,7 +121,11 @@ async fn broadcast_encrypted_vote(
                 vote_request.round_id, e
             );
             // Rollback voter insertion before returning error
-            let _ = handle_vote_error(e, repo, &vote_request.address).await;
+            // Rollback voter insertion before returning error
+            let _ = match repo.remove_voter_address(&vote_request.address).await {
+                Ok(_) => (),
+                Err(e) => error!("Error rolling back the vote: {e}"),
+            };
             return HttpResponse::InternalServerError().json("Internal server error");
         }
     };
