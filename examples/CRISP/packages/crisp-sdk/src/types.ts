@@ -163,16 +163,26 @@ export interface CircuitInputs {
   is_first_vote: boolean
 }
 
-export interface MaskVoteProofInputs {
+export interface ProofInputs {
+  vote: IVote
+  publicKey: Uint8Array
+  signature: `0x${string}`
+  balance: bigint
+  slotAddress: string
   previousCiphertext?: Uint8Array
   merkleProof: IMerkleProof
+}
+
+export interface MaskVoteProofInputs {
+  previousCiphertext?: Uint8Array
+  merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
   balance: bigint
   slotAddress: string
 }
 
 export interface VoteProofInputs {
-  merkleProof: IMerkleProof
+  merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
   balance: bigint
   vote: IVote

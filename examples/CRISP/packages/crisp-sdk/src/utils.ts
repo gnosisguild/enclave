@@ -35,7 +35,7 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
  * @param address The voter's address
  * @param leaves The leaves of the Merkle tree
  */
-export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[]): IMerkleProof => {
+export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[] | string[]): IMerkleProof => {
   const leaf = hashLeaf(address.toLowerCase(), balance)
 
   const index = leaves.findIndex((l) => l === leaf)
@@ -44,7 +44,7 @@ export const generateMerkleProof = (balance: bigint, address: string, leaves: bi
     throw new Error('Leaf not found in the tree')
   }
 
-  const tree = generateMerkleTree(leaves)
+  const tree = generateMerkleTree(leaves.map((l) => BigInt(l)))
 
   const proof = tree.generateProof(index)
 

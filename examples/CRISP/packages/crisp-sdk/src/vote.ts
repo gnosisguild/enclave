@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, type IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
-import { toBinary } from './utils'
+import { type CircuitInputs, IMerkleProof, type IVote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
+import { generateMerkleProof, toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { extractSignatureComponents } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
@@ -91,7 +91,7 @@ export const generatePublicKey = (): Uint8Array => {
   return zkInputsGenerator.generatePublicKey()
 }
 
-export const generateCircuitInputs = async (proofInputs: VoteProofInputs & MaskVoteProofInputs): Promise<CircuitInputs> => {
+export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<CircuitInputs> => {
   const encodedVote = encodeVote(proofInputs.vote)
 
   let crispInputs = await zkInputsGenerator.generateInputs(
@@ -156,19 +156,25 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
   const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature: voteProofInputs.signature })
   const address = publicKeyToAddress(publicKey)
 
+  const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
+
   const crispInputs = await generateCircuitInputs({
     ...voteProofInputs,
     slotAddress: address,
+    merkleProof,
   })
 
   return generateProof(crispInputs)
 }
 
 export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs) => {
+  const merkleProof = generateMerkleProof(maskVoteProofInputs.balance, maskVoteProofInputs.slotAddress, maskVoteProofInputs.merkleLeaves)
+
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
     signature: FAKE_SIGNATURE,
     vote: { yes: 0n, no: 0n },
+    merkleProof,
   })
 
   return generateProof(crispInputs)

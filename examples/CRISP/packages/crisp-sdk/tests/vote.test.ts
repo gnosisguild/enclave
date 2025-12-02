@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { SIGNATURE_MESSAGE, generateMerkleProof, hashLeaf, IVote, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
+import { SIGNATURE_MESSAGE, generateMerkleProof, IVote, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
 import {
   decodeTally,
   encryptVote,
@@ -148,9 +148,9 @@ describe('Vote', () => {
         vote,
         publicKey,
         signature,
-        merkleProof,
         balance,
         slotAddress: address,
+        merkleProof,
       })
 
       const proof = await generateProof(crispInputs)
@@ -232,12 +232,11 @@ describe('Vote', () => {
 
   describe('generateVoteProof', () => {
     it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
-      const merkleProof = generateMerkleProof(balance, address, LEAVES)
       const proof = await generateVoteProof({
         vote,
         publicKey,
         signature,
-        merkleProof,
+        merkleLeaves: LEAVES,
         balance,
       })
 
@@ -252,14 +251,30 @@ describe('Vote', () => {
   })
 
   describe('generateMaskVoteProof', () => {
-    it('Should generate a valid mask vote proof', { timeout: 100000 }, async () => {
-      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+    it('Should generate a valid mask vote proof with a previous ciphertext', { timeout: 100000 }, async () => {
       const proof = await generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
         previousCiphertext,
-        merkleProof,
+        merkleLeaves: LEAVES,
+      })
+
+      expect(proof).toBeDefined()
+      expect(proof.proof).toBeDefined()
+      expect(proof.publicInputs).toBeDefined()
+
+      const isValid = await verifyProof(proof)
+
+      expect(isValid).toBe(true)
+    })
+
+    it('Should generate a valid mask vote proof without a previous ciphertext', { timeout: 100000 }, async () => {
+      const proof = await generateMaskVoteProof({
+        balance,
+        slotAddress,
+        publicKey,
+        merkleLeaves: LEAVES,
       })
 
       expect(proof).toBeDefined()
