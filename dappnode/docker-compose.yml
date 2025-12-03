@@ -4,7 +4,7 @@ services:
     build:
       context: .
       args:
-        UPSTREAM_VERSION: 0.1.5
+        UPSTREAM_VERSION: 0.1.6
     image: 'ciphernode.enclave-ciphernode.public.dappnode.eth:0.1.0'
     restart: unless-stopped
     volumes:
