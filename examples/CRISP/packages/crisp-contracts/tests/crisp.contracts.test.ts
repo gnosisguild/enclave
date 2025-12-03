@@ -6,10 +6,8 @@
 
 import { zeroAddress } from 'viem'
 import {
-  generateMerkleProof,
   hashLeaf,
   generatePublicKey,
-  encryptVote,
   SIGNATURE_MESSAGE,
   generateVoteProof,
   getAddressFromSignature,
@@ -20,7 +18,6 @@ import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers } from './utils'
 
 let publicKey = generatePublicKey()
-const previousCiphertext = encryptVote({ yes: 10n, no: 0n }, publicKey)
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {
