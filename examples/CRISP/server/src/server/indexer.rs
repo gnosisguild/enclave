@@ -138,16 +138,12 @@ pub async fn register_e3_requested(
                     .with_context(|| format!("[e3_id={}] Merkle root is not valid hex", e3_id))?;
                 let merkle_root_u256 = U256::from_be_slice(&merkle_root_bytes);
 
-                // Convert balance_threshold from BigUint to U256.
-                let balance_threshold_bytes = balance_threshold.to_bytes_be();
-                let balance_threshold_u256 = U256::from_be_slice(&balance_threshold_bytes);
-
                 // Convert e3Id from u64 to U256
                 let e3_id_u256 = U256::from(e3_id);
 
                 info!(
-                    "[e3_id={}] Calling setRoundData with root: {}, token: {}, threshold: {}",
-                    e3_id, merkle_root_u256, token_address, balance_threshold_u256
+                    "[e3_id={}] Calling setMerkleRoot with root: {}",
+                    e3_id, merkle_root_u256
                 );
 
                 let contract = CRISPContractFactory::create_write(
@@ -161,14 +157,14 @@ pub async fn register_e3_requested(
                 })?;
 
                 let receipt = contract
-                    .set_round_data(e3_id_u256, merkle_root_u256, token_address, balance_threshold_u256)
+                    .set_merkle_root(e3_id_u256, merkle_root_u256)
                     .await
                     .with_context(|| {
-                        format!("[e3_id={}] Failed to call setRoundData", e3_id)
+                        format!("[e3_id={}] Failed to call setMerkleRoot", e3_id)
                     })?;
 
                 info!(
-                    "[e3_id={}] setRoundData successful. TxHash: {:?}",
+                    "[e3_id={}] setMerkleRoot successful. TxHash: {:?}",
                     e3_id, receipt.transaction_hash
                 );
 
