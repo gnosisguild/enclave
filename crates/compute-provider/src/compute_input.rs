@@ -34,7 +34,7 @@ impl ComputeInput {
             "Ciphertext hash mismatch"
         );
 
-        let merkle_root = MerkleTreeBuilder::new()
+        let merkle_root = MerkleTreeBuilder::new(self.leaf_hashes.len())
             .with_leaf_hashes(self.leaf_hashes.clone())
             .build_tree()
             .root()
