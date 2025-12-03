@@ -139,12 +139,10 @@ contract MockCRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external returns (bytes memory input) {
+  function validateInput(uint256 e3Id, address, bytes memory data) external {
     if (data.length == 0) revert EmptyInputData();
 
     (, , bytes memory vote, ) = abi.decode(data, (bytes, bytes32[], bytes, address));
-
-    input = vote;
   }
 
   /// @notice Decode the tally from the plaintext output

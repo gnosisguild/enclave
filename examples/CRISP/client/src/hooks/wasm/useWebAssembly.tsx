@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
-import { EncryptedVote } from '@/model/vote.model'
 
 export const useWebAssemblyHook = () => {
   const { showToast } = useNotificationAlertContext()
@@ -15,7 +14,7 @@ export const useWebAssemblyHook = () => {
   const [worker, setWorker] = useState<Worker | null>(null)
 
   useEffect(() => {
-    const newWorker = new Worker(new URL('libs/wasm/pkg/crisp_worker.js', import.meta.url), {
+    const newWorker = new Worker(new URL('libs/crispWorker.js', import.meta.url), {
       type: 'module',
     })
     setWorker(newWorker)
@@ -24,37 +23,32 @@ export const useWebAssemblyHook = () => {
     }
   }, [])
 
-  const encryptVote = async (
+  const generateProof = async (
     voteId: bigint,
     publicKey: Uint8Array,
     address: string,
     signature: string,
     message: string,
-  ): Promise<EncryptedVote | undefined> => {
+  ): Promise<string | undefined> => {
     if (!worker) {
       console.error('WebAssembly worker not initialized')
       return
     }
 
-    return new Promise<EncryptedVote | undefined>((resolve, reject) => {
+    return new Promise<string | undefined>((resolve, reject) => {
       setIsLoading(true)
-      worker.postMessage({ type: 'encrypt_vote', data: { voteId, publicKey, address, signature, message } })
+      worker.postMessage({ type: 'generate_proof', data: { voteId, publicKey, address, signature, message } })
       worker.onmessage = async (event) => {
-        const { type, success, encryptedVote, error } = event.data
-        if (type === 'encrypt_vote') {
+        const { type, success, encodedProof, error } = event.data
+        if (type === 'generate_proof') {
           if (success) {
-            const { vote, proof } = encryptedVote
-
-            resolve({
-              vote: vote,
-              proof: proof,
-            })
+            resolve(encodedProof)
           } else {
             showToast({
               type: 'danger',
               message: error,
             })
-            handleGenericError('encryptVote', new Error(error))
+            handleGenericError('generateProof', new Error(error))
             reject(new Error(error))
           }
           setIsLoading(false)
@@ -65,6 +59,6 @@ export const useWebAssemblyHook = () => {
 
   return {
     isLoading,
-    encryptVote,
+    generateProof,
   }
 }

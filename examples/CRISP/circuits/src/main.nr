@@ -56,7 +56,7 @@ fn main(
     balance: Field,
     // Whether this is the first vote for this slot.
     is_first_vote: pub bool,
-) {
+) -> pub ([Polynomial<512>; 2], [Polynomial<512>; 2]) {
     // Verify the ECDSA signature.
     let is_signature_valid =
         verify_signature(hashed_message, public_key_x, public_key_y, signature);
@@ -120,7 +120,7 @@ fn main(
         // Verify the correct coefficient values and that the vote is <= balance
         check_coefficient_values_with_balance(k1, params.crypto_params().q_mod_t, balance);
 
-        // (ct0is, ct1is)
+        (ct0is, ct1is)
     } else {
         // check if vote == 0.
         let is_vote_zero = check_coefficient_zero(k1);
@@ -130,11 +130,11 @@ fn main(
         // If so, (ct0is, ct1is) should be returned.
 
         if is_first_vote {
-            // (ct0is, ct1is)
+            (ct0is, ct1is)
         } else {
             // check if the sum is valid
             assert(is_ct_add_valid);
-            // (sum_ct0is, sum_ct1is)
+            (sum_ct0is, sum_ct1is)
         }
     }
 }

@@ -40,7 +40,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
    * Voting Management Methods
    **/
-  const { isLoading: wasmLoading, encryptVote } = useWebAssemblyHook()
+  const { isLoading: wasmLoading, generateProof } = useWebAssemblyHook()
   const {
     isLoading: enclaveLoading,
     getRoundStateLite: getRoundStateLiteRequest,
@@ -137,7 +137,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         broadcastVote,
         setVotingRound,
         setUser,
-        encryptVote,
+        generateProof,
       }}
     >
       {children}
