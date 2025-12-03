@@ -6,8 +6,8 @@
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type Vote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
-import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, MASK_SIGNATURE } from './constants'
+import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MASK_SIGNATURE } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
@@ -16,6 +16,7 @@ import { Hex } from 'viem'
 
 // Initialize the ZKInputsGenerator.
 const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
+const optimalThreadCount = await getOptimalThreadCount()
 
 /**
  * Encode a vote.
@@ -129,7 +130,7 @@ export const generateWitness = async (crispInputs: CircuitInputs): Promise<Uint8
 
 export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofData> => {
   const witness = await generateWitness(crispInputs)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
 
   const proof = await backend.generateProof(witness, { keccakZK: true })
 
@@ -179,7 +180,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
 }
 
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: OPTIMAL_THREAD_COUNT })
+  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
 
   const isValid = await backend.verifyProof(proof, { keccakZK: true })
 

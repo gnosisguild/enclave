@@ -121,3 +121,29 @@ export const getAddressFromSignature = async (signature: `0x${string}`): Promise
 
   return publicKeyToAddress(publicKey)
 }
+
+/**
+ * Get optimal number of threads for proof generation
+ * Leaves at least 1 core free for other operations
+ * Works in both Node.js and browser environments
+ */
+export async function getOptimalThreadCount(): Promise<number> {
+  // Node.js environment - use os module if available
+  if (typeof process !== 'undefined' && process.versions?.node) {
+    try {
+      const os = await import('os')
+      const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
+      return Math.max(1, cpuCount - 1)
+    } catch {
+      // Fall through to browser check or fallback
+    }
+  }
+
+  // Browser environment
+  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
+    return Math.max(1, navigator.hardwareConcurrency - 1)
+  }
+
+  // Fallback
+  return 5
+}

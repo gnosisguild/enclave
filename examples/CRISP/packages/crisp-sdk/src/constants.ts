@@ -4,22 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import os from 'os'
 import { hashMessage } from 'viem'
 
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
 
 export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
-
-/**
- * Optimal number of threads for proof generation
- * Leaves at least 1 core free for other operations
- */
-export const OPTIMAL_THREAD_COUNT = Math.max(
-  1,
-  (typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length) - 1,
-)
 
 /**
  * Half the minimum degree needed to support the maxium vote value
