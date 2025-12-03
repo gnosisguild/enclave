@@ -167,6 +167,19 @@ class VersionBumper {
     console.log('\n📝 Performing git operations...')
 
     try {
+      // Run prettier from root before committing to avoid hook failures
+      console.log('   Running prettier from root...')
+      try {
+        execSync('pnpm prettier --write .', {
+          cwd: this.rootDir,
+          stdio: 'pipe',
+        })
+        console.log('   ✓ Prettier formatting complete')
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        console.warn('   ⚠️  Prettier failed, continuing anyway')
+      }
+
       // Add all changes
       console.log('   Adding changes...')
       execSync('git add .', { cwd: this.rootDir })
