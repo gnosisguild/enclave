@@ -5,15 +5,15 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, type IVote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
+import { type CircuitInputs, type Vote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
-import { extractSignatureComponents } from './signature'
+import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, OPTIMAL_THREAD_COUNT, MASK_SIGNATURE } from './constants'
+import { extractSignatureComponents, getAddressFromSignature } from './signature'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, publicKeyToAddress } from 'viem/utils'
-import { Hex, recoverPublicKey } from 'viem'
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
+import { Hex } from 'viem'
 
 // Initialize the ZKInputsGenerator.
 const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
@@ -23,7 +23,7 @@ const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
  * @param vote The vote to encode.
  * @returns The encoded vote as a BigInt64Array.
  */
-export const encodeVote = (vote: IVote): BigInt64Array => {
+export const encodeVote = (vote: Vote): BigInt64Array => {
   const bfvParams = zkInputsGenerator.getBFVParams()
   const voteArray = []
   const length = bfvParams.degree
@@ -51,7 +51,7 @@ export const encodeVote = (vote: IVote): BigInt64Array => {
  * @param tally The encoded tally to decode.
  * @returns The decoded tally as an IVote.
  */
-export const decodeTally = (tally: string[]): IVote => {
+export const decodeTally = (tally: string[]): Vote => {
   const HALF_D = tally.length / 2
   const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
   const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
@@ -81,7 +81,7 @@ export const decodeTally = (tally: string[]): IVote => {
   }
 }
 
-export const encryptVote = (vote: IVote, publicKey: Uint8Array): Uint8Array => {
+export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
   const encodedVote = encodeVote(vote)
 
   return zkInputsGenerator.encryptVote(publicKey, encodedVote)
@@ -153,8 +153,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
   }
 
   // The address slot of an actual vote always is the address of the public key that signed the message.
-  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature: voteProofInputs.signature })
-  const address = publicKeyToAddress(publicKey)
+  const address = await getAddressFromSignature(voteProofInputs.signature)
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
 
@@ -172,7 +171,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
 
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
-    signature: FAKE_SIGNATURE,
+    signature: MASK_SIGNATURE,
     vote: { yes: 0n, no: 0n },
     merkleProof,
   })

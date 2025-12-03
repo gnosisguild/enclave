@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { SIGNATURE_MESSAGE, generateMerkleProof, IVote, FAKE_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
+import { SIGNATURE_MESSAGE, generateMerkleProof, IVote, MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
 import {
   decodeTally,
   encryptVote,
@@ -178,7 +178,7 @@ describe('Vote', () => {
           vote: { yes: 0n, no: 0n },
           publicKey,
           previousCiphertext,
-          signature: FAKE_SIGNATURE,
+          signature: MASK_SIGNATURE,
           merkleProof,
           balance,
           slotAddress,
@@ -209,7 +209,7 @@ describe('Vote', () => {
         const crispInputs = await generateCircuitInputs({
           vote: { yes: 0n, no: 0n },
           publicKey,
-          signature: FAKE_SIGNATURE,
+          signature: MASK_SIGNATURE,
           merkleProof,
           balance,
           slotAddress,

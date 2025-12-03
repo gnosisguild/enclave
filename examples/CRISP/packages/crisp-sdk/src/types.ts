@@ -7,9 +7,9 @@
 import type { LeanIMTMerkleProof } from '@zk-kit/lean-imt'
 
 /**
- * Interface representing the details of a specific round returned by the CRISP server
+ * Type representing the details of a specific round returned by the CRISP server
  */
-export interface IRoundDetailsResponse {
+export type RoundDetailsResponse = {
   id: string
   chain_id: string
   enclave_address: string
@@ -26,9 +26,9 @@ export interface IRoundDetailsResponse {
 }
 
 /**
- * Interface representing the details of a specific round in a more convenient format
+ * Type representing the details of a specific round in a more convenient format
  */
-export interface IRoundDetails {
+export type RoundDetails = {
   e3Id: bigint
   chainId: bigint
   enclaveAddress: string
@@ -45,18 +45,18 @@ export interface IRoundDetails {
 }
 
 /**
- * Interface representing the token details required for participation in a round
+ * Type representing the token details required for participation in a round
  */
-export interface ITokenDetails {
+export type TokenDetails = {
   tokenAddress: string
   threshold: bigint
   snapshotBlock: bigint
 }
 
 /**
- * Interface representing a Merkle proof
+ * Type representing a Merkle proof
  */
-export interface IMerkleProof {
+export type MerkleProof = {
   leaf: bigint
   index: number
   proof: LeanIMTMerkleProof<bigint>
@@ -65,9 +65,9 @@ export interface IMerkleProof {
 }
 
 /**
- * Interface representing a vote with power for 'yes' and 'no'
+ * Type representing a vote with power for 'yes' and 'no'
  */
-export interface IVote {
+export type Vote = {
   /**
    * The voting power for 'yes' votes
    */
@@ -79,25 +79,25 @@ export interface IVote {
 }
 
 /**
- * Interface representing a vector with coefficients
+ * Type representing a vector with coefficients
  */
-export interface Polynomial {
+export type Polynomial = {
   coefficients: string[]
 }
 
 /**
- * Interface representing cryptographic parameters
+ * Type representing cryptographic parameters
  */
-export interface GrecoCryptographicParams {
+export type GrecoCryptographicParams = {
   q_mod_t: string
   qis: string[]
   k0is: string[]
 }
 
 /**
- * Interface representing Greco bounds
+ * Type representing Greco bounds
  */
-export interface GrecoBoundParams {
+export type GrecoBoundParams = {
   e_bound: string
   u_bound: string
   k1_low_bound: string
@@ -111,9 +111,9 @@ export interface GrecoBoundParams {
 }
 
 /**
- * Interface representing Greco parameters
+ * Type representing Greco parameters
  */
-export interface GrecoParams {
+export type GrecoParams = {
   crypto: GrecoCryptographicParams
   bounds: GrecoBoundParams
 }
@@ -121,7 +121,7 @@ export interface GrecoParams {
 /**
  * The inputs required for the CRISP circuit.
  */
-export interface CircuitInputs {
+export type CircuitInputs = {
   // Ciphertext Addition Section.
   prev_ct0is: Polynomial[]
   prev_ct1is: Polynomial[]
@@ -163,17 +163,17 @@ export interface CircuitInputs {
   is_first_vote: boolean
 }
 
-export interface ProofInputs {
-  vote: IVote
+export type ProofInputs = {
+  vote: Vote
   publicKey: Uint8Array
   signature: `0x${string}`
   balance: bigint
   slotAddress: string
   previousCiphertext?: Uint8Array
-  merkleProof: IMerkleProof
+  merkleProof: MerkleProof
 }
 
-export interface MaskVoteProofInputs {
+export type MaskVoteProofInputs = {
   previousCiphertext?: Uint8Array
   merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
@@ -181,10 +181,10 @@ export interface MaskVoteProofInputs {
   slotAddress: string
 }
 
-export interface VoteProofInputs {
+export type VoteProofInputs = {
   merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
   balance: bigint
-  vote: IVote
+  vote: Vote
   signature: `0x${string}`
 }

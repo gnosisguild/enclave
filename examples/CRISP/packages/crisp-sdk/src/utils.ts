@@ -7,7 +7,7 @@
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
 
-import type { IMerkleProof } from './types'
+import type { MerkleProof } from './types'
 import { MERKLE_TREE_MAX_DEPTH } from './constants'
 
 /**
@@ -35,7 +35,7 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
  * @param address The voter's address
  * @param leaves The leaves of the Merkle tree
  */
-export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[] | string[]): IMerkleProof => {
+export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[] | string[]): MerkleProof => {
   const leaf = hashLeaf(address.toLowerCase(), balance)
 
   const index = leaves.findIndex((l) => l === leaf)

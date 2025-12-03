@@ -10,4 +10,11 @@ export * from './constants'
 export * from './utils'
 export { decodeTally, generateVoteProof, generateMaskVoteProof, verifyProof } from './vote'
 
-export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IVote, MaskVoteProofInputs, VoteProofInputs } from './types'
+export type {
+  RoundDetails as IRoundDetails,
+  RoundDetailsResponse as IRoundDetailsResponse,
+  TokenDetails as ITokenDetails,
+  Vote as IVote,
+  MaskVoteProofInputs,
+  VoteProofInputs,
+} from './types'

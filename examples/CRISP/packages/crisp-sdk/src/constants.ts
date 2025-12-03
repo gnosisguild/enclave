@@ -41,5 +41,5 @@ export const SIGNATURE_MESSAGE = 'CRISP: Sign this message to prove ownership of
 export const SIGNATURE_MESSAGE_HASH = hashMessage(SIGNATURE_MESSAGE)
 
 // Placeholder signature for masking votes.
-export const FAKE_SIGNATURE =
+export const MASK_SIGNATURE =
   '0x8e7d77112641d59e9409ec3052041703bb9d9e6ed39bfcf75aefbcafe829ac6b21dd7648116ad5db0466fcb4bd468dcb28f6c069def8bc47cd9d859c85a016e31b'

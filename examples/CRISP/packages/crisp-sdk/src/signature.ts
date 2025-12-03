@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { publicKeyToAddress } from 'viem/utils'
 import { SIGNATURE_MESSAGE_HASH } from './constants'
 import { hexToBytes, recoverPublicKey } from 'viem'
 
@@ -40,4 +41,10 @@ export const extractSignatureComponents = async (
     publicKeyY: publicKeyY,
     signature: signatureBytes,
   }
+}
+
+export const getAddressFromSignature = async (signature: `0x${string}`): Promise<string> => {
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+
+  return publicKeyToAddress(publicKey)
 }
