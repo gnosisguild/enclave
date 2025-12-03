@@ -39,7 +39,7 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
 export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[] | string[]): MerkleProof => {
   const leaf = hashLeaf(address.toLowerCase(), balance)
 
-  const index = leaves.findIndex((l) => l === leaf)
+  const index = leaves.findIndex((l) => BigInt(l) === leaf)
 
   if (index === -1) {
     throw new Error('Leaf not found in the tree')
