@@ -1,6 +1,6 @@
 # CRISP SDK
 
-TypeScript SDK for interacting with CRISP (Cryptographically Secure and Private voting protocol) and
+TypeScript SDK for interacting with CRISP (Coercion-Resistant Impartial Selection Protocol) and
 the CRISP server.
 
 ## Installation
