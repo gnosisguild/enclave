@@ -15,7 +15,7 @@ import {
   generateMerkleTree,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
-import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers } from './utils'
+import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
 let publicKey = generatePublicKey()
 

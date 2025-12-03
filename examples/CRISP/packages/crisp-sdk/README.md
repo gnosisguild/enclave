@@ -1,7 +1,7 @@
 # CRISP SDK
 
-TypeScript SDK for interacting with CRISP (Coercion-Resistant Impartial Selection Protocol) and
-the CRISP server.
+TypeScript SDK for interacting with CRISP (Coercion-Resistant Impartial Selection Protocol) and the
+CRISP server.
 
 ## Installation
 
