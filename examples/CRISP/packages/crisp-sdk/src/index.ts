@@ -6,15 +6,8 @@
 
 export * from './token'
 export * from './state'
-export * from './constants'
-export * from './utils'
+export { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, MAXIMUM_VOTE_VALUE } from './constants'
+export { hashLeaf, generateMerkleProof, generateMerkleTree, getAddressFromSignature } from './utils'
 export { decodeTally, generateVoteProof, generateMaskVoteProof, verifyProof } from './vote'
 
-export type {
-  RoundDetails as IRoundDetails,
-  RoundDetailsResponse as IRoundDetailsResponse,
-  TokenDetails as ITokenDetails,
-  Vote as IVote,
-  MaskVoteProofInputs,
-  VoteProofInputs,
-} from './types'
+export type { RoundDetails, RoundDetailsResponse, TokenDetails, Vote, MaskVoteProofInputs, VoteProofInputs } from './types'

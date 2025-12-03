@@ -6,9 +6,10 @@
 
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
-
 import type { MerkleProof } from './types'
-import { MERKLE_TREE_MAX_DEPTH } from './constants'
+import { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
+import { publicKeyToAddress } from 'viem/utils'
+import { hexToBytes, recoverPublicKey } from 'viem'
 
 /**
  * Hash a leaf node for the Merkle tree
@@ -78,4 +79,45 @@ export const toBinary = (number: bigint): string => {
   }
 
   return number.toString(2)
+}
+
+/**
+ * Given a signature, extract the signature components for the Noir signature verification circuit.
+ * @param signature The signature to extract the components from.
+ * @returns The extracted signature components.
+ */
+export const extractSignatureComponents = async (
+  signature: `0x${string}`,
+): Promise<{
+  messageHash: Uint8Array
+  publicKeyX: Uint8Array
+  publicKeyY: Uint8Array
+  signature: Uint8Array
+}> => {
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+  const publicKeyBytes = hexToBytes(publicKey)
+  const publicKeyX = publicKeyBytes.slice(1, 33)
+  const publicKeyY = publicKeyBytes.slice(33, 65)
+
+  // Extract r and s from signature (remove v)
+  const sigBytes = hexToBytes(signature)
+  const r = sigBytes.slice(0, 32) // First 32 bytes
+  const s = sigBytes.slice(32, 64) // Next 32 bytes
+
+  const signatureBytes = new Uint8Array(64)
+  signatureBytes.set(r, 0)
+  signatureBytes.set(s, 32)
+
+  return {
+    messageHash: hexToBytes(SIGNATURE_MESSAGE_HASH),
+    publicKeyX: publicKeyX,
+    publicKeyY: publicKeyY,
+    signature: signatureBytes,
+  }
+}
+
+export const getAddressFromSignature = async (signature: `0x${string}`): Promise<string> => {
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+
+  return publicKeyToAddress(publicKey)
 }

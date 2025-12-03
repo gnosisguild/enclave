@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { SIGNATURE_MESSAGE, generateMerkleProof, IVote, MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from '../src'
+import { Vote } from '../src/types'
+import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE } from '../src/constants'
+import { generateMerkleProof } from '../src/utils'
 import {
   decodeTally,
   encryptVote,
@@ -22,7 +24,7 @@ import { Hex, recoverPublicKey } from 'viem'
 import { ECDSA_PRIVATE_KEY, LEAVES } from './constants'
 
 describe('Vote', () => {
-  let vote: IVote
+  let vote: Vote
   let signature: Hex
   let balance: bigint
   let address: string
