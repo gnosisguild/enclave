@@ -15,7 +15,7 @@ import {
   generateMerkleTree,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
-import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers } from './utils'
+import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
 let publicKey = generatePublicKey()
 
@@ -108,7 +108,7 @@ describe('CRISP Contracts', function () {
       const encodedProof = encodeSolidityProof(proof)
 
       // Call next functions with fake data for testing.
-      await crispProgram.setRoundData(e3Id, merkleTree.root, nonZeroAddress, 1n)
+      await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
       await crispProgram.validate(e3Id, 0n, '0x', '0x')
 
       // If it doesn't throw, the test is successful.
