@@ -2642,7 +2642,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-aggregator"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -2664,7 +2664,7 @@ dependencies = [
 
 [[package]]
 name = "e3-bfv-helpers"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -2687,7 +2687,7 @@ dependencies = [
 
 [[package]]
 name = "e3-ciphernode-builder"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -2710,7 +2710,7 @@ dependencies = [
 
 [[package]]
 name = "e3-cli"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -2741,7 +2741,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -2758,7 +2758,7 @@ dependencies = [
 
 [[package]]
 name = "e3-config"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -2778,7 +2778,7 @@ dependencies = [
 
 [[package]]
 name = "e3-crypto"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2796,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "e3-data"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -2812,7 +2812,7 @@ dependencies = [
 
 [[package]]
 name = "e3-entrypoint"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "actix-web",
@@ -2851,7 +2851,7 @@ dependencies = [
 
 [[package]]
 name = "e3-events"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -2879,7 +2879,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -2905,7 +2905,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2919,7 +2919,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -2943,7 +2943,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fs"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2956,7 +2956,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2971,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "e3-init"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "e3-keyshare"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -3015,7 +3015,7 @@ dependencies = [
 
 [[package]]
 name = "e3-logger"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "base64",
@@ -3025,7 +3025,7 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -3043,7 +3043,7 @@ dependencies = [
 
 [[package]]
 name = "e3-net"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -3069,7 +3069,7 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -3084,7 +3084,7 @@ dependencies = [
 
 [[package]]
 name = "e3-request"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "anyhow",
@@ -3100,7 +3100,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "e3-bfv-helpers",
  "e3-evm-helpers",
@@ -3109,7 +3109,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sortition"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -3129,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "e3-support-scripts"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3140,7 +3140,7 @@ dependencies = [
 
 [[package]]
 name = "e3-test-helpers"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -3172,7 +3172,7 @@ dependencies = [
 
 [[package]]
 name = "e3-tests"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -3214,7 +3214,7 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3242,7 +3242,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix",
  "alloy",
@@ -3257,7 +3257,7 @@ dependencies = [
 
 [[package]]
 name = "e3-wasm"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "e3-bfv-helpers",
  "getrandom 0.2.16",
@@ -3348,7 +3348,7 @@ dependencies = [
 
 [[package]]
 name = "enclaveup"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "clap",
