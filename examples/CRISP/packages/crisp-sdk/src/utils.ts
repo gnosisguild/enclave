@@ -6,9 +6,10 @@
 
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
-
-import type { IMerkleProof } from './types'
-import { MERKLE_TREE_MAX_DEPTH } from './constants'
+import type { MerkleProof } from './types'
+import { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
+import { publicKeyToAddress } from 'viem/utils'
+import { hexToBytes, recoverPublicKey } from 'viem'
 
 /**
  * Hash a leaf node for the Merkle tree
@@ -16,8 +17,8 @@ import { MERKLE_TREE_MAX_DEPTH } from './constants'
  * @param balance The voter's balance
  * @returns The hashed leaf as a bigint
  */
-export const hashLeaf = (address: string, balance: string): bigint => {
-  return poseidon2([address, balance])
+export const hashLeaf = (address: string, balance: bigint): bigint => {
+  return poseidon2([address.toLowerCase(), balance])
 }
 
 /**
@@ -31,25 +32,20 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
 
 /**
  * Generate a Merkle proof for a given address to prove inclusion in the voters' list
- * @param threshold The minimum balance required to be eligible
  * @param balance The voter's balance
  * @param address The voter's address
  * @param leaves The leaves of the Merkle tree
  */
-export const generateMerkleProof = (threshold: bigint, balance: bigint, address: string, leaves: bigint[]): IMerkleProof => {
-  if (balance < threshold) {
-    throw new Error('Balance is below the threshold')
-  }
+export const generateMerkleProof = (balance: bigint, address: string, leaves: bigint[] | string[]): MerkleProof => {
+  const leaf = hashLeaf(address.toLowerCase(), balance)
 
-  const leaf = hashLeaf(address, balance.toString())
-
-  const index = leaves.findIndex((l) => l === leaf)
+  const index = leaves.findIndex((l) => BigInt(l) === leaf)
 
   if (index === -1) {
     throw new Error('Leaf not found in the tree')
   }
 
-  const tree = generateMerkleTree(leaves)
+  const tree = generateMerkleTree(leaves.map((l) => BigInt(l)))
 
   const proof = tree.generateProof(index)
 
@@ -83,4 +79,71 @@ export const toBinary = (number: bigint): string => {
   }
 
   return number.toString(2)
+}
+
+/**
+ * Given a signature, extract the signature components for the Noir signature verification circuit.
+ * @param signature The signature to extract the components from.
+ * @returns The extracted signature components.
+ */
+export const extractSignatureComponents = async (
+  signature: `0x${string}`,
+): Promise<{
+  messageHash: Uint8Array
+  publicKeyX: Uint8Array
+  publicKeyY: Uint8Array
+  signature: Uint8Array
+}> => {
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+  const publicKeyBytes = hexToBytes(publicKey)
+  const publicKeyX = publicKeyBytes.slice(1, 33)
+  const publicKeyY = publicKeyBytes.slice(33, 65)
+
+  // Extract r and s from signature (remove v)
+  const sigBytes = hexToBytes(signature)
+  const r = sigBytes.slice(0, 32) // First 32 bytes
+  const s = sigBytes.slice(32, 64) // Next 32 bytes
+
+  const signatureBytes = new Uint8Array(64)
+  signatureBytes.set(r, 0)
+  signatureBytes.set(s, 32)
+
+  return {
+    messageHash: hexToBytes(SIGNATURE_MESSAGE_HASH),
+    publicKeyX: publicKeyX,
+    publicKeyY: publicKeyY,
+    signature: signatureBytes,
+  }
+}
+
+export const getAddressFromSignature = async (signature: `0x${string}`): Promise<string> => {
+  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+
+  return publicKeyToAddress(publicKey)
+}
+
+/**
+ * Get optimal number of threads for proof generation
+ * Leaves at least 1 core free for other operations
+ * Works in both Node.js and browser environments
+ */
+export async function getOptimalThreadCount(): Promise<number> {
+  // Node.js environment - use os module if available
+  if (typeof process !== 'undefined' && process.versions?.node) {
+    try {
+      const os = await import('os')
+      const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
+      return Math.max(1, cpuCount - 1)
+    } catch {
+      // Fall through to browser check or fallback
+    }
+  }
+
+  // Browser environment
+  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
+    return Math.max(1, navigator.hardwareConcurrency - 1)
+  }
+
+  // Fallback
+  return 5
 }

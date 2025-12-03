@@ -28,7 +28,7 @@ export type VoteManagementContextType = {
   getPastPolls: () => Promise<void>
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
-  generateProof: (voteId: bigint, publicKey: Uint8Array, address: string, signature: string, message: string) => Promise<string | undefined>
+  generateProof: (voteId: bigint, publicKey: Uint8Array, address: string, signature: string) => Promise<string | undefined>
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>
   setPastPolls: React.Dispatch<React.SetStateAction<PollResult[]>>

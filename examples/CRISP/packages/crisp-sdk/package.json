@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/sdk",
-  "version": "0.3.0-test",
+  "version": "0.4.1",
   "type": "module",
   "author": {
     "name": "gnosisguild",
@@ -24,8 +24,7 @@
     "compile:circuit": "cd ../../circuits && nargo compile",
     "build:wasm": "pnpm -C ../crisp-zk-inputs build",
     "build": "pnpm build:wasm && pnpm compile:circuit && tsup",
-    "test": "pnpm build:wasm && pnpm compile:circuit && vitest --run",
-    "release": "pnpm build && pnpm publish --access public"
+    "test": "pnpm build:wasm && pnpm compile:circuit && vitest --run"
   },
   "publishConfig": {
     "access": "public"

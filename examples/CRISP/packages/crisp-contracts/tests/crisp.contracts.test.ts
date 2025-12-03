@@ -5,23 +5,19 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { zeroAddress } from 'viem'
-import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import {
-  encryptVoteAndGenerateCRISPInputs,
-  generateProof,
-  VotingMode,
-  encodeVote,
-  MESSAGE,
-  generateMerkleProof,
   hashLeaf,
+  generatePublicKey,
+  SIGNATURE_MESSAGE,
+  generateVoteProof,
+  getAddressFromSignature,
   encodeSolidityProof,
+  generateMerkleTree,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, nonZeroAddress, ethers } from './utils'
 
-let zkInputsGenerator = ZKInputsGenerator.withDefaults()
-let publicKey = zkInputsGenerator.generatePublicKey()
-const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
+let publicKey = generatePublicKey()
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {
@@ -63,36 +59,22 @@ describe('CRISP Contracts', function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
+      const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
 
-      const honkVerifier = await deployHonkVerifier()
-
-      const slotAddress = signer.address.toLowerCase() as `0x${string}`
-
       const vote = { yes: 10n, no: 0n }
-      const balance = vote.yes
-      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, balance)
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
 
-      const signature = (await signer.signMessage(MESSAGE)) as `0x${string}`
-      const leaf = hashLeaf(slotAddress, balance.toString())
-      const leaves = [...[10n, 20n], leaf]
-
-      const threshold = 0n
-      const merkleProof = generateMerkleProof(threshold, balance, slotAddress, leaves)
-
-      const inputs = await encryptVoteAndGenerateCRISPInputs({
-        encodedVote,
+      const proof = await generateVoteProof({
+        vote,
         publicKey,
-        previousCiphertext,
         signature,
-        message: MESSAGE,
-        merkleData: merkleProof,
+        merkleLeaves: leaves,
         balance,
-        slotAddress,
-        isFirstVote: true,
       })
-
-      const proof = await generateProof(inputs)
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
 
@@ -103,42 +85,30 @@ describe('CRISP Contracts', function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
-      const [signer] = await ethers.getSigners()
-
       const crispProgram = await deployCRISPProgram()
-
-      const address = signer.address.toLowerCase() as `0x${string}`
+      const [signer] = await ethers.getSigners()
 
       const e3Id = 1n
 
       const vote = { yes: 10n, no: 0n }
-      const balance = vote.yes
-      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, balance)
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
+      const merkleTree = generateMerkleTree(leaves)
 
-      const signature = (await signer.signMessage(MESSAGE)) as `0x${string}`
-      const leaf = hashLeaf(address, balance.toString())
-      const leaves = [...[10n, 20n], leaf]
-
-      const threshold = 0n
-      const merkleProof = generateMerkleProof(threshold, balance, address, leaves)
-
-      const inputs = await encryptVoteAndGenerateCRISPInputs({
-        encodedVote,
+      const proof = await generateVoteProof({
+        vote,
         publicKey,
-        previousCiphertext,
         signature,
-        message: MESSAGE,
-        merkleData: merkleProof,
+        merkleLeaves: leaves,
         balance,
-        slotAddress: address,
-        isFirstVote: true,
       })
 
-      const proof = await generateProof(inputs)
       const encodedProof = encodeSolidityProof(proof)
 
       // Call next functions with fake data for testing.
-      await crispProgram.setRoundData(e3Id, merkleProof.proof.root, nonZeroAddress, 1n)
+      await crispProgram.setRoundData(e3Id, merkleTree.root, nonZeroAddress, 1n)
       await crispProgram.validate(e3Id, 0n, '0x', '0x')
 
       // If it doesn't throw, the test is successful.
