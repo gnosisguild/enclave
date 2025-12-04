@@ -23,6 +23,7 @@ members = [
   "crates/net", 
   "crates/program-server", 
   "crates/request",
+  "crates/safe",
   "crates/sdk",
   "crates/sortition",
   "crates/support-scripts",
