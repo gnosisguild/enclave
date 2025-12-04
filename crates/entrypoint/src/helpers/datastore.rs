@@ -11,7 +11,7 @@ use anyhow::Result;
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::{get_enclave_bus_handle, BusHandle, EnclaveEvent};
+use e3_events::{get_enclave_bus_handle, BusHandle};
 
 pub fn get_sled_store(bus: &BusHandle, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())

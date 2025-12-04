@@ -7,9 +7,7 @@
 use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use e3_events::{
-    get_enclave_bus_handle, prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData,
-};
+use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use once_cell::sync::Lazy;
 use sled::Db;
 use std::{
