@@ -24,6 +24,7 @@
     "test:circuits": "cd circuits && nargo test",
     "compile:circuits": "bash ./scripts/compile_circuits.sh",
     "test:sdk": "pnpm -C packages/crisp-sdk test",
+    "build:sdk": "pnpm -C packages/crisp-sdk build",
     "report": "playwright show-report",
     "publish:packages": "tsx scripts/publish.ts",
     "setup:testnet": "bash ./scripts/setup_testnet.sh"

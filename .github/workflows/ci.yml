@@ -486,7 +486,7 @@ jobs:
 
       - name: Run Solidity tests
         working-directory: ./examples/CRISP
-        run: 'pnpm test:contracts'
+        run: 'pnpm build:sdk && pnpm test:contracts'
 
   crisp_e2e:
     runs-on: ubuntu-latest
