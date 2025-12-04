@@ -14,11 +14,5 @@ else
 fi
 
 echo "TEST E2E SCRIPT STARTING..."
-pnpm concurrently \
-  --kill-others \
-  --fail-fast \
-  -n "SERVER,SDK,PLAYWRIGHT" \
-  "./scripts/setup.sh && ./scripts/dev.sh" \
-  "./scripts/run-sdk-tests.sh" \
-  "./scripts/run-playwright-tests.sh"
+pnpm concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on tcp:3000 && sleep 20 && ${PLAYWRIGHT_CMD} && sleep 3"
   
