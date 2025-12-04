@@ -135,6 +135,9 @@ impl ThresholdKeyshareExtension {
     }
 }
 
+const ERROR_KEYSHARE_META_MISSING: &str =
+    "Could not create ThresholdKeyshare because the meta instance it depends on was not set on the context.";
+
 #[async_trait]
 impl E3Extension for ThresholdKeyshareExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
@@ -147,7 +150,7 @@ impl E3Extension for ThresholdKeyshareExtension {
         let party_id = data.clone().party_id;
         let Some(meta) = ctx.get_dependency(META_KEY) else {
             self.bus
-                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_META_MISSING));
             return;
         };
         let repo = ctx.repositories().threshold_keyshare(&e3_id);
