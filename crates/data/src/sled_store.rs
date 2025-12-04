@@ -8,7 +8,7 @@ use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{
-    get_enclave_bus_handle, prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+    get_enclave_bus_handle, prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData,
 };
 use once_cell::sync::Lazy;
 use sled::Db;
@@ -51,7 +51,7 @@ impl Handler<Insert> for SledStore {
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.insert(event) {
-                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                Err(err) => self.bus.err(EType::Data, err),
                 _ => (),
             }
         }
@@ -76,7 +76,7 @@ impl Handler<Remove> for SledStore {
     fn handle(&mut self, event: Remove, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.remove(event) {
-                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                Err(err) => self.bus.err(EType::Data, err),
                 _ => (),
             }
         }
@@ -91,7 +91,7 @@ impl Handler<Get> for SledStore {
             return match db.get(event) {
                 Ok(v) => v,
                 Err(err) => {
-                    self.bus.err(EnclaveErrorType::Data, err);
+                    self.bus.err(EType::Data, err);
                     None
                 }
             };

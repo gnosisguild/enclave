@@ -15,8 +15,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
-    DocumentReceived, E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-    Event, PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, Event,
+    PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -155,7 +155,7 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle publish document requested");
-                    bus.err(EnclaveErrorType::IO, e)
+                    bus.err(EType::IO, e)
                 }
             }
         })
@@ -204,7 +204,7 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle document published notification");
-                    bus.err(EnclaveErrorType::IO, e);
+                    bus.err(EType::IO, e);
                 }
             }
         })
@@ -283,7 +283,7 @@ pub async fn handle_document_published_notification(
     bus.publish(DocumentReceived {
         meta: event.meta,
         value,
-    });
+    })?;
 
     Ok(())
 }
@@ -422,7 +422,8 @@ impl EventConverter {
             vec![],
             None,
         );
-        self.bus.publish(PublishDocumentRequested::new(meta, value));
+        self.bus
+            .publish(PublishDocumentRequested::new(meta, value))?;
         Ok(())
     }
     /// Received document externally
@@ -437,7 +438,7 @@ impl EventConverter {
             },
         };
 
-        self.bus.publish(event);
+        self.bus.publish(event)?;
         Ok(())
     }
 }
@@ -486,7 +487,7 @@ mod tests {
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
-        hlc::Hlc, BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
+        BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
         EnclaveEvent, EventBus, EventBusConfig, GetEvents, HistoryCollector,
         PublishDocumentRequested, TakeEvents,
     };
@@ -545,7 +546,7 @@ mod tests {
         bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        });
+        })?;
 
         // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
         let Some(NetCommand::DhtPutRecord {
@@ -621,7 +622,7 @@ mod tests {
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        });
+        })?;
 
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
@@ -681,7 +682,7 @@ mod tests {
         bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        });
+        })?;
 
         for _ in 0..4 {
             // Expect retry
@@ -733,7 +734,7 @@ mod tests {
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        });
+        })?;
 
         // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(

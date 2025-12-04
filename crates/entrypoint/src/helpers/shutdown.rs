@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_events::{prelude::*, BusHandle, EnclaveEvent, Shutdown};
+use e3_events::{prelude::*, BusHandle, Shutdown};
 use std::time::Duration;
 use tokio::{
     select,
@@ -22,7 +22,10 @@ pub async fn listen_for_shutdown(bus: BusHandle, mut handle: JoinHandle<Result<(
             info!("SIGTERM received, initiating graceful shutdown...");
 
             // Stop the actor system
-            bus.publish(Shutdown);
+            match bus.publish(Shutdown){
+                Ok(_) => (),
+                Err(e) => error!("Shutdown failed to publish! {e}")
+            }
 
             // Wait for all events to propagate
             tokio::time::sleep(Duration::from_secs(2)).await;

@@ -22,7 +22,7 @@ use e3_events::BusHandle;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
-use e3_events::{E3id, EnclaveErrorType, PlaintextAggregated};
+use e3_events::{E3id, EType, PlaintextAggregated};
 use tracing::info;
 
 sol!(
@@ -99,10 +99,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                 // HACK: plaintext format is now a Vec of ArcBytes for legacy tests for now we are extracting
                 // the first entry and writing this will change once we make our legacy tests catch up
                 let Some(decrypted) = decrypted_output.first() else {
-                    bus.err(
-                        EnclaveErrorType::Evm,
-                        anyhow::anyhow!("Decrypted output was empty!"),
-                    );
+                    bus.err(EType::Evm, anyhow::anyhow!("Decrypted output was empty!"));
                     return;
                 };
                 let result = publish_plaintext_output(
@@ -118,7 +115,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     }
                     Err(err) => {
                         bus.err(
-                            EnclaveErrorType::Evm,
+                            EType::Evm,
                             anyhow::anyhow!("Error publishing plaintext output: {:?}", err),
                         );
                     }

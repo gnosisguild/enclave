@@ -7,6 +7,7 @@
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Recipient};
+use anyhow::Result;
 use derivative::Derivative;
 
 use crate::{
@@ -16,8 +17,8 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EnclaveErrorType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector,
-    Stored, Subscribe, Unstored,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector, Stored,
+    Subscribe, Unstored,
 };
 
 #[derive(Clone, Derivative)]
@@ -54,14 +55,16 @@ impl BusHandle {
 }
 
 impl EventPublisher<EnclaveEvent<Unstored>> for BusHandle {
-    fn publish(&self, data: impl Into<EnclaveEventData>) {
-        let evt = self.event_from(data);
+    fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
+        let evt = self.event_from(data)?;
         self.producer.do_send(evt);
+        Ok(())
     }
 
-    fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) {
-        let evt = self.event_from_remote_source(data, ts);
-        self.producer.do_send(evt)
+    fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
+        let evt = self.event_from_remote_source(data, ts)?;
+        self.producer.do_send(evt);
+        Ok(())
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unstored>) {
@@ -70,32 +73,38 @@ impl EventPublisher<EnclaveEvent<Unstored>> for BusHandle {
 }
 
 impl ErrorDispatcher<EnclaveEvent<Unstored>> for BusHandle {
-    fn err(&self, err_type: EnclaveErrorType, error: impl Into<anyhow::Error>) {
+    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
         let evt = self.event_from_error(err_type, error);
         self.producer.do_send(evt);
     }
 }
 
 impl EventFactory<EnclaveEvent<Unstored>> for BusHandle {
-    fn event_from(&self, data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unstored> {
-        let ts = self.hlc.tick().unwrap(); // XXX:
-        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts.into())
+    fn event_from(&self, data: impl Into<EnclaveEventData>) -> Result<EnclaveEvent<Unstored>> {
+        let ts = self.hlc.tick()?;
+        Ok(EnclaveEvent::<Unstored>::new_with_timestamp(
+            data.into(),
+            ts.into(),
+        ))
     }
 
     fn event_from_remote_source(
         &self,
         data: impl Into<EnclaveEventData>,
         ts: u128,
-    ) -> EnclaveEvent<Unstored> {
-        let ts = self.hlc.receive(&ts.into()).unwrap(); // XXX:
-        EnclaveEvent::<Unstored>::new_with_timestamp(data.into(), ts.into())
+    ) -> Result<EnclaveEvent<Unstored>> {
+        let ts = self.hlc.receive(&ts.into())?;
+        Ok(EnclaveEvent::<Unstored>::new_with_timestamp(
+            data.into(),
+            ts.into(),
+        ))
     }
 }
 
 impl ErrorFactory<EnclaveEvent<Unstored>> for BusHandle {
     fn event_from_error(
         &self,
-        err_type: EnclaveErrorType,
+        err_type: EType,
         error: impl Into<anyhow::Error>,
     ) -> EnclaveEvent<Unstored> {
         EnclaveEvent::<Unstored>::from_error(err_type, error)

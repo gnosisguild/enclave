@@ -51,7 +51,10 @@ mod tests {
             TestEvent::new("three", 3),
         ];
 
-        event_data.iter().cloned().for_each(|d| bus.publish(d));
+        for d in event_data.clone() {
+            bus.publish(d)?;
+        }
+
         let expected = event_data
             .into_iter()
             .map(|d| EnclaveEvent::new_stored_event(d.clone().into(), 0, d.entropy))

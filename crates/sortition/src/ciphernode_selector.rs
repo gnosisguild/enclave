@@ -11,8 +11,8 @@ use actix::prelude::*;
 use e3_config::StoreKeys;
 use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{
-    prelude::*, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, EnclaveEvent,
-    EnclaveEventData, Shutdown, TicketGenerated, TicketId,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, EType,
+    EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::MetaRepositoryFactory;
 use tracing::info;
@@ -109,11 +109,14 @@ impl Handler<E3Requested> for CiphernodeSelector {
                         ticket_id = tid,
                         "Ticket generated for score sortition"
                     );
-                    bus.publish(TicketGenerated {
-                        e3_id: data.e3_id.clone(),
-                        ticket_id: TicketId::Score(tid),
-                        node: address.clone(),
-                    });
+                    trap(EType::Sortition, &bus.clone(), || {
+                        bus.publish(TicketGenerated {
+                            e3_id: data.e3_id.clone(),
+                            ticket_id: TicketId::Score(tid),
+                            node: address.clone(),
+                        })?;
+                        Ok(())
+                    })
                 }
             } else {
                 info!("This node is not selected");
@@ -165,16 +168,19 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
-            bus.publish(CiphernodeSelected {
-                party_id: party_id as u64,
-                e3_id,
-                threshold_m: e3_meta.threshold_m,
-                threshold_n: e3_meta.threshold_n,
-                esi_per_ct: e3_meta.esi_per_ct,
-                error_size: e3_meta.error_size,
-                params: e3_meta.params,
-                seed: e3_meta.seed,
-            });
+            trap(EType::Sortition, &bus.clone(), || {
+                bus.publish(CiphernodeSelected {
+                    party_id: party_id as u64,
+                    e3_id,
+                    threshold_m: e3_meta.threshold_m,
+                    threshold_n: e3_meta.threshold_n,
+                    esi_per_ct: e3_meta.esi_per_ct,
+                    error_size: e3_meta.error_size,
+                    params: e3_meta.params,
+                    seed: e3_meta.seed,
+                })?;
+                Ok(())
+            })
         })
     }
 }

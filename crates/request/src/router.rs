@@ -10,7 +10,6 @@ use crate::E3ContextParams;
 use crate::E3ContextSnapshot;
 use crate::E3MetaExtension;
 use crate::RouterRepositoryFactory;
-use actix::AsyncContext;
 use actix::Message;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
@@ -22,16 +21,16 @@ use e3_data::RepositoriesFactory;
 use e3_data::Repository;
 use e3_data::Snapshot;
 use e3_events::prelude::*;
+use e3_events::trap;
 use e3_events::BusHandle;
 use e3_events::E3RequestComplete;
+use e3_events::EType;
 use e3_events::EnclaveEventData;
-use e3_events::Shutdown;
 use e3_events::{E3id, EnclaveEvent, Event};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
-use tracing::error;
 
 /// Buffers events for downstream instances to handle out-of-order event delivery.
 /// Events are stored in a HashMap keyed by string identifiers until they are ready
@@ -151,63 +150,65 @@ impl Actor for E3Router {
 impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        // If we are shutting down then bail on anything else
-        if let EnclaveEventData::Shutdown(_) = msg.get_data() {
-            for (_, ctx) in self.contexts.iter() {
-                ctx.forward_message_now(&msg)
+        trap(EType::Event, &self.bus.clone(), || {
+            // If we are shutting down then bail on anything else
+            if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+                for (_, ctx) in self.contexts.iter() {
+                    ctx.forward_message_now(&msg)
+                }
+
+                return Ok(());
             }
 
-            return;
-        }
+            // Only process events with e3_ids
+            let Some(e3_id) = msg.get_e3_id() else {
+                return Ok(());
+            };
 
-        // Only process events with e3_ids
-        let Some(e3_id) = msg.get_e3_id() else {
-            return;
-        };
+            // If this e3 round has already been completed then we are not going to do anything here
+            if self.completed.contains(&e3_id) {
+                return Err(anyhow!("Received the following event to E3Id({}) despite already being completed:\n\n{:?}\n\n", e3_id, msg));
+            }
 
-        // If this e3 round has already been completed then we are not going to do anything here
-        if self.completed.contains(&e3_id) {
-            error!("Received the following event to E3Id({}) despite already being completed:\n\n{:?}\n\n", e3_id, msg);
-            return;
-        }
-
-        let repositories = self.repository().repositories();
-        let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
-            E3Context::from_params(E3ContextParams {
-                e3_id: e3_id.clone(),
-                repository: repositories.context(&e3_id),
-                extensions: self.extensions.clone(),
-            })
-        });
-
-        for extension in self.extensions.iter() {
-            extension.on_event(context, &msg);
-        }
-
-        context.forward_message(&msg, &mut self.buffer);
-
-        match msg.into_data() {
-            EnclaveEventData::PlaintextAggregated(_) => {
-                // Here we are detemining that by receiving the PlaintextAggregated event our request is
-                // complete and we can notify everyone. This might change as we consider other factors
-                // when determining if the request is complete
-                let event = E3RequestComplete {
+            let repositories = self.repository().repositories();
+            let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
+                E3Context::from_params(E3ContextParams {
                     e3_id: e3_id.clone(),
-                };
+                    repository: repositories.context(&e3_id),
+                    extensions: self.extensions.clone(),
+                })
+            });
 
-                // Send to bus so all other actors can react to a request being complete.
-                self.bus.publish(event);
+            for extension in self.extensions.iter() {
+                extension.on_event(context, &msg);
             }
-            EnclaveEventData::E3RequestComplete(_) => {
-                // Note this will be sent above to the children who can kill themselves based on
-                // the event
-                self.contexts.remove(&e3_id);
-                self.completed.insert(e3_id);
-            }
-            _ => (),
-        }
 
-        self.checkpoint();
+            context.forward_message(&msg, &mut self.buffer);
+
+            match msg.into_data() {
+                EnclaveEventData::PlaintextAggregated(_) => {
+                    // Here we are detemining that by receiving the PlaintextAggregated event our request is
+                    // complete and we can notify everyone. This might change as we consider other factors
+                    // when determining if the request is complete
+                    let event = E3RequestComplete {
+                        e3_id: e3_id.clone(),
+                    };
+
+                    // Send to bus so all other actors can react to a request being complete.
+                    self.bus.publish(event)?;
+                }
+                EnclaveEventData::E3RequestComplete(_) => {
+                    // Note this will be sent above to the children who can kill themselves based on
+                    // the event
+                    self.contexts.remove(&e3_id);
+                    self.completed.insert(e3_id);
+                }
+                _ => (),
+            }
+
+            self.checkpoint();
+            Ok(())
+        });
     }
 }
 

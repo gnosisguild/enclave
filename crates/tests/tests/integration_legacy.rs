@@ -129,7 +129,7 @@ async fn setup_score_sortition_environment(
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    });
+    })?;
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
@@ -141,13 +141,13 @@ async fn setup_score_sortition_environment(
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        });
+        })?;
 
         bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        });
+        })?;
     }
 
     Ok(())
@@ -202,17 +202,17 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     println!("Sending E3 event...");
     // Send the computation requested event
-    bus.publish(e3_request_event.clone());
+    bus.publish(e3_request_event.clone())?;
 
     // Test that we cannot send the same event twice
-    bus.publish(e3_request_event.clone());
+    bus.publish(e3_request_event.clone())?;
 
     // Finalize committee with all available nodes
     bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: eth_addrs.clone(),
         chain_id: 1,
-    });
+    })?;
 
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
@@ -258,7 +258,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone())?;
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(6))
@@ -313,13 +313,13 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             seed: seed.clone(),
             params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
             ..E3Requested::default()
-        });
+        })?;
 
         bus.publish(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
             chain_id: 1,
-        });
+        })?;
 
         let history_collector = cn1.history().unwrap();
         let error_collector = cn1.errors().unwrap();
@@ -331,7 +331,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         assert_eq!(errors.len(), 0);
 
         // SEND SHUTDOWN!
-        bus.publish(Shutdown);
+        bus.publish(Shutdown)?;
 
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
@@ -406,7 +406,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
             .collect(),
         e3_id: e3_id.clone(),
-    });
+    })?;
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(5))
@@ -494,9 +494,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         ..CiphernodeSelected::default()
     };
 
-    bus.publish(evt_1.clone());
-    bus.publish(evt_2.clone());
-    bus.publish(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
+    bus.publish(evt_1.clone())?;
+    bus.publish(evt_2.clone())?;
+    bus.publish(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
 
     // check the history of the event bus
     let history = history_collector
@@ -550,13 +550,13 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
-    });
+    })?;
 
     bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
         chain_id: 1,
-    });
+    })?;
 
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
@@ -587,13 +587,13 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
-    });
+    })?;
 
     bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
         chain_id: 2,
-    });
+    })?;
 
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
@@ -643,7 +643,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
-        bus.event_from(event.clone()).to_bytes()?,
+        bus.event_from(event.clone())?.to_bytes()?,
     )));
 
     // check the history of the event bus

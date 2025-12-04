@@ -239,7 +239,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
             e3_id: self.e3_id.clone(),
         };
 
-        self.bus.publish(event);
+        self.bus.publish(event)?;
 
         Ok(())
     }

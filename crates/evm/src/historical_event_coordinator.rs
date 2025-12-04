@@ -6,7 +6,7 @@
 
 use crate::EnclaveEvmEvent;
 use actix::prelude::*;
-use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, trap, BusHandle, EType, EnclaveEventData};
 use tracing::info;
 
 #[derive(Clone)]
@@ -54,19 +54,20 @@ impl HistoricalEventCoordinator {
         self.registered_count > 0 && self.registered_count == self.completed_count
     }
 
-    fn flush_buffered_events(&mut self) {
+    fn flush_buffered_events(&mut self) -> anyhow::Result<()> {
         // Ordering by block number. But we should also consider the tx_index and log_index.
         self.buffered_events.sort_by_key(|e| e.block);
 
         let count = self.buffered_events.len();
         for BufferedEvent { event, .. } in self.buffered_events.drain(..) {
-            self.target.publish(event);
+            self.target.publish(event)?;
         }
 
         info!(
             "HistoricalEventCoordinator: replay complete, published {} ordered events",
             count
         );
+        Ok(())
     }
 }
 
@@ -82,13 +83,14 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
-        match msg {
+        trap(EType::Evm, &self.target.clone(), || match msg {
             EnclaveEvmEvent::RegisterReader => {
                 self.registered_count += 1;
                 info!(
                     total_registered = self.registered_count,
                     "Reader registered with coordinator"
                 );
+                Ok(())
             }
 
             EnclaveEvmEvent::HistoricalSyncComplete => {
@@ -101,8 +103,9 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
 
                 if self.started && self.all_readers_complete() {
                     info!("All readers completed historical sync, flushing buffered events");
-                    self.flush_buffered_events();
+                    self.flush_buffered_events()?;
                 }
+                Ok(())
             }
 
             EnclaveEvmEvent::Event { event, block } => {
@@ -111,10 +114,11 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
                         self.buffered_events.push(BufferedEvent { block, event });
                     }
                 } else {
-                    self.target.publish(event);
+                    self.target.publish(event)?;
                 }
+                Ok(())
             }
-        }
+        })
     }
 }
 
@@ -122,14 +126,17 @@ impl Handler<CoordinatorStart> for HistoricalEventCoordinator {
     type Result = ();
 
     fn handle(&mut self, _msg: CoordinatorStart, _ctx: &mut Self::Context) -> Self::Result {
-        info!(
-            registered_readers = self.registered_count,
-            "Starting HistoricalEventCoordinator"
-        );
-        self.started = true;
+        trap(EType::Evm, &self.target.clone(), || {
+            info!(
+                registered_readers = self.registered_count,
+                "Starting HistoricalEventCoordinator"
+            );
+            self.started = true;
 
-        if self.all_readers_complete() {
-            self.flush_buffered_events();
-        }
+            if self.all_readers_complete() {
+                self.flush_buffered_events()?;
+            }
+            Ok(())
+        })
     }
 }
