@@ -420,6 +420,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
