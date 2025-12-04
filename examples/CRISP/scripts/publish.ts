@@ -239,9 +239,21 @@ class CRISPPublisher {
     console.log('\n📝 Performing git operations...')
 
     try {
-      // Add all changes
+      // Get git repository root
+      const gitRoot = execSync('git rev-parse --show-toplevel', {
+        cwd: this.crispDir,
+        encoding: 'utf-8',
+      }).trim()
+
+      // Add all changes from CRISP directory
       console.log('   Adding changes...')
       execSync('git add .', { cwd: this.crispDir })
+
+      // Explicitly add the lock file from root
+      const lockFilePath = join(gitRoot, 'pnpm-lock.yaml')
+      if (existsSync(lockFilePath)) {
+        execSync(`git add ${lockFilePath}`, { cwd: gitRoot })
+      }
 
       // Create commit message
       const commitMessage = `chore(crisp): publish version ${this.newVersion}
@@ -254,7 +266,7 @@ class CRISPPublisher {
       // Commit changes
       console.log('   Committing changes...')
       execSync(`git commit -m "${commitMessage}"`, {
-        cwd: this.crispDir,
+        cwd: gitRoot,
         stdio: 'pipe',
       })
       console.log(`   ✓ Committed with message: "chore(crisp): publish version ${this.newVersion}"`)

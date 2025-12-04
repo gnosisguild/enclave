@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use keccak256::keccak256;
 use poseidon::poseidon2_permutation;
-use sha256::sha256_var;
 
 /// SAFE (Sponge API for Field Elements)
 ///
@@ -156,6 +156,9 @@ impl<let L: u32> SafeSponge<L> {
     ///
     /// The number of elements to squeeze is automatically determined from the IO pattern.
     pub fn squeeze(&mut self) -> Vec<Field> {
+        // Validate against IO pattern.
+        assert(self.io_count < L);
+
         // Parse expected operation from io_pattern (encoded word)
         let expected_encoded_word = self.io_pattern[self.io_count];
         let is_expected_squeeze = (expected_encoded_word & ABSORB_FLAG) == 0;
@@ -284,13 +287,25 @@ pub fn compute_tag<let L: u32>(io_pattern: [u32; L], domain_separator: [u8; 64])
     }
 
     // Step 2: Serialize to byte string and append domain separator (following SAFE spec 2.3).
-    // Create a fixed-size array for SHA256 input (max 256 bytes should be enough).
-    let mut input_bytes = [0; 256];
-    let mut byte_count = 0;
+    // Buffer is 256 bytes: max 192 bytes for IO pattern (48 words) + 64 bytes for domain separator.
+    // Note: We must use a fixed-size array because Noir's keccak256 requires [u8; N], not Vec<u8>.
+    let max_io_pattern_bytes: u32 = 192; // 256 - 64 (domain separator)
+    let io_pattern_bytes = word_count * 4;
+    assert(
+        io_pattern_bytes <= max_io_pattern_bytes,
+        "IO pattern too large: max 48 aggregated words supported",
+    );
+
+    let mut input_bytes = [0u8; 256];
+    let mut byte_count: u32 = 0;
 
     // Serialize encoded words to bytes (big-endian as per SAFE spec).
-    for i in 0..word_count {
-        if byte_count + 4 <= 256 {
+    // Note: Noir requires compile-time loop bounds, so we iterate over L (the array size)
+    // instead of word_count (runtime value). The condition `i < word_count` ensures we only
+    // process valid encoded words. This is safe because word_count <= L always holds
+    // (we can have at most L encoded words from L input operations).
+    for i in 0..L {
+        if i < word_count {
             let word = encoded_words[i];
             input_bytes[byte_count] = (word >> 24) as u8;
             input_bytes[byte_count + 1] = (word >> 16) as u8;
@@ -300,16 +315,16 @@ pub fn compute_tag<let L: u32>(io_pattern: [u32; L], domain_separator: [u8; 64])
         }
     }
 
-    // Append domain separator.
+    // Append full 64-byte domain separator.
     for i in 0..64 {
-        if byte_count + i < 256 {
-            input_bytes[byte_count + i] = domain_separator[i];
-        }
+        input_bytes[byte_count] = domain_separator[i];
+        byte_count += 1;
     }
-    byte_count += 64;
 
-    // Step 3: Hash with SHA256 and truncate to 128 bits (following SAFE spec 2.3).
-    let hash_bytes = sha256_var(input_bytes, byte_count as u64);
+    // Step 3: Hash with Keccak-256 and truncate to 128 bits.
+    // Note: The SAFE spec uses SHA3-256, but we use Keccak-256 for Noir compatibility.
+    // Keccak-256 differs from SHA3-256 in padding, but both provide equivalent security.
+    let hash_bytes = keccak256(input_bytes, byte_count);
 
     // Convert first 128 bits (16 bytes) to field element.
     let mut tag_value: Field = 0;
@@ -681,4 +696,67 @@ fn test_mixed_consecutive_aggregation() {
     println(f"  (ABSORB(2), SQUEEZE(2), ABSORB(1))");
     println(f"Original tag: {tag}");
     println(f"Aggregated tag: {aggregated_tag}");
+}
+
+#[test]
+fn test_large_io_pattern() {
+    let domain_separator = [
+        0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ];
+
+    // Create pattern with 48 alternating ABSORB(1) and SQUEEZE(1) operations
+    // This is the maximum supported (48 words * 4 bytes = 192 bytes, leaving 64 for domain separator)
+    let mut io_pattern = [0u32; 48];
+    for i in 0..48 {
+        if i % 2 == 0 {
+            io_pattern[i] = ABSORB_FLAG | 1; // ABSORB(1)
+        } else {
+            io_pattern[i] = SQUEEZE_FLAG | 1; // SQUEEZE(1)
+        }
+    }
+
+    let tag = compute_tag(io_pattern, domain_separator);
+    assert(tag != 0);
+}
+
+#[test]
+fn test_domain_separator_not_truncated() {
+    // This test verifies that the domain separator is always included in the tag computation,
+    // even for large IO patterns. If the domain separator were truncated, different domain
+    // separators would produce the same tag for large patterns.
+
+    let domain_separator_a = [
+        0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+        0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+        0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+        0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+        0x41, 0x41, 0x41, 0x41,
+    ]; // All 'A's
+
+    let domain_separator_b = [
+        0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
+        0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
+        0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
+        0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
+        0x42, 0x42, 0x42, 0x42,
+    ]; // All 'B's
+
+    // Create pattern with 48 alternating operations (max supported: 192 bytes of IO pattern)
+    let mut io_pattern = [0u32; 48];
+    for i in 0..48 {
+        if i % 2 == 0 {
+            io_pattern[i] = ABSORB_FLAG | 1;
+        } else {
+            io_pattern[i] = SQUEEZE_FLAG | 1;
+        }
+    }
+
+    let tag_a = compute_tag(io_pattern, domain_separator_a);
+    let tag_b = compute_tag(io_pattern, domain_separator_b);
+
+    // Tags MUST be different because domain separators are different.
+    // If they were the same, it would mean the domain separator was truncated/ignored.
+    assert(tag_a != tag_b, "Domain separator must affect tag even for large IO patterns");
 }

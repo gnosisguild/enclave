@@ -163,6 +163,11 @@ export type CircuitInputs = {
   is_first_vote: boolean
 }
 
+export type ExecuteCircuitResult = {
+  witness: Uint8Array
+  returnValue: [Polynomial[][], Polynomial[][]]
+}
+
 export type ProofInputs = {
   vote: Vote
   publicKey: Uint8Array
