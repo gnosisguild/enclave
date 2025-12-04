@@ -331,9 +331,9 @@ pub fn compute_tag<const L: usize>(io_pattern: [u32; L], domain_separator: [u8; 
         }
     }
 
-    // Step 3: Hash with Keccak-256 and truncate to 128 bits.
-    // Note: Using Keccak-256 (Ethereum's hash) for compatibility with Noir's keccak256.
-    // The SAFE spec mentions SHA3-256, but Keccak-256 is used here for cross-implementation consistency.
+    // Step 3: Hash with Keccak256 and truncate to 128 bits.
+    // Note: Using Keccak-256 (Ethereum's hash) for consistency with the Rust implementation.
+    // Keccak-256 differs from FIPS SHA3-256 in padding but is used here for cross-implementation compatibility.
     let mut hasher = Keccak256::new();
     hasher.update(&input_bytes[..byte_count]);
     let hash_bytes = hasher.finalize();
