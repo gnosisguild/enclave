@@ -15,3 +15,4 @@ fi
 
 echo "TEST E2E SCRIPT STARTING..."
 pnpm concurrently -krs first "./scripts/setup.sh && ./scripts/dev.sh" "wait-on tcp:3000 && sleep 20 && ${PLAYWRIGHT_CMD} && sleep 3"
+  

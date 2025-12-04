@@ -8,10 +8,10 @@ echo "SETUP..."
 echo "pnpm install"
 (cd ../../ && pnpm install --frozen-lockfile)
 echo "sdk"
-(cd packages/crisp-sdk && pnpm install && pnpm build)
+(pnpm build:sdk)
 echo "evm"
-(cd ../../packages/enclave-contracts && pnpm compile)
-(cd packages/crisp-contracts && pnpm compile)
+(cd ../../packages/enclave-contracts && pnpm compile:contracts)
+(pnpm compile:contracts)
 echo "server"
 (cd ./server && [[ ! -f .env ]] && cp .env.example .env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "client"
