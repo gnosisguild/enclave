@@ -307,7 +307,7 @@ pub fn compute_tag<const L: usize>(io_pattern: [u32; L], domain_separator: [u8; 
     }
 
     // Step 2: Serialize to byte string and append domain separator (following SAFE spec 2.3).
-    // Create a fixed-size array for SHA256 input (max 256 bytes should be enough).
+    // Create a fixed-size array for Keccak-256 input (max 256 bytes should be enough).
     let mut input_bytes = [0; 256];
     let mut byte_count = 0;
 
