@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, Polynomial, ProofInputs, VoteProofInputs } from './types'
+import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
 import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MASK_SIGNATURE } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
