@@ -310,33 +310,38 @@ pub fn compute_tag<const L: usize>(io_pattern: [u32; L], domain_separator: [u8; 
     }
 
     // Step 2: Serialize to byte string and append domain separator (following SAFE spec 2.3).
-    // Create a fixed-size array for Keccak-256 input (max 256 bytes should be enough).
-    let mut input_bytes = [0; 256];
+    // Buffer is 256 bytes: max 192 bytes for IO pattern (48 words) + 64 bytes for domain separator.
+    // Note: We use a fixed-size array to match Noir's implementation exactly.
+    let max_io_pattern_bytes = 192; // 256 - 64 (domain separator)
+    let io_pattern_bytes = word_count * 4;
+    assert!(
+        io_pattern_bytes <= max_io_pattern_bytes,
+        "IO pattern too large: max 48 aggregated words supported"
+    );
+
+    let mut input_bytes = [0u8; 256];
     let mut byte_count = 0;
 
     // Serialize encoded words to bytes (big-endian as per SAFE spec).
     for word in encoded_words.iter().take(word_count) {
-        if byte_count + 4 <= 256 {
-            let word = *word;
-            input_bytes[byte_count] = (word >> 24) as u8;
-            input_bytes[byte_count + 1] = (word >> 16) as u8;
-            input_bytes[byte_count + 2] = (word >> 8) as u8;
-            input_bytes[byte_count + 3] = word as u8;
-            byte_count += 4;
-        }
+        let word = *word;
+        input_bytes[byte_count] = (word >> 24) as u8;
+        input_bytes[byte_count + 1] = (word >> 16) as u8;
+        input_bytes[byte_count + 2] = (word >> 8) as u8;
+        input_bytes[byte_count + 3] = word as u8;
+        byte_count += 4;
     }
 
-    // Append domain separator.
-    for i in 0..64 {
-        if byte_count < 256 {
-            input_bytes[byte_count] = domain_separator[i];
-            byte_count += 1;
-        }
+    // Append full 64-byte domain separator.
+    for ds_val in domain_separator {
+        input_bytes[byte_count] = ds_val;
+        byte_count += 1;
     }
 
-    // Step 3: Hash with Keccak256 and truncate to 128 bits.
-    // Note: Using Keccak-256 (Ethereum's hash) for consistency with the Rust implementation.
-    // Keccak-256 differs from FIPS SHA3-256 in padding but is used here for cross-implementation compatibility.
+    // Step 3: Hash with Keccak-256 and truncate to 128 bits.
+    // Note: Using Keccak-256 (Ethereum's hash) for compatibility with Noir's keccak256.
+    // The SAFE spec mentions SHA3-256, but Keccak-256 is used here for cross-implementation consistency.
+    // Hash only the first byte_count bytes to match Noir's keccak256(input_bytes, byte_count).
     let mut hasher = Keccak256::new();
     hasher.update(&input_bytes[..byte_count]);
     let hash_bytes = hasher.finalize();
@@ -630,10 +635,10 @@ mod tests {
     fn test_large_io_pattern() {
         let domain_separator = test_domain_separator();
 
-        // Create pattern with 64 alternating ABSORB(1) and SQUEEZE(1) operations
-        // so we get 64 words = 256 bytes
-        let mut io_pattern = [0u32; 64];
-        for i in 0..64 {
+        // Create pattern with 48 alternating ABSORB(1) and SQUEEZE(1) operations
+        // This is the maximum supported (48 words * 4 bytes = 192 bytes, leaving 64 for domain separator)
+        let mut io_pattern = [0u32; 48];
+        for i in 0..48 {
             if i % 2 == 0 {
                 io_pattern[i] = ABSORB_FLAG | 1; // ABSORB(1)
             } else {
@@ -644,7 +649,39 @@ mod tests {
         let tag = compute_tag(io_pattern, domain_separator);
         assert!(tag != Field::zero());
     }
+
     #[test]
+    fn test_domain_separator_not_truncated() {
+        // This test verifies that the domain separator is always included in the tag computation,
+        // even for large IO patterns. If the domain separator were truncated, different domain
+        // separators would produce the same tag for large patterns.
+
+        let domain_separator_a = [0x41u8; 64]; // All 'A's
+        let domain_separator_b = [0x42u8; 64]; // All 'B's
+
+        // Create pattern with 48 alternating operations (max supported: 192 bytes of IO pattern)
+        let mut io_pattern = [0u32; 48];
+        for i in 0..48 {
+            if i % 2 == 0 {
+                io_pattern[i] = ABSORB_FLAG | 1;
+            } else {
+                io_pattern[i] = SQUEEZE_FLAG | 1;
+            }
+        }
+
+        let tag_a = compute_tag(io_pattern, domain_separator_a);
+        let tag_b = compute_tag(io_pattern, domain_separator_b);
+
+        // Tags MUST be different because domain separators are different.
+        // If they were the same, it would mean the domain separator was truncated/ignored.
+        assert_ne!(
+            tag_a, tag_b,
+            "Domain separator must affect tag even for large IO patterns"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "IO pattern exhausted")]
     fn test_squeeze_io_pattern_exhausted() {
         // This test verifies that squeeze properly checks for IO pattern exhaustion
         // and provides a clear error message instead of an index-out-of-bounds panic.
@@ -662,6 +699,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "IO pattern exhausted")]
     fn test_absorb_io_pattern_exhausted() {
         // This test verifies that absorb properly checks for IO pattern exhaustion.
 
