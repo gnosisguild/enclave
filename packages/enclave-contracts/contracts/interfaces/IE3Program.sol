@@ -42,10 +42,9 @@ interface IE3Program {
     /// @param e3Id ID of the E3 computation
     /// @param sender The account that is submitting the input
     /// @param data The input data to be validated
-    /// @return input The decoded, policy-approved application payload
     function validateInput(
         uint256 e3Id,
         address sender,
         bytes memory data
-    ) external returns (bytes memory input);
+    ) external;
 }

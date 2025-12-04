@@ -143,7 +143,7 @@ importers:
   examples/CRISP/client:
     dependencies:
       '@crisp-e3/sdk':
-        specifier: 0.2.3-test
+        specifier: 0.4.1
         version: link:../packages/crisp-sdk
       '@emotion/babel-plugin':
         specifier: ^11.11.0

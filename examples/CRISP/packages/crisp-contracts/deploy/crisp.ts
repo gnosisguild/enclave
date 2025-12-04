@@ -8,10 +8,9 @@ import { readDeploymentArgs, storeDeploymentArgs } from '@enclave-e3/contracts/s
 import { Enclave__factory as EnclaveFactory } from '@enclave-e3/contracts/types'
 import { readFileSync } from 'fs'
 
-import { ContractFactory } from 'ethers'
 import hre from 'hardhat'
 
-import { MockCRISPProgram__factory as MockCRISPProgramFactory, CRISPProgram__factory as CRISPProgramFactory } from '../types'
+import { CRISPProgram__factory as CRISPProgramFactory } from '../types'
 
 const imageIdContent = readFileSync('../../.enclave/generated/contracts/ImageID.sol', 'utf-8')
 const match = imageIdContent.match(/bytes32 public constant PROGRAM_ID = bytes32\((0x[a-fA-F0-9]+)\)/)
@@ -28,7 +27,6 @@ export const deployCRISPContracts = async () => {
   const chain = hre.globalOptions.network
 
   const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER)
-  const useMockInputValidator = Boolean(process.env.USE_MOCK_INPUT_VALIDATOR)
 
   console.log('useMockVerifier', useMockVerifier)
 
@@ -65,26 +63,13 @@ export const deployCRISPContracts = async () => {
     chain,
   )
 
-  let crispFactory: ContractFactory
-
-  if (useMockInputValidator) {
-    console.log('Using MockCRISPProgram')
-    crispFactory = await ethers.getContractFactory(
-      MockCRISPProgramFactory.abi,
-      MockCRISPProgramFactory.linkBytecode({
-        'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
-      }),
-      owner,
-    )
-  } else {
-    crispFactory = await ethers.getContractFactory(
-      CRISPProgramFactory.abi,
-      CRISPProgramFactory.linkBytecode({
-        'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
-      }),
-      owner,
-    )
-  }
+  const crispFactory = await ethers.getContractFactory(
+    CRISPProgramFactory.abi,
+    CRISPProgramFactory.linkBytecode({
+      'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
+    }),
+    owner,
+  )
 
   const crisp = await crispFactory.deploy(enclaveAddress, verifier, honkVerifierAddress, IMAGE_ID)
 
