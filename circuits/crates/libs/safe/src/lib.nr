@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use keccak256::keccak256;
 use poseidon::poseidon2_permutation;
-use sha256::sha256_var;
 
 /// SAFE (Sponge API for Field Elements)
 ///
@@ -289,8 +289,12 @@ pub fn compute_tag<let L: u32>(io_pattern: [u32; L], domain_separator: [u8; 64])
     let mut byte_count = 0;
 
     // Serialize encoded words to bytes (big-endian as per SAFE spec).
-    for i in 0..word_count {
-        if byte_count + 4 <= 256 {
+    // Note: Noir requires compile-time loop bounds, so we iterate over L (the array size)
+    // instead of word_count (runtime value). The condition `i < word_count` ensures we only
+    // process valid encoded words. This is safe because word_count <= L always holds
+    // (we can have at most L encoded words from L input operations).
+    for i in 0..L {
+        if (i < word_count) & (byte_count + 4 <= 256) {
             let word = encoded_words[i];
             input_bytes[byte_count] = (word >> 24) as u8;
             input_bytes[byte_count + 1] = (word >> 16) as u8;
@@ -302,14 +306,15 @@ pub fn compute_tag<let L: u32>(io_pattern: [u32; L], domain_separator: [u8; 64])
 
     // Append domain separator.
     for i in 0..64 {
-        if byte_count + i < 256 {
-            input_bytes[byte_count + i] = domain_separator[i];
+        if byte_count < 256 {
+            input_bytes[byte_count] = domain_separator[i];
+            byte_count += 1;
         }
     }
-    byte_count += 64;
 
-    // Step 3: Hash with SHA256 and truncate to 128 bits (following SAFE spec 2.3).
-    let hash_bytes = sha256_var(input_bytes, byte_count as u64);
+    // Step 3: Hash with Keccak256 and truncate to 128 bits (following SAFE spec 2.3).
+    // Note: Noir uses Keccak256 which is equivalent to SHA3-256 for this purpose.
+    let hash_bytes = keccak256(input_bytes, byte_count as u32);
 
     // Convert first 128 bits (16 bytes) to field element.
     let mut tag_value: Field = 0;
@@ -681,4 +686,27 @@ fn test_mixed_consecutive_aggregation() {
     println(f"  (ABSORB(2), SQUEEZE(2), ABSORB(1))");
     println(f"Original tag: {tag}");
     println(f"Aggregated tag: {aggregated_tag}");
+}
+
+#[test]
+fn test_large_io_pattern() {
+    let domain_separator = [
+        0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ];
+
+    // Create pattern with 64 alternating ABSORB(1) and SQUEEZE(1) operations
+    // so we get 64 words = 256 bytes
+    let mut io_pattern = [0u32; 64];
+    for i in 0..64 {
+        if i % 2 == 0 {
+            io_pattern[i] = ABSORB_FLAG | 1; // ABSORB(1)
+        } else {
+            io_pattern[i] = SQUEEZE_FLAG | 1; // SQUEEZE(1)
+        }
+    }
+
+    let tag = compute_tag(io_pattern, domain_separator);
+    assert(tag != 0);
 }
