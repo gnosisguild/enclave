@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Message, Recipient};
+use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
@@ -37,12 +38,12 @@ pub trait EventFactory<E: Event> {
     /// Create a new event from the given event data, apply a local HLC timestamp.
     ///
     /// This method should be used for events that have originated locally.
-    fn event_from(&self, data: impl Into<E::Data>) -> E;
+    fn event_from(&self, data: impl Into<E::Data>) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E;
+    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> Result<E>;
 }
 
 /// An ErrorFactory creates errors.
@@ -57,12 +58,12 @@ pub trait EventPublisher<E: Event> {
     /// to the event bus.
     ///
     /// This method should be used for events that have originated locally.
-    fn publish(&self, data: impl Into<E::Data>);
+    fn publish(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
 }

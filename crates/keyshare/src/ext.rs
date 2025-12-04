@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
@@ -48,10 +48,8 @@ impl E3Extension for KeyshareExtension {
 
         // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
             return;
         };
 
@@ -91,10 +89,8 @@ impl E3Extension for KeyshareExtension {
 
         // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
             return Ok(());
         };
 
@@ -150,10 +146,8 @@ impl E3Extension for ThresholdKeyshareExtension {
         let e3_id = data.clone().e3_id;
         let party_id = data.clone().party_id;
         let Some(meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
             return;
         };
         let repo = ctx.repositories().threshold_keyshare(&e3_id);

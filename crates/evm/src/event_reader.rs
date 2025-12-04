@@ -14,7 +14,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use e3_events::{prelude::*, EnclaveErrorType, EnclaveEvent, EnclaveEventData, EventId};
+use e3_events::{prelude::*, EType, EnclaveEvent, EnclaveEventData, EventId};
 use e3_events::{BusHandle, Event};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
@@ -156,7 +156,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
 
         let extractor = self.extractor;
         let Some(shutdown) = self.shutdown_rx.take() else {
-            bus.err(EnclaveErrorType::Evm, anyhow!("shutdown already called"));
+            bus.err(EType::Evm, anyhow!("shutdown already called"));
             return;
         };
 
@@ -203,7 +203,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             rpc_url
         );
         bus.err(
-            EnclaveErrorType::Evm,
+            EType::Evm,
             anyhow!(
                 "Misconfiguration: Attempted to query historical events from genesis on a non-local node. \
                 Please specify a `start_block` for contract address {contract_address} on chain {chain_id} using rpc {rpc_url}"
@@ -235,7 +235,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         }
         Err(e) => {
             error!("Failed to fetch historical events: {}", e);
-            bus.err(EnclaveErrorType::Evm, anyhow!(e));
+            bus.err(EType::Evm, anyhow!(e));
             return;
         }
     }
@@ -277,7 +277,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             }
         }
         Err(e) => {
-            bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
+            bus.err(EType::Evm, anyhow!("{}", e));
         }
     }
 
@@ -344,7 +344,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
                     Ok(state)
                 }) {
                     Ok(_) => (),
-                    Err(err) => self.bus.err(EnclaveErrorType::Evm, err),
+                    Err(err) => self.bus.err(EType::Evm, err),
                 }
             }
         }

@@ -182,7 +182,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.publish(evt.clone());
+        self.bus.publish(evt.clone())?;
 
         Ok(evt.into())
     }

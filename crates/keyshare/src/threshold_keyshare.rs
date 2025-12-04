@@ -535,7 +535,7 @@ impl ThresholdKeyshare {
                 sk_sss,
             }),
             external: false,
-        });
+        })?;
 
         Ok(())
     }
@@ -634,7 +634,7 @@ impl ThresholdKeyshare {
             pubkey: current.pk_share,
             e3_id,
             node: address,
-        });
+        })?;
 
         Ok(())
     }
@@ -697,7 +697,7 @@ impl ThresholdKeyshare {
         };
 
         // send the decryption share
-        self.bus.publish(event);
+        self.bus.publish(event)?;
 
         // mark as complete
         self.state.try_mutate(|s| {

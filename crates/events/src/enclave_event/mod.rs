@@ -213,7 +213,7 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
 }
 
 impl ErrorEvent for EnclaveEvent<Unstored> {
-    type ErrType = EnclaveErrorType;
+    type ErrType = EType;
     type FromError = anyhow::Error;
 
     fn from_error(err_type: Self::ErrType, msg: impl Into<Self::FromError>) -> Self {

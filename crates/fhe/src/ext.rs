@@ -8,9 +8,7 @@ use crate::{Fhe, FheRepositoryFactory};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
-use e3_events::{
-    prelude::*, BusHandle, E3Requested, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-};
+use e3_events::{prelude::*, BusHandle, E3Requested, EType, EnclaveEvent, EnclaveEventData};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use e3_utils::SharedRng;
 use std::sync::Arc;
@@ -50,10 +48,8 @@ impl E3Extension for FheExtension {
         } = data.clone();
 
         let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_FHE_FAILED_TO_DECODE),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_FHE_FAILED_TO_DECODE));
             return;
         };
 
@@ -61,10 +57,8 @@ impl E3Extension for FheExtension {
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
         let Ok(snapshot) = fhe.snapshot() else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!("Failed to get snapshot"),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!("Failed to get snapshot"));
             return;
         };
         ctx.repositories().fhe(&e3_id).write(&snapshot);

@@ -5,12 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use e3_crypto::Cipher;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    Die, E3RequestComplete, EnclaveErrorType, EnclaveEvent, EnclaveEventData, KeyshareCreated,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished,
+    DecryptionshareCreated, Die, E3RequestComplete, EType, EnclaveEvent, EnclaveEventData,
+    KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
 use e3_utils::utility_types::ArcBytes;
@@ -90,28 +91,27 @@ impl Handler<CiphernodeSelected> for Keyshare {
     type Result = ();
 
     fn handle(&mut self, event: CiphernodeSelected, _: &mut actix::Context<Self>) -> Self::Result {
-        let CiphernodeSelected { e3_id, .. } = event;
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            let CiphernodeSelected { e3_id, .. } = event;
 
-        // generate keyshare
-        let Ok((secret, pubkey)) = self.fhe.generate_keyshare() else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!("Error creating Keyshare for {e3_id}"),
-            );
-            return;
-        };
+            // generate keyshare
+            let (secret, pubkey) = self
+                .fhe
+                .generate_keyshare()
+                .with_context(|| format!("Error creating Keyshare for {}", e3_id))?;
 
-        // Save secret on state
-        if let Err(err) = self.set_secret(secret) {
-            self.bus.err(EnclaveErrorType::KeyGeneration, err)
-        };
+            // Save secret on state
+            self.set_secret(secret)?;
 
-        // Broadcast the KeyshareCreated message
-        self.bus.publish(KeyshareCreated {
-            pubkey,
-            e3_id,
-            node: self.address.clone(),
-        });
+            // Broadcast the KeyshareCreated message
+            self.bus.publish(KeyshareCreated {
+                pubkey,
+                e3_id,
+                node: self.address.clone(),
+            })?;
+
+            Ok(())
+        })
     }
 }
 
@@ -123,44 +123,32 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
         event: CiphertextOutputPublished,
         _: &mut actix::Context<Self>,
     ) -> Self::Result {
-        let CiphertextOutputPublished {
-            e3_id,
-            ciphertext_output,
-        } = event;
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            let CiphertextOutputPublished {
+                e3_id,
+                ciphertext_output,
+            } = event;
 
-        let Ok(secret) = self.get_secret() else {
-            self.bus.err(
-                EnclaveErrorType::Decryption,
-                anyhow!("Secret not available for Keyshare for e3_id {e3_id}"),
-            );
-            return;
-        };
+            let secret = self.get_secret()?;
 
-        let Some(ciphertext) = ciphertext_output.first() else {
-            self.bus.err(
-                EnclaveErrorType::Decryption,
-                anyhow!("Ciphernode output array is empty!"),
-            );
-            return;
-        };
+            let ciphertext = ciphertext_output
+                .first()
+                .ok_or(anyhow!("Ciphernode output array is empty!"))?;
 
-        let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext.extract_bytes(),
-            unsafe_secret: secret,
-        }) else {
-            self.bus.err(
-                EnclaveErrorType::Decryption,
-                anyhow!("error decrypting ciphertext: {:?}", ciphertext_output),
-            );
-            return;
-        };
+            let decryption_share = self.fhe.decrypt_ciphertext(DecryptCiphertext {
+                ciphertext: ciphertext.extract_bytes(),
+                unsafe_secret: secret,
+            })?;
 
-        self.bus.publish(DecryptionshareCreated {
-            party_id: 0, // Not used
-            e3_id,
-            decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],
-            node: self.address.clone(),
-        });
+            self.bus.publish(DecryptionshareCreated {
+                party_id: 0, // Not used
+                e3_id,
+                decryption_share: vec![ArcBytes::from_bytes(&decryption_share)],
+                node: self.address.clone(),
+            })?;
+
+            Ok(())
+        })
     }
 }
 

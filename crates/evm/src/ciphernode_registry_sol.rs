@@ -18,7 +18,7 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EnclaveErrorType,
+    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
     EnclaveEvent, EnclaveEventData, EventSubscriber, OrderedSet, PublicKeyAggregated, Seed,
     Shutdown, TicketGenerated, TicketId,
 };
@@ -361,7 +361,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
                         }
                         Err(err) => {
                             error!("Failed to submit ticket: {:?}", err);
-                            bus.err(EnclaveErrorType::Evm, err);
+                            bus.err(EType::Evm, err);
                         }
                     }
                 })
@@ -391,7 +391,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                 }
                 Err(err) => {
                     error!("Failed to finalize committee: {:?}", err);
-                    bus.err(EnclaveErrorType::Evm, err);
+                    bus.err(EType::Evm, err);
                 }
             }
         })
@@ -419,7 +419,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 Ok(receipt) => {
                     info!(tx=%receipt.transaction_hash, "Committee published to registry");
                 }
-                Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                Err(err) => bus.err(EType::Evm, err),
             }
         })
     }

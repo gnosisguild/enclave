@@ -6,8 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent,
-    EnclaveEventData, Shutdown,
+    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
+    EnclaveEvent, EnclaveEventData, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -112,8 +112,11 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                bus.publish(CommitteeFinalizeRequested {
-                                    e3_id: e3_id_clone.clone(),
+                                trap(EType::Sortition, &act.bus.clone(), || {
+                                    bus.publish(CommitteeFinalizeRequested {
+                                        e3_id: e3_id_clone.clone(),
+                                    })?;
+                                    Ok(())
                                 });
 
                                 act.pending_committees.remove(&e3_id_clone.to_string());

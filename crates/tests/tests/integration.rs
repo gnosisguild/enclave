@@ -42,7 +42,7 @@ async fn setup_score_sortition_environment(
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    });
+    })?;
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
@@ -54,13 +54,13 @@ async fn setup_score_sortition_environment(
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        });
+        })?;
 
         bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        });
+        })?;
     }
 
     Ok(())
@@ -237,7 +237,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    bus.publish(e3_requested);
+    bus.publish(e3_requested)?;
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -263,7 +263,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
-    });
+    })?;
 
     let committee_finalized_timer = Instant::now();
 
@@ -360,7 +360,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone())?;
 
     println!("CiphertextOutputPublished event has been dispatched!");
 

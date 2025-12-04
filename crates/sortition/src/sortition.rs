@@ -11,8 +11,8 @@ use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
+    ConfigurationUpdated, EType, EnclaveEvent, OperatorActivationChanged, PlaintextOutputPublished,
+    Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use serde::{Deserialize, Serialize};
@@ -262,7 +262,7 @@ impl Handler<CiphernodeAdded> for Sortition {
                 .or_insert_with(NodeState::default);
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
 
         if let Err(err) = self.backends.try_mutate(move |mut list_map| {
@@ -277,7 +277,7 @@ impl Handler<CiphernodeAdded> for Sortition {
                 .add(addr);
             Ok(list_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
 
         info!(address = %msg.address, chain_id = chain_id, "Node added to sortition state");
@@ -297,7 +297,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
             }
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
 
         if let Err(err) = self.backends.try_mutate(move |mut list_map| {
@@ -306,7 +306,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
             }
             Ok(list_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
 
         info!(address = %msg.address, chain_id = chain_id, "Node removed from sortition state");
@@ -336,7 +336,7 @@ impl Handler<TicketBalanceUpdated> for Sortition {
 
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
     }
 }
@@ -363,7 +363,7 @@ impl Handler<OperatorActivationChanged> for Sortition {
             }
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
     }
 }
@@ -386,7 +386,7 @@ impl Handler<ConfigurationUpdated> for Sortition {
                 );
                 Ok(state_map)
             }) {
-                self.bus.err(EnclaveErrorType::Sortition, err);
+                self.bus.err(EType::Sortition, err);
             }
         }
     }
@@ -425,7 +425,7 @@ impl Handler<CommitteePublished> for Sortition {
 
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
     }
 }
@@ -474,7 +474,7 @@ impl Handler<PlaintextOutputPublished> for Sortition {
 
             Ok(state_map)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
     }
 }
@@ -493,7 +493,7 @@ impl Handler<CommitteeFinalized> for Sortition {
             committees.insert(msg.e3_id.clone(), msg.committee.clone());
             Ok(committees)
         }) {
-            self.bus.err(EnclaveErrorType::Sortition, err);
+            self.bus.err(EType::Sortition, err);
         }
     }
 }
@@ -514,7 +514,7 @@ impl Handler<GetNodeIndex> for Sortition {
                     backend
                         .get_index(msg.seed, msg.size, msg.address.clone(), msg.chain_id, state)
                         .unwrap_or_else(|err| {
-                            bus.err(EnclaveErrorType::Sortition, err);
+                            bus.err(EType::Sortition, err);
                             None
                         })
                 } else {
