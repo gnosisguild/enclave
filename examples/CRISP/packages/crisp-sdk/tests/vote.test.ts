@@ -16,8 +16,8 @@ import {
   generatePublicKey,
   verifyProof,
   encodeVote,
-  generateProof,
   generateCircuitInputs,
+  executeCircuit,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
@@ -141,7 +141,7 @@ describe('Vote', () => {
   })
 
   describe('generateProof', () => {
-    it('Should generate a proof where the output is the new ciphertext', { timeout: 100000 }, async () => {
+    it('Should generate a proof where the output is the new ciphertext', async () => {
       // This test simulates a real vote (i.e. generateVoteProof).
 
       // Using generateCircuitInputs directly to check the output of the circuit.
@@ -155,81 +155,82 @@ describe('Vote', () => {
         merkleProof,
       })
 
-      const proof = await generateProof(crispInputs)
-
-      expect(proof).toBeDefined()
-      expect(proof.proof).toBeDefined()
-      expect(proof.publicInputs).toBeDefined()
+      const { returnValue } = await executeCircuit(crispInputs)
 
       const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
       const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
+      const outputCt0is = returnValue[0]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
+      const outputCt1is = returnValue[1]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
 
-      expect([...ct0is, ...ct1is]).toEqual(outputCiphertext)
+      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
     })
 
-    it(
-      'Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote',
-      { timeout: 100000 },
-      async () => {
-        // This test simulates a mask vote (i.e. generateMaskVoteProof).
+    it('Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote', async () => {
+      // This test simulates a mask vote (i.e. generateMaskVoteProof).
 
-        // Using generateCircuitInputs directly to check the output of the circuit.
-        const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-        const crispInputs = await generateCircuitInputs({
-          vote: { yes: 0n, no: 0n },
-          publicKey,
-          previousCiphertext,
-          signature: MASK_SIGNATURE,
-          merkleProof,
-          balance,
-          slotAddress,
-        })
+      // Using generateCircuitInputs directly to check the output of the circuit.
+      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+      const crispInputs = await generateCircuitInputs({
+        vote: { yes: 0n, no: 0n },
+        publicKey,
+        previousCiphertext,
+        signature: MASK_SIGNATURE,
+        merkleProof,
+        balance,
+        slotAddress,
+      })
 
-        const proof = await generateProof(crispInputs)
+      const { returnValue } = await executeCircuit(crispInputs)
 
-        expect(proof).toBeDefined()
-        expect(proof.proof).toBeDefined()
-        expect(proof.publicInputs).toBeDefined()
+      const sumCt0is = crispInputs.sum_ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const sumCt1is = crispInputs.sum_ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const outputSumCt0is = returnValue[0]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
+      const outputSumCt1is = returnValue[1]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
 
-        const sumCt0is = crispInputs.sum_ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-        const sumCt1is = crispInputs.sum_ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-        const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
+      expect([...outputSumCt0is, ...outputSumCt1is]).toEqual([...sumCt0is, ...sumCt1is])
+    })
 
-        expect([...sumCt0is, ...sumCt1is]).toEqual(outputCiphertext)
-      },
-    )
+    it('Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext', async () => {
+      // This test simulates a mask vote (i.e. generateMaskVoteProof).
 
-    it(
-      'Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext',
-      { timeout: 100000 },
-      async () => {
-        // This test simulates a mask vote (i.e. generateMaskVoteProof).
+      // Using generateCircuitInputs directly to check the output of the circuit.
+      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+      const crispInputs = await generateCircuitInputs({
+        vote: { yes: 0n, no: 0n },
+        publicKey,
+        signature: MASK_SIGNATURE,
+        merkleProof,
+        balance,
+        slotAddress,
+      })
 
-        // Using generateCircuitInputs directly to check the output of the circuit.
-        const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-        const crispInputs = await generateCircuitInputs({
-          vote: { yes: 0n, no: 0n },
-          publicKey,
-          signature: MASK_SIGNATURE,
-          merkleProof,
-          balance,
-          slotAddress,
-        })
+      const { returnValue } = await executeCircuit(crispInputs)
 
-        const proof = await generateProof(crispInputs)
+      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
+      const outputCt0is = returnValue[0]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
+      const outputCt1is = returnValue[1]
+        .flat()
+        .flatMap((p) => p.coefficients)
+        .map((b) => BigInt(b))
 
-        expect(proof).toBeDefined()
-        expect(proof.proof).toBeDefined()
-        expect(proof.publicInputs).toBeDefined()
-
-        const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-        const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-        const outputCiphertext = proof.publicInputs.slice(2).map((b) => BigInt(b))
-
-        expect([...ct0is, ...ct1is]).toEqual(outputCiphertext)
-      },
-    )
+      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
+    })
   })
 
   describe('generateVoteProof', () => {

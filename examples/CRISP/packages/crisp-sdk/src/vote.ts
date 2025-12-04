@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, type Vote, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
+import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, Polynomial, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
 import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MASK_SIGNATURE } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
@@ -120,17 +120,15 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
   return crispInputs
 }
 
-export const generateWitness = async (crispInputs: CircuitInputs): Promise<Uint8Array> => {
+export const executeCircuit = async (crispInputs: CircuitInputs): Promise<ExecuteCircuitResult> => {
   const noir = new Noir(circuit as CompiledCircuit)
 
-  const { witness } = await noir.execute(crispInputs as any)
-
-  return witness
+  return noir.execute(crispInputs) as Promise<ExecuteCircuitResult>
 }
 
 export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofData> => {
-  const witness = await generateWitness(crispInputs)
-  const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
+  const { witness } = await executeCircuit(crispInputs)
+  const backend = new UltraHonkBackend(circuit.bytecode, { threads: optimalThreadCount })
 
   const proof = await backend.generateProof(witness, { keccakZK: true })
 
