@@ -123,7 +123,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
         event: CiphertextOutputPublished,
         _: &mut actix::Context<Self>,
     ) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
+        trap(EType::Decryption, &self.bus.clone(), || {
             let CiphertextOutputPublished {
                 e3_id,
                 ciphertext_output,
