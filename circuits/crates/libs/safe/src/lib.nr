@@ -156,6 +156,9 @@ impl<let L: u32> SafeSponge<L> {
     ///
     /// The number of elements to squeeze is automatically determined from the IO pattern.
     pub fn squeeze(&mut self) -> Vec<Field> {
+        // Validate against IO pattern.
+        assert(self.io_count < L);
+
         // Parse expected operation from io_pattern (encoded word)
         let expected_encoded_word = self.io_pattern[self.io_count];
         let is_expected_squeeze = (expected_encoded_word & ABSORB_FLAG) == 0;

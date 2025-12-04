@@ -171,6 +171,9 @@ impl<const L: usize> SafeSponge<L> {
     /// # Panics
     /// Panics if the operation doesn't match the expected IO pattern.
     pub fn squeeze(&mut self) -> Vec<Field> {
+        // Validate against IO pattern.
+        assert!(self.io_count < L, "IO pattern exhausted");
+
         // Parse expected operation from io_pattern (encoded word)
         let expected_encoded_word = self.io_pattern[self.io_count];
         let is_expected_squeeze = (expected_encoded_word & ABSORB_FLAG) == 0;
@@ -640,5 +643,37 @@ mod tests {
 
         let tag = compute_tag(io_pattern, domain_separator);
         assert!(tag != Field::zero());
+    }
+    #[test]
+    fn test_squeeze_io_pattern_exhausted() {
+        // This test verifies that squeeze properly checks for IO pattern exhaustion
+        // and provides a clear error message instead of an index-out-of-bounds panic.
+
+        let domain_separator = test_domain_separator();
+
+        // Create a sponge with exactly one operation (L=1)
+        let io_pattern: [u32; 1] = [ABSORB_FLAG | 1]; // Only ABSORB(1)
+
+        let mut sponge: SafeSponge<1> = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(vec![field_from_u64(42)]);
+
+        // io_count is now 1, which equals L=1, so this should panic with "IO pattern exhausted"
+        let _ = sponge.squeeze();
+    }
+
+    #[test]
+    fn test_absorb_io_pattern_exhausted() {
+        // This test verifies that absorb properly checks for IO pattern exhaustion.
+
+        let domain_separator = test_domain_separator();
+
+        // Create a sponge with exactly one operation (L=1)
+        let io_pattern: [u32; 1] = [ABSORB_FLAG | 1]; // Only ABSORB(1)
+
+        let mut sponge: SafeSponge<1> = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(vec![field_from_u64(42)]);
+
+        // io_count is now 1, which equals L=1, so this should panic with "IO pattern exhausted"
+        sponge.absorb(vec![field_from_u64(43)]);
     }
 }
