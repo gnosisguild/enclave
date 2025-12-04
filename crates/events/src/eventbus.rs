@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::hlc::Hlc;
 use crate::traits::{ErrorEvent, Event};
 use crate::{prelude::*, BusHandle, EnclaveEvent, Stored};
 use actix::prelude::*;
