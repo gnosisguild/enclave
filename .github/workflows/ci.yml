@@ -397,7 +397,7 @@ jobs:
           if-no-files-found: error
 
   ciphernode_integration_test:
-    needs: [integration_prebuild, build_enclave_cli]
+    needs: [integration_prebuild, build_enclave_cli, build_sdk]
     runs-on: 'ubuntu-latest'
     strategy:
       matrix:
