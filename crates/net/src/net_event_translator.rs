@@ -18,6 +18,7 @@ use e3_data::Repository;
 use e3_events::prelude::*;
 use e3_events::trap;
 use e3_events::BusHandle;
+use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
 use e3_events::Unsequenced;
@@ -171,44 +172,37 @@ impl Handler<LibP2pEvent> for NetEventTranslator {
 }
 
 impl Handler<EnclaveEvent> for NetEventTranslator {
-    type Result = ResponseFuture<()>;
+    type Result = ();
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        let sent_events = self.sent_events.clone();
-        let tx = self.tx.clone();
-        let evt = event.clone();
-        let topic = self.topic.clone();
-        Box::pin(async move {
+        trap(EType::Net, &self.bus.clone(), || {
+            let sent_events = self.sent_events.clone();
+            let tx = self.tx.clone();
+            let evt = event.clone();
+            let topic = self.topic.clone();
             let id: EventId = evt.clone().into();
 
             // Ignore events that should be considered local
             if !Self::is_forwardable_event(&evt) {
                 trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
-                return;
+                return Ok(());
             }
 
             // if we have seen this event before dont rebroadcast
             if sent_events.contains(&id) {
                 trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
-                return;
+                return Ok(());
             }
+
             warn!("GossipPublish event: {}", event.event_type());
-            match evt.to_bytes() {
-                Ok(data) => {
-                    if let Err(e) = tx
-                        .send(NetCommand::GossipPublish {
-                            topic,
-                            data: GossipData::GossipBytes(data),
-                            correlation_id: CorrelationId::new(),
-                        })
-                        .await
-                    {
-                        error!(error=?e, "Error sending bytes to libp2p: {e}");
-                    };
-                }
-                Err(error) => {
-                    error!(error=?error, "Could not convert event to bytes for serialization!")
-                }
-            }
+            let data: GossipData = evt.try_into()?;
+
+            tx.blocking_send(NetCommand::GossipPublish {
+                topic,
+                data,
+                correlation_id: CorrelationId::new(),
+            })?;
+
+            Ok(())
         })
     }
 }

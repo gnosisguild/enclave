@@ -33,6 +33,7 @@ pub enum EType {
     KeyGeneration,
     PublickeyAggregation,
     IO,
+    Net,
     PlaintextAggregation,
     Decryption,
     Sortition,
