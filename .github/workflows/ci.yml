@@ -83,7 +83,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: 'Install the dependencies'
-        run: 'pnpm install'
+        run: 'pnpm install --frozen-lockfile'
 
       - name: Checking code format rust
         run: pnpm rust:lint
@@ -145,7 +145,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: 'Install the dependencies'
-        run: 'pnpm install'
+        run: 'pnpm install --frozen-lockfile'
 
       - name: Checking code format rust
         run: pnpm rust:lint
@@ -277,7 +277,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: 'Install the dependencies'
-        run: 'pnpm install'
+        run: 'pnpm install --frozen-lockfile'
 
       - name: 'Lint the code'
         run: 'pnpm evm:lint'
@@ -368,7 +368,7 @@ jobs:
           && sudo apt-get install -y solc
 
       - name: 'Install the dependencies'
-        run: 'pnpm install'
+        run: 'pnpm install --frozen-lockfile'
 
       - name: 'Lint the code'
         run: 'pnpm lint'
@@ -432,7 +432,7 @@ jobs:
         with:
           toolchain: 1.86.0
       - name: 'Install the dependencies'
-        run: 'pnpm install'
+        run: 'pnpm install --frozen-lockfile'
       - name: 'Download build artifacts'
         uses: actions/download-artifact@v4
         with:
@@ -804,7 +804,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install node dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build the sdk
         run: pnpm sdk:build
@@ -844,7 +844,7 @@ jobs:
         with:
           toolchain: 1.86.0
       - name: Install node dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Download enclave binary
         uses: actions/download-artifact@v4
         with:
