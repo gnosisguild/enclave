@@ -196,7 +196,7 @@ impl Handler<EnclaveEvent> for NetEventTranslator {
             warn!("GossipPublish event: {}", event.event_type());
             let data: GossipData = evt.try_into()?;
 
-            tx.blocking_send(NetCommand::GossipPublish {
+            tx.try_send(NetCommand::GossipPublish {
                 topic,
                 data,
                 correlation_id: CorrelationId::new(),
