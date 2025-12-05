@@ -16,7 +16,7 @@ use e3_data::InMemStore;
 use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::GetEvents;
-use e3_events::Sequenced;
+use e3_events::Unsequenced;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,
     ConfigurationUpdated, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
@@ -454,7 +454,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<EnclaveEvent>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<EnclaveEventData>>> = Arc::new(Mutex::new(Vec::new()));
 
     let msgs_loop = msgs.clone();
 
@@ -468,10 +468,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
-                if let GossipData::GossipBytes(ref data) = msg {
-                    let data: EnclaveEvent = EnclaveEvent::from_bytes(data)?;
-                    msgs_loop.lock().await.push(data.strip_ts());
-                    event_tx.send(NetEvent::GossipData(msg))?;
+                if let GossipData::GossipBytes(ref bytes) = msg {
+                    let event: EnclaveEvent<Unsequenced> = msg.clone().try_into().unwrap();
+                    let (data, _) = event.split();
+                    msgs_loop.lock().await.push(data);
+                    event_tx.send(NetEvent::GossipData(msg)).unwrap();
                 }
             }
             // if this  manages to broadcast an event to the
@@ -509,10 +510,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         *msgs.lock().await,
-        vec![
-            EnclaveEvent::new_stored_event(evt_1.clone().into(), 0, 1),
-            EnclaveEvent::new_stored_event(evt_2.clone().into(), 0, 2)
-        ], // notice no local events
+        vec![evt_1.clone().into(), evt_2.clone().into()], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );
 

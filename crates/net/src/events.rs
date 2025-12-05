@@ -245,3 +245,38 @@ where
     .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {}", debug_cmd)))?;
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use e3_events::{
+        EnclaveEvent, EventConstructorWithTimestamp, Sequenced, TestEvent, Unsequenced,
+    };
+
+    use super::GossipData;
+
+    #[test]
+    fn test_enclave_event_gossip_lifecycle() -> anyhow::Result<()> {
+        // event is created locally
+        let event: EnclaveEvent<Unsequenced> =
+            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), 31415);
+
+        // event is sequenced after bus.publish() adds a sequence number
+        let event: EnclaveEvent<Sequenced> = event.into_sequenced(90210);
+
+        // event is broadcast
+        let gossip_data: GossipData = event.try_into()?;
+
+        let GossipData::GossipBytes(_) = gossip_data else {
+            panic!("events must only be serialized to GossipBytes");
+        };
+
+        // received gossip data from libp2p convert to unsequenced event
+        let event: EnclaveEvent<Unsequenced> = gossip_data.try_into()?;
+        let (data, ts) = event.split();
+
+        assert_eq!(data, TestEvent::new("fish", 42).into());
+        assert_eq!(ts, 31415);
+
+        Ok(())
+    }
+}
