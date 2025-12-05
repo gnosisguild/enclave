@@ -468,7 +468,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
-                if let GossipData::GossipBytes(ref bytes) = msg {
+                if let GossipData::GossipBytes(_) = msg {
                     let event: EnclaveEvent<Unsequenced> = msg.clone().try_into().unwrap();
                     let (data, _) = event.split();
                     msgs_loop.lock().await.push(data);
