@@ -6,7 +6,6 @@
 
 // helpers.rs
 use alloy::{
-    network::Ethereum,
     node_bindings::{Anvil, AnvilInstance},
     providers::{Provider, ProviderBuilder, WsConnect},
     signers::local::PrivateKeySigner,
@@ -14,7 +13,6 @@ use alloy::{
 };
 use eyre::Result;
 use EmitLogs::EmitLogsInstance;
-use Enclave::EnclaveInstance;
 
 sol!(
     #[sol(rpc)]

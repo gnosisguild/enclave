@@ -9,9 +9,9 @@ use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse,
-    DecryptionshareCreated, E3id, EnclaveEvent, EventBus, KeyshareCreated, PartyId, ThresholdShare,
-    ThresholdShareCreated,
+    prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
+    ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated,
+    PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -269,14 +269,14 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
 }
 
 pub struct ThresholdKeyshareParams {
-    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub bus: BusHandle<EnclaveEvent>,
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
 }
 
 pub struct ThresholdKeyshare {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,
@@ -526,7 +526,7 @@ impl ThresholdKeyshare {
             .map(|s| PvwEncrypted::new(s.decrypt(&self.cipher)?))
             .collect::<Result<_>>()?;
 
-        self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
+        self.bus.publish(ThresholdShareCreated {
             e3_id,
             share: Arc::new(ThresholdShare {
                 party_id,
@@ -535,7 +535,7 @@ impl ThresholdKeyshare {
                 sk_sss,
             }),
             external: false,
-        }));
+        });
 
         Ok(())
     }
@@ -630,11 +630,11 @@ impl ThresholdKeyshare {
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
-        self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
+        self.bus.publish(KeyshareCreated {
             pubkey: current.pk_share,
             e3_id,
             node: address,
-        }));
+        });
 
         Ok(())
     }
@@ -689,15 +689,15 @@ impl ThresholdKeyshare {
         let e3_id = state.e3_id;
         let decryption_share = msg.d_share_poly;
 
-        let event = EnclaveEvent::from(DecryptionshareCreated {
+        let event = DecryptionshareCreated {
             party_id,
             node,
             e3_id,
             decryption_share,
-        });
+        };
 
         // send the decryption share
-        self.bus.do_send(event);
+        self.bus.publish(event);
 
         // mark as complete
         self.state.try_mutate(|s| {
@@ -754,10 +754,10 @@ impl ThresholdKeyshare {
 impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
-            EnclaveEvent::ThresholdShareCreated { data, .. } => {
+        match msg.into_data() {
+            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
+            EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
+            EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
             }
             _ => (),

@@ -24,6 +24,7 @@ members = [
   "crates/net", 
   "crates/program-server", 
   "crates/request",
+  "crates/safe",
   "crates/sdk",
   "crates/sortition",
   "crates/support-scripts",
@@ -145,6 +146,7 @@ opentelemetry-stdout = "=0.29.0"
 path-clean = "=1.0.1"
 petname = "=2.0.2"
 phf = { version = "=0.11.3", features = ["macros"] }
+proptest = "=1.9.0"
 rand_chacha = "=0.3.1"
 rand = "=0.8.5"
 rayon = "=1.10.0"
@@ -171,6 +173,7 @@ vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs
 libp2p = { version = "=0.54.1", features = [
   "gossipsub",
   "identify",
+  "dns",
   "kad",
   "macros",
   "mdns",

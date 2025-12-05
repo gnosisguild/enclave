@@ -15,7 +15,11 @@ use actix::prelude::*;
 use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::prelude::*;
+use e3_events::BusHandle;
+use e3_events::EnclaveEventData;
+use e3_events::Event;
+use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -30,7 +34,7 @@ use tracing::{error, info, instrument, trace};
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
 pub struct NetEventTranslator {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
@@ -47,13 +51,9 @@ struct LibP2pEvent(pub Vec<u8>);
 
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
-    pub fn new(
-        bus: Addr<EventBus<EnclaveEvent>>,
-        tx: &mpsc::Sender<NetCommand>,
-        topic: &str,
-    ) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
         Self {
-            bus,
+            bus: bus.clone(),
             tx: tx.clone(),
             sent_events: HashSet::new(),
             topic: topic.to_string(),
@@ -61,19 +61,16 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: &Addr<EventBus<EnclaveEvent>>,
+        bus: &BusHandle<EnclaveEvent>,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
     ) -> Addr<Self> {
         let mut rx = rx.resubscribe();
-        let addr = NetEventTranslator::new(bus.clone(), tx, topic).start();
+        let addr = NetEventTranslator::new(&bus, tx, topic).start();
 
         // Listen on all events
-        bus.do_send(Subscribe {
-            event_type: String::from("*"),
-            listener: addr.clone().recipient(),
-        });
+        bus.subscribe("*", addr.clone().recipient());
 
         tokio::spawn({
             let addr = addr.clone();
@@ -99,11 +96,11 @@ impl NetEventTranslator {
     /// as static means we can keep this maintained here but use this rule elsewhere
     pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
         // Add a list of events allowed to be forwarded to libp2p
-        match event {
-            EnclaveEvent::DecryptionshareCreated { .. } => true,
-            EnclaveEvent::KeyshareCreated { .. } => true,
-            EnclaveEvent::PlaintextAggregated { .. } => true,
-            EnclaveEvent::PublicKeyAggregated { .. } => true,
+        match event.get_data() {
+            EnclaveEventData::DecryptionshareCreated(_) => true,
+            EnclaveEventData::KeyshareCreated(_) => true,
+            EnclaveEventData::PlaintextAggregated(_) => true,
+            EnclaveEventData::PublicKeyAggregated(_) => true,
             _ => false,
         }
     }
@@ -111,7 +108,7 @@ impl NetEventTranslator {
     /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
     pub async fn setup_with_interface(
-        bus: Addr<EventBus<EnclaveEvent>>,
+        bus: BusHandle<EnclaveEvent>,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,
@@ -165,7 +162,7 @@ impl Handler<LibP2pEvent> for NetEventTranslator {
         let LibP2pEvent(bytes) = msg;
         match EnclaveEvent::from_bytes(&bytes) {
             Ok(event) => {
-                self.bus.do_send(event.clone());
+                self.bus.naked_dispatch(event.clone()); // TODO: convert to receive
                 self.sent_events.insert(event.into());
             }
             Err(err) => error!(error=?err, "Could not create EnclaveEvent from Libp2p Bytes!"),

@@ -6,12 +6,12 @@
 
 import { CRISP_SERVER_STATE_LITE_ENDPOINT } from './constants'
 
-import type { IRoundDetailsResponse, IRoundDetails, ITokenDetails } from './types'
+import type { RoundDetailsResponse, RoundDetails, TokenDetails } from './types'
 
 /**
  * Get the details of a specific round
  */
-export const getRoundDetails = async (serverUrl: string, e3Id: number): Promise<IRoundDetails> => {
+export const getRoundDetails = async (serverUrl: string, e3Id: number): Promise<RoundDetails> => {
   const response = await fetch(`${serverUrl}/${CRISP_SERVER_STATE_LITE_ENDPOINT}`, {
     method: 'POST',
     headers: {
@@ -20,7 +20,7 @@ export const getRoundDetails = async (serverUrl: string, e3Id: number): Promise<
     body: JSON.stringify({ round_id: e3Id }),
   })
 
-  const data = (await response.json()) as IRoundDetailsResponse
+  const data = (await response.json()) as RoundDetailsResponse
 
   return {
     e3Id: BigInt(data.id),
@@ -45,7 +45,7 @@ export const getRoundDetails = async (serverUrl: string, e3Id: number): Promise<
  * @param e3Id - The e3Id of the round
  * @returns The token address, balance threshold and snapshot block
  */
-export const getRoundTokenDetails = async (serverUrl: string, e3Id: number): Promise<ITokenDetails> => {
+export const getRoundTokenDetails = async (serverUrl: string, e3Id: number): Promise<TokenDetails> => {
   const roundDetails = await getRoundDetails(serverUrl, e3Id)
   return {
     tokenAddress: roundDetails.tokenAddress,

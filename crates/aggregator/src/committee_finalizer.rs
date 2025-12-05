@@ -6,7 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent, EventBus, Shutdown, Subscribe,
+    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent,
+    EnclaveEventData, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -15,26 +16,25 @@ use tracing::{error, info};
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
-    bus: Addr<EventBus<EnclaveEvent>>,
+    bus: BusHandle<EnclaveEvent>,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
         Self {
             bus: bus.clone(),
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: &Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+    pub fn attach(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
-        bus.do_send(Subscribe::new(
-            "CommitteeRequested",
+        bus.subscribe_all(
+            &["CommitteeRequested", "Shutdown"],
             addr.clone().recipient(),
-        ));
-        bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));
+        );
 
         addr
     }
@@ -47,9 +47,9 @@ impl Actor for CommitteeFinalizer {
 impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CommitteeRequested { data, .. } => ctx.notify(data),
-            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+        match msg.into_data() {
+            EnclaveEventData::CommitteeRequested(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
         }
     }
@@ -117,9 +117,9 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                bus.do_send(EnclaveEvent::from(CommitteeFinalizeRequested {
+                                bus.publish(CommitteeFinalizeRequested {
                                     e3_id: e3_id_clone.clone(),
-                                }));
+                                });
 
                                 act.pending_committees.remove(&e3_id_clone.to_string());
                             },

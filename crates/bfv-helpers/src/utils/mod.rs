@@ -10,12 +10,14 @@ use fhe_traits::FheEncoder;
 use fhe_util::transcode_from_bytes;
 use std::{cmp::min, fmt, sync::Arc, time::Duration};
 
+pub mod greco;
+
 /// Macros to time code and display a human-readable duration.
 pub mod timeit {
     #[allow(unused_macros)]
     macro_rules! timeit_n {
         ($name:expr, $loops:expr, $code:expr) => {{
-            use util::DisplayDuration;
+            use crate::utils::DisplayDuration;
             let start = std::time::Instant::now();
             let r = $code;
             for _ in 1..$loops {
@@ -33,7 +35,7 @@ pub mod timeit {
     #[allow(unused_macros)]
     macro_rules! timeit {
         ($name:expr, $code:expr) => {{
-            use util::DisplayDuration;
+            use crate::utils::DisplayDuration;
             let start = std::time::Instant::now();
             let r = $code;
             println!("⏱  {}: {}", $name, DisplayDuration(start.elapsed()));

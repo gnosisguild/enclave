@@ -4,70 +4,26 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { network } from 'hardhat'
-import { zeroAddress, zeroHash } from 'viem'
-import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
+import { zeroAddress } from 'viem'
 import {
-  encryptVoteAndGenerateCRISPInputs,
-  generateProof,
-  VotingMode,
-  encodeVote,
-  MESSAGE,
-  generateMerkleProof,
   hashLeaf,
+  generatePublicKey,
+  SIGNATURE_MESSAGE,
+  generateVoteProof,
+  getAddressFromSignature,
+  encodeSolidityProof,
+  generateMerkleTree,
 } from '@crisp-e3/sdk'
-
 import { expect } from 'chai'
-import type { HonkVerifier, MockEnclave } from '../types'
+import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
-import { CRISPProgram__factory as CRISPProgramFactory } from '../types'
-
-let zkInputsGenerator = ZKInputsGenerator.withDefaults()
-let publicKey = zkInputsGenerator.generatePublicKey()
-const previousCiphertext = zkInputsGenerator.encryptVote(publicKey, new BigInt64Array([0n]))
+let publicKey = generatePublicKey()
 
 describe('CRISP Contracts', function () {
-  const nonZeroAddress = '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d'
-
-  let poseidonT3Address: string
-
-  before(async () => {
-    const { ethers } = await network.connect()
-
-    const poseidonT3 = await ethers.deployContract('PoseidonT3')
-    await poseidonT3.waitForDeployment()
-    poseidonT3Address = await poseidonT3.getAddress()
-  })
-
-  describe('deployment', () => {
-    it('should deploy the contracts', async () => {
-      const { ethers } = await network.connect()
-
-      const programFactory = await ethers.getContractFactory(
-        CRISPProgramFactory.abi,
-        CRISPProgramFactory.linkBytecode({
-          'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
-        }),
-      )
-      const program = await programFactory.deploy(nonZeroAddress, nonZeroAddress, nonZeroAddress, zeroHash)
-
-      expect(await program.getAddress()).to.not.equal(zeroAddress)
-    })
-  })
-
   describe('decode tally', () => {
     it('should decode different tallies correctly', async () => {
-      const { ethers } = await network.connect()
-      const mockEnclave = (await ethers.deployContract('MockEnclave')) as MockEnclave
-
-      const programFactory = await ethers.getContractFactory(
-        CRISPProgramFactory.abi,
-        CRISPProgramFactory.linkBytecode({
-          'npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3': poseidonT3Address,
-        }),
-      )
-
-      const program = await programFactory.deploy(await mockEnclave.getAddress(), nonZeroAddress, nonZeroAddress, zeroHash)
+      const mockEnclave = await deployMockEnclave()
+      const crispProgram = await deployCRISPProgram({ mockEnclave })
 
       // 2 * 2 + 1 * 1 = 5 Y
       // 2 * 1 + 0 * 1 = 2 N
@@ -78,7 +34,7 @@ describe('CRISP Contracts', function () {
 
       await mockEnclave.setPlaintextOutput(tally1)
 
-      const decodedTally1 = await program.decodeTally(0)
+      const decodedTally1 = await crispProgram.decodeTally(0)
 
       expect(decodedTally1[0]).to.equal(5n)
       expect(decodedTally1[1]).to.equal(2n)
@@ -91,7 +47,7 @@ describe('CRISP Contracts', function () {
       ]
       await mockEnclave.setPlaintextOutput(tally2)
 
-      const decodedTally2 = await program.decodeTally(0)
+      const decodedTally2 = await crispProgram.decodeTally(0)
 
       expect(decodedTally2[0]).to.equal(8277n)
       expect(decodedTally2[1]).to.equal(1218n)
@@ -103,54 +59,60 @@ describe('CRISP Contracts', function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
-      const { ethers } = await network.connect()
-
-      const signers = await ethers.getSigners()
-      const signer = signers[0]
-      const address = (await signer.getAddress()).toLowerCase() as `0x${string}`
-
-      const zkTranscriptLib = await ethers.deployContract('ZKTranscriptLib')
-      await zkTranscriptLib.waitForDeployment()
-      const zkTranscriptLibAddress = await zkTranscriptLib.getAddress()
-
-      const HonkVerifierFactory = await ethers.getContractFactory('HonkVerifier', {
-        libraries: {
-          'project/contracts/CRISPVerifier.sol:ZKTranscriptLib': zkTranscriptLibAddress,
-        },
-      })
-
-      // Deploy HonkVerifier with the linked library
-      const honkVerifier = (await HonkVerifierFactory.deploy()) as HonkVerifier
+      const honkVerifier = await deployHonkVerifier()
+      const [signer] = await ethers.getSigners()
 
       const vote = { yes: 10n, no: 0n }
-      const votingPower = vote.yes
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
 
-      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, votingPower)
-
-      const signature = (await signer.signMessage(MESSAGE)) as `0x${string}`
-      const leaf = hashLeaf(address, vote.yes.toString())
-      const leaves = [...[10n, 20n], leaf]
-
-      const threshold = 0n
-      const merkleProof = generateMerkleProof(threshold, vote.yes, address, leaves)
-
-      const inputs = await encryptVoteAndGenerateCRISPInputs({
-        encodedVote,
+      const proof = await generateVoteProof({
+        vote,
         publicKey,
-        previousCiphertext,
         signature,
-        message: MESSAGE,
-        merkleData: merkleProof,
-        balance: vote.yes,
-        slotAddress: address,
-        isFirstVote: true,
+        merkleLeaves: leaves,
+        balance,
       })
-
-      const proof = await generateProof(inputs)
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
 
       expect(isValid).to.be.true
+    })
+
+    it('should validate input correctly', async function () {
+      // It needs some time to generate the proof.
+      this.timeout(60000)
+
+      const crispProgram = await deployCRISPProgram()
+      const [signer] = await ethers.getSigners()
+
+      const e3Id = 1n
+
+      const vote = { yes: 10n, no: 0n }
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
+      const merkleTree = generateMerkleTree(leaves)
+
+      const proof = await generateVoteProof({
+        vote,
+        publicKey,
+        signature,
+        merkleLeaves: leaves,
+        balance,
+      })
+
+      const encodedProof = encodeSolidityProof(proof)
+
+      // Call next functions with fake data for testing.
+      await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
+      await crispProgram.validate(e3Id, 0n, '0x', '0x')
+
+      // If it doesn't throw, the test is successful.
+      await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)
     })
   })
 })

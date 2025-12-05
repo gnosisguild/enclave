@@ -8,6 +8,8 @@ use alloy_primitives::utils::{parse_ether, parse_units};
 use alloy_signer_local::PrivateKeySigner;
 use anyhow::{Context, Error, Result};
 use bincode::serialize;
+use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
+use risc0_ethereum_contracts::groth16;
 use boundless_market::{
     client::ClientError,
     contracts::{boundless_market::MarketError, FulfillmentData},
@@ -20,7 +22,7 @@ use e3_compute_provider::{
 };
 use e3_user_program::fhe_processor;
 use methods::PROGRAM_ELF;
-use std::time::{Duration, Instant};
+use std::{ops::Bound, time::{Duration, Instant}};
 use url::Url;
 
 pub struct BoundlessProvider;
@@ -215,6 +217,58 @@ async fn boundless_prove_inner(input: &ComputeInput) -> Result<BoundlessOutput> 
     })
 }
 
+pub struct Risc0Provider;
+
+#[derive(Debug, Clone)]
+pub struct Risc0Output {
+    pub result: ComputeResult,
+    pub bytes: Vec<u8>,
+    pub seal: Vec<u8>,
+}
+
+impl ComputeProvider for Risc0Provider {
+    type Output = Risc0Output;
+
+    fn prove(&self, input: &ComputeInput) -> Self::Output {
+        let encoded_input = encode_input(&serialize(input).unwrap()).unwrap();
+        let env = ExecutorEnv::builder()
+            .write_slice(&encoded_input)
+            .build()
+            .unwrap();
+
+        let receipt = default_prover()
+            .prove_with_ctx(
+                env,
+                &VerifierContext::default(),
+                PROGRAM_ELF,
+                &ProverOpts::groth16(),
+            )
+            .unwrap()
+            .receipt;
+
+        let decoded_journal = receipt.journal.decode().unwrap();
+
+        // Check if RISC0_DEV_MODE is set to "1" (dev mode)
+        // If dev mode: return empty seal (fake proof)
+        // Otherwise: return real groth16 proof
+        let is_dev_mode = std::env::var("RISC0_DEV_MODE").unwrap_or_default() == "1";
+
+        let seal = if is_dev_mode {
+            println!("RISC0_DEV_MODE=1: Using fake proof (empty seal)");
+            vec![]
+        } else {
+            println!("RISC0_DEV_MODE=0 or unset: Generating real Groth16 proof");
+            groth16::encode(receipt.inner.groth16().unwrap().seal.clone()).unwrap()
+        };
+
+        Risc0Output {
+            result: decoded_journal,
+            bytes: receipt.journal.bytes.clone(),
+            seal,
+        }
+    }
+}
+
 pub fn run_compute(
     params: FHEInputs,
 ) -> std::result::Result<(BoundlessOutput, Vec<u8>), ComputeError> {
@@ -250,4 +304,22 @@ pub fn run_compute(
         BoundlessOutput::Success { .. } => Ok(output),
         BoundlessOutput::Error { error } => Err(ComputeError::BoundlessFailed(error)),
     }
+}
+
+pub fn run_risc0_compute(
+    params: FHEInputs,
+) -> std::result::Result<(Risc0Output, Vec<u8>), ComputeError> {
+    let risc0_provider = Risc0Provider;
+
+    let mut provider = ComputeManager::new(
+        risc0_provider,
+        params.clone(),
+        fhe_processor,
+        false,
+        None,
+    );
+
+    let output = provider.start();
+
+   Ok(output)
 }
