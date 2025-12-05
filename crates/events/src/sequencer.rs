@@ -4,19 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use actix::{Actor, Addr, Handler};
 
-use crate::{EnclaveEvent, EventBus, Stored, Unstored};
+use crate::{EnclaveEvent, EventBus, Sequenced, Unsequenced};
 
 pub struct Sequencer {
-    bus: Addr<EventBus<EnclaveEvent<Stored>>>,
+    bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     seq: u64,
 }
 
 impl Sequencer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Stored>>>) -> Self {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
         Self {
             bus: bus.clone(),
             seq: 0,
@@ -28,9 +26,9 @@ impl Actor for Sequencer {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvent<Unstored>> for Sequencer {
+impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Unstored>, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
         self.seq += 1;
         self.bus.do_send(msg.into_stored(self.seq))
     }

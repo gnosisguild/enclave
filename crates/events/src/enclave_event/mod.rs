@@ -137,22 +137,22 @@ pub trait SeqState: Clone + std::fmt::Debug + 'static {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Unstored;
+pub struct Unsequenced;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Stored;
+pub struct Sequenced;
 
-impl SeqState for Unstored {
+impl SeqState for Unsequenced {
     type Seq = ();
 }
 
-impl SeqState for Stored {
+impl SeqState for Sequenced {
     type Seq = u64;
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct EnclaveEvent<S: SeqState = Stored> {
+pub struct EnclaveEvent<S: SeqState = Sequenced> {
     id: EventId,
     payload: EnclaveEventData,
     seq: S::Seq,
@@ -180,9 +180,9 @@ where
     }
 }
 
-impl EnclaveEvent<Unstored> {
-    pub fn into_stored(self, seq: u64) -> EnclaveEvent<Stored> {
-        EnclaveEvent::<Stored> {
+impl EnclaveEvent<Unsequenced> {
+    pub fn into_stored(self, seq: u64) -> EnclaveEvent<Sequenced> {
+        EnclaveEvent::<Sequenced> {
             id: self.id,
             payload: self.payload,
             ts: self.ts,
@@ -192,9 +192,9 @@ impl EnclaveEvent<Unstored> {
 }
 
 #[cfg(feature = "test-helpers")]
-impl EnclaveEvent<Stored> {
+impl EnclaveEvent<Sequenced> {
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unstored>::new_with_timestamp(data, time).into_stored(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_stored(seq)
     }
 }
 
@@ -219,7 +219,7 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
     }
 }
 
-impl ErrorEvent for EnclaveEvent<Unstored> {
+impl ErrorEvent for EnclaveEvent<Unsequenced> {
     type ErrType = EType;
     type FromError = anyhow::Error;
 
@@ -300,16 +300,16 @@ impl_into_event_data!(
     ThresholdShareCreated
 );
 
-impl TryFrom<&EnclaveEvent<Stored>> for EnclaveError {
+impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
     type Error = anyhow::Error;
     fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
         value.clone().try_into()
     }
 }
 
-impl TryFrom<EnclaveEvent<Stored>> for EnclaveError {
+impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
     type Error = anyhow::Error;
-    fn try_from(value: EnclaveEvent<Stored>) -> Result<Self, Self::Error> {
+    fn try_from(value: EnclaveEvent<Sequenced>) -> Result<Self, Self::Error> {
         if let EnclaveEventData::EnclaveError(data) = value.payload.clone() {
             Ok(data)
         } else {
@@ -324,7 +324,7 @@ impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     }
 }
 
-impl EventConstructorWithTimestamp for EnclaveEvent<Unstored> {
+impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
     fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
