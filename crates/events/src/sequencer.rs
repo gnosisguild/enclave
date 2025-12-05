@@ -31,7 +31,7 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
         // NOTE: FAKE SEQUENCER FOR NOW - JUST SET THE SEQUENCE NUMBER AND UPDATE
         self.seq += 1;
-        self.bus.do_send(msg.into_stored(self.seq))
+        self.bus.do_send(msg.into_sequenced(self.seq))
     }
 }
 
