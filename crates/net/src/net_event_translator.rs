@@ -16,9 +16,11 @@ use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::prelude::*;
+use e3_events::trap;
 use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
+use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
@@ -47,7 +49,7 @@ impl Actor for NetEventTranslator {
 /// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
-struct LibP2pEvent(pub Vec<u8>);
+struct LibP2pEvent(pub GossipData);
 
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
@@ -78,8 +80,8 @@ impl NetEventTranslator {
                 while let Ok(event) = rx.recv().await {
                     match event {
                         NetEvent::GossipData(data) => {
-                            if let GossipData::GossipBytes(payload) = data {
-                                addr.do_send(LibP2pEvent(payload));
+                            if let GossipData::GossipBytes(_) = data {
+                                addr.do_send(LibP2pEvent(data));
                             }
                         }
                         _ => (),
@@ -159,14 +161,11 @@ impl NetEventTranslator {
 impl Handler<LibP2pEvent> for NetEventTranslator {
     type Result = anyhow::Result<()>;
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
-        let LibP2pEvent(bytes) = msg;
-        match EnclaveEvent::from_bytes(&bytes) {
-            Ok(event) => {
-                self.bus.naked_dispatch(event.clone()); // TODO: convert to receive
-                self.sent_events.insert(event.into());
-            }
-            Err(err) => error!(error=?err, "Could not create EnclaveEvent from Libp2p Bytes!"),
-        }
+        let LibP2pEvent(data) = msg;
+        let event: EnclaveEvent<Unsequenced> = data.try_into()?;
+        self.sent_events.insert(event.get_id());
+        let (data, ts) = event.split();
+        self.bus.publish_from_remote(data, ts)?;
         Ok(())
     }
 }

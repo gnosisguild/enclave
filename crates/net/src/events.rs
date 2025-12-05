@@ -6,8 +6,11 @@
 
 use crate::Cid;
 use actix::Message;
-use anyhow::{Context, Result};
-use e3_events::{CorrelationId, DocumentMeta};
+use anyhow::{bail, Context, Result};
+use e3_events::{
+    CorrelationId, DocumentMeta, EnclaveEvent, EventConstructorWithTimestamp, Sequenced,
+    Unsequenced,
+};
 use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
@@ -36,6 +39,28 @@ impl GossipData {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).context("Could not deserialize GossipData")
+    }
+}
+
+impl TryFrom<EnclaveEvent<Sequenced>> for GossipData {
+    type Error = anyhow::Error;
+    fn try_from(value: EnclaveEvent<Sequenced>) -> Result<Self, Self::Error> {
+        let bytes = value
+            .clone_unsequenced() // Note serializing UNSEQUENCED
+            .to_bytes()
+            .context("Could not convert event to bytes for serialization!")?;
+        Ok(GossipData::GossipBytes(bytes))
+    }
+}
+
+impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
+    type Error = anyhow::Error;
+    fn try_from(value: GossipData) -> Result<Self, Self::Error> {
+        let GossipData::GossipBytes(bytes) = value else {
+            bail!("GossipData was not the GossipBytes variant");
+        };
+
+        Ok(EnclaveEvent::from_bytes(&bytes)?)
     }
 }
 
