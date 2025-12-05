@@ -9,6 +9,7 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
+use tracing::error;
 
 use crate::{
     hlc::Hlc,
@@ -82,8 +83,10 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        let evt = self.event_from_error(err_type, error);
-        self.producer.do_send(evt);
+        match self.event_from_error(err_type, error) {
+            Ok(evt) => self.producer.do_send(evt),
+            Err(e) => error!("{e}"),
+        }
     }
 }
 
@@ -114,8 +117,9 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         err_type: EType,
         error: impl Into<anyhow::Error>,
-    ) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::from_error(err_type, error)
+    ) -> Result<EnclaveEvent<Unsequenced>> {
+        let ts = self.hlc.tick()?;
+        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into())
     }
 }
 

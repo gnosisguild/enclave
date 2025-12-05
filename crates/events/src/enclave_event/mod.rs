@@ -235,16 +235,19 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
     type ErrType = EType;
     type FromError = anyhow::Error;
 
-    fn from_error(err_type: Self::ErrType, msg: impl Into<Self::FromError>) -> Self {
+    fn from_error(
+        err_type: Self::ErrType,
+        msg: impl Into<Self::FromError>,
+        ts: u128,
+    ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
-        let ts = 0; // XXX: fix this
-        EnclaveEvent {
+        Ok(EnclaveEvent {
             payload: payload.into(),
             id,
             seq: (),
             ts,
-        }
+        })
     }
 }
 

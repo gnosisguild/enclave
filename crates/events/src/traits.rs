@@ -30,7 +30,11 @@ pub trait ErrorEvent: Event {
     type ErrType;
     type FromError;
 
-    fn from_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
+    fn from_error(
+        err_type: Self::ErrType,
+        error: impl Into<Self::FromError>,
+        ts: u128,
+    ) -> Result<Self>;
 }
 
 /// An EventFactory creates events
@@ -49,7 +53,7 @@ pub trait EventFactory<E: Event> {
 /// An ErrorFactory creates errors.
 pub trait ErrorFactory<E: ErrorEvent> {
     /// Create an error event from the given error.
-    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
+    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> Result<E>;
 }
 
 /// An EventPublisher publishes events on it's internal EventBus
