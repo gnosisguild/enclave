@@ -95,5 +95,5 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
 
 pub fn get_enclave_bus_handle() -> BusHandle {
     let bus = get_enclave_event_bus();
-    BusHandle::new(bus)
+    BusHandle::new_from_consumer(bus)
 }

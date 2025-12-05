@@ -156,6 +156,7 @@ pub struct EnclaveEvent<S: SeqState = Stored> {
     id: EventId,
     payload: EnclaveEventData,
     seq: S::Seq,
+    ts: u128,
 }
 
 impl<S> EnclaveEvent<S>
@@ -173,6 +174,10 @@ where
     pub fn get_id(&self) -> EventId {
         self.into()
     }
+
+    pub fn get_ts(&self) -> u128 {
+        self.ts
+    }
 }
 
 impl EnclaveEvent<Unstored> {
@@ -180,6 +185,7 @@ impl EnclaveEvent<Unstored> {
         EnclaveEvent::<Stored> {
             id: self.id,
             payload: self.payload,
+            ts: self.ts,
             seq,
         }
     }
@@ -207,6 +213,7 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
     fn get_data(&self) -> &EnclaveEventData {
         &self.payload
     }
+
     fn into_data(self) -> EnclaveEventData {
         self.payload
     }
@@ -219,10 +226,12 @@ impl ErrorEvent for EnclaveEvent<Unstored> {
     fn from_error(err_type: Self::ErrType, msg: impl Into<Self::FromError>) -> Self {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
+        let ts = 0; // XXX: fix this
         EnclaveEvent {
             payload: payload.into(),
             id,
             seq: (),
+            ts,
         }
     }
 }
@@ -316,14 +325,14 @@ impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
 }
 
 impl EventConstructorWithTimestamp for EnclaveEvent<Unstored> {
-    fn new_with_timestamp(data: Self::Data, _ts: u128) -> Self {
+    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
-        // hcl.receive(remote_ts)?;
         EnclaveEvent {
             id,
             payload,
             seq: (),
+            ts,
         }
     }
 }
