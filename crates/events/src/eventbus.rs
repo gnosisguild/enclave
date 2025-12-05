@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, EnclaveEvent, Stored};
+use crate::{prelude::*, BusHandle, EnclaveEvent, Sequenced};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -411,8 +411,9 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Stored>>>) {
-    let consumer = EventBus::<EnclaveEvent<Stored>>::default().start();
+pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Sequenced>>>)
+{
+    let consumer = EventBus::<EnclaveEvent<Sequenced>>::default().start();
     let bus: BusHandle = BusHandle::new_from_consumer(consumer);
     let history = HistoryCollector::new().start();
     bus.subscribe("*", history.clone().recipient());
