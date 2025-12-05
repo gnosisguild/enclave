@@ -180,6 +180,12 @@ where
     }
 }
 
+impl EnclaveEvent<Sequenced> {
+    pub fn get_seq(&self) -> u64 {
+        self.seq
+    }
+}
+
 impl EnclaveEvent<Unsequenced> {
     pub fn into_sequenced(self, seq: u64) -> EnclaveEvent<Sequenced> {
         EnclaveEvent::<Sequenced> {
@@ -193,12 +199,14 @@ impl EnclaveEvent<Unsequenced> {
 
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
+    /// test-helpers only utility function to create a new unsequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_sequenced(seq)
     }
 
-    pub fn get_seq(&self) -> u64 {
-        self.seq
+    /// test-helpers only utility function to remove time information from an event
+    pub fn strip_ts(&self) -> EnclaveEvent {
+        EnclaveEvent::new_stored_event(self.get_data().clone(), 0, self.get_seq())
     }
 }
 

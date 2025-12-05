@@ -16,6 +16,7 @@ use e3_data::InMemStore;
 use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::GetEvents;
+use e3_events::Sequenced;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,
     ConfigurationUpdated, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
@@ -453,7 +454,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<GossipData>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<EnclaveEvent>>> = Arc::new(Mutex::new(Vec::new()));
 
     let msgs_loop = msgs.clone();
 
@@ -467,8 +468,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
-                msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetEvent::GossipData(msg))?;
+                if let GossipData::GossipBytes(ref data) = msg {
+                    let data: EnclaveEvent = EnclaveEvent::from_bytes(data)?;
+                    msgs_loop.lock().await.push(data.strip_ts());
+                    event_tx.send(NetEvent::GossipData(msg))?;
+                }
             }
             // if this  manages to broadcast an event to the
             // event bus we will expect to see an extra event on
@@ -506,12 +510,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     assert_eq!(
         *msgs.lock().await,
         vec![
-            GossipData::GossipBytes(
-                EnclaveEvent::new_stored_event(evt_1.clone().into(), 0, 1).to_bytes()?
-            ),
-            GossipData::GossipBytes(
-                EnclaveEvent::new_stored_event(evt_2.clone().into(), 0, 2).to_bytes()?
-            )
+            EnclaveEvent::new_stored_event(evt_1.clone().into(), 0, 1),
+            EnclaveEvent::new_stored_event(evt_2.clone().into(), 0, 2)
         ], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );
