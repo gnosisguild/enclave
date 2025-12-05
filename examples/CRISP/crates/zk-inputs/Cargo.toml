@@ -12,8 +12,8 @@ crisp-constants.workspace = true
 fhe.workspace = true
 fhe-math.workspace = true
 fhe-traits.workspace = true
-greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator", branch = "dummy-parameters" }
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator", branch = "dummy-parameters" }
 bigint-poly = { git = "https://github.com/gnosisguild/bigint-poly", features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true

@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
+use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
 use rand::thread_rng;
 
@@ -103,6 +104,10 @@ where
         .try_encrypt_extended(&plaintext, &mut thread_rng())
         .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
+    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
+
+    let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
     // Create Greco input validation ZK proof
     let input_val_vectors = GrecoVectors::compute(
         &plaintext,
@@ -112,6 +117,7 @@ where
         &cipher_text,
         &pk,
         &params,
+        bit_pk,
     )
     .map_err(|e| anyhow!("Error computing input validation vectors: {}", e))?;
 

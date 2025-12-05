@@ -91,10 +91,22 @@ impl ZKInputsGenerator {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .with_context(|| "Failed to encrypt plaintext")?;
 
+        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+
+        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
         // Compute the vectors of the GRECO inputs.
-        let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &self.bfv_params)
-                .with_context(|| "Failed to compute vectors")?;
+        let greco_vectors = GrecoVectors::compute(
+            &pt,
+            &u_rns,
+            &e0_rns,
+            &e1_rns,
+            &ct,
+            &pk,
+            &self.bfv_params,
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute vectors")?;
 
         let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
             .with_context(|| "Failed to compute bounds")?;
