@@ -299,7 +299,7 @@ impl CiphernodeBuilder {
         };
 
         // Get a handle from the event bus
-        let bus = BusHandle::new(local_bus);
+        let bus = BusHandle::new_from_consumer(local_bus);
 
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);

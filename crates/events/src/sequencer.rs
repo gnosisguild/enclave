@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use actix::{Actor, Addr, Handler};
 
 use crate::{EnclaveEvent, EventBus, Stored, Unstored};
@@ -42,7 +44,7 @@ mod tests {
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let bus = BusHandle::new(EventBus::<EnclaveEvent>::default().start());
+        let bus = BusHandle::new_from_consumer(EventBus::<EnclaveEvent>::default().start());
         let history = bus.history();
 
         let event_data = vec![
@@ -62,11 +64,6 @@ mod tests {
         let events = history.send(TakeEvents::new(3)).await?;
 
         assert_eq!(events, expected);
-        Ok(())
-    }
-
-    #[actix::test]
-    async fn test_hlc_events() -> anyhow::Result<()> {
         Ok(())
     }
 }
