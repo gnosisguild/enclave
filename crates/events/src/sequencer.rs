@@ -40,6 +40,9 @@ mod tests {
 
     use crate::{prelude::*, BusHandle, EnclaveEvent, EventBus, TakeEvents, TestEvent};
     use actix::Actor;
+    fn strips_ts(event: &EnclaveEvent) -> EnclaveEvent {
+        EnclaveEvent::new_stored_event(event.get_data().clone(), 0, event.get_seq())
+    }
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
@@ -62,7 +65,7 @@ mod tests {
             .collect::<Vec<_>>();
         let events = history.send(TakeEvents::new(3)).await?;
 
-        assert_eq!(events, expected);
+        assert_eq!(events.iter().map(strips_ts).collect::<Vec<_>>(), expected);
         Ok(())
     }
 }

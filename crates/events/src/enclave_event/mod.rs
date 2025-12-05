@@ -196,6 +196,10 @@ impl EnclaveEvent<Sequenced> {
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_sequenced(seq)
     }
+
+    pub fn get_seq(&self) -> u64 {
+        self.seq
+    }
 }
 
 impl<S: SeqState> Event for EnclaveEvent<S> {
