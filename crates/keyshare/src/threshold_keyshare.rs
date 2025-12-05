@@ -269,14 +269,14 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
 }
 
 pub struct ThresholdKeyshareParams {
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
 }
 
 pub struct ThresholdKeyshare {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,
@@ -535,7 +535,7 @@ impl ThresholdKeyshare {
                 sk_sss,
             }),
             external: false,
-        });
+        })?;
 
         Ok(())
     }
@@ -634,7 +634,7 @@ impl ThresholdKeyshare {
             pubkey: current.pk_share,
             e3_id,
             node: address,
-        });
+        })?;
 
         Ok(())
     }
@@ -697,7 +697,7 @@ impl ThresholdKeyshare {
         };
 
         // send the decryption share
-        self.bus.publish(event);
+        self.bus.publish(event)?;
 
         // mark as complete
         self.state.try_mutate(|s| {

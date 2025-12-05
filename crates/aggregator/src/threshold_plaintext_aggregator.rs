@@ -122,7 +122,7 @@ pub struct ComputeAggregate {
 
 pub struct ThresholdPlaintextAggregator {
     multithread: Addr<Multithread>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<ThresholdPlaintextAggregatorState>,
@@ -130,7 +130,7 @@ pub struct ThresholdPlaintextAggregator {
 
 pub struct ThresholdPlaintextAggregatorParams {
     pub multithread: Addr<Multithread>,
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
 }
@@ -342,7 +342,7 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                     };
 
                     info!("Dispatching plaintext event {:?}", event);
-                    act.bus.publish(event);
+                    act.bus.publish(event)?;
                     Ok(())
                 }),
         )

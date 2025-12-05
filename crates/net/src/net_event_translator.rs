@@ -16,9 +16,12 @@ use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::prelude::*;
+use e3_events::trap;
 use e3_events::BusHandle;
+use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
+use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
@@ -34,7 +37,7 @@ use tracing::{error, info, instrument, trace};
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
 pub struct NetEventTranslator {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
@@ -47,11 +50,11 @@ impl Actor for NetEventTranslator {
 /// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
-struct LibP2pEvent(pub Vec<u8>);
+struct LibP2pEvent(pub GossipData);
 
 impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
-    pub fn new(bus: &BusHandle<EnclaveEvent>, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
+    pub fn new(bus: &BusHandle, tx: &mpsc::Sender<NetCommand>, topic: &str) -> Self {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),
@@ -61,7 +64,7 @@ impl NetEventTranslator {
     }
 
     pub fn setup(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: &str,
@@ -78,8 +81,8 @@ impl NetEventTranslator {
                 while let Ok(event) = rx.recv().await {
                     match event {
                         NetEvent::GossipData(data) => {
-                            if let GossipData::GossipBytes(payload) = data {
-                                addr.do_send(LibP2pEvent(payload));
+                            if let GossipData::GossipBytes(_) = data {
+                                addr.do_send(LibP2pEvent(data));
                             }
                         }
                         _ => (),
@@ -108,7 +111,7 @@ impl NetEventTranslator {
     /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
     pub async fn setup_with_interface(
-        bus: BusHandle<EnclaveEvent>,
+        bus: BusHandle,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,
@@ -159,57 +162,47 @@ impl NetEventTranslator {
 impl Handler<LibP2pEvent> for NetEventTranslator {
     type Result = anyhow::Result<()>;
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
-        let LibP2pEvent(bytes) = msg;
-        match EnclaveEvent::from_bytes(&bytes) {
-            Ok(event) => {
-                self.bus.naked_dispatch(event.clone()); // TODO: convert to receive
-                self.sent_events.insert(event.into());
-            }
-            Err(err) => error!(error=?err, "Could not create EnclaveEvent from Libp2p Bytes!"),
-        }
+        let LibP2pEvent(data) = msg;
+        let event: EnclaveEvent<Unsequenced> = data.try_into()?;
+        self.sent_events.insert(event.get_id());
+        let (data, ts) = event.split();
+        self.bus.publish_from_remote(data, ts)?;
         Ok(())
     }
 }
 
 impl Handler<EnclaveEvent> for NetEventTranslator {
-    type Result = ResponseFuture<()>;
+    type Result = ();
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        let sent_events = self.sent_events.clone();
-        let tx = self.tx.clone();
-        let evt = event.clone();
-        let topic = self.topic.clone();
-        Box::pin(async move {
+        trap(EType::Net, &self.bus.clone(), || {
+            let sent_events = self.sent_events.clone();
+            let tx = self.tx.clone();
+            let evt = event.clone();
+            let topic = self.topic.clone();
             let id: EventId = evt.clone().into();
 
             // Ignore events that should be considered local
             if !Self::is_forwardable_event(&evt) {
                 trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
-                return;
+                return Ok(());
             }
 
             // if we have seen this event before dont rebroadcast
             if sent_events.contains(&id) {
                 trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
-                return;
+                return Ok(());
             }
+
             warn!("GossipPublish event: {}", event.event_type());
-            match evt.to_bytes() {
-                Ok(data) => {
-                    if let Err(e) = tx
-                        .send(NetCommand::GossipPublish {
-                            topic,
-                            data: GossipData::GossipBytes(data),
-                            correlation_id: CorrelationId::new(),
-                        })
-                        .await
-                    {
-                        error!(error=?e, "Error sending bytes to libp2p: {e}");
-                    };
-                }
-                Err(error) => {
-                    error!(error=?error, "Could not convert event to bytes for serialization!")
-                }
-            }
+            let data: GossipData = evt.try_into()?;
+
+            tx.try_send(NetCommand::GossipPublish {
+                topic,
+                data,
+                correlation_id: CorrelationId::new(),
+            })?;
+
+            Ok(())
         })
     }
 }

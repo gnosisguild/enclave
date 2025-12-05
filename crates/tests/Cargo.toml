@@ -43,3 +43,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 zeroize = { workspace = true }
+
+[dev-dependencies]
+e3-events = { workspace = true, features = ["test-helpers"] }
