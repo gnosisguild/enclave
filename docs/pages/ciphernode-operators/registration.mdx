@@ -1,0 +1,117 @@
+---
+title: 'Registration & Licensing'
+---
+
+# Registration & Licensing
+
+This guide covers everything required to become an active Ciphernode: collateral, bonding,
+registration transactions, and config secrets.
+
+## Before you start
+
+| Track | Checklist |
+| --- | --- |
+| Financial | ENCL covering `licenseRequiredBond`, USDC covering at least `minTicketBalance * ticketPrice`, and ETH for gas |
+| Technical | Enclave CLI ≥ current release, WebSocket RPC, `enclave password/net keypair/wallet` secrets set |
+| Operational | `enclave.config.yaml` committed, secrets mirrored into `deploy/*.secrets.json`, monitoring hooks for registration state |
+
+Adjust the numbers using `cast call $BONDING` for `licenseRequiredBond()`, `ticketPrice()` and
+`minTicketBalance()` on your target network.
+
+## Economic requirements
+
+Sepolia defaults (check `BondingRegistry` on your network):
+
+- **Ticket price**: `10_000_000` base units (10 USDC per ticket)
+- **License bond requirement**: `100 ENCL`
+- **Active license floor**: 80% of the required bond must remain locked
+- **Minimum ticket balance**: 1 ticket (10 USDC)
+- **Exit delay**: `604_800 s` (7 days)
+
+Tickets live inside the non-transferable `EnclaveTicketToken`. Mint them by depositing the underlying
+stablecoin (MockUSDC on Sepolia) via `BondingRegistry.addTicketBalance`. The usable ticket count is:
+
+
+`availableTickets = floor(ticketTokenBalance / ticketPrice)`
+
+License bonds are denominated in ENCL. Falling below 80% of `licenseRequiredBond` moves the operator
+back to `inactive` even if tickets remain.
+
+## CLI prerequisites
+
+Before bonding, prepare local secrets:
+
+```bash
+# Set up config (or pass --config later)
+enclave config-set --rpc-url $RPC --eth-address $OPERATOR_ADDRESS
+
+# Store secrets (optional if using automation)
+enclave password set --password "$PASSWORD"
+enclave net keypair
+enclave wallet set --private-key $OPERATOR_KEY
+```
+
+These commands populate `~/.config/enclave` and `~/.local/share/enclave`. For containerized
+deployments, bake the steps into `ciphernode-entrypoint.sh` (see `deploy/`).
+
+## Lifecycle checklist
+
+1. **Acquire collateral**
+   - ENCL for license bonds
+   - USDC (or the configured fee token) for tickets
+2. **Bond the license**
+   ```bash
+   cast send $BONDING "bondLicense(uint256)" 100e18 --private-key $OPERATOR_KEY --rpc-url $RPC
+   ```
+3. **Register the operator**
+   ```bash
+   cast send $BONDING "registerOperator()" --private-key $OPERATOR_KEY --rpc-url $RPC
+   ```
+4. **Deposit tickets**
+   ```bash
+   cast send $FEE_TOKEN "approve(address,uint256)" $BONDING 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
+   cast send $BONDING "addTicketBalance(uint256)" 1000e6 --rpc-url $RPC --private-key $OPERATOR_KEY
+   ```
+5. **Verify status**
+   ```bash
+   cast call $BONDING "isRegistered(address)" $OPERATOR
+   cast call $BONDING "isActive(address)" $OPERATOR
+   cast call $BONDING "getLicenseBond(address)" $OPERATOR
+   cast call $BONDING "getTicketBalance(address)" $OPERATOR
+   ```
+6. **Add buffers (optional)**
+   - Maintain ≥ 1.1× the minimum license bond so transient unbonds or slashes do not deactivate you
+   - Keep a few extra tickets so `availableTickets` never dips below the floor
+7. **Snapshot config for production**
+   - Commit `enclave.config.yaml` alongside deployment manifests
+   - Store secrets in JSON (see `deploy/cn1.secrets.json`) and mount them securely
+
+> The wallet private key is encrypted and stored in the config. Ensure you have set the correct
+> operator key with `enclave wallet set` before running bonding transactions.
+
+## One-command bootstrap (optional)
+
+Hardhat ships with a helper task that strings approvals + bonding + registration together:
+
+```bash
+npx hardhat ciphernode:add \
+   --license-bond-amount 100000000000000000000 \
+   --ticket-amount 10000000
+```
+
+It calls `bondLicense`, `registerOperator`, and `addTicketBalance` under the hood. Production nodes
+usually stick with explicit `cast` or `enclave` commands for better observability and auditing.
+
+## Status probes to monitor
+
+Once bonded, keep lightweight probes in your monitoring stack:
+
+```bash
+cast call $BONDING "minTicketBalance()"
+cast call $BONDING "ticketPrice()"
+cast call $BONDING "licenseRequiredBond()"
+cast call $BONDING "hasExitInProgress(address)" $OPERATOR
+```
+
+Pause automation if any probe changes unexpectedly until you reconcile it with a governance action
+or migration plan.

@@ -18,91 +18,64 @@ complete voting round of CRISP and do the following:
 
 Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before proceeding.
 
+enclave nodes up -v
 <Steps>
 
-### Start Infrastructure
+### Prep Once per Checkout
 
-First, ensure you have the infrastructure running. If you haven't already, complete the setup:
-
-**Terminal 1: Start Anvil**
-
-```sh
-anvil
-```
-
-**Terminal 2: Start Ciphernodes**
+From the repo root run the bundled setup script (it installs dependencies, builds the CLI, prepares
+env files, and compiles contracts):
 
 ```sh
 cd examples/CRISP
-enclave nodes up -v
+pnpm dev:setup
 ```
 
-Make sure contracts are deployed and ciphernodes are added to the registry as described in the setup
-guide.
+You only need to re-run this when dependencies change.
 
-### Start the Client Application
+### Start Everything with One Command
 
-**Terminal 3: Client**
-
-Navigate to the client directory and start the React application:
+The CRISP workspace ships with a supervisor that launches Hardhat, deploys contracts, boots
+Ciphernodes, runs the RISC Zero program server, the Rust backend, and the React client. Start it in
+the example root:
 
 ```sh
-cd examples/CRISP/client
-pnpm dev
+pnpm dev:up
 ```
 
-The client application will start on `http://localhost:3000`.
+Behind the scenes `scripts/dev.sh` calls `scripts/dev_services.sh`, which:
 
-### Start the Server Application
+- Spawns a Hardhat chain on `http://localhost:8545`
+- Deploys contracts and registers five Ciphernodes against the local registry
+- Runs `enclave program start --dev true` so proving happens instantly while developing
+- Launches the Rust server with `cargo run --bin server`
+- Starts the React client via `pnpm dev-static`
 
-**Terminal 4: Server**
+Keep this terminal open; logs from every service are multiplexed with
+`pnpm concurrently`.
 
-Navigate to the server directory and start the backend server:
+### (Optional) Build Once for Production
+
+If you want release binaries or a static client before running, execute:
 
 ```sh
-cd examples/CRISP/server
-cargo run --bin server
+pnpm dev:build
 ```
 
-The server will start and begin listening for blockchain events.
-
-### Start the Program Server
-
-**Terminal 5: Program**
-
-Navigate to the program directory and start the program server:
-
-```sh
-cd examples/CRISP/
-enclave program start
-```
-
-This runs the RISC Zero program server that handles secure computations.
-
-If you would like to run the program server in dev mode, you can run the following command:
-
-```sh
-cd examples/CRISP/
-enclave program start --dev true
-```
-
-In this case, Risc0 will not be used to generate proofs, and instead these will be mocked.
+That pipeline runs `cargo build --locked`, compiles the contracts, and builds the client bundle.
 
 ### Initialize a New Voting Round
 
-**Terminal 6: CLI**
-
-Navigate to the server directory and start the CLI:
+Open a new terminal and launch the CLI from the example root:
 
 ```sh
-cd examples/CRISP/server
-cargo run --bin cli
+pnpm cli
 ```
 
-Follow these steps in the CLI:
+In the interactive menu:
 
-1. Select `CRISP: Voting Protocol (ETH)` from the menu
-2. Choose `Initialize new E3 round` to start a new voting round
+1. Select `CRISP: Voting Protocol (ETH)`
+2. Choose `Initialize new E3 round`
 
 You should see output similar to:
 
@@ -115,25 +88,54 @@ You should see output similar to:
 
 ### Set Up MetaMask
 
-To interact with the client application, you need to configure MetaMask:
+Whether you used `pnpm dev:up` or the manual flow below, you will interact with the Hardhat chain
+running at `http://localhost:8545` (chain ID `31337`). Configure MetaMask once:
 
-1. Open MetaMask in your browser
-2. Add the Anvil private key to your wallet:
+1. Import the Hardhat/Anvil deployer key so you have funds available:
    ```
    0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
    ```
-3. Connect to the local Anvil network:
-   - Network Name: Anvil Local
-   - RPC URL: `http://localhost:8545`
-   - Chain ID: `31337`
-   - Currency Symbol: `ETH`
+2. Add a custom network pointing to `http://localhost:8545` with symbol `ETH` and chain ID `31337`.
+3. Connect your wallet to `http://localhost:3000` when the client asks.
 
 ### Submit Votes via Web Interface
 
-1. Navigate to `http://localhost:3000` in your browser
-2. Connect your MetaMask wallet
-3. You should see the active voting round
-4. Submit your vote by selecting your choice and confirming the transaction
+1. Navigate to `http://localhost:3000` (started by `pnpm dev:up`)
+2. Connect your MetaMask wallet when prompted
+3. You should see the active voting round seeded by the CLI request
+4. Cast a vote, approve the transaction, and wait for the confirmation toast
+
+### Manual Control (Optional)
+
+If you prefer to run each process in its own terminal (or need to customize flags), replicate what
+`pnpm dev:up` does under the hood:
+
+1. **Hardhat chain + deploy contracts**
+   ```sh
+   pnpm -C packages/crisp-contracts hardhat node
+   # in another terminal
+   ./scripts/crisp_deploy.sh
+   ```
+2. **Ciphernodes & wallets**
+   ```sh
+   ./scripts/dev_cipher.sh ./.enclave/ready
+   ```
+   This script wipes previous `.enclave` state, installs dev wallets, starts `enclave nodes up -v`,
+   and waits until all nodes are registered.
+3. **Program server**
+   ```sh
+   ./scripts/dev_program.sh        # add --dev true inside to skip proofs in dev
+   ```
+4. **Rust server**
+   ```sh
+   wait-on tcp:13151 && ./scripts/dev_server.sh
+   ```
+5. **React client**
+   ```sh
+   wait-on tcp:4000 && wait-on file:./.enclave/ready && ./scripts/dev_client.sh
+   ```
+
+You can also let `./scripts/dev_services.sh` orchestrate steps 2–5 once Hardhat is up.
 
 ### Monitor the Process
 
@@ -194,7 +196,8 @@ The CRISP voting process involves several key steps:
 - **Ensure all terminals remain open** during the voting process
 - **MetaMask connection issues**: Check that you're connected to the correct network (Chain
   ID: 31337)
-- **Transaction failures**: Verify you have sufficient ETH balance from the Anvil faucet
+- **Transaction failures**: Verify you have sufficient ETH balance from the Hardhat faucet (the
+   account with the imported deployer key starts funded)
 - **Server errors**: Monitor the server logs for detailed error messages
 - **Ciphernode issues**: Ensure all ciphernode processes are running and connected
 

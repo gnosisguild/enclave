@@ -39,7 +39,8 @@ impl ComputeProvider for Risc0Provider {
     type Output = Risc0Output;
 
     fn prove(&self, input: &ComputeInput) -> Self::Output {
-        // Implement proof generation using RISC Zero / SP1 or any other provider
+        // Implement proof generation using RISC Zero with Boundless / SP1 or any other provider
+        // See https://docs.beboundless.xyz/ for production proving
         // ...
     }
 }
@@ -59,7 +60,7 @@ environment. Below are the key steps to implement it effectively:
 4. **Focus on Computation**: Use the Compute Provider package to handle additional tasks like Merkle
    tree verification and proof verification, so you can focus on your computation logic.
 
-**Example (Rust with RISC Zero):**
+**Example (Rust with RISC Zero + Boundless):**
 
 ```rust
 use fhe::bfv::{BfvParameters, Ciphertext};
