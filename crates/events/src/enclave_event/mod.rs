@@ -181,7 +181,7 @@ where
 }
 
 impl EnclaveEvent<Unsequenced> {
-    pub fn into_stored(self, seq: u64) -> EnclaveEvent<Sequenced> {
+    pub fn into_sequenced(self, seq: u64) -> EnclaveEvent<Sequenced> {
         EnclaveEvent::<Sequenced> {
             id: self.id,
             payload: self.payload,
@@ -194,7 +194,7 @@ impl EnclaveEvent<Unsequenced> {
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_stored(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_sequenced(seq)
     }
 }
 
