@@ -39,6 +39,7 @@ pub struct ZKInputs {
     e0_quotients: Vec<serde_json::Value>,
     e1: serde_json::Value,
     k1: serde_json::Value,
+    pk_commitment: String,
 }
 
 /// Converts a 1D vector of BigInt to a vector of strings.
@@ -255,6 +256,7 @@ pub fn construct_inputs(
         k1: serde_json::json!({
             "coefficients": to_string_1d_vec(&vectors_standard.k1)
         }),
+        pk_commitment: vectors_standard.pk_commitment.to_string(),
     }
 }
 
@@ -339,10 +341,15 @@ mod tests {
                 vec![BigInt::from(43), BigInt::from(44)],
                 vec![BigInt::from(45), BigInt::from(46)],
             ],
+            e0_quotients: vec![
+                vec![BigInt::from(47), BigInt::from(48)],
+                vec![BigInt::from(49), BigInt::from(50)],
+            ],
             u: vec![BigInt::from(37), BigInt::from(38)],
             e0: vec![BigInt::from(39), BigInt::from(40)],
             e1: vec![BigInt::from(41), BigInt::from(42)],
             k1: vec![BigInt::from(43), BigInt::from(44)],
+            pk_commitment: BigInt::from(45),
         }
     }
 
@@ -387,6 +394,7 @@ mod tests {
         assert!(inputs.e0.is_object());
         assert!(inputs.e1.is_object());
         assert!(inputs.k1.is_object());
+        assert!(inputs.pk_commitment.len() > 0);
     }
 
     #[test]
@@ -425,5 +433,6 @@ mod tests {
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());
         assert!(parsed.get("pk1is").is_some());
+        assert!(parsed.get("pk_commitment").is_some());
     }
 }

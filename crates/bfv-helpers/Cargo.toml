@@ -10,16 +10,16 @@ repository = "https://github.com/gnosisguild/enclave/crates/bfv-helpers"
 alloy-dyn-abi = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow.workspace = true
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
 fhe-traits.workspace = true
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
 fhe.workspace = true
-greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator", branch = "dummy-parameters" }
 itertools = "0.14.0"
 ndarray = "0.15"
 num-bigint = { workspace = true }
 num-traits = "0.2"
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator", branch = "dummy-parameters" }
 strum.workspace = true
 rand.workspace = true
 thiserror = { workspace = true }

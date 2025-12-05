@@ -3569,7 +3569,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3594,7 +3594,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3616,7 +3616,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3624,7 +3624,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -7135,6 +7135,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "safe"
+version = "0.1.5"
+source = "git+https://github.com/gnosisguild/enclave#c8aff7c361199118404c0b17f63270e1fa5c177a"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "sha3",
+ "taceo-poseidon2",
+]
+
+[[package]]
 name = "scc"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9252,9 +9264,11 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
  "bigint-poly",
  "blake3",
  "fhe",
@@ -9265,6 +9279,7 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "rayon",
+ "safe 0.1.5 (git+https://github.com/gnosisguild/enclave)",
  "serde",
  "serde_json",
  "tempfile",
@@ -9275,9 +9290,11 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
  "bigint-poly",
  "chrono",
  "fhe",

@@ -1117,9 +1117,20 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a22f4561524cd949590d78d7d4c5df8f592430d221f7f3c9497bbafd8972120f"
 dependencies = [
- "ark-ec",
+ "ark-ec 0.4.2",
  "ark-ff 0.4.2",
  "ark-std 0.4.0",
+]
+
+[[package]]
+name = "ark-bn254"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d69eab57e8d2663efa5c63135b2af4f396d66424f88954c21104125ab6b3e6bc"
+dependencies = [
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-std 0.5.0",
 ]
 
 [[package]]
@@ -1129,12 +1140,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "defd9a439d56ac24968cca0571f598a61bc8c55f71d50a89cda591cb750670ba"
 dependencies = [
  "ark-ff 0.4.2",
- "ark-poly",
+ "ark-poly 0.4.2",
  "ark-serialize 0.4.2",
  "ark-std 0.4.0",
  "derivative",
  "hashbrown 0.13.2",
  "itertools 0.10.5",
+ "num-traits",
+ "zeroize",
+]
+
+[[package]]
+name = "ark-ec"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43d68f2d516162846c1238e755a7c4d131b892b70cc70c471a8e3ca3ed818fce"
+dependencies = [
+ "ahash",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "educe",
+ "fnv",
+ "hashbrown 0.15.5",
+ "itertools 0.13.0",
+ "num-bigint",
+ "num-integer",
  "num-traits",
  "zeroize",
 ]
@@ -1279,6 +1311,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-poly"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "579305839da207f02b89cd1679e50e67b4331e2f9294a57693e5051b7703fe27"
+dependencies = [
+ "ahash",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "educe",
+ "fnv",
+ "hashbrown 0.15.5",
+]
+
+[[package]]
 name = "ark-serialize"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1294,7 +1341,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb7b85a02b83d2f22f89bd5cac66c9c89474240cb6207cb1efc16d098e822a5"
 dependencies = [
- "ark-serialize-derive",
+ "ark-serialize-derive 0.4.2",
  "ark-std 0.4.0",
  "digest 0.10.7",
  "num-bigint",
@@ -1306,6 +1353,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f4d068aaf107ebcd7dfb52bc748f8030e0fc930ac8e360146ca54c1203088f7"
 dependencies = [
+ "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
  "arrayvec",
  "digest 0.10.7",
@@ -1321,6 +1369,17 @@ dependencies = [
  "proc-macro2 1.0.103",
  "quote 1.0.42",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ark-serialize-derive"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "213888f660fddcca0d257e88e54ac05bca01885f258ccdf695bafd77031bb69d"
+dependencies = [
+ "proc-macro2 1.0.103",
+ "quote 1.0.42",
+ "syn 2.0.110",
 ]
 
 [[package]]
@@ -1954,7 +2013,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "anyhow",
- "ark-bn254",
+ "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
  "async-trait",
  "bigdecimal",
@@ -2279,7 +2338,7 @@ dependencies = [
 name = "e3-compute-provider"
 version = "0.1.5"
 dependencies = [
- "ark-bn254",
+ "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
  "hex",
  "lean-imt",
@@ -2562,7 +2621,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -2587,7 +2646,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2609,7 +2668,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -2617,7 +2676,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#7692b954ce887ee78f0b6baae36447ca1aa74708"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -3561,7 +3620,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1dc4be3ca47e5f9ca5d5a3fc839f9006d3a7e059fe6f7690ef10405c2be723"
 dependencies = [
- "ark-bn254",
+ "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
  "thiserror 1.0.69",
 ]
@@ -3572,7 +3631,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c9a85a9752c549ceb7578064b4ed891179d20acd85f27318573b64d2d7ee7ee"
 dependencies = [
- "ark-bn254",
+ "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
  "num-bigint",
  "thiserror 1.0.69",
@@ -4885,6 +4944,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "safe"
+version = "0.1.5"
+source = "git+https://github.com/gnosisguild/enclave#c8aff7c361199118404c0b17f63270e1fa5c177a"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "sha3",
+ "taceo-poseidon2",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5387,6 +5458,19 @@ checksum = "8e1d1b10ced5ca923a1fcb8d03e96b8d3268065d724548c0211415ff6ac6bac4"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "taceo-poseidon2"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fbf106fb8682ee4e057872a18f431828bd467c28d2ead469e4c84dbf6ce5ec6"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-std 0.5.0",
+ "num-bigint",
+ "num-traits",
 ]
 
 [[package]]
@@ -6590,9 +6674,11 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
  "bigint-poly",
  "blake3",
  "fhe",
@@ -6603,6 +6689,7 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "rayon",
+ "safe",
  "serde",
  "serde_json",
  "tempfile",
@@ -6613,9 +6700,11 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#7314bed079b91ea6432864f30b991e4ef724a5c5"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
  "bigint-poly",
  "chrono",
  "fhe",

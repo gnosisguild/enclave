@@ -131,6 +131,7 @@ export type CircuitInputs = {
   sum_r1is: Polynomial[]
   // Greco Section.
   params: GrecoParams
+  pk_commitment: string
   ct0is: Polynomial[]
   ct1is: Polynomial[]
   pk0is: Polynomial[]
