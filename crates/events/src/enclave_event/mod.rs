@@ -178,11 +178,21 @@ where
     pub fn get_ts(&self) -> u128 {
         self.ts
     }
+
+    pub fn split(self) -> (EnclaveEventData, u128) {
+        (self.payload, self.ts)
+    }
 }
 
 impl EnclaveEvent<Sequenced> {
     pub fn get_seq(&self) -> u64 {
         self.seq
+    }
+
+    pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
+        let ts = self.get_ts();
+        let data = self.clone().into_data();
+        EnclaveEvent::new_with_timestamp(data, ts)
     }
 }
 
