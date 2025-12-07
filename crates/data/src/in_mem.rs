@@ -55,6 +55,10 @@ impl InMemStore {
     }
 }
 
+// Add a BatchInsert event that contains multiple Insert messages
+// Use the Responder pattern to manage the response
+// Have a proxy actor hold the Inserts until the BatchInsert event is called
+
 impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
