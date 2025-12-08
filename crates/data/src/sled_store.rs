@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertSync, Remove};
+use crate::{
+    traits::{KeyValStore, Seekable},
+    Get, Insert, InsertSync, Remove, SeekForPrev,
+};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
@@ -178,7 +181,13 @@ impl SledDb {
         Ok(Self { db })
     }
 
-    pub fn insert(&mut self, msg: Insert) -> Result<()> {
+    pub fn close_all_connections() {
+        clear_all_caches()
+    }
+}
+
+impl KeyValStore for SledDb {
+    fn insert(&mut self, msg: Insert) -> Result<()> {
         self.db
             .insert(msg.key(), msg.value().to_vec())
             .context("Could not insert data into db")?;
@@ -186,14 +195,14 @@ impl SledDb {
         Ok(())
     }
 
-    pub fn remove(&mut self, msg: Remove) -> Result<()> {
+    fn remove(&mut self, msg: Remove) -> Result<()> {
         self.db
             .remove(msg.key())
             .context("Could not remove data from db")?;
         Ok(())
     }
 
-    pub fn get(&mut self, event: Get) -> Result<Option<Vec<u8>>> {
+    fn get(&self, event: Get) -> Result<Option<Vec<u8>>> {
         let key = event.key();
         let str_key = String::from_utf8_lossy(&key).into_owned();
         let res = self
@@ -203,9 +212,18 @@ impl SledDb {
 
         Ok(res.map(|v| v.to_vec()))
     }
+}
 
-    pub fn close_all_connections() {
-        clear_all_caches()
+impl Seekable for SledDb {
+    fn seek_for_prev(&self, msg: SeekForPrev) -> Result<Option<Vec<u8>>> {
+        let key = msg.key();
+        let entry = self.db.range(..=&key[..]).next_back();
+
+        match entry {
+            Some(Ok((_, bytes))) => Ok(Some(bytes.as_ref().try_into()?)),
+            Some(Err(e)) => Err(e.into()),
+            None => Ok(None),
+        }
     }
 }
 

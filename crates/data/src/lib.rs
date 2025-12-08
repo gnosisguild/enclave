@@ -12,6 +12,7 @@ mod repositories;
 mod repository;
 mod sled_store;
 mod snapshot;
+mod traits;
 
 pub use data_store::*;
 pub use in_mem::*;
