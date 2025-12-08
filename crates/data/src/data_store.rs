@@ -80,6 +80,19 @@ impl Remove {
     }
 }
 
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[rtype(result = "()")]
+pub struct SeekForPrev(pub Vec<u8>);
+impl SeekForPrev {
+    pub fn new<K: IntoKey>(key: K) -> Self {
+        Self(key.into_key())
+    }
+
+    pub fn key(&self) -> &Vec<u8> {
+        &self.0
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum StoreAddr {
     InMem(Addr<InMemStore>),
