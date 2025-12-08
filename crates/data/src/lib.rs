@@ -6,6 +6,7 @@
 
 mod data_store;
 mod events;
+mod hlc_store;
 mod in_mem;
 mod into_key;
 mod persistable;
@@ -18,6 +19,7 @@ mod traits;
 
 pub use data_store::*;
 pub use events::*;
+pub use hlc_store::*;
 pub use in_mem::*;
 pub use into_key::IntoKey;
 pub use persistable::*;
@@ -26,3 +28,4 @@ pub use repository::*;
 pub use sled_db::*;
 pub use sled_store::*;
 pub use snapshot::*;
+pub use traits::*;

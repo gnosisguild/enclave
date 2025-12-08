@@ -2862,6 +2862,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-events",
+ "e3-utils",
  "once_cell",
  "serde",
  "sled",
