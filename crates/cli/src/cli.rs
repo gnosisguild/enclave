@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 
+use crate::ciphernode::{self, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
@@ -188,6 +189,7 @@ impl Cli {
             }
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
+            Commands::Ciphernode { command } => ciphernode::execute(command, &config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
             Commands::Rev => rev::execute().await?,
         }
@@ -286,6 +288,12 @@ pub enum Commands {
     Net {
         #[command(subcommand)]
         command: NetCommands,
+    },
+
+    /// On-chain ciphernode lifecycle management
+    Ciphernode {
+        #[command(subcommand)]
+        command: CiphernodeCommands,
     },
 
     /// Set configuration values (similar to solana config set)
