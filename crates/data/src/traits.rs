@@ -4,8 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, Remove, SeekForPrev};
 use anyhow::Result;
+
+use crate::{Get, Insert, Remove, SeekForPrev};
 
 pub trait KeyValStore {
     fn insert(&mut self, msg: Insert) -> Result<()>;
@@ -13,7 +14,7 @@ pub trait KeyValStore {
     fn get(&self, msg: Get) -> Result<Option<Vec<u8>>>;
 }
 
-pub trait Seekable: KeyValStore {
+pub trait SeekableStore: KeyValStore {
     /// Seek for the first key that is less than or equal to the given key in the SeekForPrev msg
     /// and return the value as a Some variant. If no value exists return None. If there was an
     /// error doing the seek return an Error.
