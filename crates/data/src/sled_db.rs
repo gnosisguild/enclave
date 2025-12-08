@@ -65,7 +65,7 @@ impl KeyValStore for SledDb {
 impl SeekableStore for SledDb {
     fn seek_for_prev(&self, msg: SeekForPrev) -> Result<Option<Vec<u8>>> {
         let key = msg.key();
-        let entry = self.db.range(..=&key[..]).next_back();
+        let entry = self.db.range(..=key.to_vec()).next_back();
 
         match entry {
             Some(Ok((_, bytes))) => Ok(Some(bytes.as_ref().try_into()?)),
