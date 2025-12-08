@@ -12,6 +12,7 @@ name = "enclave"
 path = "src/main.rs"
 
 [dependencies]
+alloy = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -20,6 +21,7 @@ dialoguer = { workspace = true }
 e3-config = { workspace = true }
 e3-crypto = { workspace = true }
 e3-entrypoint = { workspace = true }
+e3-evm = { workspace = true }
 e3-events = { workspace = true }
 e3-init = { workspace = true }
 e3-support-scripts = { workspace = true }
