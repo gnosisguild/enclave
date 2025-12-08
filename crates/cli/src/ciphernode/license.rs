@@ -13,24 +13,6 @@ use super::LicenseCommands;
 
 pub(crate) async fn execute(ctx: &ChainContext, command: LicenseCommands) -> Result<()> {
     match command {
-        LicenseCommands::Acquire { amount, allocation } => {
-            let license = ctx.license_token_address().await?;
-            let metadata = ctx.erc20(license);
-            let decimals = metadata.decimals().call().await?;
-            let parsed = parse_amount(&amount, decimals)?;
-            let tx = ctx
-                .enclave_token(license)
-                .mintAllocation(ctx.operator(), parsed, allocation)
-                .send()
-                .await?;
-            let receipt = tx.get_receipt().await?;
-            println!(
-                "Minted {} ENCL on {} (tx: {:#x})",
-                amount,
-                ctx.chain_label(),
-                receipt.transaction_hash
-            );
-        }
         LicenseCommands::Bond { amount } => {
             bond_license(ctx, &amount).await?;
         }

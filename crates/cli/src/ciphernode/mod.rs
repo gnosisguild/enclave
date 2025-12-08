@@ -80,13 +80,6 @@ pub enum CiphernodeCommands {
 
 #[derive(Subcommand, Debug)]
 pub enum LicenseCommands {
-    /// Mint ENCL tokens using the faucet/minter role (dev tooling)
-    Acquire {
-        #[arg(long = "amount")]
-        amount: String,
-        #[arg(long = "allocation", default_value = "CLI allocation")]
-        allocation: String,
-    },
     /// Bond ENCL into the bonding registry
     Bond {
         #[arg(long = "amount")]

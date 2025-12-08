@@ -26,16 +26,6 @@ mod bonding_registry_contract {
     );
 }
 
-mod enclave_token_contract {
-    use super::sol;
-
-    sol!(
-        #[sol(rpc)]
-        EnclaveTokenContract,
-        "../../packages/enclave-contracts/artifacts/contracts/token/EnclaveToken.sol/EnclaveToken.json"
-    );
-}
-
 mod enclave_ticket_token_contract {
     use super::sol;
 
@@ -64,7 +54,6 @@ mod erc20_metadata_interface {
 
 use bonding_registry_contract::BondingRegistryContract;
 use enclave_ticket_token_contract::EnclaveTicketTokenContract;
-use enclave_token_contract::EnclaveTokenContract;
 use erc20_metadata_interface::IERC20Metadata;
 
 pub(crate) struct ChainContext {
@@ -143,13 +132,6 @@ impl ChainContext {
         address: Address,
     ) -> IERC20Metadata::IERC20MetadataInstance<ConcreteWriteProvider> {
         IERC20Metadata::new(address, self.provider_client())
-    }
-
-    pub(crate) fn enclave_token(
-        &self,
-        address: Address,
-    ) -> EnclaveTokenContract::EnclaveTokenContractInstance<ConcreteWriteProvider> {
-        EnclaveTokenContract::new(address, self.provider_client())
     }
 }
 
