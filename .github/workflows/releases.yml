@@ -267,9 +267,6 @@ jobs:
 
       - name: Publish to npm
         run: |
-          # Configure npm authentication
-          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
-
           # Get the tag to use
           TAG="${{ steps.npm_tag.outputs.tag }}"
 
