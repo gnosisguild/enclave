@@ -192,4 +192,5 @@ export type VoteProofInputs = {
   balance: bigint
   vote: Vote
   signature: `0x${string}`
+  previousCiphertext?: Uint8Array
 }

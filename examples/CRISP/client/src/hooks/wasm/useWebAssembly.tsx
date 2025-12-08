@@ -23,7 +23,13 @@ export const useWebAssemblyHook = () => {
     }
   }, [])
 
-  const generateProof = async (voteId: bigint, publicKey: Uint8Array, address: string, signature: string): Promise<string | undefined> => {
+  const generateProof = async (
+    voteId: bigint,
+    publicKey: Uint8Array,
+    address: string,
+    signature: string,
+    previousCiphertext?: Uint8Array,
+  ): Promise<string | undefined> => {
     if (!worker) {
       console.error('WebAssembly worker not initialized')
       return
@@ -31,7 +37,7 @@ export const useWebAssemblyHook = () => {
 
     return new Promise<string | undefined>((resolve, reject) => {
       setIsLoading(true)
-      worker.postMessage({ type: 'generate_proof', data: { voteId, publicKey, address, signature } })
+      worker.postMessage({ type: 'generate_proof', data: { voteId, publicKey, address, signature, previousCiphertext } })
       worker.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data
         if (type === 'generate_proof') {

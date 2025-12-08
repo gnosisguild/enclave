@@ -13,6 +13,8 @@ import { useNotificationAlertContext } from '@/context/NotificationAlert/Notific
 import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest, VoteStateLite, VotingRound } from '@/model/vote.model'
 
+import { encryptVote, SIGNATURE_MESSAGE } from '@crisp-e3/sdk'
+
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
 const extractCleanErrorMessage = (errorMessage: string | undefined): string => {
@@ -65,9 +67,9 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Poll, address: string, signature: string) => {
+    async (vote: Poll, address: string, signature: string, previousCiphertext?: Uint8Array) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature)
+      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, previousCiphertext)
     },
     [generateProof, votingRound],
   )
@@ -105,11 +107,11 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setVotingStep('signing')
         setLastActiveStep('signing')
         setStepMessage('Please sign the message in your wallet...')
-        const message = `Vote for round ${roundState.id}`
+        // const message = `Vote for round ${roundState.id}`
 
         let signature: string
         try {
-          signature = await signMessageAsync({ message })
+          signature = await signMessageAsync({ message: SIGNATURE_MESSAGE })
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (signError) {
           console.log('User rejected signature or signing failed')
@@ -123,7 +125,10 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature)
+        // @todo get this from the contract or server
+        const newEncryptionTemp = encryptVote({ yes: 0n, no: 0n }, new Uint8Array(votingRound!.pk_bytes))
+        const previousCiphertext = isVoteUpdate ? newEncryptionTemp : undefined
+        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, previousCiphertext)
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')
         }
