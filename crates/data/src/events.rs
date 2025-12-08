@@ -86,3 +86,12 @@ impl SeekForPrev {
         &self.0
     }
 }
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SeekForPrevResponse(u64);
+impl SeekForPrevResponse {
+    pub fn new(val: u64) -> Self {
+        Self(val)
+    }
+}
