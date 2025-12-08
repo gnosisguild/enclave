@@ -138,7 +138,7 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn get_vote_count(&self) -> Result<u64> {
         let e3_crisp = self.get_crisp().await?;
-        Ok(u64::try_from(e3_crisp.ciphertext_inputs.len())?)
+        Ok(u64::try_from(e3_crisp.has_voted.len())?)
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -206,7 +206,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             status: e3_crisp.status,
             chain_id: e3.chain_id,
             duration: e3.duration,
-            vote_count: u64::try_from(e3_crisp.ciphertext_inputs.len())?,
+            vote_count: u64::try_from(e3_crisp.has_voted.len())?,
             start_time: e3_crisp.start_time,
             start_block: e3.request_block,
             enclave_address: e3.enclave_address,
