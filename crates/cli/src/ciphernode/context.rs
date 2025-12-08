@@ -22,7 +22,7 @@ mod bonding_registry_contract {
     sol!(
         #[sol(rpc)]
         BondingRegistryContract,
-        "../../packages/enclave-contracts/artifacts/contracts/registry/BondingRegistry.sol/BondingRegistry.json"
+        "../../packages/enclave-contracts/artifacts/contracts/interfaces/IBondingRegistry.sol/IBondingRegistry.json"
     );
 }
 
@@ -110,11 +110,11 @@ impl ChainContext {
     }
 
     pub(crate) async fn license_token_address(&self) -> Result<Address> {
-        Ok(self.bonding().licenseToken().call().await?)
+        Ok(self.bonding().getLicenseToken().call().await?)
     }
 
     pub(crate) async fn ticket_token_address(&self) -> Result<Address> {
-        Ok(self.bonding().ticketToken().call().await?)
+        Ok(self.bonding().getTicketToken().call().await?)
     }
 
     pub(crate) async fn ticket_underlying_address(&self) -> Result<Address> {
