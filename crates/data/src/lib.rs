@@ -5,11 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod data_store;
-mod event_log;
+mod event_store;
+mod event_store_in_mem;
 mod events;
-mod hlc_store;
 mod in_mem;
-mod in_mem_hlc_store;
 mod into_key;
 mod persistable;
 mod repositories;
@@ -20,9 +19,7 @@ mod snapshot;
 mod traits;
 
 pub use data_store::*;
-pub use event_log::*;
 pub use events::*;
-pub use hlc_store::*;
 pub use in_mem::*;
 pub use into_key::IntoKey;
 pub use persistable::*;
