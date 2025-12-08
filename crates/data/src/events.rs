@@ -89,8 +89,8 @@ impl SeekForPrev {
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct SeekForPrevResponse(u64);
-impl SeekForPrevResponse {
+pub struct SeekForPrevReply(u64);
+impl SeekForPrevReply {
     pub fn new(val: u64) -> Self {
         Self(val)
     }
