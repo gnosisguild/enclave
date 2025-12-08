@@ -9,7 +9,7 @@ use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use once_cell::sync::Lazy;
-use sled::Db;
+use sled::{Db, Tree};
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -29,7 +29,7 @@ impl Actor for SledStore {
 impl SledStore {
     pub fn new(bus: &BusHandle, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
-        let db = SledDb::new(PathBuf::from(path))?;
+        let db = SledDb::new(path, "datastore")?;
 
         let store = Self {
             db: Some(db),
@@ -110,7 +110,7 @@ impl Handler<EnclaveEvent> for SledStore {
 }
 
 pub struct SledDb {
-    db: Db,
+    db: Tree,
 }
 
 // Global static cache
@@ -146,9 +146,25 @@ fn get_or_open_db(path: &PathBuf) -> Result<Db> {
     if let Some(db) = cache.get(&key) {
         return Ok(db.clone());
     }
-    let db = sled::open(path)?;
+    let db = sled::open(path).with_context(|| {
+        format!(
+            "Could not open database at path '{}'",
+            path.to_string_lossy()
+        )
+    })?;
     cache.insert(key, db.clone());
+    if !db.was_recovered() {
+        info!("created db at: {:?}", &path);
+    } else {
+        info!("recovered db st: {:?}", &path);
+    }
+
     Ok(db)
+}
+
+fn get_or_open_db_tree(path: &PathBuf, tree: &str) -> Result<Tree> {
+    let db = get_or_open_db(path)?;
+    Ok(db.open_tree(tree)?)
 }
 
 fn clear_all_caches() {
@@ -157,18 +173,8 @@ fn clear_all_caches() {
 }
 
 impl SledDb {
-    pub fn new(path: PathBuf) -> Result<Self> {
-        let db = get_or_open_db(&path).with_context(|| {
-            format!(
-                "Could not open database at path '{}'",
-                path.to_string_lossy()
-            )
-        })?;
-        if !db.was_recovered() {
-            info!("created db at: {:?}", &path);
-        } else {
-            info!("recovered db st: {:?}", &path);
-        }
+    pub fn new(path: &PathBuf, tree: &str) -> Result<Self> {
+        let db = get_or_open_db_tree(path, tree)?;
         Ok(Self { db })
     }
 
@@ -216,11 +222,11 @@ mod tests {
         let db_path = temp_dir.path().join("test_cache.db");
 
         // Create first instance and insert data
-        let mut db1 = SledDb::new(db_path.clone())?;
+        let mut db1 = SledDb::new(&db_path, "datastore")?;
         db1.insert(Insert::new(b"test_key".to_vec(), b"test_value".to_vec()))?;
 
         // Create second instance to same path and verify data access
-        let mut db2 = SledDb::new(db_path.clone())?;
+        let mut db2 = SledDb::new(&db_path, "datastore")?;
         let result = db2.get(Get::new(b"test_key".to_vec()))?;
         assert_eq!(
             result.unwrap(),
@@ -246,11 +252,11 @@ mod tests {
 
         // Section 3: Test cache with different path
         let second_path = temp_dir.path().join("different_cache.db");
-        let mut db3 = SledDb::new(second_path.clone())?;
+        let mut db3 = SledDb::new(&second_path, "datastore")?;
         db3.insert(Insert::new(b"db3_key".to_vec(), b"db3_value".to_vec()))?;
 
         // Create another instance to the second path
-        let mut db4 = SledDb::new(second_path)?;
+        let mut db4 = SledDb::new(&second_path, "datastore")?;
         assert_eq!(
             db4.get(Get::new(b"db3_key".to_vec()))?.unwrap(),
             b"db3_value".to_vec(),
