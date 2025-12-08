@@ -8,8 +8,8 @@ use clap::Parser;
 use cli::Cli;
 use tracing::info;
 
-mod cli;
 mod ciphernode;
+mod cli;
 mod config_set;
 pub mod helpers;
 mod init;

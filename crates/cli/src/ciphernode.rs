@@ -552,6 +552,11 @@ async fn print_status(ctx: &ChainContext) -> Result<()> {
     let min_ticket_balance: U256 = contract.minTicketBalance().call().await?;
     let license_required: U256 = contract.licenseRequiredBond().call().await?;
 
+    let ticket_token = ctx.ticket_token_address().await?;
+    let license_token = ctx.license_token_address().await?;
+    let ticket_decimals = ctx.erc20(ticket_token).decimals().call().await?;
+    let license_decimals = ctx.erc20(license_token).decimals().call().await?;
+
     println!("Ciphernode status on {}:", ctx.chain_label);
     println!("  Address: {:#x}", operator);
     println!("  Registered: {}", is_registered);
@@ -559,18 +564,44 @@ async fn print_status(ctx: &ChainContext) -> Result<()> {
     println!("  Exit pending: {}", has_exit);
     println!(
         "  Ticket balance: {} ({} available)",
-        ticket_balance, available_tickets
+        format_amount(ticket_balance, ticket_decimals),
+        format_amount(available_tickets, ticket_decimals)
     );
-    println!("  License bond: {}", license_bond);
+    println!(
+        "  License bond: {}",
+        format_amount(license_bond, license_decimals)
+    );
     println!(
         "  Pending exits: tickets={}, license={}",
-        pending_tickets, pending_license
+        format_amount(pending_tickets, ticket_decimals),
+        format_amount(pending_license, license_decimals)
     );
     println!(
-        "  Requirements: minTickets={}, ticketPrice={}, licenseBond={} ENCL",
-        min_ticket_balance, ticket_price, license_required
+        "  Requirements: minTickets={}, ticketPrice={} EKT, licenseBond={} ENCL",
+        format_amount(min_ticket_balance, ticket_decimals),
+        format_amount(ticket_price, ticket_decimals),
+        format_amount(license_required, license_decimals)
     );
     Ok(())
+}
+
+fn format_amount(amount: U256, decimals: u8) -> String {
+    let scale = U256::from(10u64).pow(U256::from(decimals as u64));
+    let int_part = amount / scale;
+    let frac_part = amount % scale;
+
+    if frac_part == U256::from(0) {
+        int_part.to_string()
+    } else {
+        let frac_str = frac_part.to_string();
+        let frac_padded = format!("{:0>width$}", frac_str, width = decimals as usize);
+        let frac_trimmed = frac_padded.trim_end_matches('0');
+        if frac_trimmed.is_empty() {
+            int_part.to_string()
+        } else {
+            format!("{}.{}", int_part, frac_trimmed)
+        }
+    }
 }
 
 fn parse_amount(value: &str, decimals: u8) -> Result<U256> {
