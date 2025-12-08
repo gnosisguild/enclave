@@ -2772,6 +2772,7 @@ name = "e3-cli"
 version = "0.1.5"
 dependencies = [
  "actix",
+ "alloy",
  "anyhow",
  "clap",
  "compile-time",
@@ -2780,6 +2781,7 @@ dependencies = [
  "e3-crypto",
  "e3-entrypoint",
  "e3-events",
+ "e3-evm",
  "e3-init",
  "e3-support-scripts",
  "hex",

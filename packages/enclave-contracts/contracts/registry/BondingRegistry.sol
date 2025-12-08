@@ -187,6 +187,16 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // ======================
 
     /// @inheritdoc IBondingRegistry
+    function getLicenseToken() external view returns (address) {
+        return address(licenseToken);
+    }
+
+    /// @inheritdoc IBondingRegistry
+    function getTicketToken() external view returns (address) {
+        return address(ticketToken);
+    }
+
+    /// @inheritdoc IBondingRegistry
     function getTicketBalance(
         address operator
     ) external view returns (uint256) {
