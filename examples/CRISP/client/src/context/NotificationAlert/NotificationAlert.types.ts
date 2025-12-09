@@ -9,6 +9,8 @@ import { ReactNode } from 'react'
 
 export type NotificationAlertContextType = {
   showToast: (toast: NotificationAlert) => void
+  closeToast: (id?: string) => void
+  clearAllToasts: () => void
 }
 
 export type NotificationAlertProviderProps = {

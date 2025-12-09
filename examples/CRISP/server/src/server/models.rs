@@ -54,6 +54,22 @@ pub struct VoteResponse {
     pub status: VoteResponseStatus,
     pub tx_hash: Option<String>,
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_vote_update: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VoteStatusRequest {
+    pub round_id: u64,
+    pub address: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VoteStatusResponse {
+    pub round_id: u64,
+    pub address: String,
+    pub has_voted: bool,
+    pub round_status: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -6,31 +6,81 @@
 
 import { createGenericContext } from '@/utils/create-generic-context'
 import { NotificationAlertContextType, NotificationAlertProviderProps } from '@/context/NotificationAlert'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useMemo } from 'react'
 import { NotificationAlert } from '@/model/notification.model'
 import ToastAlert from '@/components/ToastAlert'
+
+const MAX_TOASTS = 5
+
+const generateToastId = (): string => `toast-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
 const [useNotificationAlertContext, NotificationAlertContextProvider] = createGenericContext<NotificationAlertContextType>()
 
 const NotificationAlertProvider = ({ children }: NotificationAlertProviderProps) => {
-  const [toast, setToast] = useState<NotificationAlert | null>(null)
+  const [toasts, setToasts] = useState<NotificationAlert[]>([])
+
+  const closeToast = useCallback((id?: string) => {
+    if (id) {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    } else {
+      setToasts((prev) => {
+        const nonPersistentIndex = prev.findIndex((t) => !t.persistent)
+        if (nonPersistentIndex !== -1) {
+          return prev.filter((_, i) => i !== nonPersistentIndex)
+        }
+        return prev
+      })
+    }
+  }, [])
 
   const showToast = useCallback((toast: NotificationAlert) => {
-    setToast(toast)
+    const toastWithId: NotificationAlert = {
+      ...toast,
+      id: toast.id || generateToastId(),
+    }
+
+    setToasts((prev) => {
+      const newToasts = prev.length >= MAX_TOASTS ? prev.slice(1) : prev
+
+      return [...newToasts, toastWithId]
+    })
   }, [])
 
-  const closeToast = useCallback(() => {
-    setToast(null)
+  const clearAllToasts = useCallback(() => {
+    setToasts([])
   }, [])
+
+  const contextValue = useMemo(
+    () => ({
+      showToast,
+      closeToast,
+      clearAllToasts,
+    }),
+    [showToast, closeToast, clearAllToasts],
+  )
 
   return (
-    <NotificationAlertContextProvider
-      value={{
-        showToast,
-      }}
-    >
+    <NotificationAlertContextProvider value={contextValue}>
       {children}
-      {toast && <ToastAlert linkUrl={toast.linkUrl} message={toast.message} type={toast.type} onClose={closeToast} />}
+      <div
+        className='fixed bottom-8 left-8 z-[9999] flex flex-col-reverse gap-2 pointer-events-none'
+        role='region'
+        aria-label='Notifications'
+        aria-live='polite'
+      >
+        {toasts.map((toast) => (
+          <ToastAlert
+            key={toast.id}
+            id={toast.id}
+            linkUrl={toast.linkUrl}
+            message={toast.message}
+            type={toast.type}
+            persistent={toast.persistent}
+            duration={toast.duration}
+            onClose={() => closeToast(toast.id)}
+          />
+        ))}
+      </div>
     </NotificationAlertContextProvider>
   )
 }
