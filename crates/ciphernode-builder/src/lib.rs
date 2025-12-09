@@ -6,5 +6,7 @@
 
 mod ciphernode;
 mod ciphernode_builder;
+mod eventbus_factory;
 pub use ciphernode::*;
 pub use ciphernode_builder::*;
+pub use eventbus_factory::*;
