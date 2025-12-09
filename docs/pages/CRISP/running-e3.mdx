@@ -19,6 +19,7 @@ complete voting round of CRISP and do the following:
 Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before proceeding.
 
 enclave nodes up -v
+
 <Steps>
 
 ### Prep Once per Checkout
@@ -51,8 +52,7 @@ Behind the scenes `scripts/dev.sh` calls `scripts/dev_services.sh`, which:
 - Launches the Rust server with `cargo run --bin server`
 - Starts the React client via `pnpm dev-static`
 
-Keep this terminal open; logs from every service are multiplexed with
-`pnpm concurrently`.
+Keep this terminal open; logs from every service are multiplexed with `pnpm concurrently`.
 
 ### (Optional) Build Once for Production
 
@@ -197,7 +197,7 @@ The CRISP voting process involves several key steps:
 - **MetaMask connection issues**: Check that you're connected to the correct network (Chain
   ID: 31337)
 - **Transaction failures**: Verify you have sufficient ETH balance from the Hardhat faucet (the
-   account with the imported deployer key starts funded)
+  account with the imported deployer key starts funded)
 - **Server errors**: Monitor the server logs for detailed error messages
 - **Ciphernode issues**: Ensure all ciphernode processes are running and connected
 

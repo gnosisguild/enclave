@@ -29,7 +29,8 @@ Each library has its own `README.md` describing APIs and dependency stanza. Exam
 safe = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.5", directory = "circuits/crates/libs/safe" }
 ```
 
-From `v0.1.6` onward the directory becomes `circuits/crates/libs/safe` (the `packages/` prefix was removed).
+From `v0.1.6` onward the directory becomes `circuits/crates/libs/safe` (the `packages/` prefix was
+removed).
 
 ## Tooling requirements
 
@@ -51,8 +52,8 @@ Run the helper scripts from the repo root or reproduce them in your project:
 ./scripts/test-circuits.sh      # run circuit unit tests (nargo test) when available
 ```
 
-These scripts exit early (without failing the whole build) if `nargo` is not installed, which makes CI happy
-when Noir is optional.
+These scripts exit early (without failing the whole build) if `nargo` is not installed, which makes
+CI happy when Noir is optional.
 
 ## Exporting verifiers
 
@@ -78,5 +79,6 @@ Adapt the script for your own circuits and verifiers by changing the output path
 - Generate Solidity verifiers and move them into your contract package
 - Reference the compiled artifacts when deploying via the template or CRISP scripts
 
-When adding new circuits, remember to update `package.json` scripts (e.g., `pnpm dev:all`) so they call your
-compile script before spinning up the dev environment. This keeps your verifiers in sync with the Noir source.
+When adding new circuits, remember to update `package.json` scripts (e.g., `pnpm dev:all`) so they
+call your compile script before spinning up the dev environment. This keeps your verifiers in sync
+with the Noir source.

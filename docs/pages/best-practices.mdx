@@ -13,8 +13,8 @@ clear guardrails for confidential compute. This guide distills the equivalent pl
   matches available Ciphernodes. Higher thresholds improve collusion resistance but increase fees.
 - **Timing Windows**: Ensure `startWindow` leaves enough time for committee selection (a few blocks)
   and `duration` matches the longest credible compute time plus buffer.
-- **Custom Params**: Use `customParams` in `E3RequestParams` to tag jurisdiction, use case, or feature
-  toggles without redeploying contracts.
+- **Custom Params**: Use `customParams` in `E3RequestParams` to tag jurisdiction, use case, or
+  feature toggles without redeploying contracts.
 
 ## Input Validation
 
@@ -30,26 +30,26 @@ clear guardrails for confidential compute. This guide distills the equivalent pl
 
 - **Determinism**: Reconstruct the on-chain Merkle root inside the Secure Process, then assert
   equality prior to any heavy math.
-- **Proof hooks**: When using RISC Zero or other verifiable CPs, keep witness blobs small and reserve
-  `computeProviderParams` for runtime toggles (precision, chunk size, etc.).
-- **Failover**: Decide how your app reacts if `CiphertextOutputPublished` never arrives—e.g., allow a
-  guardian to cancel the round and refund deposits.
+- **Proof hooks**: When using RISC Zero or other verifiable CPs, keep witness blobs small and
+  reserve `computeProviderParams` for runtime toggles (precision, chunk size, etc.).
+- **Failover**: Decide how your app reacts if `CiphertextOutputPublished` never arrives—e.g., allow
+  a guardian to cancel the round and refund deposits.
 
 ## Key Material & Ciphernodes
 
-- **Key hygiene**: `dev:setup` wipes `.enclave` directories for you; mimic that behavior in production
-  by rotating committee keys when nodes churn.
-- **Monitoring**: Subscribe to `E3Activated` and `PlaintextOutputPublished` events to ensure the CiCo
-  publishes keys and decryptions on schedule.
-- **Operator docs**: Keep the [Ciphernode Operators](/ciphernode-operators) runbooks close to your app
-  documentation so node providers can mirror your expectations.
+- **Key hygiene**: `dev:setup` wipes `.enclave` directories for you; mimic that behavior in
+  production by rotating committee keys when nodes churn.
+- **Monitoring**: Subscribe to `E3Activated` and `PlaintextOutputPublished` events to ensure the
+  CiCo publishes keys and decryptions on schedule.
+- **Operator docs**: Keep the [Ciphernode Operators](/ciphernode-operators) runbooks close to your
+  app documentation so node providers can mirror your expectations.
 
 ## Observability & Tooling
 
 - **Structured logs**: Adopt the logging schema from the CRISP server (JSON with `e3_id` and phase)
   so you can stitch together end-to-end traces.
-- **Synthetic tests**: Reuse `pnpm dev:up` + Playwright to run rehearsal rounds on CI before shipping
-  new circuits or SDK releases.
+- **Synthetic tests**: Reuse `pnpm dev:up` + Playwright to run rehearsal rounds on CI before
+  shipping new circuits or SDK releases.
 - **Dashboarding**: Track request fees, committee saturation, and mean time from `request` to
   `PlaintextOutputPublished` just like Ritual exposes node specialization metrics.
 

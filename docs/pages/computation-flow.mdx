@@ -25,19 +25,19 @@ Providers, or other network participant.
 
    ```solidity
    function request(
-       E3RequestParams calldata requestParams
+     E3RequestParams calldata requestParams
    ) external returns (uint256 e3Id, E3 memory e3);
    ```
 
    ```solidity
    struct E3RequestParams {
-       uint32[2] threshold;
-       uint256[2] startWindow;
-       uint256 duration;
-       IE3Program e3Program;
-       bytes e3ProgramParams;
-       bytes computeProviderParams;
-       bytes customParams;
+     uint32[2] threshold;
+     uint256[2] startWindow;
+     uint256 duration;
+     IE3Program e3Program;
+     bytes e3ProgramParams;
+     bytes computeProviderParams;
+     bytes customParams;
    }
    ```
 

@@ -21,17 +21,17 @@ containers:
 3. Fill the wizard fields with the same addresses listed in the contract table on this page. The
    following values keep you in-sync with the public Sepolia network:
 
-| Wizard field | Value / Notes |
-| --- | --- |
-| `Network` | `sepolia` (mainnet + localhost are also available) |
-| `RPC URL` | WebSocket endpoint, e.g. `wss://ethereum-sepolia.publicnode.com` |
-| `Node Address` | Operator address funded with ENCL and the stable token (ETK backing) |
-| `Private Key` | Matches `Node Address`; stored as a secret in the container |
-| `Bootstrap Peers` | `/dnsaddr/bootstrap.enclave.gg` (add more comma-separated peers as needed) |
-| `Node Role` | `ciphernode` (switch to `aggregator` only if this host should aggregate plaintext) |
-| `Enclave / CiphernodeRegistry / BondingRegistry` | Use the Sepolia addresses from this doc or your deployment artifact |
-| `*_DEPLOY_BLOCK` | Block numbers for each contract (Sepolia example: Enclave `9615399`) |
-| `ENCRYPTION_PASSWORD`, `NETWORK_PRIVATE_KEY` | Provide values to keep deterministic peer IDs across restarts; leave blank to auto-generate |
+| Wizard field                                     | Value / Notes                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `Network`                                        | `sepolia` (mainnet + localhost are also available)                                          |
+| `RPC URL`                                        | WebSocket endpoint, e.g. `wss://ethereum-sepolia.publicnode.com`                            |
+| `Node Address`                                   | Operator address funded with ENCL and the stable token (ETK backing)                        |
+| `Private Key`                                    | Matches `Node Address`; stored as a secret in the container                                 |
+| `Bootstrap Peers`                                | `/dnsaddr/bootstrap.enclave.gg` (add more comma-separated peers as needed)                  |
+| `Node Role`                                      | `ciphernode` (switch to `aggregator` only if this host should aggregate plaintext)          |
+| `Enclave / CiphernodeRegistry / BondingRegistry` | Use the Sepolia addresses from this doc or your deployment artifact                         |
+| `*_DEPLOY_BLOCK`                                 | Block numbers for each contract (Sepolia example: Enclave `9615399`)                        |
+| `ENCRYPTION_PASSWORD`, `NETWORK_PRIVATE_KEY`     | Provide values to keep deterministic peer IDs across restarts; leave blank to auto-generate |
 
 The wizard writes `config.yaml` from `config.template.yaml`, injects your answers as environment
 variables, and persists `/data` so restarts do not erase the node database. After the wizard
@@ -188,19 +188,19 @@ Your node will:
 
 With the node running (via DAppNode, Docker, or bare metal) and your wallet already funded with the
 required ENCL + stable tokens, move through the registry lifecycle using the CLI. Every command
-accepts `--chain <name>` to select the chain entry from your config file and `--config <path>` if you
-store configs outside the default.
+accepts `--chain <name>` to select the chain entry from your config file and `--config <path>` if
+you store configs outside the default.
 
-| Goal | Command | Result |
-| --- | --- | --- |
-| Bond ENCL license collateral | `enclave ciphernode license bond --amount 100 --chain sepolia` | Approves + bonds ENCL into the BondingRegistry |
-| Deposit ticket backing (stablecoin) | `enclave ciphernode tickets buy --amount 100 --chain sepolia` | Approves fee token, mints ETK tickets |
-| Register the operator | `enclave ciphernode register --chain sepolia` | Calls `registerOperator()` and unlocks sortition eligibility |
-| Force an activation check | `enclave ciphernode activate --chain sepolia` | Replays `registerOperator()` if status drifted |
-| Inspect state | `enclave ciphernode status --chain sepolia` | Prints bonded amounts, tickets, exits, and requirements |
-| Remove stake during an exit | `enclave ciphernode deactivate --tickets 10 --license 20 --chain sepolia` | Withdraws tickets / unbonds license into the exit queue |
-| Deregister completely | `enclave ciphernode deregister --proof 0xabc,0xdef --chain sepolia` | Calls `deregisterOperator()`, burning tickets immediately |
-| Claim finished exits | `enclave ciphernode license claim --max-ticket 100 --max-license 100 --chain sepolia` | Calls `claimExits()` to pull unlocked funds |
+| Goal                                | Command                                                                               | Result                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Bond ENCL license collateral        | `enclave ciphernode license bond --amount 100 --chain sepolia`                        | Approves + bonds ENCL into the BondingRegistry               |
+| Deposit ticket backing (stablecoin) | `enclave ciphernode tickets buy --amount 100 --chain sepolia`                         | Approves fee token, mints ETK tickets                        |
+| Register the operator               | `enclave ciphernode register --chain sepolia`                                         | Calls `registerOperator()` and unlocks sortition eligibility |
+| Force an activation check           | `enclave ciphernode activate --chain sepolia`                                         | Replays `registerOperator()` if status drifted               |
+| Inspect state                       | `enclave ciphernode status --chain sepolia`                                           | Prints bonded amounts, tickets, exits, and requirements      |
+| Remove stake during an exit         | `enclave ciphernode deactivate --tickets 10 --license 20 --chain sepolia`             | Withdraws tickets / unbonds license into the exit queue      |
+| Deregister completely               | `enclave ciphernode deregister --proof 0xabc,0xdef --chain sepolia`                   | Calls `deregisterOperator()`, burning tickets immediately    |
+| Claim finished exits                | `enclave ciphernode license claim --max-ticket 100 --max-license 100 --chain sepolia` | Calls `claimExits()` to pull unlocked funds                  |
 
 - For `tickets buy` and `license bond`, the CLI automatically checks ERC20 allowances and submits
   approvals before calling the BondingRegistry.

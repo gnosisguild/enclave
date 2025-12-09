@@ -10,8 +10,8 @@ Understand how to collect rewards, respond to slashing proposals, and exit the r
 
 - Distributed via `BondingRegistry.distributeRewards` (any ERC20)
 - Watch for `RewardsDistributed` events and map them back to the source `e3Id`
-- Keep the operator wallet funded; payouts are on-chain transfers and still require gas when
-   claimed through automation scripts
+- Keep the operator wallet funded; payouts are on-chain transfers and still require gas when claimed
+  through automation scripts
 
 Pair reward monitoring with lightweight probes:
 
@@ -21,7 +21,8 @@ cast call $BONDING "getTicketBalance(address)" $OPERATOR
 cast call $BONDING "licenseRequiredBond()"
 ```
 
-Seeing rewards fall while balances remain healthy is an early indicator of missed jobs or RPC issues.
+Seeing rewards fall while balances remain healthy is an early indicator of missed jobs or RPC
+issues.
 
 ## Slashing lifecycle
 
@@ -41,11 +42,11 @@ Policy anatomy:
 
 ```solidity
 struct SlashPolicy {
-   uint256 ticketPenalty;
-   uint256 licensePenalty;
-   bool requiresProof;
-   uint64 appealWindow;
-   bool appealable;
+  uint256 ticketPenalty;
+  uint256 licensePenalty;
+  bool requiresProof;
+  uint64 appealWindow;
+  bool appealable;
 }
 ```
 
@@ -68,6 +69,7 @@ Never assume a slash is appealable without fetching the latest policy via `Slash
 
    Pass `type(uint256).max` to withdraw the full pending amount. The call reverts with
    `ExitNotReady` if neither queue matured yet.
+
 5. **Cancel if needed** — Calling `registerOperator()` before `claimExits` clears the exit and puts
    you back into the registry.
 
@@ -79,12 +81,12 @@ Helpful getters:
 
 ## Health checklist
 
-| Symptom | Actions |
-| --- | --- |
-| `ExitNotReady` on `claimExits` | Confirm `block.timestamp` passed `exitUnlocksAt` and delay. Call `previewClaimable`. |
-| Slashing appeal rejected immediately | Policy likely disables appeals. Review policy metadata. |
-| `isActive` toggles false unexpectedly | Check ticket balance (>= 1) and verify bonded ENCL >= 80% requirement. |
-| Missed reward payouts | Ensure registry still lists the operator, RPC did not drop events, and reward token address is supported. |
+| Symptom                               | Actions                                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `ExitNotReady` on `claimExits`        | Confirm `block.timestamp` passed `exitUnlocksAt` and delay. Call `previewClaimable`.                      |
+| Slashing appeal rejected immediately  | Policy likely disables appeals. Review policy metadata.                                                   |
+| `isActive` toggles false unexpectedly | Check ticket balance (>= 1) and verify bonded ENCL >= 80% requirement.                                    |
+| Missed reward payouts                 | Ensure registry still lists the operator, RPC did not drop events, and reward token address is supported. |
 
 ## Post-exit
 
