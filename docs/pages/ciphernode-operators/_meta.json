@@ -2,11 +2,11 @@
   "index": {
     "title": "Overview"
   },
+  "running": {
+    "title": "Running a Ciphernode"
+  },
   "registration": {
     "title": "Registration & Licensing"
-  },
-  "operations": {
-    "title": "Running a Ciphernode"
   },
   "tickets-and-sortition": {
     "title": "Tickets & Sortition"

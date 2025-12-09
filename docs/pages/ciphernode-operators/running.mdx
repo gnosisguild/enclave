@@ -1,0 +1,329 @@
+---
+title: 'Running a Ciphernode'
+description: 'Three ways to run a ciphernode: DappNode, Enclave CLI, or Docker'
+---
+
+# Running a Ciphernode
+
+This guide covers three methods to run a ciphernode, from easiest to most flexible. Choose the
+method that best fits your infrastructure.
+
+## Method 1: DappNode (Easiest)
+
+DappNode provides a user-friendly interface for running a ciphernode with minimal configuration.
+
+### Installation
+
+1. Open your DappNode UI (`http://my.dappnode`)
+2. Search for **"Enclave Ciphernode"** and install the package
+3. The setup wizard will prompt you for:
+   - `RPC_URL` - WebSocket RPC endpoint (e.g., `wss://ethereum-sepolia-rpc.publicnode.com`)
+   - `NETWORK` - Network name (e.g., `sepolia`, `mainnet`)
+   - Contract addresses and deploy blocks
+   - Node role (`ciphernode` or `aggregator`)
+   - Optional: encryption password, network key, private key
+
+4. Confirm and complete the installation
+5. Check **Packages → enclave-ciphernode → Logs** to verify the node started
+
+### Configuration via Environment Variables
+
+| Variable              | Description                                  | Required |
+| --------------------- | -------------------------------------------- | -------- |
+| `RPC_URL`             | WebSocket RPC endpoint                       | Yes      |
+| `NETWORK`             | Network name (sepolia, mainnet, etc.)        | No       |
+| `NODE_ROLE`           | `ciphernode` or `aggregator`                 | No       |
+| `NODE_ADDRESS`        | Your Ethereum address                        | No       |
+| `QUIC_PORT`           | UDP port for P2P networking (default: 37173) | No       |
+| `ENCRYPTION_PASSWORD` | Password to encrypt local data               | No       |
+| `NETWORK_PRIVATE_KEY` | libp2p network key (ed25519)                 | No       |
+| `PRIVATE_KEY`         | Ethereum private key (for aggregator)        | No       |
+| `PEERS`               | Comma-separated peer multiaddresses          | No       |
+
+---
+
+## Method 2: Enclave CLI (Recommended)
+
+The Enclave CLI provides the most control and is recommended for production deployments.
+
+### Install the CLI
+
+```bash
+# Quick install
+curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
+
+# Then install the CLI
+enclaveup install
+```
+
+### Initialize Configuration
+
+```bash
+enclave config-set \
+  --rpc-url wss://ethereum-sepolia-rpc.publicnode.com \
+  --eth-address 0xYourAddress
+```
+
+This creates `~/.config/enclave/config.yaml`. You'll be prompted for a password to encrypt sensitive
+data.
+
+### Set Up Credentials
+
+```bash
+# Set encryption password (encrypts local keystore)
+enclave password set
+
+# Generate or set network keypair (for libp2p)
+enclave net keypair generate
+# Or import an existing key:
+# enclave net keypair set --net-keypair 0x...
+
+# Set your wallet private key (for on-chain transactions)
+enclave wallet set --private-key 0xYourPrivateKey
+```
+
+### Configure Your Node
+
+Edit `~/.config/enclave/config.yaml`:
+
+```yaml
+node:
+  address: '0xYourAddress'
+  quic_port: 9091
+  peers:
+    - '/dnsaddr/bootstrap.enclave.gg'
+  autonetkey: true
+  autopassword: true
+
+chains:
+  - name: sepolia
+    rpc_url: 'wss://ethereum-sepolia-rpc.publicnode.com'
+    contracts:
+      enclave:
+        address: '0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6'
+        deploy_block: 9615399
+      ciphernode_registry:
+        address: '0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7'
+      bonding_registry:
+        address: '0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3'
+```
+
+### Start Your Node
+
+```bash
+# Start in foreground with verbose logging
+enclave start -v
+
+# Or use the node supervisor for multiple nodes
+enclave nodes up --detach
+enclave nodes ps          # Check status
+enclave nodes logs cn1    # View logs
+enclave nodes down        # Stop all nodes
+```
+
+### CLI Commands Reference
+
+| Command                        | Description                            |
+| ------------------------------ | -------------------------------------- |
+| `enclave start`                | Start the node in foreground           |
+| `enclave nodes up`             | Start all configured nodes             |
+| `enclave nodes down`           | Stop all nodes                         |
+| `enclave nodes ps`             | List running nodes                     |
+| `enclave nodes status <name>`  | Check specific node status             |
+| `enclave nodes restart <name>` | Restart a specific node                |
+| `enclave ciphernode status`    | Show on-chain registration status      |
+| `enclave purge-all`            | Wipe all local data (use with caution) |
+
+---
+
+## Method 3: Docker
+
+For containerized deployments, you can run the ciphernode Docker image directly.
+
+### Pull the Image
+
+```bash
+docker pull ghcr.io/gnosisguild/ciphernode:latest
+```
+
+### Create Configuration
+
+Create a `config.yaml` file:
+
+```yaml
+node:
+  address: '0xYourAddress'
+  quic_port: 9091
+  peers:
+    - '/dnsaddr/bootstrap.enclave.gg'
+  autonetkey: true
+  autopassword: true
+
+chains:
+  - name: sepolia
+    rpc_url: 'wss://ethereum-sepolia-rpc.publicnode.com'
+    contracts:
+      enclave:
+        address: '0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6'
+        deploy_block: 9615399
+      ciphernode_registry:
+        address: '0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7'
+      bonding_registry:
+        address: '0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3'
+```
+
+### Run the Container
+
+```bash
+docker run -d \
+  --name ciphernode \
+  -v $(pwd)/config.yaml:/home/ciphernode/.config/enclave/config.yaml:ro \
+  -v ciphernode-data:/home/ciphernode/.local/share/enclave \
+  -p 9091:9091/udp \
+  -e ENCRYPTION_PASSWORD=your_password \
+  -e PRIVATE_KEY=0xYourPrivateKey \
+  ghcr.io/gnosisguild/ciphernode:latest
+```
+
+### Docker Compose
+
+For a more manageable setup, use Docker Compose:
+
+```yaml
+services:
+  ciphernode:
+    image: ghcr.io/gnosisguild/ciphernode:latest
+    restart: unless-stopped
+    volumes:
+      - ./config.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ciphernode-data:/home/ciphernode/.local/share/enclave
+    ports:
+      - '9091:9091/udp'
+    environment:
+      ENCRYPTION_PASSWORD: ${ENCRYPTION_PASSWORD}
+      PRIVATE_KEY: ${PRIVATE_KEY}
+
+volumes:
+  ciphernode-data:
+```
+
+### View Logs
+
+```bash
+docker logs -f ciphernode
+```
+
+---
+
+## Configuration Reference
+
+### Node Configuration
+
+| Field          | Description                          | Default                  |
+| -------------- | ------------------------------------ | ------------------------ |
+| `address`      | Your Ethereum address                | Required                 |
+| `quic_port`    | UDP port for QUIC/libp2p networking  | `9091`                   |
+| `peers`        | Bootstrap peer multiaddresses        | `[]`                     |
+| `autonetkey`   | Auto-generate network key if missing | `false`                  |
+| `autopassword` | Auto-generate password if missing    | `false`                  |
+| `autowallet`   | Auto-load wallet from environment    | `false`                  |
+| `data_dir`     | Override data directory              | `~/.local/share/enclave` |
+| `config_dir`   | Override config directory            | `~/.config/enclave`      |
+
+### Chain Configuration
+
+| Field       | Description                          | Required |
+| ----------- | ------------------------------------ | -------- |
+| `name`      | Chain identifier                     | Yes      |
+| `rpc_url`   | WebSocket RPC endpoint               | Yes      |
+| `contracts` | Contract addresses and deploy blocks | Yes      |
+
+### Contract Addresses
+
+Each chain requires these contract addresses:
+
+| Contract              | Description                              |
+| --------------------- | ---------------------------------------- |
+| `enclave`             | Main Enclave coordinator                 |
+| `ciphernode_registry` | Tracks registered operators              |
+| `bonding_registry`    | Manages bonds and tickets                |
+| `fee_token`           | Optional: stablecoin address for tickets |
+
+---
+
+## Networking Requirements
+
+### Firewall Configuration
+
+Open the following ports:
+
+| Port   | Protocol | Purpose                    |
+| ------ | -------- | -------------------------- |
+| `9091` | UDP      | QUIC/libp2p P2P networking |
+
+### Bootstrap Peers
+
+Connect to the Enclave bootstrap network:
+
+```yaml
+peers:
+  - '/dnsaddr/bootstrap.enclave.gg'
+```
+
+Or specify individual peers:
+
+```yaml
+peers:
+  - '/dns4/node1.example.com/udp/9091/quic-v1'
+  - '/ip4/192.168.1.100/udp/9091/quic-v1'
+```
+
+---
+
+## Data Directories
+
+| Directory                      | Contents                          |
+| ------------------------------ | --------------------------------- |
+| `~/.config/enclave/`           | Configuration files, network keys |
+| `~/.local/share/enclave/`      | Databases, job data, keystores    |
+| `~/.local/share/enclave/jobs/` | Per-E3 secret shares and state    |
+
+> Back up these directories regularly. The `jobs/` directory contains encrypted key shares for
+> active E3s - losing this data while participating in a committee may result in slashing.
+
+---
+
+## Monitoring
+
+### Log Levels
+
+Control verbosity with the `-v` flag:
+
+| Flag   | Level | Description              |
+| ------ | ----- | ------------------------ |
+| (none) | WARN  | Warnings and errors only |
+| `-v`   | INFO  | Normal operation logs    |
+| `-vv`  | DEBUG | Detailed debug output    |
+| `-vvv` | TRACE | Full trace logging       |
+
+### Key Events to Watch
+
+| Event                       | Meaning                              |
+| --------------------------- | ------------------------------------ |
+| `E3Requested`               | New computation request detected     |
+| `TicketGenerated`           | Your sortition ticket was calculated |
+| `CiphernodeSelected`        | You were selected for a committee    |
+| `KeyshareCreated`           | Your key share was generated         |
+| `PublicKeyAggregated`       | Committee public key is ready        |
+| `CiphertextOutputPublished` | Time to generate decryption share    |
+| `DecryptionshareCreated`    | Your decryption share was published  |
+| `PlaintextAggregated`       | Final result is available            |
+
+---
+
+## Next Steps
+
+Once your node is running:
+
+1. **[Register & License](./registration)** - Bond ENCL and register as an operator
+2. **[Add Tickets](./tickets-and-sortition)** - Purchase tickets to participate in sortition
