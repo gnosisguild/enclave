@@ -274,11 +274,11 @@ jobs:
           pnpm build:ts
 
           # Publish each package explicitly with the correct tag
-          pnpm --filter @enclave-e3/config publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/contracts publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/wasm publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/sdk publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/react publish --access public --tag $TAG --no-git-checks
+          pnpm --filter @enclave-e3/config publish --access public --tag $TAG --no-git-checks --provenance
+          pnpm --filter @enclave-e3/contracts publish --access public --tag $TAG --no-git-checks --provenance
+          pnpm --filter @enclave-e3/wasm publish --access public --tag $TAG --no-git-checks --provenance 
+          pnpm --filter @enclave-e3/sdk publish --access public --tag $TAG --no-git-checks --provenance
+          pnpm --filter @enclave-e3/react publish --access public --tag $TAG --no-git-checks --provenance
 
   create-github-release:
     name: Create GitHub Release
