@@ -14,9 +14,13 @@ pub trait KeyValStore {
     fn get(&self, msg: Get) -> Result<Option<Vec<u8>>>;
 }
 
-pub trait SeekableStore: KeyValStore {
+pub trait SeekableStore: KeyValStore + Unpin {
     /// Seek for the first key that is less than or equal to the given key in the SeekForPrev msg
     /// and return the value as a Some variant. If no value exists return None. If there was an
     /// error doing the seek return an Error.
     fn seek_for_prev(&self, msg: SeekForPrev) -> Result<Option<Vec<u8>>>;
+}
+
+pub trait AppendOnlyStore: Unpin {
+    fn append_msg(&mut self, payload: Vec<u8>) -> Result<u64>;
 }

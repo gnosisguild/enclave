@@ -5,12 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler};
-use e3_events::{trap, BusHandle, EType};
+use e3_events::{sequencer, trap, BusHandle, EType};
 
-use crate::{
-    event_store::{EventPersisted, PersistRequest},
-    InMemCommitLog, InMemDb, Insert, KeyValStore,
-};
+use crate::{InMemCommitLog, InMemDb, Insert, KeyValStore};
 
 pub struct InMemEventStore {
     hlc_store: InMemDb,
@@ -22,7 +19,7 @@ impl Actor for InMemEventStore {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<PersistRequest> for InMemEventStore {
+impl Handler<sequencer::PersistRequest> for InMemEventStore {
     type Result = ();
     fn handle(&mut self, msg: PersistRequest, _: &mut Self::Context) -> Self::Result {
         trap(EType::Data, &self.bus, || {
@@ -31,8 +28,8 @@ impl Handler<PersistRequest> for InMemEventStore {
             let ts = event.get_ts();
             let seq = self.event_log.append_msg(event.to_bytes()?)?;
             self.hlc_store
-                .insert(Insert::new(ts, seq.to_be_bytes().to_vec()));
-            sender.try_send(EventPersisted(seq))?;
+                .insert(Insert::new(ts, seq.to_be_bytes().to_vec()))?;
+            sender.try_send(sequencer::EventPersisted(seq))?;
             Ok(())
         })
     }

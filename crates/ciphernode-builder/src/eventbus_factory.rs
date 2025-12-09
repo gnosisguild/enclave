@@ -12,6 +12,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::hlc::Hlc;
 use crate::traits::Event;
 use crate::BusHandle;
 use crate::EnclaveEvent;
@@ -93,7 +94,8 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
-pub fn get_enclave_bus_handle() -> BusHandle {
+pub fn get_enclave_bus_handle(node_name: &str) -> BusHandle {
     let bus = get_enclave_event_bus();
-    BusHandle::new_from_consumer(bus)
+    let hlc = Hlc::from_str(node_name);
+    BusHandle::new(bus, sequencer, hlc)
 }

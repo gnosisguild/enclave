@@ -209,3 +209,13 @@ pub fn encrypt_ciphertext(
         .collect::<Result<Vec<Ciphertext>>>()?;
     Ok((ciphertext, plaintext))
 }
+
+/// Function to help with testing when we want to maintain a vec of events
+pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Sequenced>>>)
+{
+    let consumer = EventBus::<EnclaveEvent<Sequenced>>::default().start();
+    let bus: BusHandle = BusHandle::new(consumer);
+    let history = HistoryCollector::new().start();
+    bus.subscribe("*", history.clone().recipient());
+    (bus, history)
+}

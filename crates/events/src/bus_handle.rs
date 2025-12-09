@@ -13,7 +13,7 @@ use tracing::error;
 
 use crate::{
     hlc::Hlc,
-    sequencer::Sequencer,
+    sequencer::{self, Sequencer},
     traits::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
@@ -26,21 +26,21 @@ use crate::{
 #[derivative(Debug)]
 pub struct BusHandle {
     consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-    producer: Addr<Sequencer>,
+    producer: Recipient<EnclaveEvent<Unsequenced>>,
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
 }
 
 impl BusHandle {
-    pub fn new_from_consumer(consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
-        let producer = Sequencer::new(&consumer).start();
-        let hlc = Hlc::default();
-        Self::new(consumer, producer, hlc)
-    }
+    // pub fn new_from_consumer(consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
+    //     // let producer = Sequencer::new(&consumer, event_store).start();
+    //     let hlc = Hlc::default();
+    //     Self::new(consumer, producer, hlc)
+    // }
 
     pub fn new(
         consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-        producer: Addr<Sequencer>,
+        producer: Recipient<EnclaveEvent<Unsequenced>>,
         hlc: Hlc,
     ) -> Self {
         Self {
@@ -54,7 +54,7 @@ impl BusHandle {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.consumer)
     }
 
-    pub fn producer(&self) -> &Addr<Sequencer> {
+    pub fn producer(&self) -> &Recipient<EnclaveEvent<Unsequenced>> {
         &self.producer
     }
 
@@ -136,17 +136,17 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
     }
 }
 
-impl Into<BusHandle> for Addr<EventBus<EnclaveEvent>> {
-    fn into(self) -> BusHandle {
-        BusHandle::new_from_consumer(self)
-    }
-}
-
-impl Into<BusHandle> for &Addr<EventBus<EnclaveEvent>> {
-    fn into(self) -> BusHandle {
-        BusHandle::new_from_consumer(self.clone())
-    }
-}
+// impl Into<BusHandle> for Addr<EventBus<EnclaveEvent>> {
+//     fn into(self) -> BusHandle {
+//         BusHandle::new_from_consumer(self)
+//     }
+// }
+//
+// impl Into<BusHandle> for &Addr<EventBus<EnclaveEvent>> {
+//     fn into(self) -> BusHandle {
+//         BusHandle::new_from_consumer(self.clone())
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

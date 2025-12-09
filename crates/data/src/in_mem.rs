@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertSync, KeyValStore, Remove};
+use crate::{AppendOnlyStore, Get, Insert, InsertSync, KeyValStore, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
 use commitlog::Offset;
@@ -120,6 +120,12 @@ impl Handler<GetDump> for InMemStore {
 
 pub struct InMemDb(BTreeMap<Vec<u8>, Vec<u8>>);
 
+impl InMemDb {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+}
+
 impl Deref for InMemDb {
     type Target = BTreeMap<Vec<u8>, Vec<u8>>;
     fn deref(&self) -> &Self::Target {
@@ -146,7 +152,13 @@ pub struct InMemCommitLog {
 }
 
 impl InMemCommitLog {
-    pub fn append_msg(&mut self, payload: Vec<u8>) -> Result<Offset> {
+    pub fn new() -> Self {
+        Self { log: vec![] }
+    }
+}
+
+impl AppendOnlyStore for InMemCommitLog {
+    fn append_msg(&mut self, payload: Vec<u8>) -> Result<u64> {
         self.log.push(payload);
         Ok(self.log.len() as u64)
     }

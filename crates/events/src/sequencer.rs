@@ -4,20 +4,39 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient};
 
-use crate::{EnclaveEvent, EventBus, Sequenced, Unsequenced};
+use crate::{trap, EType, EnclaveEvent, EventBus, Sequenced, Unsequenced};
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct PersistRequest {
+    pub event: EnclaveEvent<Unsequenced>,
+    pub sender: Recipient<EventPersisted>,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct EventPersisted {
+    pub seq: u64,
+    pub event: EnclaveEvent<Unsequenced>,
+}
 
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     seq: u64,
+    event_store: Recipient<PersistRequest>,
 }
 
 impl Sequencer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
+    pub fn new(
+        bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
+        event_store: Recipient<PersistRequest>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             seq: 0,
+            event_store,
         }
     }
 }
@@ -28,10 +47,18 @@ impl Actor for Sequencer {
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
-        // NOTE: FAKE SEQUENCER FOR NOW - JUST SET THE SEQUENCE NUMBER AND UPDATE
-        self.seq += 1;
-        self.bus.do_send(msg.into_sequenced(self.seq))
+    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+        self.event_store.do_send(PersistRequest {
+            sender: ctx.address().recipient(),
+            event: msg,
+        })
+    }
+}
+
+impl Handler<EventPersisted> for Sequencer {
+    type Result = ();
+    fn handle(&mut self, msg: EventPersisted, ctx: &mut Self::Context) -> Self::Result {
+        self.bus.do_send(msg.event.into_sequenced(msg.seq));
     }
 }
 

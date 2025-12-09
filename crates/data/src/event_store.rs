@@ -4,45 +4,64 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Handler, Message, Recipient};
-use commitlog::CommitLog;
-use e3_events::{trap, BusHandle, EType, EnclaveEvent};
+use actix::{Actor, Handler};
+use e3_events::sequencer;
+use tracing::error;
 
-use crate::{Insert, KeyValStore, SledDb};
+use crate::{AppendOnlyStore, Insert, SeekableStore};
 
-#[derive(Message)]
-#[rtype("()")]
-pub struct PersistRequest {
-    pub event: EnclaveEvent,
-    pub sender: Recipient<EventPersisted>,
+pub struct EventStore<L, S>
+where
+    L: AppendOnlyStore,
+    S: SeekableStore,
+{
+    event_log: L,
+    hlc_store: S,
 }
 
-#[derive(Message)]
-#[rtype("()")]
-pub struct EventPersisted(pub u64);
+// impl EventStore {
+//     pub fn in_mem() -> EventStore<InMemCommitLog, InMemDb> {
+//         Self {
+//             event_log: InMemCommitLog::new(),
+//             hlc_store: InMemDb::new(),
+//         }
+//     }
+//
+//     pub fn new(log: EventLog, db: SledDb) -> EventStore<EventLog, SledDb> {
+//         Self {
+//             event_log: log,
+//             hlc_store: db,
+//         }
+//     }
+// }
 
-pub struct EventStore {
-    hlc_store: SledDb,
-    event_log: CommitLog,
-    bus: BusHandle,
-}
-
-impl Actor for EventStore {
+impl<L, S> Actor for EventStore<L, S>
+where
+    L: AppendOnlyStore + 'static,
+    S: SeekableStore + 'static,
+{
     type Context = actix::Context<Self>;
 }
 
-impl Handler<PersistRequest> for EventStore {
+impl<L, S> Handler<sequencer::PersistRequest> for EventStore<L, S>
+where
+    L: AppendOnlyStore + 'static,
+    S: SeekableStore + 'static,
+{
     type Result = ();
-    fn handle(&mut self, msg: PersistRequest, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Data, &self.bus, || {
+    fn handle(&mut self, msg: sequencer::PersistRequest, _: &mut Self::Context) -> Self::Result {
+        match {
             let event = msg.event;
             let sender = msg.sender;
             let ts = event.get_ts();
             let seq = self.event_log.append_msg(event.to_bytes()?)?;
             self.hlc_store
-                .insert(Insert::new(ts, seq.to_be_bytes().to_vec()));
-            sender.try_send(EventPersisted(seq))?;
+                .insert(Insert::new(ts, seq.to_be_bytes().to_vec()))?;
+            sender.do_send(sequencer::EventPersisted { seq, event });
             Ok(())
-        })
+        } {
+            Ok(_) => (),
+            Err(e) => error!(""),
+        }
     }
 }

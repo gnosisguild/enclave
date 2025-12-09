@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod data_store;
+mod event_log;
 mod event_store;
 mod event_store_in_mem;
 mod events;
@@ -19,6 +20,8 @@ mod snapshot;
 mod traits;
 
 pub use data_store::*;
+pub use event_log::*;
+pub use event_store::*;
 pub use events::*;
 pub use in_mem::*;
 pub use into_key::IntoKey;
