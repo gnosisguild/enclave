@@ -42,6 +42,7 @@ export type VoteManagementContextType = {
     publicKey: Uint8Array,
     address: string,
     signature: string,
+    messageHash: `0x${string}`,
     previousCiphertext?: Uint8Array,
   ) => Promise<string | undefined>
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>

@@ -176,6 +176,7 @@ export type ProofInputs = {
   slotAddress: string
   previousCiphertext?: Uint8Array
   merkleProof: MerkleProof
+  messageHash?: `0x${string}`
 }
 
 export type MaskVoteProofInputs = {
@@ -193,4 +194,5 @@ export type VoteProofInputs = {
   vote: Vote
   signature: `0x${string}`
   previousCiphertext?: Uint8Array
+  messageHash: `0x${string}`
 }

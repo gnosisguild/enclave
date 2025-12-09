@@ -11,7 +11,7 @@ self.onmessage = async function (event) {
   switch (type) {
     case 'generate_proof':
       try {
-        const { voteId, publicKey, address, signature, previousCiphertext } = data
+        const { voteId, publicKey, address, signature, previousCiphertext, messageHash } = data
 
         // voteId is either 0 or 1, so we need to encode the vote accordingly.
         // We are adapting to the current CRISP application.
@@ -32,6 +32,7 @@ self.onmessage = async function (event) {
           merkleLeaves,
           balance,
           previousCiphertext,
+          messageHash,
         })
         const encodedProof = encodeSolidityProof(proof)
 
