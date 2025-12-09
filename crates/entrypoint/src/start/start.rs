@@ -6,11 +6,10 @@
 
 use alloy::primitives::Address;
 use anyhow::Result;
-use e3_ciphernode_builder::CiphernodeBuilder;
+use e3_ciphernode_builder::{get_enclave_bus_handle, CiphernodeBuilder};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
-use e3_events::get_enclave_bus_handle;
 use e3_events::BusHandle;
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use rand::SeedableRng;

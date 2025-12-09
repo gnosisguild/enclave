@@ -2787,6 +2787,7 @@ dependencies = [
  "e3-request",
  "e3-sortition",
  "e3-utils",
+ "once_cell",
  "tracing",
 ]
 
@@ -2954,7 +2955,6 @@ dependencies = [
  "e3-trbfv",
  "e3-utils",
  "futures-util",
- "once_cell",
  "proptest",
  "rand 0.8.5",
  "serde",

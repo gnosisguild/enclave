@@ -12,12 +12,12 @@ use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::traits::Event;
-use crate::BusHandle;
-use crate::EnclaveEvent;
-use crate::EventBus;
-use crate::HistoryCollector;
-use crate::Subscribe;
+use e3_events::BusHandle;
+use e3_events::EnclaveEvent;
+use e3_events::Event;
+use e3_events::EventBus;
+use e3_events::HistoryCollector;
+use e3_events::Subscribe;
 
 // The singleton factory using once_cell
 pub struct EventBusFactory {
