@@ -1,6 +1,7 @@
 name: Release
 
 permissions:
+  id-token: write
   contents: write
   packages: write
 
@@ -265,12 +266,7 @@ jobs:
           fi
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Configure npm authentication
-          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
-
           # Get the tag to use
           TAG="${{ steps.npm_tag.outputs.tag }}"
 
