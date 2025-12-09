@@ -206,24 +206,27 @@ After deployment, you will see the addresses for the following contracts:
 
 #### Step 3: Configure Boundless (Optional)
 
-> Please note that this step is optional for development only. By default, the program server runs in dev mode which uses fake proofs for fast local development.
+> Please note that this step is optional for development only. By default, the program server runs
+> in dev mode which uses fake proofs for fast local development.
 
-For production-grade zero-knowledge proofs with [Boundless](https://docs.beboundless.xyz/), update the `enclave.config.yaml` file in the CRISP root directory:
+For production-grade zero-knowledge proofs with [Boundless](https://docs.beboundless.xyz/), update
+the `enclave.config.yaml` file in the CRISP root directory:
 
 ```yaml
 program:
-  dev: false  # Disable dev mode to use real proofs
+  dev: false # Disable dev mode to use real proofs
   risc0:
-    risc0_dev_mode: 0  # 0 = production (Boundless), 1 = dev mode
+    risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode
     boundless:
-      rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"  # RPC endpoint
-      private_key: "YOUR_PRIVATE_KEY"  # Wallet with funds for proving
-      pinata_jwt: "YOUR_PINATA_JWT"  # Required for uploading programs to IPFS
-      program_url: "https://gateway.pinata.cloud/ipfs/YOUR_CID"  # Pre-uploaded program URL
-      onchain: true  # true = onchain requests, false = offchain
+      rpc_url: 'https://sepolia.infura.io/v3/YOUR_KEY' # RPC endpoint
+      private_key: 'YOUR_PRIVATE_KEY' # Wallet with funds for proving
+      pinata_jwt: 'YOUR_PINATA_JWT' # Required for uploading programs to IPFS
+      program_url: 'https://gateway.pinata.cloud/ipfs/YOUR_CID' # Pre-uploaded program URL
+      onchain: true # true = onchain requests, false = offchain
 ```
 
 > **_Note:_** For production proving with Boundless, you need:
+>
 > - An RPC endpoint (e.g., Infura, Alchemy) with funds
 > - A private key with sufficient ETH/tokens for proof generation
 > - A Pinata JWT for uploading programs to IPFS (get one at [pinata.cloud](https://pinata.cloud))
@@ -236,16 +239,17 @@ When you make changes to the guest program in `program/`, you need to upload it 
 1. Build and upload your program:
 
    ```bash
-   enclave program upload 
+   enclave program upload
    ```
 
 2. The command outputs an IPFS hash. Update `enclave.config.yaml` with the full URL:
 
    ```yaml
-   program_url: "https://gateway.pinata.cloud/ipfs/QmXxx..."
+   program_url: 'https://gateway.pinata.cloud/ipfs/QmXxx...'
    ```
 
-> **_Important:_** Every time you modify the guest program, rebuild and re-upload it to IPFS, then update the `program_url` in your configuration.
+> **_Important:_** Every time you modify the guest program, rebuild and re-upload it to IPFS, then
+> update the `program_url` in your configuration.
 
 #### Step 4: Set up Environment Variables
 

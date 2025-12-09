@@ -31,32 +31,33 @@ can quickly map Enclave building blocks to the outcomes you need.
 
 - **Problem**: Networks such as Ritual and Olas expose agent marketplaces; those agents still need a
   privacy-preserving substrate for sensitive scoring, routing, or risk checks.
-- **Pattern**: Treat each agent as a Data Provider, push policy enforcement into an `IInputValidator`,
-  and let Enclave host shared state transitions (e.g., allocating budget or updating trust scores).
-- **Flow**: Agents encrypt telemetry, the Secure Process derives rankings, and downstream contracts or
-  marketplaces read the published plaintext.
-- **Extras**: Use `customParams` inside `E3RequestParams` to tag rounds per agent vertical (NFT curation,
-  wallet assistants, on-chain AI retrieval).
+- **Pattern**: Treat each agent as a Data Provider, push policy enforcement into an
+  `IInputValidator`, and let Enclave host shared state transitions (e.g., allocating budget or
+  updating trust scores).
+- **Flow**: Agents encrypt telemetry, the Secure Process derives rankings, and downstream contracts
+  or marketplaces read the published plaintext.
+- **Extras**: Use `customParams` inside `E3RequestParams` to tag rounds per agent vertical (NFT
+  curation, wallet assistants, on-chain AI retrieval).
 
 ## Identity, Compliance, and Scoring
 
 - **Problem**: Identity attestations or credit scores leak sensitive attributes when stored directly
   on-chain.
-- **Pattern**: Build circuits that validate proofs of residency, KYC, or AML results without revealing
-  raw data; only the computed risk vector is decrypted.
+- **Pattern**: Build circuits that validate proofs of residency, KYC, or AML results without
+  revealing raw data; only the computed risk vector is decrypted.
 - **Flow**: Validators encrypt attestations, the Secure Process derives the minimal disclosure blob,
   and downstream protocols pull the plaintext via `PlaintextOutputPublished`.
-- **Extras**: Combine with `customParams` to pin jurisdictional policy, similar to how Fhenix exposes
-  "Key Considerations" per sector.
+- **Extras**: Combine with `customParams` to pin jurisdictional policy, similar to how Fhenix
+  exposes "Key Considerations" per sector.
 
 ## Solution Matrix
 
-| Scenario | Typical Inputs | Secure Process Focus | Output Consumers |
-| --- | --- | --- | --- |
-| Confidential Governance | Wallet + ballot selections | Vote aggregation, quorum, randomness | DAO front-ends, multi-sigs |
-| Private Auctions | Bid amount, bidder proofs | Price discovery, winner selection | Settlement contracts |
-| AI Agent Coordination | Agent telemetry, task queue | Ranking, budget splits | Agent marketplaces, orchestrators |
-| Identity / Compliance | Encrypted attestations | Risk flag derivation | On-chain registries, bridges |
+| Scenario                | Typical Inputs              | Secure Process Focus                 | Output Consumers                  |
+| ----------------------- | --------------------------- | ------------------------------------ | --------------------------------- |
+| Confidential Governance | Wallet + ballot selections  | Vote aggregation, quorum, randomness | DAO front-ends, multi-sigs        |
+| Private Auctions        | Bid amount, bidder proofs   | Price discovery, winner selection    | Settlement contracts              |
+| AI Agent Coordination   | Agent telemetry, task queue | Ranking, budget splits               | Agent marketplaces, orchestrators |
+| Identity / Compliance   | Encrypted attestations      | Risk flag derivation                 | On-chain registries, bridges      |
 
 Next, explore the [Best Practices](/best-practices) and
 [Putting It All Together](/putting-it-together) guides to tailor these patterns to your app.

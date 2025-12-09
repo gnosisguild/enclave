@@ -9,10 +9,10 @@ registration transactions, and config secrets.
 
 ## Before you start
 
-| Track | Checklist |
-| --- | --- |
-| Financial | ENCL covering `licenseRequiredBond`, USDC covering at least `minTicketBalance * ticketPrice`, and ETH for gas |
-| Technical | Enclave CLI ≥ current release, WebSocket RPC, `enclave password/net keypair/wallet` secrets set |
+| Track       | Checklist                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Financial   | ENCL covering `licenseRequiredBond`, USDC covering at least `minTicketBalance * ticketPrice`, and ETH for gas           |
+| Technical   | Enclave CLI ≥ current release, WebSocket RPC, `enclave password/net keypair/wallet` secrets set                         |
 | Operational | `enclave.config.yaml` committed, secrets mirrored into `deploy/*.secrets.json`, monitoring hooks for registration state |
 
 Adjust the numbers using `cast call $BONDING` for `licenseRequiredBond()`, `ticketPrice()` and
@@ -28,9 +28,9 @@ Sepolia defaults (check `BondingRegistry` on your network):
 - **Minimum ticket balance**: 1 ticket (10 USDC)
 - **Exit delay**: `604_800 s` (7 days)
 
-Tickets live inside the non-transferable `EnclaveTicketToken`. Mint them by depositing the underlying
-stablecoin (MockUSDC on Sepolia) via `BondingRegistry.addTicketBalance`. The usable ticket count is:
-
+Tickets live inside the non-transferable `EnclaveTicketToken`. Mint them by depositing the
+underlying stablecoin (MockUSDC on Sepolia) via `BondingRegistry.addTicketBalance`. The usable
+ticket count is:
 
 `availableTickets = floor(ticketTokenBalance / ticketPrice)`
 
