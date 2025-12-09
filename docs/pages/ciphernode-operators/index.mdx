@@ -1,104 +1,103 @@
 ---
 title: 'Ciphernode Operators'
-description: 'Role overview, prerequisites, and quick links for node operators'
+description: 'Overview of ciphernode operations, contracts, and lifecycle'
 ---
 
 # Ciphernode Operators
 
-Ciphernodes decrypt committee outputs, publish threshold key shares, and keep the Enclave request
-pipeline moving. This section organizes everything operators need—from bonding requirements to exit
-procedures—into focused guides.
+Ciphernodes are the distributed workers that power the Enclave network. They participate in
+threshold cryptography to enable encrypted computations (E3s) while ensuring no single party can
+access the underlying data.
 
-## Responsibilities at a glance
+## What is a Ciphernode?
 
-Operators are expected to cover four concurrent tracks:
+A ciphernode is a node operator that:
 
-- **Key management**: generate PVSS shares, keep private key material encrypted at rest, and publish
-  committee public keys once the threshold is met.
-- **Decryption work**: watch for ciphertext outputs, craft decryption shares, and ensure plaintext
-  gets relayed on-chain.
-- **Network availability**: run a QUIC/libp2p endpoint that stays reachable, stay synced to the
-  event bus, and keep RPC endpoints redundant.
-- **Operational hygiene**: rotate secrets, snapshot configs, monitor sortition + job logs, and react
-  to slashing proposals or bans quickly.
+- **Generates key shares**: Creates PVSS (Publicly Verifiable Secret Sharing) key shares for each
+  committee
+- **Publishes public keys**: Contributes to aggregated committee public keys used for encryption
+- **Produces decryption shares**: Decrypts computation outputs when the threshold is met
+- **Maintains availability**: Stays online and responsive to participate in sortition and committee
+  duties
 
-## Role overview
+Ciphernodes earn rewards for successful participation and risk slashing for missed duties or
+malicious behavior.
 
-Operators are expected to:
+## Contract Architecture
 
-- Maintain a QUIC/libp2p endpoint that stays reachable 24/7
-- Bond license collateral (ENCL) and hold ticket balances (ETK) to remain eligible for committees
-- Stay synced with the event bus so sortition submissions and key shares happen on time
-- Produce decryption shares for every E3 assigned to their committee
-- Monitor slashing proposals, appeals, and rewards distribution
+The Enclave protocol uses several contracts that work together:
 
-Each node profile in `enclave.config.yaml` can point to a different network (mainnet, testnet, or
-local dev). The CLI supervises all configured chains concurrently.
+| Contract               | Purpose                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| **Enclave**            | Core coordinator that manages E3 requests and computation lifecycle            |
+| **CiphernodeRegistry** | Tracks registered operators and manages committee formation                    |
+| **BondingRegistry**    | Handles license bonds (ENCL) and ticket balances (ETK)                         |
+| **SlashingManager**    | Processes slashing proposals, appeals, and ban enforcement                     |
+| **EnclaveToken**       | ENCL token used for license bonding                                            |
+| **EnclaveTicketToken** | Non-transferable ETK token representing ticket balances (backed by stablecoin) |
 
-## Why operate a Ciphernode?
+### Sepolia Contract Addresses
 
-- **Rewards & upside**: committee participation and steady uptime translate to ERC20 payouts through
-  `distributeRewards`.
-- **Governance voice**: active operators are closest to the protocol and shape roadmap + policy
-  discussions.
-- **Visibility**: infra partners highlight high-performing nodes in working group updates and future
-  customer routes.
+| Contract             | Address                                      |
+| -------------------- | -------------------------------------------- |
+| Enclave              | `0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6` |
+| CiphernodeRegistry   | `0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7` |
+| BondingRegistry      | `0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3` |
+| SlashingManager      | `0x50dfC643226f09423d51F81c7f37F7a5F1e8f359` |
+| EnclaveTicketToken   | `0x72691272E10a8CA6499c3aa0d59c76E4C090c9E2` |
+| EnclaveToken (ENCL)  | `0xc93f71D10874F09F7F514a3d160E5be21fD624ab` |
+| MockUSDC (fee token) | `0xB58B762748c64f1a36B34012d1C52503617f4De0` |
 
-Balance rewards against the capital tied up in ENCL bonds and ETK tickets plus infra costs. The
-Scenarios page includes quick ROI checklists.
+> Always verify addresses from `packages/enclave-contracts/deployed_contracts.json` or your
+> deployment output. Addresses differ per network.
 
-## Contract references
+## Operator Lifecycle
 
-| Contract                 | Sepolia address                              | Notes                             |
-| ------------------------ | -------------------------------------------- | --------------------------------- |
-| Enclave                  | `0x1E8BD97F15Cd94f250a4dd567d2fd2114303FAa6` | Core coordinator                  |
-| CiphernodeRegistry       | `0x11F647479bEd47cd0dd10276DDc04F2d4B20b1C7` | Handles registration + committees |
-| BondingRegistry          | `0x56368bB545Ab2D6811b4dffa8Ad4B8AF560406E3` | Manages license bonds + tickets   |
-| SlashingManager          | `0x50dfC643226f09423d51F81c7f37F7a5F1e8f359` | Slash & ban workflow              |
-| EnclaveTicketToken (ETK) | `0x72691272E10a8CA6499c3aa0d59c76E4C090c9E2` | Ticket wrapper around USDC        |
-| EnclaveToken (ENCL)      | `0xc93f71D10874F09F7F514a3d160E5be21fD624ab` | License bond token                |
-| MockUSDC (fee token)     | `0xB58B762748c64f1a36B34012d1C52503617f4De0` | Underlying asset for ETK          |
-
-> ⚠️ Confirm addresses in `packages/enclave-contracts/deployed_contracts.json` or your deployment
-> output before funding a node. Values differ per network.
-
-## Requirements checklist
-
-| Track                        | What you need                                                                     | Notes         |
-| ---------------------------- | --------------------------------------------------------------------------------- | ------------- |
-| Financial                    | ≥ `licenseRequiredBond` ENCL, ≥ `minTicketBalance * ticketPrice` USDC, plus gas   | Top up        |
-| ahead of big request windows |
-| Technical                    | Linux/macOS host, 4 cores / 8 GB RAM minimum, open UDP ports for QUIC             | Containers or |
-| bare metal both work         |
-| Operational                  | CLI >= current release, secrets storage (password, wallet, net key), monitoring + |
-| pager                        | Bake into `ciphernode-entrypoint.sh` in `deploy/`                                 |
-
-## Section map
-
-- [Registration & Licensing](./registration) — economic requirements, bonding steps, CLI commands
-- [Tickets & Sortition](./tickets-and-sortition) — how ETK balances influence committee selection
-- [Operations & Responsibilities](./operations) — CLI workflow, networking, deployment manifests
-- [Exits, Rewards & Slashing](./exits-and-slashing) — life after registration, penalties, exits
-- [Runbook Scenarios](./scenarios) — ready-made playbooks for common situations
-
-Use these pages sequentially when onboarding a new operator or jump to the topic you need.
-
-## Lifecycle states
+A ciphernode moves through several states during its lifecycle:
 
 ```mermaid
 stateDiagram-v2
-		[*] --> Unbonded
-		Unbonded --> Licensed: bondLicense(amount >= requiredBond)
-		Licensed --> Registered: registerOperator()
-		Registered --> Active: addTicketBalance(balance >= minBalance)
-		Active --> Inactive: removeTicketBalance() OR unbondLicense()
-		Inactive --> Active: addTicketBalance() OR bondLicense()
-		Active --> ExitPending: deregisterOperator()
-		Inactive --> ExitPending: deregisterOperator()
-		Registered --> ExitPending: deregisterOperator()
-		ExitPending --> [*]: claimExits() after exitDelay
-		ExitPending --> Registered: registerOperator() (cancels exit)
+    [*] --> Unbonded
+    Unbonded --> Licensed: bondLicense(amount >= requiredBond)
+    Licensed --> Registered: registerOperator()
+    Registered --> Active: addTicketBalance(balance >= minBalance)
+    Active --> Inactive: removeTicketBalance() OR unbondLicense()
+    Inactive --> Active: addTicketBalance() OR bondLicense()
+    Active --> ExitPending: deregisterOperator()
+    Inactive --> ExitPending: deregisterOperator()
+    Registered --> ExitPending: deregisterOperator()
+    ExitPending --> [*]: claimExits() after exitDelay
+    ExitPending --> Registered: registerOperator() (cancels exit)
 ```
 
-Refer back here while reading the rest of the section; each guide calls out which state transitions
-it affects.
+### State Descriptions
+
+| State           | Description                                                            |
+| --------------- | ---------------------------------------------------------------------- |
+| **Unbonded**    | No license bond deposited; cannot register                             |
+| **Licensed**    | ENCL bonded but not yet registered in the registry                     |
+| **Registered**  | In the registry but lacking minimum ticket balance                     |
+| **Active**      | Fully operational; eligible for committee selection via sortition      |
+| **Inactive**    | Registered but below minimum requirements (tickets or license bond)    |
+| **ExitPending** | Deregistration requested; waiting for exit delay before claiming funds |
+
+## Requirements
+
+Before operating a ciphernode, ensure you have:
+
+| Requirement     | Details                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
+| **ENCL Tokens** | At least `100 ENCL` for the license bond (check `licenseRequiredBond()`) |
+| **Stablecoin**  | USDC (or configured fee token) for tickets; minimum 1 ticket worth       |
+| **ETH**         | Gas for transactions on your target network                              |
+| **Hardware**    | Linux/macOS, 4+ cores, 8GB+ RAM, stable internet with open UDP port      |
+| **Software**    | Enclave CLI installed, WebSocket RPC endpoint                            |
+
+## Getting Started
+
+Follow these guides in order to become an active ciphernode operator:
+
+1. **[Running a Ciphernode](./running)** - Set up your node using DappNode, Enclave CLI, or Docker
+2. **[Registration & Licensing](./registration)** - Bond your license, register, and add tickets
+3. **[Tickets & Sortition](./tickets-and-sortition)** - Understand how committee selection works
+4. **[Exits, Rewards & Slashing](./exits-and-slashing)** - Learn about rewards and exit procedures
