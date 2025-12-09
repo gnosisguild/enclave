@@ -97,7 +97,16 @@ impl<S: DataStore> CrispE3Repository<S> {
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
-                    e.ciphertext_inputs.push((vote.clone(), index));
+                    // We check if we already have a vote at this index (re-vote case)
+                    // If we do, we update the vote
+                    // If we don't, we append the vote
+                    if let Some(existing) =
+                        e.ciphertext_inputs.iter_mut().find(|(_, i)| *i == index)
+                    {
+                        existing.0 = vote.clone();
+                    } else {
+                        e.ciphertext_inputs.push((vote.clone(), index));
+                    }
                     e
                 })
             })
