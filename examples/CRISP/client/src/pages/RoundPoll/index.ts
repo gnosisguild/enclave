@@ -4,11 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-export interface NotificationAlert {
-  message: string
-  type: 'success' | 'danger' | 'warning' | 'info'
-  linkUrl?: string
-  persistent?: boolean
-  id?: string
-  duration?: number
-}
+export { default } from './RoundPoll'
