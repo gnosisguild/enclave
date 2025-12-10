@@ -22,6 +22,11 @@
     "prerelease": "pnpm build",
     "release": "pnpm publish --access=public"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "crates/wasm"
+  },
   "exports": {
     ".": {
       "node": {

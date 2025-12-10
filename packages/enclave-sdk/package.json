@@ -19,6 +19,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "packages/enclave-sdk"
+  },
   "scripts": {
     "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build",
     "build": "tsup",

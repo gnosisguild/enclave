@@ -8,6 +8,11 @@
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "packages/enclave-contracts"
+  },
   "exports": {
     "./tasks/ciphernode": {
       "import": {
