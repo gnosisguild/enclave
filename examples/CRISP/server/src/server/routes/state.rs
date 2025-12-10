@@ -4,16 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::str::FromStr;
+
 use crate::server::{
-    app_data::AppData,
-    models::{GetRoundRequest, WebhookPayload},
-    CONFIG,
+    CONFIG, app_data::AppData, models::{GetRoundRequest, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload}
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::primitives::{Bytes, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{
     EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
 };
+use evm_helpers::CRISPContractFactory;
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -26,8 +27,72 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             // be included on chain
             .route("/add-result", web::post().to(handle_program_server_result))
             // Get the token holders hashes for a given round
-            .route("/token-holders", web::post().to(get_token_holders_hashes)),
+            .route("/token-holders", web::post().to(get_token_holders_hashes))
+            .route(
+                "/previous-ciphertext",
+                web::post().to(handle_get_previous_ciphertext),
+            ),
     );
+}
+
+/// Endpoint to get the ciphertext input at a certain slot. Used for masking operations
+///
+/// # Arguments
+/// * `data` - The round id and the slot index
+///
+/// # Returns
+/// * A JSON response with the result of the operation. If sucessful it includes the ciphertext input at the given slot
+async fn handle_get_previous_ciphertext(
+    data: web::Json<PreviousCiphertextRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    let contract =
+        match CRISPContractFactory::create_read(&CONFIG.http_rpc_url, &CONFIG.e3_program_address)
+            .await
+        {
+            Ok(contract) => contract,
+            Err(e) => {
+                error!("Failed to create CRISP contract: {:?}", e);
+                return HttpResponse::InternalServerError().body("Failed to create CRISP contract");
+            }
+        };
+
+    let address = match Address::from_str(incoming.address.as_str()) {
+        Ok(addr) => addr,
+        Err(e) => {
+            error!("Invalid address format: {:?}", e);
+            return HttpResponse::BadRequest().body("Invalid address format");
+        }
+    };
+
+    let slot_index = match contract
+        .get_slot_index_from_address(U256::from(incoming.round_id), address)
+        .await
+    {
+        Ok(index) => index.to::<u64>(),
+        Err(e) => {
+            error!("Error getting slot index from address: {:?}", e);
+            return HttpResponse::InternalServerError()
+                .body("Failed to get slot index from address");
+        }
+    };
+
+    match store
+        .e3(incoming.round_id)
+        .get_ciphertext_input(slot_index)
+        .await
+    {
+        Ok(Some(ciphertext)) => HttpResponse::Ok().json(PreviousCiphertextResponse {
+            ciphertext
+        }),
+        Ok(None) => HttpResponse::NotFound().body("Ciphertext not found"),
+        Err(e) => {
+            error!("Error getting previous ciphertext: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get previous ciphertext")
+        }
+    }
 }
 
 /// Webhook callback from program server

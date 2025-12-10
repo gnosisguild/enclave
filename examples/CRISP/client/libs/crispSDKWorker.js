@@ -33,6 +33,7 @@ self.onmessage = async function (event) {
           balance,
           previousCiphertext,
         })
+
         const encodedProof = encodeSolidityProof(proof)
 
         self.postMessage({

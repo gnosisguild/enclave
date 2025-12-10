@@ -117,6 +117,18 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    pub async fn get_ciphertext_input(&mut self, index: u64) -> Result<Option<Vec<u8>>> {
+        let e3_crisp = self.get_crisp().await?;
+        for (vote, i) in e3_crisp.ciphertext_inputs {
+            if i == index {
+                return Ok(Some(vote));
+            }
+        }
+        Err(eyre::eyre!(
+            "Could not find ciphertext_input for index '{index}'"
+        ))
+    }
+
     pub async fn initialize_round(
         &mut self,
         token_address: String,

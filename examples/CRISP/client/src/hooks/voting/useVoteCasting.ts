@@ -55,6 +55,8 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     hasVotedInCurrentRound,
   } = useVoteManagementContext()
 
+  const { getPreviousCiphertext } = useEnclaveServer()
+
   const roundState = customRoundState ?? contextRoundState
   const votingRound = customVotingRound ?? contextVotingRound
 
@@ -214,7 +216,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       signMessageAsync,
       markVotedInRound,
       resetVotingState,
-      votingRound,
+      getPreviousCiphertext,
     ],
   )
 

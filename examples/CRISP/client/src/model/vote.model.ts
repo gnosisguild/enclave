@@ -55,3 +55,12 @@ export interface VoteStateLite {
   committee_public_key: number[]
   emojis: [string, string]
 }
+
+export interface GetPreviousCiphertextRequest {
+  round_id: number
+  address: string
+}
+
+export interface GetPreviousCiphertextResponse {
+  ciphertext: Uint8Array
+}

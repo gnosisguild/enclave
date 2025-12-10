@@ -52,6 +52,8 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidMerkleRoot();
   error MerkleRootAlreadySet();
   error InvalidTallyLength();
+  error SlotIsEmpty();
+
   // Events
   event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
 
@@ -249,5 +251,17 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     return result;
+  }
+  
+  /// @notice Get the slot index for a given E3 ID and slot address
+  /// @param e3Id The E3 program ID
+  /// @param slotAddress The slot address
+  /// @return The slot index
+  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (uint40) {
+    uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
+    if (storedIndexPlusOne == 0) {
+      revert SlotIsEmpty();
+    }
+    return storedIndexPlusOne - 1;
   }
 }
