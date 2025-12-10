@@ -294,4 +294,7 @@ interface IEnclave {
     function getDecryptionVerifier(
         bytes32 encryptionSchemeId
     ) external view returns (IDecryptionVerifier);
+
+    /// @notice Returns the ERC20 token used to pay for E3 fees.
+    function feeToken() external view returns (IERC20);
 }
