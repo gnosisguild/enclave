@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::CiphernodeHandle;
+use crate::{CiphernodeHandle, EventSystem};
 use actix::{Actor, Addr};
 use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
@@ -15,8 +15,8 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
+use e3_data::{DataStore, Repositories, RepositoriesFactory};
+use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -36,8 +36,14 @@ use e3_sortition::{
     Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
+
+#[derive(Clone, Debug)]
+enum EventSystemType {
+    Persisted { log_path: PathBuf, kv_path: PathBuf },
+    InMem,
+}
 
 /// Build a ciphernode configuration.
 // NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
@@ -46,6 +52,7 @@ use tracing::{error, info};
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
+    name: String,
     address: Option<String>,
     chains: Vec<ChainConfig>,
     #[derivative(Debug = "ignore")]
@@ -54,6 +61,7 @@ pub struct CiphernodeBuilder {
     datastore: Option<DataStore>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
+    event_system: EventSystemType,
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
     multithread_capture_events: bool,
@@ -89,8 +97,9 @@ pub enum KeyshareKind {
 }
 
 impl CiphernodeBuilder {
-    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
+    pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
+            name: name.to_owned(),
             address: None,
             chains: vec![],
             cipher,
@@ -102,6 +111,7 @@ impl CiphernodeBuilder {
             plaintext_agg: false,
             pubkey_agg: false,
             multithread_concurrent_jobs: None,
+            event_system: EventSystemType::InMem,
             rng,
             source_bus: None,
             sortition_backend: SortitionBackend::score(),
@@ -139,9 +149,13 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Attach an existing in mem store to the node
-    pub fn with_datastore(mut self, store: DataStore) -> Self {
-        self.datastore = Some(store);
+    /// Add persistence information for storing events and data. Without persistence information
+    /// the node will run in memory by default.
+    pub fn with_persistence(mut self, log_path: &PathBuf, kv_path: &PathBuf) -> Self {
+        self.event_system = EventSystemType::Persisted {
+            log_path: log_path.to_owned(),
+            kv_path: kv_path.to_owned(),
+        };
         self
     }
 
@@ -298,8 +312,13 @@ impl CiphernodeBuilder {
             None
         };
 
-        // Get a handle from the event bus
-        let bus = BusHandle::new_from_consumer(local_bus);
+        // Get an event system instance
+        let event_system =
+            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
+                EventSystem::persisted(&self.name, log_path, kv_path).with_event_bus(local_bus)
+            } else {
+                EventSystem::in_mem(&self.name).with_event_bus(local_bus)
+            };
 
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);
@@ -310,10 +329,8 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
-        let store = self
-            .datastore
-            .clone()
-            .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
+        let bus = event_system.handle()?;
+        let store = event_system.store()?;
 
         let repositories = store.repositories();
 

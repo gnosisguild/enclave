@@ -94,6 +94,10 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
 }
 
 pub fn get_enclave_bus_handle() -> BusHandle {
-    let bus = get_enclave_event_bus();
-    BusHandle::new_from_consumer(bus)
+    // let bus = get_enclave_event_bus();
+    // let index;
+    // let eventstore = EventStore::new(index, bus);
+    // let seq = Sequencer::new(bus, eventstore).start();
+    // BusHandle::new(bus, seq)
+    todo!();
 }

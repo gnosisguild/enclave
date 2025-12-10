@@ -2788,6 +2788,7 @@ dependencies = [
  "e3-sortition",
  "e3-utils",
  "once_cell",
+ "tempfile",
  "tracing",
 ]
 

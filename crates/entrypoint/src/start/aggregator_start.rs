@@ -30,13 +30,9 @@ pub async fn execute(
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let bus = get_enclave_bus_handle();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
-    let store = setup_datastore(config, &bus)?;
-    let repositories = store.repositories();
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
-
-    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_source_bus(bus.consumer())
-        .with_datastore(store)
         .with_chains(&config.chains())
         .with_sortition_score()
         .with_contract_enclave_full()
@@ -50,7 +46,11 @@ pub async fn execute(
     } else {
         builder = builder.with_plaintext_aggregation()
     }
-    builder.build().await?;
+
+    // TODO: put the following in the CNB:
+    let node = builder.build().await?;
+    let store = node.store();
+    let repositories = store.repositories();
     let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),

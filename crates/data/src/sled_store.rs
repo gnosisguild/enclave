@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{traits::KeyValStore, Get, Insert, InsertSync, Remove, SledDb};
-use actix::{Actor, ActorContext, Addr, Handler};
+use crate::{Get, Insert, InsertBatch, InsertSync, Remove, SledDb};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Handler};
 use anyhow::Result;
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use std::path::PathBuf;
@@ -46,6 +46,17 @@ impl Handler<Insert> for SledStore {
                 Err(err) => self.bus.err(EType::Data, err),
                 _ => (),
             }
+        }
+    }
+}
+
+impl Handler<InsertBatch> for SledStore {
+    type Result = ();
+
+    fn handle(&mut self, event: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+        // XXX: handle this properly
+        for cmd in event.commands() {
+            ctx.notify(cmd.to_owned())
         }
     }
 }

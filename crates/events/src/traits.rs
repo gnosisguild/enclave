@@ -9,6 +9,8 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
+use crate::{EnclaveEvent, Unsequenced};
+
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:
     Message<Result = ()> + Clone + Display + Send + Sync + Unpin + Sized + 'static
@@ -95,3 +97,26 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
 pub trait CompositeEvent: EventConstructorWithTimestamp {}
 
 impl<E> CompositeEvent for E where E: Sized + Event + EventConstructorWithTimestamp {}
+
+/// SequenceIndex is the index for each sequence which we can lookup based on HLC timestamp
+pub trait SequenceIndex: Unpin + 'static {
+    /// Insert a sequence offset at the given timestamp
+    fn insert(&mut self, key: u128, value: u64) -> Result<()>;
+    /// Get the sequence offset for the given timestamp
+    fn get(&self, key: u128) -> Result<Option<u64>>;
+    /// Get the first sequence offset before the given timestamp
+    fn seek_for_prev(&self, key: u128) -> Result<Option<u64>>;
+}
+
+/// Store and retrieve events from a write ahead log
+pub trait EventLog: Unpin + 'static {
+    /// Append an event to the log, returning its sequence number
+    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
+    /// Read all events starting from the given sequence number (inclusive)
+    fn read_from(
+        &self,
+        from: u64,
+    ) -> Box<
+        dyn Iterator<Item = std::result::Result<(u64, EnclaveEvent<Unsequenced>), anyhow::Error>>,
+    >;
+}
