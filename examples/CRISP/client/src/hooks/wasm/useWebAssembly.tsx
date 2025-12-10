@@ -28,6 +28,7 @@ export const useWebAssemblyHook = () => {
     publicKey: Uint8Array,
     address: string,
     signature: string,
+    messageHash: `0x${string}`,
     previousCiphertext?: Uint8Array,
   ): Promise<string | undefined> => {
     if (!worker) {
@@ -37,7 +38,7 @@ export const useWebAssemblyHook = () => {
 
     return new Promise<string | undefined>((resolve, reject) => {
       setIsLoading(true)
-      worker.postMessage({ type: 'generate_proof', data: { voteId, publicKey, address, signature, previousCiphertext } })
+      worker.postMessage({ type: 'generate_proof', data: { voteId, publicKey, address, signature, messageHash, previousCiphertext } })
       worker.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data
         if (type === 'generate_proof') {
