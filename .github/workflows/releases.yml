@@ -1,6 +1,7 @@
 name: Release
 
 permissions:
+  id-token: write
   contents: write
   packages: write
 
@@ -167,6 +168,17 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install solc (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo add-apt-repository -y ppa:ethereum/ethereum
+          sudo apt-get update
+          sudo apt-get install -y solc
+
+      - name: Install solc (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install solidity
+
       - name: Build enclave binary
         run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
 
@@ -230,7 +242,7 @@ jobs:
             echo "📦 Publishing stable version to crates.io: $VERSION"
           fi
 
-          cargo install cargo-workspaces
+          cargo install cargo-workspaces --locked
           cargo workspaces publish --from-git --yes
 
   publish-npm-packages:
@@ -265,12 +277,7 @@ jobs:
           fi
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Configure npm authentication
-          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
-
           # Get the tag to use
           TAG="${{ steps.npm_tag.outputs.tag }}"
 
@@ -278,11 +285,11 @@ jobs:
           pnpm build:ts
 
           # Publish each package explicitly with the correct tag
-          pnpm --filter @enclave-e3/config publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/contracts publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/wasm publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/sdk publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/react publish --access public --tag $TAG --no-git-checks
+          cd packages/enclave-config && npm publish --access public --tag $TAG --provenance && cd ../..
+          cd packages/enclave-contracts && npm publish --access public --tag $TAG --provenance && cd ../..
+          cd crates/wasm && npm publish --access public --tag $TAG --provenance && cd ../..
+          cd packages/enclave-sdk && npm publish --access public --tag $TAG --provenance && cd ../..
+          cd packages/enclave-react && npm publish --access public --tag $TAG --provenance && cd ../..
 
   create-github-release:
     name: Create GitHub Release
