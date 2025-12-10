@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/sdk",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "exports": {
     ".": {
@@ -18,6 +18,11 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "packages/enclave-sdk"
   },
   "scripts": {
     "prebuild": "pnpm -C ../enclave-contracts build && pnpm -C ../../ wasm:build",

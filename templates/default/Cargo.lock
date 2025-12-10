@@ -1096,7 +1096,7 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "e3-bfv-helpers"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -1118,7 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -1135,7 +1135,7 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "actix-web",
  "anyhow",

@@ -1,12 +1,16 @@
 {
   "name": "@enclave/main",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave"
   },
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
@@ -57,7 +61,8 @@
     "build": "pnpm compile",
     "wasm:build": "cd ./crates/wasm && pnpm build",
     "build:ts": "pnpm evm:build && pnpm sdk:build && pnpm react:build",
-    "template:build": "cd templates/default && pnpm compile"
+    "template:build": "cd templates/default && pnpm compile",
+    "prepare-publish": "tsx .github/scripts/prepareForNpmPublishing.ts"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808",
   "devDependencies": {

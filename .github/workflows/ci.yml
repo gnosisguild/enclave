@@ -799,7 +799,7 @@ jobs:
           else
             BRANCH="${{ github.ref_name }}"
           fi
-          enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
+          enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
     runs-on: ubuntu-latest
