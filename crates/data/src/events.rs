@@ -26,6 +26,19 @@ impl Insert {
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[rtype(result = "()")]
+pub struct InsertBatch(pub Vec<Insert>);
+impl InsertBatch {
+    pub fn new(commands: Vec<Insert>) -> Self {
+        Self(commands)
+    }
+
+    pub fn commands(&self) -> &Vec<Insert> {
+        &self.0
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Result<()>")]
 pub struct InsertSync(pub Vec<u8>, pub Vec<u8>);
 impl InsertSync {

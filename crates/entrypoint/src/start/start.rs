@@ -18,8 +18,6 @@ use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::instrument;
 
-use crate::helpers::datastore::setup_datastore;
-
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
     config: &AppConfig,
@@ -30,13 +28,10 @@ pub async fn execute(
 
     let bus = get_enclave_bus_handle();
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
-    let store = setup_datastore(&config, &bus)?;
-    let repositories = store.repositories();
 
-    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_source_bus(bus.consumer())
-        .with_datastore(store)
         .with_sortition_score()
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
@@ -49,7 +44,9 @@ pub async fn execute(
     } else {
         builder = builder.with_keyshare();
     }
-    builder.build().await?;
+
+    let node = builder.build().await?;
+    let repositories = node.store().repositories();
     let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),

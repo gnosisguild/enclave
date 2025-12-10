@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertSync, KeyValStore, Remove};
+use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
 use commitlog::Offset;
@@ -72,6 +72,15 @@ impl Handler<Insert> for InMemStore {
     }
 }
 
+impl Handler<InsertBatch> for InMemStore {
+    type Result = ();
+    fn handle(&mut self, msg: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+        for cmd in msg.commands() {
+            self.db.insert(cmd.key().to_owned(), cmd.value().to_owned());
+        }
+    }
+}
+
 impl Handler<InsertSync> for InMemStore {
     type Result = Result<()>;
 
@@ -127,15 +136,15 @@ impl Deref for InMemDb {
     }
 }
 
-impl KeyValStore for InMemDb {
-    fn get(&self, msg: Get) -> Result<Option<Vec<u8>>> {
+impl InMemDb {
+    pub fn get(&self, msg: Get) -> Result<Option<Vec<u8>>> {
         Ok(self.0.get(msg.key()).cloned())
     }
-    fn insert(&mut self, msg: Insert) -> Result<()> {
+    pub fn insert(&mut self, msg: Insert) -> Result<()> {
         self.0.insert(msg.key().to_owned(), msg.value().to_owned());
         Ok(())
     }
-    fn remove(&mut self, msg: Remove) -> Result<()> {
+    pub fn remove(&mut self, msg: Remove) -> Result<()> {
         self.0.remove(msg.key());
         Ok(())
     }

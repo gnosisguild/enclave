@@ -4,20 +4,32 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
 
-use crate::{EnclaveEvent, EventBus, Sequenced, Unsequenced};
+use crate::{
+    events::{CommitSnapshot, EventStored, StoreEventRequested},
+    EnclaveEvent, EventBus, Sequenced, Unsequenced,
+};
 
+/// Component to sequence the storage of events
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     seq: u64,
+    eventstore: Recipient<StoreEventRequested>,
+    snapshot_buffer: Recipient<CommitSnapshot>,
 }
 
 impl Sequencer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
+    pub fn new(
+        bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
+        eventstore: impl Into<Recipient<StoreEventRequested>>,
+        snapshot_buffer: impl Into<Recipient<CommitSnapshot>>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             seq: 0,
+            eventstore: eventstore.into(),
+            snapshot_buffer: snapshot_buffer.into(),
         }
     }
 }
@@ -28,10 +40,19 @@ impl Actor for Sequencer {
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
-        // NOTE: FAKE SEQUENCER FOR NOW - JUST SET THE SEQUENCE NUMBER AND UPDATE
-        self.seq += 1;
-        self.bus.do_send(msg.into_sequenced(self.seq))
+    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+        self.eventstore
+            .do_send(StoreEventRequested::new(msg, ctx.address()))
+    }
+}
+
+impl Handler<EventStored> for Sequencer {
+    type Result = ();
+    fn handle(&mut self, msg: EventStored, ctx: &mut Self::Context) -> Self::Result {
+        let event = msg.into_event();
+        let seq = event.get_seq();
+        // TODO: store snapshot...
+        self.bus.do_send(event)
     }
 }
 
