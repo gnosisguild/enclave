@@ -276,6 +276,9 @@ jobs:
       - name: Build packages
         run: pnpm build:ts
 
+      - name: Prepare packages for npm publishing
+        run: pnpm prepare-publish
+
       - name: Determine npm tag
         id: npm_tag
         run: |
