@@ -61,6 +61,8 @@ pub struct EventSystem {
     handle: OnceCell<BusHandle>,
     /// A OnceLock that is used to indicate whether the system is wired to write snapshots
     wired: OnceCell<()>,
+    /// Hlc override
+    hlc: OnceCell<Hlc>,
 }
 
 impl EventSystem {
@@ -82,6 +84,7 @@ impl EventSystem {
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
             wired: OnceCell::new(),
+            hlc: OnceCell::new(),
         }
     }
 
@@ -98,6 +101,7 @@ impl EventSystem {
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
             wired: OnceCell::new(),
+            hlc: OnceCell::new(),
         }
     }
 
@@ -116,6 +120,7 @@ impl EventSystem {
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
             wired: OnceCell::new(),
+            hlc: OnceCell::new(),
         }
     }
 
@@ -130,6 +135,12 @@ impl EventSystem {
         let _ = self
             .eventbus
             .set(EventBus::new(EventBusConfig { deduplicate: true }).start());
+        self
+    }
+
+    /// Add an injected hlc
+    pub fn with_hlc(self, hlc: Hlc) -> Self {
+        let _ = self.hlc.set(hlc);
         self
     }
 
@@ -176,6 +187,13 @@ impl EventSystem {
             .cloned()
     }
 
+    /// Get an instance of the Hlc
+    pub fn hlc(&self) -> Result<Hlc> {
+        self.hlc
+            .get_or_try_init(|| Ok(Hlc::new(self.node_id)))
+            .cloned()
+    }
+
     /// Get the BusHandle
     pub fn handle(&self) -> Result<BusHandle> {
         self.handle
@@ -183,7 +201,7 @@ impl EventSystem {
                 Ok(BusHandle::new(
                     self.eventbus(),
                     self.sequencer()?,
-                    Hlc::new(self.node_id),
+                    self.hlc()?,
                 ))
             })
             .cloned()
