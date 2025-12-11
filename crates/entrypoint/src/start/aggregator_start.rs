@@ -28,7 +28,7 @@ pub async fn execute(
     plaintext_write_path: Option<PathBuf>,
     experimental_trbfv: bool,
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
-    let bus = get_enclave_bus_handle();
+    let bus = get_enclave_bus_handle(config)?;
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
     let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())

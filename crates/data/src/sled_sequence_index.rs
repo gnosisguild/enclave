@@ -37,12 +37,20 @@ impl SequenceIndex for SledSequenceIndex {
     }
 
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
-        todo!("Do this");
+        self.db
+            .insert(key.to_be_bytes().to_vec(), value.to_be_bytes().to_vec())
+            .context(format!("Failed to insert key: {}", key))?;
         Ok(())
     }
 
     fn seek_for_prev(&self, key: u128) -> Result<Option<u64>> {
-        todo!("Do this");
-        Ok(None)
+        let key_bytes = key.to_be_bytes();
+        self.db
+            .range(..=key_bytes)
+            .next_back()
+            .transpose()
+            .context(format!("Failed to seek for prev: {}", key))?
+            .map(|(_, v)| Ok(u64::from_be_bytes(v.as_ref().try_into()?)))
+            .transpose()
     }
 }
