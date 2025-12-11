@@ -33,6 +33,7 @@ impl Handler<ForwardTo> for WriteBuffer {
 impl Handler<Insert> for WriteBuffer {
     type Result = ();
     fn handle(&mut self, msg: Insert, ctx: &mut Self::Context) -> Self::Result {
+        // XXX: finish me
         // store insert in buffer
     }
 }
@@ -40,6 +41,7 @@ impl Handler<Insert> for WriteBuffer {
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
     fn handle(&mut self, msg: CommitSnapshot, ctx: &mut Self::Context) -> Self::Result {
+        // XXX: finish me
         // send all inserts to
     }
 }
