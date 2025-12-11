@@ -4,11 +4,18 @@ FROM rust:1.86 AS builder
 WORKDIR /app
 
 # Copy workspace files and all crates EXCEPT net
-COPY --exclude=crates/net . .
+COPY --exclude=crates/net --exclude=crates/evm . .
+
 COPY ./crates/net/Cargo.toml ./crates/net/Cargo.toml
 RUN mkdir -p ./crates/net/src/bin && \
     echo "fn main() {}" > ./crates/net/src/main.rs && \
     echo "fn main() {}" > ./crates/net/src/bin/p2p_test.rs
+
+# Stub out evm crate too
+COPY ./crates/evm/Cargo.toml ./crates/evm/Cargo.toml
+RUN mkdir -p ./crates/evm/src && \
+    echo "" > ./crates/evm/src/lib.rs
+
 
 # Build dependencies
 RUN cargo build --locked --bin p2p_test
