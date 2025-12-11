@@ -38,10 +38,10 @@ impl SledDb {
         Ok(())
     }
 
-    pub fn insert_batch(&mut self, msgs: Vec<Insert>) -> Result<()> {
+    pub fn insert_batch(&mut self, msgs: &Vec<Insert>) -> Result<()> {
         self.db
             .transaction(|tx_db| {
-                for msg in &msgs {
+                for msg in msgs {
                     tx_db.insert(msg.key().as_slice(), msg.value().to_vec())?;
                 }
                 Ok::<(), ConflictableTransactionError>(())
@@ -155,7 +155,7 @@ mod tests {
         ];
 
         // Insert the batch
-        db.insert_batch(batch)?;
+        db.insert_batch(&batch)?;
 
         // Verify all items were inserted
         assert_eq!(
