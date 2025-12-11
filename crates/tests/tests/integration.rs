@@ -146,11 +146,19 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_m = 2;
     let threshold_n = 5;
     let esi_per_ct = 3;
+
+    // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
+    // This is just for INSECURE parameter set.
+    // This is not secure and should not be used in production.
+    // For production use lambda = 80.
+    let lambda = 2;
+
     let seed = create_seed_from_u64(123);
     let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
         threshold_n,
         threshold_m,
+        lambda,
     )?));
 
     // Cipher
@@ -219,6 +227,7 @@ async fn test_trbfv_actor() -> Result<()> {
     //
     //   - m=2.
     //   - n=5
+    //   - lambda=2
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 3
     ///////////////////////////////////////////////////////////////////////////////////

@@ -26,6 +26,7 @@ fn main(
     sum_r1is: [Polynomial<512>; 2],
     // Greco Section.
     params: Params<512, 2>, // todo: make this pub
+    pk_commitment: Field, // todo: make this pub
     pk0is: [Polynomial<512>; 2],
     pk1is: [Polynomial<512>; 2],
     ct0is: [Polynomial<512>; 2],
@@ -75,6 +76,7 @@ fn main(
 
     let greco: Greco<512, 2, 36, 36, 2, 6, 6, 4, 10, 36, 10, 36> = Greco::new(
         params,
+        pk_commitment,
         pk0is,
         pk1is,
         ct0is,
