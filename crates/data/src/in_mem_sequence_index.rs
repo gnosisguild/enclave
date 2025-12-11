@@ -22,15 +22,16 @@ impl InMemSequenceIndex {
 
 impl SequenceIndex for InMemSequenceIndex {
     fn seek_for_prev(&self, key: u128) -> Result<Option<u64>> {
-        todo!("do this");
-        Ok(None)
+        // Find the largest key <= the given key and return its value
+        Ok(self.index.range(..=key).next_back().map(|(_, &v)| v))
     }
+
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
-        todo!("do this");
+        self.index.insert(key, value);
         Ok(())
     }
+
     fn get(&self, key: u128) -> Result<Option<u64>> {
-        todo!("do this");
-        Ok(None)
+        Ok(self.index.get(&key).copied())
     }
 }
