@@ -10,6 +10,7 @@ use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_ciphernode_builder::CiphernodeHandle;
+use e3_ciphernode_builder::EventSystem;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
@@ -20,8 +21,8 @@ use e3_events::Unsequenced;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,
     ConfigurationUpdated, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
-    HistoryCollector, OperatorActivationChanged, OrderedSet, PlaintextAggregated,
-    PublicKeyAggregated, Seed, Shutdown, TakeEvents, TicketBalanceUpdated,
+    OperatorActivationChanged, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
+    Shutdown, TakeEvents, TicketBalanceUpdated,
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
@@ -52,10 +53,10 @@ async fn setup_local_ciphernode(
     rng: &SharedRng,
     logging: bool,
     addr: &str,
-    data: Option<Addr<InMemStore>>,
+    store: Option<Addr<InMemStore>>,
     cipher: &Arc<Cipher>,
 ) -> Result<CiphernodeHandle> {
-    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+    let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
         .with_keyshare()
         .with_address(addr)
         .testmode_with_forked_bus(bus.consumer())
@@ -65,8 +66,8 @@ async fn setup_local_ciphernode(
         .with_plaintext_aggregation()
         .with_sortition_score();
 
-    if let Some(data) = data {
-        builder = builder.with_datastore((&data).into());
+    if let Some(ref in_mem_store) = store {
+        builder = builder.with_in_mem_datastore(in_mem_store);
     }
 
     if logging {
@@ -361,9 +362,10 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     // Apply the address and data node to two new actors
     // Here we test that hydration occurred sucessfully
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-        .start()
-        .into();
+
+    let bus = EventSystem::in_mem("cn2")
+        .with_event_bus(EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start())
+        .handle()?;
     let cn1 = setup_local_ciphernode(
         &bus,
         &rng,
@@ -444,11 +446,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-        .start()
-        .into();
-    let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
-    bus.subscribe("*", history_collector.clone().recipient());
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let event_rx = Arc::new(event_tx.subscribe());
     // Pas cmd and event channels to NetEventTranslator
     NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
@@ -621,11 +621,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-        .start()
-        .into();
-    let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
-    bus.subscribe("*", history_collector.clone().recipient());
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
 
     NetEventTranslator::setup(&bus, &cmd_tx, &Arc::new(event_rx), "mytopic");
 

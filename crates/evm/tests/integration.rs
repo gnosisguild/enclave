@@ -14,11 +14,11 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
+use e3_ciphernode_builder::EventSystem;
 use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
-    new_event_bus_with_history, prelude::*, EnclaveEvent, EnclaveEventData, GetEvents,
-    HistoryCollector, Shutdown, TestEvent,
+    prelude::*, EnclaveEvent, EnclaveEventData, GetEvents, HistoryCollector, Shutdown, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
 use std::time::Duration;
@@ -81,7 +81,9 @@ async fn evm_reader() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
 
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
@@ -150,8 +152,9 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];
 
@@ -229,7 +232,9 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
 
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
@@ -336,7 +341,9 @@ async fn coordinator_single_reader() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
 
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
@@ -409,7 +416,9 @@ async fn coordinator_multiple_readers() -> Result<()> {
     let contract1 = EmitLogs::deploy(provider.provider()).await?;
     let contract2 = EmitLogs::deploy(provider.provider()).await?;
 
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let repository1 = Repository::new(get_in_mem_store());
     let repository2 = Repository::new(get_in_mem_store());
 
@@ -492,7 +501,9 @@ async fn coordinator_no_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let (bus, history_collector) = new_event_bus_with_history();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
+    let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
 
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());

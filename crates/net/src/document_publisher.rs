@@ -486,10 +486,10 @@ mod tests {
     use crate::events::NetCommand;
     use actix::Addr;
     use anyhow::{bail, Result};
+    use e3_ciphernode_builder::EventSystem;
     use e3_events::{
         BusHandle, CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError,
-        EnclaveEvent, EventBus, EventBusConfig, GetEvents, HistoryCollector,
-        PublishDocumentRequested, TakeEvents,
+        EnclaveEvent, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
     use libp2p::kad::{GetRecordError, PutRecordError, RecordKey};
     use tokio::{
@@ -498,7 +498,7 @@ mod tests {
     };
     use tracing::subscriber::DefaultGuard;
 
-    fn setup_test() -> (
+    fn setup_test() -> Result<(
         DefaultGuard,
         BusHandle,
         mpsc::Sender<NetCommand>,
@@ -508,7 +508,7 @@ mod tests {
         Addr<HistoryCollector<EnclaveEvent>>,
         Addr<HistoryCollector<EnclaveEvent>>,
         Addr<DocumentPublisher>,
-    ) {
+    )> {
         use tracing_subscriber::{fmt, EnvFilter};
 
         let subscriber = fmt()
@@ -518,8 +518,10 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let consumer = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-        let bus = BusHandle::new_from_consumer(consumer);
+        // let consumer = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        // let bus = BusHandle::new(consumer);
+        let system = EventSystem::new("test");
+        let bus = system.handle()?;
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
@@ -529,15 +531,15 @@ mod tests {
         bus.subscribe("EnclaveError", error.clone().recipient());
         let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
-        (
+        Ok((
             guard, bus, net_cmd_tx, net_cmd_rx, net_evt_tx, net_evt_rx, history, error, publisher,
-        )
+        ))
     }
 
     #[actix::test]
     async fn test_publishes_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, _, _) =
-            setup_test();
+            setup_test()?;
         let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
@@ -609,7 +611,7 @@ mod tests {
     #[actix::test]
     async fn test_get_document_fails_with_exponential_backoff() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, errors, _) =
-            setup_test();
+            setup_test()?;
 
         let value = b"I am a special document".to_vec();
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
@@ -673,7 +675,7 @@ mod tests {
             _history,
             errors,
             _,
-        ) = setup_test();
+        ) = setup_test()?;
         let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
@@ -721,7 +723,7 @@ mod tests {
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =
-            setup_test();
+            setup_test()?;
 
         let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Utc::now() + chrono::Duration::days(1);
