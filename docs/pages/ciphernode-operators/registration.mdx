@@ -1,0 +1,230 @@
+---
+title: 'Registration & Licensing'
+description: 'Bond your license, register as an operator, and add tickets'
+---
+
+# Registration & Licensing
+
+This guide walks you through the complete registration process to become an active ciphernode
+operator. Make sure your node is already [running](./running) before proceeding.
+
+## Prerequisites
+
+Before registering, ensure your wallet has:
+
+| Token                   | Amount Required                          | Purpose                      |
+| ----------------------- | ---------------------------------------- | ---------------------------- |
+| **ENCL**                | ≥ 100 ENCL (check `licenseRequiredBond`) | License bond collateral      |
+| **USDC** (or fee token) | ≥ 10 USDC per ticket (minimum 1 ticket)  | Ticket balance for sortition |
+| **ETH**                 | Sufficient for gas                       | Transaction fees             |
+
+## Registration Steps
+
+### Step 1: Check Current Status
+
+First, verify your current on-chain status:
+
+```bash
+enclave ciphernode status
+```
+
+Example output:
+
+```
+Ciphernode status on sepolia:
+  Address: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+  Registered: false
+  Active: false
+  Exit pending: false
+  Ticket balance: 0 (0 available)
+  License bond: 0
+  Pending exits: tickets=0, license=0
+  Requirements: minTickets=1, ticketPrice=10 EKT, licenseBond=100 ENCL
+```
+
+### Step 2: Bond Your License
+
+Bond ENCL tokens to meet the license requirement:
+
+```bash
+enclave ciphernode license bond --amount 100
+```
+
+This command:
+
+- Approves the BondingRegistry to spend your ENCL (if needed)
+- Calls `bondLicense(100e18)` on the BondingRegistry contract
+
+> You can bond more than the minimum for a buffer against slashing. The active license floor is 80%
+> of the required bond.
+
+### Step 3: Register as an Operator
+
+Register your address in the CiphernodeRegistry:
+
+```bash
+enclave ciphernode register
+```
+
+After registration, your node will be added to the registry's Merkle tree and can participate in
+committee formation once you have tickets.
+
+### Step 4: Add Ticket Balance
+
+Purchase tickets by depositing the underlying stablecoin:
+
+```bash
+enclave ciphernode tickets buy --amount 100
+```
+
+This deposits 100 USDC (or fee token units) and mints the equivalent in non-transferable ETK
+(EnclaveTicketToken).
+
+The number of usable tickets is calculated as:
+
+```
+availableTickets = floor(ticketTokenBalance / ticketPrice)
+```
+
+With a ticket price of 10 USDC and a 100 USDC deposit, you get 10 available tickets.
+
+### Step 5: Verify Active Status
+
+Confirm your registration is complete:
+
+```bash
+enclave ciphernode status
+```
+
+Expected output for an active operator:
+
+```
+Ciphernode status on sepolia:
+  Address: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+  Registered: true
+  Active: true
+  Exit pending: false
+  Ticket balance: 100 (10 available)
+  License bond: 100
+  Pending exits: tickets=0, license=0
+  Requirements: minTickets=1, ticketPrice=10 EKT, licenseBond=100 ENCL
+```
+
+## CLI Command Reference
+
+### License Commands
+
+```bash
+# Bond ENCL tokens
+enclave ciphernode license bond --amount <AMOUNT>
+
+# Unbond ENCL (moves to exit queue)
+enclave ciphernode license unbond --amount <AMOUNT>
+
+# Claim unlocked exits
+enclave ciphernode license claim
+enclave ciphernode license claim --max-ticket 50 --max-license 100
+```
+
+### Ticket Commands
+
+```bash
+# Buy tickets (deposit stablecoin)
+enclave ciphernode tickets buy --amount <AMOUNT>
+
+# Burn tickets (withdraw stablecoin)
+enclave ciphernode tickets burn --amount <AMOUNT>
+```
+
+### Lifecycle Commands
+
+```bash
+# Register as an operator
+enclave ciphernode register
+
+# Deregister (requires IMT proof)
+enclave ciphernode deregister --proof <SIBLING_NODES>
+
+# Force activation check
+enclave ciphernode activate
+
+# Deactivate by withdrawing stake
+enclave ciphernode deactivate --tickets <AMOUNT> --license <AMOUNT>
+
+# Check status
+enclave ciphernode status
+```
+
+### Multi-Chain Support
+
+Specify a chain when operating on multiple networks:
+
+```bash
+enclave ciphernode status --chain mainnet
+enclave ciphernode license bond --amount 100 --chain sepolia
+```
+
+The `--chain` parameter matches the `name` field in your config's `chains` array.
+
+## Economic Parameters
+
+Current Sepolia defaults (verify on-chain before depositing):
+
+| Parameter             | Value                | Description                        |
+| --------------------- | -------------------- | ---------------------------------- |
+| `ticketPrice`         | 10,000,000 (10 USDC) | Cost per ticket in fee token units |
+| `licenseRequiredBond` | 100 ENCL             | Minimum ENCL to bond               |
+| `minTicketBalance`    | 1 ticket             | Minimum tickets to be active       |
+| `exitDelay`           | 604,800s (7 days)    | Wait time before claiming exits    |
+
+Query these values on-chain:
+
+```bash
+# Using cast (foundry)
+cast call $BONDING "ticketPrice()" --rpc-url $RPC
+cast call $BONDING "licenseRequiredBond()" --rpc-url $RPC
+cast call $BONDING "minTicketBalance()" --rpc-url $RPC
+cast call $BONDING "exitDelay()" --rpc-url $RPC
+```
+
+## Best Practices
+
+### Maintain Buffer Amounts
+
+- **License bond**: Keep 10-20% above the minimum to absorb potential slashing without losing active
+  status
+- **Tickets**: Maintain extra tickets so you're not deactivated if one is consumed or slashed
+
+### Monitor Your Status
+
+Set up alerts for:
+
+- `isActive` changing to `false`
+- `SlashProposed` events targeting your address
+- Low ticket balance approaching minimum
+
+### Backup Your IMT Proof
+
+When you register, save the sibling nodes from the `CiphernodeAdded` event. You'll need these to
+deregister:
+
+```bash
+# Store the proof when you register
+enclave ciphernode deregister --proof 0x123...,0x456...,0x789...
+```
+
+## Troubleshooting
+
+| Issue                     | Cause                                  | Solution                              |
+| ------------------------- | -------------------------------------- | ------------------------------------- |
+| `isActive` is false       | Below minimum license (80%) or tickets | Add more ENCL or tickets              |
+| Registration fails        | Already registered or banned           | Check `isRegistered()` and ban status |
+| Ticket purchase fails     | Insufficient stablecoin or allowance   | Ensure balance and approve spending   |
+| "NodeNotEligible" in logs | Not registered before E3 request       | Register before requests are made     |
+
+## Next Steps
+
+Once registered and active:
+
+1. **[Tickets & Sortition](./tickets-and-sortition)** - Learn how committee selection works
+2. **[Exits & Slashing](./exits-and-slashing)** - Understand rewards and exit procedures
