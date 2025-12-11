@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{Context, Result};
-use sled::Tree;
+use sled::{
+    transaction::{ConflictableTransactionError, TransactionalTree, UnabortableTransactionError},
+    Tree,
+};
 use std::path::PathBuf;
 
 use crate::{
@@ -32,6 +35,18 @@ impl SledDb {
             .insert(msg.key(), msg.value().to_vec())
             .context("Could not insert data into db")?;
 
+        Ok(())
+    }
+
+    pub fn insert_batch(&mut self, msgs: Vec<Insert>) -> Result<()> {
+        self.db
+            .transaction(|tx_db| {
+                for msg in &msgs {
+                    tx_db.insert(msg.key().as_slice(), msg.value().to_vec())?;
+                }
+                Ok::<(), ConflictableTransactionError>(())
+            })
+            .context("Could not insert batch data into db")?;
         Ok(())
     }
 
@@ -118,6 +133,51 @@ mod tests {
         assert!(
             db1.get(Get::new(b"db3_key".to_vec()))?.is_none(),
             "db1 should not see data from db3/db4"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sled_db_batch_insert() -> Result<()> {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().expect("Failed to create temporary directory");
+        let db_path = temp_dir.path().join("test_batch.db");
+
+        let mut db = SledDb::new(&db_path, "datastore")?;
+
+        // Create a batch of inserts
+        let batch = vec![
+            Insert::new(b"batch_key1".to_vec(), b"batch_value1".to_vec()),
+            Insert::new(b"batch_key2".to_vec(), b"batch_value2".to_vec()),
+            Insert::new(b"batch_key3".to_vec(), b"batch_value3".to_vec()),
+        ];
+
+        // Insert the batch
+        db.insert_batch(batch)?;
+
+        // Verify all items were inserted
+        assert_eq!(
+            db.get(Get::new(b"batch_key1".to_vec()))?.unwrap(),
+            b"batch_value1".to_vec(),
+            "First batch item should be retrievable"
+        );
+        assert_eq!(
+            db.get(Get::new(b"batch_key2".to_vec()))?.unwrap(),
+            b"batch_value2".to_vec(),
+            "Second batch item should be retrievable"
+        );
+        assert_eq!(
+            db.get(Get::new(b"batch_key3".to_vec()))?.unwrap(),
+            b"batch_value3".to_vec(),
+            "Third batch item should be retrievable"
+        );
+
+        // Verify non-existent key returns None
+        assert!(
+            db.get(Get::new(b"nonexistent".to_vec()))?.is_none(),
+            "Non-existent key should return None"
         );
 
         Ok(())
