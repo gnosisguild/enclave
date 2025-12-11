@@ -58,6 +58,7 @@ export const deployCRISPContracts = async () => {
   storeDeploymentArgs(
     {
       address: honkVerifierAddress,
+      blockNumber: await ethers.provider.getBlockNumber(),
     },
     'HonkVerifier',
     chain,
@@ -77,6 +78,7 @@ export const deployCRISPContracts = async () => {
   storeDeploymentArgs(
     {
       address: crispAddress,
+      blockNumber: await ethers.provider.getBlockNumber(),
       constructorArgs: {
         enclave: enclaveAddress,
         verifierAddress: verifier,
@@ -125,6 +127,7 @@ export const deployVerifier = async (useMockVerifier: boolean): Promise<string> 
     storeDeploymentArgs(
       {
         address,
+        blockNumber: await ethers.provider.getBlockNumber(),
       },
       'RiscZeroGroth16Verifier',
       chain,
@@ -144,6 +147,7 @@ export const deployVerifier = async (useMockVerifier: boolean): Promise<string> 
   storeDeploymentArgs(
     {
       address: mockVerifierAddress,
+      blockNumber: await ethers.provider.getBlockNumber(),
     },
     'MockRISC0Verifier',
     hre.globalOptions.network,
