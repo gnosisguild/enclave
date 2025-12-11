@@ -88,13 +88,14 @@ export const toBinary = (number: bigint): string => {
  */
 export const extractSignatureComponents = async (
   signature: `0x${string}`,
+  messageHash: `0x${string}` = SIGNATURE_MESSAGE_HASH,
 ): Promise<{
   messageHash: Uint8Array
   publicKeyX: Uint8Array
   publicKeyY: Uint8Array
   signature: Uint8Array
 }> => {
-  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+  const publicKey = await recoverPublicKey({ hash: messageHash, signature })
   const publicKeyBytes = hexToBytes(publicKey)
   const publicKeyX = publicKeyBytes.slice(1, 33)
   const publicKeyY = publicKeyBytes.slice(33, 65)
@@ -109,15 +110,15 @@ export const extractSignatureComponents = async (
   signatureBytes.set(s, 32)
 
   return {
-    messageHash: hexToBytes(SIGNATURE_MESSAGE_HASH),
+    messageHash: hexToBytes(messageHash),
     publicKeyX: publicKeyX,
     publicKeyY: publicKeyY,
     signature: signatureBytes,
   }
 }
 
-export const getAddressFromSignature = async (signature: `0x${string}`): Promise<string> => {
-  const publicKey = await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature })
+export const getAddressFromSignature = async (signature: `0x${string}`, messageHash: `0x${string}`): Promise<string> => {
+  const publicKey = await recoverPublicKey({ hash: messageHash, signature })
 
   return publicKeyToAddress(publicKey)
 }

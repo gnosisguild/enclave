@@ -1,6 +1,7 @@
 name: Release
 
 permissions:
+  id-token: write
   contents: write
   packages: write
 
@@ -167,6 +168,17 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install solc (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo add-apt-repository -y ppa:ethereum/ethereum
+          sudo apt-get update
+          sudo apt-get install -y solc
+
+      - name: Install solc (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install solidity
+
       - name: Build enclave binary
         run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
 
@@ -230,13 +242,16 @@ jobs:
             echo "📦 Publishing stable version to crates.io: $VERSION"
           fi
 
-          cargo install cargo-workspaces
+          cargo install cargo-workspaces@0.3.6 --locked
           cargo workspaces publish --from-git --yes
 
   publish-npm-packages:
     name: Publish NPM Packages
     runs-on: ubuntu-latest
     needs: validate-and-prepare
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -247,11 +262,22 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Upgrade npm
+        run: |
+          npm install -g npm@latest
+          echo "npm version: $(npm --version)"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build:ts
+
+      - name: Prepare packages for npm publishing
+        run: pnpm prepare-publish
 
       - name: Determine npm tag
         id: npm_tag
@@ -264,25 +290,25 @@ jobs:
             echo "📦 Publishing with 'latest' tag for stable release"
           fi
 
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          # Configure npm authentication
-          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
+      - name: Publish @enclave-e3/config
+        working-directory: packages/enclave-config
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-          # Get the tag to use
-          TAG="${{ steps.npm_tag.outputs.tag }}"
+      - name: Publish @enclave-e3/contracts
+        working-directory: packages/enclave-contracts
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-          # Build first
-          pnpm build:ts
+      - name: Publish @enclave-e3/wasm
+        working-directory: crates/wasm
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
-          # Publish each package explicitly with the correct tag
-          pnpm --filter @enclave-e3/config publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/contracts publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/wasm publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/sdk publish --access public --tag $TAG --no-git-checks
-          pnpm --filter @enclave-e3/react publish --access public --tag $TAG --no-git-checks
+      - name: Publish @enclave-e3/sdk
+        working-directory: packages/enclave-sdk
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
+
+      - name: Publish @enclave-e3/react
+        working-directory: packages/enclave-react
+        run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
   create-github-release:
     name: Create GitHub Release

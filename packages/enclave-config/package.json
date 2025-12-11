@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/config",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "publishConfig": {
     "access": "public"
   },
@@ -13,6 +13,11 @@
     "./tsconfig.json": "./tsconfig.json",
     "./dom.tsconfig.json": "./dom.tsconfig.json",
     "./eslint.config.js": "./eslint.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "packages/enclave-config"
   },
   "scripts": {
     "release": "pnpm publish --access=public"

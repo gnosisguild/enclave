@@ -27,11 +27,24 @@ export interface BroadcastVoteRequest {
   address: string
 }
 
-export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast'
+export type VoteResponseStatus = 'success' | 'failed_broadcast'
 export interface BroadcastVoteResponse {
   status: VoteResponseStatus
   tx_hash?: string
   message?: string
+  is_vote_update?: boolean
+}
+
+export interface VoteStatusRequest {
+  round_id: number
+  address: string
+}
+
+export interface VoteStatusResponse {
+  round_id: number
+  address: string
+  has_voted: boolean
+  round_status?: string
 }
 
 export interface VoteStateLite {

@@ -241,6 +241,7 @@ describe('Vote', () => {
         signature,
         merkleLeaves: LEAVES,
         balance,
+        messageHash: SIGNATURE_MESSAGE_HASH,
       })
 
       expect(proof).toBeDefined()

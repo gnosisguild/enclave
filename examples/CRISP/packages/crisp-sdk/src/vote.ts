@@ -103,7 +103,10 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
     encodedVote,
   )
 
-  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(proofInputs.signature)
+  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(
+    proofInputs.signature,
+    proofInputs.messageHash,
+  )
 
   crispInputs.hashed_message = Array.from(messageHash).map((b) => b.toString())
   crispInputs.public_key_x = Array.from(publicKeyX).map((b) => b.toString())
@@ -151,7 +154,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
   }
 
   // The address slot of an actual vote always is the address of the public key that signed the message.
-  const address = await getAddressFromSignature(voteProofInputs.signature)
+  const address = await getAddressFromSignature(voteProofInputs.signature, voteProofInputs.messageHash)
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
 

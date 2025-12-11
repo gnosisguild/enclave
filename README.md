@@ -385,10 +385,10 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Stable branch
+- **`main`** - Latest code. All releases are tagged from here. Using feature flags for experimental
+  features, we ensure that code is always stable.
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
-- **`dev`** - Branch for ongoing development
 
 ### Installation Sources
 
@@ -399,14 +399,6 @@ curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/stable/install 
 # Latest development version (may be unstable)
 curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
 ```
-
-### Future Branch Strategy
-
-We plan to implement a three-tier branch strategy:
-
-1. **`develop`** - Bleeding edge, experimental features
-2. **`testnet`** - Stable features for testnet deployment
-3. **`mainnet`** - Production-ready for mainnet deployment
 
 ## 📋 Release Checklist
 

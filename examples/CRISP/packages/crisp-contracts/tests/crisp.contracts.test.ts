@@ -13,6 +13,7 @@ import {
   getAddressFromSignature,
   encodeSolidityProof,
   generateMerkleTree,
+  SIGNATURE_MESSAGE_HASH,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
@@ -65,7 +66,7 @@ describe('CRISP Contracts', function () {
       const vote = { yes: 10n, no: 0n }
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
-      const address = await getAddressFromSignature(signature)
+      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
       const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
 
       const proof = await generateVoteProof({
@@ -74,6 +75,7 @@ describe('CRISP Contracts', function () {
         signature,
         merkleLeaves: leaves,
         balance,
+        messageHash: SIGNATURE_MESSAGE_HASH,
       })
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
@@ -93,7 +95,7 @@ describe('CRISP Contracts', function () {
       const vote = { yes: 10n, no: 0n }
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
-      const address = await getAddressFromSignature(signature)
+      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
       const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
       const merkleTree = generateMerkleTree(leaves)
 
@@ -103,6 +105,7 @@ describe('CRISP Contracts', function () {
         signature,
         merkleLeaves: leaves,
         balance,
+        messageHash: SIGNATURE_MESSAGE_HASH,
       })
 
       const encodedProof = encodeSolidityProof(proof)

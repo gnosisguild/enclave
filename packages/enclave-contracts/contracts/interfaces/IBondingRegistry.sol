@@ -114,6 +114,18 @@ interface IBondingRegistry {
     // ======================
 
     /**
+     * @notice Get license token address
+     * @return License token address
+     */
+    function getLicenseToken() external view returns (address);
+
+    /**
+     * @notice Get ticket token address
+     * @return Ticket token address
+     */
+    function getTicketToken() external view returns (address);
+
+    /**
      * @notice Get operator's current ticket balance
      * @param operator Address of the operator
      * @return Current collateral balance
