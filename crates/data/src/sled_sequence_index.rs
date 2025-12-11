@@ -37,10 +37,12 @@ impl SequenceIndex for SledSequenceIndex {
     }
 
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
+        todo!("Do this");
         Ok(())
     }
 
     fn seek_for_prev(&self, key: u128) -> Result<Option<u64>> {
+        todo!("Do this");
         Ok(None)
     }
 }

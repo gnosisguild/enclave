@@ -22,12 +22,15 @@ impl InMemSequenceIndex {
 
 impl SequenceIndex for InMemSequenceIndex {
     fn seek_for_prev(&self, key: u128) -> Result<Option<u64>> {
+        todo!("do this");
         Ok(None)
     }
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
+        todo!("do this");
         Ok(())
     }
     fn get(&self, key: u128) -> Result<Option<u64>> {
+        todo!("do this");
         Ok(None)
     }
 }
