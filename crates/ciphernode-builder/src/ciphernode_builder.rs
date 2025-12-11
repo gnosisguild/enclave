@@ -15,7 +15,7 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
+use e3_data::{InMemStore, Repositories, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
@@ -25,7 +25,7 @@ use e3_evm::{
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
-    EvmEventReader, HistoricalEventCoordinator,
+    HistoricalEventCoordinator,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
