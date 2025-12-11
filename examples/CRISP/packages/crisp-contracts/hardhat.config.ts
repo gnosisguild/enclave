@@ -6,7 +6,7 @@
 
 import type { HardhatUserConfig } from 'hardhat/config'
 import { cleanDeploymentsTask } from '@enclave-e3/contracts/tasks/utils'
-import { ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens } from '@enclave-e3/contracts/tasks/ciphernode'
+import { ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens, updateSubmissionWindow } from '@enclave-e3/contracts/tasks/ciphernode'
 import dotenv from 'dotenv'
 
 import hardhatEthersChaiMatchers from '@nomicfoundation/hardhat-ethers-chai-matchers'
@@ -63,7 +63,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
 
 const config: HardhatUserConfig = {
   plugins: [hardhatTypechainPlugin, hardhatEthersChaiMatchers, hardhatNetworkHelpers, hardhatToolboxMochaEthersPlugin, hardhatVerify],
-  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens],
+  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd, ciphernodeMintTokens, updateSubmissionWindow],
   networks: {
     default: {
       accounts: {
