@@ -159,9 +159,10 @@ impl From<u128> for HlcTimestamp {
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct Hlc {
     /// Inner state guarded by mutex
-    inner: Mutex<HlcInner>,
+    inner: Arc<Mutex<HlcInner>>,
     /// Our node id
     node: u32,
     /// Maximum drift amount
@@ -187,7 +188,7 @@ impl Hlc {
 
     pub fn new(node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts: 0, counter: 0 }),
+            inner: Arc::new(Mutex::new(HlcInner { ts: 0, counter: 0 })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,
@@ -203,7 +204,7 @@ impl Hlc {
 
     pub fn with_state(ts: u64, counter: u32, node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts, counter }),
+            inner: Arc::new(Mutex::new(HlcInner { ts, counter })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,
