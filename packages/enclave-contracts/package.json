@@ -170,7 +170,8 @@
     "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish",
-    "verify:contracts": "hardhat run scripts/runVerification.ts"
+    "verify:contracts": "hardhat run scripts/runVerification.ts",
+    "updateSubmissionWindow": "hardhat ciphernode:window"
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",

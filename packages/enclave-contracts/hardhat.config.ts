@@ -18,6 +18,7 @@ import {
   ciphernodeMintTokens,
   ciphernodeRemove,
   ciphernodeSiblings,
+  updateSubmissionWindow,
 } from "./tasks/ciphernode";
 import {
   activateE3,
@@ -101,6 +102,7 @@ const config: HardhatUserConfig = {
     publishCommittee,
     enableE3,
     cleanDeploymentsTask,
+    updateSubmissionWindow,
   ],
   networks: {
     hardhat: {
