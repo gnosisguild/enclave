@@ -57,20 +57,26 @@ async fn test_trbfv_isolation() -> Result<()> {
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
-    let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
-    let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
-        params_raw.clone(),
-        5,
-        3,
-    )?));
-
     // E3Parameters
     let threshold_m = 2;
     let threshold_n = 5;
     let esi_per_ct = 3;
+    // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
+    // This is just for INSECURE parameter set.
+    // This is not secure and should not be used in production.
+    // For production use lambda = 80.
+    let lambda = 2;
     let seed = create_seed_from_u64(123);
 
-    let trbfv_config = TrBFVConfig::new(params, threshold_n, threshold_m);
+    let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
+    let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
+        params_raw.clone(),
+        threshold_n,
+        esi_per_ct,
+        lambda,
+    )?));
+
+    let trbfv_config = TrBFVConfig::new(params, threshold_n as u64, threshold_m as u64);
     let crp_raw = create_crp(
         trbfv_config.params(),
         Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
@@ -79,7 +85,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
     let shares_hash_map = usecase_helpers::generate_shares_hash_map(
         &trbfv_config,
-        esi_per_ct,
+        esi_per_ct as u64,
         &error_size,
         &crp_raw,
         &rng,

@@ -36,9 +36,9 @@ risc0-zkvm = { version = "=3.0.3" }
 risc0-zkp = { version = "=3.0.2", default-features = false }
 serde = { version = "1.0", features = ["derive", "std"] }
 serde_json = "=1.0.141"
-fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params"}
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
+fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration"}
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
 e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "632766e4ed1ceeccdeb023a56f16413a33be6f46" }
 tokio = { version = "=1.46.1", features = ["full"] }
 rand = { version = "=0.8.5" }

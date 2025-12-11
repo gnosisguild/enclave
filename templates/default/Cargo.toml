@@ -7,8 +7,8 @@ members = [
 
 [workspace.dependencies]
 e3-user-program = { path = "./program" }
-fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
+fhe = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
 e3-program-server = { path = "../../crates/program-server" }
 e3-bfv-helpers = { path = "../../crates/bfv-helpers" }
 e3-compute-provider = { path = "../../crates/compute-provider" }

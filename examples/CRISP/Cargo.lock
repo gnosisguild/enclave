@@ -2314,7 +2314,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-bfv-helpers"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -2336,7 +2336,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -2353,7 +2353,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -2397,7 +2397,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.1.5"
+version = "0.1.7"
 dependencies = [
  "e3-bfv-helpers",
  "e3-evm-helpers",
@@ -2621,8 +2621,9 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
+ "bincode",
  "doc-comment",
  "fhe-math",
  "fhe-traits",
@@ -2646,7 +2647,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2660,6 +2661,7 @@ dependencies = [
  "prost-build",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "serde",
  "sha2",
  "thiserror 1.0.69",
  "zeroize",
@@ -2668,7 +2670,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -2676,7 +2678,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -6674,7 +6676,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=prepare-integration#806424d9863a4fcc0abeb1cc27bb3930893f6a75"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -6700,7 +6702,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=prepare-integration#806424d9863a4fcc0abeb1cc27bb3930893f6a75"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",

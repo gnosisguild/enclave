@@ -3571,8 +3571,9 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
+ "bincode",
  "doc-comment",
  "fhe-math",
  "fhe-traits",
@@ -3596,7 +3597,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3610,6 +3611,7 @@ dependencies = [
  "prost-build",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "serde",
  "sha2",
  "thiserror 1.0.69",
  "zeroize",
@@ -3618,7 +3620,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3626,7 +3628,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=dummy-params#b3353fb46ce2219ecd87a1c693591aa56ab13fae"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=prepare-integration#5d59a12e2117cd8560b102acf2991c8727e50009"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -7127,7 +7129,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "safe"
-version = "0.1.7"
+version = "0.1.5"
+source = "git+https://github.com/gnosisguild/enclave#c8aff7c361199118404c0b17f63270e1fa5c177a"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -7138,8 +7141,7 @@ dependencies = [
 
 [[package]]
 name = "safe"
-version = "0.1.5"
-source = "git+https://github.com/gnosisguild/enclave#c8aff7c361199118404c0b17f63270e1fa5c177a"
+version = "0.1.7"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -9266,7 +9268,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=prepare-integration#806424d9863a4fcc0abeb1cc27bb3930893f6a75"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -9281,7 +9283,7 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "rayon",
- "safe 0.1.5 (git+https://github.com/gnosisguild/enclave)",
+ "safe 0.1.5",
  "serde",
  "serde_json",
  "tempfile",
@@ -9292,7 +9294,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=dummy-parameters#02130f9914d115a97ab952295df66d528fb143a3"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=prepare-integration#806424d9863a4fcc0abeb1cc27bb3930893f6a75"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",

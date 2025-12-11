@@ -121,10 +121,10 @@ dirs = "=5.0.1"
 dialoguer = "=0.11.0"
 duct = "=1.0.0"
 eyre = { version = "=0.6.12" }
-fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "dummy-params" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "dummy-params" }
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "prepare-integration" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "prepare-integration" }
 figment = { version = "=0.10.19", features = ["yaml", "test"] }
 futures = "=0.3.31"
 futures-util = "=0.3.31"
