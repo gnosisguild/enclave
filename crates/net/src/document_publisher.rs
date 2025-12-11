@@ -520,7 +520,7 @@ mod tests {
 
         // let consumer = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         // let bus = BusHandle::new(consumer);
-        let system = EventSystem::new("test");
+        let system = EventSystem::new("test").with_fresh_bus();
         let bus = system.handle()?;
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
