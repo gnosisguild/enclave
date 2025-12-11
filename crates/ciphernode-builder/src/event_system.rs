@@ -152,7 +152,7 @@ impl EventSystem {
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
             .get_or_try_init(|| match &self.backend {
-                Backend::InMem(b) => {
+                EventSystemBackend::InMem(b) => {
                     let eventstore = b
                         .eventstore
                         .get_or_init(|| {
@@ -161,7 +161,7 @@ impl EventSystem {
                         .clone();
                     Ok(Sequencer::new(&self.eventbus(), eventstore, self.buffer()).start())
                 }
-                Backend::Persisted(b) => {
+                EventSystemBackend::Persisted(b) => {
                     let eventstore = b
                         .eventstore
                         .get_or_try_init(|| -> Result<_> {
@@ -192,14 +192,14 @@ impl EventSystem {
     /// Get the DataStore
     pub fn store(&self) -> Result<DataStore> {
         let store = match &self.backend {
-            Backend::InMem(b) => {
+            EventSystemBackend::InMem(b) => {
                 let addr = b
                     .store
                     .get_or_init(|| InMemStore::new(true).start())
                     .clone();
                 DataStore::from(&addr)
             }
-            Backend::Persisted(b) => {
+            EventSystemBackend::Persisted(b) => {
                 let addr = b
                     .store
                     .get_or_try_init(|| {
@@ -223,12 +223,12 @@ impl EventSystem {
         };
 
         self.wired.get_or_init(|| match &self.backend {
-            Backend::InMem(b) => {
+            EventSystemBackend::InMem(b) => {
                 if let Some(store) = b.store.get() {
                     buffer.do_send(ForwardTo::new(store.clone()));
                 }
             }
-            Backend::Persisted(b) => {
+            EventSystemBackend::Persisted(b) => {
                 if let Some(store) = b.store.get() {
                     buffer.do_send(ForwardTo::new(store.clone()));
                 }
