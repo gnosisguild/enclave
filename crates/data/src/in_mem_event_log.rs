@@ -7,11 +7,13 @@
 use anyhow::Result;
 use e3_events::{EnclaveEvent, EventLog, Unsequenced};
 
-pub struct InMemEventLog;
+pub struct InMemEventLog {
+    log: Vec<EnclaveEvent<Unsequenced>>,
+}
 
 impl InMemEventLog {
     pub fn new() -> Self {
-        Self {}
+        Self { log: Vec::new() }
     }
 }
 
@@ -20,9 +22,21 @@ impl EventLog for InMemEventLog {
         &self,
         from: u64,
     ) -> Box<dyn Iterator<Item = Result<(u64, EnclaveEvent<Unsequenced>)>>> {
-        Box::new(vec![].into_iter())
+        // Convert 1-indexed sequence to 0-indexed array position
+        let start_idx = from.saturating_sub(1) as usize;
+
+        let events: Vec<_> = self
+            .log
+            .iter()
+            .skip(start_idx)
+            .enumerate()
+            .map(|(i, event)| Ok((from + i as u64, event.clone())))
+            .collect();
+
+        Box::new(events.into_iter())
     }
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
-        Ok(1u64)
+        self.log.push(event.to_owned());
+        Ok(self.log.len() as u64)
     }
 }
