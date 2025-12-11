@@ -140,6 +140,7 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
 mod tests {
     use actix::{Actor, Handler, Message};
     use e3_ciphernode_builder::EventSystem;
+    // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
         hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, TestEvent,
     };
