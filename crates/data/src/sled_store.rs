@@ -53,10 +53,12 @@ impl Handler<Insert> for SledStore {
 impl Handler<InsertBatch> for SledStore {
     type Result = ();
 
-    fn handle(&mut self, event: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
-        // XXX: handle this properly
-        for cmd in event.commands() {
-            ctx.notify(cmd.to_owned())
+    fn handle(&mut self, event: InsertBatch, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref mut db) = &mut self.db {
+            match db.insert_batch(event.commands()) {
+                Err(err) => self.bus.err(EType::Data, err),
+                _ => (),
+            }
         }
     }
 }
