@@ -58,13 +58,13 @@ impl Handler<EventStored> for Sequencer {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::{prelude::*, BusHandle, EnclaveEvent, EventBus, TakeEvents, TestEvent};
-    use actix::Actor;
+    use e3_ciphernode_builder::EventSystem;
+    use e3_events::{EnclaveEvent, EventPublisher, TakeEvents, TestEvent};
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let bus = BusHandle::new_from_consumer(EventBus::<EnclaveEvent>::default().start());
+        let system = EventSystem::new("test");
+        let bus = system.handle()?;
         let history = bus.history();
 
         let event_data = vec![

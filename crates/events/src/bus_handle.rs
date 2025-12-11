@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use actix::{Actor, Addr, Recipient};
+use actix::{Addr, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
 use tracing::error;
@@ -150,7 +150,7 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::{
         hlc::Hlc, prelude::*, sequencer::Sequencer, BusHandle, EnclaveEvent, EnclaveEventData,

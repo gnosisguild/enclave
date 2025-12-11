@@ -30,4 +30,5 @@ zeroize = { workspace = true }
 
 [dev-dependencies]
 e3-entrypoint = { workspace = true }
-
+e3-ciphernode-builder = { workspace = true }
+e3-events = { workspace = true, features = ["test-helpers"] }

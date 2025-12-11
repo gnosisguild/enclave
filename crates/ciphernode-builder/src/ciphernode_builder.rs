@@ -15,7 +15,7 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, Repositories, RepositoriesFactory};
+use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
@@ -25,7 +25,7 @@ use e3_evm::{
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
-    HistoricalEventCoordinator,
+    EvmEventReader, HistoricalEventCoordinator,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -58,7 +58,7 @@ pub struct CiphernodeBuilder {
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
     contract_components: ContractComponents,
-    datastore: Option<DataStore>,
+    in_mem_store: Option<Addr<InMemStore>>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
     event_system: EventSystemType,
@@ -104,7 +104,7 @@ impl CiphernodeBuilder {
             chains: vec![],
             cipher,
             contract_components: ContractComponents::default(),
-            datastore: None,
+            in_mem_store: None,
             keyshare: None,
             logging: false,
             multithread_cache: None,
@@ -146,6 +146,12 @@ impl CiphernodeBuilder {
     #[deprecated = "in future versions we will migrate to with_trbfv()"]
     pub fn with_keyshare(mut self) -> Self {
         self.keyshare = Some(KeyshareKind::NonThreshold);
+        self
+    }
+
+    /// Use the given in-mem datastore. This is useful for injecting a store dump.
+    pub fn with_in_mem_datastore(mut self, store: &Addr<InMemStore>) -> Self {
+        self.in_mem_store = Some(store.to_owned());
         self
     }
 
@@ -317,7 +323,11 @@ impl CiphernodeBuilder {
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
                 EventSystem::persisted(&self.name, log_path, kv_path).with_event_bus(local_bus)
             } else {
-                EventSystem::in_mem(&self.name).with_event_bus(local_bus)
+                if let Some(ref store) = self.in_mem_store {
+                    EventSystem::in_mem_from_store(&self.name, store).with_event_bus(local_bus)
+                } else {
+                    EventSystem::in_mem(&self.name).with_event_bus(local_bus)
+                }
             };
 
         let addr = if let Some(addr) = self.address.clone() {

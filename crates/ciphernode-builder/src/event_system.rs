@@ -45,12 +45,31 @@ pub struct EventSystem {
 }
 
 impl EventSystem {
+    pub fn new(name: &str) -> Self {
+        EventSystem::in_mem(name)
+    }
+
     pub fn in_mem(node_id: &str) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
             backend: Backend::InMem(InMemBackend {
                 eventstore: OnceCell::new(),
                 store: OnceCell::new(),
+            }),
+            buffer: OnceCell::new(),
+            sequencer: OnceCell::new(),
+            eventbus: OnceCell::new(),
+            handle: OnceCell::new(),
+            wired: OnceCell::new(),
+        }
+    }
+
+    pub fn in_mem_from_store(node_id: &str, store: &Addr<InMemStore>) -> Self {
+        Self {
+            node_id: EventSystem::node_id(node_id),
+            backend: Backend::InMem(InMemBackend {
+                eventstore: OnceCell::new(),
+                store: OnceCell::from(store.to_owned()),
             }),
             buffer: OnceCell::new(),
             sequencer: OnceCell::new(),

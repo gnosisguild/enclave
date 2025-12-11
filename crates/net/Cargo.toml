@@ -26,6 +26,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 e3-events = { workspace = true }
+e3-ciphernode-builder = { workspace = true }
 anyhow = { workspace = true }
 actix = { workspace = true }
 zeroize = { workspace = true }
