@@ -81,7 +81,7 @@ async fn evm_reader() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
@@ -152,7 +152,7 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
@@ -232,7 +232,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
@@ -341,7 +341,7 @@ async fn coordinator_single_reader() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());
@@ -416,7 +416,7 @@ async fn coordinator_multiple_readers() -> Result<()> {
     let contract1 = EmitLogs::deploy(provider.provider()).await?;
     let contract2 = EmitLogs::deploy(provider.provider()).await?;
 
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let repository1 = Repository::new(get_in_mem_store());
@@ -501,7 +501,7 @@ async fn coordinator_no_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let repository = Repository::new(get_in_mem_store());

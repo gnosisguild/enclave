@@ -12,7 +12,7 @@ use e3_data::{
     SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventStore, Sequencer};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
 use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -98,6 +98,13 @@ impl EventSystem {
 
     pub fn with_event_bus(self, bus: Addr<EventBus<EnclaveEvent>>) -> Self {
         let _ = self.eventbus.set(bus);
+        self
+    }
+
+    pub fn with_fresh_bus(self) -> Self {
+        let _ = self
+            .eventbus
+            .set(EventBus::new(EventBusConfig { deduplicate: true }).start());
         self
     }
 

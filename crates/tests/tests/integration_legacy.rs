@@ -621,7 +621,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let system = EventSystem::new("test");
+    let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
 
