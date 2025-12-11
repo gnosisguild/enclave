@@ -385,8 +385,8 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Latest code. All releases are tagged from here. Using feature flags for
-  experimental features, we ensure that code is always stable.
+- **`main`** - Latest code. All releases are tagged from here. Using feature flags for experimental
+  features, we ensure that code is always stable.
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
 
