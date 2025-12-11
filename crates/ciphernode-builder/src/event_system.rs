@@ -17,11 +17,13 @@ use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
+/// Hold the InMem EventStore instance and InMemStore
 struct InMemBackend {
     eventstore: OnceCell<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
+/// Hold the Persistent EventStore instance and SledStore
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
@@ -29,30 +31,49 @@ struct PersistedBackend {
     store: OnceCell<Addr<SledStore>>,
 }
 
-enum Backend {
+/// An EventSystemBackend is holding the potentially persistent structures for the system
+enum EventSystemBackend {
     InMem(InMemBackend),
     Persisted(PersistedBackend),
 }
 
+/// EventSystem holds interconnected references to the components that manage events and
+/// persistence within the node. The EventSystem connects:
+///
+/// - **BusHandle** for interacting with the event system
+/// - **EventBus** for managing publishing of events to listeners
+/// - **EventStore** for managing persistence of events
+/// - **Sequencer** for managing sequencing of event persistence and snapshot coordination
+/// - **WriteBuffer** for batching inserts from actors into a snapshot
+///
 pub struct EventSystem {
+    /// A nodes id to be used as a tiebreaker in logical clock timestamp differentiation
     node_id: u32,
-    backend: Backend,
+    /// EventSystem backend either persisted or in memory
+    backend: EventSystemBackend,
+    /// WriteBuffer for batching inserts from actors into a snapshot
     buffer: OnceCell<Addr<WriteBuffer>>,
+    /// EventSystem Sequencer
     sequencer: OnceCell<Addr<Sequencer>>,
+    /// EventSystem eventbus
     eventbus: OnceCell<Addr<EventBus<EnclaveEvent>>>,
+    /// EventSystem BusHandle
     handle: OnceCell<BusHandle>,
+    /// A OnceLock that is used to indicate whether the system is wired to write snapshots
     wired: OnceCell<()>,
 }
 
 impl EventSystem {
+    /// Create a new in memory EventSystem with default settings
     pub fn new(name: &str) -> Self {
         EventSystem::in_mem(name)
     }
 
+    /// Create an in memory EventSystem
     pub fn in_mem(node_id: &str) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
-            backend: Backend::InMem(InMemBackend {
+            backend: EventSystemBackend::InMem(InMemBackend {
                 eventstore: OnceCell::new(),
                 store: OnceCell::new(),
             }),
@@ -64,10 +85,11 @@ impl EventSystem {
         }
     }
 
+    /// Create an in memory EventSystem with a given store
     pub fn in_mem_from_store(node_id: &str, store: &Addr<InMemStore>) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
-            backend: Backend::InMem(InMemBackend {
+            backend: EventSystemBackend::InMem(InMemBackend {
                 eventstore: OnceCell::new(),
                 store: OnceCell::from(store.to_owned()),
             }),
@@ -79,10 +101,11 @@ impl EventSystem {
         }
     }
 
+    /// Create a persisted EventSystem with datafiles at the given paths
     pub fn persisted(node_id: &str, log_path: PathBuf, sled_path: PathBuf) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
-            backend: Backend::Persisted(PersistedBackend {
+            backend: EventSystemBackend::Persisted(PersistedBackend {
                 log_path,
                 sled_path,
                 eventstore: OnceCell::new(),
@@ -96,11 +119,13 @@ impl EventSystem {
         }
     }
 
+    /// Pass in a sepecific given event bus
     pub fn with_event_bus(self, bus: Addr<EventBus<EnclaveEvent>>) -> Self {
         let _ = self.eventbus.set(bus);
         self
     }
 
+    /// Use a fresh event bus that is not the default singleton instance
     pub fn with_fresh_bus(self) -> Self {
         let _ = self
             .eventbus
@@ -108,10 +133,12 @@ impl EventSystem {
         self
     }
 
+    /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
     }
 
+    /// Get the buffer address
     pub fn buffer(&self) -> Addr<WriteBuffer> {
         let buffer = self
             .buffer
@@ -121,6 +148,7 @@ impl EventSystem {
         buffer
     }
 
+    /// Get the sequencer address
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
             .get_or_try_init(|| match &self.backend {
@@ -148,6 +176,7 @@ impl EventSystem {
             .cloned()
     }
 
+    /// Get the BusHandle
     pub fn handle(&self) -> Result<BusHandle> {
         self.handle
             .get_or_try_init(|| {
@@ -160,6 +189,7 @@ impl EventSystem {
             .cloned()
     }
 
+    /// Get the DataStore
     pub fn store(&self) -> Result<DataStore> {
         let store = match &self.backend {
             Backend::InMem(b) => {
@@ -184,6 +214,8 @@ impl EventSystem {
         Ok(store)
     }
 
+    // We need to ensure that once the buffer and store are created they are connected so that
+    // inserts are sent between the two actors. This internal function ensures this happens.
     fn wire_if_ready(&self) {
         let buffer = match self.buffer.get() {
             Some(b) => b,
