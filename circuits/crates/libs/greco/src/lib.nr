@@ -457,8 +457,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let commitment = sponge.squeeze();
         sponge.finish();
 
-        print(commitment);
-
         assert_eq(commitment.get(0), self.pk_commitment);
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
