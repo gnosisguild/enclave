@@ -26,7 +26,7 @@ pub async fn execute(
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
-    let bus = get_enclave_bus_handle();
+    let bus = get_enclave_bus_handle(config)?;
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
 
     let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())

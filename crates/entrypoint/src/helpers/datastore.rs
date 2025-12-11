@@ -32,7 +32,7 @@ pub fn setup_datastore(config: &AppConfig, bus: &BusHandle) -> Result<DataStore>
 }
 
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
-    let bus = get_enclave_bus_handle();
+    let bus = get_enclave_bus_handle(config)?;
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
 }

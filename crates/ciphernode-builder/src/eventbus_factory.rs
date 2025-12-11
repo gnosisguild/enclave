@@ -6,6 +6,8 @@
 
 use actix::Actor;
 use actix::Addr;
+use e3_config::AppConfig;
+use e3_events::EventStore;
 use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
@@ -18,6 +20,8 @@ use e3_events::Event;
 use e3_events::EventBus;
 use e3_events::HistoryCollector;
 use e3_events::Subscribe;
+
+use crate::EventSystem;
 
 // The singleton factory using once_cell
 pub struct EventBusFactory {
@@ -93,11 +97,8 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
-pub fn get_enclave_bus_handle() -> BusHandle {
-    // let bus = get_enclave_event_bus();
-    // let index;
-    // let eventstore = EventStore::new(index, bus);
-    // let seq = Sequencer::new(bus, eventstore).start();
-    // BusHandle::new(bus, seq)
-    todo!();
+pub fn get_enclave_bus_handle(config: &AppConfig) -> anyhow::Result<BusHandle> {
+    let bus = get_enclave_event_bus();
+    let system = EventSystem::new(&config.name()).with_event_bus(bus);
+    Ok(system.handle()?)
 }
