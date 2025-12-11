@@ -11,6 +11,7 @@ use crate::{Insert, InsertBatch};
 
 pub struct WriteBuffer {
     dest: Option<Recipient<InsertBatch>>,
+    buffer: Vec<Insert>,
 }
 
 impl Actor for WriteBuffer {
@@ -19,30 +20,39 @@ impl Actor for WriteBuffer {
 
 impl WriteBuffer {
     pub fn new() -> Self {
-        Self { dest: None }
+        Self {
+            dest: None,
+            buffer: Vec::new(),
+        }
     }
 }
 
 impl Handler<ForwardTo> for WriteBuffer {
     type Result = ();
-    fn handle(&mut self, msg: ForwardTo, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ForwardTo, _: &mut Self::Context) -> Self::Result {
         self.dest = Some(msg.dest())
     }
 }
 
 impl Handler<Insert> for WriteBuffer {
     type Result = ();
-    fn handle(&mut self, msg: Insert, ctx: &mut Self::Context) -> Self::Result {
-        // XXX: finish me
-        // store insert in buffer
+
+    fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
+        self.buffer.push(msg);
     }
 }
 
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
-    fn handle(&mut self, msg: CommitSnapshot, ctx: &mut Self::Context) -> Self::Result {
-        // XXX: finish me
-        // send all inserts to
+
+    fn handle(&mut self, _: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref dest) = self.dest {
+            if !self.buffer.is_empty() {
+                let inserts = std::mem::take(&mut self.buffer);
+                let batch = InsertBatch::new(inserts);
+                dest.do_send(batch);
+            }
+        }
     }
 }
 
