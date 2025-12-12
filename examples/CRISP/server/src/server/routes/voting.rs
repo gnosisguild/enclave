@@ -5,14 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::server::{
-    CONFIG, app_data::AppData, database::SledDB, models::{
-        VoteRequest, VoteResponse, VoteResponseStatus, VoteStatusRequest, VoteStatusResponse
-    }, repo::CrispE3Repository
+    app_data::AppData,
+    database::SledDB,
+    models::{
+        VoteRequest, VoteResponse, VoteResponseStatus, VoteStatusRequest, VoteStatusResponse,
+    },
+    repo::CrispE3Repository,
+    CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::{
-    primitives::{Bytes, U256},
-};
+use alloy::primitives::{Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
 use log::{error, info};
