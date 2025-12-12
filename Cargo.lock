@@ -2785,6 +2785,7 @@ dependencies = [
  "actix",
  "alloy",
  "anyhow",
+ "bincode",
  "derivative",
  "e3-aggregator",
  "e3-config",
@@ -2800,6 +2801,7 @@ dependencies = [
  "e3-utils",
  "once_cell",
  "tempfile",
+ "tokio",
  "tracing",
 ]
 
