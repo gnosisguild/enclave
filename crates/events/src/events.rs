@@ -9,12 +9,18 @@ use actix::{Message, Recipient};
 use crate::{EnclaveEvent, Sequenced, Unsequenced};
 
 /// Direct event received by the snapshot buffer in order to save snapshot to disk
-#[derive(Message)]
+#[derive(Message, Debug)]
 #[rtype("()")]
-pub struct CommitSnapshot(pub u64);
+pub struct CommitSnapshot(u64);
+
+impl CommitSnapshot {
+    pub fn new(seq: u64) -> Self {
+        Self(seq)
+    }
+}
 
 /// Direct event received by the EventStore to store an event
-#[derive(Message)]
+#[derive(Message, Debug)]
 #[rtype("()")]
 pub struct StoreEventRequested {
     pub event: EnclaveEvent<Unsequenced>,
@@ -34,7 +40,7 @@ impl StoreEventRequested {
 }
 
 /// Direct event received by the Sequencer once an event has been stored
-#[derive(Message)]
+#[derive(Message, Debug)]
 #[rtype("()")]
 pub struct EventStored(pub EnclaveEvent<Sequenced>);
 

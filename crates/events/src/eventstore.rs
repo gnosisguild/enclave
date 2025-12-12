@@ -19,10 +19,13 @@ pub struct EventStore<I: SequenceIndex, L: EventLog> {
 
 impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
+        println!("EventStore got {:?}", msg);
+
         let event = msg.event;
         let sender = msg.sender;
         let ts = event.get_ts();
         let seq = self.log.append(&event)?;
+        println!("EventStore: got seq {}", seq);
         self.index.insert(ts, seq)?;
         sender.try_send(EventStored(event.into_sequenced(seq)))?;
         Ok(())

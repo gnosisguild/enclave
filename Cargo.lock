@@ -2800,6 +2800,7 @@ dependencies = [
  "e3-utils",
  "once_cell",
  "tempfile",
+ "tokio",
  "tracing",
 ]
 

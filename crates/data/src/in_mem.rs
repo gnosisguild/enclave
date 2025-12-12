@@ -75,7 +75,9 @@ impl Handler<Insert> for InMemStore {
 impl Handler<InsertBatch> for InMemStore {
     type Result = ();
     fn handle(&mut self, msg: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+        println!("InMemStore: Running InsertBatch");
         for cmd in msg.commands() {
+            println!("InMemStore: writing {:?}", cmd.key());
             self.db.insert(cmd.key().to_owned(), cmd.value().to_owned());
         }
     }
@@ -108,6 +110,7 @@ impl Handler<Remove> for InMemStore {
 impl Handler<Get> for InMemStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
+        println!("Getting contents {:?}", event.key());
         let key = event.key();
         self.db.get(key).cloned()
     }

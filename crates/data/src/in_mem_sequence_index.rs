@@ -27,6 +27,7 @@ impl SequenceIndex for InMemSequenceIndex {
     }
 
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
+        println!("InMemSequenceIndex got key={} value={}", key, value);
         self.index.insert(key, value);
         Ok(())
     }

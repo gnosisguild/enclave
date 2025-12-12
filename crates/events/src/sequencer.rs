@@ -16,20 +16,20 @@ pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     seq: u64,
     eventstore: Recipient<StoreEventRequested>,
-    snapshot_buffer: Recipient<CommitSnapshot>,
+    buffer: Recipient<CommitSnapshot>,
 }
 
 impl Sequencer {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
         eventstore: impl Into<Recipient<StoreEventRequested>>,
-        snapshot_buffer: impl Into<Recipient<CommitSnapshot>>,
+        buffer: impl Into<Recipient<CommitSnapshot>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             seq: 0,
             eventstore: eventstore.into(),
-            snapshot_buffer: snapshot_buffer.into(),
+            buffer: buffer.into(),
         }
     }
 }
@@ -41,6 +41,7 @@ impl Actor for Sequencer {
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+        println!("Sequencer got {}", msg);
         self.eventstore
             .do_send(StoreEventRequested::new(msg, ctx.address()))
     }
@@ -49,9 +50,11 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
 impl Handler<EventStored> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EventStored, ctx: &mut Self::Context) -> Self::Result {
+        println!("Sequencer got EventStored {:?}", msg);
+
         let event = msg.into_event();
         let seq = event.get_seq();
-        // TODO: store snapshot...
+        self.buffer.do_send(CommitSnapshot::new(seq));
         self.bus.do_send(event)
     }
 }
