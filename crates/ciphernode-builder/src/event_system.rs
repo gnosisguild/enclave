@@ -5,14 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::get_enclave_event_bus;
-use actix::{Actor, Addr};
+use actix::{Actor, Addr, Recipient};
 use anyhow::Result;
 use e3_data::{
     CommitLogEventLog, DataStore, ForwardTo, InMemEventLog, InMemSequenceIndex, InMemStore,
-    SledSequenceIndex, SledStore, WriteBuffer,
+    InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
+use e3_events::{
+    BusHandle, CommitSnapshot, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer,
+};
 use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -35,6 +37,11 @@ struct PersistedBackend {
 enum EventSystemBackend {
     InMem(InMemBackend),
     Persisted(PersistedBackend),
+}
+
+pub enum EventStoreAddr {
+    InMem(Addr<EventStore<InMemSequenceIndex, InMemEventLog>>),
+    Persisted(Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>),
 }
 
 /// EventSystem holds interconnected references to the components that manage events and
@@ -162,29 +169,41 @@ impl EventSystem {
     /// Get the sequencer address
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
-            .get_or_try_init(|| match &self.backend {
-                EventSystemBackend::InMem(b) => {
-                    let eventstore = b
-                        .eventstore
-                        .get_or_init(|| {
-                            EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new()).start()
-                        })
-                        .clone();
-                    Ok(Sequencer::new(&self.eventbus(), eventstore, self.buffer()).start())
+            .get_or_try_init(|| match self.eventstore()? {
+                EventStoreAddr::InMem(es) => {
+                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
                 }
-                EventSystemBackend::Persisted(b) => {
-                    let eventstore = b
-                        .eventstore
-                        .get_or_try_init(|| -> Result<_> {
-                            let index = SledSequenceIndex::new(&b.sled_path, "sequence_index")?;
-                            let log = CommitLogEventLog::new(&b.log_path)?;
-                            Ok(EventStore::new(index, log).start())
-                        })?
-                        .clone();
-                    Ok(Sequencer::new(&self.eventbus(), eventstore, self.buffer()).start())
+                EventStoreAddr::Persisted(es) => {
+                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
                 }
             })
             .cloned()
+    }
+
+    /// Get the EventStore address
+    pub fn eventstore(&self) -> Result<EventStoreAddr> {
+        match &self.backend {
+            EventSystemBackend::InMem(b) => {
+                let addr = b
+                    .eventstore
+                    .get_or_init(|| {
+                        EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new()).start()
+                    })
+                    .clone();
+                Ok(EventStoreAddr::InMem(addr))
+            }
+            EventSystemBackend::Persisted(b) => {
+                let addr = b
+                    .eventstore
+                    .get_or_try_init(|| -> Result<_> {
+                        let index = SledSequenceIndex::new(&b.sled_path, "sequence_index")?;
+                        let log = CommitLogEventLog::new(&b.log_path)?;
+                        Ok(EventStore::new(index, log).start())
+                    })?
+                    .clone();
+                Ok(EventStoreAddr::Persisted(addr))
+            }
+        }
     }
 
     /// Get an instance of the Hlc
@@ -240,17 +259,18 @@ impl EventSystem {
             None => return,
         };
 
-        self.wired.get_or_init(|| match &self.backend {
-            EventSystemBackend::InMem(b) => {
-                if let Some(store) = b.store.get() {
-                    buffer.do_send(ForwardTo::new(store.clone()));
-                }
-            }
-            EventSystemBackend::Persisted(b) => {
-                if let Some(store) = b.store.get() {
-                    buffer.do_send(ForwardTo::new(store.clone()));
-                }
-            }
+        let store: Option<Recipient<InsertBatch>> = match &self.backend {
+            EventSystemBackend::InMem(b) => b.store.get().cloned().map(Into::into),
+            EventSystemBackend::Persisted(b) => b.store.get().cloned().map(Into::into),
+        };
+
+        let Some(store) = store else {
+            return;
+        };
+
+        // Now we know both are ready, so initialization will succeed
+        self.wired.get_or_init(|| {
+            buffer.do_send(ForwardTo::new(store));
         });
     }
 
@@ -263,8 +283,19 @@ impl EventSystem {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
+    use actix::Actor;
+    use actix::Handler;
+    use actix::Message;
+    use e3_data::Get;
+    use e3_data::Insert;
+    use e3_events::prelude::*;
+    use e3_events::EnclaveEventData;
+    use e3_events::TestEvent;
     use tempfile::TempDir;
+    use tokio::time::sleep;
 
     #[actix::test]
     async fn test_persisted() {
@@ -288,5 +319,70 @@ mod tests {
 
         // Wiring happened automatically
         assert!(system.wired.get().is_some());
+    }
+
+    #[actix::test]
+    async fn test_correct_data() -> Result<()> {
+        let system = EventSystem::in_mem("cn1").with_fresh_bus();
+        let seqencer = system.sequencer()?;
+        let handle = system.handle()?;
+        let store = system.store()?;
+        let buffer = system.buffer();
+        let eventstore = system.eventstore()?;
+
+        #[derive(Message, Debug)]
+        #[rtype("Vec<String>")]
+        struct GetLogs;
+
+        struct Listener {
+            logs: Vec<String>,
+        }
+
+        impl Handler<EnclaveEvent> for Listener {
+            type Result = ();
+            fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+                if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = msg.into_data() {
+                    self.logs.push(msg);
+                }
+            }
+        }
+
+        impl Handler<GetLogs> for Listener {
+            type Result = Vec<String>;
+            fn handle(&mut self, msg: GetLogs, _: &mut Self::Context) -> Self::Result {
+                self.logs.clone()
+            }
+        }
+
+        impl Actor for Listener {
+            type Context = actix::Context<Self>;
+        }
+
+        buffer.do_send(Insert::new("/foo/name", b"Fred".into()));
+        buffer.do_send(Insert::new("/foo/age", b"21".into()));
+        buffer.do_send(Insert::new("/foo/occupation", b"developer".into()));
+
+        let r = store.scope("name").read::<Vec<u8>>().await?;
+        assert_eq!(r, None);
+
+        let listener = Listener { logs: Vec::new() }.start();
+        handle.subscribe("*", listener.clone().into());
+        handle.publish(TestEvent::new("pink", 1))?;
+        // handle.publish(TestEvent::new("yellow", 1))?;
+        // handle.publish(TestEvent::new("red", 1))?;
+        // handle.publish(TestEvent::new("white", 1))?;
+        sleep(Duration::from_millis(100)).await;
+
+        let logs = listener.send(GetLogs).await?;
+
+        assert_eq!(logs, vec!["pink"]);
+        // assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
+
+        sleep(Duration::from_millis(100)).await;
+
+        let r = store.scope("/foo/name").read::<Vec<u8>>().await?;
+        assert_eq!(r, None);
+
+        Ok(())
     }
 }

@@ -36,6 +36,7 @@ impl EventLog for InMemEventLog {
         Box::new(events.into_iter())
     }
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
+        println!("InMemEventLog.append({:?})", event);
         self.log.push(event.to_owned());
         Ok(self.log.len() as u64)
     }

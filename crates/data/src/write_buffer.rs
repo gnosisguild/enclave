@@ -45,11 +45,14 @@ impl Handler<Insert> for WriteBuffer {
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
 
-    fn handle(&mut self, _: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+        println!("WriteBuffer received {:?}", msg);
         if let Some(ref dest) = self.dest {
+            println!("buffer.is_empty() == {}", self.buffer.is_empty());
             if !self.buffer.is_empty() {
                 let inserts = std::mem::take(&mut self.buffer);
                 let batch = InsertBatch::new(inserts);
+                println!("running BatchInsert!");
                 dest.do_send(batch);
             }
         }

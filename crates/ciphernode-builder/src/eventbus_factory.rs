@@ -7,7 +7,6 @@
 use actix::Actor;
 use actix::Addr;
 use e3_config::AppConfig;
-use e3_events::EventStore;
 use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
