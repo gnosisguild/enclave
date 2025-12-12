@@ -327,16 +327,17 @@ impl EtherscanClient {
     ) -> Result<Vec<TokenHolder>> {
         let mut token_holders: Vec<TokenHolder> = Vec::new();
 
+        let decimals = Self::get_decimals(token_address, rpc_url).await?;
+
+        // we want to keep some precision.
+        let half_decimals = decimals / 2;
+
+        let scale_factor = U256::from(10u128.pow(half_decimals as u32));
+
         for voter in potential_voters {
             match Self::get_past_votes(token_address, voter.address, block_number, rpc_url).await {
                 Ok(votes) => {
                     if votes >= threshold {
-                        let decimals = Self::get_decimals(token_address, rpc_url).await?;
-
-                        // we want to keep some precision.
-                        let half_decimals = decimals / 2;
-
-                        let scale_factor = U256::from(10u128.pow(half_decimals as u32));
                         let scaled_votes = votes / scale_factor;
 
                         token_holders.push(TokenHolder {
@@ -871,7 +872,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // #[ignore]
+    #[ignore]
     async fn test_get_token_holders_with_voting_power() {
         let token = "0xb0BE360719f84c5351621590B7FfBD8EB0B46B5d";
         let token_address: Address = token.parse().unwrap();
