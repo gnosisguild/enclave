@@ -3,19 +3,21 @@ FROM rust:1.86 AS builder
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    jq \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.8.27/solc-static-linux -o /usr/local/bin/solc \
+    && chmod +x /usr/local/bin/solc
+
 # Copy workspace files and all crates EXCEPT net
-COPY --exclude=crates/net --exclude=crates/evm . .
+COPY --exclude=crates/net . .
 
 COPY ./crates/net/Cargo.toml ./crates/net/Cargo.toml
 RUN mkdir -p ./crates/net/src/bin && \
     echo "fn main() {}" > ./crates/net/src/main.rs && \
     echo "fn main() {}" > ./crates/net/src/bin/p2p_test.rs
-
-# Stub out evm crate too
-COPY ./crates/evm/Cargo.toml ./crates/evm/Cargo.toml
-RUN mkdir -p ./crates/evm/src && \
-    echo "" > ./crates/evm/src/lib.rs
-
 
 # Build dependencies
 RUN cargo build --locked --bin p2p_test
