@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use actix::{Addr, Recipient};
+use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
 use tracing::error;
@@ -18,16 +18,16 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector, Sequenced,
-    Subscribe, Unsequenced,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, Event, EventBus, HistoryCollector,
+    Sequenced, Subscribe, Unsequenced,
 };
 
 #[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derivative(Debug, PartialEq, Eq)]
 pub struct BusHandle {
     consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     producer: Addr<Sequencer>,
-    #[derivative(Debug = "ignore")]
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
     hlc: Arc<Hlc>,
 }
 
@@ -59,6 +59,14 @@ impl BusHandle {
     pub fn ts(&self) -> Result<u128> {
         let ts = self.hlc.tick()?;
         Ok(ts.into())
+    }
+
+    pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
+    where
+        F: Fn(&EnclaveEvent<Sequenced>) -> bool + 'static,
+    {
+        let pipe = BusHandlePipe(other.to_owned(), predicate).start();
+        self.subscribe("*", pipe.into());
     }
 }
 
@@ -281,3 +289,20 @@ mod tests {
         Ok(())
     }
 }
+
+pub struct BusHandlePipe<F>(BusHandle, F)
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + 'static;
+
+impl<F> Actor for BusHandlePipe<F> {
+    type Context = actix::Context<Self>;
+}
+
+impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F> {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+        let (data, ts) = msg.split();
+        let _ = self.0.publish_from_remote(data, ts);
+    }
+}
+// XXX: need to use predicate here to filter events to forward

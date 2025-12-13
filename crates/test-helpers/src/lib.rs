@@ -16,7 +16,7 @@ use anyhow::*;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventPublisher, HistoryCollector, Seed, Subscribe,
+    EventPublisher, EventSubscriber, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
@@ -126,10 +126,11 @@ pub fn get_common_setup(
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
-        let source = node.bus().consumer();
+        let source = node.bus();
         for (_, node) in nodes.iter().enumerate() {
-            let dest = node.bus().consumer();
+            let dest = node.bus();
             if source != dest {
+                source.pipe_to(dest);
                 EventBus::pipe_filter(
                     source,
                     move |e: &EnclaveEvent| {
