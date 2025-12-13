@@ -18,10 +18,7 @@ impl InMemEventLog {
 }
 
 impl EventLog for InMemEventLog {
-    fn read_from(
-        &self,
-        from: u64,
-    ) -> Box<dyn Iterator<Item = Result<(u64, EnclaveEvent<Unsequenced>)>>> {
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed array position
         let start_idx = from.saturating_sub(1) as usize;
 
@@ -30,13 +27,12 @@ impl EventLog for InMemEventLog {
             .iter()
             .skip(start_idx)
             .enumerate()
-            .map(|(i, event)| Ok((from + i as u64, event.clone())))
+            .map(|(i, event)| (from + i as u64, event.clone()))
             .collect();
-
+        println!("XXX: events:{:?}", events);
         Box::new(events.into_iter())
     }
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
-        println!("InMemEventLog.append({:?})", event);
         self.log.push(event.to_owned());
         Ok(self.log.len() as u64)
     }

@@ -2785,6 +2785,7 @@ dependencies = [
  "actix",
  "alloy",
  "anyhow",
+ "bincode",
  "derivative",
  "e3-aggregator",
  "e3-config",

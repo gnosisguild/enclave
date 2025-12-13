@@ -21,18 +21,45 @@ impl InMemSequenceIndex {
 }
 
 impl SequenceIndex for InMemSequenceIndex {
-    fn seek_for_prev(&self, key: u128) -> Result<Option<u64>> {
-        // Find the largest key <= the given key and return its value
-        Ok(self.index.range(..=key).next_back().map(|(_, &v)| v))
+    fn seek(&self, key: u128) -> Result<Option<u64>> {
+        Ok(self.index.range(key..).next().map(|(_, &v)| v))
     }
 
     fn insert(&mut self, key: u128, value: u64) -> Result<()> {
-        println!("InMemSequenceIndex got key={} value={}", key, value);
         self.index.insert(key, value);
         Ok(())
     }
 
     fn get(&self, key: u128) -> Result<Option<u64>> {
         Ok(self.index.get(&key).copied())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::InMemSequenceIndex;
+    use e3_events::SequenceIndex;
+
+    #[test]
+    fn seek_for_prev_finds_nearest_key_at_or_before_target() {
+        let mut index = InMemSequenceIndex::new();
+        index.insert(100, 1).unwrap();
+        index.insert(200, 2).unwrap();
+        index.insert(300, 3).unwrap();
+
+        // Empty range (before all keys)
+        assert_eq!(index.seek(50).unwrap(), Some(1));
+
+        // Exact matches
+        assert_eq!(index.seek(100).unwrap(), Some(1));
+        assert_eq!(index.seek(200).unwrap(), Some(2));
+        assert_eq!(index.seek(300).unwrap(), Some(3));
+
+        // Between keys (returns next)
+        assert_eq!(index.seek(150).unwrap(), Some(2));
+        assert_eq!(index.seek(250).unwrap(), Some(3));
+
+        // After all keys (returns last)
+        assert_eq!(index.seek(999).unwrap(), None);
     }
 }

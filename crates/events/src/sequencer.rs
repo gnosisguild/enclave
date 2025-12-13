@@ -41,7 +41,6 @@ impl Actor for Sequencer {
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
-        println!("Sequencer got {}", msg);
         self.eventstore
             .do_send(StoreEventRequested::new(msg, ctx.address()))
     }
@@ -50,8 +49,6 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
 impl Handler<EventStored> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EventStored, ctx: &mut Self::Context) -> Self::Result {
-        println!("Sequencer got EventStored {:?}", msg);
-
         let event = msg.into_event();
         let seq = event.get_seq();
         self.buffer.do_send(CommitSnapshot::new(seq));

@@ -32,12 +32,6 @@ pub struct BusHandle {
 }
 
 impl BusHandle {
-    // pub fn new_from_consumer(consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
-    //     let producer = Sequencer::new(&consumer).start();
-    //     let hlc = Hlc::default();
-    //     Self::new(consumer, producer, hlc)
-    // }
-
     pub fn new(
         consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
         producer: Addr<Sequencer>,
@@ -60,6 +54,11 @@ impl BusHandle {
 
     pub fn consumer(&self) -> &Addr<EventBus<EnclaveEvent<Sequenced>>> {
         &self.consumer
+    }
+
+    pub fn ts(&self) -> Result<u128> {
+        let ts = self.hlc.tick()?;
+        Ok(ts.into())
     }
 }
 

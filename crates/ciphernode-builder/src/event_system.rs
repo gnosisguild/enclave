@@ -6,15 +6,13 @@
 
 use crate::get_enclave_event_bus;
 use actix::{Actor, Addr, Recipient};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use e3_data::{
     CommitLogEventLog, DataStore, ForwardTo, InMemEventLog, InMemSequenceIndex, InMemStore,
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{
-    BusHandle, CommitSnapshot, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer,
-};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
 use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -42,6 +40,19 @@ enum EventSystemBackend {
 pub enum EventStoreAddr {
     InMem(Addr<EventStore<InMemSequenceIndex, InMemEventLog>>),
     Persisted(Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>),
+}
+
+impl TryFrom<EventStoreAddr> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
+    type Error = anyhow::Error;
+    fn try_from(value: EventStoreAddr) -> std::result::Result<Self, Self::Error> {
+        if let EventStoreAddr::InMem(addr) = value {
+            Ok(addr)
+        } else {
+            Err(anyhow!(
+                "address was not EventStore<InMemSequenceIndex, InMemEventLog>"
+            ))
+        }
+    }
 }
 
 /// EventSystem holds interconnected references to the components that manage events and
@@ -234,7 +245,7 @@ impl EventSystem {
                     .store
                     .get_or_init(|| InMemStore::new(true).start())
                     .clone();
-                DataStore::from(&addr)
+                DataStore::from_in_mem(&addr, &self.buffer())
             }
             EventSystemBackend::Persisted(b) => {
                 let addr = b
@@ -244,7 +255,7 @@ impl EventSystem {
                         SledStore::new(&handle, &b.sled_path)
                     })?
                     .clone();
-                DataStore::from(&addr)
+                DataStore::from_sled_store(&addr, &self.buffer())
             }
         };
         self.wire_if_ready();
@@ -289,13 +300,70 @@ mod tests {
     use actix::Actor;
     use actix::Handler;
     use actix::Message;
-    use e3_data::Get;
-    use e3_data::Insert;
+
     use e3_events::prelude::*;
     use e3_events::EnclaveEventData;
+    use e3_events::GetEventsAfter;
+    use e3_events::ReceiveEvents;
     use e3_events::TestEvent;
     use tempfile::TempDir;
     use tokio::time::sleep;
+
+    // Setup Listener for the test
+    #[derive(Message, Debug)]
+    #[rtype("Vec<String>")]
+    struct GetLogs;
+
+    #[derive(Message, Debug)]
+    #[rtype("Vec<String>")]
+    struct GetEvents;
+
+    struct Listener {
+        logs: Vec<String>,
+        events: Vec<EnclaveEvent>,
+    }
+
+    impl Handler<EnclaveEvent> for Listener {
+        type Result = ();
+        fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+            if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = msg.into_data() {
+                self.logs.push(msg);
+            }
+        }
+    }
+
+    impl Handler<GetLogs> for Listener {
+        type Result = Vec<String>;
+        fn handle(&mut self, msg: GetLogs, _: &mut Self::Context) -> Self::Result {
+            self.logs.clone()
+        }
+    }
+
+    impl Handler<GetEvents> for Listener {
+        type Result = Vec<String>;
+        fn handle(&mut self, _: GetEvents, _: &mut Self::Context) -> Self::Result {
+            self.events
+                .iter()
+                .filter_map(|event| {
+                    if let EnclaveEventData::TestEvent(evt) = event.get_data() {
+                        return Some(evt.msg.clone());
+                    }
+                    None
+                })
+                .collect::<Vec<_>>()
+        }
+    }
+
+    impl Handler<ReceiveEvents> for Listener {
+        type Result = ();
+        fn handle(&mut self, msg: ReceiveEvents, _: &mut Self::Context) -> Self::Result {
+            self.events = msg.events().clone();
+        }
+    }
+
+    impl Actor for Listener {
+        type Context = actix::Context<Self>;
+    }
 
     #[actix::test]
     async fn test_persisted() {
@@ -322,67 +390,80 @@ mod tests {
     }
 
     #[actix::test]
-    async fn test_correct_data() -> Result<()> {
+    async fn test_event_system() -> Result<()> {
         let system = EventSystem::in_mem("cn1").with_fresh_bus();
-        let seqencer = system.sequencer()?;
         let handle = system.handle()?;
-        let store = system.store()?;
-        let buffer = system.buffer();
+        let datastore = system.store()?;
         let eventstore = system.eventstore()?;
-
-        #[derive(Message, Debug)]
-        #[rtype("Vec<String>")]
-        struct GetLogs;
-
-        struct Listener {
-            logs: Vec<String>,
+        let listener = Listener {
+            logs: Vec::new(),
+            events: Vec::new(),
         }
+        .start();
 
-        impl Handler<EnclaveEvent> for Listener {
-            type Result = ();
-            fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-                if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = msg.into_data() {
-                    self.logs.push(msg);
-                }
-            }
-        }
-
-        impl Handler<GetLogs> for Listener {
-            type Result = Vec<String>;
-            fn handle(&mut self, msg: GetLogs, _: &mut Self::Context) -> Self::Result {
-                self.logs.clone()
-            }
-        }
-
-        impl Actor for Listener {
-            type Context = actix::Context<Self>;
-        }
-
-        buffer.do_send(Insert::new("/foo/name", b"Fred".into()));
-        buffer.do_send(Insert::new("/foo/age", b"21".into()));
-        buffer.do_send(Insert::new("/foo/occupation", b"developer".into()));
-
-        let r = store.scope("name").read::<Vec<u8>>().await?;
-        assert_eq!(r, None);
-
-        let listener = Listener { logs: Vec::new() }.start();
+        // Send all evts to the listener
         handle.subscribe("*", listener.clone().into());
+
+        // Lets store some data
+        datastore.scope("/foo/name").write("Fred".to_string());
+        datastore.scope("/foo/age").write(21u64);
+        datastore
+            .scope("/foo/occupation")
+            .write("developer".to_string());
+
+        // NOTE: Eventual consistency
+        // Store should not have data set on it until event has been published
+        // There is an argument we should instead delay reads until the event has been stored
+        // For now we allow this inconsistency under the assumption that data is written for
+        // snapshot storage exclusively. If we have issues we may wish to change to a more
+        // highly consistent model.
+
+        // Let's check the eventual consistency all data points should be none...
+        assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);
+        assert_eq!(datastore.scope("/foo/age").read::<u64>().await?, None);
+        assert_eq!(
+            datastore.scope("/foo/occupation").read::<String>().await?,
+            None
+        );
+
+        // Push an event
         handle.publish(TestEvent::new("pink", 1))?;
-        // handle.publish(TestEvent::new("yellow", 1))?;
-        // handle.publish(TestEvent::new("red", 1))?;
-        // handle.publish(TestEvent::new("white", 1))?;
+        sleep(Duration::from_millis(1)).await;
+
+        // Now we have published an event all data should be written we can get the data from the store
+        assert_eq!(
+            datastore.scope("/foo/name").read::<String>().await?,
+            Some("Fred".to_string())
+        );
+        assert_eq!(datastore.scope("/foo/age").read::<u64>().await?, Some(21));
+        assert_eq!(
+            datastore.scope("/foo/occupation").read::<String>().await?,
+            Some("developer".to_string())
+        );
+
+        // Get a timestamp
+        let ts = handle.ts()?;
+
+        // Push a few other events
+        handle.publish(TestEvent::new("yellow", 1))?;
+        handle.publish(TestEvent::new("red", 1))?;
+        handle.publish(TestEvent::new("white", 1))?;
         sleep(Duration::from_millis(100)).await;
 
+        // Get the event logs from the listener
         let logs = listener.send(GetLogs).await?;
+        assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
 
-        assert_eq!(logs, vec!["pink"]);
-        // assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
+        // Get the in mem address for the event store
+        let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstore.try_into()?;
 
+        // Get all events after the given timestamp and send them to the listener
+        es.do_send(GetEventsAfter::new(ts, listener.clone()));
         sleep(Duration::from_millis(100)).await;
 
-        let r = store.scope("/foo/name").read::<Vec<u8>>().await?;
-        assert_eq!(r, None);
-
+        // Pull the events off the listsner since the timestamp
+        let events = listener.send(GetEvents).await?;
+        assert_eq!(events, vec!["yellow", "red", "white"]);
         Ok(())
     }
 }

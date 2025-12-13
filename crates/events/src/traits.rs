@@ -105,7 +105,7 @@ pub trait SequenceIndex: Unpin + 'static {
     /// Get the sequence offset for the given timestamp
     fn get(&self, key: u128) -> Result<Option<u64>>;
     /// Get the first sequence offset before the given timestamp
-    fn seek_for_prev(&self, key: u128) -> Result<Option<u64>>;
+    fn seek(&self, key: u128) -> Result<Option<u64>>;
 }
 
 /// Store and retrieve events from a write ahead log
@@ -113,10 +113,5 @@ pub trait EventLog: Unpin + 'static {
     /// Append an event to the log, returning its sequence number
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
-    fn read_from(
-        &self,
-        from: u64,
-    ) -> Box<
-        dyn Iterator<Item = std::result::Result<(u64, EnclaveEvent<Unsequenced>), anyhow::Error>>,
-    >;
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
 }

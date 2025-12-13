@@ -6,9 +6,9 @@
 
 use std::borrow::Cow;
 
-use crate::{Get, Insert, InsertSync, Remove};
+use crate::{ForwardTo, Get, Insert, InsertSync, Remove, WriteBuffer};
 use crate::{InMemStore, IntoKey, SledStore};
-use actix::{Addr, Recipient};
+use actix::{Actor, Addr, Recipient};
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
@@ -22,12 +22,12 @@ pub enum StoreAddr {
 }
 
 impl StoreAddr {
-    pub fn to_data_store(&self) -> DataStore {
-        match self {
-            StoreAddr::InMem(s) => s.into(),
-            StoreAddr::Sled(s) => s.into(),
-        }
-    }
+    // pub fn to_data_store(&self) -> DataStore {
+    //     match self {
+    //         StoreAddr::InMem(s) => s.into(),
+    //         StoreAddr::Sled(s) => s.into(),
+    //     }
+    // }
 
     pub fn to_maybe_in_mem(&self) -> Option<&Addr<InMemStore>> {
         match self {
@@ -150,6 +150,28 @@ impl DataStore {
             insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope: key.into_key(),
+        }
+    }
+
+    pub fn from_sled_store(addr: &Addr<SledStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
+        Self {
+            addr: StoreAddr::Sled(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: write_buffer.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_in_mem(addr: &Addr<InMemStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
+        Self {
+            addr: StoreAddr::InMem(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: write_buffer.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
         }
     }
 }
