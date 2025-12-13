@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use rand::Rng;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -157,9 +159,10 @@ impl From<u128> for HlcTimestamp {
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct Hlc {
     /// Inner state guarded by mutex
-    inner: Mutex<HlcInner>,
+    inner: Arc<Mutex<HlcInner>>,
     /// Our node id
     node: u32,
     /// Maximum drift amount
@@ -173,21 +176,35 @@ struct HlcInner {
     counter: u32,
 }
 
+impl Default for Hlc {
+    fn default() -> Self {
+        let random_id: u32 = rand::thread_rng().gen();
+        Self::new(random_id)
+    }
+}
+
 impl Hlc {
     const DEFAULT_MAX_DRIFT: u64 = 60_000_000; // 60 sec
 
     pub fn new(node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts: 0, counter: 0 }),
+            inner: Arc::new(Mutex::new(HlcInner { ts: 0, counter: 0 })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,
         }
     }
 
+    pub fn from_str(node: &str) -> Self {
+        let mut h = DefaultHasher::new();
+        node.hash(&mut h);
+        let id: u64 = h.finish();
+        Self::new(id as u32)
+    }
+
     pub fn with_state(ts: u64, counter: u32, node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts, counter }),
+            inner: Arc::new(Mutex::new(HlcInner { ts, counter })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,

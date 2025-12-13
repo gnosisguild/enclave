@@ -24,6 +24,9 @@ pub struct PathsEngine {
     /// This can either be a fully qualified path to a specific db file or a relative path to the
     /// data_dir location
     db_file_override: Option<PathBuf>,
+    /// This can either be a fully qualified path to a specific db file or a relative path to the
+    /// data_dir location
+    log_file_override: Option<PathBuf>,
     /// This can either be a fully qualified path to a specific key file or a relative path to the
     /// config_dir location
     key_file_override: Option<PathBuf>,
@@ -38,6 +41,7 @@ pub struct PathsEngine {
 pub const DEFAULT_CONFIG_NAME: &str = "enclave.config.yaml";
 pub const DEFAULT_KEY_NAME: &str = "key";
 pub const DEFAULT_DB_NAME: &str = "db";
+pub const DEFAULT_LOG_NAME: &str = "log";
 
 // Find the config file is specified anywhere upstream from cwd and if found then locate the
 // data and config folders under .enclave/data and .enclave/config relative to the location of
@@ -54,6 +58,7 @@ impl PathsEngine {
         data_dir_override: Option<&PathBuf>,
         db_file_override: Option<&PathBuf>,
         key_file_override: Option<&PathBuf>,
+        log_file_override: Option<&PathBuf>,
     ) -> Self {
         Self {
             name: name.to_owned(),
@@ -65,6 +70,7 @@ impl PathsEngine {
             data_dir_override: data_dir_override.map(PathBuf::from),
             db_file_override: db_file_override.map(PathBuf::from),
             key_file_override: key_file_override.map(PathBuf::from),
+            log_file_override: log_file_override.map(PathBuf::from),
         }
     }
 
@@ -104,6 +110,17 @@ impl PathsEngine {
         }
 
         clean(self.get_data_dir().join(&self.name).join(DEFAULT_DB_NAME))
+    }
+
+    pub fn log_file(&self) -> PathBuf {
+        if let Some(log_file) = self.log_file_override.clone() {
+            if log_file.is_absolute() {
+                return clean(log_file);
+            } else {
+                return clean(self.get_data_dir().join(&self.name).join(log_file));
+            }
+        }
+        clean(self.get_data_dir().join(&self.name).join(DEFAULT_LOG_NAME))
     }
 
     pub fn relative_to_config(&self, path: &PathBuf) -> PathBuf {
@@ -175,6 +192,7 @@ mod test {
         found_config_file: Option<&'static str>,
         data_dir_override: Option<&'static str>,
         db_file_override: Option<&'static str>,
+        log_file_override: Option<&'static str>,
         key_file_override: Option<&'static str>,
     }
 
@@ -182,6 +200,7 @@ mod test {
         config_file: &'static str,
         key_file: &'static str,
         db_file: &'static str,
+        log_file: &'static str,
     }
 
     fn test_cases(test_cases: Vec<TestCase>) {
@@ -197,6 +216,7 @@ mod test {
             let data_dir_override = test_case.input.data_dir_override.map(PathBuf::from);
             let db_file = test_case.input.db_file_override.map(PathBuf::from);
             let key_file = test_case.input.key_file_override.map(PathBuf::from);
+            let log_file = test_case.input.log_file_override.map(PathBuf::from);
             let cwd = PathBuf::from(test_case.input.cwd);
 
             let paths = PathsEngine::new(
@@ -209,6 +229,7 @@ mod test {
                 data_dir_override.as_ref(),
                 db_file.as_ref(),
                 key_file.as_ref(),
+                log_file.as_ref(),
             );
 
             assert_eq!(
@@ -229,6 +250,13 @@ mod test {
                 "Failed db_file assertion for test case: {}",
                 test_case.name
             );
+
+            assert_eq!(
+                paths.log_file(),
+                PathBuf::from(test_case.expected.log_file),
+                "Failed log_file assertion for test case: {}",
+                test_case.name
+            );
         }
     }
 
@@ -247,11 +275,13 @@ mod test {
                     data_dir_override: None,
                     db_file_override: None,
                     key_file_override: None,
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/home/user/.config/enclave/enclave.config.yaml",
                     key_file: "/home/user/.config/enclave/_default/key",
                     db_file: "/home/user/.local/share/enclave/_default/db",
+                    log_file: "/home/user/.local/share/enclave/_default/log",
                 },
             },
             TestCase {
@@ -266,11 +296,13 @@ mod test {
                     data_dir_override: None,
                     db_file_override: None,
                     key_file_override: None,
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/foo/.enclave/config/_default/key",
                     db_file: "/foo/.enclave/data/_default/db",
+                    log_file: "/foo/.enclave/data/_default/log",
                 },
             },
             TestCase {
@@ -285,11 +317,13 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: None,
                     key_file_override: None,
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/foo/.enclave/config/_default/key",
                     db_file: "/path/to/data/_default/db",
+                    log_file: "/path/to/data/_default/log",
                 },
             },
             TestCase {
@@ -304,11 +338,13 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: None,
                     key_file_override: None,
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/_default/key",
                     db_file: "/path/to/data/_default/db",
+                    log_file: "/path/to/data/_default/log",
                 },
             },
             TestCase {
@@ -323,11 +359,13 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: None,
                     key_file_override: Some("/ding/bat/key_file"),
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/ding/bat/key_file",
                     db_file: "/path/to/data/_default/db",
+                    log_file: "/path/to/data/_default/log",
                 },
             },
             TestCase {
@@ -342,11 +380,14 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: None,
                     key_file_override: Some("../bat/key_file"),
+                    log_file_override: None,
                 },
+
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/path/to/data/_default/db",
+                    log_file: "/path/to/data/_default/log",
                 },
             },
             TestCase {
@@ -361,11 +402,13 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: Some("/ding/blat/foo/my/data"),
                     key_file_override: Some("../bat/key_file"),
+                    log_file_override: Some("../ding/loggy"),
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/ding/blat/foo/my/data",
+                    log_file: "/path/to/data/ding/loggy",
                 },
             },
             TestCase {
@@ -380,11 +423,13 @@ mod test {
                     data_dir_override: Some("/path/to/data"),
                     db_file_override: Some("../../yes"),
                     key_file_override: Some("../bat/key_file"),
+                    log_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/path/to/yes",
+                    log_file: "/path/to/data/_default/log",
                 },
             },
         ]);

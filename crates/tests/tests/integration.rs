@@ -4,15 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Result};
-use e3_ciphernode_builder::CiphernodeBuilder;
+use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
-    E3Requested, E3id, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    OperatorActivationChanged, PlaintextAggregated, TicketBalanceUpdated,
+    E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
+    TicketBalanceUpdated,
 };
 use e3_multithread::{GetReport, Multithread};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
@@ -33,7 +32,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 }
 
 async fn setup_score_sortition_environment(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
@@ -42,7 +41,7 @@ async fn setup_score_sortition_environment(
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    });
+    })?;
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
@@ -54,13 +53,13 @@ async fn setup_score_sortition_environment(
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        });
+        })?;
 
         bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        });
+        })?;
     }
 
     Ok(())
@@ -118,10 +117,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let bus: BusHandle<EnclaveEvent> =
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+    let system = EventSystem::new("test");
+    let bus = system.handle()?;
 
     // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (
@@ -181,7 +178,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .testmode_with_history()
@@ -189,7 +186,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(&bus.bus())
+                .testmode_with_forked_bus(bus.consumer())
                 .with_logging()
                 .build()
                 .await
@@ -197,12 +194,12 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(6, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .with_trbfv()
                 .with_sortition_score()
-                .testmode_with_forked_bus(&bus.bus())
+                .testmode_with_forked_bus(bus.consumer())
                 .with_logging()
                 .build()
                 .await
@@ -247,7 +244,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    bus.publish(e3_requested);
+    bus.publish(e3_requested)?;
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -273,7 +270,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
-    });
+    })?;
 
     let committee_finalized_timer = Instant::now();
 
@@ -370,7 +367,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone())?;
 
     println!("CiphertextOutputPublished event has been dispatched!");
 

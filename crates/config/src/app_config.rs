@@ -57,6 +57,8 @@ pub struct NodeDefinition {
     pub db_file: PathBuf,
     /// The name for the keyfile
     pub key_file: PathBuf,
+    /// The name for the logfile
+    pub log_file: PathBuf,
     /// The data dir for enclave defaults to `~/.local/share/enclave/{name}`
     pub data_dir: PathBuf,
     /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
@@ -80,6 +82,7 @@ impl Default for NodeDefinition {
             quic_port: 9091,
             key_file: PathBuf::from("key"), // ~/.config/enclave/key
             db_file: PathBuf::from("db"),   // ~/.config/enclave/db
+            log_file: PathBuf::from("log"), // ~/.config/enclave/log
             config_dir: std::path::PathBuf::new(), // ~/.config/enclave
             data_dir: std::path::PathBuf::new(), // ~/.config/enclave
             role: NodeRole::Ciphernode,
@@ -216,6 +219,7 @@ impl AppConfig {
             data_dir_override,
             Some(&node.db_file),
             Some(&node.key_file),
+            Some(&node.log_file),
         );
 
         Ok(AppConfig {

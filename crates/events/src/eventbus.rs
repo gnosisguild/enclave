@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, CompositeEvent};
+use crate::{prelude::*, BusHandle, EType, EnclaveEvent, Sequenced, Unsequenced};
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -70,7 +70,7 @@ impl<E: Event> EventBus<E> {
         addr
     }
 
-    pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
+    pub fn error<EE: Event>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
         source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
         addr
@@ -130,12 +130,6 @@ impl<E: Event> Handler<E> for EventBus<E> {
         // TODO: workshop to work out best display format
         tracing::info!(">>> {}", event);
         self.track(event);
-    }
-}
-
-impl<E: CompositeEvent> From<Addr<EventBus<E>>> for BusHandle<E> {
-    fn from(value: Addr<EventBus<E>>) -> Self {
-        BusHandle::new(value)
     }
 }
 
@@ -410,18 +404,4 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.add_event(msg);
     }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Test Helper Functions
-//////////////////////////////////////////////////////////////////////////////
-
-/// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history<E: CompositeEvent>() -> (BusHandle<E>, Addr<HistoryCollector<E>>)
-{
-    let bus: BusHandle<E> = EventBus::<E>::default().start().into();
-
-    let history = HistoryCollector::new().start();
-    bus.subscribe("*", history.clone().recipient());
-    (bus, history)
 }

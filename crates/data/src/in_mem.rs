@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertSync, Remove};
+use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
-use std::collections::BTreeMap;
+use commitlog::Offset;
+use std::{collections::BTreeMap, ops::Deref};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -55,6 +56,10 @@ impl InMemStore {
     }
 }
 
+// Add a BatchInsert event that contains multiple Insert messages
+// Use the Responder pattern to manage the response
+// Have a proxy actor hold the Inserts until the BatchInsert event is called
+
 impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
@@ -63,6 +68,15 @@ impl Handler<Insert> for InMemStore {
 
         if self.capture {
             self.log.push(DataOp::Insert(event));
+        }
+    }
+}
+
+impl Handler<InsertBatch> for InMemStore {
+    type Result = ();
+    fn handle(&mut self, msg: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+        for cmd in msg.commands() {
+            self.db.insert(cmd.key().to_owned(), cmd.value().to_owned());
         }
     }
 }
@@ -95,7 +109,8 @@ impl Handler<Get> for InMemStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
         let key = event.key();
-        self.db.get(key).cloned()
+        let r = self.db.get(key);
+        r.cloned()
     }
 }
 
@@ -110,5 +125,39 @@ impl Handler<GetDump> for InMemStore {
     type Result = anyhow::Result<Vec<u8>>;
     fn handle(&mut self, _: GetDump, _: &mut Self::Context) -> Self::Result {
         self.get_dump()
+    }
+}
+
+pub struct InMemDb(BTreeMap<Vec<u8>, Vec<u8>>);
+
+impl Deref for InMemDb {
+    type Target = BTreeMap<Vec<u8>, Vec<u8>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl InMemDb {
+    pub fn get(&self, msg: Get) -> Result<Option<Vec<u8>>> {
+        Ok(self.0.get(msg.key()).cloned())
+    }
+    pub fn insert(&mut self, msg: Insert) -> Result<()> {
+        self.0.insert(msg.key().to_owned(), msg.value().to_owned());
+        Ok(())
+    }
+    pub fn remove(&mut self, msg: Remove) -> Result<()> {
+        self.0.remove(msg.key());
+        Ok(())
+    }
+}
+
+pub struct InMemCommitLog {
+    log: Vec<Vec<u8>>,
+}
+
+impl InMemCommitLog {
+    pub fn append_msg(&mut self, payload: Vec<u8>) -> Result<Offset> {
+        self.log.push(payload);
+        Ok(self.log.len() as u64)
     }
 }

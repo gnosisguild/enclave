@@ -6,8 +6,11 @@
 
 use crate::Cid;
 use actix::Message;
-use anyhow::{Context, Result};
-use e3_events::{CorrelationId, DocumentMeta};
+use anyhow::{bail, Context, Result};
+use e3_events::{
+    CorrelationId, DocumentMeta, EnclaveEvent, EventConstructorWithTimestamp, Sequenced,
+    Unsequenced,
+};
 use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
@@ -36,6 +39,28 @@ impl GossipData {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).context("Could not deserialize GossipData")
+    }
+}
+
+impl TryFrom<EnclaveEvent<Sequenced>> for GossipData {
+    type Error = anyhow::Error;
+    fn try_from(value: EnclaveEvent<Sequenced>) -> Result<Self, Self::Error> {
+        let bytes = value
+            .clone_unsequenced() // Note serializing UNSEQUENCED
+            .to_bytes()
+            .context("Could not convert event to bytes for serialization!")?;
+        Ok(GossipData::GossipBytes(bytes))
+    }
+}
+
+impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
+    type Error = anyhow::Error;
+    fn try_from(value: GossipData) -> Result<Self, Self::Error> {
+        let GossipData::GossipBytes(bytes) = value else {
+            bail!("GossipData was not the GossipBytes variant");
+        };
+
+        Ok(EnclaveEvent::from_bytes(&bytes)?)
     }
 }
 
@@ -219,4 +244,39 @@ where
     .await
     .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {}", debug_cmd)))?;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use e3_events::{
+        EnclaveEvent, EventConstructorWithTimestamp, Sequenced, TestEvent, Unsequenced,
+    };
+
+    use super::GossipData;
+
+    #[test]
+    fn test_enclave_event_gossip_lifecycle() -> anyhow::Result<()> {
+        // event is created locally
+        let event: EnclaveEvent<Unsequenced> =
+            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), 31415);
+
+        // event is sequenced after bus.publish() adds a sequence number
+        let event: EnclaveEvent<Sequenced> = event.into_sequenced(90210);
+
+        // event is broadcast
+        let gossip_data: GossipData = event.try_into()?;
+
+        let GossipData::GossipBytes(_) = gossip_data else {
+            panic!("events must only be serialized to GossipBytes");
+        };
+
+        // received gossip data from libp2p convert to unsequenced event
+        let event: EnclaveEvent<Unsequenced> = gossip_data.try_into()?;
+        let (data, ts) = event.split();
+
+        assert_eq!(data, TestEvent::new("fish", 42).into());
+        assert_eq!(ts, 31415);
+
+        Ok(())
+    }
 }
