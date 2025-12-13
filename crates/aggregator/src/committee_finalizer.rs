@@ -6,8 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EnclaveEvent,
-    EnclaveEventData, Shutdown,
+    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
+    EnclaveEvent, EnclaveEventData, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -16,19 +16,19 @@ use tracing::{error, info};
 /// CommitteeFinalizer is an actor that listens to CommitteeRequested events and dispatches
 /// CommitteeFinalizeRequested events after the submission deadline has passed.
 pub struct CommitteeFinalizer {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     pending_committees: HashMap<String, SpawnHandle>,
 }
 
 impl CommitteeFinalizer {
-    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
+    pub fn new(bus: &BusHandle) -> Self {
         Self {
             bus: bus.clone(),
             pending_committees: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn attach(bus: &BusHandle) -> Addr<Self> {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.subscribe_all(
@@ -112,8 +112,11 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                bus.publish(CommitteeFinalizeRequested {
-                                    e3_id: e3_id_clone.clone(),
+                                trap(EType::Sortition, &act.bus.clone(), || {
+                                    bus.publish(CommitteeFinalizeRequested {
+                                        e3_id: e3_id_clone.clone(),
+                                    })?;
+                                    Ok(())
                                 });
 
                                 act.pending_committees.remove(&e3_id_clone.to_string());

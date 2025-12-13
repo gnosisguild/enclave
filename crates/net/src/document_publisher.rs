@@ -15,8 +15,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
-    DocumentReceived, E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-    Event, PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, Event,
+    PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -40,7 +40,7 @@ const KADEMLIA_BROADCAST_TIMEOUT: Duration = Duration::from_secs(30);
 /// bus
 pub struct DocumentPublisher {
     /// Enclave EventBus
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
@@ -55,7 +55,7 @@ pub struct DocumentPublisher {
 impl DocumentPublisher {
     /// Create a new NetEventTranslator actor
     pub fn new(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -81,7 +81,7 @@ impl DocumentPublisher {
 
     /// Setup the DocumentPublisher and start listening for GossipEvents
     pub fn setup(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
         topic: impl Into<String>,
@@ -155,7 +155,7 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle publish document requested");
-                    bus.err(EnclaveErrorType::IO, e)
+                    bus.err(EType::IO, e)
                 }
             }
         })
@@ -204,7 +204,7 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle document published notification");
-                    bus.err(EnclaveErrorType::IO, e);
+                    bus.err(EType::IO, e);
                 }
             }
         })
@@ -253,7 +253,7 @@ pub async fn handle_publish_document_requested(
 pub async fn handle_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     ids: HashMap<E3id, PartyId>,
     event: DocumentPublishedNotification,
 ) -> Result<()> {
@@ -283,7 +283,7 @@ pub async fn handle_document_published_notification(
     bus.publish(DocumentReceived {
         meta: event.meta,
         value,
-    });
+    })?;
 
     Ok(())
 }
@@ -374,7 +374,7 @@ async fn broadcast_document_published_notification(
 
 /// Convert between ThresholdShareCreated and DocumentPublished events
 pub struct EventConverter {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -399,10 +399,10 @@ impl ReceivableDocument {
 }
 
 impl EventConverter {
-    pub fn new(bus: &BusHandle<EnclaveEvent>) -> Self {
+    pub fn new(bus: &BusHandle) -> Self {
         Self { bus: bus.clone() }
     }
-    pub fn setup(bus: &BusHandle<EnclaveEvent>) -> Addr<Self> {
+    pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
@@ -422,7 +422,8 @@ impl EventConverter {
             vec![],
             None,
         );
-        self.bus.publish(PublishDocumentRequested::new(meta, value));
+        self.bus
+            .publish(PublishDocumentRequested::new(meta, value))?;
         Ok(())
     }
     /// Received document externally
@@ -437,7 +438,7 @@ impl EventConverter {
             },
         };
 
-        self.bus.publish(event);
+        self.bus.publish(event)?;
         Ok(())
     }
 }
@@ -499,7 +500,7 @@ mod tests {
 
     fn setup_test() -> (
         DefaultGuard,
-        BusHandle<EnclaveEvent>,
+        BusHandle,
         mpsc::Sender<NetCommand>,
         mpsc::Receiver<NetCommand>,
         broadcast::Sender<NetEvent>,
@@ -517,10 +518,8 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let bus: BusHandle<EnclaveEvent> =
-            EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-                .start()
-                .into();
+        let consumer = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let bus = BusHandle::new_from_consumer(consumer);
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
@@ -547,7 +546,7 @@ mod tests {
         bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        });
+        })?;
 
         // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
         let Some(NetCommand::DhtPutRecord {
@@ -623,7 +622,7 @@ mod tests {
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        });
+        })?;
 
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
@@ -683,7 +682,7 @@ mod tests {
         bus.publish(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
-        });
+        })?;
 
         for _ in 0..4 {
             // Expect retry
@@ -735,7 +734,7 @@ mod tests {
             threshold_m: 3,
             threshold_n: 5,
             ..CiphernodeSelected::default()
-        });
+        })?;
 
         // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(

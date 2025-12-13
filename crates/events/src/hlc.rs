@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use rand::Rng;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -173,6 +175,13 @@ struct HlcInner {
     counter: u32,
 }
 
+impl Default for Hlc {
+    fn default() -> Self {
+        let random_id: u32 = rand::thread_rng().gen();
+        Self::new(random_id)
+    }
+}
+
 impl Hlc {
     const DEFAULT_MAX_DRIFT: u64 = 60_000_000; // 60 sec
 
@@ -183,6 +192,13 @@ impl Hlc {
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,
         }
+    }
+
+    pub fn from_str(node: &str) -> Self {
+        let mut h = DefaultHasher::new();
+        node.hash(&mut h);
+        let id: u64 = h.finish();
+        Self::new(id as u32)
     }
 
     pub fn with_state(ts: u64, counter: u32, node: u32) -> Self {

@@ -7,9 +7,7 @@
 use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use e3_events::{
-    get_enclave_bus_handle, prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
-};
+use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use once_cell::sync::Lazy;
 use sled::Db;
 use std::{
@@ -21,7 +19,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle, // Only used for Shutdown
 }
 
 impl Actor for SledStore {
@@ -29,7 +27,7 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &BusHandle<EnclaveEvent>, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new(bus: &BusHandle, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(PathBuf::from(path))?;
 
@@ -43,13 +41,6 @@ impl SledStore {
 
         Ok(store)
     }
-
-    pub fn from_db(db: SledDb) -> Result<Self> {
-        Ok(Self {
-            db: Some(db),
-            bus: get_enclave_bus_handle(),
-        })
-    }
 }
 
 impl Handler<Insert> for SledStore {
@@ -58,7 +49,7 @@ impl Handler<Insert> for SledStore {
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.insert(event) {
-                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                Err(err) => self.bus.err(EType::Data, err),
                 _ => (),
             }
         }
@@ -83,7 +74,7 @@ impl Handler<Remove> for SledStore {
     fn handle(&mut self, event: Remove, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.remove(event) {
-                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                Err(err) => self.bus.err(EType::Data, err),
                 _ => (),
             }
         }
@@ -98,7 +89,7 @@ impl Handler<Get> for SledStore {
             return match db.get(event) {
                 Ok(v) => v,
                 Err(err) => {
-                    self.bus.err(EnclaveErrorType::Data, err);
+                    self.bus.err(EType::Data, err);
                     None
                 }
             };
@@ -108,7 +99,6 @@ impl Handler<Get> for SledStore {
         }
     }
 }
-
 impl Handler<EnclaveEvent> for SledStore {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {

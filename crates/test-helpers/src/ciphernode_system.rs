@@ -205,7 +205,7 @@ mod tests {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
-        let bus = BusHandle::new(bus);
+        let bus = BusHandle::new_from_consumer(bus);
 
         Ok(CiphernodeHandle {
             address,
