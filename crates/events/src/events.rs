@@ -39,6 +39,36 @@ impl StoreEventRequested {
     }
 }
 
+/// Get events after timestamp in EventStore
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct GetEventsAfter {
+    pub ts: u128,
+    pub sender: Recipient<ReceiveEvents>,
+}
+
+impl GetEventsAfter {
+    pub fn new(ts: u128, sender: impl Into<Recipient<ReceiveEvents>>) -> Self {
+        Self {
+            ts,
+            sender: sender.into(),
+        }
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct ReceiveEvents(Vec<EnclaveEvent<Sequenced>>);
+
+impl ReceiveEvents {
+    pub fn new(events: Vec<EnclaveEvent>) -> Self {
+        Self(events)
+    }
+    pub fn events(&self) -> &Vec<EnclaveEvent> {
+        &self.0
+    }
+}
+
 /// Direct event received by the Sequencer once an event has been stored
 #[derive(Message, Debug)]
 #[rtype("()")]

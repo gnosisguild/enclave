@@ -27,12 +27,7 @@ impl EventLog for CommitLogEventLog {
         Ok(1u64)
     }
 
-    fn read_from(
-        &self,
-        from: u64,
-    ) -> Box<
-        dyn Iterator<Item = std::result::Result<(u64, EnclaveEvent<Unsequenced>), anyhow::Error>>,
-    > {
+    fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         Box::new(vec![].into_iter())
     }
 }

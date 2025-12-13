@@ -6,7 +6,7 @@
 
 use crate::{
     events::{EventStored, StoreEventRequested},
-    EventLog, SequenceIndex,
+    EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
 };
 use actix::{Actor, Handler};
 use anyhow::Result;
@@ -19,15 +19,29 @@ pub struct EventStore<I: SequenceIndex, L: EventLog> {
 
 impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
-        println!("EventStore got {:?}", msg);
-
         let event = msg.event;
         let sender = msg.sender;
         let ts = event.get_ts();
+        println!("VVV: ts={}", ts);
         let seq = self.log.append(&event)?;
-        println!("EventStore: got seq {}", seq);
+        println!("VVV: seq={}", seq);
         self.index.insert(ts, seq)?;
         sender.try_send(EventStored(event.into_sequenced(seq)))?;
+        Ok(())
+    }
+
+    pub fn handle_get_events_after(&mut self, msg: GetEventsAfter) -> Result<()> {
+        println!("XXX: GetEventsAfter {}!", msg.ts);
+        let seq = self.index.seek(msg.ts)?.unwrap_or(1);
+        println!("XXX: seq={}", seq);
+
+        let evts = self
+            .log
+            .read_from(seq)
+            .map(|(s, e)| e.into_sequenced(s))
+            .collect::<Vec<_>>();
+        println!("XXX: Got evts:{:?}", evts.len());
+        msg.sender.try_send(ReceiveEvents::new(evts))?;
         Ok(())
     }
 }
@@ -45,6 +59,16 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
     type Result = ();
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
         match self.handle_store_event_requested(msg) {
+            Ok(_) => (),
+            Err(e) => error!("{e}"),
+        }
+    }
+}
+
+impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfter> for EventStore<I, L> {
+    type Result = ();
+    fn handle(&mut self, msg: GetEventsAfter, ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_get_events_after(msg) {
             Ok(_) => (),
             Err(e) => error!("{e}"),
         }
