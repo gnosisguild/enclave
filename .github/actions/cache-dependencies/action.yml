@@ -1,45 +1,25 @@
-name: Cache dependencies
-description: Cache Rust (cargo + target) and pnpm store
+name: Cache Rust dependencies
+description: Cache Rust dependencies (cargo registry/git + target)
 
 inputs:
-  enable-rust:
-    description: Whether to cache Rust dependencies
+  cargo-lock-path:
+    description: Cargo.lock path (or glob) used to invalidate the cache key
     required: false
-    default: 'true'
+    default: Cargo.lock
   rust-target-path:
-    description: Path to Rust target dir to cache (when enable-rust is true)
+    description: Path to Rust target dir to cache
     required: false
     default: target/
-  enable-pnpm:
-    description: Whether to cache pnpm store
-    required: false
-    default: 'true'
 
 runs:
   using: composite
   steps:
     - name: Cache Rust dependencies
-      if: ${{ inputs.enable-rust == 'true' }}
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           ${{ inputs.rust-target-path }}
-        key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: rust-deps-
-
-    - name: Get pnpm store directory
-      if: ${{ inputs.enable-pnpm == 'true' }}
-      id: pnpm-cache
-      shell: bash
-      run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-    - name: Setup pnpm cache
-      if: ${{ inputs.enable-pnpm == 'true' }}
-      uses: actions/cache@v4
-      with:
-        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
+        key: rust-deps-${{ inputs.rust-target-path }}-${{ hashFiles(inputs.cargo-lock-path) }}
+        restore-keys: rust-deps-${{ inputs.rust-target-path }}-
