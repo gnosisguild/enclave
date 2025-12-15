@@ -7,7 +7,11 @@
 use std::str::FromStr;
 
 use crate::server::{
-    CONFIG, app_data::AppData, models::{GetRoundRequest, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload}
+    app_data::AppData,
+    models::{
+        GetRoundRequest, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload,
+    },
+    CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -84,9 +88,7 @@ async fn handle_get_previous_ciphertext(
         .get_ciphertext_input(slot_index)
         .await
     {
-        Ok(Some(ciphertext)) => HttpResponse::Ok().json(PreviousCiphertextResponse {
-            ciphertext
-        }),
+        Ok(Some(ciphertext)) => HttpResponse::Ok().json(PreviousCiphertextResponse { ciphertext }),
         Ok(None) => HttpResponse::NotFound().body("Ciphertext not found"),
         Err(e) => {
             error!("Error getting previous ciphertext: {:?}", e);

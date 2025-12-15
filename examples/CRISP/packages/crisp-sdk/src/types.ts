@@ -175,17 +175,18 @@ export type ProofInputs = {
   signature: `0x${string}`
   balance: bigint
   slotAddress: string
-  previousCiphertext?: Uint8Array
   merkleProof: MerkleProof
   messageHash?: `0x${string}`
+  isFirstVote: boolean
 }
 
 export type MaskVoteProofInputs = {
   previousCiphertext?: Uint8Array
-  merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
   balance: bigint
   slotAddress: string
+  isFirstVote: boolean
+  merkleRoot: bigint
 }
 
 export type VoteProofInputs = {

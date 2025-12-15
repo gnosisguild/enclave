@@ -69,9 +69,26 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Poll, address: string, signature: string, previousCiphertext?: Uint8Array) => {
+    async (
+      vote: Poll,
+      address: string,
+      signature: string,
+      messageHash: `0x${string}`,
+      isFirstVote: boolean,
+      isMasking: boolean,
+      previousCiphertext?: Uint8Array,
+    ) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, previousCiphertext)
+      return generateProof(
+        BigInt(vote.value),
+        new Uint8Array(votingRound.pk_bytes),
+        address,
+        signature,
+        messageHash,
+        isFirstVote,
+        isMasking,
+        previousCiphertext,
+      )
     },
     [generateProof, votingRound],
   )
@@ -84,7 +101,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   }, [])
 
   const castVoteWithProof = useCallback(
-    async (pollSelected: Poll | null, isVoteUpdate: boolean = false) => {
+    async (pollSelected: Poll | null, isVoteUpdate: boolean = false, isMasking: boolean = false) => {
       if (!pollSelected) {
         console.log('Cannot cast vote: Poll option not selected.')
         showToast({ type: 'danger', message: 'Please select a poll option first.' })
@@ -126,10 +143,25 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        // @todo get this from the contract or server
-        const newEncryptionTemp = encryptVote({ yes: 0n, no: 0n }, new Uint8Array(votingRound!.pk_bytes))
-        const previousCiphertext = isVoteUpdate ? newEncryptionTemp : undefined
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, previousCiphertext)
+        const previousCiphertextFromServer = isVoteUpdate
+          ? await getPreviousCiphertext({
+              round_id: roundState.id,
+              address: user.address,
+            })
+          : undefined
+
+        const previousCiphertext = previousCiphertextFromServer && previousCiphertextFromServer?.ciphertext
+
+        const encodedProof = await handleProofGeneration(
+          pollSelected,
+          user.address,
+          signature,
+          messageHash,
+          !isVoteUpdate,
+          isMasking,
+          previousCiphertext,
+        )
+
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')
         }

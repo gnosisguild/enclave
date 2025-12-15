@@ -47,7 +47,7 @@ impl ZKInputsGenerator {
         Ok(ZKInputsGenerator { generator })
     }
 
-    /// Generate a CRISP ZK inputs from JavaScript.
+    /// Generate CRISP ZK inputs from JavaScript.
     #[wasm_bindgen(js_name = "generateInputs")]
     pub fn generate_inputs(
         &self,
@@ -60,6 +60,31 @@ impl ZKInputsGenerator {
         match self
             .generator
             .generate_inputs(prev_ciphertext, public_key, vote_vec)
+        {
+            Ok(inputs_json) => {
+                // Parse the JSON string and return as JsValue.
+                match js_sys::JSON::parse(&inputs_json) {
+                    Ok(js_value) => Ok(js_value),
+                    Err(_) => Err(JsValue::from_str("Failed to parse inputs JSON")),
+                }
+            }
+            Err(e) => Err(JsValue::from_str(&e.to_string())),
+        }
+    }
+
+    /// Generate CRISP ZK inputs for a Masking vote from JavaScript.
+    #[wasm_bindgen(js_name = "generateInputsForMasking")]
+    pub fn generate_inputs_for_masking(
+        &self,
+        prev_ciphertext: &[u8],
+        public_key: &[u8],
+        vote: Vec<i64>,
+    ) -> Result<JsValue, JsValue> {
+        let vote_vec: Vec<u64> = vote.into_iter().map(|v| v as u64).collect();
+
+        match self
+            .generator
+            .generate_inputs_for_masking(prev_ciphertext, public_key, vote_vec)
         {
             Ok(inputs_json) => {
                 // Parse the JSON string and return as JsValue.

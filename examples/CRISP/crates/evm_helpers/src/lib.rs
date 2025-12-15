@@ -123,12 +123,7 @@ impl CRISPContract<CRISPReadProvider> {
     ) -> Result<U256> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
 
-        if let Some(slot_index) = contract
-            .getSlotIndex(e3_id, slot_address)
-            .call()
-            .await
-            .ok()
-        {
+        if let Some(slot_index) = contract.getSlotIndex(e3_id, slot_address).call().await.ok() {
             return Ok(slot_index);
         }
 

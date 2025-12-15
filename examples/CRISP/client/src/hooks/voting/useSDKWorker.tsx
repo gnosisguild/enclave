@@ -30,6 +30,9 @@ export const useSDKWorkerHook = () => {
     publicKey: Uint8Array,
     address: string,
     signature: string,
+    messageHash: `0x${string}`,
+    isFirstVote: boolean,
+    isMasking: boolean,
     previousCiphertext?: Uint8Array,
   ): Promise<string | undefined> => {
     if (!workerRef.current) {
@@ -42,9 +45,8 @@ export const useSDKWorkerHook = () => {
 
       workerRef.current!.postMessage({
         type: 'generate_proof',
-        data: { voteId, publicKey, address, signature, previousCiphertext },
+        data: { voteId, publicKey, address, signature, messageHash, previousCiphertext, isFirstVote, isMasking },
       })
-
       workerRef.current!.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data
 

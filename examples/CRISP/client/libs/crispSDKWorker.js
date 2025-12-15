@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { hashLeaf, generateVoteProof, encodeSolidityProof } from '@crisp-e3/sdk'
+import { hashLeaf, generateVoteProof, encodeSolidityProof, generateMaskVoteProof } from '@crisp-e3/sdk'
 
 self.onmessage = async function (event) {
   const { type, data } = event.data
   switch (type) {
     case 'generate_proof':
       try {
-        const { voteId, publicKey, address, signature, previousCiphertext } = data
+        const { voteId, publicKey, address: slotAddress, signature, previousCiphertext, messageHash, isFirstVote, isMasking } = data
 
         // voteId is either 0 or 1, so we need to encode the vote accordingly.
         // We are adapting to the current CRISP application.
@@ -20,19 +20,33 @@ self.onmessage = async function (event) {
 
         // todo: get the leaves from the server (pass them from the client).
         const merkleLeaves = [
-          hashLeaf(address, balance),
+          hashLeaf(slotAddress, balance),
           4720511075913887710172192848636076523165432993226978491435561065722130431597n,
           14131255645332550266535358189863475289290770471998199141522479556687499890181n,
         ]
 
-        const proof = await generateVoteProof({
-          vote,
-          publicKey,
-          signature,
-          merkleLeaves,
-          balance,
-          previousCiphertext,
-        })
+        let proof
+
+        if (isMasking) {
+          proof = await generateMaskVoteProof({
+            vote,
+            publicKey,
+            balance,
+            previousCiphertext,
+            isFirstVote,
+            slotAddress,
+          })
+        } else {
+          proof = await generateVoteProof({
+            vote,
+            publicKey,
+            signature,
+            merkleLeaves,
+            balance,
+            messageHash,
+            isFirstVote,
+          })
+        }
 
         const encodedProof = encodeSolidityProof(proof)
 
