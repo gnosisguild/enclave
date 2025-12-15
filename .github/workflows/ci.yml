@@ -391,9 +391,6 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
-        with:
-          cargo-lock-path: templates/default/Cargo.lock
-          rust-target-path: templates/default/target/
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
