@@ -167,7 +167,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
 export const generateCircuitInputsForMasking = async (proofInputs: MaskVoteProofInputs): Promise<CircuitInputs> => {
   const encodedVote = encodeVote(zeroVote)
 
-  let crispInputs = await zkInputsGenerator.generateInputsForMasking(
+  let crispInputs = await zkInputsGenerator.generateInputsForUpdate(
     proofInputs.previousCiphertext || encryptVote(zeroVote, proofInputs.publicKey),
     proofInputs.publicKey,
     encodedVote,

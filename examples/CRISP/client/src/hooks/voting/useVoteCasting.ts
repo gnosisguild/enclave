@@ -152,6 +152,10 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
         const previousCiphertext = previousCiphertextFromServer && previousCiphertextFromServer?.ciphertext
 
+        if (isMasking && isVoteUpdate && !previousCiphertext) {
+          throw new Error('Previous ciphertext required for masking vote update.')
+        }
+
         const encodedProof = await handleProofGeneration(
           pollSelected,
           user.address,

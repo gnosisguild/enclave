@@ -123,11 +123,10 @@ impl CRISPContract<CRISPReadProvider> {
     ) -> Result<U256> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
 
-        if let Some(slot_index) = contract.getSlotIndex(e3_id, slot_address).call().await.ok() {
-            return Ok(slot_index);
+        match contract.getSlotIndex(e3_id, slot_address).call().await {
+            Ok(slot_index) => Ok(slot_index),
+            Err(e) => Err(eyre::eyre!("Failed to get slot index: {}", e)),
         }
-
-        Err(eyre::eyre!("Slot address not found for given e3_id"))
     }
 }
 

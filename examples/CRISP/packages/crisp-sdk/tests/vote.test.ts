@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest'
 import { Vote } from '../src/types'
-import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE } from '../src/constants'
+import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, zeroVote } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
 import {
   decodeTally,
@@ -18,6 +18,7 @@ import {
   encodeVote,
   generateCircuitInputs,
   executeCircuit,
+  generateCircuitInputsForMasking,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
@@ -98,6 +99,7 @@ describe('Vote', () => {
         balance,
         slotAddress: address,
         merkleProof,
+        isFirstVote: true,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -121,14 +123,12 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      const crispInputs = await generateCircuitInputs({
-        vote: { yes: 0n, no: 0n },
+      const crispInputs = await generateCircuitInputsForMasking({
         publicKey,
-        previousCiphertext,
-        signature: MASK_SIGNATURE,
-        merkleProof,
         balance,
         slotAddress,
+        isFirstVote: true,
+        merkleRoot: merkleProof.proof.root,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -153,12 +153,13 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
       const crispInputs = await generateCircuitInputs({
-        vote: { yes: 0n, no: 0n },
+        vote: zeroVote,
         publicKey,
         signature: MASK_SIGNATURE,
         merkleProof,
         balance,
         slotAddress,
+        isFirstVote: true,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -205,7 +206,8 @@ describe('Vote', () => {
         slotAddress,
         publicKey,
         previousCiphertext,
-        merkleLeaves: LEAVES,
+        isFirstVote: false,
+        merkleRoot: generateMerkleProof(balance, slotAddress, LEAVES).proof.root,
       })
 
       expect(proof).toBeDefined()
@@ -222,7 +224,8 @@ describe('Vote', () => {
         balance,
         slotAddress,
         publicKey,
-        merkleLeaves: LEAVES,
+        isFirstVote: true,
+        merkleRoot: generateMerkleProof(balance, slotAddress, LEAVES).proof.root,
       })
 
       expect(proof).toBeDefined()
