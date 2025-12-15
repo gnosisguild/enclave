@@ -57,7 +57,7 @@ jobs:
 
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
       - name: 'Setup node'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -107,7 +107,7 @@ jobs:
 
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
       - name: 'Setup node'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -225,7 +225,7 @@ jobs:
           target: wasm32-unknown-unknown
 
       - name: 'Setup node'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
