@@ -46,6 +46,11 @@ export const deploy = async () => {
     const programAddress = readDeploymentArgs('CRISPProgram', chain)?.address
     const ciphernodeRegistryAddress = readDeploymentArgs('CiphernodeRegistryOwnable', chain)?.address
 
+    if (!enclaveAddress || !tokenAddress || !programAddress || !ciphernodeRegistryAddress) {
+      console.error('Error: Missing deployment addresses. Ensure all contracts are deployed.')
+      return
+    }
+
     console.log('\nAdd these to your server .env')
     console.log(
       `ENCLAVE_ADDRESS=${enclaveAddress}\nFEE_TOKEN_ADDRESS=${tokenAddress}\nE3_PROGRAM_ADDRESS=${programAddress}\nCIPHERNODE_REGISTRY_ADDRESS=${ciphernodeRegistryAddress}`,
