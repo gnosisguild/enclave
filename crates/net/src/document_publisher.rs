@@ -15,7 +15,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
-    DocumentReceived, E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
     EncryptionKeyCreated, Event, PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
@@ -444,24 +444,8 @@ impl EventConverter {
             vec![],
             None,
         );
-        self.bus.publish(PublishDocumentRequested::new(meta, value));
-        Ok(())
-    }
-    /// Local node created an encryption key. Send it as a published document
-    pub fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
-        // If this is received from elsewhere
-        if msg.external {
-            return Ok(());
-        }
-        let receivable = ReceivableDocument::EncryptionKeyCreated(msg);
-        let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
-        let meta = DocumentMeta::new(
-            receivable.get_e3_id().clone(),
-            DocumentKind::TrBFV,
-            vec![],
-            None,
-        );
-        self.bus.publish(PublishDocumentRequested::new(meta, value));
+        self.bus
+            .publish(PublishDocumentRequested::new(meta, value))?;
         Ok(())
     }
     /// Received document externally
@@ -474,14 +458,14 @@ impl EventConverter {
                     external: true,
                     e3_id: evt.e3_id,
                     share: evt.share,
-                });
+                })?;
             }
             ReceivableDocument::EncryptionKeyCreated(evt) => {
                 self.bus.publish(EncryptionKeyCreated {
                     external: true,
                     e3_id: evt.e3_id,
                     key: evt.key,
-                });
+                })?;
             }
         };
         Ok(())

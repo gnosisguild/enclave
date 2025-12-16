@@ -89,12 +89,18 @@ pub fn generate_shares_hash_map(
             .collect::<Result<_>>()?;
 
         // Encrypt shares for all recipients using BFV
-        let encrypted_sk_sss =
-            BfvEncryptedShares::encrypt_all(&decrypted_sk_sss, &bfv_public_keys, &bfv_params, &mut bfv_rng)?;
+        let encrypted_sk_sss = BfvEncryptedShares::encrypt_all(
+            &decrypted_sk_sss,
+            &bfv_public_keys,
+            &bfv_params,
+            &mut bfv_rng,
+        )?;
 
         let encrypted_esi_sss: Vec<BfvEncryptedShares> = decrypted_esi_sss
             .iter()
-            .map(|esi| BfvEncryptedShares::encrypt_all(esi, &bfv_public_keys, &bfv_params, &mut bfv_rng))
+            .map(|esi| {
+                BfvEncryptedShares::encrypt_all(esi, &bfv_public_keys, &bfv_params, &mut bfv_rng)
+            })
             .collect::<Result<_>>()?;
 
         shares_hash_map.insert(
@@ -165,9 +171,9 @@ pub fn get_decryption_keys(
                 ts.esi_sss
                     .iter()
                     .map(|esi_shares| {
-                        let encrypted = esi_shares
-                            .clone_share(party_id)
-                            .ok_or_else(|| anyhow::anyhow!("No esi_sss share for party {}", party_id))?;
+                        let encrypted = esi_shares.clone_share(party_id).ok_or_else(|| {
+                            anyhow::anyhow!("No esi_sss share for party {}", party_id)
+                        })?;
                         encrypted.decrypt(sk_bfv, &bfv_params, degree)
                     })
                     .collect::<Result<Vec<_>>>()

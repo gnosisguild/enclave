@@ -129,5 +129,3 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
         );
     }
 }
-
-
