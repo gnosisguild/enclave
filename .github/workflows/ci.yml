@@ -723,7 +723,7 @@ jobs:
 
       - name: Build the sdk
         working-directory: ./examples/CRISP
-        run: pnpm crisp:build
+        run: pnpm build:sdk
 
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
