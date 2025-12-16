@@ -538,7 +538,7 @@ jobs:
           cp client/.env.example client/.env
           cp .env.example .env
 
-      - name: Build Crisp server and client
+      - name: Build Crisp server and CLI binaries
         working-directory: ./examples/CRISP/server
         run: |
           cargo build --locked --bin cli
