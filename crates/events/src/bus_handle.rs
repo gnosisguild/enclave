@@ -18,8 +18,8 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, Event, EventBus, HistoryCollector,
-    Sequenced, Subscribe, Unsequenced,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector, Sequenced,
+    Subscribe, Unsequenced,
 };
 
 #[derive(Clone, Derivative)]
@@ -63,9 +63,9 @@ impl BusHandle {
 
     pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
     where
-        F: Fn(&EnclaveEvent<Sequenced>) -> bool + 'static,
+        F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
     {
-        let pipe = BusHandlePipe(other.to_owned(), predicate).start();
+        let pipe = BusHandlePipe::new(other.to_owned(), predicate).start();
         self.subscribe("*", pipe.into());
     }
 }
@@ -290,19 +290,39 @@ mod tests {
     }
 }
 
-pub struct BusHandlePipe<F>(BusHandle, F)
+pub struct BusHandlePipe<F>
 where
-    F: Fn(&EnclaveEvent<Sequenced>) -> bool + 'static;
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    handle: BusHandle,
+    predicate: F,
+}
 
-impl<F> Actor for BusHandlePipe<F> {
+impl<F> BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    pub fn new(handle: BusHandle, predicate: F) -> Self {
+        Self { handle, predicate }
+    }
+}
+
+impl<F> Actor for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
     type Context = actix::Context<Self>;
 }
 
-impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F> {
+impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
-        let (data, ts) = msg.split();
-        let _ = self.0.publish_from_remote(data, ts);
+        if (self.predicate)(&msg) {
+            let (data, ts) = msg.split();
+            let _ = self.handle.publish_from_remote(data, ts);
+        }
     }
 }
-// XXX: need to use predicate here to filter events to forward

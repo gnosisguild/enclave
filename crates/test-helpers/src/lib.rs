@@ -130,18 +130,13 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
         for (_, node) in nodes.iter().enumerate() {
             let dest = node.bus();
             if source != dest {
-                source.pipe_to(dest);
-                EventBus::pipe_filter(
-                    source,
-                    move |e: &EnclaveEvent| {
-                        // TODO: Document publisher events need to be
-                        // converted to DocumentReceived events
+                source.pipe_to(dest, |e: &EnclaveEvent| {
+                    // TODO: Document publisher events need to be
+                    // converted to DocumentReceived events
 
-                        NetEventTranslator::is_forwardable_event(e)
-                            || DocumentPublisher::is_document_publisher_event(e)
-                    },
-                    dest,
-                )
+                    NetEventTranslator::is_forwardable_event(e)
+                        || DocumentPublisher::is_document_publisher_event(e)
+                });
             } else {
                 println!("not piping bus to itself");
             }
