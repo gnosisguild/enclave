@@ -19,6 +19,7 @@ mod die;
 mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
+mod encryption_key_created;
 mod keyshare_created;
 mod operator_activation_changed;
 mod plaintext_aggregated;
@@ -47,6 +48,7 @@ pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use enclave_error::*;
+pub use encryption_key_created::*;
 pub use keyshare_created::*;
 pub use operator_activation_changed::*;
 pub use plaintext_aggregated::*;
@@ -112,6 +114,7 @@ pub enum EnclaveEventData {
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
+    EncryptionKeyCreated(EncryptionKeyCreated),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -291,6 +294,7 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::CommitteeFinalized(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -322,7 +326,8 @@ impl_into_event_data!(
     Shutdown,
     TestEvent,
     DocumentReceived,
-    ThresholdShareCreated
+    ThresholdShareCreated,
+    EncryptionKeyCreated
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

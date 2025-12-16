@@ -7,7 +7,6 @@
 use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
-use e3_trbfv::shares::BfvEncryptedShares;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,34 +14,23 @@ use std::{
     sync::Arc,
 };
 
-/// BFV-encrypted shares list for a party in the DKG.
-///
-/// Each party broadcasts their encrypted shares to all other parties.
-/// Each recipient can only decrypt the share meant for them using their
-/// BFV secret key.
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
-pub struct ThresholdShare {
-    /// The publisher's party_id
+pub struct EncryptionKey {
     pub party_id: u64,
-    /// The publisher's TrBFV public key share
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub pk_share: ArcBytes,
-    /// BFV-encrypted sk_sss - each recipient can decrypt their share
-    pub sk_sss: BfvEncryptedShares,
-    /// BFV-encrypted esi_sss - one per ciphertext, each recipient can decrypt their share
-    pub esi_sss: Vec<BfvEncryptedShares>,
+    pub pk_bfv: ArcBytes,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct ThresholdShareCreated {
+pub struct EncryptionKeyCreated {
     pub e3_id: E3id,
-    pub share: Arc<ThresholdShare>,
+    pub key: Arc<EncryptionKey>,
     pub external: bool,
 }
 
-impl Display for ThresholdShareCreated {
+impl Display for EncryptionKeyCreated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

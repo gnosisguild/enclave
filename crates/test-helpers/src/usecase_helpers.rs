@@ -16,17 +16,26 @@ use e3_trbfv::{
     gen_pk_share_and_sk_sss::{
         gen_pk_share_and_sk_sss, GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse,
     },
-    shares::{EncryptableVec, PvwEncrypted, PvwEncryptedVecExt, ShamirShare, SharedSecret},
+    helpers::get_share_encryption_params,
+    shares::{BfvEncryptedShares, EncryptableVec, ShamirShare, SharedSecret},
     TrBFVConfig,
 };
 use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
-    bfv::{BfvParameters, PublicKey},
+    bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
 use fhe_traits::Serialize;
+use rand::rngs::OsRng;
 
 // The following functions are designed to aid testing our usecases
+
+/// Result of generating shares - includes the shares plus BFV keys for decryption
+pub struct GeneratedShares {
+    pub shares: HashMap<u64, ThresholdShare>,
+    /// BFV secret keys for each party (for decryption in tests)
+    pub bfv_secret_keys: Vec<SecretKey>,
+}
 
 pub fn generate_shares_hash_map(
     trbfv_config: &TrBFVConfig,
@@ -35,11 +44,24 @@ pub fn generate_shares_hash_map(
     crp: &CommonRandomPoly,
     rng: &SharedRng,
     cipher: &Cipher,
-) -> Result<HashMap<u64, ThresholdShare>> {
-    let threshold_n = trbfv_config.num_parties();
+) -> Result<GeneratedShares> {
+    let threshold_n = trbfv_config.num_parties() as usize;
+
+    // First, generate BFV encryption keys for all parties
+    let bfv_params = get_share_encryption_params();
+    let mut bfv_rng = OsRng;
+    let mut bfv_secret_keys = Vec::with_capacity(threshold_n);
+    let mut bfv_public_keys = Vec::with_capacity(threshold_n);
+
+    for _ in 0..threshold_n {
+        let sk = SecretKey::random(&bfv_params, &mut bfv_rng);
+        let pk = fhe::bfv::PublicKey::new(&sk, &mut bfv_rng);
+        bfv_secret_keys.push(sk);
+        bfv_public_keys.push(pk);
+    }
 
     let mut shares_hash_map = HashMap::new();
-    for party_id in 0u64..threshold_n {
+    for party_id in 0u64..threshold_n as u64 {
         let GenEsiSssResponse { esi_sss } = gen_esi_sss(
             &rng,
             &cipher,
@@ -59,24 +81,36 @@ pub fn generate_shares_hash_map(
             },
         )?;
 
-        // Simulate actor boundry and SharesGenerated
-        let sk_sss = PvwEncrypted::new(sk_sss.decrypt(&cipher)?)?;
-        let esi_sss: Vec<PvwEncrypted<SharedSecret>> = esi_sss
+        // Decrypt locally stored secrets
+        let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&cipher)?;
+        let decrypted_esi_sss: Vec<SharedSecret> = esi_sss
             .into_iter()
-            .map(|s| PvwEncrypted::new(s.decrypt(&cipher)?))
+            .map(|s| s.decrypt(&cipher))
+            .collect::<Result<_>>()?;
+
+        // Encrypt shares for all recipients using BFV
+        let encrypted_sk_sss =
+            BfvEncryptedShares::encrypt_all(&decrypted_sk_sss, &bfv_public_keys, &bfv_params, &mut bfv_rng)?;
+
+        let encrypted_esi_sss: Vec<BfvEncryptedShares> = decrypted_esi_sss
+            .iter()
+            .map(|esi| BfvEncryptedShares::encrypt_all(esi, &bfv_public_keys, &bfv_params, &mut bfv_rng))
             .collect::<Result<_>>()?;
 
         shares_hash_map.insert(
             party_id,
             ThresholdShare {
                 party_id,
-                esi_sss,
-                sk_sss,
+                esi_sss: encrypted_esi_sss,
+                sk_sss: encrypted_sk_sss,
                 pk_share,
             },
         );
     }
-    Ok(shares_hash_map)
+    Ok(GeneratedShares {
+        shares: shares_hash_map,
+        bfv_secret_keys,
+    })
 }
 
 pub fn get_public_key(
@@ -99,36 +133,44 @@ pub fn get_public_key(
 
 pub fn get_decryption_keys(
     shares: Vec<ThresholdShare>,
+    bfv_secret_keys: &[SecretKey],
     cipher: &Cipher,
     trbfv_config: &TrBFVConfig,
 ) -> Result<HashMap<usize, (Vec<SensitiveBytes>, SensitiveBytes)>> {
-    let threshold_n = trbfv_config.num_parties();
-    let received_sss = shares
-        .iter()
-        .map(|ts| ts.sk_sss.clone().pvw_decrypt())
-        .collect::<Result<Vec<SharedSecret>>>()?;
+    let threshold_n = trbfv_config.num_parties() as usize;
+    let bfv_params = get_share_encryption_params();
+    let degree = bfv_params.degree();
 
-    let received_esi_sss: Vec<Vec<SharedSecret>> = shares
-        .iter()
-        .map(|ts| ts.esi_sss.clone().to_vec_decrypted())
-        .collect::<Result<Vec<_>>>()?;
-
-    // Individualize based on node
+    // Individualize based on node - each party decrypts their share from each sender
     let mut decryption_keys = HashMap::new();
-    for party_id in 0..threshold_n as usize {
-        let sk_sss_collected = received_sss
-            .clone()
-            .into_iter()
-            .map(|sss| sss.extract_party_share(party_id))
-            .collect::<Result<Vec<_>>>()?;
+    for party_id in 0..threshold_n {
+        let sk_bfv = &bfv_secret_keys[party_id];
 
-        let esi_sss_collected: Vec<Vec<ShamirShare>> = received_esi_sss
-            .clone()
-            .into_iter()
-            .map(|s| {
-                s.into_iter()
-                    .map(|ss| ss.extract_party_share(party_id))
-                    .collect()
+        // Decrypt sk_sss share from each sender using our BFV secret key
+        let sk_sss_collected: Vec<ShamirShare> = shares
+            .iter()
+            .map(|ts| {
+                let encrypted = ts
+                    .sk_sss
+                    .clone_share(party_id)
+                    .ok_or_else(|| anyhow::anyhow!("No sk_sss share for party {}", party_id))?;
+                encrypted.decrypt(sk_bfv, &bfv_params, degree)
+            })
+            .collect::<Result<_>>()?;
+
+        // Similarly decrypt esi_sss
+        let esi_sss_collected: Vec<Vec<ShamirShare>> = shares
+            .iter()
+            .map(|ts| {
+                ts.esi_sss
+                    .iter()
+                    .map(|esi_shares| {
+                        let encrypted = esi_shares
+                            .clone_share(party_id)
+                            .ok_or_else(|| anyhow::anyhow!("No esi_sss share for party {}", party_id))?;
+                        encrypted.decrypt(sk_bfv, &bfv_params, degree)
+                    })
+                    .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<_>>()?;
 

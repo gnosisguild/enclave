@@ -10,8 +10,8 @@ use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated,
-    PartyId, ThresholdShare, ThresholdShareCreated,
+    ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -22,12 +22,14 @@ use e3_trbfv::{
     },
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
-    shares::{EncryptableVec, Encrypted, PvwEncrypted, ShamirShare, SharedSecret},
+    helpers::{deserialize_secret_key, get_share_encryption_params, serialize_secret_key},
+    shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
 use e3_utils::{bail, to_ordered_vec, utility_types::ArcBytes};
-use fhe_traits::Serialize;
-use rand::SeedableRng;
+use fhe::bfv::{PublicKey, SecretKey};
+use fhe_traits::{DeserializeParametrized, Serialize};
+use rand::{rngs::OsRng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::{
     collections::HashMap,
@@ -36,6 +38,7 @@ use std::{
 };
 use tracing::{error, info};
 
+use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
 use crate::threshold_share_collector::ThresholdShareCollector;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -68,11 +71,20 @@ impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CollectingEncryptionKeysData {
+    sk_bfv: SensitiveBytes,
+    pk_bfv: ArcBytes,
+    ciphernode_selected: CiphernodeSelected,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<ArcBytes>,
     sk_sss: Option<Encrypted<SharedSecret>>,
     esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
+    sk_bfv: Option<SensitiveBytes>,
+    pk_bfv: Option<ArcBytes>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -80,6 +92,7 @@ pub struct AggregatingDecryptionKey {
     pk_share: ArcBytes,
     sk_sss: Encrypted<SharedSecret>,
     esi_sss: Vec<Encrypted<SharedSecret>>,
+    sk_bfv: SensitiveBytes,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -96,11 +109,12 @@ pub struct Decrypting {
     es_poly_sum: Vec<SensitiveBytes>,
 }
 
-// TODO: Add GeneratingPvwKey state
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum KeyshareState {
     // Before anything
     Init,
+    // Collecting BFV encryption keys from all parties
+    CollectingEncryptionKeys(CollectingEncryptionKeysData),
     // Generating TrBFV share material
     GeneratingThresholdShare(GeneratingThresholdShareData),
     // Collecting remaining TrBFV shares to aggregate decryption key
@@ -123,7 +137,8 @@ impl KeyshareState {
                 true
             } else {
                 match (self, &new_state) {
-                    (K::Init, K::GeneratingThresholdShare(_)) => true,
+                    (K::Init, K::CollectingEncryptionKeys(_)) => true,
+                    (K::CollectingEncryptionKeys(_), K::GeneratingThresholdShare(_)) => true,
                     (K::GeneratingThresholdShare(_), K::AggregatingDecryptionKey(_)) => true,
                     (K::AggregatingDecryptionKey(_), K::ReadyForDecryption(_)) => true,
                     (K::ReadyForDecryption(_), K::Decrypting(_)) => true,
@@ -146,6 +161,7 @@ impl KeyshareState {
     pub fn variant_name(&self) -> &'static str {
         match self {
             Self::Init => "Init",
+            Self::CollectingEncryptionKeys(_) => "CollectingEncryptionKeys",
             Self::GeneratingThresholdShare(_) => "GeneratingThresholdShare",
             Self::AggregatingDecryptionKey(_) => "AggregatingDecryptionKey",
             Self::ReadyForDecryption(_) => "ReadyForDecryption",
@@ -228,6 +244,16 @@ impl ThresholdKeyshareState {
     }
 }
 
+impl TryInto<CollectingEncryptionKeysData> for ThresholdKeyshareState {
+    type Error = anyhow::Error;
+    fn try_into(self) -> std::result::Result<CollectingEncryptionKeysData, Self::Error> {
+        match self.state {
+            KeyshareState::CollectingEncryptionKeys(s) => Ok(s),
+            _ => Err(anyhow!("Invalid state")),
+        }
+    }
+}
+
 impl TryInto<GeneratingThresholdShareData> for ThresholdKeyshareState {
     type Error = anyhow::Error;
     fn try_into(self) -> std::result::Result<GeneratingThresholdShareData, Self::Error> {
@@ -279,6 +305,8 @@ pub struct ThresholdKeyshare {
     bus: BusHandle,
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
+    encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
+    collected_encryption_keys: Option<Vec<Arc<EncryptionKey>>>,
     multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
 }
@@ -289,6 +317,8 @@ impl ThresholdKeyshare {
             bus: params.bus,
             cipher: params.cipher,
             decryption_key_collector: None,
+            encryption_key_collector: None,
+            collected_encryption_keys: None,
             multithread: params.multithread,
             state: params.state,
         }
@@ -318,6 +348,24 @@ impl ThresholdKeyshare {
         Ok(addr.clone())
     }
 
+    pub fn ensure_encryption_key_collector(
+        &mut self,
+        self_addr: Addr<Self>,
+    ) -> Result<Addr<EncryptionKeyCollector>> {
+        let Some(state) = self.state.get() else {
+            bail!("State not found on threshold keyshare. This should not happen.");
+        };
+
+        info!(
+            "Setting up encryption key collector for addr: {} and {} nodes",
+            state.address, state.threshold_n
+        );
+        let addr = self
+            .encryption_key_collector
+            .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, state.threshold_n));
+        Ok(addr.clone())
+    }
+
     pub fn handle_threshold_share_created(
         &mut self,
         msg: ThresholdShareCreated,
@@ -330,27 +378,88 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// 1. CiphernodeSelected
+    pub fn handle_encryption_key_created(
+        &mut self,
+        msg: EncryptionKeyCreated,
+        self_addr: Addr<Self>,
+    ) -> Result<()> {
+        info!("Received EncryptionKeyCreated forwarding to encryption key collector!");
+        let collector = self.ensure_encryption_key_collector(self_addr)?;
+        collector.do_send(msg);
+        Ok(())
+    }
+
+    /// 1. CiphernodeSelected - Generate BFV keys and start collecting
     pub fn handle_ciphernode_selected(
         &mut self,
         msg: CiphernodeSelected,
         address: Addr<Self>,
     ) -> Result<()> {
-        // Ensure the collector is created
         let _ = self.ensure_collector(address.clone());
-        // Initialize State
+        let _ = self.ensure_encryption_key_collector(address.clone());
+
+        let params = get_share_encryption_params();
+        let mut rng = OsRng;
+        let sk_bfv = SecretKey::random(&params, &mut rng);
+        let pk_bfv = PublicKey::new(&sk_bfv, &mut rng);
+
+        let sk_bytes = serialize_secret_key(&sk_bfv)?;
+        let sk_bfv_encrypted = SensitiveBytes::new(sk_bytes, &self.cipher)?;
+        let pk_bfv_bytes = ArcBytes::from_bytes(&pk_bfv.to_bytes());
+
+        self.state.try_mutate(|s| {
+            s.new_state(KeyshareState::CollectingEncryptionKeys(
+                CollectingEncryptionKeysData {
+                    sk_bfv: sk_bfv_encrypted.clone(),
+                    pk_bfv: pk_bfv_bytes.clone(),
+                    ciphernode_selected: msg.clone(),
+                },
+            ))
+        })?;
+
+        let state = self.state.get().ok_or(anyhow!("No state"))?;
+        self.bus.publish(EncryptionKeyCreated {
+            e3_id: state.e3_id.clone(),
+            key: Arc::new(EncryptionKey {
+                party_id: state.party_id,
+                pk_bfv: pk_bfv_bytes,
+            }),
+            external: false,
+        });
+
+        Ok(())
+    }
+
+    /// 1a. AllEncryptionKeysCollected - All BFV keys received, start share generation
+    pub fn handle_all_encryption_keys_collected(
+        &mut self,
+        msg: AllEncryptionKeysCollected,
+        address: Addr<Self>,
+    ) -> Result<()> {
+        info!(
+            "AllEncryptionKeysCollected - {} keys received",
+            msg.keys.len()
+        );
+
+        self.collected_encryption_keys = Some(msg.keys);
+        let state = self.state.get().ok_or(anyhow!("No state"))?;
+        let current: CollectingEncryptionKeysData = state.clone().try_into()?;
+
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::GeneratingThresholdShare(
                 GeneratingThresholdShareData {
                     sk_sss: None,
                     pk_share: None,
                     esi_sss: None,
+                    sk_bfv: Some(current.sk_bfv),
+                    pk_bfv: Some(current.pk_bfv),
                 },
             ))
         })?;
 
-        address.do_send(GenEsiSss(msg.clone()));
-        address.do_send(GenPkShareAndSkSss(msg));
+        address.do_send(GenEsiSss(current.ciphernode_selected.clone()));
+        address.do_send(GenPkShareAndSkSss(current.ciphernode_selected));
+
         Ok(())
     }
 
@@ -400,20 +509,25 @@ impl ThresholdKeyshare {
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
             let pk_share = current.pk_share;
             let sk_sss = current.sk_sss;
-            let next = match (pk_share, sk_sss) {
+            let sk_bfv = current.sk_bfv;
+            let pk_bfv = current.pk_bfv;
+            let next = match (pk_share, sk_sss, &sk_bfv) {
                 // If the other shares are here then transition to aggregation
-                (Some(pk_share), Some(sk_sss)) => {
+                (Some(pk_share), Some(sk_sss), Some(sk_bfv_ref)) => {
                     K::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
+                        sk_bfv: sk_bfv_ref.clone(),
                     })
                 }
                 // If the other shares are not here yet then dont transition
-                (None, None) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
+                (None, None, _) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
                     esi_sss: Some(esi_sss),
                     pk_share: None,
                     sk_sss: None,
+                    sk_bfv,
+                    pk_bfv,
                 }),
                 _ => bail!("Inconsistent state!"),
             };
@@ -461,6 +575,7 @@ impl ThresholdKeyshare {
     }
 
     /// 3a. GenPkShareAndSkSss
+    /// 3a. GenPkShareAndSkSss result
     pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
         let ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output)) = res else {
             bail!("Error extracting data from compute process")
@@ -472,21 +587,30 @@ impl ThresholdKeyshare {
             info!("try_store_pk_share_and_sk_sss");
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
             let esi_sss = current.esi_sss;
-            let next = match esi_sss {
-                // If the esi shares are here then transition to aggregation
-                Some(esi_sss) => {
+            let sk_bfv = current.sk_bfv;
+            let pk_bfv = current.pk_bfv;
+            let next = match (esi_sss, sk_bfv) {
+                // If the esi shares and BFV key are here then transition to aggregation
+                (Some(esi_sss), Some(sk_bfv)) => {
                     KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
+                        sk_bfv,
                     })
                 }
                 // If esi shares are not here yet then don't transition
-                None => KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
-                    esi_sss: None,
-                    pk_share: Some(pk_share),
-                    sk_sss: Some(sk_sss),
-                }),
+                (None, sk_bfv) => {
+                    KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
+                        esi_sss: None,
+                        pk_share: Some(pk_share),
+                        sk_sss: Some(sk_sss),
+                        sk_bfv,
+                        pk_bfv,
+                    })
+                }
+                // If we have esi_sss but no sk_bfv, that's an error
+                (Some(_), None) => bail!("Have esi_sss but no sk_bfv - inconsistent state!"),
             };
             s.new_state(next)
         })?;
@@ -501,7 +625,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// 4. SharesGenerated
+    /// 4. SharesGenerated - Encrypt shares with BFV and publish
     pub fn handle_shares_generated(&self) -> Result<()> {
         let Some(ThresholdKeyshareState {
             state:
@@ -519,20 +643,46 @@ impl ThresholdKeyshare {
             bail!("Invalid state!");
         };
 
-        let decrypted = sk_sss.decrypt(&self.cipher)?;
-        let sk_sss: PvwEncrypted<SharedSecret> = PvwEncrypted::new(decrypted)?;
-        let esi_sss = esi_sss
+        // Get collected BFV public keys from all parties
+        let encryption_keys = self
+            .collected_encryption_keys
+            .as_ref()
+            .ok_or(anyhow!("No encryption keys collected"))?;
+
+        // Convert to BFV public keys
+        let params = get_share_encryption_params();
+        let recipient_pks: Vec<PublicKey> = encryption_keys
+            .iter()
+            .map(|k| {
+                PublicKey::from_bytes(&k.pk_bfv, &params)
+                    .map_err(|e| anyhow!("Failed to deserialize BFV public key: {:?}", e))
+            })
+            .collect::<Result<_>>()?;
+
+        // Decrypt our shares from local storage
+        let decrypted_sk_sss: SharedSecret = sk_sss.decrypt(&self.cipher)?;
+        let decrypted_esi_sss: Vec<SharedSecret> = esi_sss
             .into_iter()
-            .map(|s| PvwEncrypted::new(s.decrypt(&self.cipher)?))
+            .map(|s| s.decrypt(&self.cipher))
+            .collect::<Result<_>>()?;
+
+        // Encrypt shares for all recipients using BFV
+        let mut rng = OsRng;
+        let encrypted_sk_sss =
+            BfvEncryptedShares::encrypt_all(&decrypted_sk_sss, &recipient_pks, &params, &mut rng)?;
+
+        let encrypted_esi_sss: Vec<BfvEncryptedShares> = decrypted_esi_sss
+            .iter()
+            .map(|esi| BfvEncryptedShares::encrypt_all(esi, &recipient_pks, &params, &mut rng))
             .collect::<Result<_>>()?;
 
         self.bus.publish(ThresholdShareCreated {
             e3_id,
             share: Arc::new(ThresholdShare {
                 party_id,
-                esi_sss,
                 pk_share,
-                sk_sss,
+                sk_sss: encrypted_sk_sss,
+                esi_sss: encrypted_esi_sss,
             }),
             external: false,
         })?;
@@ -542,6 +692,7 @@ impl ThresholdKeyshare {
 
     /// 5. AllThresholdSharesCollected. This is fired after the ThresholdShareCreated events are
     ///    aggregateed in the decryption_key_collector::ThresholdShareCollector
+    /// 5. AllThresholdSharesCollected - Decrypt received shares using BFV and aggregate
     pub fn handle_all_threshold_shares_collected(
         &self,
         msg: AllThresholdSharesCollected,
@@ -552,37 +703,42 @@ impl ThresholdKeyshare {
         let party_id = state.party_id as usize;
         let trbfv_config = state.get_trbfv_config();
 
-        // Shares are in order of party_id
-        let received_sss: Vec<SharedSecret> = msg
-            .shares
-            .clone()
-            .into_iter()
-            .map(|ts| ts.sk_sss.clone().pvw_decrypt())
-            .collect::<Result<_>>()?;
+        // Get our BFV secret key from state
+        let current: AggregatingDecryptionKey = state.clone().try_into()?;
+        let sk_bytes = current.sk_bfv.access(&cipher)?;
+        let params = get_share_encryption_params();
+        let sk_bfv = deserialize_secret_key(&sk_bytes, &params)?;
+        let degree = params.degree();
 
-        let received_esi_sss: Vec<Vec<SharedSecret>> = msg
+        // Decrypt our share from each sender using BFV
+        // Each sender's ThresholdShare contains encrypted shares for all parties
+        // We extract and decrypt the share meant for us (at index party_id)
+        let sk_sss_collected: Vec<ShamirShare> = msg
             .shares
-            .into_iter()
+            .iter()
             .map(|ts| {
-                ts.esi_sss
-                    .clone()
-                    .into_iter()
-                    .map(|s| s.pvw_decrypt())
-                    .collect()
+                let encrypted = ts
+                    .sk_sss
+                    .clone_share(party_id)
+                    .ok_or(anyhow!("No sk_sss share for party {}", party_id))?;
+                encrypted.decrypt(&sk_bfv, &params, degree)
             })
             .collect::<Result<_>>()?;
 
-        let sk_sss_collected: Vec<ShamirShare> = received_sss
-            .into_iter()
-            .map(|s| s.extract_party_share(party_id))
-            .collect::<Result<_>>()?;
-
-        let esi_sss_collected: Vec<Vec<ShamirShare>> = received_esi_sss
-            .into_iter()
-            .map(|esi| {
-                esi.into_iter()
-                    .map(|s| s.extract_party_share(party_id))
-                    .collect()
+        // Similarly decrypt esi_sss for each ciphertext
+        let esi_sss_collected: Vec<Vec<ShamirShare>> = msg
+            .shares
+            .iter()
+            .map(|ts| {
+                ts.esi_sss
+                    .iter()
+                    .map(|esi_shares| {
+                        let encrypted = esi_shares
+                            .clone_share(party_id)
+                            .ok_or(anyhow!("No esi_sss share for party {}", party_id))?;
+                        encrypted.decrypt(&sk_bfv, &params, degree)
+                    })
+                    .collect::<Result<Vec<_>>>()
             })
             .collect::<Result<_>>()?;
 
@@ -751,6 +907,7 @@ impl ThresholdKeyshare {
 }
 
 // Will only receive events that are for this specific e3_id
+// Will only receive events that are for this specific e3_id
 impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
@@ -759,6 +916,9 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
             EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
+            }
+            EnclaveEventData::EncryptionKeyCreated(data) => {
+                let _ = self.handle_encryption_key_created(data, ctx.address());
             }
             _ => (),
         }
@@ -792,6 +952,16 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
             |act| act.handle_gen_pk_share_and_sk_sss_requested(msg),
             |act, res, _| act.handle_gen_pk_share_and_sk_sss_response(res),
         )
+    }
+}
+
+impl Handler<AllEncryptionKeysCollected> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(&mut self, msg: AllEncryptionKeysCollected, ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_all_encryption_keys_collected(msg, ctx.address()) {
+            Err(e) => error!("{e}"),
+            Ok(_) => (),
+        }
     }
 }
 

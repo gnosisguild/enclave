@@ -3,9 +3,9 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+pub mod bfv_encrypted;
 pub mod encrypted;
-pub mod pvw;
 pub mod shares;
+pub use bfv_encrypted::*;
 pub use encrypted::*;
-pub use pvw::*;
 pub use shares::*;

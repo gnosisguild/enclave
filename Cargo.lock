@@ -3078,6 +3078,7 @@ dependencies = [
  "e3-request",
  "e3-trbfv",
  "e3-utils",
+ "fhe",
  "fhe-traits",
  "ndarray",
  "rand 0.8.5",

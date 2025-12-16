@@ -287,6 +287,21 @@ async fn test_trbfv_actor() -> Result<()> {
         committee_finalized_timer.elapsed(),
     ));
 
+    // First, wait for all EncryptionKeyCreated events (BFV key exchange)
+    let encryption_keys_timer = Instant::now();
+    let expected = vec![
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+    ];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+    report.push(("All EncryptionKeyCreated events", encryption_keys_timer.elapsed()));
+
+    // Then wait for all ThresholdShareCreated events
     let shares_timer = Instant::now();
     let expected = vec![
         "ThresholdShareCreated",

@@ -15,8 +15,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
-    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, Event,
-    PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    DocumentReceived, E3RequestComplete, E3id, EnclaveErrorType, EnclaveEvent, EnclaveEventData,
+    EncryptionKeyCreated, Event, PartyId, PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -75,6 +75,7 @@ impl DocumentPublisher {
         match event.get_data() {
             EnclaveEventData::PublishDocumentRequested(_) => true,
             EnclaveEventData::ThresholdShareCreated(_) => true,
+            EnclaveEventData::EncryptionKeyCreated(_) => true,
             _ => false,
         }
     }
@@ -380,12 +381,14 @@ pub struct EventConverter {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum ReceivableDocument {
     ThresholdShareCreated(ThresholdShareCreated),
+    EncryptionKeyCreated(EncryptionKeyCreated),
 }
 
 impl ReceivableDocument {
     pub fn get_e3_id(&self) -> &E3id {
         match self {
             ReceivableDocument::ThresholdShareCreated(d) => &d.e3_id,
+            ReceivableDocument::EncryptionKeyCreated(d) => &d.e3_id,
         }
     }
 
@@ -405,6 +408,7 @@ impl EventConverter {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
+        bus.subscribe("EncryptionKeyCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
         addr
     }
@@ -426,19 +430,60 @@ impl EventConverter {
             .publish(PublishDocumentRequested::new(meta, value))?;
         Ok(())
     }
+    /// Local node created an encryption key. Send it as a published document
+    pub fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
+        // If this is received from elsewhere
+        if msg.external {
+            return Ok(());
+        }
+        let receivable = ReceivableDocument::EncryptionKeyCreated(msg);
+        let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
+        let meta = DocumentMeta::new(
+            receivable.get_e3_id().clone(),
+            DocumentKind::TrBFV,
+            vec![],
+            None,
+        );
+        self.bus.publish(PublishDocumentRequested::new(meta, value));
+        Ok(())
+    }
+    /// Local node created an encryption key. Send it as a published document
+    pub fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
+        // If this is received from elsewhere
+        if msg.external {
+            return Ok(());
+        }
+        let receivable = ReceivableDocument::EncryptionKeyCreated(msg);
+        let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
+        let meta = DocumentMeta::new(
+            receivable.get_e3_id().clone(),
+            DocumentKind::TrBFV,
+            vec![],
+            None,
+        );
+        self.bus.publish(PublishDocumentRequested::new(meta, value));
+        Ok(())
+    }
     /// Received document externally
     pub fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
         warn!("Converting DocumentReceived...");
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
-        let event = match receivable {
-            ReceivableDocument::ThresholdShareCreated(evt) => ThresholdShareCreated {
-                external: true,
-                e3_id: evt.e3_id,
-                share: evt.share,
-            },
+        match receivable {
+            ReceivableDocument::ThresholdShareCreated(evt) => {
+                self.bus.publish(ThresholdShareCreated {
+                    external: true,
+                    e3_id: evt.e3_id,
+                    share: evt.share,
+                });
+            }
+            ReceivableDocument::EncryptionKeyCreated(evt) => {
+                self.bus.publish(EncryptionKeyCreated {
+                    external: true,
+                    e3_id: evt.e3_id,
+                    key: evt.key,
+                });
+            }
         };
-
-        self.bus.publish(event)?;
         Ok(())
     }
 }
@@ -452,6 +497,7 @@ impl Handler<EnclaveEvent> for EventConverter {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::ThresholdShareCreated(data) => ctx.notify(data),
+            EnclaveEventData::EncryptionKeyCreated(data) => ctx.notify(data),
             EnclaveEventData::DocumentReceived(data) => ctx.notify(data),
             _ => (),
         }
@@ -462,6 +508,16 @@ impl Handler<ThresholdShareCreated> for EventConverter {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, _ctx: &mut Self::Context) -> Self::Result {
         match self.handle_threshold_share_created(msg) {
+            Ok(_) => (),
+            Err(err) => error!("{err}"),
+        }
+    }
+}
+
+impl Handler<EncryptionKeyCreated> for EventConverter {
+    type Result = ();
+    fn handle(&mut self, msg: EncryptionKeyCreated, _ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_encryption_key_created(msg) {
             Ok(_) => (),
             Err(err) => error!("{err}"),
         }
