@@ -21,6 +21,7 @@ env:
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.86.0
+  NOIR_TOOLCHAIN: v1.0.0-beta.15
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -200,15 +201,6 @@ jobs:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
 
-      - name: Cache Rust dependencies
-        uses: ./.github/actions/cache-dependencies
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-          target: wasm32-unknown-unknown
-
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
@@ -285,7 +277,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.15
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Install solc
         run: |
@@ -413,9 +405,9 @@ jobs:
           path: ~/.cargo/bin/enclave
           retention-days: 1
 
-  # CRISP Unit Tests (Rust, JavaScript, Noir, Solidity)
   crisp_unit:
     runs-on: ubuntu-latest
+    needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -438,7 +430,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.15
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -452,8 +444,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: |
-          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile Enclave contracts
+        working-directory: .
+        run: pnpm evm:build
 
       - name: Install solc
         run: |
@@ -465,6 +460,12 @@ jobs:
         working-directory: ./examples/CRISP
         run: 'cargo test'
 
+      - name: Download Crisp SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: ./examples/CRISP
+
       - name: Run Noir tests
         working-directory: ./examples/CRISP
         run: 'pnpm test:circuits'
@@ -475,12 +476,11 @@ jobs:
 
       - name: Run Solidity tests
         working-directory: ./examples/CRISP
-        run: 'pnpm build:sdk && pnpm test:contracts'
+        run: 'pnpm test:contracts'
 
   crisp_e2e:
     runs-on: ubuntu-latest
-    needs: [build_enclave_cli]
-
+    needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -509,20 +509,11 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
 
-      # We must install foundry in order to be able to test anvil
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Install solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
-
-      - name: Install Nargo
-        uses: noir-lang/noirup@v0.1.4
-        with:
-          toolchain: v1.0.0-beta.15
 
       - name: Install yq
         run: |
@@ -530,8 +521,34 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile Enclave contracts
+        working-directory: .
+        run: pnpm evm:build
+
+      - name: Compile Crisp contracts
+        working-directory: ./examples/CRISP
+        run: pnpm compile:contracts
+
+      - name: Copy environment variables
+        working-directory: ./examples/CRISP
         run: |
-          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
+          cp server/.env.example server/.env
+          cp client/.env.example client/.env
+          cp .env.example .env
+
+      - name: Build Crisp server and CLI binaries
+        working-directory: ./examples/CRISP/server
+        run: |
+          cargo build --locked --bin cli
+          cargo build --locked --bin server
+
+      - name: Download Crisp SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: ./examples/CRISP
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
@@ -572,7 +589,7 @@ jobs:
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
-          toolchain: v1.0.0-beta.15
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Check formatting
         working-directory: ./circuits
@@ -671,6 +688,50 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+          retention-days: 1
+          if-no-files-found: warn
+
+  build_crisp_sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the sdk
+        working-directory: ./examples/CRISP
+        run: pnpm build:sdk
+
+      - name: Upload SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: |
+            examples/CRISP/packages/crisp-sdk/dist
+            examples/CRISP/packages/crisp-zk-inputs/dist
+            examples/CRISP/circuits/target
           retention-days: 1
           if-no-files-found: warn
 
