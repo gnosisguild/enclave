@@ -408,6 +408,7 @@ jobs:
   # CRISP Unit Tests (Rust, JavaScript, Noir, Solidity)
   crisp_unit:
     runs-on: ubuntu-latest
+    needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -460,6 +461,12 @@ jobs:
         working-directory: ./examples/CRISP
         run: 'cargo test'
 
+      - name: Download Crisp SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: ./
+
       - name: Run Noir tests
         working-directory: ./examples/CRISP
         run: 'pnpm test:circuits'
@@ -470,12 +477,11 @@ jobs:
 
       - name: Run Solidity tests
         working-directory: ./examples/CRISP
-        run: 'pnpm build:sdk && pnpm test:contracts'
+        run: 'pnpm test:contracts'
 
   crisp_e2e:
     runs-on: ubuntu-latest
-    needs: [build_enclave_cli]
-
+    needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -526,6 +532,29 @@ jobs:
       - name: Compile Enclave contracts
         working-directory: .
         run: pnpm evm:build
+
+      - name: Compile Crisp contracts
+        working-directory: ./examples/CRISP
+        run: pnpm compile:contracts
+
+      - name: Copy environment variables
+        working-directory: ./examples/CRISP
+        run: |
+          cp server/.env.example server/.env
+          cp client/.env.example client/.env
+          cp .env.example .env
+
+      - name: Build Crisp server and client
+        working-directory: ./examples/CRISP/server
+        run: |
+          cargo build --locked --bin cli
+          cargo build --locked --bin server
+
+      - name: Download Crisp SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: ./
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
@@ -665,6 +694,45 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+          retention-days: 1
+          if-no-files-found: warn
+
+  build_crisp_sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the sdk
+        working-directory: ./examples/CRISP
+        run: pnpm crisp:build
+
+      - name: Upload SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: crisp-sdk-artifacts
+          path: |
+            examples/CRISP/packages/crisp-sdk/dist
+            examples/CRISP/packages/crisp-zk-inputs/dist
+            examples/CRISP/circuits/target
           retention-days: 1
           if-no-files-found: warn
 
