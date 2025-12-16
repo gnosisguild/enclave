@@ -729,9 +729,9 @@ jobs:
         with:
           name: crisp-sdk-artifacts
           path: |
-            packages/crisp-sdk/dist
-            packages/crisp-zk-inputs/dist
-            circuits/target
+            examples/CRISP/packages/crisp-sdk/dist
+            examples/CRISP/packages/crisp-zk-inputs/dist
+            examples/CRISP/circuits/target
           retention-days: 1
           if-no-files-found: warn
 
