@@ -136,16 +136,20 @@ to the E3's public key. It is also recommended to bundle in proofs to validate:
 
 ### Key Events
 
-The following events are emitted by the Program contract:
+**Enclave Contract Events:**
 
 ```solidity
 event E3Requested(uint256 indexed e3Id, address indexed requester, address e3ProgramAddress);
 
-event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
-
 event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
 event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+```
+
+**Program Contract Events:**
+
+```solidity
+event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
 ```
 
 ### Result Publication Flow

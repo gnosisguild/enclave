@@ -5,8 +5,8 @@ description: 'Build and reuse Noir circuits for Enclave programs'
 
 # Noir Circuits & Libraries
 
-Enclave ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE sponge,
-polynomial utilities, Poseidon hashing, etc.). Use these circuits as-is or vendor them into your own
+Enclave ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE sponge API,
+polynomial utilities, Greco BFV proofs, etc.). Use these circuits as-is or vendor them into your own
 E3 programs.
 
 ## Workspace layout
@@ -17,7 +17,7 @@ circuits/
 ├── crates/
 │   └── libs/
 │       ├── safe/           # SAFE sponge implementation
-│       ├── greco/          # Poseidon & Merkle helpers
+│       ├── greco/          # ZK circuit for BFV ciphertext correctness proofs
 │       └── polynomial/     # polynomial commitments utils
 └── target/                 # build artifacts (created by nargo)
 ```

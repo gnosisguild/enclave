@@ -232,7 +232,7 @@ program:
 > - A Pinata JWT for uploading programs to IPFS (get one at [pinata.cloud](https://pinata.cloud))
 > - Pre-uploaded program URL to avoid uploading the ~40MB program at runtime
 
-**Uploading Your Program to IPFS**
+### Uploading Your Program to IPFS
 
 When you make changes to the guest program in `program/`, you need to upload it to IPFS:
 
