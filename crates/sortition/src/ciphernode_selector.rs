@@ -5,23 +5,25 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::sortition::{GetNodeIndex, Sortition};
-/// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
-/// emits a TicketGenerated event (score sortition) to the event bus
 use actix::prelude::*;
-use e3_config::StoreKeys;
-use e3_data::{DataStore, RepositoriesFactory};
+use anyhow::bail;
+use anyhow::Result;
+use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, EType,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, E3id, EType,
     EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
-use e3_request::MetaRepositoryFactory;
+use e3_request::E3Meta;
+use std::collections::HashMap;
 use tracing::info;
 
+/// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
+/// emits a TicketGenerated event (score sortition) to the event bus
 pub struct CiphernodeSelector {
     bus: BusHandle,
     sortition: Addr<Sortition>,
     address: String,
-    data_store: DataStore,
+    e3_cache: Persistable<HashMap<E3id, E3Meta>>,
 }
 
 impl Actor for CiphernodeSelector {
@@ -32,30 +34,31 @@ impl CiphernodeSelector {
     pub fn new(
         bus: &BusHandle,
         sortition: &Addr<Sortition>,
+        e3_cache: Persistable<HashMap<E3id, E3Meta>>,
         address: &str,
-        data_store: &DataStore,
     ) -> Self {
         Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
+            e3_cache,
             address: address.to_owned(),
-            data_store: data_store.clone(),
         }
     }
 
-    pub fn attach(
+    pub async fn attach(
         bus: &BusHandle,
         sortition: &Addr<Sortition>,
+        selector_store: Repository<HashMap<E3id, E3Meta>>,
         address: &str,
-        data_store: &DataStore,
-    ) -> Addr<Self> {
-        let addr = CiphernodeSelector::new(bus, sortition, address, data_store).start();
+    ) -> Result<Addr<Self>> {
+        let e3_cache = selector_store.load_or_default(HashMap::new()).await?;
+        let addr = CiphernodeSelector::new(bus, sortition, e3_cache, address).start();
 
         bus.subscribe("E3Requested", addr.clone().recipient());
         bus.subscribe("CommitteeFinalized", addr.clone().recipient());
         bus.subscribe("Shutdown", addr.clone().recipient());
 
-        addr
+        Ok(addr)
     }
 }
 
@@ -79,6 +82,23 @@ impl Handler<E3Requested> for CiphernodeSelector {
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
         let chain_id = data.e3_id.chain_id();
+
+        trap(EType::Sortition, &bus.clone(), || {
+            self.e3_cache.try_mutate(|mut cache| {
+                cache.insert(
+                    data.e3_id.clone(),
+                    E3Meta {
+                        seed: data.seed,
+                        threshold_n: data.threshold_n,
+                        threshold_m: data.threshold_m,
+                        params: data.params,
+                        esi_per_ct: data.esi_per_ct,
+                        error_size: data.error_size,
+                    },
+                );
+                Ok(cache)
+            })
+        });
 
         Box::pin(async move {
             let seed = data.seed;
@@ -126,61 +146,55 @@ impl Handler<E3Requested> for CiphernodeSelector {
 }
 
 impl Handler<CommitteeFinalized> for CiphernodeSelector {
-    type Result = ResponseFuture<()>;
+    type Result = ();
 
     fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
-        let address = self.address.clone();
-        let bus = self.bus.clone();
-        let e3_id = msg.e3_id.clone();
-        let repositories = self
-            .data_store
-            .scope(StoreKeys::router())
-            .scope(StoreKeys::context(&e3_id))
-            .repositories();
-
-        // Check if this node is in the finalized committee
-        if !msg.committee.contains(&address) {
-            info!(node = address, "Node not in finalized committee");
-            return Box::pin(async {});
-        }
-
-        Box::pin(async move {
-            // Retrieve E3 metadata from repository
-            let meta_repo = repositories.meta(&e3_id);
-            let Some(e3_meta) = meta_repo.read().await.ok().flatten() else {
-                info!(
-                    node = address,
-                    "No stored E3 metadata for {:?}, skipping", e3_id
-                );
-                return;
+        trap(EType::Sortition, &self.bus.clone(), move || {
+            let bus = self.bus.clone();
+            let Some(e3_cache) = self.e3_cache.get() else {
+                bail!("Could not get cache");
             };
 
-            let Some(party_id) = msg.committee.iter().position(|addr| addr == &address) else {
+            let Some(e3_meta) = e3_cache.get(&msg.e3_id) else {
+                bail!(
+                    "Could not find E3Meta on CiphernodeSelector for {}",
+                    msg.e3_id
+                );
+            };
+
+            // Check if this node is in the finalized committee
+            if !msg.committee.contains(&self.address) {
+                info!(node = self.address, "Node not in finalized committee");
+                return Ok(());
+            }
+
+            // Retrieve E3 metadata from repository
+            let Some(party_id) = msg.committee.iter().position(|addr| addr == &self.address) else {
                 info!(
-                    node = address,
+                    node = self.address,
                     "Node address not found in committee list (should not happen)"
                 );
-                return;
+                return Ok(());
             };
 
             info!(
-                node = address,
+                node = self.address,
                 party_id = party_id,
                 "Node is in finalized committee, emitting CiphernodeSelected"
             );
-            trap(EType::Sortition, &bus.clone(), || {
-                bus.publish(CiphernodeSelected {
-                    party_id: party_id as u64,
-                    e3_id,
-                    threshold_m: e3_meta.threshold_m,
-                    threshold_n: e3_meta.threshold_n,
-                    esi_per_ct: e3_meta.esi_per_ct,
-                    error_size: e3_meta.error_size,
-                    params: e3_meta.params,
-                    seed: e3_meta.seed,
-                })?;
-                Ok(())
-            })
+
+            bus.publish(CiphernodeSelected {
+                party_id: party_id as u64,
+                e3_id: msg.e3_id,
+                threshold_m: e3_meta.threshold_m,
+                threshold_n: e3_meta.threshold_n,
+                esi_per_ct: e3_meta.esi_per_ct,
+                error_size: e3_meta.error_size.clone(),
+                params: e3_meta.params.clone(),
+                seed: e3_meta.seed,
+            })?;
+
+            Ok(())
         })
     }
 }

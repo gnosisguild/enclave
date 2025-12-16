@@ -32,8 +32,8 @@ use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{
-    CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
-    Sortition, SortitionBackend, SortitionRepositoryFactory,
+    CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
+    NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -356,7 +356,7 @@ impl CiphernodeBuilder {
         )
         .await?;
 
-        CiphernodeSelector::attach(&bus, &sortition, &addr, &store);
+        CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr);
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
