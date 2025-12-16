@@ -19,6 +19,8 @@ env:
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
+  NODE_VERSION: 22
+  RUST_TOOLCHAIN: 1.86.0
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -35,19 +37,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
         # We must install foundry in order to be able to test anvil
       - name: Install Foundry
@@ -59,28 +54,16 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
-        # We need to setup node in order to compile the hardhat contracts to get the artifacts
-      - name: 'Setup node'
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+        # We need to setup node in order to compile the hardhat contracts to get the artifacts
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
@@ -97,19 +80,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
         # We must install foundry in order to be able to test anvil
       - name: Install Foundry
@@ -121,28 +97,16 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
-        # We need to setup node in order to compile the hardhat contracts to get the artifacts
-      - name: 'Setup node'
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+        # We need to setup node in order to compile the hardhat contracts to get the artifacts
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
@@ -155,8 +119,6 @@ jobs:
 
   build_e3_support_risc0:
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Generate tags
@@ -239,42 +201,23 @@ jobs:
         uses: 'actions/checkout@v4'
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           target: wasm32-unknown-unknown
-
-      - name: 'Setup node'
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
@@ -300,12 +243,14 @@ jobs:
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
       - name: 'Setup node'
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - name: pnpm-setup
-        uses: pnpm/action-setup@v4
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
       - name: 'Run network tests'
         run: 'pnpm test:integration net --no-prebuild'
       - name: 'Add test summary'
@@ -320,41 +265,22 @@ jobs:
         uses: 'actions/checkout@v4'
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
-
-      - name: 'Setup node'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
@@ -406,31 +332,19 @@ jobs:
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
       - name: 'Setup node'
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - name: pnpm-setup
-        uses: pnpm/action-setup@v4
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
       - name: 'Download build artifacts'
@@ -476,19 +390,12 @@ jobs:
           submodules: recursive
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            templates/default/target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install solc
         run: |
@@ -515,19 +422,15 @@ jobs:
           submodules: recursive
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache-dependencies
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+          cargo-lock-path: examples/CRISP/Cargo.lock
+          rust-target-path: examples/CRISP/target/
 
-      - name: Install Rust 1.86.0
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -537,27 +440,15 @@ jobs:
         with:
           toolchain: v1.0.0-beta.15
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: .
@@ -596,14 +487,7 @@ jobs:
           submodules: recursive
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
       - name: Prepare test environment
         run: |
@@ -615,13 +499,15 @@ jobs:
           sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
           sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       # We must install foundry in order to be able to test anvil
       - name: Install Foundry
@@ -641,20 +527,6 @@ jobs:
       - name: Install yq
         run: |
           sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
         working-directory: .
@@ -731,18 +603,14 @@ jobs:
         with:
           submodules: recursive
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache-dependencies
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            templates/default/target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+          cargo-lock-path: templates/default/Cargo.lock
+          rust-target-path: templates/default/target/
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Build support scripts
         run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
       - name: Verify build artifacts
@@ -764,41 +632,23 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
       - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
+        uses: ./.github/actions/cache-dependencies
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: wasm32-unknown-unknown
 
       - name: Install node dependencies
@@ -831,16 +681,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
       - name: Download enclave binary
@@ -883,20 +735,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.7.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.86.0
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Download enclave binary
         uses: actions/download-artifact@v4
         with:
