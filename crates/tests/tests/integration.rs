@@ -311,9 +311,6 @@ async fn test_trbfv_actor() -> Result<()> {
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
 
-    return Ok(());
-    unreachable!();
-
     report.push((
         "ThresholdShares -> PublicKeyAggregated",
         shares_to_pubkey_agg_timer.elapsed(),
