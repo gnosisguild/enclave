@@ -14,7 +14,6 @@ use crate::{
 /// Component to sequence the storage of events
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-    seq: u64,
     eventstore: Recipient<StoreEventRequested>,
     buffer: Recipient<CommitSnapshot>,
 }
@@ -27,7 +26,6 @@ impl Sequencer {
     ) -> Self {
         Self {
             bus: bus.clone(),
-            seq: 0,
             eventstore: eventstore.into(),
             buffer: buffer.into(),
         }

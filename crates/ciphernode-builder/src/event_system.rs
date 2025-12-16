@@ -413,10 +413,12 @@ mod tests {
 
         // NOTE: Eventual consistency
         // Store should not have data set on it until event has been published
-        // There is an argument we should instead delay reads until the event has been stored
+        // There is an argument we should instead delay reads until the event has been stored but
+        // this would:
+        //   a. Promote poor patterns of sharing data through persistence
+        //   b. Add a large amount of complexity to batching Get operations
         // For now we allow this inconsistency under the assumption that data is written for
-        // snapshot storage exclusively. If we have issues we may wish to change to a more
-        // highly consistent model.
+        // snapshot storage exclusively.
 
         // Let's check the eventual consistency all data points should be none...
         assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);

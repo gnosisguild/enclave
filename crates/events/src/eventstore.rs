@@ -22,25 +22,19 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         let event = msg.event;
         let sender = msg.sender;
         let ts = event.get_ts();
-        println!("VVV: ts={}", ts);
         let seq = self.log.append(&event)?;
-        println!("VVV: seq={}", seq);
         self.index.insert(ts, seq)?;
         sender.try_send(EventStored(event.into_sequenced(seq)))?;
         Ok(())
     }
 
     pub fn handle_get_events_after(&mut self, msg: GetEventsAfter) -> Result<()> {
-        println!("XXX: GetEventsAfter {}!", msg.ts);
         let seq = self.index.seek(msg.ts)?.unwrap_or(1);
-        println!("XXX: seq={}", seq);
-
         let evts = self
             .log
             .read_from(seq)
             .map(|(s, e)| e.into_sequenced(s))
             .collect::<Vec<_>>();
-        println!("XXX: Got evts:{:?}", evts.len());
         msg.sender.try_send(ReceiveEvents::new(evts))?;
         Ok(())
     }
