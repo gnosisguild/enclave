@@ -20,6 +20,7 @@ sol! {
     #[sol(rpc)]
     contract ERC20Votes {
         function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
+        function decimals() external view returns (uint8);
     }
 }
 
@@ -178,8 +179,8 @@ impl EtherscanClient {
                 }
 
                 return Err(eyre!(
-                    "Etherscan getLogs failed on page {}: {}", 
-                    page, 
+                    "Etherscan getLogs failed on page {}: {}",
+                    page,
                     data.message
                 ));
             }
@@ -245,8 +246,8 @@ impl EtherscanClient {
                 }
 
                 return Err(eyre!(
-                    "Etherscan getLogs failed on page {}: {}", 
-                    page, 
+                    "Etherscan getLogs failed on page {}: {}",
+                    page,
                     data.message
                 ));
             }
@@ -326,13 +327,22 @@ impl EtherscanClient {
     ) -> Result<Vec<TokenHolder>> {
         let mut token_holders: Vec<TokenHolder> = Vec::new();
 
+        let decimals = Self::get_decimals(token_address, rpc_url).await?;
+
+        // we want to keep some precision.
+        let half_decimals = decimals / 2;
+
+        let scale_factor = U256::from(10u128.pow(half_decimals as u32));
+
         for voter in potential_voters {
             match Self::get_past_votes(token_address, voter.address, block_number, rpc_url).await {
                 Ok(votes) => {
                     if votes >= threshold {
+                        let scaled_votes = votes / scale_factor;
+
                         token_holders.push(TokenHolder {
                             address: voter.address.to_string(),
-                            balance: votes.to_string(),
+                            balance: scaled_votes.to_string(),
                         });
                     }
                 }
@@ -450,6 +460,21 @@ impl EtherscanClient {
             .context("Failed to call getPastVotes")?;
 
         Ok(votes)
+    }
+
+    /// Get the token decimals
+    async fn get_decimals(token_address: Address, rpc_url: &str) -> Result<u8> {
+        let url = rpc_url.parse().context("Failed to parse RPC URL")?;
+        let provider = ProviderBuilder::new().connect_http(url);
+        let token = ERC20Votes::new(token_address, provider);
+
+        let decimals = token
+            .decimals()
+            .call()
+            .await
+            .context("Failed to call decimals")?;
+
+        Ok(decimals)
     }
 
     /// Parse address from 32-byte topic (last 20 bytes)

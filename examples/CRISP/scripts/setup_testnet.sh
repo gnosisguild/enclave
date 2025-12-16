@@ -80,6 +80,9 @@ pnpm ciphernode:add:self --network "sepolia"
 
 echo "CIPHERNODES HAVE BEEN ADDED."
 
+# Reset the private key to the aggregator for further operations (owner of contracts)
+export PRIVATE_KEY="$PRIVATE_KEY_AG"
+
 # wait
 
 concurrently -kr \

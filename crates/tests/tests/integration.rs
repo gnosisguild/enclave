@@ -33,7 +33,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 }
 
 async fn setup_score_sortition_environment(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
@@ -42,7 +42,7 @@ async fn setup_score_sortition_environment(
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    });
+    })?;
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
@@ -54,13 +54,13 @@ async fn setup_score_sortition_environment(
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        });
+        })?;
 
         bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        });
+        })?;
     }
 
     Ok(())
@@ -118,10 +118,9 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let bus: BusHandle<EnclaveEvent> =
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+        .start()
+        .into();
 
     // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (
@@ -146,11 +145,19 @@ async fn test_trbfv_actor() -> Result<()> {
     let threshold_m = 2;
     let threshold_n = 5;
     let esi_per_ct = 3;
+
+    // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
+    // This is just for INSECURE parameter set.
+    // This is not secure and should not be used in production.
+    // For production use lambda = 80.
+    let lambda = 2;
+
     let seed = create_seed_from_u64(123);
     let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
         threshold_n,
         threshold_m,
+        lambda,
     )?));
 
     // Cipher
@@ -181,7 +188,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(&bus.bus())
+                .testmode_with_forked_bus(bus.consumer())
                 .with_logging()
                 .build()
                 .await
@@ -194,7 +201,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_injected_multithread(multithread.clone())
                 .with_trbfv()
                 .with_sortition_score()
-                .testmode_with_forked_bus(&bus.bus())
+                .testmode_with_forked_bus(bus.consumer())
                 .with_logging()
                 .build()
                 .await
@@ -219,6 +226,7 @@ async fn test_trbfv_actor() -> Result<()> {
     //
     //   - m=2.
     //   - n=5
+    //   - lambda=2
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 3
     ///////////////////////////////////////////////////////////////////////////////////
@@ -238,7 +246,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    bus.publish(e3_requested);
+    bus.publish(e3_requested)?;
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -264,7 +272,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
-    });
+    })?;
 
     let committee_finalized_timer = Instant::now();
 
@@ -361,7 +369,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone())?;
 
     println!("CiphertextOutputPublished event has been dispatched!");
 

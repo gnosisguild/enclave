@@ -1,0 +1,41 @@
+name: Cache Rust dependencies
+description: Cache Rust dependencies (cargo registry/git + target)
+
+inputs:
+  cargo-lock-path:
+    description: Cargo.lock path (or glob) used to invalidate the cache key
+    required: false
+    default: Cargo.lock
+  rust-target-path:
+    description: Path to Rust target dir to cache
+    required: false
+    default: target/
+
+runs:
+  using: composite
+  steps:
+    - name: Compute cache scope
+      id: cache-key
+      shell: bash
+      run: |
+        target_path='${{ inputs.rust-target-path }}'
+        target_path="${target_path#./}"
+        while [[ "$target_path" == */ ]]; do target_path="${target_path%/}"; done
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          scope="$(printf '%s' "$target_path" | sha256sum | cut -d' ' -f1)"
+        else
+          scope="$(printf '%s' "$target_path" | shasum -a 256 | cut -d' ' -f1)"
+        fi
+
+        echo "scope=$scope" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ${{ inputs.rust-target-path }}
+        key: rust-deps-${{ steps.cache-key.outputs.scope }}-${{ hashFiles(inputs.cargo-lock-path) }}
+        restore-keys: rust-deps-${{ steps.cache-key.outputs.scope }}-

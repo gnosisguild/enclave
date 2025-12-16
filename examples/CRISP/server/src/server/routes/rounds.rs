@@ -7,17 +7,17 @@
 use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, CustomParams, JsonResponse, PKRequest, RoundRequest,
+    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
 };
 
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
+use alloy::sol_types::SolValue;
 use chrono::Utc;
 use crisp_constants::get_default_paramset;
 use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
-use num_bigint::BigUint;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -183,16 +183,10 @@ pub async fn initialize_crisp_round(
     let params = encode_bfv_params(&build_bfv_params_from_set_arc(get_default_paramset()));
 
     let token_address: Address = token_address.parse()?;
-    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
-        .ok_or("Invalid balance threshold")?;
-
-    let custom_params = CustomParams {
-        token_address: token_address.to_string(),
-        balance_threshold: balance_threshold.to_string(),
-    };
+    let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
 
     // Serialize the custom parameters to bytes.
-    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
+    let custom_params_bytes = Bytes::from((token_address, balance_threshold).abi_encode());
 
     info!("Requesting E3...");
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];

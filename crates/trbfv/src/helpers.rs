@@ -48,8 +48,9 @@ pub fn calculate_error_size(
     params: Arc<bfv::BfvParameters>,
     n: usize,
     num_ciphertexts: usize,
+    lambda: usize,
 ) -> Result<BigUint> {
-    let config = SmudgingBoundCalculatorConfig::new(params, n, num_ciphertexts);
+    let config = SmudgingBoundCalculatorConfig::new(params, n, num_ciphertexts, lambda);
     let calculator = SmudgingBoundCalculator::new(config);
     Ok(calculator.calculate_sm_bound()?)
 }

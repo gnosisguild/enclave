@@ -12,7 +12,6 @@ use e3_events::{
     PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_sortition::Sortition;
 use e3_utils::ArcBytes;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -56,14 +55,14 @@ struct ComputeAggregate {
 
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
 }
 
 pub struct PublicKeyAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: BusHandle<EnclaveEvent>,
+    pub bus: BusHandle,
     pub e3_id: E3id,
 }
 
@@ -176,7 +175,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 impl Handler<ComputeAggregate> for PublicKeyAggregator {
     type Result = Result<()>;
 
-    fn handle(&mut self, msg: ComputeAggregate, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
         info!("Computing Aggregate PublicKey...");
         let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
             keyshares: msg.keyshares,
@@ -198,7 +197,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
                 e3_id: msg.e3_id,
                 nodes,
             };
-            self.bus.publish(event);
+            self.bus.publish(event)?;
         }
         Ok(())
     }

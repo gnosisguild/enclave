@@ -1,12 +1,17 @@
 {
   "name": "@enclave-e3/contracts",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "license": "LGPL-3.0-only",
   "type": "module",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave.git",
+    "directory": "packages/enclave-contracts"
   },
   "exports": {
     "./tasks/ciphernode": {
@@ -165,7 +170,8 @@
     "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish",
-    "verify:contracts": "hardhat run scripts/runVerification.ts"
+    "verify:contracts": "hardhat run scripts/runVerification.ts",
+    "updateSubmissionWindow": "hardhat ciphernode:window"
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",

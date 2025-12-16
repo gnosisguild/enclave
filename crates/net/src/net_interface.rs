@@ -74,8 +74,8 @@ impl NetInterface {
         udp_port: Option<u16>,
         topic: &str,
     ) -> Result<Self> {
-        let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
-        let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
+        let (event_tx, _) = broadcast::channel(1000); // TODO : tune this param
+        let (cmd_tx, cmd_rx) = mpsc::channel(1000); // TODO : tune this param
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()

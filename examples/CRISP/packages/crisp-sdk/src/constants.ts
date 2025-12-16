@@ -15,17 +15,18 @@ export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
  * Half the minimum degree needed to support the maxium vote value
  * If you change MAXIMUM_VOTE_VALUE, make sure to update this value too.
  */
-export const HALF_LARGEST_MINIMUM_DEGREE = 28
+export const HALF_LARGEST_MINIMUM_DEGREE = 50
 
 /**
- * This is the maximum value for a vote (Yes or No). This is 2^28 - 1
- * The minimum degree that BFV should use is 56 (to accommodate both Yes and No votes)
+ * This is the maximum value for a vote (Yes or No). This is 2^50 - 1
+ * The minimum degree that BFV should use is 100 (to accommodate both Yes and No votes)
  */
 export const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE) - 1)
 
 /**
  * Message used by users to prove ownership of their Ethereum account
  * This message is signed by the user's private key to authenticate their identity
+ * @notice Apps ideally want to use a different message to avoid signature reuse across different applications
  */
 export const SIGNATURE_MESSAGE = 'CRISP: Sign this message to prove ownership of your Ethereum account'
 export const SIGNATURE_MESSAGE_HASH = hashMessage(SIGNATURE_MESSAGE)

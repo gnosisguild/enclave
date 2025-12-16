@@ -22,6 +22,7 @@ interface PublishOptions {
   skipGit?: boolean
   dryRun?: boolean
   tag?: string // npm dist-tag (e.g., 'latest', 'beta', 'next')
+  noVerify?: boolean
 }
 
 class CRISPPublisher {
@@ -239,21 +240,23 @@ class CRISPPublisher {
     console.log('\n📝 Performing git operations...')
 
     try {
-      // Get git repository root
-      const gitRoot = execSync('git rev-parse --show-toplevel', {
-        cwd: this.crispDir,
-        encoding: 'utf-8',
-      }).trim()
+      // Run prettier from root before committing to avoid hook failures
+      console.log('   Running prettier from root...')
+      const rootDir = resolve(this.crispDir, '../..')
+      try {
+        execSync('pnpm prettier --write .', {
+          cwd: rootDir,
+          stdio: 'pipe',
+        })
+        console.log('   ✓ Prettier formatting complete')
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        console.warn('   ⚠️  Prettier failed, continuing anyway')
+      }
 
-      // Add all changes from CRISP directory
+      // Add all changes
       console.log('   Adding changes...')
       execSync('git add .', { cwd: this.crispDir })
-
-      // Explicitly add the lock file from root
-      const lockFilePath = join(gitRoot, 'pnpm-lock.yaml')
-      if (existsSync(lockFilePath)) {
-        execSync(`git add ${lockFilePath}`, { cwd: gitRoot })
-      }
 
       // Create commit message
       const commitMessage = `chore(crisp): publish version ${this.newVersion}
@@ -265,8 +268,9 @@ class CRISPPublisher {
 
       // Commit changes
       console.log('   Committing changes...')
-      execSync(`git commit -m "${commitMessage}"`, {
-        cwd: gitRoot,
+      const noVerifyFlag = this.options.noVerify ? ' --no-verify' : ''
+      execSync(`git commit -m "${commitMessage}"${noVerifyFlag}`, {
+        cwd: this.crispDir,
         stdio: 'pipe',
       })
       console.log(`   ✓ Committed with message: "chore(crisp): publish version ${this.newVersion}"`)
@@ -415,6 +419,8 @@ async function main() {
       options.dryRun = true
     } else if (arg === '--tag') {
       options.tag = args[++i]
+    } else if (arg === '--no-verify') {
+      options.noVerify = true
     } else if (!arg.startsWith('-')) {
       version = arg
     }

@@ -172,6 +172,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomials `p2is`
 ///
 /// # Circuit Inputs
+/// * `pk_commitment` - Public key commitment
 /// * `pk0is`, `pk1is` - Public key polynomials
 /// * `ct0is`, `ct1is` - Ciphertext polynomials
 /// * `u` - Secret polynomial sampled from ternary distribution
@@ -182,6 +183,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     params: Params<N, L>,
+    pk_commitment: Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],
@@ -206,6 +208,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ///
     /// # Arguments
     /// * `params` - Cryptographic parameters including bounds and moduli
+    /// * `pk_commitment` - Public key commitment
     /// * `pk0is` - Public key polynomials pk0i = [ai*s + E] for each CRT basis
     /// * `pk1is` - Public key polynomials pk1i = -[ai] for each CRT basis
     /// * `ct0is` - First ciphertext component for each CRT basis
@@ -225,6 +228,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// A new Greco instance ready for constraint checking
     pub fn new(
         params: Params<N, L>,
+        pk_commitment: Field,
         pk0is: [Polynomial<N>; L],
         pk1is: [Polynomial<N>; L],
         ct0is: [Polynomial<N>; L],
@@ -242,6 +246,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco {
             params,
+            pk_commitment,
             pk0is,
             pk1is,
             ct0is,
@@ -268,12 +273,12 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     ///
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
-    fn payload(self) -> Vec<Field> {
+    fn gammas_payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
-        // Flatten public key and ciphertext polynomials first (public inputs)
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
+        inputs.push(self.pk_commitment);
+
+        // Flatten ciphertext polynomials first (public inputs)
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
         inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
@@ -288,6 +293,23 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         inputs = flatten::<_, _, BIT_R2>(inputs, self.r2is);
         inputs = flatten::<_, _, BIT_P1>(inputs, self.p1is);
         inputs = flatten::<_, _, BIT_P2>(inputs, self.p2is);
+
+        inputs
+    }
+
+    /// Flattens public key polynomials into a single array for commitment generation.
+    ///
+    /// This function serializes all public key polynomial coefficients into a 1D array to enable
+    /// the generation of a public key commitment using a cryptographic sponge.
+    ///
+    /// # Returns
+    /// An array containing all public key polynomial coefficients in flattened form
+    fn commitment_payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
+
+        // Flatten public key polynomials
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
 
         inputs
     }
@@ -416,8 +438,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let inputs = self.payload();
-
         // Domain separator for Greco circuit - "Greco" in hex
         let domain_separator = [
             0x47, 0x72, 0x65, 0x63, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -427,13 +447,27 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
+        // IO Pattern: ABSORB(input_size), SQUEEZE(1)
+        let inputs = self.commitment_payload();
+        let input_size = inputs.len();
+        let io_pattern = [0x80000000 | input_size, 0x00000000 | 1];
+
+        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+        sponge.absorb(inputs);
+        let commitment = sponge.squeeze();
+        sponge.finish();
+
+        assert_eq(commitment.get(0), self.pk_commitment);
+
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
+        let inputs = self.gammas_payload();
         let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
         sponge.absorb(inputs);
         let gammas = sponge.squeeze();
+
         sponge.finish();
         gammas
     }

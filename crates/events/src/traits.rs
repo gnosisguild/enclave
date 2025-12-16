@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Message, Recipient};
+use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
@@ -29,7 +30,11 @@ pub trait ErrorEvent: Event {
     type ErrType;
     type FromError;
 
-    fn from_error(err_type: Self::ErrType, error: impl Into<Self::FromError>) -> Self;
+    fn from_error(
+        err_type: Self::ErrType,
+        error: impl Into<Self::FromError>,
+        ts: u128,
+    ) -> Result<Self>;
 }
 
 /// An EventFactory creates events
@@ -37,18 +42,18 @@ pub trait EventFactory<E: Event> {
     /// Create a new event from the given event data, apply a local HLC timestamp.
     ///
     /// This method should be used for events that have originated locally.
-    fn event_from(&self, data: impl Into<E::Data>) -> E;
+    fn event_from(&self, data: impl Into<E::Data>) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> E;
+    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> Result<E>;
 }
 
 /// An ErrorFactory creates errors.
 pub trait ErrorFactory<E: ErrorEvent> {
     /// Create an error event from the given error.
-    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> E;
+    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> Result<E>;
 }
 
 /// An EventPublisher publishes events on it's internal EventBus
@@ -57,12 +62,12 @@ pub trait EventPublisher<E: Event> {
     /// to the event bus.
     ///
     /// This method should be used for events that have originated locally.
-    fn publish(&self, data: impl Into<E::Data>);
+    fn publish(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128);
+    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
 }
@@ -87,6 +92,6 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
     fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
 }
 
-pub trait CompositeEvent: ErrorEvent + EventConstructorWithTimestamp {}
+pub trait CompositeEvent: EventConstructorWithTimestamp {}
 
-impl<E> CompositeEvent for E where E: Sized + Event + ErrorEvent + EventConstructorWithTimestamp {}
+impl<E> CompositeEvent for E where E: Sized + Event + EventConstructorWithTimestamp {}

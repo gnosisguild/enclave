@@ -94,9 +94,19 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn insert_ciphertext_input(&mut self, vote: Vec<u8>, index: u64) -> Result<()> {
         let key = self.crisp_key();
 
-        self.store.modify(&key, |e3_obj: Option<E3Crisp>| {
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
-                    e.ciphertext_inputs.push((vote.clone(), index));
+                    // We check if we already have a vote at this index (re-vote case)
+                    // If we do, we update the vote
+                    // If we don't, we append the vote
+                    if let Some(existing) =
+                        e.ciphertext_inputs.iter_mut().find(|(_, i)| *i == index)
+                    {
+                        existing.0 = vote.clone();
+                    } else {
+                        e.ciphertext_inputs.push((vote.clone(), index));
+                    }
                     e
                 })
             })
@@ -137,7 +147,7 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn get_vote_count(&self) -> Result<u64> {
         let e3_crisp = self.get_crisp().await?;
-        Ok(u64::try_from(e3_crisp.ciphertext_inputs.len())?)
+        Ok(u64::try_from(e3_crisp.has_voted.len())?)
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -205,7 +215,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             status: e3_crisp.status,
             chain_id: e3.chain_id,
             duration: e3.duration,
-            vote_count: u64::try_from(e3_crisp.ciphertext_inputs.len())?,
+            vote_count: u64::try_from(e3_crisp.has_voted.len())?,
             start_time: e3_crisp.start_time,
             start_block: e3.request_block,
             enclave_address: e3.enclave_address,
@@ -219,7 +229,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(e3_crisp.ciphertext_inputs)
     }
-    
+
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())

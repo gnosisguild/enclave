@@ -6,6 +6,7 @@
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
+import { ArgumentType } from "hardhat/types/arguments";
 import { poseidon2 } from "poseidon-lite";
 
 export const ciphernodeAdd = task(
@@ -529,6 +530,44 @@ export const ciphernodeSiblings = task(
       const { siblings } = tree.generateProof(index);
 
       console.log(`Siblings for ${ciphernodeAddress}: ${siblings}`);
+    },
+  }))
+  .build();
+
+export const updateSubmissionWindow = task(
+  "ciphernode:window",
+  "Update the submission window for the ciphernode registry",
+)
+  .addOption({
+    name: "newWindow",
+    description: "the new submission window",
+    defaultValue: 10,
+    type: ArgumentType.INT,
+  })
+  .setAction(async () => ({
+    default: async ({ newWindow }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
+
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({
+          hre,
+          poseidonT3Address: poseidonT3,
+        });
+
+      const tx =
+        await ciphernodeRegistry.setSortitionSubmissionWindow(newWindow);
+
+      console.log("Updating submission window... ", tx.hash);
+      await tx.wait();
+
+      console.log(`Submission window update to ${newWindow}`);
     },
   }))
   .build();

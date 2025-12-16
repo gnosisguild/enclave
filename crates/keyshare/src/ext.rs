@@ -13,20 +13,20 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
-use e3_events::{prelude::*, BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     address: String,
     cipher: Arc<Cipher>,
 }
 
 impl KeyshareExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
+    pub fn create(bus: &BusHandle, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
@@ -48,10 +48,8 @@ impl E3Extension for KeyshareExtension {
 
         // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
             return;
         };
 
@@ -91,10 +89,8 @@ impl E3Extension for KeyshareExtension {
 
         // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
             return Ok(());
         };
 
@@ -117,7 +113,7 @@ impl E3Extension for KeyshareExtension {
 }
 
 pub struct ThresholdKeyshareExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
     multithread: Addr<Multithread>,
@@ -125,7 +121,7 @@ pub struct ThresholdKeyshareExtension {
 
 impl ThresholdKeyshareExtension {
     pub fn create(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         address: &str,
@@ -139,6 +135,9 @@ impl ThresholdKeyshareExtension {
     }
 }
 
+const ERROR_KEYSHARE_META_MISSING: &str =
+    "Could not create ThresholdKeyshare because the meta instance it depends on was not set on the context.";
+
 #[async_trait]
 impl E3Extension for ThresholdKeyshareExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
@@ -150,10 +149,8 @@ impl E3Extension for ThresholdKeyshareExtension {
         let e3_id = data.clone().e3_id;
         let party_id = data.clone().party_id;
         let Some(meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::KeyGeneration,
-                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-            );
+            self.bus
+                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_META_MISSING));
             return;
         };
         let repo = ctx.repositories().threshold_keyshare(&e3_id);

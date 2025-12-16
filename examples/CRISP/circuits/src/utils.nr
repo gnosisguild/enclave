@@ -12,8 +12,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     q_mod_t: Field,
     balance: Field,
 ) {
-    // This value allows to fit 268,435,455 for yes and 268,435,455 for no
-    let HALF_LARGEST_MINIMUM_DEGREE = 28;
+    // This value allows to fit 1125899906842624 for yes and 1125899906842624 for no
+    let HALF_LARGEST_MINIMUM_DEGREE = 50;
     let HALF_D = D / 2;
 
     // After reversal, bits that were at END of first half are now at START of second half
@@ -58,7 +58,7 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 }
 
 pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
-    let HALF_LARGEST_MINIMUM_DEGREE = 28;
+    let HALF_LARGEST_MINIMUM_DEGREE = 50;
     let HALF_D = D / 2;
 
     let START_INDEX_Y = HALF_D;
@@ -89,10 +89,10 @@ fn test_check_vote_is_within_balance_pass() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
             // YES votes: bits at indices 50-52 (START of YES window)
             1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ],
     };
 
@@ -165,10 +165,10 @@ fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
             // Non-zero at index 50 (YES section)
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
         ],
     };
 

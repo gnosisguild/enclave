@@ -200,6 +200,7 @@ mod tests {
     use alloy_primitives::FixedBytes;
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
+    use greco::bounds::GrecoBounds;
     use greco::vectors::GrecoVectors;
     use rand::thread_rng;
 
@@ -220,8 +221,14 @@ mod tests {
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
         let (ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
 
+        let (_, bounds) = GrecoBounds::compute(&params, 0).unwrap();
+
+        let bit_pk =
+            shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
+
         let greco_vectors =
-            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params).unwrap();
+            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params, bit_pk)
+                .unwrap();
         let standard_vectors = greco_vectors.standard_form();
 
         (params, ct, (standard_vectors.ct0is, standard_vectors.ct1is))

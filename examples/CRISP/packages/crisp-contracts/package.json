@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/contracts",
-  "version": "0.4.2",
+  "version": "0.5.2",
   "type": "module",
   "files": [
     "contracts",
@@ -34,8 +34,10 @@
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy:contracts": "hardhat run deploy/deploy.ts",
     "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",
+    "deploy:contracts:full:mock": "export DEPLOY_ENCLAVE=true USE_MOCK_VERIFIER=true PRINT_ENV_VARS=true && pnpm deploy:contracts",
     "test": "hardhat test mocha",
-    "verify": "hardhat run deploy/verify.ts"
+    "verify": "hardhat run deploy/verify.ts",
+    "updateSubmissionWindow": "hardhat ciphernode:window"
   },
   "dependencies": {
     "@enclave-e3/contracts": "workspace:*",

@@ -15,19 +15,21 @@ import { hasPollEnded } from '@/utils/methods'
 import CountdownTimer from '@/components/CountdownTime'
 import { useModal } from 'connectkit'
 import { useVoteCasting } from '@/hooks/voting/useVoteCasting'
+import VotingStepIndicator from '@/components/VotingStepIndicator'
 
 type DailyPollSectionProps = {
   loading?: boolean
   endTime: Date | null
+  title?: string
 }
 
-const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime }) => {
-  const { user, pollOptions, setPollOptions, roundState } = useVoteManagementContext()
+const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, title = 'Daily Poll' }) => {
+  const { user, pollOptions, setPollOptions, roundState, hasVotedInCurrentRound, voteStatusLoading } = useVoteManagementContext()
   const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
-  const { castVoteWithProof, isLoading: isCastingVote } = useVoteCasting()
+  const { castVoteWithProof, isLoading: isCastingVote, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
   const statusClass = !isEnded ? 'lime' : 'red'
 
@@ -56,7 +58,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
       return
     }
 
-    await castVoteWithProof(pollSelected)
+    await castVoteWithProof(pollSelected, hasVotedInCurrentRound)
   }
 
   return (
@@ -68,12 +70,12 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
 
         <div className='relative mx-auto flex w-full max-w-screen-md flex-col items-center justify-center space-y-8'>
           <div className='space-y-2'>
-            <p className='text-center text-sm font-extrabold uppercase text-slate-400'>Daily Poll</p>
+            <p className='text-center text-sm font-extrabold uppercase text-slate-400'>{title}</p>
             <h3 className='md:text-h3 text-center font-bold leading-none text-slate-600'>Choose your favorite</h3>
-            {!roundState && <p className='text-center text-2xl font-bold text-slate-600/50 '>There are is no current daily poll.</p>}
+            {!roundState && <p className='text-center text-2xl font-bold text-slate-600/50 '>No active poll found.</p>}
           </div>
           {roundState && (
-            <div className='flex items-center justify-center space-x-2'>
+            <div className='flex items-center justify-center space-x-2 flex-wrap gap-2'>
               <div
                 className={`flex items-center space-x-2 rounded-lg border-2 border-${statusClass}-600/80 ${!isEnded ? 'bg-lime-400' : 'bg-red-400'} px-2 py-1 text-center font-bold uppercase leading-none text-white`}
               >
@@ -83,6 +85,16 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
               <div className='rounded-lg border-2 border-slate-600/20 bg-white px-2 py-1.5 text-center font-bold uppercase leading-none text-slate-800/50'>
                 {roundState.vote_count} votes
               </div>
+              {hasVotedInCurrentRound && (
+                <div className='rounded-lg border-2 border-blue-500/80 bg-blue-100 px-2 py-1.5 text-center font-bold uppercase leading-none text-blue-600'>
+                  You voted
+                </div>
+              )}
+              {voteStatusLoading && (
+                <div className='rounded-lg border-2 border-slate-300 bg-slate-100 px-2 py-1.5 text-center font-bold uppercase leading-none text-slate-500'>
+                  Checking...
+                </div>
+              )}
             </div>
           )}
 
@@ -91,13 +103,8 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
               <CountdownTimer endTime={endTime} />
             </div>
           )}
-          {isCastingVote && (
-            <div className='flex flex-col items-center justify-center space-y-2 max-sm:py-5'>
-              <p className='text-base font-bold uppercase text-slate-600/50'>Casting Vote</p>
-              <LoadingAnimation isLoading={isCastingVote} />
-            </div>
-          )}
-          {loading && <LoadingAnimation isLoading={loading} />}
+          {isCastingVote && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
+          {loading && !isCastingVote && <LoadingAnimation isLoading={loading} />}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (
               <div data-test-id={`poll-button-${poll.value}`} key={poll.label} className='col-span-2 md:col-span-1'>
@@ -108,14 +115,18 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
             ))}
           </div>
           {roundState && (
-            <div className='space-y-4'>
-              {noPollSelected && !isEnded && <div className='text-center text-sm leading-none text-slate-500'>Select your favorite</div>}
+            <div className='space-y-4 flex flex-col items-center justify-center'>
+              {noPollSelected && !isEnded && (
+                <div className='text-center text-sm leading-none text-slate-500'>
+                  {hasVotedInCurrentRound ? 'Select an option to update your vote' : 'Select your favorite'}
+                </div>
+              )}
               <button
                 className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
                 disabled={noPollSelected || loading || !roundState || isEnded || isCastingVote}
                 onClick={castVote}
               >
-                {isCastingVote ? 'Processing Vote...' : 'Cast Vote'}
+                {isCastingVote ? 'Processing Vote...' : hasVotedInCurrentRound ? 'Update Vote' : 'Cast Vote'}
               </button>
             </div>
           )}

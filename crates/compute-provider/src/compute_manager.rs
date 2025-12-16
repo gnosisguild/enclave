@@ -56,7 +56,8 @@ where
     }
 
     fn start_sequential(&mut self) -> (P::Output, Vec<u8>) {
-        let mut tree_builder = MerkleTreeBuilder::new();
+        let num_leaves = self.input.fhe_inputs.ciphertexts.len();
+        let mut tree_builder = MerkleTreeBuilder::new(num_leaves);
 
         tree_builder.compute_leaf_hashes(&self.input.fhe_inputs.ciphertexts);
         self.input.leaf_hashes = tree_builder.leaf_hashes.clone();
@@ -84,7 +85,7 @@ where
         let tally_results: Vec<(P::Output, Vec<u8>, String)> = chunks
             .into_par_iter()
             .map(|chunk| {
-                let mut tree_builder = MerkleTreeBuilder::new();
+                let mut tree_builder = MerkleTreeBuilder::new(chunk.len());
 
                 tree_builder.compute_leaf_hashes(&chunk);
                 let merkle_root = tree_builder.build_tree().root().unwrap();
