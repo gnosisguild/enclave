@@ -444,14 +444,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: |
-          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
+        run: pnpm install --frozen-lockfile
 
-      - name: Install solc
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
+      - name: Compile contracts
+        working-directory: .
+        run: pnpm evm:build
 
       - name: Run Rust tests
         working-directory: ./examples/CRISP
@@ -522,8 +519,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: |
-          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile contracts
+        working-directory: .
+        run: pnpm evm:build
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
