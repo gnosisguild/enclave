@@ -446,9 +446,15 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Compile contracts
+      - name: Compile Enclave contracts
         working-directory: .
         run: pnpm evm:build
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
 
       - name: Run Rust tests
         working-directory: ./examples/CRISP
@@ -521,7 +527,7 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Compile contracts
+      - name: Compile Enclave contracts
         working-directory: .
         run: pnpm evm:build
 
