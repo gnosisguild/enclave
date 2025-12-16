@@ -6,9 +6,7 @@
 
 use crisp_constants::get_default_paramset;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
-use e3_sdk::bfv_helpers::BfvParamSets;
 use log::info;
-use num_bigint::BigUint;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +14,7 @@ use super::approve;
 use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
+use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
@@ -39,12 +38,6 @@ struct ComputeProviderParams {
     name: String,
     parallel: bool,
     batch_size: u32,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct CustomParams {
-    token_address: String,
-    balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -105,15 +98,10 @@ pub async fn initialize_crisp_round(
     }
 
     let token_address: Address = token_address.parse()?;
-    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
-        .ok_or("Invalid balance threshold")?;
+    let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
 
-    let custom_params = CustomParams {
-        token_address: token_address.to_string(),
-        balance_threshold: balance_threshold.to_string(),
-    };
     // Serialize the custom parameters to bytes.
-    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
+    let custom_params_bytes = Bytes::from((token_address, balance_threshold).abi_encode());
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let mut current_timestamp = get_current_timestamp().await?;

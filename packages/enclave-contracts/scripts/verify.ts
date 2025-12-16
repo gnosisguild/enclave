@@ -36,25 +36,24 @@ const findContractPath = (
           if (artifact.sourceName && artifact.contractName === contractName) {
             const sourceName = artifact.sourceName;
 
-            // Skip external packages - return undefined so they won't be verified
+            // Normalize the source name by removing leading './' if present
+            let normalizedPath = sourceName;
+            if (normalizedPath.startsWith("./")) {
+              normalizedPath = normalizedPath.slice(2);
+            }
+
+            // Handle external packages (from node_modules or @ packages)
             if (
               sourceName.startsWith("./@") ||
               sourceName.startsWith("@") ||
               sourceName.includes("node_modules")
             ) {
               console.log(
-                `⏭️  Skipping external contract: ${contractName} (from ${sourceName})`,
+                `📦 Found external contract: ${contractName} (from ${normalizedPath})`,
               );
-              return undefined;
             }
 
-            // For local contracts, remove leading './' and return the path
-            let localPath = sourceName;
-            if (localPath.startsWith("./")) {
-              localPath = localPath.slice(2);
-            }
-
-            return `${localPath}:${contractName}`;
+            return `${normalizedPath}:${contractName}`;
           }
         } catch (error) {
           console.warn(`Failed to parse artifact at ${fullPath}:`, error);
