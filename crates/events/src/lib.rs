@@ -15,6 +15,7 @@ pub mod hlc;
 mod ordered_set;
 pub mod prelude;
 mod seed;
+mod sequencer;
 mod traits;
 
 pub use bus_handle::*;

@@ -16,6 +16,7 @@ use e3_data::InMemStore;
 use e3_events::BusHandle;
 use e3_events::EnclaveEventData;
 use e3_events::GetEvents;
+use e3_events::Unsequenced;
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized,
     ConfigurationUpdated, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
@@ -47,7 +48,7 @@ use tokio::sync::{broadcast, Mutex};
 use tokio::time::sleep;
 
 async fn setup_local_ciphernode(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     rng: &SharedRng,
     logging: bool,
     addr: &str,
@@ -57,7 +58,7 @@ async fn setup_local_ciphernode(
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_keyshare()
         .with_address(addr)
-        .testmode_with_forked_bus(&bus.bus())
+        .testmode_with_forked_bus(bus.consumer())
         .testmode_with_history()
         .testmode_with_errors()
         .with_pubkey_aggregation()
@@ -102,7 +103,7 @@ fn generate_pk_shares(
 }
 
 async fn create_local_ciphernodes(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     rng: &SharedRng,
     count: u32,
     cipher: &Arc<Cipher>,
@@ -120,7 +121,7 @@ async fn create_local_ciphernodes(
 }
 
 async fn setup_score_sortition_environment(
-    bus: &BusHandle<EnclaveEvent>,
+    bus: &BusHandle,
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
@@ -129,7 +130,7 @@ async fn setup_score_sortition_environment(
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
         chain_id,
-    });
+    })?;
 
     let mut adder = AddToCommittee::new(bus, chain_id);
     for addr in eth_addrs {
@@ -141,13 +142,13 @@ async fn setup_score_sortition_environment(
             new_balance: U256::from(1_000_000_000u64),
             reason: FixedBytes::ZERO,
             chain_id,
-        });
+        })?;
 
         bus.publish(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
-        });
+        })?;
     }
 
     Ok(())
@@ -202,17 +203,17 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     println!("Sending E3 event...");
     // Send the computation requested event
-    bus.publish(e3_request_event.clone());
+    bus.publish(e3_request_event.clone())?;
 
     // Test that we cannot send the same event twice
-    bus.publish(e3_request_event.clone());
+    bus.publish(e3_request_event.clone())?;
 
     // Finalize committee with all available nodes
     bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: eth_addrs.clone(),
         chain_id: 1,
-    });
+    })?;
 
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
@@ -258,7 +259,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone());
+    bus.publish(ciphertext_published_event.clone())?;
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(6))
@@ -313,13 +314,13 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             seed: seed.clone(),
             params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
             ..E3Requested::default()
-        });
+        })?;
 
         bus.publish(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
             chain_id: 1,
-        });
+        })?;
 
         let history_collector = cn1.history().unwrap();
         let error_collector = cn1.errors().unwrap();
@@ -331,7 +332,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         assert_eq!(errors.len(), 0);
 
         // SEND SHUTDOWN!
-        bus.publish(Shutdown);
+        bus.publish(Shutdown)?;
 
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
@@ -406,7 +407,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
             .collect(),
         e3_id: e3_id.clone(),
-    });
+    })?;
 
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(5))
@@ -443,10 +444,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus: BusHandle<EnclaveEvent> =
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+        .start()
+        .into();
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.subscribe("*", history_collector.clone().recipient());
     let event_rx = Arc::new(event_tx.subscribe());
@@ -454,7 +454,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     NetEventTranslator::setup(&bus, &cmd_tx, &event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<GossipData>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<EnclaveEventData>>> = Arc::new(Mutex::new(Vec::new()));
 
     let msgs_loop = msgs.clone();
 
@@ -468,8 +468,12 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
-                msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetEvent::GossipData(msg))?;
+                if let GossipData::GossipBytes(_) = msg {
+                    let event: EnclaveEvent<Unsequenced> = msg.clone().try_into().unwrap();
+                    let (data, _) = event.split();
+                    msgs_loop.lock().await.push(data);
+                    event_tx.send(NetEvent::GossipData(msg)).unwrap();
+                }
             }
             // if this  manages to broadcast an event to the
             // event bus we will expect to see an extra event on
@@ -495,9 +499,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         ..CiphernodeSelected::default()
     };
 
-    bus.publish(evt_1.clone());
-    bus.publish(evt_2.clone());
-    bus.publish(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
+    bus.publish(evt_1.clone())?;
+    bus.publish(evt_2.clone())?;
+    bus.publish(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
 
     // check the history of the event bus
     let history = history_collector
@@ -506,10 +510,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         *msgs.lock().await,
-        vec![
-            GossipData::GossipBytes(bus.event_from(evt_1.clone()).to_bytes()?),
-            GossipData::GossipBytes(bus.event_from(evt_2.clone()).to_bytes()?)
-        ], // notice no local events
+        vec![evt_1.clone().into(), evt_2.clone().into()], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );
 
@@ -547,13 +548,13 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
-    });
+    })?;
 
     bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
         chain_id: 1,
-    });
+    })?;
 
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
@@ -584,13 +585,13 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
-    });
+    })?;
 
     bus.publish(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
         chain_id: 2,
-    });
+    })?;
 
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
@@ -620,10 +621,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus: BusHandle<EnclaveEvent> =
-        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-            .start()
-            .into();
+    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
+        .start()
+        .into();
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.subscribe("*", history_collector.clone().recipient());
 
@@ -641,7 +641,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
-        bus.event_from(event.clone()).to_bytes()?,
+        bus.event_from(event.clone())?.to_bytes()?,
     )));
 
     // check the history of the event bus

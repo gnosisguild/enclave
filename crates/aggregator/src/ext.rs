@@ -19,7 +19,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
 use e3_events::{prelude::*, E3id};
-use e3_events::{BusHandle, EnclaveErrorType, EnclaveEvent, EnclaveEventData};
+use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
 use e3_multithread::Multithread;
@@ -28,12 +28,12 @@ use e3_sortition::Sortition;
 
 #[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
 }
 
 impl PlaintextAggregatorExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -54,7 +54,7 @@ impl E3Extension for PlaintextAggregatorExtension {
 
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
+                EType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
             );
             return;
@@ -62,7 +62,7 @@ impl E3Extension for PlaintextAggregatorExtension {
 
         let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
+                EType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_META_MISSING),
             );
             return;
@@ -74,7 +74,7 @@ impl E3Extension for PlaintextAggregatorExtension {
         // This is a single ciphertext for the legacy PlaintextAggregator
         let Some(single_ciphertext) = data.ciphertext_output.first() else {
             self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
+                EType::PlaintextAggregation,
                 anyhow!("Could not extract ciphertext from array"),
             );
             return;
@@ -122,7 +122,7 @@ impl E3Extension for PlaintextAggregatorExtension {
         // Get deps
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
+                EType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
             );
             return Ok(());
@@ -148,11 +148,11 @@ impl E3Extension for PlaintextAggregatorExtension {
 }
 
 pub struct PublicKeyAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &BusHandle<EnclaveEvent>) -> Box<Self> {
+    pub fn create(bus: &BusHandle) -> Box<Self> {
         Box::new(Self { bus: bus.clone() })
     }
 }
@@ -170,14 +170,14 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PublickeyAggregation,
+                EType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_FHE_MISSING),
             );
             return;
         };
         let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PublickeyAggregation,
+                EType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_META_MISSING),
             );
             return;
@@ -211,7 +211,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
         // Get deps
         let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PublickeyAggregation,
+                EType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_FHE_MISSING),
             );
 
@@ -233,7 +233,7 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
 fn create_publickey_aggregator(
     fhe: Arc<Fhe>,
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     e3_id: E3id,
     sync_state: Persistable<PublicKeyAggregatorState>,
 ) -> Recipient<EnclaveEvent> {
@@ -247,14 +247,14 @@ fn create_publickey_aggregator(
 }
 
 pub struct ThresholdPlaintextAggregatorExtension {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     sortition: Addr<Sortition>,
     multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
     pub fn create(
-        bus: &BusHandle<EnclaveEvent>,
+        bus: &BusHandle,
         sortition: &Addr<Sortition>,
         multithread: &Addr<Multithread>,
     ) -> Box<Self> {
@@ -278,7 +278,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
 
         let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
+                EType::PlaintextAggregation,
                 anyhow!(ERROR_TRBFV_PLAINTEXT_META_MISSING),
             );
             return;

@@ -72,7 +72,7 @@ pub fn create_crp_bytes_params(
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
-    BusHandle<EnclaveEvent>,
+    BusHandle,
     SharedRng,
     Seed,
     Arc<BfvParameters>,
@@ -126,9 +126,9 @@ pub fn get_common_setup(
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
-        let source = &node.bus();
+        let source = node.bus().consumer();
         for (_, node) in nodes.iter().enumerate() {
-            let dest = &node.bus();
+            let dest = node.bus().consumer();
             if source != dest {
                 EventBus::pipe_filter(
                     source,
@@ -159,13 +159,13 @@ pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
 /// Test helper to add addresses to the committee by creating events on the event bus
 #[derive(Clone, Debug)]
 pub struct AddToCommittee {
-    bus: BusHandle<EnclaveEvent>,
+    bus: BusHandle,
     count: usize,
     chain_id: u64,
 }
 
 impl AddToCommittee {
-    pub fn new(bus: &BusHandle<EnclaveEvent>, chain_id: u64) -> Self {
+    pub fn new(bus: &BusHandle, chain_id: u64) -> Self {
         Self {
             bus: bus.clone(),
             chain_id,
@@ -182,7 +182,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.publish(evt.clone());
+        self.bus.publish(evt.clone())?;
 
         Ok(evt.into())
     }
