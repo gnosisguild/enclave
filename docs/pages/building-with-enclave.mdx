@@ -93,7 +93,8 @@ function publishInput(
 ) external
 ```
 
-Inputs are accumulated incrementally into a Merkle tree (LeanIMT). This allows you to:
+Inputs can be accumulated incrementally into a Merkle tree (LazyIMT, or ultimately chosen by the
+program implementation). This allows you to:
 
 1. Use the published Merkle root as part of your E3 Program's Secure Process to ensure all published
    inputs are processed by the Compute Provider.
@@ -134,6 +135,8 @@ to the E3's public key. It is also recommended to bundle in proofs to validate:
 ## Result Publication and Events
 
 ### Key Events
+
+The following events are emitted by the Program contract:
 
 ```solidity
 event E3Requested(uint256 indexed e3Id, address indexed requester, address e3ProgramAddress);

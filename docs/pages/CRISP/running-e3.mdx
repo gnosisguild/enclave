@@ -54,16 +54,6 @@ Behind the scenes `scripts/dev.sh` calls `scripts/dev_services.sh`, which:
 
 Keep this terminal open; logs from every service are multiplexed with `pnpm concurrently`.
 
-### (Optional) Build Once for Production
-
-If you want release binaries or a static client before running, execute:
-
-```sh
-pnpm dev:build
-```
-
-That pipeline runs `cargo build --locked`, compiles the contracts, and builds the client bundle.
-
 ### Initialize a New Voting Round
 
 Open a new terminal and launch the CLI from the example root:
@@ -72,18 +62,32 @@ Open a new terminal and launch the CLI from the example root:
 pnpm cli
 ```
 
+You can initialize a round using the interactive menu or directly via command-line flags:
+
+**Interactive Menu:**
+
+1. Select `Initialize new E3 round`
+2. Enter the token contract address
+3. Enter the balance threshold for the voting round
+
+**Command-Line (Direct):**
+
+```bash
+cargo run --bin cli init --token-address 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 --balance-threshold 1000
+```
+
 In the interactive menu:
 
-1. Select `CRISP: Voting Protocol (ETH)`
-2. Choose `Initialize new E3 round`
+- `--token-address`: ERC20 token address for voting eligibility
+- `--balance-threshold`: Balance threshold for the voting round
 
 You should see output similar to:
 
 ```sh
-[2024-10-22 11:56:11] [commands.rs:42] - Starting new CRISP round!
-[2024-10-22 11:56:11] [commands.rs:46] - Enabling E3 Program...
-[2024-10-22 11:56:11] [commands.rs:50] - E3 Program enabled. TxHash: 0xa391a4cd2dcc59f4bc6dd1f5ed1c78006dbba4556ea633f4b6a53e2271538682
-[2024-10-22 11:56:11] [commands.rs:74] - E3 request sent. TxHash: 0xe7998b9748e3526f6ca992c9bb498beabe4f387b02240a23d0f42a2386d3c305
+[2025-12-16 13:41:37] [commands.rs:77] - Starting new CRISP round with token address: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 and balance threshold: 1000000000000000000
+[2025-12-16 13:41:37] [commands.rs:90] - Enabling E3 Program with address: 0x67d269191c92Caf3cD7723F116c85e6E9bf55933
+[2025-12-16 13:41:37] [commands.rs:94] - E3 Program enabled. TxHash: 0xa391a4cd2dcc59f4bc6dd1f5ed1c78006dbba4556ea633f4b6a53e2271538682
+[2025-12-16 13:41:37] [commands.rs:118] - E3 request sent. TxHash: 0xe7998b9748e3526f6ca992c9bb498beabe4f387b02240a23d0f42a2386d3c305
 ```
 
 ### Set Up MetaMask
