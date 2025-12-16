@@ -425,6 +425,9 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
