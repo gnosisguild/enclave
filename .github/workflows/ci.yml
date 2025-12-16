@@ -425,9 +425,6 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Install Nargo
         uses: noir-lang/noirup@v0.1.4
         with:
@@ -515,11 +512,6 @@ jobs:
           sudo add-apt-repository ppa:ethereum/ethereum \
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
-
-      - name: Install Nargo
-        uses: noir-lang/noirup@v0.1.4
-        with:
-          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Install yq
         run: |
@@ -711,6 +703,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
