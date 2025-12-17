@@ -196,7 +196,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the given Address to represent the node
+    /// Use the given Address to represent the node. This should be unique.
     pub fn with_address(mut self, addr: &str) -> Self {
         self.address = Some(addr.to_owned());
         self
@@ -328,18 +328,6 @@ impl CiphernodeBuilder {
             None
         };
 
-        // Get an event system instance
-        let event_system =
-            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(&self.name, log_path, kv_path).with_event_bus(local_bus)
-            } else {
-                if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(&self.name, store).with_event_bus(local_bus)
-                } else {
-                    EventSystem::in_mem(&self.name).with_event_bus(local_bus)
-                }
-            };
-
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);
             addr
@@ -348,6 +336,18 @@ impl CiphernodeBuilder {
             // TODO: This is for testing and should not be used for production if we use this to create ciphernodes in production
             rand_eth_addr(&self.rng)
         };
+
+        // Get an event system instance.
+        let event_system =
+            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
+                EventSystem::persisted(&addr, log_path, kv_path).with_event_bus(local_bus)
+            } else {
+                if let Some(ref store) = self.in_mem_store {
+                    EventSystem::in_mem_from_store(&addr, store).with_event_bus(local_bus)
+                } else {
+                    EventSystem::in_mem(&addr).with_event_bus(local_bus)
+                }
+            };
 
         let bus = event_system.handle()?;
         let store = event_system.store()?;
