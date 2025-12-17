@@ -292,13 +292,17 @@ pub async fn register_plaintext_output_published(
                 // The plaintextOutput from the event contains the result of the FHE computation.
                 // Decode the tally using the utility function.
                 let vote_counts = decode_tally(&event.plaintextOutput)?;
-                let option_1 = vote_counts.yes;
-                let option_2 = vote_counts.no;
 
-                info!("[e3_id={}] Votes Option 1 (Yes): {:?}", e3_id, option_1);
-                info!("[e3_id={}] Votes Option 2 (No): {:?}", e3_id, option_2);
+                info!(
+                    "[e3_id={}] Votes Option 1 (Yes): {:?}",
+                    e3_id, vote_counts.yes
+                );
+                info!(
+                    "[e3_id={}] Votes Option 2 (No): {:?}",
+                    e3_id, vote_counts.no
+                );
 
-                repo.set_votes(option_1, option_2).await?;
+                repo.set_votes(vote_counts.yes, vote_counts.no).await?;
                 repo.update_status("Finished").await?;
                 Ok(())
             }

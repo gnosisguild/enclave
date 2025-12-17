@@ -10,4 +10,5 @@ repository.workspace = true
 e3-sdk = { workspace = true, default-features = false, features=["bfv"] }
 eyre = { workspace = true }
 hex = { workspace = true }
+num-bigint = "=0.4.6"
 

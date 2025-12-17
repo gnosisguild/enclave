@@ -11,6 +11,7 @@ use super::{
 use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
+use num_bigint::BigUint;
 
 pub struct CurrentRoundRepository<S: DataStore> {
     store: SharedStore<S>,
@@ -125,8 +126,8 @@ impl<S: DataStore> CrispE3Repository<S> {
             has_voted: vec![],
             start_time: 0u64,
             status: "Requested".to_string(),
-            votes_option_1: 0,
-            votes_option_2: 0,
+            votes_option_1: "0".to_string(),
+            votes_option_2: "0".to_string(),
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
             token_address,
@@ -165,14 +166,14 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn set_votes(&mut self, option_1: u64, option_2: u64) -> Result<()> {
+    pub async fn set_votes(&mut self, option_1: BigUint, option_2: BigUint) -> Result<()> {
         info!("set_votes(option_1:{} option_2:{})", option_1, option_2);
         let key = self.crisp_key();
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
-                    e.votes_option_1 = option_1;
-                    e.votes_option_2 = option_2;
+                    e.votes_option_1 = option_1.to_string();
+                    e.votes_option_2 = option_2.to_string();
                     e
                 })
             })
@@ -198,7 +199,6 @@ impl<S: DataStore> CrispE3Repository<S> {
             round_id: e3.id,
             option_1_tally: e3_crisp.votes_option_1,
             option_2_tally: e3_crisp.votes_option_2,
-            total_votes: e3_crisp.votes_option_1 + e3_crisp.votes_option_2,
             option_1_emoji: e3_crisp.emojis[0].clone(),
             option_2_emoji: e3_crisp.emojis[1].clone(),
             end_time: e3.expiration,

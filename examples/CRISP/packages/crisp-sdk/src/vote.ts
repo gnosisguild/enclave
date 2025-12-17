@@ -28,8 +28,8 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
   const voteArray = []
   const length = bfvParams.degree
   const halfLength = length / 2
-  const yesBinary = toBinary(BigInt(vote.yes)).split('')
-  const noBinary = toBinary(BigInt(vote.no)).split('')
+  const yesBinary = toBinary(vote.yes).split('')
+  const noBinary = toBinary(vote.no).split('')
 
   // Fill first half with 'yes' binary representation (pad with leading 0s if needed)
   for (let i = 0; i < halfLength; i++) {
@@ -95,19 +95,19 @@ export const decodeTally = (tallyBytes: string): Vote => {
   const yesBinary = numbers.slice(0, HALF_D)
   const noBinary = numbers.slice(HALF_D, numbers.length)
 
-  let yes = 0
-  let no = 0
+  let yes = 0n
+  let no = 0n
 
   // Convert yes votes (entire first half)
   for (let i = 0; i < yesBinary.length; i += 1) {
-    const weight = 2 ** (yesBinary.length - 1 - i)
-    yes += yesBinary[i] * weight
+    const weight = 2n ** BigInt(yesBinary.length - 1 - i)
+    yes += BigInt(yesBinary[i]) * weight
   }
 
   // Convert no votes (entire second half)
   for (let i = 0; i < noBinary.length; i += 1) {
-    const weight = 2 ** (noBinary.length - 1 - i)
-    no += noBinary[i] * weight
+    const weight = 2n ** BigInt(noBinary.length - 1 - i)
+    no += BigInt(noBinary[i]) * weight
   }
 
   return {
@@ -133,7 +133,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
     // If no previous ciphertext is provided, a placeholder ciphertext vote will be generated.
     // This is safe because the circuit will not check the ciphertext addition if
     // the previous ciphertext is not provided (is_first_vote is true).
-    proofInputs.previousCiphertext || encryptVote({ yes: 0, no: 0 }, proofInputs.publicKey),
+    proofInputs.previousCiphertext || encryptVote({ yes: 0n, no: 0n }, proofInputs.publicKey),
     proofInputs.publicKey,
     encodedVote,
   )
@@ -180,11 +180,12 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     throw new Error('Invalid vote: vote exceeds balance')
   }
 
-  if (voteProofInputs.vote.yes > MAXIMUM_VOTE_VALUE || voteProofInputs.vote.no > MAXIMUM_VOTE_VALUE) {
+  const maxVoteValue = BigInt(MAXIMUM_VOTE_VALUE)
+  if (voteProofInputs.vote.yes > maxVoteValue || voteProofInputs.vote.no > maxVoteValue) {
     throw new Error('Invalid vote: vote exceeds maximum allowed value')
   }
 
-  if (voteProofInputs.vote.yes < 0 || voteProofInputs.vote.no < 0) {
+  if (voteProofInputs.vote.yes < 0n || voteProofInputs.vote.no < 0n) {
     throw new Error('Invalid vote: vote is negative')
   }
 
@@ -208,7 +209,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
     signature: MASK_SIGNATURE,
-    vote: { yes: 0, no: 0 },
+    vote: { yes: 0n, no: 0n },
     merkleProof,
   })
 

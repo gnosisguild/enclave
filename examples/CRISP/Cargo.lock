@@ -2071,6 +2071,7 @@ dependencies = [
  "e3-sdk",
  "eyre",
  "hex",
+ "num-bigint",
 ]
 
 [[package]]
