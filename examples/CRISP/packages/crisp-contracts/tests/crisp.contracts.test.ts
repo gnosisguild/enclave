@@ -46,7 +46,7 @@ describe('CRISP Contracts', function () {
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
 
-      const vote = { yes: 10, no: 0 }
+      const vote = { yes: 10n, no: 0n }
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
@@ -75,7 +75,7 @@ describe('CRISP Contracts', function () {
 
       const e3Id = 1n
 
-      const vote = { yes: 10, no: 0 }
+      const vote = { yes: 10n, no: 0n }
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
