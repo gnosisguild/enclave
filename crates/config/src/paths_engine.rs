@@ -24,7 +24,7 @@ pub struct PathsEngine {
     /// This can either be a fully qualified path to a specific db file or a relative path to the
     /// data_dir location
     db_file_override: Option<PathBuf>,
-    /// This can either be a fully qualified path to a specific db file or a relative path to the
+    /// This can either be a fully qualified path to a specific log file or a relative path to the
     /// data_dir location
     log_file_override: Option<PathBuf>,
     /// This can either be a fully qualified path to a specific key file or a relative path to the
