@@ -46,7 +46,7 @@ pub async fn execute(
         builder = builder.with_plaintext_aggregation()
     }
 
-    // TODO: put the following in the CNB:
+    // TODO: put net package provisioning in the ciphernode-builder:
     let node = builder.build().await?;
     let store = node.store();
     let repositories = store.repositories();

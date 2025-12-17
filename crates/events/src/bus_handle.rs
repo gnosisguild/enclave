@@ -25,13 +25,17 @@ use crate::{
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq)]
 pub struct BusHandle {
+    /// EventBus that actors can consume sequenced events from
     consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
+    /// Sequencer that new events should be produced from
     producer: Addr<Sequencer>,
+    /// Hlc clock used to time all events created on this BusHandle
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
 }
 
 impl BusHandle {
+    /// Create a new BusHandle
     pub fn new(
         consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
         producer: Addr<Sequencer>,
@@ -44,23 +48,28 @@ impl BusHandle {
         }
     }
 
+    /// Return a HistoryCollector for examining events that have passed through on the events bus
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.consumer)
     }
 
+    /// Access the producer to internally dispatch am event to
     pub fn producer(&self) -> &Addr<Sequencer> {
         &self.producer
     }
 
+    /// Access the consumer to internally subscribe to events
     pub fn consumer(&self) -> &Addr<EventBus<EnclaveEvent<Sequenced>>> {
         &self.consumer
     }
 
+    /// Get a new timestamp. Note this ticks over the internal Hlc.
     pub fn ts(&self) -> Result<u128> {
         let ts = self.hlc.tick()?;
         Ok(ts.into())
     }
 
+    /// Pipe events from this handle to the other handle only when the predicate returns true
     pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
     where
         F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
@@ -290,6 +299,7 @@ mod tests {
     }
 }
 
+/// Actor for piping between BusHandles.
 pub struct BusHandlePipe<F>
 where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
@@ -302,6 +312,8 @@ impl<F> BusHandlePipe<F>
 where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
+    /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
+    /// function returns true
     pub fn new(handle: BusHandle, predicate: F) -> Self {
         Self { handle, predicate }
     }
