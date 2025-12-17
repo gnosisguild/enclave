@@ -102,11 +102,21 @@ pub enum KeyshareKind {
 }
 
 impl CiphernodeBuilder {
-    /// Create a new ciphernode builder.
+    /// Creates a new ciphernode builder configured with the given name, RNG, and cipher.
     ///
-    /// - name - Unique name for the ciphernode
-    /// - rng - Arc Mutex wrapped random number generator
-    /// - cipher - Cipher for encryption and decryption of sensitive data
+    /// The returned builder uses an in-memory event system by default, has no chains configured,
+    /// and leaves all optional features (keyshare, aggregation, multithread capture, logging, etc.)
+    /// disabled so callers can opt into the features they need.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Construct shared RNG and cipher according to your test/setup utilities.
+    /// let rng = SharedRng::default(); // replace with actual RNG initialization
+    /// let cipher = std::sync::Arc::new(Cipher::default()); // replace with actual Cipher initialization
+    /// let builder = CiphernodeBuilder::new("node1", rng, cipher);
+    /// assert_eq!(builder.name, "node1");
+    /// ```
     pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             name: name.to_owned(),
@@ -152,21 +162,62 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the Deprecated Keyshare feature
+    /// Enable the legacy non-threshold keyshare mechanism on the builder.
+    ///
+    /// This marks the builder to configure a non-threshold (deprecated) keyshare mode.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = CiphernodeBuilder::new("node", rng, cipher).with_keyshare();
+    /// ```
     #[deprecated = "in future versions we will migrate to with_trbfv()"]
     pub fn with_keyshare(mut self) -> Self {
         self.keyshare = Some(KeyshareKind::NonThreshold);
         self
     }
 
-    /// Use the given in-mem datastore. This is useful for injecting a store dump.
+    /// Configure the builder to use the provided in-memory datastore.
+    ///
+    /// This allows injecting a pre-populated in-memory store (for tests or restoring a store dump).
+    ///
+    /// # Parameters
+    ///
+    /// - `store`: address of the in-memory datastore to attach to the node.
+    ///
+    /// # Returns
+    ///
+    /// The updated `CiphernodeBuilder`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use actix::Addr;
+    /// # use crate::{CiphernodeBuilder, InMemStore, SharedRng, Cipher};
+    /// let rng: SharedRng = /* ... */;
+    /// let cipher: std::sync::Arc<Cipher> = /* ... */;
+    /// let builder = CiphernodeBuilder::new("node", rng, cipher);
+    /// let store_addr: Addr<InMemStore> = /* create or obtain an in-memory store */ unimplemented!();
+    /// let builder = builder.with_in_mem_datastore(&store_addr);
+    /// ```
     pub fn with_in_mem_datastore(mut self, store: &Addr<InMemStore>) -> Self {
         self.in_mem_store = Some(store.to_owned());
         self
     }
 
-    /// Add persistence information for storing events and data. Without persistence information
-    /// the node will run in memory by default.
+    /// Configure the builder to use persisted on-disk storage for events and state.
+    ///
+    /// Sets the event system to `Persisted` with the given paths: `log_path` is used for the append-only event log
+    /// and `kv_path` is used for the key-value store backing repositories.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// let builder = CiphernodeBuilder::new("node", rng, cipher)
+    ///     .with_persistence(&PathBuf::from("events.log"), &PathBuf::from("store.kv"));
+    /// ```
     pub fn with_persistence(mut self, log_path: &PathBuf, kv_path: &PathBuf) -> Self {
         self.event_system = EventSystemType::Persisted {
             log_path: log_path.to_owned(),
@@ -295,6 +346,32 @@ impl CiphernodeBuilder {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
 
+    /// Builds and starts a fully configured ciphernode and returns a runtime handle to its components.
+    ///
+    /// This initializes the event bus and event system (persisted or in-memory), sets up history and
+    /// error collectors if enabled, creates repositories and sortition, attaches contract readers and
+    /// optional writers for each configured chain, registers a ciphernode selector, starts the
+    /// historical event coordinator, attaches configured E3 router extensions (keyshare, FHE,
+    /// aggregation, etc.), builds the router, and returns a `CiphernodeHandle` that exposes the node's
+    /// address, store, event bus, and optional history/error collectors.
+    ///
+    /// # Returns
+    ///
+    /// `CiphernodeHandle` containing the node's Ethereum address, the backing store, the event bus
+    /// address, and optional history and error collector addresses.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use futures::executor::block_on;
+    /// # async fn example(builder: crate::CiphernodeBuilder) -> anyhow::Result<()> {
+    /// let handle = builder.build().await?;
+    /// // Use handle (address, store, bus, ...)...
+    /// drop(handle);
+    /// # Ok(())
+    /// # }
+    /// # fn main() { let _ = block_on(async {}); }
+    /// ```
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
         // Local bus for ciphernode events can either be forked from a bus or it can be directly
         // attached to a source bus

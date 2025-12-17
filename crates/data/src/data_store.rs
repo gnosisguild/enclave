@@ -22,6 +22,21 @@ pub enum StoreAddr {
 }
 
 impl StoreAddr {
+    /// Get the `InMemStore` actor address when this `StoreAddr` is the `InMem` variant.
+    ///
+    /// # Returns
+    ///
+    /// `Some(&Addr<InMemStore>)` if the variant is `InMem`, `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use crate::StoreAddr;
+    /// let store_addr = /* obtain a StoreAddr */ unimplemented!();
+    /// if let Some(in_mem_addr) = store_addr.to_maybe_in_mem() {
+    ///     // use the in-memory store actor address
+    /// }
+    /// ```
     pub fn to_maybe_in_mem(&self) -> Option<&Addr<InMemStore>> {
         match self {
             StoreAddr::InMem(ref store) => Some(store),
@@ -135,6 +150,17 @@ impl DataStore {
         }
     }
 
+    /// Create a new DataStore whose scope is set to the given key while preserving the same store address and actor recipients.
+    ///
+    /// The returned DataStore shares the original instance's address and message recipients but uses `key` as its absolute scope (replacing the current scope).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Given an existing `DataStore` instance `ds`, create a new root store at "settings".
+    /// let child = ds.base("settings");
+    /// assert_eq!(child.get_scope().unwrap(), "settings");
+    /// ```
     pub fn base<K: IntoKey>(&self, key: K) -> Self {
         Self {
             addr: self.addr.clone(),
@@ -146,6 +172,23 @@ impl DataStore {
         }
     }
 
+    /// Constructs a DataStore backed by the provided Sled store and wired to the given WriteBuffer.
+    ///
+    /// The resulting DataStore uses `addr` for reads, synchronous writes, and removals, and uses
+    /// `write_buffer` for buffered insert operations. The returned store has an empty scope.
+    ///
+    /// # Parameters
+    /// - `addr`: address of the SledStore actor.
+    /// - `write_buffer`: address of the WriteBuffer actor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given existing actix addresses `sled_addr: Addr<SledStore>` and `wb_addr: Addr<WriteBuffer>`:
+    /// let ds = DataStore::from_sled_store(&sled_addr, &wb_addr);
+    /// // new DataStore starts with an empty scope
+    /// assert_eq!(ds.get_scope().unwrap(), "");
+    /// ```
     pub fn from_sled_store(addr: &Addr<SledStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
         Self {
             addr: StoreAddr::Sled(addr.clone()),
@@ -157,6 +200,20 @@ impl DataStore {
         }
     }
 
+    /// Creates a DataStore configured to use the provided in-memory store and write buffer.
+    ///
+    /// `addr` is the actor address of the InMemStore used for reads, synchronous inserts, and removals.
+    /// `write_buffer` is the actor address used for buffered (asynchronous) inserts.
+    ///
+    /// Returns a DataStore that uses the given in-memory store for direct operations and the write buffer
+    /// for buffered insertions. The returned DataStore has an empty initial scope.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // assume `in_mem_addr` and `write_buffer_addr` are available Addr<...> values
+    /// let ds = DataStore::from_in_mem(&in_mem_addr, &write_buffer_addr);
+    /// ```
     pub fn from_in_mem(addr: &Addr<InMemStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
         Self {
             addr: StoreAddr::InMem(addr.clone()),

@@ -138,6 +138,25 @@ async fn evm_reader() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that events emitted before an EVM reader is attached (historical events)
+/// are captured and returned in order together with subsequently emitted live events.
+///
+/// The test starts an Anvil WebSocket provider, deploys the EmitLogs contract,
+/// emits a sequence of historical events, attaches an EvmEventReader, emits live events,
+/// and asserts that the history contains the historical events followed by the live events.
+///
+/// # Examples
+///
+/// ```
+/// // This test is executed by the test harness (cargo test). To exercise the same
+/// // behavior manually from an async context:
+/// # async fn run() -> eyre::Result<()> {
+/// #     // call the test function as an async function in examples only; normally
+/// #     // the test framework runs it automatically.
+/// #     let _ = crate::ensure_historical_events().await?;
+/// #     Ok(())
+/// # }
+/// ```
 #[actix::test]
 async fn ensure_historical_events() -> Result<()> {
     // Create a WS provider
@@ -218,6 +237,24 @@ async fn ensure_historical_events() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that an EVM event reader resumes after a shutdown and that no events are lost during the shutdown window.
+///
+/// The test:
+/// - Emits events before any reader is attached (historical events).
+/// - Attaches an `EvmEventReader` and starts the coordinator so live events are processed.
+/// - Emits additional live events, then simulates a reader shutdown by storing a `Shutdown` enclave event.
+/// - Emits further events while the reader is down, re-attaches a reader, and asserts that all events
+///   (pre-shutdown historical, live before shutdown, events emitted during shutdown, and events after resume)
+///   appear in the collected history in the original emission order.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use eyre::Result;
+/// # async fn example() -> Result<()> {
+/// ensure_resume_after_shutdown().await?;
+/// # Ok(()) }
+/// ```
 #[actix::test]
 async fn ensure_resume_after_shutdown() -> Result<()> {
     // Create a WS provider
@@ -329,6 +366,20 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     Ok(())
 }
 
+/// Integration test that verifies a single EVM reader processes both historical events and subsequent live events in order.
+///
+/// This test deploys an EmitLogs contract to an Anvil node, stages several historical events by emitting logs
+/// before attaching the reader, attaches an EvmEventReader via a HistoricalEventCoordinator, starts the
+/// coordinator, and then emits live events to ensure they are processed after the historical ones.
+///
+/// # Examples
+///
+/// ```
+/// # async fn run() -> anyhow::Result<()> {
+/// coordinator_single_reader().await?;
+/// # Ok::<(), anyhow::Error>(())
+/// # }
+/// ```
 #[actix::test]
 async fn coordinator_single_reader() -> Result<()> {
     let anvil = Anvil::new().block_time(1).try_spawn()?;
@@ -489,6 +540,19 @@ async fn coordinator_multiple_readers() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that an EVM event reader attached with no historical events processes only subsequently emitted (live) events.
+///
+/// # Examples
+///
+/// ```
+/// // When no historical events are present, the history starts empty and
+/// // later contains events emitted after the reader is attached.
+/// let msgs_before: Vec<&str> = vec![];
+/// assert_eq!(msgs_before.len(), 0);
+///
+/// let msgs_after = vec!["live1", "live2"];
+/// assert_eq!(msgs_after, ["live1", "live2"]);
+/// ```
 #[actix::test]
 async fn coordinator_no_historical_events() -> Result<()> {
     let anvil = Anvil::new().block_time(1).try_spawn()?;

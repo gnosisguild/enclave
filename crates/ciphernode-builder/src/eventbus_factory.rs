@@ -92,10 +92,34 @@ pub fn get_enclave_event_bus() -> Addr<EventBus<EnclaveEvent>> {
     EventBusFactory::instance().get_event_bus()
 }
 
+/// Retrieve the process-wide `HistoryCollector` for enclave events.
+///
+/// Returns an `Addr<HistoryCollector<EnclaveEvent>>` that collects error/history events for the enclave event bus.
+///
+/// # Examples
+///
+/// ```
+/// let collector = get_error_collector();
+/// // `collector` is an `Addr<HistoryCollector<EnclaveEvent>>` you can use to interact with the collector.
+/// ```
 pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
+/// Creates a BusHandle for the enclave event bus using the provided AppConfig.
+///
+/// The returned `BusHandle` is configured with an EventSystem named after `config.name()`.
+///
+/// # Errors
+///
+/// Returns an error if constructing the system handle fails.
+///
+/// # Examples
+///
+/// ```
+/// let config = AppConfig::default();
+/// let handle = get_enclave_bus_handle(&config).expect("failed to create enclave bus handle");
+/// ```
 pub fn get_enclave_bus_handle(config: &AppConfig) -> anyhow::Result<BusHandle> {
     let bus = get_enclave_event_bus();
     let system = EventSystem::new(&config.name()).with_event_bus(bus);

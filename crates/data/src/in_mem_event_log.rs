@@ -12,18 +12,55 @@ pub struct InMemEventLog {
 }
 
 impl InMemEventLog {
+    /// Creates a new, empty in-memory event log.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let log = InMemEventLog::new();
+    /// assert!(log.read_from(1).next().is_none());
+    /// ```
     pub fn new() -> Self {
         Self { log: Vec::new() }
     }
 }
 
 impl Default for InMemEventLog {
+    /// Creates a default, empty `InMemEventLog`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let log = InMemEventLog::default();
+    /// assert!(log.read_from(1).collect::<Vec<_>>().is_empty());
+    /// ```
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl EventLog for InMemEventLog {
+    /// Reads events starting at a 1-based sequence offset.
+    ///
+    /// `from` is a 1-based index indicating the first event sequence number to return. The
+    /// returned iterator yields pairs `(sequence_number, event)` where `sequence_number` is
+    /// the 1-based position of the event in the log. If `from` is greater than the number
+    /// of stored events, the iterator is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut log = InMemEventLog::new();
+    /// let e1 = event_from("a");
+    /// let e2 = event_from("b");
+    /// log.append(&e1).unwrap();
+    /// log.append(&e2).unwrap();
+    ///
+    /// let events: Vec<_> = log.read_from(1).collect();
+    /// assert_eq!(events.len(), 2);
+    /// assert_eq!(events[0].0, 1);
+    /// assert_eq!(events[1].0, 2);
+    /// ```
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed array position
         let start_idx = from.saturating_sub(1) as usize;
@@ -37,6 +74,18 @@ impl EventLog for InMemEventLog {
             .collect();
         Box::new(events.into_iter())
     }
+    /// Appends an event to the in-memory log and returns its 1-based sequence number.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut log = InMemEventLog::new();
+    /// let ev = /* construct an EnclaveEvent<Unsequenced> */ ;
+    /// let seq = log.append(&ev).unwrap();
+    /// assert_eq!(seq, 1);
+    /// ```
+    ///
+    /// Returns the 1-based sequence number assigned to the appended event.
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
         self.log.push(event.to_owned());
         Ok(self.log.len() as u64)
@@ -48,6 +97,22 @@ mod tests {
     use super::*;
     use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, TestEvent};
 
+    /// Create an `EnclaveEvent<Unsequenced>` from the given data with a fixed timestamp of 123.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ev = event_from("payload");
+    /// // `ev` is an `EnclaveEvent<Unsequenced>` whose timestamp is 123.
+    /// ```
+    ///
+    /// # Parameters
+    ///
+    /// - `data`: A value convertible into `EnclaveEventData`.
+    ///
+    /// # Returns
+    ///
+    /// An `EnclaveEvent<Unsequenced>` containing the provided data and timestamp 123.
     fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(data.into().into(), 123)
     }

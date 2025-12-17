@@ -400,6 +400,14 @@ impl<E: Event> Actor for HistoryCollector<E> {
 
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
+    /// Record an incoming event into the collector.
+    ///
+    /// The received event is appended to pending takes if any are waiting for events;
+    /// otherwise it is appended to the collector's history.
+    ///
+    /// # Returns
+    ///
+    /// `E::Result` as required by the `Handler<E>` implementation (typically `()`).
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.add_event(msg);
     }

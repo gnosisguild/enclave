@@ -35,7 +35,18 @@ pub struct BusHandle {
 }
 
 impl BusHandle {
-    /// Create a new BusHandle
+    /// Constructs a BusHandle that connects an EventBus consumer with a Sequencer producer and an HLC clock.
+    ///
+    /// The provided HLC is associated with the handle and used to timestamp events created by it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given existing `consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>`,
+    /// // `producer: Addr<Sequencer>` and `hlc: Hlc`:
+    /// let handle = BusHandle::new(consumer, producer, hlc);
+    /// // `handle` can now be used to publish and subscribe to events.
+    /// ```
     pub fn new(
         consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
         producer: Addr<Sequencer>,
@@ -48,12 +59,37 @@ impl BusHandle {
         }
     }
 
-    /// Return a HistoryCollector for examining events that have passed through on the events bus
+    /// Returns the HistoryCollector actor address for this bus's sequenced events.
+    ///
+    /// The returned address can be used to query or inspect events that have passed through the consumer EventBus.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use actix::prelude::*;
+    /// # use crates::events::{BusHandle, EnclaveEvent, Sequenced, HistoryCollector};
+    /// # fn example(handle: &BusHandle) {
+    /// let hist: Addr<HistoryCollector<EnclaveEvent<Sequenced>>> = handle.history();
+    /// # }
+    /// ```
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.consumer)
     }
 
-    /// Access the producer to internally dispatch am event to
+    /// Access the handle's internal producer actor.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the internal producer address (`Addr<Sequencer>`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // `consumer_addr`, `producer_addr`, and `hlc` are assumed to be available.
+    /// let handle = BusHandle::new(consumer_addr, producer_addr, hlc);
+    /// let producer_ref = handle.producer();
+    /// // `producer_ref` can be used to send messages to the producer actor.
+    /// ```
     pub fn producer(&self) -> &Addr<Sequencer> {
         &self.producer
     }
@@ -63,13 +99,43 @@ impl BusHandle {
         &self.consumer
     }
 
-    /// Get a new timestamp. Note this ticks over the internal Hlc.
+    /// Produces a new timestamp from the handle's HLC and advances the internal clock.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(u128)` containing the new HLC-derived timestamp, or an `Err` if advancing the HLC fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `handle` is a BusHandle available in scope.
+    /// let ts = handle.ts().expect("failed to obtain timestamp");
+    /// println!("timestamp = {}", ts);
+    /// ```
     pub fn ts(&self) -> Result<u128> {
         let ts = self.hlc.tick()?;
         Ok(ts.into())
     }
 
-    /// Pipe events from this handle to the other handle only when the predicate returns true
+    /// Create a BusHandlePipe actor that forwards matching sequenced events from this handle to another.
+    ///
+    /// Starts a BusHandlePipe actor and subscribes it to all event types ("*"). For each incoming
+    /// `EnclaveEvent<Sequenced>`, the provided `predicate` is invoked; when it returns `true` the event
+    /// is forwarded to the `other` handle with its original timestamp preserved.
+    ///
+    /// # Parameters
+    ///
+    /// - `other`: target `BusHandle` to forward matching events to.
+    /// - `predicate`: function called for each `EnclaveEvent<Sequenced>`; return `true` to forward the event.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // forward-only-important is an example predicate that forwards events whose data equals "important"
+    /// let a: BusHandle = /* source handle */;
+    /// let b: BusHandle = /* target handle */;
+    /// a.pipe_to(&b, |ev: &EnclaveEvent<Sequenced>| ev.data == "important");
+    /// ```
     pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
     where
         F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
@@ -144,6 +210,18 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
         self.consumer.do_send(Subscribe::new(event_type, recipient))
     }
 
+    /// Subscribe a recipient to multiple event types on the internal consumer.
+    ///
+    /// Each provided event type will be registered with the consumer so the given recipient will receive events of those types. The recipient is cloned for each registration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use actix::prelude::*;
+    /// // assume `handle` is a BusHandle and `recipient` implements `Recipient<EnclaveEvent<Sequenced>>`
+    /// let types = vec!["type_a", "type_b"];
+    /// handle.subscribe_all(&types, recipient);
+    /// ```
     fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<EnclaveEvent<Sequenced>>) {
         for event_type in event_types.into_iter() {
             self.consumer
@@ -163,6 +241,16 @@ mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
 
+    /// Get the current system time as microseconds since the UNIX epoch.
+    ///
+    /// Returns the number of microseconds elapsed since 1970-01-01 00:00:00 UTC.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let t = now_micros();
+    /// assert!(t > 0);
+    /// ```
     fn now_micros() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -170,6 +258,21 @@ mod tests {
             .as_micros() as u64
     }
 
+    /// Verifies that HLC timestamps preserve causal ordering and monotonicity across clock-drifted buses.
+    ///
+    /// Sets up three EventSystem buses (A, B, C) where A's clock is 30 seconds behind B's, forwards all
+    /// events from A and B to C, publishes four causally-ordered test events across A and B, and then
+    /// collects the events observed on C. Asserts that:
+    /// - the causal order of messages ("one","two","three","four") is preserved when sorted by HLC timestamp,
+    /// - all HLC timestamps are unique,
+    /// - timestamps are strictly increasing when ordered.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Run the test suite; this test will execute as part of `cargo test`.
+    /// // cargo test --test crates_events
+    /// ```
     #[actix::test]
     async fn test_hlc_events() -> anyhow::Result<()> {
         #[derive(Message)]
@@ -312,8 +415,20 @@ impl<F> BusHandlePipe<F>
 where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
-    /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
-    /// function returns true
+    /// Creates a BusHandlePipe that forwards events to the provided `BusHandle` only when the predicate returns `true`.
+    ///
+    /// # Parameters
+    ///
+    /// - `handle`: The destination `BusHandle` to which matching events will be forwarded.
+    /// - `predicate`: A function that receives an `EnclaveEvent<Sequenced>` and returns `true` to forward the event or `false` to drop it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `handle` is a valid BusHandle and `event` is an EnclaveEvent<Sequenced>.
+    /// let pipe = BusHandlePipe::new(handle, |evt: &EnclaveEvent<Sequenced>| evt.data().len() > 0);
+    /// // The pipe will forward only events whose data length is greater than zero.
+    /// ```
     pub fn new(handle: BusHandle, predicate: F) -> Self {
         Self { handle, predicate }
     }
@@ -331,6 +446,23 @@ where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
     type Result = ();
+    /// Forwards an incoming `EnclaveEvent<Sequenced>` to the wrapped `BusHandle` when the pipe's predicate returns `true`.
+    ///
+    /// If the predicate accepts the event, the event is split into its data and timestamp and forwarded via
+    /// `publish_from_remote` on the inner handle. If the predicate rejects the event, the message is ignored.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Placeholder example — replace `MyHandle`, `EnclaveEvent`, and context creation with concrete types from the crate.
+    /// # use std::sync::Arc;
+    /// # use actix::prelude::*;
+    /// // let handle: MyHandle = /* existing BusHandle */ unimplemented!();
+    /// // let mut pipe = BusHandlePipe::new(handle, |ev: &EnclaveEvent<Sequenced>| true);
+    /// // let mut ctx = Context::new(&mut pipe);
+    /// // let event: EnclaveEvent<Sequenced> = /* create or receive an event */ unimplemented!();
+    /// // pipe.handle(event, &mut ctx);
+    /// ```
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         if (self.predicate)(&msg) {
             let (data, ts) = msg.split();

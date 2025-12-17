@@ -69,6 +69,36 @@ pub fn create_crp_bytes_params(
     (crp_bytes, params)
 }
 
+/// Sets up an in-memory event environment and cryptographic test fixtures for use in tests.
+///
+/// This creates an in-memory `EventBus` and two `HistoryCollector`s (one subscribed to all events,
+/// the other subscribed to `EnclaveError`), a deterministic shared RNG and seed, BFV parameters
+/// (using the provided `param_set` or a secure default), and a deserialized `CommonRandomPoly`.
+///
+/// # Parameters
+///
+/// * `param_set` - Optional BFV parameter set to use; when `None`, a default `InsecureSet2048_1032193_1` is used.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// 1. `BusHandle` — an in-memory event system handle bound to the created event bus,
+/// 2. `SharedRng` — a thread-safe, seeded ChaCha20 RNG,
+/// 3. `Seed` — seed material derived deterministically,
+/// 4. `Arc<BfvParameters>` — the BFV parameters derived from the chosen parameter set,
+/// 5. `CommonRandomPoly` — the deserialized common random polynomial created from CRP bytes,
+/// 6. `Addr<HistoryCollector<EnclaveEvent>>` — the address of the error history collector,
+/// 7. `Addr<HistoryCollector<EnclaveEvent>>` — the address of the general history collector.
+///
+/// # Examples
+///
+/// ```
+/// let (handle, _rng, _seed, _params, _crp, errors, history) =
+///     get_common_setup(None).expect("setup should succeed");
+/// // collectors should be running and addresses valid
+/// assert!(errors.connected());
+/// assert!(history.connected());
+/// ```
 pub fn get_common_setup(
     param_set: Option<BfvParamSet>,
 ) -> Result<(
@@ -98,31 +128,18 @@ pub fn get_common_setup(
     Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 
-/// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
-/// deduplication will remove previously seen events.
-/// This sets up a set of cyphernodes without libp2p.
-/// The way it works is that it feeds back all events from
-/// all nodes filteres by whether they are broadcastible or not
-/// ```txt
+/// Wire node event buses so broadcastable events are forwarded between distinct nodes to simulate a libp2p-like network.
 ///
-///                    ┌─────┐
-///                    │ BUS │
-///                    └─────┘
-///                       │
-///          ┌────────────┼────────────┐
-///          │            │            │
-///          ▼            ▼            ▼
-///       ┌────┐       ┌────┐       ┌────┐               
-///       │ B1 │       │ B2 │       │ B3 │◀──┐
-///       └────┘       └────┘       └────┘   │
-///          │            │            │     │
-///          │            │            │     │
-///          └────────────┼────────────┘     │
-///                       │                  │
-///                       ▼                  │
-///                    ┌─────┐               │               
-///                    │ FIL │───────────────┘                 
-///                    └─────┘
+/// For each pair of distinct ciphernode handles, this forwards events from the source bus to the destination bus when the event
+/// is considered forwardable by `NetEventTranslator` or is a document-publisher event. Events are not forwarded to the same node's bus.
+/// This function does not modify nodes or perform network IO; it only connects in-memory event buses so tests can observe cross-node propagation.
+///
+/// # Examples
+///
+/// ```no_run
+/// // Given a list of initialized CiphernodeHandle values, connect their buses so broadcastable events propagate between them.
+/// // let nodes: Vec<CiphernodeHandle> = ...;
+/// // simulate_libp2p_net(&nodes);
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {

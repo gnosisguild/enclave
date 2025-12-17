@@ -17,6 +17,19 @@ pub struct CommitLogEventLog {
 }
 
 impl CommitLogEventLog {
+    /// Creates a new CommitLogEventLog backed by a CommitLog stored at the given path.
+    ///
+    /// The created log uses configured CommitLog options (including a permissive
+    /// maximum message size) and returns an error if the underlying CommitLog
+    /// cannot be opened or created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// let dir = tempfile::tempdir().unwrap();
+    /// let log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
+    /// ```
     pub fn new(path: &PathBuf) -> Result<Self> {
         let mut opts = LogOptions::new(path);
         // TODO: drive this from config - currently set high to be permissive
@@ -27,6 +40,21 @@ impl CommitLogEventLog {
 }
 
 impl EventLog for CommitLogEventLog {
+    /// Appends an EnclaveEvent to the underlying commit log and returns its 1-indexed sequence number.
+    ///
+    /// The function serializes the provided event and stores it in the commit log.
+    ///
+    /// # Returns
+    ///
+    /// `u64` containing the 1-indexed sequence number assigned to the appended event.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // assuming `log` is a mutable CommitLogEventLog and `event` is an EnclaveEvent<Unsequenced>
+    /// let seq = log.append(&event).unwrap();
+    /// assert!(seq >= 1);
+    /// ```
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
         let bytes = bincode::serialize(event)?;
         let offset = self
@@ -37,6 +65,29 @@ impl EventLog for CommitLogEventLog {
         Ok(offset + 1)
     }
 
+    /// Reads events starting at a 1-indexed sequence number and returns an iterator over (sequence, event) pairs.
+    ///
+    /// The `from` parameter is a 1-indexed sequence number; reading begins from that sequence (or the start when `from` is 0).
+    /// The returned iterator yields tuples where the first element is the 1-indexed sequence number and the second is the deserialized `EnclaveEvent<Unsequenced>`.
+    /// Messages that fail deserialization are skipped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use e3_events::{EnclaveEvent, Unsequenced};
+    /// # use tempfile::tempdir;
+    /// # use std::path::PathBuf;
+    /// # // setup omitted: create CommitLogEventLog and append events
+    /// # let dir = tempdir().unwrap();
+    /// # let path = dir.path().to_path_buf();
+    /// # let mut log = CommitLogEventLog::new(&path).unwrap();
+    /// # let e = EnclaveEvent::<Unsequenced>::new(vec![1u8], 0);
+    /// # log.append(&e).unwrap();
+    /// let mut iter = log.read_from(1);
+    /// let results: Vec<(u64, EnclaveEvent<Unsequenced>)> = iter.collect();
+    /// assert!(!results.is_empty());
+    /// assert_eq!(results[0].0, 1);
+    /// ```
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed offset
         let mut current_offset = from.saturating_sub(1);

@@ -19,6 +19,20 @@ pub struct Sequencer {
 }
 
 impl Sequencer {
+    /// Creates a new `Sequencer` wired to the given bus, event store, and commit buffer.
+    ///
+    /// The sequencer will send sequenced events to `bus`, forward incoming unsequenced events to
+    /// `eventstore`, and send commit snapshots to `buffer`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use actix::prelude::*;
+    /// // `bus`: Addr<EventBus<EnclaveEvent<Sequenced>>>
+    /// // `eventstore_recipient`: Recipient<StoreEventRequested>
+    /// // `buffer_recipient`: Recipient<CommitSnapshot>
+    /// let sequencer = Sequencer::new(&bus, eventstore_recipient, buffer_recipient);
+    /// ```
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
         eventstore: impl Into<Recipient<StoreEventRequested>>,
@@ -38,6 +52,16 @@ impl Actor for Sequencer {
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
+    /// Forwards an unsequenced enclave event to the event store for persistence.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // When the Sequencer actor receives an `EnclaveEvent<Unsequenced>`,
+    /// // it forwards that event to the configured event store:
+    /// //
+    /// // sequencer.handle(unsequenced_event, &mut ctx);
+    /// ```
     fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
         self.eventstore
             .do_send(StoreEventRequested::new(msg, ctx.address()))
@@ -46,6 +70,9 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
 
 impl Handler<EventStored> for Sequencer {
     type Result = ();
+    /// Handles an `EventStored` by committing its snapshot and forwarding the resulting sequenced event to the bus.
+    ///
+    /// Converts the incoming `EventStored` into its sequenced event, sends a `CommitSnapshot` with that event's sequence number to the configured buffer, and then forwards the sequenced event to the event bus.
     fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
         let event = msg.into_event();
         let seq = event.get_seq();

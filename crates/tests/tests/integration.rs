@@ -82,7 +82,28 @@ fn serialize_report(report: &[(&str, Duration)]) -> String {
         .join("\n")
 }
 
-/// Test trbfv
+/// Runs an end-to-end integration test of the TRBFV workflow on a simulated multi-node ciphernode system,
+/// exercising committee setup, threshold keyshare generation, public-key aggregation, application ciphertext
+/// generation and publication, decryption share collection, and plaintext aggregation and verification.
+///
+/// This test builds an in-process event system with multiple ciphernodes (including a collector), configures
+/// a threshold BFV setup (m=2, n=5 in this test), publishes an E3Requested event, finalizes a deterministic
+/// committee, generates application ciphertexts, publishes them, and asserts that the final plaintext tally
+/// matches the expected results. Timing measurements for major phases are collected and printed for diagnostics.
+///
+/// # Returns
+///
+/// `Ok(())` if the full workflow completes and all assertions succeed, `Err(_)` on failure.
+///
+/// # Examples
+///
+/// ```
+/// #[actix::test]
+/// async fn run_trbfv_example() -> anyhow::Result<()> {
+///     // Execute the full integration test; any failure will be returned as an error.
+///     test_trbfv_actor().await
+/// }
+/// ```
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv_actor() -> Result<()> {

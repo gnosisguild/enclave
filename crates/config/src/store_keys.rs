@@ -69,10 +69,28 @@ impl StoreKeys {
         String::from("//node_state")
     }
 
+    /// Path for finalized committees in the store.
+    ///
+    /// Produces the store key string `"//finalized_committees"`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let key = finalized_committees();
+    /// assert_eq!(key, "//finalized_committees".to_string());
+    /// ```
     pub fn finalized_committees() -> String {
         String::from("//finalized_committees")
     }
 
+    /// Constructs the store key path for the ciphernode selector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let key = ciphernode_selector();
+    /// assert_eq!(key, "//ciphernode_selector".to_string());
+    /// ```
     pub fn ciphernode_selector() -> String {
         String::from("//ciphernode_selector")
     }

@@ -22,7 +22,25 @@ pub fn hexf(data: &[u8], f: &mut fmt::Formatter) -> fmt::Result {
     )
 }
 
-/// truncate a string
+/// Truncates a hex-like string for compact display, prefixing short values with `0x` and
+/// summarizing long values with their length and leading/trailing segments.
+///
+/// For input strings with length <= 100, the function returns the input prefixed with `0x`.
+/// For longer inputs it returns `"<bytes(len):0x<start>..<end>>"`, where `start` is the
+/// first 25 characters and `end` is the last 25 characters of the original string.
+///
+/// # Examples
+///
+/// ```
+/// // Short input is prefixed with 0x
+/// let short = "deadbeef".to_string();
+/// assert_eq!(crate::truncate(short), "0xdeadbeef");
+///
+/// // Long input is summarized with length and leading/trailing segments
+/// let long = String::from("a").repeat(120);
+/// let expected = format!("<bytes({}):0x{}..{}>", 120, "a".repeat(25), "a".repeat(25));
+/// assert_eq!(crate::truncate(long), expected);
+/// ```
 pub fn truncate(s: String) -> String {
     let threshold = 100; // will leave it
     let limit = 50;
@@ -55,6 +73,18 @@ pub enum Color {
     BrightWhite = 97,
 }
 
+/// Wraps a Displayable value with ANSI escape codes to apply the specified color.
+///
+/// The returned string contains an ANSI sequence that sets the given color, the
+/// formatted value, and a reset sequence to restore terminal formatting.
+///
+/// # Examples
+///
+/// ```
+/// let s = colorize("hello", Color::Red);
+/// assert!(s.starts_with("\x1b[31m"));
+/// assert!(s.ends_with("\x1b[0m"));
+/// ```
 pub fn colorize<T: std::fmt::Display>(s: T, color: Color) -> String {
     format!("\x1b[{}m{}\x1b[0m", color as u8, s)
 }

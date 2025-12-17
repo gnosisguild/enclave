@@ -84,12 +84,28 @@ pub struct EventSystem {
 }
 
 impl EventSystem {
-    /// Create a new in memory EventSystem with default settings
+    /// Creates an in-memory EventSystem configured from the provided name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::new("node1");
+    /// // `sys` is ready to be used with its in-memory backend.
+    /// ```
     pub fn new(name: &str) -> Self {
         EventSystem::in_mem(name)
     }
 
-    /// Create an in memory EventSystem
+    /// Create an EventSystem configured to use an in-memory backend.
+    ///
+    /// The `node_id` string is hashed to derive the internal `u32` node identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::in_mem("local-node");
+    /// // `sys` uses in-memory stores and lazy-initializes actors when accessed.
+    /// ```
     pub fn in_mem(node_id: &str) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
@@ -106,7 +122,16 @@ impl EventSystem {
         }
     }
 
-    /// Create an in memory EventSystem with a given store
+    /// Constructs an in-memory EventSystem that uses the provided `InMemStore`.
+    ///
+    /// The `node_id` string is used to derive the system's numeric node identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `store` is an existing Addr<InMemStore> obtained elsewhere.
+    /// let system = EventSystem::in_mem_from_store("node-a", &store);
+    /// ```
     pub fn in_mem_from_store(node_id: &str, store: &Addr<InMemStore>) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
@@ -123,7 +148,27 @@ impl EventSystem {
         }
     }
 
-    /// Create a persisted EventSystem with datafiles at the given paths
+    /// Construct an EventSystem configured to use persisted storage at the specified file paths.
+    ///
+    /// The `node_id` string is hashed to derive the internal node identifier. `log_path` is the
+    /// filesystem path for the commit log, and `sled_path` is the path for the Sled key-value store.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` - A human-readable identifier used to derive an internal u32 node identifier.
+    /// * `log_path` - Path to the commit log file to be used by the persisted event log.
+    /// * `sled_path` - Path to the directory used by the Sled database.
+    ///
+    /// # Returns
+    ///
+    /// An EventSystem instance configured to use persisted backends (CommitLog + Sled).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// let sys = EventSystem::persisted("node-a", PathBuf::from("commits.log"), PathBuf::from("sled_db"));
+    /// ```
     pub fn persisted(node_id: &str, log_path: PathBuf, sled_path: PathBuf) -> Self {
         Self {
             node_id: EventSystem::node_id(node_id),
@@ -142,13 +187,35 @@ impl EventSystem {
         }
     }
 
-    /// Pass in a specific given event bus
+    /// Sets the EventBus address to be used by this EventSystem.
+    ///
+    /// This overrides any previously configured bus for the instance.
+    ///
+    /// # Returns
+    ///
+    /// The EventSystem with the provided EventBus configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `bus_addr` is an `Addr<EventBus<EnclaveEvent>>` obtained elsewhere.
+    /// let sys = EventSystem::in_mem("node").with_event_bus(bus_addr);
+    /// ```
     pub fn with_event_bus(self, bus: Addr<EventBus<EnclaveEvent>>) -> Self {
         let _ = self.eventbus.set(bus);
         self
     }
 
-    /// Use a fresh event bus that is not the default singleton instance
+    /// Replaces the system's EventBus with a newly created, deduplicating EventBus.
+    ///
+    /// Returns the modified EventSystem with its event bus set to a fresh instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::in_mem("node").with_fresh_bus();
+    /// // `sys` now uses a fresh EventBus with deduplication enabled
+    /// ```
     pub fn with_fresh_bus(self) -> Self {
         let _ = self
             .eventbus
@@ -156,18 +223,44 @@ impl EventSystem {
         self
     }
 
-    /// Add an injected hlc
+    /// Injects a high-level clock (Hlc) to be used by the EventSystem.
+    ///
+    /// This sets the HLC instance that the event system will use for generating timestamps
+    /// and returns the moved `EventSystem` to allow builder-style chaining.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::in_mem("node").with_hlc(Hlc::default());
+    /// ```
     pub fn with_hlc(self, hlc: Hlc) -> Self {
         let _ = self.hlc.set(hlc);
         self
     }
 
-    /// Get the eventbus address
+    /// Obtain the EventBus actor address used by the system.
+    ///
+    /// This will lazily initialize and return the shared EventBus if one is not already configured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let system = EventSystem::new("node");
+    /// let bus = system.eventbus();
+    /// // `bus` is an Addr<EventBus<EnclaveEvent>>
+    /// ```
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
     }
 
-    /// Get the buffer address
+    /// Returns the system's WriteBuffer actor address, creating the buffer if it does not yet exist and initiating wiring with other components when possible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::new("node");
+    /// let _buffer_addr = sys.buffer();
+    /// ```
     pub fn buffer(&self) -> Addr<WriteBuffer> {
         let buffer = self
             .buffer
@@ -177,7 +270,20 @@ impl EventSystem {
         buffer
     }
 
-    /// Get the sequencer address
+    /// Obtain the Sequencer actor address, initializing and starting it if it has not been created yet.
+    ///
+    /// The Sequencer is created using the system's EventBus, EventStore, and WriteBuffer when first requested.
+    ///
+    /// # Returns
+    ///
+    /// The address of the Sequencer actor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let system = EventSystem::new("node");
+    /// let _sequencer = system.sequencer().unwrap();
+    /// ```
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
             .get_or_try_init(|| match self.eventstore()? {
@@ -191,7 +297,25 @@ impl EventSystem {
             .cloned()
     }
 
-    /// Get the EventStore address
+    /// Retrieve the address of the configured EventStore, initializing it if necessary.
+    ///
+    /// Initializes and returns an in-memory EventStore for the in-memory backend or initializes
+    /// the sled sequence index and commit log and returns a persisted EventStore for the persisted backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if persisted backend initialization (sled index or commit log) fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::in_mem("node");
+    /// let store_addr = sys.eventstore().unwrap();
+    /// match store_addr {
+    ///     EventStoreAddr::InMem(_) => {},
+    ///     EventStoreAddr::Persisted(_) => panic!("expected in-memory backend"),
+    /// }
+    /// ```
     pub fn eventstore(&self) -> Result<EventStoreAddr> {
         match &self.backend {
             EventSystemBackend::InMem(b) => {
@@ -217,14 +341,36 @@ impl EventSystem {
         }
     }
 
-    /// Get an instance of the Hlc
+    /// Provides the system's high-level clock, initializing it with the system node id if it has not been created yet.
+    ///
+    /// The returned `Hlc` is a clone of the internally stored clock instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let sys = EventSystem::in_mem("node-1");
+    /// let _hlc = sys.hlc().unwrap();
+    /// ```
     pub fn hlc(&self) -> Result<Hlc> {
         self.hlc
             .get_or_try_init(|| Ok(Hlc::new(self.node_id)))
             .cloned()
     }
 
-    /// Get the BusHandle
+    /// Returns a BusHandle connected to this EventSystem, initializing it lazily if needed.
+    ///
+    /// The returned handle coordinates the eventbus, sequencer, and HLC for publishing and querying events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Err` if initialization of the sequencer or HLC fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let system = EventSystem::new("node");
+    /// let handle = system.handle().expect("failed to create BusHandle");
+    /// ```
     pub fn handle(&self) -> Result<BusHandle> {
         self.handle
             .get_or_try_init(|| {
@@ -237,7 +383,31 @@ impl EventSystem {
             .cloned()
     }
 
-    /// Get the DataStore
+    /// Obtain a DataStore view backed by the event system's configured backend.
+    ///
+    /// This returns a DataStore that routes write operations through the system's
+    /// WriteBuffer and is backed by either an in-memory store or a sled-backed store
+    /// depending on the EventSystem backend configuration. If the underlying store
+    /// has not yet been created it will be initialized lazily. Wiring between the
+    /// buffer and the store is attempted before returning.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if initializing or accessing the persisted store fails (for
+    /// the persisted backend).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use actix::System;
+    /// # use ciphernode_builder::event_system::EventSystem;
+    /// let sys = System::new();
+    /// sys.block_on(async {
+    ///     let es = EventSystem::new("node");
+    ///     let ds = es.store().unwrap();
+    ///     // use `ds` for reads/writes...
+    /// });
+    /// ```
     pub fn store(&self) -> Result<DataStore> {
         let store = match &self.backend {
             EventSystemBackend::InMem(b) => {
@@ -264,6 +434,16 @@ impl EventSystem {
 
     // We need to ensure that once the buffer and store are created they are connected so that
     // inserts are sent between the two actors. This internal function ensures this happens.
+    /// Ensures the write buffer is forwarded to the underlying store when both are initialized.
+    ///
+    /// When both the system's WriteBuffer and a store `Recipient<InsertBatch>` are available, instructs the buffer to forward batches to that store. The operation is idempotent: subsequent calls do nothing once wiring has occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given an initialized `EventSystem` named `es`:
+    /// es.wire_if_ready();
+    /// ```
     fn wire_if_ready(&self) {
         let buffer = match self.buffer.get() {
             Some(b) => b,
@@ -285,6 +465,17 @@ impl EventSystem {
         });
     }
 
+    /// Derives a deterministic 32-bit node identifier from a name string.
+    ///
+    /// The result is a u32 value computed by hashing `name`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let a = node_id("alice");
+    /// let b = node_id("alice");
+    /// assert_eq!(a, b);
+    /// ```
     fn node_id(name: &str) -> u32 {
         let mut hasher = DefaultHasher::new();
         name.hash(&mut hasher);
@@ -325,6 +516,23 @@ mod tests {
 
     impl Handler<EnclaveEvent> for Listener {
         type Result = ();
+        /// Handles an incoming `EnclaveEvent` and records the contained `TestEvent` message.
+        ///
+        /// When the event's payload is a `TestEvent`, its `msg` field is appended to the listener's
+        /// `logs` collection; other event types are ignored.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use ciphernode_builder::event_system::{Listener, EnclaveEvent, EnclaveEventData, TestEvent};
+        /// # use actix::Context;
+        /// let mut listener = Listener { logs: Vec::new(), events: Vec::new() };
+        /// // construct a TestEvent-wrapped EnclaveEvent (details depend on crate constructors)
+        /// let test_ev = EnclaveEvent::from(EnclaveEventData::TestEvent(TestEvent { msg: "hello".into(), ts: 0 }));
+        /// // call the handler directly (context parameter is not used)
+        /// listener.handle(test_ev, &mut Context::from_waker(std::task::noop_waker_ref()));
+        /// assert_eq!(listener.logs.last().map(String::as_str), Some("hello"));
+        /// ```
         fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
             if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = msg.into_data() {
                 self.logs.push(msg);
@@ -334,6 +542,16 @@ mod tests {
 
     impl Handler<GetLogs> for Listener {
         type Result = Vec<String>;
+        /// Returns a clone of the listener's stored logs.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// // Construct a listener and retrieve its logs.
+        /// let mut listener = Listener { logs: vec!["entry".to_string()], events: vec![] };
+        /// let logs = listener.logs.clone();
+        /// assert_eq!(logs, vec!["entry".to_string()]);
+        /// ```
         fn handle(&mut self, _: GetLogs, _: &mut Self::Context) -> Self::Result {
             self.logs.clone()
         }
@@ -341,6 +559,16 @@ mod tests {
 
     impl Handler<GetEvents> for Listener {
         type Result = Vec<String>;
+        /// Collects the `msg` fields from any `TestEvent` entries in the listener's stored events.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// // assume `listener` is a mutable Listener with some EnclaveEvent entries,
+        /// // and `ctx` is a mutable actor context available in the test.
+        /// let msgs: Vec<String> = listener.handle(GetEvents, &mut ctx);
+        /// // `msgs` now contains the `msg` of each `TestEvent` in insertion order.
+        /// ```
         fn handle(&mut self, _: GetEvents, _: &mut Self::Context) -> Self::Result {
             self.events
                 .iter()
@@ -356,6 +584,13 @@ mod tests {
 
     impl Handler<ReceiveEvents> for Listener {
         type Result = ();
+        /// Replace the listener's stored events with the events carried by the incoming message.
+        ///
+        /// # Parameters
+        ///
+        /// - `msg`: message containing the sequence of `EnclaveEvent`s to store in the listener.
+        ///
+        /// The handler assigns the message's events to the actor's `events` field.
         fn handle(&mut self, msg: ReceiveEvents, _: &mut Self::Context) -> Self::Result {
             self.events = msg.events().clone();
         }
@@ -365,6 +600,25 @@ mod tests {
         type Context = actix::Context<Self>;
     }
 
+    /// Verifies that a persisted EventSystem initializes its components and automatically wires the buffer to the store.
+    ///
+    /// Creates a persisted EventSystem, obtains its BusHandle and DataStore, and asserts that wiring has occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #[actix::test]
+    /// async fn test_persisted() {
+    ///     let tmp = tempfile::tempdir().unwrap();
+    ///     let system = EventSystem::persisted("cn2", tmp.path().join("log"), tmp.path().join("sled"));
+    ///
+    ///     let _handle = system.handle().expect("Failed to get handle");
+    ///     system.store().expect("Failed to get store");
+    ///
+    ///     // Wiring happened automatically
+    ///     assert!(system.wired.get().is_some());
+    /// }
+    /// ```
     #[actix::test]
     async fn test_persisted() {
         let tmp = TempDir::new().unwrap();
@@ -389,6 +643,29 @@ mod tests {
         assert!(system.wired.get().is_some());
     }
 
+    /// Integration test that verifies in-memory EventSystem wiring, eventual consistency, event publishing, and event retrieval.
+    ///
+    /// This test sets up an in-memory EventSystem with a fresh EventBus, attaches a listener actor,
+    /// writes values to the DataStore (which are only persisted after the corresponding event is published),
+    /// publishes events, asserts the listener receives the events in order, and queries the in-memory EventStore
+    /// for events after a captured timestamp.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # async fn run() -> anyhow::Result<()> {
+    /// let system = EventSystem::in_mem("cn1").with_fresh_bus();
+    /// let handle = system.handle()?;
+    /// let datastore = system.store()?;
+    /// let listener = Listener { logs: Vec::new(), events: Vec::new() }.start();
+    /// handle.subscribe("*", listener.clone().into());
+    /// datastore.scope("/a").write("v".to_string());
+    /// assert_eq!(datastore.scope("/a").read::<String>().await?, None);
+    /// handle.publish(TestEvent::new("e", 1))?;
+    /// tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+    /// assert_eq!(datastore.scope("/a").read::<String>().await?, Some("v".to_string()));
+    /// # Ok(()) }
+    /// ```
     #[actix::test]
     async fn test_event_system() -> Result<()> {
         let system = EventSystem::in_mem("cn1").with_fresh_bus();

@@ -53,6 +53,19 @@ impl IntoKey for &String {
 
 /// Keys can be &str
 impl<'a> IntoKey for &'a str {
+    /// Produce a UTF-8 byte sequence from a borrowed string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let s = String::from("hello");
+    /// let key = (&s).into_key();
+    /// assert_eq!(key, b"hello".to_vec());
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// A byte vector containing the UTF-8 encoding of the string.
     fn into_key(self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
@@ -60,6 +73,16 @@ impl<'a> IntoKey for &'a str {
 
 /// Keys can be u128
 impl IntoKey for u128 {
+    /// Converts the integer into a big-endian byte vector suitable for use as a key.
+    ///
+    /// The returned bytes are in big-endian order to preserve numeric ordering when compared lexicographically.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let key = 42u128.into_key();
+    /// assert_eq!(key, 42u128.to_be_bytes().to_vec());
+    /// ```
     fn into_key(self) -> Vec<u8> {
         // Ensuring big endian for ordering
         self.to_be_bytes().to_vec()

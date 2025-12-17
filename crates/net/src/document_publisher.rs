@@ -498,6 +498,35 @@ mod tests {
     };
     use tracing::subscriber::DefaultGuard;
 
+    /// Initializes a test environment for DocumentPublisher and returns handles needed by tests.
+    ///
+    /// Sets up tracing (capturing logs for the test), creates an EventSystem with a fresh bus,
+    /// constructs channels for NetCommand/NetEvent, starts history collectors for enclave events,
+    /// subscribes collectors to the bus, and spawns a DocumentPublisher wired to the test bus and
+    /// network channels.
+    ///
+    /// # Returns
+    ///
+    /// A 9-tuple containing:
+    /// 1. `DefaultGuard` — guard returned by `tracing::subscriber::set_default` to restore previous subscriber;
+    /// 2. `BusHandle` — handle to the fresh EventSystem bus;
+    /// 3. `mpsc::Sender<NetCommand>` — sender side for issuing net commands in tests;
+    /// 4. `mpsc::Receiver<NetCommand>` — receiver side for observing issued net commands;
+    /// 5. `broadcast::Sender<NetEvent>` — broadcaster for injecting net events into the system;
+    /// 6. `Arc<broadcast::Receiver<NetEvent>>` — shared receiver used by the DocumentPublisher under test;
+    /// 7. `Addr<HistoryCollector<EnclaveEvent>>` — history collector for general enclave events;
+    /// 8. `Addr<HistoryCollector<EnclaveEvent>>` — history collector for enclave error events;
+    /// 9. `Addr<DocumentPublisher>` — address of the spawned DocumentPublisher actor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use anyhow::Result;
+    /// # fn doc_test() -> Result<()> {
+    /// let (_guard, bus, net_cmd_tx, mut net_cmd_rx, net_evt_tx, net_evt_rx, history, errors, publisher) = setup_test()?;
+    /// // Use returned handles to drive and observe the DocumentPublisher in tests.
+    /// # Ok(()) }
+    /// ```
     fn setup_test() -> Result<(
         DefaultGuard,
         BusHandle,
@@ -718,6 +747,23 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a published document for an interested E3 id is fetched and forwarded as DocumentReceived.
+    ///
+    /// Sends a CiphernodeSelected to mark interest, emits a DocumentPublishedNotification for a non-matching id
+    /// (which must be ignored), then emits a matching DocumentPublishedNotification and asserts that the
+    /// publisher issues a DhtGetRecord, that the DHT response is consumed, and that a DocumentReceived event
+    /// with the original bytes is published to the enclave event bus.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Test harness sets up bus, net command/event channels, and a DocumentPublisher.
+    /// // The test covers: ignore non-matching notifications, request DHT get for matching
+    /// // notification, and publish DocumentReceived after successful DHT get.
+    /// async fn example_usage() {
+    ///     test_notified_of_document().await.unwrap();
+    /// }
+    /// ```
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =

@@ -75,6 +75,31 @@ pub struct NodeDefinition {
 }
 
 impl Default for NodeDefinition {
+    /// Constructs a NodeDefinition populated with conventional default values.
+    ///
+    /// Defaults:
+    /// - `peers`: empty list
+    /// - `address`: `None`
+    /// - `quic_port`: 9091
+    /// - `key_file`: "key"
+    /// - `db_file`: "db"
+    /// - `log_file`: "log"
+    /// - `config_dir` and `data_dir`: empty `PathBuf` (placeholders for OS defaults)
+    /// - `role`: `NodeRole::Ciphernode`
+    /// - `autonetkey`, `autopassword`, `autowallet`: `false`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// let def = NodeDefinition::default();
+    /// assert_eq!(def.quic_port, 9091);
+    /// assert_eq!(def.key_file, PathBuf::from("key"));
+    /// assert_eq!(def.db_file, PathBuf::from("db"));
+    /// assert_eq!(def.log_file, PathBuf::from("log"));
+    /// assert!(def.peers.is_empty());
+    /// assert!(matches!(def.role, NodeRole::Ciphernode));
+    /// ```
     fn default() -> Self {
         Self {
             peers: vec![], // NOTE: We should look at generation via ipns fetch for the latest nodes
@@ -179,6 +204,40 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    /// Convert an UnscopedAppConfig into a scoped AppConfig for the given node name.
+    ///
+    /// This validates that the requested node exists (and that `_default` is not used as an explicit node name),
+    /// applies node and global overrides for config and data directories, builds the paths engine (including
+    /// db, key, and log file locations), and returns an AppConfig instantiated for the named node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `name` is not present in `config.nodes` or if the reserved name `_default` is used
+    /// as an explicit node profile in `config.nodes`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// // Build a minimal unscoped config with a single node named "node1"
+    /// let mut unscoped = crate::config::UnscopedAppConfig::default();
+    /// unscoped.nodes.insert("node1".to_string(), crate::config::NodeDefinition::default());
+    ///
+    /// let default_data_dir = PathBuf::from("/tmp/data");
+    /// let default_config_dir = PathBuf::from("/tmp/config");
+    /// let cwd = PathBuf::from(".");
+    ///
+    /// let scoped = crate::config::AppConfig::try_from_unscoped(
+    ///     "node1",
+    ///     unscoped,
+    ///     &default_data_dir,
+    ///     &default_config_dir,
+    ///     &cwd,
+    /// ).unwrap();
+    ///
+    /// assert_eq!(scoped.name(), "node1");
+    /// ```
     pub fn try_from_unscoped(
         name: &str,
         config: UnscopedAppConfig,
@@ -246,16 +305,50 @@ impl AppConfig {
         self.paths.key_file()
     }
 
-    /// Get the database file
+    /// Get the node's database file path.
+    ///
+    /// # Returns
+    ///
+    /// The filesystem path of the node's database file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // given an `AppConfig` instance `cfg`
+    /// let path = cfg.db_file();
+    /// ```
     pub fn db_file(&self) -> PathBuf {
         self.paths.db_file()
     }
 
-    /// Get the log file
+    /// Returns the resolved path to the node's log file.
+    ///
+    /// # Returns
+    ///
+    /// `PathBuf` containing the resolved log file path for the current node.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // assuming `app_config` is an initialized `AppConfig`
+    /// let log_path = app_config.log_file();
+    /// println!("Log file: {}", log_path.display());
+    /// ```
     pub fn log_file(&self) -> PathBuf {
         self.paths.log_file()
     }
 
+    /// Returns the NodeDefinition entry for the currently selected node name.
+    ///
+    /// Panics if the configuration does not contain a node definition for `self.name`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // assuming `cfg` is an AppConfig with a node definition named "node1"
+    /// let node_def = cfg.node_def();
+    /// // use `node_def` to access node-specific settings, e.g. `node_def.quic_port`
+    /// ```
     fn node_def(&self) -> &NodeDefinition {
         // NOTE: on creation an invariant we have is that our node name is an extant key in our
         // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition

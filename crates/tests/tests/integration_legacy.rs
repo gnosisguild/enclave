@@ -48,6 +48,37 @@ use tokio::sync::mpsc;
 use tokio::sync::{broadcast, Mutex};
 use tokio::time::sleep;
 
+/// Constructs and configures a local Ciphernode and returns its handle.
+///
+/// The node is created with keyshare, address, test-mode features (forked bus, history, errors),
+/// pubkey and plaintext aggregation, and sortition enabled. Optionally attaches an in-memory
+/// datastore and enables logging when requested.
+///
+/// # Parameters
+///
+/// - `addr`: The node's address (used as identifier).
+/// - `store`: Optional in-memory datastore address to attach for persistence/hydration.
+///
+/// # Returns
+///
+/// A configured `CiphernodeHandle` on success.
+///
+/// # Examples
+///
+/// ```rust
+/// # use std::sync::Arc;
+/// # use tokio::runtime::Runtime;
+/// # async fn _example() -> anyhow::Result<()> {
+/// // setup placeholders (create real instances in integration tests)
+/// let bus = /* BusHandle */ unimplemented!();
+/// let rng = /* SharedRng */ unimplemented!();
+/// let cipher = Arc::new(/* Cipher */ unimplemented!());
+///
+/// let handle = crate::setup_local_ciphernode(&bus, &rng, true, "node1", None, &cipher).await?;
+/// // use `handle`...
+/// # Ok(())
+/// # }
+/// ```
 async fn setup_local_ciphernode(
     bus: &BusHandle,
     rng: &SharedRng,
@@ -292,6 +323,20 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that keyshare state is preserved after shutdown and rehydration.
+///
+/// This integration test sets up two local ciphernodes, triggers keyshare creation and
+/// aggregation, shuts down the nodes and dumps their in-memory stores, rehydrates new
+/// ciphernodes from those dumps, publishes a ciphertext encrypted with the recovered
+/// aggregated public key, and asserts that the plaintext recovered by the rehydrated
+/// nodes matches the original plaintext.
+///
+/// # Examples
+///
+/// ```no_run
+/// // This is an integration-style async test executed by the test harness.
+/// // Run with `cargo test` to execute the test case in the repository.
+/// ```
 #[actix::test]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let e3_id = E3id::new("1234", 1);
@@ -441,6 +486,23 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that NetEventTranslator forwards non-local bus events to the network while keeping local-only events on the local bus.
+///
+/// Publishes two `PlaintextAggregated` events and one local `CiphernodeSelected` event, then asserts:
+/// - the network output channel receives the two non-local `PlaintextAggregated` messages (and not the local event),
+/// - the bus history contains all three local events (including the local-only event),
+/// ensuring forwarded events are transmitted to the network but not retransmitted back into the bus.
+///
+/// # Examples
+///
+/// ```no_run
+/// #[actix::test]
+/// async fn example_forwarding_behavior() -> anyhow::Result<()> {
+///     // Setup EventSystem, NetEventTranslator, publish events and assert network vs bus history behavior.
+///     // This test mirrors `test_p2p_actor_forwards_events_to_network` integration assertions.
+///     Ok(())
+/// }
+/// ```
 #[actix::test]
 async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test

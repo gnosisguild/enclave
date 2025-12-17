@@ -345,6 +345,22 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
 }
 
 impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
+    /// Formats the event as a colorized event type followed by its debug representation.
+    ///
+    /// Writes the event's type name (colored cyan) followed by a space and the `Debug`-formatted
+    /// event into the provided formatter.
+    ///
+    /// # Returns
+    ///
+    /// `fmt::Result` indicating whether formatting succeeded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Example usage (pseudo):
+    /// // let s = format!("{}", some_enclave_event);
+    /// // // s might look like: "CiphernodeAdded EnclaveEvent { id: ..., payload: ..., ... }"
+    /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let t = self.event_type();
         f.write_str(&format!("{} {:?}", colorize(t, Color::Cyan), self))

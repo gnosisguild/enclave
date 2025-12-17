@@ -200,6 +200,23 @@ mod tests {
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
 
+    /// Constructs a mock CiphernodeHandle for tests using an in-memory store and a test event system.
+    ///
+    /// The returned handle is configured with the provided `address`, an in-memory store, an `EventSystem` handle
+    /// wired to an event bus, and populated `history` and `errors` bus handles when available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use anyhow::Result;
+    /// # async fn __example() -> Result<()> {
+    /// let handle = mock_setup_node("node_a".to_string()).await?;
+    /// assert_eq!(handle.address, "node_a");
+    /// assert!(handle.history.is_some());
+    /// assert!(handle.errors.is_some());
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
         let store = InMemStore::new(true).start();

@@ -18,6 +18,36 @@ use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::instrument;
 
+/// Start and configure a ciphernode, initialize networking, and prepare the background event task.
+///
+/// This function builds a ciphernode using values from `config` and `address`, initializes the enclave
+/// bus and cipher, configures node features (including TRBFV or keyshare depending on
+/// `experimental_trbfv`), and sets up the network event translator. It returns the enclave bus handle,
+/// the JoinHandle for the running background task, and the local libp2p peer id.
+///
+/// # Parameters
+///
+/// * `config` - Application configuration used to configure the node and networking.
+/// * `address` - Network address to bind the node to.
+/// * `experimental_trbfv` - When `true`, enable TRBFV support; otherwise enable keyshare support.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// 1. the enclave `BusHandle`,
+/// 2. a `JoinHandle<Result<()>>` for the node's background task,
+/// 3. the local libp2p peer id as a `String`.
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // let config = AppConfig::load("config.toml")?; // hypothetical loader
+/// // let address = Address::from_str("127.0.0.1:9000")?;
+/// // let (bus, join_handle, peer_id) = crate::start::execute(&config, address, false).await?;
+/// # Ok(())
+/// # }
+/// ```
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
     config: &AppConfig,

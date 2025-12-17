@@ -21,6 +21,17 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
+    /// Creates and starts a SledStore actor backed by a SledDb at the given file system path.
+    ///
+    /// The actor is started immediately and subscribed to the bus "Shutdown" topic so it will
+    /// drop its database and stop when a shutdown event is published.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `bus` and `path` are available in scope.
+    /// let addr = SledStore::new(&bus, &path).unwrap();
+    /// ```
     pub fn new(bus: &BusHandle, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(path, "datastore")?;
@@ -40,6 +51,18 @@ impl SledStore {
 impl Handler<Insert> for SledStore {
     type Result = ();
 
+    /// Handles an `Insert` message by writing the provided data to the backing database if available.
+    ///
+    /// If the store has an open database connection, attempts to insert the event into it.
+    /// On insertion error, reports the error on the store's bus with `EType::Data`. Does nothing
+    /// when the database is absent or the insertion succeeds.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// // Given `store: SledStore` and `ctx: <SledStore as Actor>::Context`
+    /// // store.handle(Insert::new(key, value), &mut ctx);
+    /// ```
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.insert(event) {
@@ -53,6 +76,13 @@ impl Handler<Insert> for SledStore {
 impl Handler<InsertBatch> for SledStore {
     type Result = ();
 
+    /// Handles an InsertBatch event by inserting its commands into the underlying database and reporting any insertion errors to the bus.
+    ///
+    /// The handler is a no-op when the database is not present.
+    ///
+    /// # Parameters
+    ///
+    /// - `event`: an `InsertBatch` containing the commands to insert; errors from the insertion are forwarded to the bus as `EType::Data`.
     fn handle(&mut self, event: InsertBatch, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.insert_batch(event.commands()) {
@@ -108,6 +138,20 @@ impl Handler<Get> for SledStore {
 }
 impl Handler<EnclaveEvent> for SledStore {
     type Result = ();
+    /// Handles enclave lifecycle events for the actor.
+    ///
+    /// When the received `EnclaveEvent` carries `EnclaveEventData::Shutdown`, this handler drops
+    /// the actor's database connection (if any) and stops the actor's context. For any other
+    /// event data, no action is taken.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // When an `EnclaveEvent` with `EnclaveEventData::Shutdown` is delivered to the actor,
+    /// // the actor will drop its DB and stop:
+    /// // let evt = EnclaveEvent::new(..., EnclaveEventData::Shutdown(...));
+    /// // sled_store.handle(evt, &mut ctx);
+    /// ```
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         if let EnclaveEventData::Shutdown(_) = msg.get_data() {
             let _db = self.db.take(); // db will be dropped

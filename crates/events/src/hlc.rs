@@ -178,6 +178,16 @@ struct HlcInner {
 }
 
 impl Default for Hlc {
+    /// Creates a new `Hlc` instance seeded with a randomly generated node identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let hlc = Hlc::default();
+    /// // produced timestamp preserves the HLC's node id
+    /// let ts = hlc.get();
+    /// assert_eq!(ts.node, hlc.node());
+    /// ```
     fn default() -> Self {
         let random_id: u32 = rand::thread_rng().gen();
         Self::new(random_id)
@@ -185,6 +195,26 @@ impl Default for Hlc {
 }
 
 impl PartialEq for Hlc {
+    /// Compare two `Hlc` instances for identity of shared state, node, and maximum drift.
+    ///
+    /// This method considers two `Hlc` values equal only when they point to the same shared
+    /// inner state (`Arc` pointer equality), and their `node` and `max_drift` fields are equal.
+    /// The `clock` field is intentionally ignored for equality (it's intended for testing).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let a = Hlc::new(1);
+    /// let b = a.clone(); // clones the Arc, so inner pointer is identical
+    /// assert_eq!(a, b);
+    ///
+    /// let c = Hlc::new(1); // distinct inner state even though node matches
+    /// assert_ne!(a, c);
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// `true` if the two `Hlc` instances share the same inner state and have equal `node` and `max_drift`, `false` otherwise.
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
             && self.node == other.node
@@ -196,6 +226,27 @@ impl PartialEq for Hlc {
 impl Hlc {
     const DEFAULT_MAX_DRIFT: u64 = 60_000_000; // 60 sec
 
+    /// Constructs a new Hybrid Logical Clock (Hlc) initialized to timestamp 0 and counter 0 for the given node.
+    ///
+    /// The new Hlc uses the default maximum clock drift and no custom clock override.
+    ///
+    /// # Parameters
+    ///
+    /// - `node`: identifier for this clock's node.
+    ///
+    /// # Returns
+    ///
+    /// A configured `Hlc` instance with internal state `ts = 0`, `counter = 0`, the provided `node`, default `max_drift`, and no custom clock.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let hlc = Hlc::new(42);
+    /// assert_eq!(hlc.node(), 42);
+    /// let ts = hlc.get();
+    /// assert_eq!(ts.ts, 0);
+    /// assert_eq!(ts.counter, 0);
+    /// ```
     pub fn new(node: u32) -> Self {
         Self {
             inner: Arc::new(Mutex::new(HlcInner { ts: 0, counter: 0 })),
@@ -212,6 +263,21 @@ impl Hlc {
         Self::new(id as u32)
     }
 
+    /// Creates an Hlc initialized with the given internal state and node identifier.
+    ///
+    /// The `ts` value is the physical timestamp in microseconds (typically UNIX epoch
+    /// microseconds). `counter` is the logical counter portion and `node` is the node id
+    /// to embed in produced `HlcTimestamp`s.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let h = Hlc::with_state(1_600_000_000_000_000, 5, 42);
+    /// let t = h.get();
+    /// assert_eq!(t.ts, 1_600_000_000_000_000);
+    /// assert_eq!(t.counter, 5);
+    /// assert_eq!(t.node, 42);
+    /// ```
     pub fn with_state(ts: u64, counter: u32, node: u32) -> Self {
         Self {
             inner: Arc::new(Mutex::new(HlcInner { ts, counter })),

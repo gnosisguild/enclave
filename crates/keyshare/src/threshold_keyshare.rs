@@ -330,7 +330,35 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// 1. CiphernodeSelected
+    /// Begin generation of threshold-share material when a cipher node is selected.
+    ///
+    /// This updates the internal state to `GeneratingThresholdShare`, ensures the
+    /// threshold-share collector actor exists, and enqueues computation requests to
+    /// generate ESI SSS shards and the public-key share / secret-key SSS for the
+    /// selected cipher node.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - The `CiphernodeSelected` event describing the selected cipher node.
+    /// * `address` - The actor address to which generation messages will be sent.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if the state transition or mutation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Pseudocode example showing typical usage:
+    /// # use actix::prelude::*;
+    /// # use anyhow::Result;
+    /// # // Assume `tk` is a mutable ThresholdKeyshare instance and `addr` is its Addr<_>
+    /// # let mut tk = /* ThresholdKeyshare::new(...) */ unimplemented!();
+    /// # let addr: Addr<ThresholdKeyshare> = unimplemented!();
+    /// # let event: CiphernodeSelected = unimplemented!();
+    /// // Start threshold-share generation for the selected cipher node
+    /// let _ = tk.handle_ciphernode_selected(event, addr);
+    /// ```
     pub fn handle_ciphernode_selected(
         &mut self,
         msg: CiphernodeSelected,

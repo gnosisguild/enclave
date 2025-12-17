@@ -48,6 +48,32 @@ pub const DEFAULT_LOG_NAME: &str = "log";
 // the config file. Otherwise locate config in the default app configuration folder and data in
 // the default app data folder.
 impl PathsEngine {
+    /// Constructs a new `PathsEngine` configured with the provided name, working directory,
+    /// defaults, and optional overrides for config, data, db, key, and log locations.
+    ///
+    /// The `name` is used as an identifier when building per-application subpaths. Path
+    /// arguments are cloned into the engine; `Option<&PathBuf>` arguments are converted to
+    /// owned `Option<PathBuf>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    /// let engine = crate::PathsEngine::new(
+    ///     "myapp",
+    ///     &PathBuf::from("."),
+    ///     &PathBuf::from("/var/lib/myapp"),
+    ///     &PathBuf::from("/etc/myapp"),
+    ///     None, // found_config_file
+    ///     None, // config_dir_override
+    ///     None, // data_dir_override
+    ///     None, // db_file_override
+    ///     None, // key_file_override
+    ///     None, // log_file_override
+    /// );
+    /// let cfg = engine.config_file();
+    /// assert!(cfg.ends_with("enclave.config.yaml"));
+    /// ```
     pub fn new(
         name: &str,
         cwd: &PathBuf,
@@ -99,7 +125,36 @@ impl PathsEngine {
         )
     }
 
-    /// Full path to the database file containing the db
+    /// Resolve the full filesystem path to the database file for this engine.
+    ///
+    /// Chooses the database path in the following order:
+    /// - If `db_file_override` is set and absolute, return that cleaned path.
+    /// - If `db_file_override` is set and relative, return it joined under `<data_dir>/<name>/`.
+    /// - Otherwise return `<data_dir>/<name>/db`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::PathBuf;
+    /// // Construct a PathsEngine (arguments: name, cwd, default_data_dir, default_config_dir,
+    /// // config_dir_override, found_config_file, data_dir_override, db_file_override, log_file_override, key_file_override)
+    /// let engine = PathsEngine::new(
+    ///     "app",
+    ///     PathBuf::from("."),
+    ///     PathBuf::from("/var/lib/app"),
+    ///     PathBuf::from("/etc/app"),
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     None,
+    /// );
+    /// let db = engine.db_file();
+    /// assert_eq!(db, PathBuf::from("/var/lib/app").join("app").join("db"));
+    /// ```
+    ///
+    /// @returns A `PathBuf` containing the cleaned path to the database file.
     pub fn db_file(&self) -> PathBuf {
         if let Some(data_file) = self.db_file_override.clone() {
             if data_file.is_absolute() {
@@ -112,6 +167,53 @@ impl PathsEngine {
         clean(self.get_data_dir().join(&self.name).join(DEFAULT_DB_NAME))
     }
 
+    /// Resolves the log file path for this engine instance.
+    ///
+    /// If a `log_file_override` is set, an absolute override is returned as-is (cleaned);
+    /// a relative override is interpreted under `<data_dir>/<name>/` and returned cleaned.
+    /// If no override is provided, returns `<data_dir>/<name>/log` cleaned.
+    ///
+    /// # Returns
+    ///
+    /// A `PathBuf` pointing to the resolved log file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::PathBuf;
+    ///
+    /// // Construct PathsEngine with a relative log override
+    /// let engine = PathsEngine::new(
+    ///     "app",
+    ///     None,                     // config_dir_override
+    ///     None,                     // found_config_file
+    ///     None,                     // data_dir_override
+    ///     None,                     // db_file_override
+    ///     Some(&PathBuf::from("custom.log")), // log_file_override (relative)
+    ///     None,                     // key_file_override
+    ///     &PathBuf::from("/var/lib"), // default_data_dir
+    ///     &PathBuf::from("/etc"),     // default_config_dir
+    ///     &PathBuf::from("."),        // cwd
+    /// );
+    ///
+    /// let log = engine.log_file();
+    /// assert!(log.ends_with("app/custom.log"));
+    ///
+    /// // Absolute override is preserved
+    /// let engine_abs = PathsEngine::new(
+    ///     "app",
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     None,
+    ///     Some(&PathBuf::from("/tmp/app.log")), // absolute override
+    ///     None,
+    ///     &PathBuf::from("/var/lib"),
+    ///     &PathBuf::from("/etc"),
+    ///     &PathBuf::from("."),
+    /// );
+    /// assert_eq!(engine_abs.log_file(), PathBuf::from("/tmp/app.log"));
+    /// ```
     pub fn log_file(&self) -> PathBuf {
         if let Some(log_file) = self.log_file_override.clone() {
             if log_file.is_absolute() {
@@ -123,6 +225,50 @@ impl PathsEngine {
         clean(self.get_data_dir().join(&self.name).join(DEFAULT_LOG_NAME))
     }
 
+    /// Resolve a path relative to the configuration file's directory.
+    ///
+    /// If `path` is absolute, it is returned unchanged. If `path` is relative, it is joined to the
+    /// directory containing the resolved configuration file (or to the current working directory if
+    /// the config file has no parent) and cleaned.
+    ///
+    /// # Parameters
+    ///
+    /// - `path`: the path to resolve; treated as absolute if `path.is_absolute()` is true.
+    ///
+    /// # Returns
+    ///
+    /// A `PathBuf` representing `path` resolved against the configuration directory or returned as-is
+    /// for absolute inputs.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::path::PathBuf;
+    ///
+    /// // Construct a PathsEngine (arguments shown for illustration; adapt to actual constructor).
+    /// let engine = PathsEngine::new(
+    ///     "app",
+    ///     &PathBuf::from("/home/user/project"),
+    ///     &PathBuf::from("/var/lib/app"),
+    ///     &PathBuf::from("/etc/app"),
+    ///     None, // config_dir_override
+    ///     None, // found_config_file
+    ///     None, // data_dir_override
+    ///     None, // db_file_override
+    ///     None, // log_file_override
+    ///     None, // key_file_override
+    /// );
+    ///
+    /// // Relative path is resolved against the config dir
+    /// let rel = PathBuf::from("sub/setting.yaml");
+    /// let resolved = engine.relative_to_config(&rel);
+    /// assert!(resolved.is_absolute());
+    ///
+    /// // Absolute path is returned unchanged
+    /// let abs = PathBuf::from("/tmp/override.yaml");
+    /// let same = engine.relative_to_config(&abs);
+    /// assert_eq!(same, abs);
+    /// ```
     pub fn relative_to_config(&self, path: &PathBuf) -> PathBuf {
         if path.is_absolute() {
             return PathBuf::from(path);
@@ -203,6 +349,34 @@ mod test {
         log_file: &'static str,
     }
 
+    /// Runs a collection of path-resolution test cases, asserting that each `PathsEngine`
+    /// result matches the provided expectations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Construct a single test case and run it with the helper.
+    /// let input = PathsInput {
+    ///     name: "app",
+    ///     cwd: ".",
+    ///     default_data_dir: "/tmp/data",
+    ///     default_config_dir: "/etc/app",
+    ///     config_dir_override: None,
+    ///     found_config_file: None,
+    ///     data_dir_override: None,
+    ///     db_file_override: None,
+    ///     log_file_override: None,
+    ///     key_file_override: None,
+    /// };
+    /// let expected = PathsExpected {
+    ///     config_file: "/etc/app/enclave.config.yaml",
+    ///     key_file: "/etc/app/app/key",
+    ///     db_file: "/tmp/data/app/db",
+    ///     log_file: "/tmp/data/app/log",
+    /// };
+    /// let tc = TestCase { name: "defaults", input, expected };
+    /// test_cases(vec![tc]);
+    /// ```
     fn test_cases(test_cases: Vec<TestCase>) {
         // Run all test cases
         for test_case in test_cases {

@@ -17,6 +17,17 @@ pub trait SortitionRepositoryFactory {
 }
 
 impl SortitionRepositoryFactory for Repositories {
+    /// Create a Repository scoped to the sortition store.
+    ///
+    /// This repository provides access to the map keyed by `u64` with `SortitionBackend` values
+    /// stored under the sortition namespace.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given a `repositories` value, obtain the sortition repository.
+    /// let sortition_repo = repositories.sortition();
+    /// ```
     fn sortition(&self) -> Repository<HashMap<u64, SortitionBackend>> {
         Repository::new(self.store.scope(StoreKeys::sortition()))
     }
@@ -27,6 +38,17 @@ pub trait CiphernodeSelectorFactory {
 }
 
 impl CiphernodeSelectorFactory for Repositories {
+    /// Create a repository scoped to the `ciphernode_selector` store key.
+    ///
+    /// The returned repository stores a `HashMap<E3id, E3Meta>`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::Repositories;
+    /// let repos: Repositories = unimplemented!();
+    /// let repo = repos.ciphernode_selector();
+    /// ```
     fn ciphernode_selector(&self) -> Repository<HashMap<E3id, E3Meta>> {
         Repository::new(self.store.scope(StoreKeys::ciphernode_selector()))
     }

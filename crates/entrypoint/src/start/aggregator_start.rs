@@ -20,6 +20,24 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
+/// Initializes and starts a ciphernode node configured from `config`, wires its cryptographic context and networking integration, and optionally attaches test writers for public keys and plaintexts.
+///
+/// # Returns
+///
+/// A tuple containing the node's enclave `BusHandle`, a `JoinHandle` for the running node task that resolves to `anyhow::Result<()>`, and the node's libp2p peer identifier.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use e3_config::AppConfig;
+/// # use std::path::PathBuf;
+/// # async fn example() -> anyhow::Result<()> {
+/// let config = AppConfig::default(); // construct with real values in real use
+/// let (bus, join_handle, peer_id) = e3_ciphernode::execute(&config, None, None, false).await?;
+/// // use bus, join_handle, peer_id...
+/// # Ok::<(), anyhow::Error>(())
+/// # }
+/// ```
 pub async fn execute(
     config: &AppConfig,
     pubkey_write_path: Option<PathBuf>,
