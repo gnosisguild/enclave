@@ -112,9 +112,8 @@ export function Dashboard() {
 ## Configuration contract map
 
 Provide both the Enclave and CiphernodeRegistry addresses. The template exposes these via `.env` /
-`enclave.config.yaml`, and CRISP scripts surface them in deployment logs. For multi-chain apps,
-instantiate multiple SDKs or call `sdk.updateConfig({ contracts: { ... }, chainId })` whenever
-wallets switch networks.
+`enclave.config.yaml`. For multi-chain apps, instantiate multiple SDKs or call
+`sdk.updateConfig({ contracts: { ... }, chainId })` whenever wallets switch networks.
 
 ## Working with the template
 
@@ -128,6 +127,23 @@ client already wires `@enclave-e3/sdk` and `@enclave-e3/react`:
 
 When you add new contracts or E3 programs, update `client/.env` and `server/.env` with the new
 addresses, then restart the dev server so the SDK reconnects.
+
+## Application-specific SDKs
+
+For complex E3 programs with specialized requirements, you may want to build an application-specific
+SDK on top of or alongside the Enclave SDK. For example,
+[CRISP](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP) uses `@crisp-e3/sdk`, which
+provides:
+
+- Zero-knowledge proof generation for votes using Noir circuits
+- Merkle tree utilities for voter eligibility verification
+- Vote encryption helpers using FHE
+- Round management and token operations
+- CRISP server interaction APIs
+
+If your E3 program requires specialized cryptographic operations, domain-specific logic, or
+application-level abstractions beyond basic protocol interactions, consider building a dedicated SDK
+that wraps or complements the core Enclave SDK.
 
 ## Advanced usage
 
