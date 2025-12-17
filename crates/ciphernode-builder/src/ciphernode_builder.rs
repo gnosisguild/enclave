@@ -52,11 +52,6 @@ enum EventSystemType {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
-    /// Unique name for the ciphernode. This name is used to derive the HLC tie breaker
-    /// functionality.
-    // TODO: how do we ensure this name is unique?
-    // TODO: we might be able to get away with simply making this a random number for every session
-    // but we need to discuss
     name: String,
     address: Option<String>,
     chains: Vec<ChainConfig>,
