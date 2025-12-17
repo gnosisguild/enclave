@@ -9,6 +9,7 @@ use actix::prelude::*;
 use anyhow::bail;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
+use e3_events::E3RequestComplete;
 use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, E3id, EType,
     EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
@@ -68,6 +69,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::E3Requested(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
             EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data),
             EnclaveEventData::Shutdown(data) => ctx.notify(data),
             _ => (),
@@ -148,6 +150,18 @@ impl Handler<E3Requested> for CiphernodeSelector {
             } else {
                 info!("This node is not selected");
             }
+        })
+    }
+}
+
+impl Handler<E3RequestComplete> for CiphernodeSelector {
+    type Result = ();
+    fn handle(&mut self, msg: E3RequestComplete, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Sortition, &self.bus.clone(), move || {
+            self.e3_cache.try_mutate(|mut cache| {
+                cache.remove(&msg.e3_id);
+                Ok(cache)
+            })
         })
     }
 }
