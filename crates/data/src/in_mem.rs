@@ -7,7 +7,6 @@
 use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
-use commitlog::Offset;
 use std::{collections::BTreeMap, ops::Deref};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
