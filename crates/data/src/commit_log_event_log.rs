@@ -78,11 +78,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
-        // Create some test events - adjust these to match your actual EnclaveEvent structure
         let event1 = event_from(TestEvent::new("one", 1));
         let event2 = event_from(TestEvent::new("two", 2));
 
-        // Append events
         let offset1 = log.append(&event1).unwrap();
         let offset2 = log.append(&event2).unwrap();
 
