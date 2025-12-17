@@ -41,7 +41,7 @@ mod tests {
     use e3_events::SequenceIndex;
 
     #[test]
-    fn seek_for_prev_finds_nearest_key_at_or_before_target() {
+    fn seek_finds_nearest_key_at_or_after_target() {
         let mut index = InMemSequenceIndex::new();
         index.insert(100, 1).unwrap();
         index.insert(200, 2).unwrap();
