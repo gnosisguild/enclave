@@ -22,7 +22,7 @@ let publicKey = generatePublicKey()
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {
-    it.only('should decode a tally correctly', async () => {
+    it('should decode a tally correctly', async () => {
       const mockEnclave = await deployMockEnclave()
       const crispProgram = await deployCRISPProgram({ mockEnclave })
 
