@@ -47,7 +47,6 @@ mod tests {
         index.insert(200, 2).unwrap();
         index.insert(300, 3).unwrap();
 
-        // Empty range (before all keys)
         assert_eq!(index.seek(50).unwrap(), Some(1));
 
         // Exact matches
@@ -59,7 +58,6 @@ mod tests {
         assert_eq!(index.seek(150).unwrap(), Some(2));
         assert_eq!(index.seek(250).unwrap(), Some(3));
 
-        // After all keys (returns last)
         assert_eq!(index.seek(999).unwrap(), None);
     }
 }
