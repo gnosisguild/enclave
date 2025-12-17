@@ -33,7 +33,7 @@ use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
-const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
+const MAX_KADEMLIA_PAYLOAD_MB: usize = 12;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
 use crate::events::{GossipData, NetCommand};
