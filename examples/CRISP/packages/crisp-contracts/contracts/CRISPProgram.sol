@@ -51,7 +51,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidNoirProof();
   error InvalidMerkleRoot();
   error MerkleRootAlreadySet();
-
+  error InvalidTallyLength();
   // Events
   event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
 
@@ -159,6 +159,10 @@ contract CRISPProgram is IE3Program, Ownable {
 
     // decode it into an array of uint64
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
+
+    if (tally.length % 2 != 0) {
+      revert InvalidTallyLength();
+    }
 
     uint256 halfD = tally.length / 2;
 
