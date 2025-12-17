@@ -3225,6 +3225,7 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-request",
+ "e3-utils",
  "num",
  "num-bigint",
  "rand 0.8.5",

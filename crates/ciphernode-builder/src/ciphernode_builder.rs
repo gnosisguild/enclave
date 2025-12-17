@@ -356,7 +356,8 @@ impl CiphernodeBuilder {
         )
         .await?;
 
-        CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr);
+        CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
+            .await?;
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;

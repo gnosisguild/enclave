@@ -14,6 +14,8 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
+use e3_utils::colorize;
+use e3_utils::Color;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -58,6 +60,7 @@ impl CiphernodeSelector {
         bus.subscribe("CommitteeFinalized", addr.clone().recipient());
         bus.subscribe("Shutdown", addr.clone().recipient());
 
+        info!("CiphernodeSelector listening!");
         Ok(addr)
     }
 }
@@ -85,6 +88,10 @@ impl Handler<E3Requested> for CiphernodeSelector {
 
         trap(EType::Sortition, &bus.clone(), || {
             self.e3_cache.try_mutate(|mut cache| {
+                info!(
+                    "Mutating e3_cache: appending data: {:?}",
+                    data.e3_id.clone()
+                );
                 cache.insert(
                     data.e3_id.clone(),
                     E3Meta {
@@ -109,6 +116,8 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 seed,
                 size
             );
+            // TODO: instead of this it would be better to pass the event theough sortition and
+            // then decorate it with this information WithIndex<E3Requested>
             if let Ok(found_result) = sortition
                 .send(GetNodeIndex {
                     chain_id,
@@ -150,11 +159,14 @@ impl Handler<CommitteeFinalized> for CiphernodeSelector {
 
     fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Sortition, &self.bus.clone(), move || {
+            info!("CiphernodeSelector received CommitteeFinalized.");
             let bus = self.bus.clone();
+            info!("Getting e3_cache...");
             let Some(e3_cache) = self.e3_cache.get() else {
                 bail!("Could not get cache");
             };
 
+            info!("Getting e3_meta...");
             let Some(e3_meta) = e3_cache.get(&msg.e3_id) else {
                 bail!(
                     "Could not find E3Meta on CiphernodeSelector for {}",
