@@ -20,120 +20,124 @@ Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before 
 
 <Steps>
 
-### Start Infrastructure
+### Prep Once per Checkout
 
-First, ensure you have the infrastructure running. If you haven't already, complete the setup:
-
-**Terminal 1: Start Anvil**
-
-```sh
-anvil
-```
-
-**Terminal 2: Start Ciphernodes**
+From the repo root run the bundled setup script (it installs dependencies, builds the CLI, prepares
+env files, and compiles contracts):
 
 ```sh
 cd examples/CRISP
-enclave nodes up -v
+pnpm dev:setup
 ```
 
-Make sure contracts are deployed and ciphernodes are added to the registry as described in the setup
-guide.
+You only need to re-run this when dependencies change.
 
-### Start the Client Application
+### Start Everything with One Command
 
-**Terminal 3: Client**
-
-Navigate to the client directory and start the React application:
+The CRISP workspace ships with a supervisor that launches Hardhat, deploys contracts, boots
+Ciphernodes, runs the RISC Zero program server, the Rust backend, and the React client. Start it in
+the example root:
 
 ```sh
-cd examples/CRISP/client
-pnpm dev
+pnpm dev:up
 ```
 
-The client application will start on `http://localhost:3000`.
+Behind the scenes `scripts/dev.sh` calls `scripts/dev_services.sh`, which:
 
-### Start the Server Application
+- Spawns a Hardhat chain on `http://localhost:8545`
+- Deploys contracts and registers five Ciphernodes against the local registry
+- Runs `enclave program start --dev true` so proving happens instantly while developing
+- Launches the Rust server with `cargo run --bin server`
+- Starts the React client via `pnpm dev-static`
 
-**Terminal 4: Server**
-
-Navigate to the server directory and start the backend server:
-
-```sh
-cd examples/CRISP/server
-cargo run --bin server
-```
-
-The server will start and begin listening for blockchain events.
-
-### Start the Program Server
-
-**Terminal 5: Program**
-
-Navigate to the program directory and start the program server:
-
-```sh
-cd examples/CRISP/
-enclave program start
-```
-
-This runs the RISC Zero program server that handles secure computations.
-
-If you would like to run the program server in dev mode, you can run the following command:
-
-```sh
-cd examples/CRISP/
-enclave program start --dev true
-```
-
-In this case, Risc0 will not be used to generate proofs, and instead these will be mocked.
+Keep this terminal open; logs from every service are multiplexed with `pnpm concurrently`.
 
 ### Initialize a New Voting Round
 
-**Terminal 6: CLI**
-
-Navigate to the server directory and start the CLI:
+Open a new terminal and launch the CLI from the example root:
 
 ```sh
-cd examples/CRISP/server
-cargo run --bin cli
+pnpm cli
 ```
 
-Follow these steps in the CLI:
+You can initialize a round using the interactive menu or directly via command-line flags:
 
-1. Select `CRISP: Voting Protocol (ETH)` from the menu
-2. Choose `Initialize new E3 round` to start a new voting round
+**Interactive Menu:**
+
+1. Select `Initialize new E3 round`
+2. Enter the token contract address
+3. Enter the balance threshold for the voting round
+
+**Command-Line (Direct):**
+
+```bash
+cargo run --bin cli init --token-address 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 --balance-threshold 1000
+```
+
+**Command-line flags:**
+
+- `--token-address`: ERC20 token address for voting eligibility
+- `--balance-threshold`: Balance threshold for the voting round
 
 You should see output similar to:
 
 ```sh
-[2024-10-22 11:56:11] [commands.rs:42] - Starting new CRISP round!
-[2024-10-22 11:56:11] [commands.rs:46] - Enabling E3 Program...
-[2024-10-22 11:56:11] [commands.rs:50] - E3 Program enabled. TxHash: 0xa391a4cd2dcc59f4bc6dd1f5ed1c78006dbba4556ea633f4b6a53e2271538682
-[2024-10-22 11:56:11] [commands.rs:74] - E3 request sent. TxHash: 0xe7998b9748e3526f6ca992c9bb498beabe4f387b02240a23d0f42a2386d3c305
+[2025-12-16 13:41:37] [commands.rs:77] - Starting new CRISP round with token address: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 and balance threshold: 1000000000000000000
+[2025-12-16 13:41:37] [commands.rs:90] - Enabling E3 Program with address: 0x67d269191c92Caf3cD7723F116c85e6E9bf55933
+[2025-12-16 13:41:37] [commands.rs:94] - E3 Program enabled. TxHash: 0xa391a4cd2dcc59f4bc6dd1f5ed1c78006dbba4556ea633f4b6a53e2271538682
+[2025-12-16 13:41:37] [commands.rs:118] - E3 request sent. TxHash: 0xe7998b9748e3526f6ca992c9bb498beabe4f387b02240a23d0f42a2386d3c305
 ```
 
 ### Set Up MetaMask
 
-To interact with the client application, you need to configure MetaMask:
+Whether you used `pnpm dev:up` or the manual flow below, you will interact with the Hardhat chain
+running at `http://localhost:8545` (chain ID `31337`). Configure MetaMask once:
 
-1. Open MetaMask in your browser
-2. Add the Anvil private key to your wallet:
+1. Import the Hardhat deployer key so you have funds available:
    ```
    0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
    ```
-3. Connect to the local Anvil network:
-   - Network Name: Anvil Local
-   - RPC URL: `http://localhost:8545`
-   - Chain ID: `31337`
-   - Currency Symbol: `ETH`
+2. Add a custom network pointing to `http://localhost:8545` with symbol `ETH` and chain ID `31337`.
+3. Connect your wallet to `http://localhost:3000` when the client asks.
 
 ### Submit Votes via Web Interface
 
-1. Navigate to `http://localhost:3000` in your browser
-2. Connect your MetaMask wallet
-3. You should see the active voting round
-4. Submit your vote by selecting your choice and confirming the transaction
+1. Navigate to `http://localhost:3000` (started by `pnpm dev:up`)
+2. Connect your MetaMask wallet when prompted
+3. You should see the active voting round seeded by the CLI request
+4. Cast a vote, approve the transaction, and wait for the confirmation toast
+
+### Manual Control (Optional)
+
+If you prefer to run each process in its own terminal (or need to customize flags), replicate what
+`pnpm dev:up` does under the hood:
+
+1. **Hardhat chain + deploy contracts**
+   ```sh
+   pnpm -C packages/crisp-contracts hardhat node
+   # in another terminal
+   ./scripts/crisp_deploy.sh
+   ```
+2. **Ciphernodes & wallets**
+   ```sh
+   ./scripts/dev_cipher.sh ./.enclave/ready
+   ```
+   This script wipes previous `.enclave` state, installs dev wallets, starts `enclave nodes up -v`,
+   and waits until all nodes are registered.
+3. **Program server**
+   ```sh
+   ./scripts/dev_program.sh        # add --dev true inside to skip proofs in dev
+   ```
+4. **Rust server**
+   ```sh
+   wait-on tcp:13151 && ./scripts/dev_server.sh
+   ```
+5. **React client**
+   ```sh
+   wait-on tcp:4000 && wait-on file:./.enclave/ready && ./scripts/dev_client.sh
+   ```
+
+You can also let `./scripts/dev_services.sh` orchestrate steps 2–5 once Hardhat is up.
 
 ### Monitor the Process
 
@@ -194,7 +198,8 @@ The CRISP voting process involves several key steps:
 - **Ensure all terminals remain open** during the voting process
 - **MetaMask connection issues**: Check that you're connected to the correct network (Chain
   ID: 31337)
-- **Transaction failures**: Verify you have sufficient ETH balance from the Anvil faucet
+- **Transaction failures**: Verify you have sufficient ETH balance from the Hardhat faucet (the
+  account with the imported deployer key starts funded)
 - **Server errors**: Monitor the server logs for detailed error messages
 - **Ciphernode issues**: Ensure all ciphernode processes are running and connected
 

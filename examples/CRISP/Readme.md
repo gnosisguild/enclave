@@ -204,37 +204,52 @@ After deployment, you will see the addresses for the following contracts:
 - CRISP Input Validator Factory
 - CRISP Program
 
-#### Step 3: RISC0 Setup (Optional)
+#### Step 3: Configure Boundless (Optional)
 
-> Please note that this step is optional for development only. You can run the program server in dev
-> mode which does not use Risc0. The smart contracts would have already been deployed at the
-> previous step.
+> Please note that this step is optional for development only. By default, the program server runs
+> in dev mode which uses fake proofs for fast local development.
 
----
+For production-grade zero-knowledge proofs with [Boundless](https://docs.beboundless.xyz/), update
+the `enclave.config.yaml` file in the CRISP root directory:
 
-**Faster Proving w/ Bonsai**
+```yaml
+program:
+  dev: false # Disable dev mode to use real proofs
+  risc0:
+    risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode
+    boundless:
+      rpc_url: 'https://sepolia.infura.io/v3/YOUR_KEY' # RPC endpoint
+      private_key: 'YOUR_PRIVATE_KEY' # Wallet with funds for proving
+      pinata_jwt: 'YOUR_PINATA_JWT' # Required for uploading programs to IPFS
+      program_url: 'https://gateway.pinata.cloud/ipfs/YOUR_CID' # Pre-uploaded program URL
+      onchain: true # true = onchain requests, false = offchain
+```
 
-The following steps are optional. You can config
-[Bonsai](https://dev.risczero.com/api/generating-proofs/remote-proving) for faster proving.
+> **_Note:_** For production proving with Boundless, you need:
+>
+> - An RPC endpoint (e.g., Infura, Alchemy) with funds
+> - A private key with sufficient ETH/tokens for proof generation
+> - A Pinata JWT for uploading programs to IPFS (get one at [pinata.cloud](https://pinata.cloud))
+> - Pre-uploaded program URL to avoid uploading the ~40MB program at runtime
 
-- Set up environment variables by creating a `.cargo` directory and `config.toml` file:
+### Uploading Your Program to IPFS
 
-  ```sh
-  mkdir .cargo && cd .cargo && touch config.toml
-  ```
+When you make changes to the guest program in `program/`, you need to upload it to IPFS:
 
-- Add the following configuration to `config.toml`:
+1. Build and upload your program:
 
-  > **_Note:_** _This requires having access to a Bonsai API Key. To request an API key
-  > [complete the form here](https://bonsai.xyz/apply)._
+   ```bash
+   enclave program upload
+   ```
 
-  ```toml
-  [env]
-  BONSAI_API_KEY="your_api_key"
-  BONSAI_API_URL="your_api_url"
-  ```
+2. The command outputs an IPFS hash. Update `enclave.config.yaml` with the full URL:
 
----
+   ```yaml
+   program_url: 'https://gateway.pinata.cloud/ipfs/QmXxx...'
+   ```
+
+> **_Important:_** Every time you modify the guest program, rebuild and re-upload it to IPFS, then
+> update the `program_url` in your configuration.
 
 #### Step 4: Set up Environment Variables
 
