@@ -160,10 +160,6 @@ contract CRISPProgram is IE3Program, Ownable {
     // decode it into an array of uint64
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
-    if (tally.length % 2 != 0) {
-      revert InvalidTallyLength();
-    }
-
     uint256 halfD = tally.length / 2;
 
     // Convert yes votes
@@ -229,11 +225,13 @@ contract CRISPProgram is IE3Program, Ownable {
     }
   }
 
-  /// @notice Decode bytes to uint256 array
-  /// @param data The bytes to decode (must be multiple of 32)
-  /// @return result Array of uint256 values
+  /// @notice Decode bytes to uint64 array
+  /// @param data The bytes to decode (must be multiple of 8)
+  /// @return result Array of uint64 values
   function _decodeBytesToUint64Array(bytes memory data) internal pure returns (uint64[] memory result) {
-    require(data.length % 8 == 0, "Data length must be multiple of 8");
+    if (data.length % 8 != 0) {
+      revert InvalidTallyLength();
+    }
 
     uint256 arrayLength = data.length / 8;
     result = new uint64[](arrayLength);
