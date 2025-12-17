@@ -20,8 +20,6 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
-use crate::helpers::datastore::setup_datastore;
-
 pub async fn execute(
     config: &AppConfig,
     pubkey_write_path: Option<PathBuf>,

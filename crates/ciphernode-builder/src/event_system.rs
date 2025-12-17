@@ -334,7 +334,7 @@ mod tests {
 
     impl Handler<GetLogs> for Listener {
         type Result = Vec<String>;
-        fn handle(&mut self, msg: GetLogs, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _: GetLogs, _: &mut Self::Context) -> Self::Result {
             self.logs.clone()
         }
     }

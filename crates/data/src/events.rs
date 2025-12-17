@@ -86,25 +86,3 @@ impl Remove {
         &self.0
     }
 }
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "()")]
-pub struct SeekForPrev(pub Vec<u8>);
-impl SeekForPrev {
-    pub fn new<K: IntoKey>(key: K) -> Self {
-        Self(key.into_key())
-    }
-
-    pub fn key(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SeekForPrevReply(u64);
-impl SeekForPrevReply {
-    pub fn new(val: u64) -> Self {
-        Self(val)
-    }
-}

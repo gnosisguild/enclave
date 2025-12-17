@@ -14,8 +14,6 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
-use e3_utils::colorize;
-use e3_utils::Color;
 use std::collections::HashMap;
 use tracing::info;
 
