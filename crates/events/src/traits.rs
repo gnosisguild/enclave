@@ -104,7 +104,7 @@ pub trait SequenceIndex: Unpin + 'static {
     fn insert(&mut self, key: u128, value: u64) -> Result<()>;
     /// Get the sequence offset for the given timestamp
     fn get(&self, key: u128) -> Result<Option<u64>>;
-    /// Get the first sequence offset before the given timestamp
+    /// Get the first sequence offset at or after the given timestamp
     fn seek(&self, key: u128) -> Result<Option<u64>>;
 }
 
