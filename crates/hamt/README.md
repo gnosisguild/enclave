@@ -1,10 +1,13 @@
 # HAMT - A Space Efficient Serializable Hash Array Mapped Trie
 
-A serializable persistent, immutable hash map implementation in Rust using a Hash Array Mapped Trie data structure designed for using in Enclave Sortition.
+A serializable persistent, immutable hash map implementation in Rust using a Hash Array Mapped Trie
+data structure designed for using in Enclave Sortition.
 
 ## What is a HAMT?
 
-A HAMT is a tree-based data structure that provides efficient immutable key-value storage. Instead of copying the entire map on updates, it shares structure between versions, making operations both fast and memory-efficient.
+A HAMT is a tree-based data structure that provides efficient immutable key-value storage. Instead
+of copying the entire map on updates, it shares structure between versions, making operations both
+fast and memory-efficient.
 
 ## Features
 
@@ -12,7 +15,8 @@ A HAMT is a tree-based data structure that provides efficient immutable key-valu
 - **Immutable**: All operations return new maps without mutating the original
 - **Structural Sharing**: Different versions share most of their data via `Arc`
 - **Thread-Safe**: Can be safely shared across threads (`Send + Sync`)
-- **Space-Efficient Serialization**: Multiple map versions can be serialized together without duplicating shared nodes
+- **Space-Efficient Serialization**: Multiple map versions can be serialized together without
+  duplicating shared nodes
 
 ## Usage
 
@@ -54,7 +58,8 @@ assert_eq!(Some(&2), map2.get(&"b"));    // shared data
 
 ## Serialization with Deduplication
 
-When you have multiple related maps (versions), you can serialize them together to avoid duplicating shared structure:
+When you have multiple related maps (versions), you can serialize them together to avoid duplicating
+shared structure:
 
 ```rust
 use hamt::Hamt;
@@ -101,7 +106,8 @@ serde = { version = "1", features = ["derive"] }
 
 ## Future considerations
 
-We could consider adding a Rc version for signlethreaded usage which is cheaper and faster than using Arc.
+We could consider adding a Rc version for signlethreaded usage which is cheaper and faster than
+using Arc.
 
 ## Benchmarks
 
