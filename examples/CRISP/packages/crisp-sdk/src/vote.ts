@@ -11,7 +11,7 @@ import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MASK_SIGNATURE } from 
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
-import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
 import { Hex } from 'viem'
 
 // Initialize the ZKInputsGenerator.
@@ -28,8 +28,8 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
   const voteArray = []
   const length = bfvParams.degree
   const halfLength = length / 2
-  const yesBinary = toBinary(vote.yes).split('')
-  const noBinary = toBinary(vote.no).split('')
+  const yesBinary = toBinary(BigInt(vote.yes)).split('')
+  const noBinary = toBinary(BigInt(vote.no)).split('')
 
   // Fill first half with 'yes' binary representation (pad with leading 0s if needed)
   for (let i = 0; i < halfLength; i++) {
@@ -47,32 +47,68 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
 }
 
 /**
+ * Decode bytes to numbers array (little-endian, 8 bytes per value).
+ * @param data The bytes to decode (must be multiple of 8).
+ * @returns Array of numbers.
+ */
+const decodeBytesToNumbers = (data: Uint8Array): number[] => {
+  if (data.length % 8 !== 0) {
+    throw new Error('Data length must be multiple of 8')
+  }
+
+  const arrayLength = data.length / 8
+  const result: number[] = []
+
+  for (let i = 0; i < arrayLength; i++) {
+    const offset = i * 8
+    let value = 0
+
+    // Read 8 bytes in little-endian order
+    for (let j = 0; j < 8; j++) {
+      const byteValue = data[offset + j]
+      value |= byteValue << (j * 8)
+    }
+
+    result.push(value)
+  }
+
+  return result
+}
+
+/**
  * Decode an encoded tally into its decimal representation.
- * @param tally The encoded tally to decode.
+ * @param tallyBytes The encoded tally as a hex string (bytes).
  * @returns The decoded tally as an IVote.
  */
-export const decodeTally = (tally: string[]): Vote => {
-  const HALF_D = tally.length / 2
+export const decodeTally = (tallyBytes: string): Vote => {
+  // Convert hex string to bytes, handling both with and without 0x prefix
+  const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
+  const bytes = hexToBytes(hexString as Hex)
+
+  // Decode bytes to numbers array
+  const numbers = decodeBytesToNumbers(bytes)
+
+  const HALF_D = numbers.length / 2
   const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
-  const START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE
+  const START_INDEX_N = numbers.length - HALF_LARGEST_MINIMUM_DEGREE
 
   // Extract only the relevant parts of the tally
-  const yesBinary = tally.slice(START_INDEX_Y, HALF_D)
-  const noBinary = tally.slice(START_INDEX_N, tally.length)
+  const yesBinary = numbers.slice(START_INDEX_Y, HALF_D)
+  const noBinary = numbers.slice(START_INDEX_N, numbers.length)
 
-  let yes = 0n
-  let no = 0n
+  let yes = 0
+  let no = 0
 
   // Convert yes votes (from START_INDEX_Y to HALF_D)
   for (let i = 0; i < yesBinary.length; i += 1) {
-    const weight = 2n ** BigInt(yesBinary.length - 1 - i)
-    yes += BigInt(yesBinary[i]) * weight
+    const weight = 2 ** (yesBinary.length - 1 - i)
+    yes += yesBinary[i] * weight
   }
 
   // Convert no votes (from START_INDEX_N to D)
   for (let i = 0; i < noBinary.length; i += 1) {
-    const weight = 2n ** BigInt(noBinary.length - 1 - i)
-    no += BigInt(noBinary[i]) * weight
+    const weight = 2 ** (noBinary.length - 1 - i)
+    no += noBinary[i] * weight
   }
 
   return {
@@ -98,7 +134,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
     // If no previous ciphertext is provided, a placeholder ciphertext vote will be generated.
     // This is safe because the circuit will not check the ciphertext addition if
     // the previous ciphertext is not provided (is_first_vote is true).
-    proofInputs.previousCiphertext || encryptVote({ yes: 0n, no: 0n }, proofInputs.publicKey),
+    proofInputs.previousCiphertext || encryptVote({ yes: 0, no: 0 }, proofInputs.publicKey),
     proofInputs.publicKey,
     encodedVote,
   )
@@ -149,7 +185,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     throw new Error('Invalid vote: vote exceeds maximum allowed value')
   }
 
-  if (voteProofInputs.vote.yes < 0n || voteProofInputs.vote.no < 0n) {
+  if (voteProofInputs.vote.yes < 0 || voteProofInputs.vote.no < 0) {
     throw new Error('Invalid vote: vote is negative')
   }
 
@@ -173,7 +209,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
     signature: MASK_SIGNATURE,
-    vote: { yes: 0n, no: 0n },
+    vote: { yes: 0, no: 0 },
     merkleProof,
   })
 

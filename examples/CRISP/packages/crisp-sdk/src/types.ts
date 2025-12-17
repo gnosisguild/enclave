@@ -71,11 +71,11 @@ export type Vote = {
   /**
    * The voting power for 'yes' votes
    */
-  yes: bigint
+  yes: number
   /**
    * The voting power for 'no' votes
    */
-  no: bigint
+  no: number
 }
 
 /**
