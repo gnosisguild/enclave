@@ -29,8 +29,6 @@ contract CRISPProgram is IE3Program, Ownable {
   bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
   /// @notice The depth of the input Merkle tree.
   uint8 public constant TREE_DEPTH = 20;
-  /// @notice Half of the largest minimum degree used to fit votes inside the plaintext polynomial.
-  uint256 public constant HALF_LARGEST_MINIMUM_DEGREE = 28; // static, hardcoded in the circuit.
 
   // State variables
   IEnclave public enclave;
@@ -159,31 +157,21 @@ contract CRISPProgram is IE3Program, Ownable {
     // fetch from enclave
     E3 memory e3 = enclave.getE3(e3Id);
 
-    // abi decode it into an array of uint256
-    uint256[] memory tally = abi.decode(e3.plaintextOutput, (uint256[]));
+    // decode it into an array of uint64
+    uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
-    /// @notice We want to completely ignore anything outside of the coefficients
-    /// we agreed to store out votes on.
     uint256 halfD = tally.length / 2;
-    uint256 START_INDEX_Y = halfD - HALF_LARGEST_MINIMUM_DEGREE;
-    uint256 START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
-
-    // first weight (we are converting back from bits to integer)
-    uint256 weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
 
     // Convert yes votes
-    for (uint256 i = START_INDEX_Y; i < halfD; i++) {
+    for (uint256 i = 0; i < halfD; i++) {
+      uint256 weight = 2 ** (halfD - 1 - i);
       yes += tally[i] * weight;
-      weight /= 2; // Right shift equivalent
     }
 
-    // Reset weight for no votes
-    weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
-
     // Convert no votes
-    for (uint256 i = START_INDEX_N; i < tally.length; i++) {
+    for (uint256 i = halfD; i < tally.length; i++) {
+      uint256 weight = 2 ** (tally.length - 1 - i);
       no += tally[i] * weight;
-      weight /= 2;
     }
 
     return (yes, no);
@@ -235,5 +223,29 @@ contract CRISPProgram is IE3Program, Ownable {
     for (uint256 i = 0; i < 32; i++) {
       journal[startIndex + i * 4] = hashVal[i];
     }
+  }
+
+  /// @notice Decode bytes to uint256 array
+  /// @param data The bytes to decode (must be multiple of 32)
+  /// @return result Array of uint256 values
+  function _decodeBytesToUint64Array(bytes memory data) internal pure returns (uint64[] memory result) {
+    require(data.length % 8 == 0, "Data length must be multiple of 8");
+
+    uint256 arrayLength = data.length / 8;
+    result = new uint64[](arrayLength);
+
+    for (uint256 i = 0; i < arrayLength; i++) {
+      uint256 offset = i * 8;
+      uint64 value = 0;
+
+      // Read 8 bytes in little-endian order
+      for (uint64 j = 0; j < 8; j++) {
+        value |= uint64(uint8(data[offset + j])) << (j * 8);
+      }
+
+      result[i] = value;
+    }
+
+    return result;
   }
 }
