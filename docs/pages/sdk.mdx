@@ -71,16 +71,18 @@ const hash = await sdk.requestE3({
 ### Event subscriptions
 
 ```ts
-sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
+const e3Handler = (event) => {
   console.log('New request', event.data)
-})
+}
 
-sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
-  console.log('Operator joined', event.data)
+sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, e3Handler)
+
+sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_REQUESTED, (event) => {
+  console.log('Committee requested', event.data)
 })
 
 // Later, remember to clean up
-sdk.off(EnclaveEventType.E3_REQUESTED, handler)
+sdk.off(EnclaveEventType.E3_REQUESTED, e3Handler)
 ```
 
 ### React hook
