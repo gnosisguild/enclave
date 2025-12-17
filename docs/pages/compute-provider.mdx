@@ -52,14 +52,17 @@ the [Writing the Secure Process](./write-secure-program.mdx) guide.
 
 ### Setup
 
-In this guide, we'll go over setting up [RISC Zero](https://www.risczero.com/) as the CP.
+In this guide, we'll go over setting up [RISC Zero](https://www.risczero.com/) with
+[Boundless](https://docs.beboundless.xyz/) as the CP.
 
-RISC Zero provides a [Foundry template](https://github.com/risc0/risc0-foundry-template) that can be
-used to run the Secure Process and create a ZK proof. The template includes a basic program that can
-be used to get started with the smart contract code to verify the proof.
+Boundless provides a [Foundry template](https://github.com/boundless-xyz/boundless-foundry-template)
+that can be used to run the Secure Process and create a ZK proof using RISC Zero's zkVM. The
+template includes a basic program that can be used to get started with the smart contract code to
+verify the proof.
 
-Follow the instructions in the [Foundry template](https://github.com/risc0/risc0-foundry-template)
-to setup RISC Zero.
+Follow the instructions in the
+[Boundless Foundry template](https://github.com/boundless-xyz/boundless-foundry-template) to setup
+RISC Zero with Boundless.
 
 Ensure the following tools are installed:
 
@@ -93,4 +96,20 @@ You can verify the installation was successful by running:
 cargo risczero --version
 ```
 
-Now you're ready to develop and deploy applications using RISC Zero as your CP.
+Now you're ready to develop and deploy applications using RISC Zero with Boundless as your CP.
+
+### Boundless Configuration
+
+Boundless is a decentralized proving marketplace for RISC Zero programs. Instead of running proofs
+locally, you can submit them to Boundless for faster, distributed proving.
+
+To use Boundless:
+
+1. Get access to an RPC endpoint (e.g., Infura, Alchemy) with funds
+2. Obtain a private key with sufficient ETH/tokens for proof generation
+3. (Optional) Get a Pinata JWT from [pinata.cloud](https://pinata.cloud) for uploading programs to
+   IPFS
+4. Configure your `enclave.config.yaml` as shown in the
+   [CRISP setup guide](/CRISP/setup#boundless-configuration-production-proving)
+
+For more details, see the [Boundless documentation](https://docs.beboundless.xyz/).

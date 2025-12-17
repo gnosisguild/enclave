@@ -41,24 +41,21 @@ contract Enclave {
 
 ### Request Flow
 
-1. Users submits onchain request
+1. Users submit `E3RequestParams` containing thresholds, timing windows, program references, and
+   optional custom params.
 
-```solidity
-function request(
-    address filter,
-    uint32[2] calldata threshold,
-    uint256[2] calldata startWindow,
-    uint256 duration,
-    IE3Program e3Program,
-    bytes memory e3ProgramParams,
-    bytes memory computeProviderParams
-) external
-```
+   ```solidity
+   function request(
+     E3RequestParams calldata requestParams
+   ) external returns (uint256 e3Id, E3 memory e3);
+   ```
 
-2. Contract validates request parameters
-3. E3 Program contract is set and used to get the Encryption scheme.
-4. Request is submitted to the ciphernodeRegistry for committee selection.
-5. `E3Requested` event is emitted
+2. Contract validates the struct, estimates the fee, and stores an `E3` record seeded with a random
+   value derived from block entropy.
+3. The E3 program's `validate` hook returns the encryption scheme ID and input validator contract,
+   which are persisted on the `E3` struct.
+4. Committee selection is delegated to the `ciphernodeRegistry` via `requestCommittee`.
+5. `E3Requested(e3Id, e3, e3Program)` is emitted with the full configuration payload for watchers.
 
 ## Committee and Ciphernode Management
 
@@ -68,6 +65,8 @@ function request(
   from the global pool of available Ciphernodes.
 - Selected nodes coordinate to produce a shared public key with the requested threshold.
 - The public key is published to the Ciphernode Registry smart contract.
+- For bonding, ticket economics, CLI commands, and operational responsibilities, see the
+  [Ciphernode Operators guide](/ciphernode-operators).
 
 ## E3 Activation
 
@@ -94,7 +93,8 @@ function publishInput(
 ) external
 ```
 
-Inputs are accumulated incrementally into a Merkle tree. This allows you to:
+Inputs can be accumulated incrementally into a Merkle tree (LazyIMT, or ultimately chosen by the
+program implementation). This allows you to:
 
 1. Use the published Merkle root as part of your E3 Program's Secure Process to ensure all published
    inputs are processed by the Compute Provider.
@@ -136,14 +136,20 @@ to the E3's public key. It is also recommended to bundle in proofs to validate:
 
 ### Key Events
 
+**Enclave Contract Events:**
+
 ```solidity
 event E3Requested(uint256 indexed e3Id, address indexed requester, address e3ProgramAddress);
 
-event InputSubmitted(uint256 indexed e3Id, address indexed sender, bytes32 inputHash);
+event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
-event CiphertextOutputPublished(uint256 indexed e3Id, bytes32 ciphertextHash);
+event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+```
 
-event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintext);
+**Program Contract Events:**
+
+```solidity
+event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
 ```
 
 ### Result Publication Flow
@@ -161,19 +167,21 @@ event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintext);
 ```javascript
 const enclaveContract = new ethers.Contract(enclaveAddress, enclaveAbi, signer)
 
-const tx = await enclaveContract.request(
-  filterAddress,
-  [thresholdMin, thresholdMax],
-  [startWindowStart, startWindowEnd],
-  duration,
-  e3ProgramAddress,
+const requestParams = {
+  threshold: [3, 5],
+  startWindow: [startWindowStart, startWindowEnd],
+  duration: 3600,
+  e3Program: e3ProgramAddress,
   e3ProgramParams,
   computeProviderParams,
-  { value: computationFee },
-)
+  customParams: '0x',
+}
 
+const tx = await enclaveContract.request(requestParams)
 const receipt = await tx.wait()
-const e3Id = receipt.events.find((e) => e.event === 'E3Requested').args.e3Id
+const e3Id = receipt.logs
+  .map((log) => enclaveContract.interface.parseLog(log))
+  .find((parsed) => parsed?.name === 'E3Requested')?.args?.e3Id
 ```
 
 ### Monitoring Results
@@ -219,21 +227,5 @@ the finality of the outcome and to appropriately handle re-orgs.
 
 ## Best Practices
 
-1. **Request Management**
-   - Set appropriate thresholds
-   - Choose realistic time windows
-
-2. **Input Handling**
-   - Encrypt inputs properly
-   - Include necessary ZKPs
-   - Submit within time windows
-
-3. **Result Processing**
-   - Listen for all relevant events
-   - Implement timeout handling
-   - Verify result integrity
-
-4. **Error Handling**
-   - Handle contract reverts
-   - Implement retry logic
-   - Log errors appropriately
+See the dedicated [Best Practices](/best-practices) guide for updated operational playbooks covering
+parameter selection, validator design, compute provider trust, and observability.

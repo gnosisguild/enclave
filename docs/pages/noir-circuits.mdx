@@ -1,0 +1,84 @@
+---
+title: 'Noir Circuits'
+description: 'Build and reuse Noir circuits for Enclave programs'
+---
+
+# Noir Circuits & Libraries
+
+Enclave ships a dedicated Noir workspace under `circuits/` plus reusable libraries (SAFE sponge API,
+polynomial utilities, Greco BFV proofs, etc.). Use these circuits as-is or vendor them into your own
+E3 programs.
+
+## Workspace layout
+
+```
+circuits/
+├── Nargo.toml              # workspace manifest
+├── crates/
+│   └── libs/
+│       ├── safe/           # SAFE sponge implementation
+│       ├── greco/          # ZK circuit for BFV ciphertext correctness proofs
+│       └── polynomial/     # polynomial commitments utils
+└── target/                 # build artifacts (created by nargo)
+```
+
+Each library has its own `README.md` describing APIs and dependency stanza. Example (`safe`):
+
+```toml
+[dependencies]
+safe = { git = "https://github.com/gnosisguild/enclave", tag = "v0.1.5", directory = "circuits/crates/libs/safe" }
+```
+
+From `v0.1.6` onward the directory becomes `circuits/crates/libs/safe` (the `packages/` prefix was
+removed).
+
+## Tooling requirements
+
+Install the Noir toolchain:
+
+```bash
+curl -L https://noir-lang.org/install | bash   # installs nargo + bb
+nargo --version                                # 1.0.0-beta.11+
+bb --version                                   # v0.87.0+
+```
+
+## Formatting & compilation
+
+Run the helper scripts from the repo root or reproduce them in your project:
+
+```bash
+./scripts/compile-circuits.sh   # nargo fmt --check && nargo compile --workspace
+./scripts/lint-circuits.sh      # format check + warnings
+./scripts/test-circuits.sh      # run circuit unit tests (nargo test) when available
+```
+
+These scripts exit early (without failing the whole build) if `nargo` is not installed, which makes
+CI happy when Noir is optional.
+
+## Exporting verifiers
+
+Projects such as CRISP compile Noir circuits into Solidity verifiers using `bb`:
+
+```bash
+cd examples/CRISP
+./scripts/compile_circuits.sh
+```
+
+The script performs:
+
+1. `nargo compile` for every circuit in the workspace
+2. `bb write_vk` to emit the verification key (`circuits/target/vk`)
+3. `bb write_solidity_verifier` to produce `CRISPVerifier.sol`
+4. Copies the generated verifier into `packages/crisp-contracts/contracts/`
+
+Adapt the script for your own circuits and verifiers by changing the output path.
+
+## Integrating with E3 programs
+
+- Import the library from `Nargo.toml` or `program/Cargo.toml`
+- Generate Solidity verifiers and move them into your contract package
+- Reference the compiled artifacts when deploying via the template or CRISP scripts
+
+When adding new circuits, remember to update `package.json` scripts (e.g., `pnpm dev:all`) so they
+call your compile script before spinning up the dev environment. This keeps your verifiers in sync
+with the Noir source.
