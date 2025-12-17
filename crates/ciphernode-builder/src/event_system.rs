@@ -142,7 +142,7 @@ impl EventSystem {
         }
     }
 
-    /// Pass in a sepecific given event bus
+    /// Pass in a specific given event bus
     pub fn with_event_bus(self, bus: Addr<EventBus<EnclaveEvent>>) -> Self {
         let _ = self.eventbus.set(bus);
         self
