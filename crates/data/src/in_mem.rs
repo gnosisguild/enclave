@@ -7,7 +7,7 @@
 use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -127,28 +127,5 @@ impl Handler<GetDump> for InMemStore {
     type Result = anyhow::Result<Vec<u8>>;
     fn handle(&mut self, _: GetDump, _: &mut Self::Context) -> Self::Result {
         self.get_dump()
-    }
-}
-
-pub struct InMemDb(BTreeMap<Vec<u8>, Vec<u8>>);
-
-impl Deref for InMemDb {
-    type Target = BTreeMap<Vec<u8>, Vec<u8>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl InMemDb {
-    pub fn get(&self, msg: Get) -> Result<Option<Vec<u8>>> {
-        Ok(self.0.get(msg.key()).cloned())
-    }
-    pub fn insert(&mut self, msg: Insert) -> Result<()> {
-        self.0.insert(msg.key().to_owned(), msg.value().to_owned());
-        Ok(())
-    }
-    pub fn remove(&mut self, msg: Remove) -> Result<()> {
-        self.0.remove(msg.key());
-        Ok(())
     }
 }
