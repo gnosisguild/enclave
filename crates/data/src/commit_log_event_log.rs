@@ -17,7 +17,9 @@ pub struct CommitLogEventLog {
 
 impl CommitLogEventLog {
     pub fn new(path: &PathBuf) -> Result<Self> {
-        let opts = LogOptions::new(path);
+        let mut opts = LogOptions::new(path);
+        // The following is high at 32Mb but we have large events
+        opts.message_max_bytes(32 * 1024 * 1024);
         let log = CommitLog::new(opts)?;
         Ok(Self { log })
     }
