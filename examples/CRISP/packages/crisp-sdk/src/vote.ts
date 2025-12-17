@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
-import { MAXIMUM_VOTE_VALUE, HALF_LARGEST_MINIMUM_DEGREE, MASK_SIGNATURE } from './constants'
+import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
@@ -89,23 +89,22 @@ export const decodeTally = (tallyBytes: string): Vote => {
   const numbers = decodeBytesToNumbers(bytes)
 
   const HALF_D = numbers.length / 2
-  const START_INDEX_Y = HALF_D - HALF_LARGEST_MINIMUM_DEGREE
-  const START_INDEX_N = numbers.length - HALF_LARGEST_MINIMUM_DEGREE
 
-  // Extract only the relevant parts of the tally
-  const yesBinary = numbers.slice(START_INDEX_Y, HALF_D)
-  const noBinary = numbers.slice(START_INDEX_N, numbers.length)
+  // Extract the first half for yes votes and second half for no votes
+  // Votes are right-aligned with leading zeros, so we can use the entire halves
+  const yesBinary = numbers.slice(0, HALF_D)
+  const noBinary = numbers.slice(HALF_D, numbers.length)
 
   let yes = 0
   let no = 0
 
-  // Convert yes votes (from START_INDEX_Y to HALF_D)
+  // Convert yes votes (entire first half)
   for (let i = 0; i < yesBinary.length; i += 1) {
     const weight = 2 ** (yesBinary.length - 1 - i)
     yes += yesBinary[i] * weight
   }
 
-  // Convert no votes (from START_INDEX_N to D)
+  // Convert no votes (entire second half)
   for (let i = 0; i < noBinary.length; i += 1) {
     const weight = 2 ** (noBinary.length - 1 - i)
     no += noBinary[i] * weight
