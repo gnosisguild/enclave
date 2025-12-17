@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{Get, Insert, InsertBatch, InsertSync, Remove, SledDb};
-use actix::{Actor, ActorContext, Addr, AsyncContext, Handler};
+use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use std::path::PathBuf;

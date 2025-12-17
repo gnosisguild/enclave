@@ -46,7 +46,7 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
 
 impl Handler<EventStored> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EventStored, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
         let event = msg.into_event();
         let seq = event.get_seq();
         self.buffer.do_send(CommitSnapshot::new(seq));

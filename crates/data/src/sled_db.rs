@@ -5,10 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{Context, Result};
-use sled::{
-    transaction::{ConflictableTransactionError, TransactionalTree, UnabortableTransactionError},
-    Tree,
-};
+use sled::{transaction::ConflictableTransactionError, Tree};
 use std::path::PathBuf;
 
 use crate::{

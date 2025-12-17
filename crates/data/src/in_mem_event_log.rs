@@ -29,7 +29,6 @@ impl EventLog for InMemEventLog {
             .enumerate()
             .map(|(i, event)| (from + i as u64, event.clone()))
             .collect();
-        println!("XXX: events:{:?}", events);
         Box::new(events.into_iter())
     }
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {

@@ -17,6 +17,10 @@ impl CommitSnapshot {
     pub fn new(seq: u64) -> Self {
         Self(seq)
     }
+
+    pub fn seq(&self) -> u64 {
+        self.0
+    }
 }
 
 /// Direct event received by the EventStore to store an event

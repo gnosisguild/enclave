@@ -48,7 +48,8 @@ impl Handler<CommitSnapshot> for WriteBuffer {
     fn handle(&mut self, msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
         if let Some(ref dest) = self.dest {
             if !self.buffer.is_empty() {
-                let inserts = std::mem::take(&mut self.buffer);
+                let mut inserts = std::mem::take(&mut self.buffer);
+                inserts.push(Insert::new("//seq", msg.seq().to_be_bytes().to_vec()));
                 let batch = InsertBatch::new(inserts);
                 dest.do_send(batch);
             }

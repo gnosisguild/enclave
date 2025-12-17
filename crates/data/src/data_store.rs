@@ -6,9 +6,9 @@
 
 use std::borrow::Cow;
 
-use crate::{ForwardTo, Get, Insert, InsertSync, Remove, WriteBuffer};
+use crate::{Get, Insert, InsertSync, Remove, WriteBuffer};
 use crate::{InMemStore, IntoKey, SledStore};
-use actix::{Actor, Addr, Recipient};
+use actix::{Addr, Recipient};
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
@@ -22,13 +22,6 @@ pub enum StoreAddr {
 }
 
 impl StoreAddr {
-    // pub fn to_data_store(&self) -> DataStore {
-    //     match self {
-    //         StoreAddr::InMem(s) => s.into(),
-    //         StoreAddr::Sled(s) => s.into(),
-    //     }
-    // }
-
     pub fn to_maybe_in_mem(&self) -> Option<&Addr<InMemStore>> {
         match self {
             StoreAddr::InMem(ref store) => Some(store),

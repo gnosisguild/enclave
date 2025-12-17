@@ -61,7 +61,7 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
 
 impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfter> for EventStore<I, L> {
     type Result = ();
-    fn handle(&mut self, msg: GetEventsAfter, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetEventsAfter, _: &mut Self::Context) -> Self::Result {
         match self.handle_get_events_after(msg) {
             Ok(_) => (),
             Err(e) => error!("{e}"),
