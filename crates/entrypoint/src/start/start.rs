@@ -34,6 +34,7 @@ pub async fn execute(
         .with_source_bus(bus.consumer())
         .with_sortition_score()
         .with_chains(&config.chains())
+        .with_persistence(&config.log_file(), &config.db_file())
         .with_contract_enclave_reader()
         .with_contract_bonding_registry()
         .with_max_threads()

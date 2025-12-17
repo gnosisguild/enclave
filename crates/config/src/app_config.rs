@@ -251,6 +251,11 @@ impl AppConfig {
         self.paths.db_file()
     }
 
+    /// Get the log file
+    pub fn log_file(&self) -> PathBuf {
+        self.paths.log_file()
+    }
+
     fn node_def(&self) -> &NodeDefinition {
         // NOTE: on creation an invariant we have is that our node name is an extant key in our
         // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition

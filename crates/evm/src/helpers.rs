@@ -32,6 +32,7 @@ use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use std::{env, sync::Arc};
+use tracing::info;
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;

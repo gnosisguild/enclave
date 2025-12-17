@@ -35,6 +35,7 @@ pub async fn execute(
         .with_sortition_score()
         .with_contract_enclave_full()
         .with_contract_bonding_registry()
+        .with_persistence(&config.log_file(), &config.db_file())
         .with_contract_ciphernode_registry()
         .with_max_threads()
         .with_pubkey_aggregation();

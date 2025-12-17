@@ -36,3 +36,72 @@ impl EventLog for InMemEventLog {
         Ok(self.log.len() as u64)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, TestEvent};
+
+    fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data.into().into(), 123)
+    }
+
+    #[test]
+    fn test_append_and_read() {
+        let mut log = InMemEventLog::new();
+
+        let event1 = event_from(TestEvent::new("one", 1));
+        let event2 = event_from(TestEvent::new("two", 2));
+
+        let offset1 = log.append(&event1).unwrap();
+        let offset2 = log.append(&event2).unwrap();
+
+        assert_eq!(offset1, 1); // 1-indexed
+        assert_eq!(offset2, 2);
+
+        // Read back from the beginning
+        let events: Vec<_> = log.read_from(1).collect();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].0, 1);
+        assert_eq!(events[1].0, 2);
+    }
+
+    #[test]
+    fn test_read_from_offset() {
+        let mut log = InMemEventLog::new();
+
+        let event1 = event_from(TestEvent::new("one", 1));
+        let event2 = event_from(TestEvent::new("two", 2));
+        let event3 = event_from(TestEvent::new("three", 3));
+
+        log.append(&event1).unwrap();
+        log.append(&event2).unwrap();
+        log.append(&event3).unwrap();
+
+        // Read from offset 2 (should get events 2 and 3)
+        let events: Vec<_> = log.read_from(2).collect();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].0, 2);
+        assert_eq!(events[1].0, 3);
+    }
+
+    #[test]
+    fn test_read_empty_log() {
+        let log = InMemEventLog::new();
+
+        let events: Vec<_> = log.read_from(1).collect();
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_read_past_end() {
+        let mut log = InMemEventLog::new();
+
+        let event = event_from(TestEvent::new("one", 1));
+        log.append(&event).unwrap();
+
+        // Read from offset beyond what exists
+        let events: Vec<_> = log.read_from(100).collect();
+        assert!(events.is_empty());
+    }
+}
