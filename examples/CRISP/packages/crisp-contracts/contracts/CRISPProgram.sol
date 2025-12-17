@@ -179,6 +179,26 @@ contract CRISPProgram is IE3Program, Ownable {
     return (yes, no);
   }
 
+  /// @notice Get the slot index for a given E3 ID and slot address
+  /// @param e3Id The E3 program ID
+  /// @param slotAddress The slot address
+  /// @return The slot index
+  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (uint40) {
+    uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
+    if (storedIndexPlusOne == 0) {
+      revert SlotIsEmpty();
+    }
+    return storedIndexPlusOne - 1;
+  }
+
+  /// @notice Check if a slot is empty for a given E3 ID and slot address
+  /// @param e3Id The E3 program ID
+  /// @param slotAddress The slot address
+  /// @return Whether the slot is empty or not
+  function isSlotEmptyByAddress(uint256 e3Id, address slotAddress) external view returns (bool) {
+    return e3Data[e3Id].voteSlots[slotAddress] == 0;
+  }
+
   /// @inheritdoc IE3Program
   function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof) external view override returns (bool) {
     if (e3Data[e3Id].paramsHash == bytes32(0)) revert E3DoesNotExist();
@@ -251,17 +271,5 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     return result;
-  }
-  
-  /// @notice Get the slot index for a given E3 ID and slot address
-  /// @param e3Id The E3 program ID
-  /// @param slotAddress The slot address
-  /// @return The slot index
-  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (uint40) {
-    uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
-    if (storedIndexPlusOne == 0) {
-      revert SlotIsEmpty();
-    }
-    return storedIndexPlusOne - 1;
   }
 }
