@@ -132,6 +132,7 @@ pub struct WebResultRequest {
     pub option_2_tally: String,
     pub option_1_emoji: String,
     pub option_2_emoji: String,
+    pub total_votes: u64,
     pub end_time: u64,
 }
 
@@ -213,6 +214,7 @@ impl From<E3> for WebResultRequest {
             option_2_tally: e3.votes_option_2,
             option_1_emoji: e3.emojis[0].clone(),
             option_2_emoji: e3.emojis[1].clone(),
+            total_votes: e3.vote_count,
             end_time: e3.expiration,
         }
     }

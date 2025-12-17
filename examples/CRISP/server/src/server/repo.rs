@@ -202,6 +202,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             option_1_emoji: e3_crisp.emojis[0].clone(),
             option_2_emoji: e3_crisp.emojis[1].clone(),
             end_time: e3.expiration,
+            total_votes: self.get_vote_count().await?,
         })
     }
 
