@@ -4,12 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
+use anyhow::Context;
 use anyhow::Result;
 use commitlog::message::MessageSet;
 use commitlog::{CommitLog, LogOptions, ReadLimit};
 use e3_events::{EnclaveEvent, EventLog, Unsequenced};
+use std::path::PathBuf;
 
 pub struct CommitLogEventLog {
     log: CommitLog,
@@ -28,7 +28,10 @@ impl CommitLogEventLog {
 impl EventLog for CommitLogEventLog {
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
         let bytes = bincode::serialize(event)?;
-        let offset = self.log.append_msg(&bytes)?;
+        let offset = self
+            .log
+            .append_msg(&bytes)
+            .context("Failed to append to event log")?;
         // Return 1-indexed sequence number
         Ok(offset + 1)
     }
