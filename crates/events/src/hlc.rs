@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use derivative::Derivative;
 use rand::Rng;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
@@ -171,6 +172,7 @@ pub struct Hlc {
     clock: Option<Arc<dyn Fn() -> u64 + Send + Sync>>,
 }
 
+#[derive(PartialEq)]
 struct HlcInner {
     ts: u64,
     counter: u32,
@@ -180,6 +182,15 @@ impl Default for Hlc {
     fn default() -> Self {
         let random_id: u32 = rand::thread_rng().gen();
         Self::new(random_id)
+    }
+}
+
+impl PartialEq for Hlc {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+            && self.node == other.node
+            && self.max_drift == other.max_drift
+        // note clock ignored because it is only used in testing
     }
 }
 

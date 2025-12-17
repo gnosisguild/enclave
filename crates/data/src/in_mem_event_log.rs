@@ -17,6 +17,12 @@ impl InMemEventLog {
     }
 }
 
+impl Default for InMemEventLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventLog for InMemEventLog {
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
         // Convert 1-indexed sequence to 0-indexed array position

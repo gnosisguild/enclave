@@ -27,7 +27,7 @@ use crate::{
 pub struct BusHandle {
     consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     producer: Addr<Sequencer>,
-    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
 }
 

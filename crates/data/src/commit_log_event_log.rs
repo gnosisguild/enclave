@@ -10,6 +10,7 @@ use commitlog::message::MessageSet;
 use commitlog::{CommitLog, LogOptions, ReadLimit};
 use e3_events::{EnclaveEvent, EventLog, Unsequenced};
 use std::path::PathBuf;
+use tracing::error;
 
 pub struct CommitLogEventLog {
     log: CommitLog,
@@ -54,6 +55,8 @@ impl EventLog for CommitLogEventLog {
                     // Convert 0-indexed offset back to 1-indexed sequence number
                     events.push((msg.offset() + 1, event));
                     current_offset = msg.offset() + 1; // Next offset to read from
+                } else {
+                    error!("Error deserializing event in read_from... skipping");
                 }
                 count += 1;
             }

@@ -150,14 +150,3 @@ impl InMemDb {
         Ok(())
     }
 }
-
-pub struct InMemCommitLog {
-    log: Vec<Vec<u8>>,
-}
-
-impl InMemCommitLog {
-    pub fn append_msg(&mut self, payload: Vec<u8>) -> Result<Offset> {
-        self.log.push(payload);
-        Ok(self.log.len() as u64)
-    }
-}
