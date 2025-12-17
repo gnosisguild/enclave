@@ -76,6 +76,9 @@ impl Handler<InsertBatch> for InMemStore {
     fn handle(&mut self, msg: InsertBatch, _: &mut Self::Context) -> Self::Result {
         for cmd in msg.commands() {
             self.db.insert(cmd.key().to_owned(), cmd.value().to_owned());
+            if self.capture {
+                self.log.push(DataOp::Insert(cmd.clone()));
+            }
         }
     }
 }
