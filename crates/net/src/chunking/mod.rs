@@ -9,6 +9,4 @@ mod collector;
 
 pub use chunkable::Chunkable;
 pub use collector::{ChunkCollector, ChunkReceived};
-// Re-export chunk types from events crate for convenience
 pub use e3_events::{ChunkSetId, ChunkedDocument};
-
