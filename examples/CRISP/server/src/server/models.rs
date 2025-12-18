@@ -128,11 +128,11 @@ pub struct RoundRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebResultRequest {
     pub round_id: u64,
-    pub option_1_tally: u64,
-    pub option_2_tally: u64,
-    pub total_votes: u64,
+    pub option_1_tally: String,
+    pub option_2_tally: String,
     pub option_1_emoji: String,
     pub option_2_emoji: String,
+    pub total_votes: u64,
     pub end_time: u64,
 }
 
@@ -168,8 +168,8 @@ pub struct E3 {
     pub status: String,
     pub has_voted: Vec<String>,
     pub vote_count: u64,
-    pub votes_option_1: u64,
-    pub votes_option_2: u64,
+    pub votes_option_1: String,
+    pub votes_option_2: String,
 
     // Timing-related
     pub start_time: u64,
@@ -198,8 +198,8 @@ pub struct E3Crisp {
     pub has_voted: Vec<String>,
     pub start_time: u64,
     pub status: String,
-    pub votes_option_1: u64,
-    pub votes_option_2: u64,
+    pub votes_option_1: String,
+    pub votes_option_2: String,
     pub token_holder_hashes: Vec<String>,
     pub token_address: String,
     pub balance_threshold: String,
@@ -212,9 +212,9 @@ impl From<E3> for WebResultRequest {
             round_id: e3.id,
             option_1_tally: e3.votes_option_1,
             option_2_tally: e3.votes_option_2,
-            total_votes: e3.votes_option_1 + e3.votes_option_2,
             option_1_emoji: e3.emojis[0].clone(),
             option_2_emoji: e3.emojis[1].clone(),
+            total_votes: e3.vote_count,
             end_time: e3.expiration,
         }
     }

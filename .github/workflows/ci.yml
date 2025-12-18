@@ -488,6 +488,9 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
+        with:
+          cargo-lock-path: examples/CRISP/Cargo.lock
+          rust-target-path: examples/CRISP/target/
 
       - name: Prepare test environment
         run: |

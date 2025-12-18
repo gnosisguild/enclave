@@ -44,7 +44,7 @@ async function checkE3Activated(e3id: number): Promise<boolean> {
   }
 }
 
-async function waitForE3Activation(e3id: number, maxWaitMs: number = 300000): Promise<void> {
+async function waitForE3Activation(e3id: number, maxWaitMs: number = 60000): Promise<void> {
   const startTime = Date.now()
   while (Date.now() - startTime < maxWaitMs) {
     const isActivated = await checkE3Activated(e3id)
@@ -110,7 +110,7 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   await page.locator('button:has-text("Cast Vote")').click()
   log(`confirming MetaMask signature request...`)
   await metamask.confirmSignature()
-  const WAIT = 310_000
+  const WAIT = 150_000
   log(`waiting for ${WAIT}ms...`)
   await page.waitForTimeout(WAIT)
   log(`clicking historic polls button...`)

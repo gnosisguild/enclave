@@ -21,7 +21,7 @@ export const HALF_LARGEST_MINIMUM_DEGREE = 50
  * This is the maximum value for a vote (Yes or No). This is 2^50 - 1
  * The minimum degree that BFV should use is 100 (to accommodate both Yes and No votes)
  */
-export const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE) - 1)
+export const MAXIMUM_VOTE_VALUE = Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE) - 1
 
 /**
  * Message used by users to prove ownership of their Ethereum account
