@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
-import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE } from './constants'
+import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
