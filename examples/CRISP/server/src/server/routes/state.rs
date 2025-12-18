@@ -7,11 +7,9 @@
 use std::str::FromStr;
 
 use crate::server::{
-    app_data::AppData,
-    models::{
-        GetRoundRequest, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload,
-    },
-    CONFIG,
+    CONFIG, app_data::AppData, models::{
+        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload
+    }
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -36,7 +34,7 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
                 "/previous-ciphertext",
                 web::post().to(handle_get_previous_ciphertext),
             )
-            .route("/is-slot-empty", web::post().to(handle_get_previous_ciphertext)),
+            .route("/is-slot-empty", web::post().to(handle_is_slot_empty)),
     );
 }
 
@@ -282,10 +280,12 @@ async fn get_token_holders_hashes(
     }
 }
 
+/// Check if a slot is empty given an address
+/// /// # Arguments
+/// * `PreviousCiphertextRequest` - The request containing round_id and address
 async fn handle_is_slot_empty(
-    data: web::Json<PreviousCiphertextRequest>,
-    store: web::Data<AppData>,
-) -> Responder {
+    data: web::Json<IsSlotEmptyRequest>,
+) -> impl Responder {
     let incoming = data.into_inner();
 
     let contract =
@@ -307,5 +307,17 @@ async fn handle_is_slot_empty(
         }
     };
 
-    
+    let is_empty = match contract
+        .get_is_slot_empty_by_address(U256::from(incoming.round_id), address)
+        .await
+    {
+        Ok(empty) => empty,
+        Err(e) => {
+            error!("Error checking if slot is empty: {:?}", e);
+            return HttpResponse::InternalServerError()
+                .body("Failed to check if slot is empty");
+        }
+    };
+
+    HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty } )
 }

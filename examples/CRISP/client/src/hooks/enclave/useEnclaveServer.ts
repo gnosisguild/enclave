@@ -9,8 +9,6 @@ import {
   BroadcastVoteRequest,
   BroadcastVoteResponse,
   CurrentRound,
-  GetPreviousCiphertextRequest,
-  GetPreviousCiphertextResponse,
   VoteStateLite,
   VoteStatusRequest,
   VoteStatusResponse,
@@ -29,11 +27,10 @@ const EnclaveEndpoints = {
   GetWebAllResult: `${ENCLAVE_API}/state/all`,
   BroadcastVote: `${ENCLAVE_API}/voting/broadcast`,
   GetVoteStatus: `${ENCLAVE_API}/voting/status`,
-  GetPreviousCiphertext: `${ENCLAVE_API}/state/previous-ciphertext`,
 } as const
 
 export const useEnclaveServer = () => {
-  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult, GetVoteStatus, GetPreviousCiphertext } =
+  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult, GetVoteStatus } =
     EnclaveEndpoints
   const { fetchData, isLoading } = useApi()
   const getCurrentRound = () => fetchData<CurrentRound>(GetCurrentRound)
@@ -42,8 +39,6 @@ export const useEnclaveServer = () => {
   const getWebResult = () => fetchData<PollRequestResult[], void>(GetWebAllResult, 'get')
   const getWebResultByRound = (round_id: number) => fetchData<PollRequestResult, { round_id: number }>(GetWebResult, 'post', { round_id })
   const getVoteStatus = (request: VoteStatusRequest) => fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
-  const getPreviousCiphertext = (request: GetPreviousCiphertextRequest) =>
-    fetchData<GetPreviousCiphertextResponse, GetPreviousCiphertextRequest>(GetPreviousCiphertext, 'post', request)
 
   return {
     isLoading,
@@ -53,6 +48,5 @@ export const useEnclaveServer = () => {
     getRoundStateLite,
     broadcastVote,
     getVoteStatus,
-    getPreviousCiphertext,
   }
 }

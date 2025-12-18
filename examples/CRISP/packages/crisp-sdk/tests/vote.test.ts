@@ -18,7 +18,6 @@ import {
   encodeVote,
   generateCircuitInputs,
   executeCircuit,
-  generateCircuitInputsForMasking,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'

@@ -11,7 +11,7 @@ self.onmessage = async function (event) {
   switch (type) {
     case 'generate_proof':
       try {
-        const { voteId, publicKey, address: slotAddress, signature, previousCiphertext, messageHash, isFirstVote, isMasking } = data
+        const { voteId, publicKey, address: slotAddress, signature, messageHash, isMasking, crispServer } = data
 
         // voteId is either 0 or 1, so we need to encode the vote accordingly.
         // We are adapting to the current CRISP application.
@@ -29,22 +29,24 @@ self.onmessage = async function (event) {
 
         if (isMasking) {
           proof = await generateMaskVoteProof({
-            vote,
+            serverUrl: crispServer,
+            e3Id: voteId,
             publicKey,
             balance,
-            previousCiphertext,
-            isFirstVote,
             slotAddress,
+            merkleLeaves,
           })
         } else {
           proof = await generateVoteProof({
+            serverUrl: crispServer,
             vote,
+            e3Id: voteId,
             publicKey,
             signature,
             merkleLeaves,
             balance,
             messageHash,
-            isFirstVote,
+            slotAddress
           })
         }
 

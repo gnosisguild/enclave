@@ -13,8 +13,6 @@ import { useNotificationAlertContext } from '@/context/NotificationAlert/Notific
 import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest, VoteStateLite, VotingRound } from '@/model/vote.model'
 
-import { encryptVote, SIGNATURE_MESSAGE } from '@crisp-e3/sdk'
-
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
 const extractCleanErrorMessage = (errorMessage: string | undefined): string => {
@@ -54,8 +52,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     markVotedInRound,
     hasVotedInCurrentRound,
   } = useVoteManagementContext()
-
-  const { getPreviousCiphertext } = useEnclaveServer()
 
   const roundState = customRoundState ?? contextRoundState
   const votingRound = customVotingRound ?? contextVotingRound
@@ -143,19 +139,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        const previousCiphertextFromServer = isVoteUpdate
-          ? await getPreviousCiphertext({
-              round_id: roundState.id,
-              address: user.address,
-            })
-          : undefined
-
-        const previousCiphertext = previousCiphertextFromServer && previousCiphertextFromServer?.ciphertext
-
-        if (isMasking && isVoteUpdate && !previousCiphertext) {
-          throw new Error('Previous ciphertext required for masking vote update.')
-        }
-
         const encodedProof = await handleProofGeneration(
           pollSelected,
           user.address,
@@ -163,7 +146,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           messageHash,
           !isVoteUpdate,
           isMasking,
-          previousCiphertext,
         )
 
         if (!encodedProof) {
@@ -252,7 +234,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       signMessageAsync,
       markVotedInRound,
       resetVotingState,
-      getPreviousCiphertext,
     ],
   )
 

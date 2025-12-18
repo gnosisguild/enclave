@@ -72,9 +72,9 @@ impl ZKInputsGenerator {
         }
     }
 
-    /// Generate CRISP ZK inputs for a Masking vote from JavaScript.
-    #[wasm_bindgen(js_name = "generateInputsForMasking")]
-    pub fn generate_inputs_for_masking(
+    /// Generate CRISP ZK inputs for a vote update (either from voter or as a masker) from JavaScript.
+    #[wasm_bindgen(js_name = "generateInputsForUpdate")]
+    pub fn generate_inputs_for_update(
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
@@ -84,7 +84,7 @@ impl ZKInputsGenerator {
 
         match self
             .generator
-            .generate_inputs_for_masking(prev_ciphertext, public_key, vote_vec)
+            .generate_inputs_for_update(prev_ciphertext, public_key, vote_vec)
         {
             Ok(inputs_json) => {
                 // Parse the JSON string and return as JsValue.

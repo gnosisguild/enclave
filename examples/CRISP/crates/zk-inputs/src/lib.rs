@@ -75,7 +75,7 @@ impl ZKInputsGenerator {
     ///
     /// # Returns
     /// JSON string containing the CRISP ZK inputs
-    pub fn generate_inputs_for_masking(
+    pub fn generate_inputs_for_update(
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],

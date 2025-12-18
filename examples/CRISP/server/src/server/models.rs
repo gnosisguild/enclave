@@ -117,6 +117,17 @@ pub struct PreviousCiphertextResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct IsSlotEmptyRequest {
+    pub round_id: u64,
+    pub address: String,
+}
+
+#[derive(Serialize)]
+pub struct IsSlotEmptyResponse {
+    pub is_empty: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComputeProviderParams {
     pub name: String,
     pub parallel: bool,
