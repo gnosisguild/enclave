@@ -19,7 +19,10 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
-    request_response::{self, cbor::Behaviour as CborRequestResponse, ProtocolSupport},
+    request_response::{
+        self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
+        Message as RequestResponseMessage, ProtocolSupport,
+    },
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
@@ -342,9 +345,11 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
+
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
         }
+
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
             topic,
@@ -353,6 +358,29 @@ async fn process_swarm_event(
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            peer,
+            message:
+                RequestResponseMessage::Request {
+                    request: SyncRequest { since, limit },
+                    ..
+                },
+        })) => {
+            // received a request for events
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            peer,
+            message:
+                RequestResponseMessage::Response {
+                    response: SyncResponse { events },
+                    ..
+                },
+        })) => {
+            // received a response to a request for events
+        }
+
         unknown => {
             trace!("Unknown event: {:?}", unknown);
         }
