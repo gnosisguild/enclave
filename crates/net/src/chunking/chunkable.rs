@@ -15,6 +15,11 @@ pub trait Chunkable: Serialize + DeserializeOwned + Clone + Sized {
         10 * 1024 * 1024
     }
 
+    /// Mark this document as received from external source (network).
+    /// Called after reassembly to prevent re-publication loops.
+    /// Default implementation does nothing - override for types with external flag.
+    fn mark_as_external(&mut self) {}
+
     fn into_chunks(&self) -> Result<Vec<ChunkedDocument>> {
         let bytes = bincode::serialize(self)?;
         let max_size = Self::max_chunk_size();

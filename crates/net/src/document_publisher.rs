@@ -35,6 +35,10 @@ impl Chunkable for ThresholdShareCreated {
     fn max_chunk_size() -> usize {
         10 * 1024 * 1024
     }
+
+    fn mark_as_external(&mut self) {
+        self.external = true;
+    }
 }
 
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -423,6 +427,7 @@ impl EventConverter {
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
         bus.subscribe("EncryptionKeyCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
+        bus.subscribe("E3RequestComplete", addr.clone().into());
         addr
     }
 
@@ -467,8 +472,8 @@ impl EventConverter {
 
         match chunks {
             [single] if single.is_complete_set() => {
-                debug!(
-                    "Party {} share: single chunk ({} bytes)",
+                info!(
+                    "Party {} share: single chunk ({} bytes), no chunking needed",
                     party_id,
                     single.data.len()
                 );
@@ -480,7 +485,11 @@ impl EventConverter {
                 )?;
             }
             multiple => {
-                info!("Party {} share: {} chunks", party_id, multiple.len());
+                info!(
+                    "Party {} share: using chunking - {} chunks",
+                    party_id,
+                    multiple.len()
+                );
                 for (idx, chunk) in multiple.iter().enumerate() {
                     debug!(
                         "  Chunk {}/{} (chunk_id: {})",
@@ -599,8 +608,20 @@ impl Handler<EnclaveEvent> for EventConverter {
             EnclaveEventData::ThresholdShareCreated(data) => ctx.notify(data),
             EnclaveEventData::EncryptionKeyCreated(data) => ctx.notify(data),
             EnclaveEventData::DocumentReceived(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
             _ => (),
         }
+    }
+}
+
+impl Handler<E3RequestComplete> for EventConverter {
+    type Result = ();
+    fn handle(&mut self, msg: E3RequestComplete, _ctx: &mut Self::Context) -> Self::Result {
+        debug!(
+            "EventConverter: E3RequestComplete for {}, cleaning up chunk collector",
+            msg.e3_id
+        );
+        self.chunk_collectors.remove(&msg.e3_id);
     }
 }
 

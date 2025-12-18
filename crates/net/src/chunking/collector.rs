@@ -179,8 +179,12 @@ where
 
     fn handle(&mut self, msg: ChunkReceived<T>, _ctx: &mut Self::Context) {
         match self.handle_chunk_internal(msg.chunk) {
-            Ok(Some(document)) => {
-                info!("Document reassembled successfully, publishing to bus");
+            Ok(Some(mut document)) => {
+                info!(
+                    "Document reassembled from chunks, marking as external and publishing to bus"
+                );
+                // Mark as external to prevent re-publication loop
+                document.mark_as_external();
                 // Publish the reassembled document to the event bus
                 if let Err(e) = self.bus.publish(document) {
                     error!("Failed to publish reassembled document: {:?}", e);
@@ -188,6 +192,7 @@ where
             }
             Ok(None) => {
                 // Still waiting for more chunks
+                debug!("Chunk received, waiting for more chunks");
             }
             Err(e) => {
                 error!("Failed to process chunk: {:?}", e);
