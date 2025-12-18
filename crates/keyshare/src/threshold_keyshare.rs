@@ -22,11 +22,12 @@ use e3_trbfv::{
     },
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
-    helpers::{deserialize_secret_key, get_share_encryption_params, serialize_secret_key},
+    helpers::{deserialize_secret_key, serialize_secret_key},
     shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
 use e3_utils::{bail, to_ordered_vec, utility_types::ArcBytes};
+use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::{rngs::OsRng, SeedableRng};
@@ -301,6 +302,7 @@ pub struct ThresholdKeyshareParams {
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
+    pub share_encryption_params: Arc<BfvParameters>,
 }
 
 pub struct ThresholdKeyshare {
@@ -310,6 +312,7 @@ pub struct ThresholdKeyshare {
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
+    share_encryption_params: Arc<BfvParameters>,
 }
 
 impl ThresholdKeyshare {
@@ -321,6 +324,7 @@ impl ThresholdKeyshare {
             encryption_key_collector: None,
             multithread: params.multithread,
             state: params.state,
+            share_encryption_params: params.share_encryption_params,
         }
     }
 }
@@ -398,7 +402,7 @@ impl ThresholdKeyshare {
         let _ = self.ensure_collector(address.clone());
         let _ = self.ensure_encryption_key_collector(address.clone());
 
-        let params = get_share_encryption_params();
+        let params = self.share_encryption_params.clone();
         let mut rng = OsRng;
         let sk_bfv = SecretKey::random(&params, &mut rng);
         let pk_bfv = PublicKey::new(&sk_bfv, &mut rng);
@@ -657,7 +661,7 @@ impl ThresholdKeyshare {
         let encryption_keys = &collected_encryption_keys;
 
         // Convert to BFV public keys
-        let params = get_share_encryption_params();
+        let params = self.share_encryption_params.clone();
         let recipient_pks: Vec<PublicKey> = encryption_keys
             .iter()
             .map(|k| {
@@ -713,7 +717,7 @@ impl ThresholdKeyshare {
         // Get our BFV secret key from state
         let current: AggregatingDecryptionKey = state.clone().try_into()?;
         let sk_bytes = current.sk_bfv.access(&cipher)?;
-        let params = get_share_encryption_params();
+        let params = self.share_encryption_params.clone();
         let sk_bfv = deserialize_secret_key(&sk_bytes, &params)?;
         let degree = params.degree();
 

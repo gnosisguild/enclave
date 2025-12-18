@@ -382,13 +382,15 @@ async fn broadcast_document_published_notification(
 
 /// Converts between internal events and network documents.
 ///
-/// Handles party-filtered distribution and chunking:
-/// - Outgoing: Splits large ThresholdShares into party-specific chunks
-/// - Incoming: Filters documents by party_id and reassembles chunks
+/// Responsibilities:
+/// - Outgoing: Converts ThresholdShareCreated → party-filtered PublishDocumentRequested
+/// - Incoming: Converts DocumentReceived → ThresholdShareCreated/EncryptionKeyCreated
+/// - Reassembles chunked documents via ChunkCollector
+///
+/// Note: Party filtering is done by DocumentPublisher BEFORE fetching from DHT.
 pub struct EventConverter {
     bus: BusHandle,
-    threshold_share_collector: Option<Addr<ChunkCollector<ThresholdShareCreated>>>,
-    ids: HashMap<E3id, PartyId>,
+    chunk_collector: Option<Addr<ChunkCollector<ThresholdShareCreated>>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -399,14 +401,6 @@ enum ReceivableDocument {
 }
 
 impl ReceivableDocument {
-    pub fn get_e3_id(&self) -> Option<&E3id> {
-        match self {
-            ReceivableDocument::ThresholdShareCreated(d) => Some(&d.e3_id),
-            ReceivableDocument::EncryptionKeyCreated(d) => Some(&d.e3_id),
-            ReceivableDocument::Chunk(_) => None, // Chunks don't have E3id directly
-        }
-    }
-
     pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
         bincode::serialize(self)
     }
@@ -420,18 +414,10 @@ impl EventConverter {
     pub fn new(bus: &BusHandle) -> Self {
         Self {
             bus: bus.clone(),
-            threshold_share_collector: None,
-            ids: HashMap::new(),
+            chunk_collector: None,
         }
     }
 
-    fn handle_ciphernode_selected(&mut self, event: CiphernodeSelected) -> Result<()> {
-        let CiphernodeSelected {
-            e3_id, party_id, ..
-        } = event;
-        self.ids.insert(e3_id, party_id);
-        Ok(())
-    }
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
@@ -440,13 +426,13 @@ impl EventConverter {
         addr
     }
 
-    /// Initialize chunk collector for a specific E3
-    fn ensure_collector(&mut self, e3_id: &E3id) {
-        if self.threshold_share_collector.is_none() {
-            debug!("Creating ThresholdShare chunk collector for E3: {}", e3_id);
-            let collector =
-                ChunkCollector::<ThresholdShareCreated>::setup(e3_id.clone(), self.bus.clone());
-            self.threshold_share_collector = Some(collector);
+    fn ensure_chunk_collector(&mut self, e3_id: &E3id) {
+        if self.chunk_collector.is_none() {
+            debug!("Creating chunk collector for E3: {}", e3_id);
+            self.chunk_collector = Some(ChunkCollector::<ThresholdShareCreated>::setup(
+                e3_id.clone(),
+                self.bus.clone(),
+            ));
         }
     }
     /// Publish a receivable document with party filter
@@ -546,59 +532,29 @@ impl EventConverter {
 
         Ok(())
     }
-    /// Local node created an encryption key. Send it as a published document
-    pub fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
-        // If this is received from elsewhere
+    fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
         if msg.external {
             return Ok(());
         }
-        let e3_id = msg.e3_id.clone();
-        let receivable = ReceivableDocument::EncryptionKeyCreated(msg);
+        let receivable = ReceivableDocument::EncryptionKeyCreated(msg.clone());
         let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
-        let meta = DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], None);
+        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
         self.bus
             .publish(PublishDocumentRequested::new(meta, value))?;
         Ok(())
     }
-    /// Received document externally
-    /// Check if document passes party filter
-    fn passes_filter(&self, e3_id: &E3id, meta: &DocumentMeta) -> bool {
-        match self.ids.get(e3_id) {
-            Some(party_id) if !meta.matches(party_id) => {
-                debug!(
-                    "Filtered out: doesn't match party_id {} for E3 {}",
-                    party_id, e3_id
-                );
-                false
-            }
-            _ => true,
-        }
-    }
 
-    /// Handle a chunk by forwarding to collector
-    fn handle_chunk(&mut self, chunk: ChunkedDocument, e3_id: &E3id) {
-        debug!(
-            "Received chunk {}/{} ({})",
-            chunk.chunk_index + 1,
-            chunk.total_chunks,
-            chunk.chunk_id
-        );
-        self.ensure_collector(e3_id);
-        if let Some(ref collector) = self.threshold_share_collector {
-            collector.do_send(ChunkReceived::<ThresholdShareCreated>::new(chunk));
-        }
-    }
-
+    /// Convert received document to internal events.
+    /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
     fn handle_document_received(&mut self, msg: DocumentReceived) -> Result<()> {
-        if !self.passes_filter(&msg.meta.e3_id, &msg.meta) {
-            return Ok(());
-        }
-
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
 
         match receivable {
             ReceivableDocument::ThresholdShareCreated(evt) => {
-                debug!("Received complete ThresholdShareCreated");
+                debug!(
+                    "Received ThresholdShareCreated from party {}",
+                    evt.share.party_id
+                );
                 self.bus.publish(ThresholdShareCreated {
                     external: true,
                     e3_id: evt.e3_id,
@@ -606,7 +562,10 @@ impl EventConverter {
                 })?;
             }
             ReceivableDocument::EncryptionKeyCreated(evt) => {
-                debug!("Received EncryptionKeyCreated");
+                debug!(
+                    "Received EncryptionKeyCreated from party {}",
+                    evt.key.party_id
+                );
                 self.bus.publish(EncryptionKeyCreated {
                     external: true,
                     e3_id: evt.e3_id,
@@ -614,7 +573,15 @@ impl EventConverter {
                 })?;
             }
             ReceivableDocument::Chunk(chunk) => {
-                self.handle_chunk(chunk, &msg.meta.e3_id);
+                debug!(
+                    "Received chunk {}/{}",
+                    chunk.chunk_index + 1,
+                    chunk.total_chunks
+                );
+                self.ensure_chunk_collector(&msg.meta.e3_id);
+                if let Some(ref collector) = self.chunk_collector {
+                    collector.do_send(ChunkReceived::<ThresholdShareCreated>::new(chunk));
+                }
             }
         }
         Ok(())
@@ -632,7 +599,6 @@ impl Handler<EnclaveEvent> for EventConverter {
             EnclaveEventData::ThresholdShareCreated(data) => ctx.notify(data),
             EnclaveEventData::EncryptionKeyCreated(data) => ctx.notify(data),
             EnclaveEventData::DocumentReceived(data) => ctx.notify(data),
-            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
             _ => (),
         }
     }
@@ -654,18 +620,6 @@ impl Handler<EncryptionKeyCreated> for EventConverter {
         match self.handle_encryption_key_created(msg) {
             Ok(_) => (),
             Err(err) => error!("{err}"),
-        }
-    }
-}
-
-impl Handler<CiphernodeSelected> for EventConverter {
-    type Result = ();
-    fn handle(&mut self, msg: CiphernodeSelected, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_ciphernode_selected(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                error!("Error handling CiphernodeSelected: {:?}", e);
-            }
         }
     }
 }
