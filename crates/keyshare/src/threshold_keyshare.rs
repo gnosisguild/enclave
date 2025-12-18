@@ -721,16 +721,16 @@ impl ThresholdKeyshare {
         let degree = params.degree();
 
         // Decrypt our share from each sender using BFV
-        // Each sender's ThresholdShare contains encrypted shares for all parties
-        // We extract and decrypt the share meant for us (at index party_id)
+        // Local share (from self) has all parties' shares, network shares are pre-extracted
         let sk_sss_collected: Vec<ShamirShare> = msg
             .shares
             .iter()
             .map(|ts| {
+                let idx = if ts.sk_sss.len() == 1 { 0 } else { party_id };
                 let encrypted = ts
                     .sk_sss
-                    .clone_share(party_id)
-                    .ok_or(anyhow!("No sk_sss share for party {}", party_id))?;
+                    .clone_share(idx)
+                    .ok_or(anyhow!("No sk_sss share at index {}", idx))?;
                 encrypted.decrypt(&sk_bfv, &params, degree)
             })
             .collect::<Result<_>>()?;
@@ -743,9 +743,10 @@ impl ThresholdKeyshare {
                 ts.esi_sss
                     .iter()
                     .map(|esi_shares| {
+                        let idx = if esi_shares.len() == 1 { 0 } else { party_id };
                         let encrypted = esi_shares
-                            .clone_share(party_id)
-                            .ok_or(anyhow!("No esi_sss share for party {}", party_id))?;
+                            .clone_share(idx)
+                            .ok_or(anyhow!("No esi_sss share at index {}", idx))?;
                         encrypted.decrypt(&sk_bfv, &params, degree)
                     })
                     .collect::<Result<Vec<_>>>()
