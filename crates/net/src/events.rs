@@ -12,6 +12,7 @@ use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
+    request_response::ResponseChannel,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,16 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncRequestValue {
+    pub since: u128,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncResponseValue {
+    pub events: Vec<GossipData>,
+}
+
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
 pub enum NetCommand {
@@ -86,6 +97,13 @@ pub enum NetCommand {
     },
     /// Shutdown signal
     Shutdown,
+    /// Request libp2p events from a peer node starting from the given timestamp.
+    SyncRequest { value: SyncRequestValue },
+    /// Send libp2p events back to a peer that requested a sync.
+    SyncResponse {
+        value: SyncResponseValue,
+        channel: Arc<ResponseChannel<SyncResponseValue>>,
+    },
 }
 
 impl NetCommand {
@@ -148,6 +166,14 @@ pub enum NetEvent {
     },
     /// GossipSubscribed
     GossipSubscribed { count: usize, topic: TopicHash },
+    /// A peer node is requesting gossipsub events since the given timestamp.
+    /// Use the provided channel to send a `SyncResponse
+    SyncRequestReceived {
+        value: SyncRequestValue,
+        channel: Arc<ResponseChannel<SyncResponseValue>>,
+    },
+    /// Received gossipsub events from a peer in response to a `SyncRequest`.
+    SyncResponseReceived { value: SyncResponseValue },
 }
 
 #[derive(Clone, Debug)]

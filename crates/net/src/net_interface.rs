@@ -21,7 +21,7 @@ use libp2p::{
     },
     request_response::{
         self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
-        Message as RequestResponseMessage, ProtocolSupport,
+        Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
     },
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
@@ -39,7 +39,7 @@ use tracing::{debug, error, info, trace, warn};
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
-use crate::events::{GossipData, NetCommand};
+use crate::events::{GossipData, NetCommand, SyncRequestValue, SyncResponseValue};
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
 
@@ -49,7 +49,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
-    sync: CborRequestResponse<SyncRequest, SyncResponse>,
+    sync: CborRequestResponse<SyncRequestValue, SyncResponseValue>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -188,7 +188,7 @@ fn create_behaviour(
         gossipsub_config,
     )?;
 
-    let sync = CborRequestResponse::<SyncRequest, SyncResponse>::new(
+    let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
@@ -363,18 +363,20 @@ async fn process_swarm_event(
             peer,
             message:
                 RequestResponseMessage::Request {
-                    request: SyncRequest { since, limit },
+                    request: SyncRequestValue { since },
+                    channel,
                     ..
                 },
         })) => {
             // received a request for events
+            // search for
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
             peer,
             message:
                 RequestResponseMessage::Response {
-                    response: SyncResponse { events },
+                    response: SyncResponseValue { events },
                     ..
                 },
         })) => {
@@ -426,6 +428,8 @@ async fn process_swarm_command(
             key,
         } => handle_get_record(swarm, correlator, correlation_id, key),
         NetCommand::Shutdown => handle_shutdown(swarm, shutdown_flag),
+        NetCommand::SyncRequest { value } => handle_sync_request(swarm, value),
+        NetCommand::SyncResponse { value, channel } => handle_sync_response(swarm, channel, value),
     }
 }
 
@@ -551,6 +555,18 @@ fn handle_shutdown(
     Ok(())
 }
 
+fn handle_sync_request(swarm: &mut Swarm<NodeBehaviour>, value: SyncRequestValue) -> Result<()> {
+    Ok(())
+}
+
+fn handle_sync_response(
+    swarm: &mut Swarm<NodeBehaviour>,
+    channel: Arc<ResponseChannel<SyncResponseValue>>,
+    value: SyncResponseValue,
+) -> Result<()> {
+    Ok(())
+}
+
 /// This correlates query_id and correlation_id.
 #[derive(Clone)]
 struct Correlator {
@@ -573,15 +589,4 @@ impl Correlator {
             .remove(query_id)
             .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncRequest {
-    pub since: u128,
-    pub limit: u32,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncResponse {
-    pub events: Vec<GossipData>,
 }
