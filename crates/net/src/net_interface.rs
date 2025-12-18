@@ -19,6 +19,7 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
+    request_response::{self, cbor, ProtocolSupport},
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
@@ -46,6 +47,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
+    sync: cbor::Behaviour<SyncRequest, SyncResponse>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -167,7 +169,7 @@ fn create_behaviour(
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
-    let identify_config = IdentifyBehaviour::new(
+    let identify = IdentifyBehaviour::new(
         identify::Config::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
@@ -183,6 +185,14 @@ fn create_behaviour(
         gossipsub::MessageAuthenticity::Signed(key.clone()),
         gossipsub_config,
     )?;
+
+    let sync = cbor::Behaviour::<SyncRequest, SyncResponse>::new(
+        [(
+            StreamProtocol::new("/enclave/sync/0.0.1"),
+            ProtocolSupport::Full,
+        )],
+        request_response::Config::default(),
+    );
 
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
     config
@@ -203,7 +213,8 @@ fn create_behaviour(
         gossipsub,
         kademlia,
         connection_limits,
-        identify: identify_config,
+        identify,
+        sync,
     })
 }
 
@@ -535,4 +546,15 @@ impl Correlator {
             .remove(query_id)
             .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncRequest {
+    pub since: u128,
+    pub limit: u32,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncResponse {
+    pub events: Vec<GossipData>,
 }
