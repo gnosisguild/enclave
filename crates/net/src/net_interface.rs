@@ -40,7 +40,10 @@ use tracing::{debug, error, info, trace, warn};
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
-use crate::events::{GossipData, NetCommand, SyncRequestValue, SyncResponseValue};
+use crate::events::{
+    GossipData, NetCommand, SyncRequestReceived, SyncRequestValue, SyncResponseReceived,
+    SyncResponseValue,
+};
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
 
@@ -363,15 +366,18 @@ async fn process_swarm_event(
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
             message:
                 RequestResponseMessage::Request {
-                    request, channel, ..
+                    request,
+                    channel,
+                    request_id,
                 },
             ..
         })) => {
             // received a request for events
-            event_tx.send(NetEvent::SyncRequestReceived {
+            event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
+                request_id,
                 channel: OnceTake::new(channel),
                 value: request,
-            })?;
+            }))?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
@@ -379,7 +385,9 @@ async fn process_swarm_event(
             ..
         })) => {
             // received a response to a request for events
-            event_tx.send(NetEvent::SyncResponseReceived { value: response })?;
+            event_tx.send(NetEvent::SyncResponseReceived(SyncResponseReceived {
+                value: response,
+            }))?;
         }
 
         unknown => {

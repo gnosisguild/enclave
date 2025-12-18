@@ -6,7 +6,7 @@
 
 use actix::{Message, Recipient};
 
-use crate::{EnclaveEvent, Sequenced, Unsequenced};
+use crate::{CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
 
 /// Direct event received by the snapshot buffer in order to save snapshot to disk
 #[derive(Message, Debug)]
@@ -47,29 +47,39 @@ impl StoreEventRequested {
 #[derive(Message, Debug)]
 #[rtype("()")]
 pub struct GetEventsAfter {
-    pub ts: u128,
+    pub id: CorrelationId,
     pub sender: Recipient<ReceiveEvents>,
+    pub ts: u128,
 }
 
 impl GetEventsAfter {
-    pub fn new(ts: u128, sender: impl Into<Recipient<ReceiveEvents>>) -> Self {
+    pub fn new(id: CorrelationId, sender: impl Into<Recipient<ReceiveEvents>>, ts: u128) -> Self {
         Self {
-            ts,
+            id,
             sender: sender.into(),
+            ts,
         }
     }
 }
 
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct ReceiveEvents(Vec<EnclaveEvent<Sequenced>>);
+pub struct ReceiveEvents {
+    id: CorrelationId,
+    events: Vec<EnclaveEvent<Sequenced>>,
+}
 
 impl ReceiveEvents {
-    pub fn new(events: Vec<EnclaveEvent>) -> Self {
-        Self(events)
+    pub fn new(id: CorrelationId, events: Vec<EnclaveEvent>) -> Self {
+        Self { id, events }
     }
+
     pub fn events(&self) -> &Vec<EnclaveEvent> {
-        &self.0
+        &self.events
+    }
+
+    pub fn id(&self) -> CorrelationId {
+        self.id
     }
 }
 

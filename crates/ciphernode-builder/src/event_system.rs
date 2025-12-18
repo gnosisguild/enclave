@@ -302,6 +302,7 @@ mod tests {
     use actix::Message;
 
     use e3_events::prelude::*;
+    use e3_events::CorrelationId;
     use e3_events::EnclaveEventData;
     use e3_events::GetEventsAfter;
     use e3_events::ReceiveEvents;
@@ -460,7 +461,8 @@ mod tests {
         let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstore.try_into()?;
 
         // Get all events after the given timestamp and send them to the listener
-        es.do_send(GetEventsAfter::new(ts, listener.clone()));
+        let id = CorrelationId::new();
+        es.do_send(GetEventsAfter::new(id, listener.clone(), ts));
         sleep(Duration::from_millis(100)).await;
 
         // Pull the events off the listsner since the timestamp

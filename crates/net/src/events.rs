@@ -12,7 +12,7 @@ use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
-    request_response::ResponseChannel,
+    request_response::{InboundRequestId, ResponseChannel},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,20 @@ pub struct SyncRequestValue {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncResponseValue {
     pub events: Vec<GossipData>,
+}
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+pub struct SyncRequestReceived {
+    pub request_id: InboundRequestId,
+    pub value: SyncRequestValue,
+    pub channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+}
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+pub struct SyncResponseReceived {
+    pub value: SyncResponseValue,
 }
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
@@ -168,12 +182,9 @@ pub enum NetEvent {
     GossipSubscribed { count: usize, topic: TopicHash },
     /// A peer node is requesting gossipsub events since the given timestamp.
     /// Use the provided channel to send a `SyncResponse
-    SyncRequestReceived {
-        value: SyncRequestValue,
-        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
-    },
+    SyncRequestReceived(SyncRequestReceived),
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
-    SyncResponseReceived { value: SyncResponseValue },
+    SyncResponseReceived(SyncResponseReceived),
 }
 
 #[derive(Clone, Debug)]

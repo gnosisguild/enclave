@@ -43,7 +43,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
             .read_from(seq)
             .map(|(s, e)| e.into_sequenced(s))
             .collect::<Vec<_>>();
-        msg.sender.try_send(ReceiveEvents::new(evts))?;
+        msg.sender.try_send(ReceiveEvents::new(msg.id, evts))?;
         Ok(())
     }
 }
