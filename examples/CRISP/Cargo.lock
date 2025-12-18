@@ -2031,6 +2031,7 @@ dependencies = [
  "clap",
  "config",
  "crisp-constants",
+ "crisp-utils",
  "derivative",
  "dialoguer",
  "dotenvy",
@@ -2061,6 +2062,16 @@ name = "crisp-constants"
 version = "0.1.0"
 dependencies = [
  "e3-sdk",
+]
+
+[[package]]
+name = "crisp-utils"
+version = "0.1.0"
+dependencies = [
+ "e3-sdk",
+ "eyre",
+ "hex",
+ "num-bigint",
 ]
 
 [[package]]

@@ -15,9 +15,9 @@ use crate::server::{
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
+use crisp_utils::decode_tally;
 use e3_sdk::indexer::IndexerContext;
 use e3_sdk::{
-    bfv_helpers::decode_bytes_to_vec_u64,
     evm_helpers::{
         contracts::{EnclaveRead, EnclaveWrite, ReadWrite},
         events::{
@@ -290,28 +290,19 @@ pub async fn register_plaintext_output_published(
                 info!("[e3_id={}] Handling PlaintextOutputPublished", e3_id);
 
                 // The plaintextOutput from the event contains the result of the FHE computation.
-                // The computation sums the encrypted votes: '0' for Option 1, '1' for Option 2.
-                // Thus, the decrypted sum directly represents the number of votes for Option 2.
-                // The output is expected to be a Vec<u8> in little endian format of u64s.
-                let decoded = decode_bytes_to_vec_u64(&event.plaintextOutput)?;
+                // Decode the tally using the utility function.
+                let vote_counts = decode_tally(&event.plaintextOutput)?;
 
-                // decoded[0] is the sum of all encrypted votes (0s and 1s).
-                // Since Option 1 votes are encrypted as '0' and Option 2 votes as '1',
-                // this sum is equivalent to the count of votes for Option 2.
-                let option_2 = decoded[0];
+                info!(
+                    "[e3_id={}] Votes Option 1 (Yes): {:?}",
+                    e3_id, vote_counts.yes
+                );
+                info!(
+                    "[e3_id={}] Votes Option 2 (No): {:?}",
+                    e3_id, vote_counts.no
+                );
 
-                // Retrieve the total number of votes that were cast and recorded for this round.
-                let total_votes = repo.get_vote_count().await?;
-
-                // The number of votes for Option 1 can be derived by subtracting
-                // the Option 2 votes (the sum from the FHE output) from the total votes.
-                let option_1 = total_votes - option_2;
-
-                info!("[e3_id={}] Vote Count: {:?}", e3_id, total_votes);
-                info!("[e3_id={}] Votes Option 1: {:?}", e3_id, option_1);
-                info!("[e3_id={}] Votes Option 2: {:?}", e3_id, option_2);
-
-                repo.set_votes(option_1, option_2).await?;
+                repo.set_votes(vote_counts.yes, vote_counts.no).await?;
                 repo.update_status("Finished").await?;
                 Ok(())
             }
