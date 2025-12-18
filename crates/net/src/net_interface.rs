@@ -19,7 +19,7 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
-    request_response::{self, cbor, ProtocolSupport},
+    request_response::{self, cbor::Behaviour as CborRequestResponse, ProtocolSupport},
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
@@ -46,7 +46,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
-    sync: cbor::Behaviour<SyncRequest, SyncResponse>,
+    sync: CborRequestResponse<SyncRequest, SyncResponse>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -185,7 +185,7 @@ fn create_behaviour(
         gossipsub_config,
     )?;
 
-    let sync = cbor::Behaviour::<SyncRequest, SyncResponse>::new(
+    let sync = CborRequestResponse::<SyncRequest, SyncResponse>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
