@@ -20,9 +20,6 @@ pub struct NetSyncManager {
     bus: BusHandle,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
-    /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
-    /// that we do not do excessive resubscribes without actually listening for events.
-    rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<GetEventsAfter>,
     requests: HashMap<CorrelationId, OnceTake<ResponseChannel<SyncResponseValue>>>,
 }
@@ -31,13 +28,11 @@ impl NetSyncManager {
     pub fn new(
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
-        rx: &Arc<broadcast::Receiver<NetEvent>>,
         eventstore: Recipient<GetEventsAfter>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),
-            rx: rx.clone(),
             eventstore,
             requests: HashMap::new(),
         }
@@ -50,9 +45,9 @@ impl NetSyncManager {
         eventstore: Recipient<GetEventsAfter>,
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
-        let addr = Self::new(bus, tx, rx, eventstore).start();
+        let addr = Self::new(bus, tx, eventstore).start();
 
-        // Forward gossip data from NetEvent
+        // Forward from NetEvent
         tokio::spawn({
             debug!("Spawning event receive loop!");
             let addr = addr.clone();
