@@ -12,8 +12,8 @@ import { IDecryptionVerifier } from "@enclave-e3/contracts/contracts/interfaces/
 contract MockEnclave {
   bytes public plaintextOutput;
 
-  function setPlaintextOutput(uint256[] memory plaintext) external {
-    plaintextOutput = abi.encode(plaintext);
+  function setPlaintextOutput(bytes memory plaintext) external {
+    plaintextOutput = plaintext;
   }
 
   function getE3(uint256 e3Id) external view returns (E3 memory) {
