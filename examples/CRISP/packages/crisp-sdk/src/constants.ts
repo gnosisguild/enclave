@@ -8,6 +8,7 @@ import { hashMessage } from 'viem'
 
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
+export const CRISP_SERVER_PREVIOUS_CIPHERTEXT_ENDPOINT = 'state/previous-ciphertext'
 
 export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
 

@@ -27,6 +27,7 @@ sol! {
     contract CRISPProgram {
         function setMerkleRoot(uint256 e3_id, uint256 _root) external;
         function getSlotIndex(uint256 e3_id, address slot_address) external view returns (uint256);
+        function isSlotEmptyByAddress(uint256 e3_id, address slot_address) external view returns (bool);
     }
 }
 
@@ -126,6 +127,20 @@ impl CRISPContract<CRISPReadProvider> {
         match contract.getSlotIndex(e3_id, slot_address).call().await {
             Ok(slot_index) => Ok(slot_index),
             Err(e) => Err(eyre::eyre!("Failed to get slot index: {}", e)),
+        }
+    }
+
+    /// Check if a slot is empty by its address
+    pub async fn get_is_slot_empty_by_address(
+        &self,
+        e3_id: U256,
+        slot_address: Address,
+    ) -> Result<bool> {
+        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+
+        match contract.isSlotEmptyByAddress(e3_id, slot_address).call().await {
+            Ok(is_empty) => Ok(is_empty),
+            Err(e) => Err(eyre::eyre!("Failed to check if slot is empty: {}", e)),
         }
     }
 }

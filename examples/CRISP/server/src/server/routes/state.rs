@@ -35,7 +35,8 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route(
                 "/previous-ciphertext",
                 web::post().to(handle_get_previous_ciphertext),
-            ),
+            )
+            .route("/is-slot-empty", web::post().to(handle_get_previous_ciphertext)),
     );
 }
 
@@ -279,4 +280,32 @@ async fn get_token_holders_hashes(
             HttpResponse::InternalServerError().body("Failed to get token holders hashes")
         }
     }
+}
+
+async fn handle_is_slot_empty(
+    data: web::Json<PreviousCiphertextRequest>,
+    store: web::Data<AppData>,
+) -> Responder {
+    let incoming = data.into_inner();
+
+    let contract =
+        match CRISPContractFactory::create_read(&CONFIG.http_rpc_url, &CONFIG.e3_program_address)
+            .await
+        {
+            Ok(contract) => contract,
+            Err(e) => {
+                error!("Failed to create CRISP contract: {:?}", e);
+                return HttpResponse::InternalServerError().body("Failed to create CRISP contract");
+            }
+        };
+
+    let address = match Address::from_str(incoming.address.as_str()) {
+        Ok(addr) => addr,
+        Err(e) => {
+            error!("Invalid address format: {:?}", e);
+            return HttpResponse::BadRequest().body("Invalid address format");
+        }
+    };
+
+    
 }
