@@ -6,13 +6,7 @@
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
-import {
-  generateMerkleProof,
-  toBinary,
-  extractSignatureComponents,
-  getAddressFromSignature,
-  getOptimalThreadCount,
-} from './utils'
+import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
 import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, zeroVote, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
@@ -269,7 +263,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
 /**
  * Generate a proof for a vote masking operation.
  * @param maskVoteProofInputs The mask vote proof inputs.
- * @returns 
+ * @returns
  */
 export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs): Promise<ProofData> => {
   // check if the slot is empty first

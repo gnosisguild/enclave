@@ -139,14 +139,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        const encodedProof = await handleProofGeneration(
-          pollSelected,
-          user.address,
-          signature,
-          messageHash,
-          !isVoteUpdate,
-          isMasking,
-        )
+        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, messageHash, !isVoteUpdate, isMasking)
 
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')

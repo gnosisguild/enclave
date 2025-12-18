@@ -30,8 +30,7 @@ const EnclaveEndpoints = {
 } as const
 
 export const useEnclaveServer = () => {
-  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult, GetVoteStatus } =
-    EnclaveEndpoints
+  const { GetCurrentRound, GetWebAllResult, BroadcastVote, GetRoundStateLite, GetWebResult, GetVoteStatus } = EnclaveEndpoints
   const { fetchData, isLoading } = useApi()
   const getCurrentRound = () => fetchData<CurrentRound>(GetCurrentRound)
   const getRoundStateLite = (round_id: number) => fetchData<VoteStateLite, { round_id: number }>(GetRoundStateLite, 'post', { round_id })

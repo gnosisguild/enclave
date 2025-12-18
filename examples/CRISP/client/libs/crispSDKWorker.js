@@ -46,7 +46,7 @@ self.onmessage = async function (event) {
             merkleLeaves,
             balance,
             messageHash,
-            slotAddress
+            slotAddress,
           })
         }
 
