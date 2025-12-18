@@ -33,7 +33,6 @@ use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
-const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
@@ -194,7 +193,7 @@ fn create_behaviour(
         request_response::Config::default(),
     );
 
-    let mut config = KademliaConfig::new(PROTOCOL_NAME);
+    let mut config = KademliaConfig::new(StreamProtocol::new("/ipfs/kad/1.0.0"));
     config
         .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
         .set_query_timeout(Duration::from_secs(30));
