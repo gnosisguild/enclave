@@ -4,18 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Poll } from '@/model/poll.model'
 import Card from '@/components/Cards/Card'
 import CircularTiles from '@/components/CircularTiles'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import LoadingAnimation from '@/components/LoadingAnimation'
-import { hasPollEnded } from '@/utils/methods'
 import CountdownTimer from '@/components/CountdownTime'
 import { useModal } from 'connectkit'
 import { useVoteCasting } from '@/hooks/voting/useVoteCasting'
 import VotingStepIndicator from '@/components/VotingStepIndicator'
+import { usePublicClient } from 'wagmi'
 
 type DailyPollSectionProps = {
   loading?: boolean
@@ -25,13 +25,25 @@ type DailyPollSectionProps = {
 
 const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, title = 'Daily Poll' }) => {
   const { user, pollOptions, setPollOptions, roundState, hasVotedInCurrentRound, voteStatusLoading } = useVoteManagementContext()
-  const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
+  const client = usePublicClient()
+  const [isEnded, setIsEnded] = useState(false)
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
   const { castVoteWithProof, isLoading: isCastingVote, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
-  const statusClass = !isEnded ? 'lime' : 'red'
+  useEffect(() => {
+    ;(async () => {
+      if (!client) return
+      if (!roundState) return
+
+      const block = await client.getBlock()
+
+      if (block.timestamp > roundState.expiration) {
+        setIsEnded(true)
+      }
+    })()
+  }, [roundState, client])
 
   const handleChecked = (selectedPoll: Poll) => {
     const isAlreadySelected = pollSelected?.value === selectedPoll.value
@@ -77,7 +89,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
           {roundState && (
             <div className='flex items-center justify-center space-x-2 flex-wrap gap-2'>
               <div
-                className={`flex items-center space-x-2 rounded-lg border-2 border-${statusClass}-600/80 ${!isEnded ? 'bg-lime-400' : 'bg-red-400'} px-2 py-1 text-center font-bold uppercase leading-none text-white`}
+                className={`flex items-center space-x-2 rounded-lg border-2 border-${!isEnded ? 'lime' : 'red'}-600/80 ${!isEnded ? 'bg-lime-400' : 'bg-red-400'} px-2 py-1 text-center font-bold uppercase leading-none text-white`}
               >
                 <div className='h-1.5 w-1.5 animate-pulse rounded-full bg-white'></div>
                 <div>{!isEnded ? 'Live' : 'Ended'}</div>

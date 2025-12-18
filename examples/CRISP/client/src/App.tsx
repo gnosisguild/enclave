@@ -8,6 +8,7 @@ import React, { Fragment, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import { useSwitchChain } from 'wagmi'
 //Pages
 import Landing from '@/pages/Landing/Landing'
 import DailyPoll from '@/pages/DailyPoll/DailyPoll'
@@ -17,16 +18,20 @@ import PollResult from '@/pages/PollResult/PollResult'
 import RoundPoll from '@/pages/RoundPoll'
 import useScrollToTop from '@/hooks/generic/useScrollToTop'
 import { useVoteManagementContext } from '@/context/voteManagement'
+import { getChain } from './utils/methods'
 
 const App: React.FC = () => {
   useScrollToTop()
   const { initialLoad } = useVoteManagementContext()
+  const { switchChain } = useSwitchChain()
 
   useEffect(() => {
-    async function loadWasm() {
+    ;(async () => {
       await initialLoad()
-    }
-    loadWasm()
+
+      const chain = getChain()
+      switchChain({ chainId: chain.id })
+    })()
   }, [])
 
   return (
