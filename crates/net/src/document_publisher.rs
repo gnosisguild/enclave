@@ -390,7 +390,7 @@ async fn broadcast_document_published_notification(
 /// Note: Party filtering is done by DocumentPublisher BEFORE fetching from DHT.
 pub struct EventConverter {
     bus: BusHandle,
-    chunk_collector: Option<Addr<ChunkCollector<ThresholdShareCreated>>>,
+    chunk_collectors: HashMap<E3id, Addr<ChunkCollector<ThresholdShareCreated>>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -414,7 +414,7 @@ impl EventConverter {
     pub fn new(bus: &BusHandle) -> Self {
         Self {
             bus: bus.clone(),
-            chunk_collector: None,
+            chunk_collectors: HashMap::new(),
         }
     }
 
@@ -426,14 +426,11 @@ impl EventConverter {
         addr
     }
 
-    fn ensure_chunk_collector(&mut self, e3_id: &E3id) {
-        if self.chunk_collector.is_none() {
+    fn ensure_chunk_collector(&mut self, e3_id: &E3id) -> &Addr<ChunkCollector<ThresholdShareCreated>> {
+        self.chunk_collectors.entry(e3_id.clone()).or_insert_with(|| {
             debug!("Creating chunk collector for E3: {}", e3_id);
-            self.chunk_collector = Some(ChunkCollector::<ThresholdShareCreated>::setup(
-                e3_id.clone(),
-                self.bus.clone(),
-            ));
-        }
+            ChunkCollector::<ThresholdShareCreated>::setup(e3_id.clone(), self.bus.clone())
+        })
     }
     /// Publish a receivable document with party filter
     fn publish_filtered(
@@ -578,10 +575,8 @@ impl EventConverter {
                     chunk.chunk_index + 1,
                     chunk.total_chunks
                 );
-                self.ensure_chunk_collector(&msg.meta.e3_id);
-                if let Some(ref collector) = self.chunk_collector {
-                    collector.do_send(ChunkReceived::<ThresholdShareCreated>::new(chunk));
-                }
+                let collector = self.ensure_chunk_collector(&msg.meta.e3_id);
+                collector.do_send(ChunkReceived::<ThresholdShareCreated>::new(chunk));
             }
         }
         Ok(())

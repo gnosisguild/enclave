@@ -580,7 +580,6 @@ impl ThresholdKeyshare {
         Ok(event)
     }
 
-    /// 3a. GenPkShareAndSkSss
     /// 3a. GenPkShareAndSkSss result
     pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
         let ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output)) = res else {
@@ -917,7 +916,6 @@ impl ThresholdKeyshare {
     }
 }
 
-// Will only receive events that are for this specific e3_id
 // Will only receive events that are for this specific e3_id
 impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
