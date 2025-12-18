@@ -426,11 +426,16 @@ impl EventConverter {
         addr
     }
 
-    fn ensure_chunk_collector(&mut self, e3_id: &E3id) -> &Addr<ChunkCollector<ThresholdShareCreated>> {
-        self.chunk_collectors.entry(e3_id.clone()).or_insert_with(|| {
-            debug!("Creating chunk collector for E3: {}", e3_id);
-            ChunkCollector::<ThresholdShareCreated>::setup(e3_id.clone(), self.bus.clone())
-        })
+    fn ensure_chunk_collector(
+        &mut self,
+        e3_id: &E3id,
+    ) -> &Addr<ChunkCollector<ThresholdShareCreated>> {
+        self.chunk_collectors
+            .entry(e3_id.clone())
+            .or_insert_with(|| {
+                debug!("Creating chunk collector for E3: {}", e3_id);
+                ChunkCollector::<ThresholdShareCreated>::setup(e3_id.clone(), self.bus.clone())
+            })
     }
     /// Publish a receivable document with party filter
     fn publish_filtered(
