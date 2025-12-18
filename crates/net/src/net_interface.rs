@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use e3_events::CorrelationId;
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -26,6 +26,7 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
+use rand::seq::IteratorRandom;
 use std::sync::atomic::AtomicBool;
 use std::{
     collections::HashMap,
@@ -360,27 +361,25 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
-            peer,
             message:
                 RequestResponseMessage::Request {
-                    request: SyncRequestValue { since },
-                    channel,
-                    ..
+                    request, channel, ..
                 },
+            ..
         })) => {
             // received a request for events
-            // search for
+            event_tx.send(NetEvent::SyncRequestReceived {
+                channel: OnceTake::new(channel),
+                value: request,
+            })?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
-            peer,
-            message:
-                RequestResponseMessage::Response {
-                    response: SyncResponseValue { events },
-                    ..
-                },
+            message: RequestResponseMessage::Response { response, .. },
+            ..
         })) => {
             // received a response to a request for events
+            event_tx.send(NetEvent::SyncResponseReceived { value: response })?;
         }
 
         unknown => {
@@ -556,14 +555,40 @@ fn handle_shutdown(
 }
 
 fn handle_sync_request(swarm: &mut Swarm<NodeBehaviour>, value: SyncRequestValue) -> Result<()> {
+    // TODO:
+    // This is a first pass.
+    // Lots of stuff to work through here:
+    // How can I know events are correct?
+    // How can I trust this peer?
+    // Can I validate events with another peer?
+    // Should I use an OrderedSet with a hash and request the hash from a second peer?
+
+    // Pick a random peer
+    let Some(peer) = swarm
+        .connected_peers()
+        .choose(&mut rand::thread_rng())
+        .copied()
+    else {
+        bail!("No peer found on swarm!")
+    };
+
+    // Request events
+    swarm.behaviour_mut().sync.send_request(&peer, value);
     Ok(())
 }
 
 fn handle_sync_response(
     swarm: &mut Swarm<NodeBehaviour>,
-    channel: Arc<ResponseChannel<SyncResponseValue>>,
+    channel: OnceTake<ResponseChannel<SyncResponseValue>>,
     value: SyncResponseValue,
 ) -> Result<()> {
+    let channel = channel.try_take()?;
+    match swarm.behaviour_mut().sync.send_response(channel, value) {
+        Ok(_) => (),
+        Err(_res) => {
+            // TODO: report failure
+        }
+    }
     Ok(())
 }
 

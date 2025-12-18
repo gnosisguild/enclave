@@ -6,9 +6,9 @@
 
 use crate::Cid;
 use actix::Message;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use e3_events::{CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
@@ -18,7 +18,7 @@ use libp2p::{
 use serde::{Deserialize, Serialize};
 use std::{
     hash::Hash,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
@@ -102,7 +102,7 @@ pub enum NetCommand {
     /// Send libp2p events back to a peer that requested a sync.
     SyncResponse {
         value: SyncResponseValue,
-        channel: Arc<ResponseChannel<SyncResponseValue>>,
+        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
     },
 }
 
@@ -170,7 +170,7 @@ pub enum NetEvent {
     /// Use the provided channel to send a `SyncResponse
     SyncRequestReceived {
         value: SyncRequestValue,
-        channel: Arc<ResponseChannel<SyncResponseValue>>,
+        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
     },
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
     SyncResponseReceived { value: SyncResponseValue },
