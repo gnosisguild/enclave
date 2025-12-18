@@ -6,6 +6,7 @@
 
 use anyhow::{Context, Result};
 use derivative::Derivative;
+use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
@@ -31,13 +32,13 @@ pub use crate::helpers::{
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct BfvEncryptedShare {
-    /// BFV ciphertexts, one per modulus level (serialized)
-    #[derivative(Debug(format_with = "debug_vec_bytes"))]
-    ciphertexts: Vec<Vec<u8>>,
+    /// BFV ciphertexts, one per modulus level
+    #[derivative(Debug(format_with = "debug_vec_arcbytes"))]
+    ciphertexts: Vec<ArcBytes>,
 }
 
-/// Debug helper for Vec<Vec<u8>>
-fn debug_vec_bytes(v: &Vec<Vec<u8>>, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// Debug helper for Vec<ArcBytes>
+fn debug_vec_arcbytes(v: &Vec<ArcBytes>, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     write!(
         f,
         "[{} ciphertexts, total {} bytes]",
@@ -79,7 +80,7 @@ impl BfvEncryptedShare {
                 .try_encrypt(&pt, rng)
                 .context("Failed to encrypt share")?;
 
-            ciphertexts.push(ct.to_bytes());
+            ciphertexts.push(ArcBytes::from_bytes(&ct.to_bytes()));
         }
 
         Ok(Self { ciphertexts })
@@ -182,6 +183,13 @@ impl BfvEncryptedShares {
     /// Clone the encrypted share for a specific recipient.
     pub fn clone_share(&self, party_id: usize) -> Option<BfvEncryptedShare> {
         self.shares.get(party_id).cloned()
+    }
+
+    /// Extract only the share for a specific party (for bandwidth optimization)
+    pub fn extract_for_party(&self, party_id: usize) -> Option<Self> {
+        self.shares.get(party_id).map(|share| Self {
+            shares: vec![share.clone()],
+        })
     }
 
     /// Number of encrypted shares

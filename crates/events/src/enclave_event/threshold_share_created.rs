@@ -34,6 +34,29 @@ pub struct ThresholdShare {
     pub esi_sss: Vec<BfvEncryptedShares>,
 }
 
+impl ThresholdShare {
+    /// Extract only the shares meant for a specific party.
+    pub fn extract_for_party(&self, recipient_party_id: usize) -> Option<Self> {
+        let sk_sss = self.sk_sss.extract_for_party(recipient_party_id)?;
+        let esi_sss: Option<Vec<_>> = self
+            .esi_sss
+            .iter()
+            .map(|shares| shares.extract_for_party(recipient_party_id))
+            .collect();
+
+        esi_sss.map(|esi_sss| Self {
+            party_id: self.party_id,
+            pk_share: self.pk_share.clone(),
+            sk_sss,
+            esi_sss,
+        })
+    }
+
+    pub fn num_parties(&self) -> usize {
+        self.sk_sss.len()
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ThresholdShareCreated {

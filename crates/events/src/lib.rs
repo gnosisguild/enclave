@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod bus_handle;
+mod chunk;
 mod correlation_id;
 mod e3id;
 mod enclave_event;
@@ -19,6 +20,7 @@ mod sequencer;
 mod traits;
 
 pub use bus_handle::*;
+pub use chunk::*;
 pub use correlation_id::*;
 pub use e3id::*;
 pub use enclave_event::*;

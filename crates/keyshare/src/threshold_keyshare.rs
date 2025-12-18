@@ -85,6 +85,7 @@ pub struct GeneratingThresholdShareData {
     esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
     sk_bfv: Option<SensitiveBytes>,
     pk_bfv: Option<ArcBytes>,
+    collected_encryption_keys: Option<Vec<Arc<EncryptionKey>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -93,6 +94,7 @@ pub struct AggregatingDecryptionKey {
     sk_sss: Encrypted<SharedSecret>,
     esi_sss: Vec<Encrypted<SharedSecret>>,
     sk_bfv: SensitiveBytes,
+    collected_encryption_keys: Vec<Arc<EncryptionKey>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -306,7 +308,6 @@ pub struct ThresholdKeyshare {
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
-    collected_encryption_keys: Option<Vec<Arc<EncryptionKey>>>,
     multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
 }
@@ -318,7 +319,6 @@ impl ThresholdKeyshare {
             cipher: params.cipher,
             decryption_key_collector: None,
             encryption_key_collector: None,
-            collected_encryption_keys: None,
             multithread: params.multithread,
             state: params.state,
         }
@@ -417,7 +417,7 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        let state = self.state.get().ok_or(anyhow!("No state"))?;
+        let state = self.state.try_get()?;
         self.bus.publish(EncryptionKeyCreated {
             e3_id: state.e3_id.clone(),
             key: Arc::new(EncryptionKey {
@@ -425,7 +425,7 @@ impl ThresholdKeyshare {
                 pk_bfv: pk_bfv_bytes,
             }),
             external: false,
-        });
+        })?;
 
         Ok(())
     }
@@ -441,9 +441,7 @@ impl ThresholdKeyshare {
             msg.keys.len()
         );
 
-        self.collected_encryption_keys = Some(msg.keys);
-        let state = self.state.get().ok_or(anyhow!("No state"))?;
-        let current: CollectingEncryptionKeysData = state.clone().try_into()?;
+        let current: CollectingEncryptionKeysData = self.state.try_get()?.try_into()?;
 
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::GeneratingThresholdShare(
@@ -453,6 +451,7 @@ impl ThresholdKeyshare {
                     esi_sss: None,
                     sk_bfv: Some(current.sk_bfv),
                     pk_bfv: Some(current.pk_bfv),
+                    collected_encryption_keys: Some(msg.keys),
                 },
             ))
         })?;
@@ -511,23 +510,26 @@ impl ThresholdKeyshare {
             let sk_sss = current.sk_sss;
             let sk_bfv = current.sk_bfv;
             let pk_bfv = current.pk_bfv;
-            let next = match (pk_share, sk_sss, &sk_bfv) {
+            let collected_encryption_keys = current.collected_encryption_keys;
+            let next = match (pk_share, sk_sss, &sk_bfv, &collected_encryption_keys) {
                 // If the other shares are here then transition to aggregation
-                (Some(pk_share), Some(sk_sss), Some(sk_bfv_ref)) => {
+                (Some(pk_share), Some(sk_sss), Some(sk_bfv_ref), Some(keys)) => {
                     K::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
                         sk_bfv: sk_bfv_ref.clone(),
+                        collected_encryption_keys: keys.clone(),
                     })
                 }
                 // If the other shares are not here yet then dont transition
-                (None, None, _) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
+                (None, None, _, _) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
                     esi_sss: Some(esi_sss),
                     pk_share: None,
                     sk_sss: None,
                     sk_bfv,
                     pk_bfv,
+                    collected_encryption_keys,
                 }),
                 _ => bail!("Inconsistent state!"),
             };
@@ -589,28 +591,35 @@ impl ThresholdKeyshare {
             let esi_sss = current.esi_sss;
             let sk_bfv = current.sk_bfv;
             let pk_bfv = current.pk_bfv;
-            let next = match (esi_sss, sk_bfv) {
+            let collected_encryption_keys = current.collected_encryption_keys;
+            let next = match (esi_sss, sk_bfv, &collected_encryption_keys) {
                 // If the esi shares and BFV key are here then transition to aggregation
-                (Some(esi_sss), Some(sk_bfv)) => {
+                (Some(esi_sss), Some(sk_bfv), Some(keys)) => {
                     KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
                         sk_bfv,
+                        collected_encryption_keys: keys.clone(),
                     })
                 }
                 // If esi shares are not here yet then don't transition
-                (None, sk_bfv) => {
+                (None, sk_bfv, _) => {
                     KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
                         esi_sss: None,
                         pk_share: Some(pk_share),
                         sk_sss: Some(sk_sss),
                         sk_bfv,
                         pk_bfv,
+                        collected_encryption_keys,
                     })
                 }
                 // If we have esi_sss but no sk_bfv, that's an error
-                (Some(_), None) => bail!("Have esi_sss but no sk_bfv - inconsistent state!"),
+                (Some(_), None, _) => bail!("Have esi_sss but no sk_bfv - inconsistent state!"),
+                // If we have shares ready but no encryption keys, that's an error
+                (Some(_), Some(_), None) => {
+                    bail!("Have shares but no collected encryption keys - inconsistent state!")
+                }
             };
             s.new_state(next)
         })?;
@@ -633,6 +642,7 @@ impl ThresholdKeyshare {
                     pk_share,
                     sk_sss,
                     esi_sss,
+                    collected_encryption_keys,
                     ..
                 }),
             party_id,
@@ -643,11 +653,8 @@ impl ThresholdKeyshare {
             bail!("Invalid state!");
         };
 
-        // Get collected BFV public keys from all parties
-        let encryption_keys = self
-            .collected_encryption_keys
-            .as_ref()
-            .ok_or(anyhow!("No encryption keys collected"))?;
+        // Get collected BFV public keys from all parties (now from persisted state)
+        let encryption_keys = &collected_encryption_keys;
 
         // Convert to BFV public keys
         let params = get_share_encryption_params();
@@ -699,7 +706,7 @@ impl ThresholdKeyshare {
     ) -> Result<ComputeRequest> {
         info!("AllThresholdSharesCollected");
         let cipher = self.cipher.clone();
-        let state = self.state.get().ok_or(anyhow!("No state found"))?;
+        let state = self.state.try_get()?;
         let party_id = state.party_id as usize;
         let trbfv_config = state.get_trbfv_config();
 
@@ -781,7 +788,7 @@ impl ThresholdKeyshare {
             s.new_state(next)
         })?;
 
-        let state = self.state.get().ok_or(anyhow!("No state found"))?;
+        let state = self.state.try_get()?;
         let e3_id = state.get_e3_id().clone();
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
@@ -816,7 +823,7 @@ impl ThresholdKeyshare {
         })?;
 
         let ciphertext_output = msg.ciphertext_output;
-        let state = self.state.get().ok_or(anyhow!("No state found"))?;
+        let state = self.state.try_get()?;
         let decrypting: Decrypting = state.clone().try_into()?;
         let trbfv_config = state.get_trbfv_config();
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
@@ -839,7 +846,7 @@ impl ThresholdKeyshare {
         res: ComputeResponse,
     ) -> Result<()> {
         let msg: CalculateDecryptionShareResponse = res.try_into()?;
-        let state = self.state.get().ok_or(anyhow!("No state found"))?;
+        let state = self.state.try_get()?;
         let party_id = state.party_id;
         let node = state.address;
         let e3_id = state.e3_id;

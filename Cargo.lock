@@ -2940,6 +2940,7 @@ dependencies = [
  "e3-trbfv",
  "e3-utils",
  "futures-util",
+ "hex",
  "once_cell",
  "proptest",
  "rand 0.8.5",
