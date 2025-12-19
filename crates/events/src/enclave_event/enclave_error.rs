@@ -6,7 +6,11 @@
 
 use actix::Message;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    future::Future,
+    pin::Pin,
+};
 
 use crate::{BusHandle, ErrorDispatcher};
 
@@ -69,4 +73,22 @@ where
         Ok(_) => (),
         Err(e) => bus.err(err_type, e),
     }
+}
+
+/// Function to accept a future that resolves to a result. If result is an Err variant it is trapped and
+/// sent to the bus as an ErrorEvent
+pub fn trap_fut<F>(
+    err_type: EType,
+    bus: &BusHandle,
+    fut: F,
+) -> Pin<Box<dyn Future<Output = ()> + Send>>
+where
+    F: Future<Output = anyhow::Result<()>> + Send + 'static,
+{
+    let bus = bus.clone();
+    Box::pin(async move {
+        if let Err(e) = fut.await {
+            bus.err(err_type, e);
+        }
+    })
 }

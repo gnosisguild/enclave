@@ -82,7 +82,7 @@ pub struct SyncRequestReceived {
 
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
-pub struct SyncResponseReceived {
+pub struct OutgoingSyncRequestSucceeded {
     pub value: SyncResponseValue,
 }
 
@@ -111,8 +111,9 @@ pub enum NetCommand {
     },
     /// Shutdown signal
     Shutdown,
-    /// Request libp2p events from a peer node starting from the given timestamp.
-    SyncRequest { value: SyncRequestValue },
+    /// Called from the syning node to request libp2p events from a random peer node starting
+    /// from the given timestamp.
+    OutgoingSyncRequest { value: SyncRequestValue },
     /// Send libp2p events back to a peer that requested a sync.
     SyncResponse {
         value: SyncResponseValue,
@@ -184,7 +185,7 @@ pub enum NetEvent {
     /// Use the provided channel to send a `SyncResponse
     SyncRequestReceived(SyncRequestReceived),
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
-    SyncResponseReceived(SyncResponseReceived),
+    OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
 }
 
 #[derive(Clone, Debug)]

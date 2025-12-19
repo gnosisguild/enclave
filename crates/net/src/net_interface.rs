@@ -41,7 +41,7 @@ const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
 use crate::events::{
-    GossipData, NetCommand, SyncRequestReceived, SyncRequestValue, SyncResponseReceived,
+    GossipData, NetCommand, OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue,
     SyncResponseValue,
 };
 use crate::events::{NetEvent, PutOrStoreError};
@@ -385,9 +385,9 @@ async fn process_swarm_event(
             ..
         })) => {
             // received a response to a request for events
-            event_tx.send(NetEvent::SyncResponseReceived(SyncResponseReceived {
-                value: response,
-            }))?;
+            event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
+                OutgoingSyncRequestSucceeded { value: response },
+            ))?;
         }
 
         unknown => {
@@ -435,7 +435,7 @@ async fn process_swarm_command(
             key,
         } => handle_get_record(swarm, correlator, correlation_id, key),
         NetCommand::Shutdown => handle_shutdown(swarm, shutdown_flag),
-        NetCommand::SyncRequest { value } => handle_sync_request(swarm, value),
+        NetCommand::OutgoingSyncRequest { value } => handle_outgoing_sync_request(swarm, value),
         NetCommand::SyncResponse { value, channel } => handle_sync_response(swarm, channel, value),
     }
 }
@@ -562,7 +562,10 @@ fn handle_shutdown(
     Ok(())
 }
 
-fn handle_sync_request(swarm: &mut Swarm<NodeBehaviour>, value: SyncRequestValue) -> Result<()> {
+fn handle_outgoing_sync_request(
+    swarm: &mut Swarm<NodeBehaviour>,
+    value: SyncRequestValue,
+) -> Result<()> {
     // TODO:
     // This is a first pass.
     // Lots of stuff to work through here:

@@ -11,7 +11,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing::debug;
 
 use crate::events::{
-    NetCommand, NetEvent, SyncRequestReceived, SyncRequestValue, SyncResponseReceived,
+    NetCommand, NetEvent, OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue,
     SyncResponseValue,
 };
 
@@ -55,7 +55,7 @@ impl NetSyncManager {
                 while let Ok(event) = events.recv().await {
                     debug!("Received event {:?}", event);
                     match event {
-                        NetEvent::SyncResponseReceived(value) => addr.do_send(value),
+                        NetEvent::OutgoingSyncRequestSucceeded(value) => addr.do_send(value),
                         NetEvent::SyncRequestReceived(value) => addr.do_send(value),
                         _ => (),
                     }
@@ -87,7 +87,7 @@ impl Handler<SyncRequest> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: SyncRequest, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus, || {
-            self.tx.try_send(NetCommand::SyncRequest {
+            self.tx.try_send(NetCommand::OutgoingSyncRequest {
                 value: SyncRequestValue { since: msg.since },
             })?;
             Ok(())
@@ -96,9 +96,9 @@ impl Handler<SyncRequest> for NetSyncManager {
 }
 
 /// We have received the sync response from the remote peer
-impl Handler<SyncResponseReceived> for NetSyncManager {
+impl Handler<OutgoingSyncRequestSucceeded> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, msg: SyncResponseReceived, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: OutgoingSyncRequestSucceeded, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
             self.bus.publish(NetEventsReceived {
                 events: msg
