@@ -44,7 +44,7 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 /// * `data` - The round id and the slot index
 ///
 /// # Returns
-/// * A JSON response with the result of the operation. If sucessful it includes the ciphertext input at the given slot
+/// * A JSON response with the result of the operation. If sucessfull it includes the ciphertext input at the given slot
 async fn handle_get_previous_ciphertext(
     data: web::Json<PreviousCiphertextRequest>,
     store: web::Data<AppData>,
