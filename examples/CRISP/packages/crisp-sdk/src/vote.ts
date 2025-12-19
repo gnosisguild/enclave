@@ -13,7 +13,6 @@ import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
 import { Hex } from 'viem'
-import { getIsSlotEmpty, getPreviousCiphertext } from './state'
 
 // Initialize the ZKInputsGenerator.
 const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
@@ -231,22 +230,12 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
 
-  // check if the slot is empty first
-  const isSlotEmpty = await getIsSlotEmpty(voteProofInputs.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
-
-  let previousCiphertext: Uint8Array
-  if (!isSlotEmpty) {
-    previousCiphertext = await getPreviousCiphertext(voteProofInputs.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
-  } else {
-    previousCiphertext = encryptVote(ZERO_VOTE, voteProofInputs.publicKey)
-  }
-
   const crispInputs = await generateCircuitInputs({
     ...voteProofInputs,
     slotAddress: address,
     merkleProof,
-    isFirstVote: isSlotEmpty,
-    previousCiphertext,
+    isFirstVote: voteProofInputs.isFirstVote,
+    previousCiphertext: voteProofInputs.previousCiphertext,
     signature: voteProofInputs.signature,
     messageHash: voteProofInputs.messageHash,
   })
@@ -260,27 +249,12 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
  * @returns
  */
 export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs): Promise<ProofData> => {
-  // check if the slot is empty first
-  const isSlotEmpty = await getIsSlotEmpty(maskVoteProofInputs.serverUrl, maskVoteProofInputs.e3Id, maskVoteProofInputs.slotAddress)
-
-  let previousCiphertext: Uint8Array
-
-  if (!isSlotEmpty) {
-    previousCiphertext = await getPreviousCiphertext(
-      maskVoteProofInputs.serverUrl,
-      maskVoteProofInputs.e3Id,
-      maskVoteProofInputs.slotAddress,
-    )
-  } else {
-    previousCiphertext = encryptVote(ZERO_VOTE, maskVoteProofInputs.publicKey)
-  }
-
   const merkleProof = generateMerkleProof(maskVoteProofInputs.balance, maskVoteProofInputs.slotAddress, maskVoteProofInputs.merkleLeaves)
 
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
-    previousCiphertext,
-    isFirstVote: isSlotEmpty,
+    previousCiphertext: maskVoteProofInputs.previousCiphertext,
+    isFirstVote: maskVoteProofInputs.isFirstVote,
     signature: MASK_SIGNATURE,
     messageHash: SIGNATURE_MESSAGE_HASH,
     vote: ZERO_VOTE,

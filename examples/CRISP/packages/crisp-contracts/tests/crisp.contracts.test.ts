@@ -14,11 +14,13 @@ import {
   encodeSolidityProof,
   generateMerkleTree,
   SIGNATURE_MESSAGE_HASH,
+  encryptVote,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
 let publicKey = generatePublicKey()
+const previousCiphertext = encryptVote({ yes: 0n, no: 0n }, publicKey)
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {
@@ -59,6 +61,9 @@ describe('CRISP Contracts', function () {
         merkleLeaves: leaves,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
+        isFirstVote: true,
+        previousCiphertext,
+        slotAddress: address,
       })
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
@@ -89,6 +94,9 @@ describe('CRISP Contracts', function () {
         merkleLeaves: leaves,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
+        isFirstVote: true,
+        previousCiphertext,
+        slotAddress: address,
       })
 
       const encodedProof = encodeSolidityProof(proof)

@@ -7,21 +7,12 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { Vote } from '../src/types'
 import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
-import {
-  decodeTally,
-  encryptVote,
-  generateVoteProof,
-  generateMaskVoteProof,
-  generatePublicKey,
-  verifyProof,
-  encodeVote,
-  generateCircuitInputs,
-  executeCircuit,
-} from '../src/vote'
+import { decodeTally, encryptVote, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
 import previousCiphertextEncoded from './previous.json'
+import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
   let vote: Vote
@@ -52,6 +43,8 @@ describe('Vote', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
+
+  const sdk = new CrispSDK(CRISP_SERVER_URL)
 
   // Setup the test environment.
   beforeAll(async () => {
@@ -220,7 +213,7 @@ describe('Vote', () => {
 
       vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
 
-      const proof = await generateVoteProof({
+      const proof = await sdk.generateVoteProof({
         vote,
         publicKey,
         signature,
@@ -251,7 +244,7 @@ describe('Vote', () => {
 
       vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
 
-      const proof = await generateMaskVoteProof({
+      const proof = await sdk.generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
@@ -282,7 +275,7 @@ describe('Vote', () => {
 
       vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse).mockResolvedValueOnce(mockFetchResponse)
 
-      const proof = await generateMaskVoteProof({
+      const proof = await sdk.generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,

@@ -182,6 +182,15 @@ export type ProofInputs = {
 }
 
 export type MaskVoteProofInputs = {
+  publicKey: Uint8Array
+  balance: bigint
+  slotAddress: string
+  merkleLeaves: string[] | bigint[]
+  isFirstVote: boolean
+  previousCiphertext: Uint8Array
+}
+
+export type MaskVoteProofRequest = {
   serverUrl: string
   e3Id: number
   publicKey: Uint8Array
@@ -190,7 +199,7 @@ export type MaskVoteProofInputs = {
   merkleLeaves: string[] | bigint[]
 }
 
-export type VoteProofInputs = {
+export type VoteProofRequest = {
   serverUrl: string
   e3Id: number
   merkleLeaves: string[] | bigint[]
@@ -200,6 +209,18 @@ export type VoteProofInputs = {
   signature: `0x${string}`
   messageHash: `0x${string}`
   slotAddress: string
+}
+
+export type VoteProofInputs = {
+  merkleLeaves: string[] | bigint[]
+  publicKey: Uint8Array
+  balance: bigint
+  vote: Vote
+  signature: `0x${string}`
+  messageHash: `0x${string}`
+  slotAddress: string
+  isFirstVote: boolean
+  previousCiphertext: Uint8Array
 }
 
 export type Signature = {
