@@ -37,4 +37,4 @@ export const SIGNATURE_MESSAGE_HASH = hashMessage(SIGNATURE_MESSAGE)
 export const MASK_SIGNATURE =
   '0x8e7d77112641d59e9409ec3052041703bb9d9e6ed39bfcf75aefbcafe829ac6b21dd7648116ad5db0466fcb4bd468dcb28f6c069def8bc47cd9d859c85a016e31b'
 
-export const zeroVote = { yes: 0n, no: 0n }
+export const ZERO_VOTE = { yes: 0n, no: 0n }

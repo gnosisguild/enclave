@@ -38,7 +38,7 @@ export type VoteManagementContextType = {
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
   generateProof: (
-    voteId: number,
+    e3Id: number,
     vote: Vote,
     publicKey: Uint8Array,
     address: string,

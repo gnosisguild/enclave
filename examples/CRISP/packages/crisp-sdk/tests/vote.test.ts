@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
-import { Signature, Vote } from '../src/types'
-import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, zeroVote } from '../src/constants'
-import { extractSignatureComponents, generateMerkleProof } from '../src/utils'
+import { Vote } from '../src/types'
+import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
+import { generateMerkleProof } from '../src/utils'
 import {
   decodeTally,
   encryptVote,
@@ -30,7 +30,6 @@ describe('Vote', () => {
   let address: string
   let slotAddress: string
   let publicKey: Uint8Array
-  let derivedSignatureComponents: Signature
 
   const e3Id = 0
 
@@ -58,7 +57,6 @@ describe('Vote', () => {
   beforeAll(async () => {
     vote = { yes: 10n, no: 0n }
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
-    derivedSignatureComponents = await extractSignatureComponents(signature, SIGNATURE_MESSAGE_HASH)
     balance = 100n
     address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
     // Address of the last leaf in the Merkle tree, used for mask votes.
@@ -113,14 +111,14 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
-      const sig = await extractSignatureComponents(signature, SIGNATURE_MESSAGE_HASH)
 
-      const previousCiphertext = encryptVote(zeroVote, publicKey)
+      const previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
 
       const crispInputs = await generateCircuitInputs({
         vote,
         publicKey,
-        signature: sig,
+        signature,
+        messageHash: SIGNATURE_MESSAGE_HASH,
         balance,
         slotAddress: address,
         merkleProof,
@@ -157,8 +155,9 @@ describe('Vote', () => {
         slotAddress,
         isFirstVote: false,
         merkleProof,
-        vote: zeroVote,
-        signature: derivedSignatureComponents,
+        vote: ZERO_VOTE,
+        signature: MASK_SIGNATURE,
+        messageHash: SIGNATURE_MESSAGE_HASH,
         previousCiphertext: new Uint8Array(previousCiphertextEncoded),
       })
 
@@ -184,9 +183,10 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
       const crispInputs = await generateCircuitInputs({
-        vote: zeroVote,
+        vote: ZERO_VOTE,
         publicKey,
-        signature: derivedSignatureComponents,
+        signature: MASK_SIGNATURE,
+        messageHash: SIGNATURE_MESSAGE_HASH,
         merkleProof,
         balance,
         slotAddress,

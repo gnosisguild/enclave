@@ -173,7 +173,8 @@ export type ProofInputs = {
   previousCiphertext: Uint8Array
   vote: Vote
   publicKey: Uint8Array
-  signature: Signature
+  signature: `0x${string}`
+  messageHash: `0x${string}`
   balance: bigint
   slotAddress: string
   merkleProof: MerkleProof

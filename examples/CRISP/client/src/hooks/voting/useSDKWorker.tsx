@@ -29,7 +29,7 @@ export const useSDKWorkerHook = () => {
   }, [])
 
   const generateProof = async (
-    voteId: number,
+    e3Id: number,
     vote: Vote,
     publicKey: Uint8Array,
     address: string,
@@ -48,7 +48,7 @@ export const useSDKWorkerHook = () => {
 
       workerRef.current!.postMessage({
         type: 'generate_proof',
-        data: { voteId, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API },
+        data: { e3Id, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API },
       })
       workerRef.current!.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data

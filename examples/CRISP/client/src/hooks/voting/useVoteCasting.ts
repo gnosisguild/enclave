@@ -135,8 +135,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        // voteId is either 0 or 1, so we need to encode the vote accordingly.
-        // We are adapting to the current CRISP application.
+        // vote is either 0 or 1, so we need to encode the vote accordingly.
         const balance = 1n
         const vote = pollSelected.value === 0 ? { yes: balance, no: 0n } : { yes: 0n, no: balance }
 

@@ -11,7 +11,7 @@ self.onmessage = async function (event) {
   switch (type) {
     case 'generate_proof':
       try {
-        const { voteId, vote, publicKey, balance, address: slotAddress, signature, messageHash, isMasking, crispServer } = data
+        const { e3Id, vote, publicKey, balance, address: slotAddress, signature, messageHash, isMasking, crispServer } = data
 
         // todo: get the leaves from the server (pass them from the client).
         const merkleLeaves = [
@@ -25,7 +25,7 @@ self.onmessage = async function (event) {
         if (isMasking) {
           proof = await generateMaskVoteProof({
             serverUrl: crispServer,
-            e3Id: voteId,
+            e3Id,
             publicKey,
             balance,
             slotAddress,
@@ -35,7 +35,7 @@ self.onmessage = async function (event) {
           proof = await generateVoteProof({
             serverUrl: crispServer,
             vote,
-            e3Id: voteId,
+            e3Id,
             publicKey,
             signature,
             merkleLeaves,
