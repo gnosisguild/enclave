@@ -218,7 +218,7 @@ describe('Vote', () => {
         json: async () => mockedIsSlotEmptyTrueResponse,
       } as Response
 
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockIsSlotEmptyResponse)
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
 
       const proof = await generateVoteProof({
         vote,
