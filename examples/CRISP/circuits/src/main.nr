@@ -25,8 +25,8 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 /// 1. **Actual Voting**: An eligible voter casts a vote
 /// 2. **Mask Vote**: Anyone submits a zero vote to mask slot activity
 ///
-/// Votes are stored in an on-chain key-value mapping, where the key is the slot address (Ethereum address)
-/// of the voter, and the value is the last ciphertext added to that slot.
+/// Votes are stored in an on-chain Merkle tree, where each vote ciphertext is stored at a specific
+/// index. A mapping stores the slot address (Ethereum address) to the index in the Merkle tree.
 ///   - For actual votes: the slot address must match the address derived from the signature
 ///   - For mask votes: the slot address can be any address (no address match required)
 /// In both cases, the address of the slot must be in the eligibility Merkle tree, a tree used

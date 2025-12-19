@@ -94,7 +94,7 @@ zero-knowledge proofs for vote validation before votes are accepted into the sys
 verify that votes are correctly encrypted using BFV fully homomorphic encryption under a valid
 public key, check that the voter's address is included in the eligibility Merkle tree, and ensure
 votes conform to the expected structure and values. The circuits also support mask votes, allowing
-anyone to submit zero votes to mask slot activity and prevent receipt-sharing attacks.
+anyone to submit zero votes to mask slot activity and reduce the risk of collusion and coercion.
 
 For detailed documentation on how the circuit works, see the
 [main circuit implementation](https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/circuits/src/main.nr).
@@ -135,8 +135,8 @@ voter inclusion in the eligibility tree.
 When casting a vote, the SDK encrypts votes using BFV fully homomorphic encryption under the
 committee's public key and generates zero-knowledge proofs using compiled Noir circuits. These
 proofs demonstrate that votes are correctly encrypted and that voters are eligible to participate.
-The SDK also supports mask votes, generating proofs for zero-value votes that help prevent
-receipt-sharing attacks. Before submission, proofs are verified locally to prevent failed
+The SDK also supports mask votes, generating proofs for zero-value votes that help reduce the risk
+of collusion and coercion. Before submission, proofs are verified locally to prevent failed
 transactions, and after voting concludes, the SDK decodes encrypted tally results into readable vote
 counts.
 

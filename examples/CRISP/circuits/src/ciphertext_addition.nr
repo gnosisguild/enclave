@@ -12,7 +12,7 @@
 //!
 //! ## Purpose
 //!
-//! In CRISP, voters can update their votes. When a vote is updated, the new vote ciphertext
+//! In CRISP, mask votes can update slots. When a mask vote updates a slot, the new vote ciphertext
 //! must be homomorphically added to the previous vote ciphertext. This module verifies that
 //! this addition was performed correctly.
 //!

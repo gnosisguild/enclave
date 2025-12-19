@@ -167,8 +167,9 @@ program URL:
 ### Environment Variables
 
 The `pnpm dev:setup` command automatically creates `.env` files for the server and client from the
-`.env.example` templates. The server's `.env` file is automatically populated with contract
-addresses after deployment.
+`.env.example` templates (if they don't already exist).
+
+The `enclave.config.yaml` file is automatically populated with contract addresses after deployment.
 
 ## Publishing packages to npm
 
