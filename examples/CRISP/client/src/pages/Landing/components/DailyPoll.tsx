@@ -89,7 +89,11 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
           {roundState && (
             <div className='flex items-center justify-center space-x-2 flex-wrap gap-2'>
               <div
-                className={`flex items-center space-x-2 rounded-lg border-2 border-${!isEnded ? 'lime' : 'red'}-600/80 ${!isEnded ? 'bg-lime-400' : 'bg-red-400'} px-2 py-1 text-center font-bold uppercase leading-none text-white`}
+                className={
+                  !isEnded
+                    ? 'flex items-center space-x-2 rounded-lg border-2 border-lime-600/80 bg-lime-400 px-2 py-1 text-center font-bold uppercase leading-none text-white'
+                    : 'flex items-center space-x-2 rounded-lg border-2 border-red-600/80 bg-red-400 px-2 py-1 text-center font-bold uppercase leading-none text-white'
+                }
               >
                 <div className='h-1.5 w-1.5 animate-pulse rounded-full bg-white'></div>
                 <div>{!isEnded ? 'Live' : 'Ended'}</div>

@@ -18,19 +18,32 @@ import PollResult from '@/pages/PollResult/PollResult'
 import RoundPoll from '@/pages/RoundPoll'
 import useScrollToTop from '@/hooks/generic/useScrollToTop'
 import { useVoteManagementContext } from '@/context/voteManagement'
+import { useNotificationAlertContext } from '@/context/NotificationAlert'
+import { handleGenericError } from '@/utils/handle-generic-error'
 import { getChain } from './utils/methods'
 
 const App: React.FC = () => {
   useScrollToTop()
   const { initialLoad } = useVoteManagementContext()
   const { switchChain } = useSwitchChain()
+  const { showToast } = useNotificationAlertContext()
 
   useEffect(() => {
     ;(async () => {
-      await initialLoad()
+      try {
+        await initialLoad()
 
-      const chain = getChain()
-      switchChain({ chainId: chain.id })
+        const chain = getChain()
+        switchChain({ chainId: chain.id })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        handleGenericError('App initial load', error instanceof Error ? error : new Error(errorMessage))
+        showToast({
+          type: 'danger',
+          message: 'Failed to initialize application. Please refresh the page.',
+          persistent: true,
+        })
+      }
     })()
   }, [])
 
