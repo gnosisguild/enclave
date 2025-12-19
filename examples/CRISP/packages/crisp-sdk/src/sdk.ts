@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { getIsSlotEmpty, getPreviousCiphertext } from './state'
 import { encryptVote, generateMaskVoteProof, generateVoteProof } from './vote'
 import { ZERO_VOTE } from './constants'
