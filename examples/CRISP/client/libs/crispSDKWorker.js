@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { hashLeaf, generateVoteProof, encodeSolidityProof, generateMaskVoteProof } from '@crisp-e3/sdk'
+import { hashLeaf, encodeSolidityProof, CrispSDK } from '@crisp-e3/sdk'
 
 self.onmessage = async function (event) {
   const { type, data } = event.data
@@ -20,10 +20,12 @@ self.onmessage = async function (event) {
           14131255645332550266535358189863475289290770471998199141522479556687499890181n,
         ]
 
+        const sdk = new CrispSDK(crispServer)
+
         let proof
 
         if (isMasking) {
-          proof = await generateMaskVoteProof({
+          proof = await sdk.generateMaskVoteProof({
             serverUrl: crispServer,
             e3Id,
             publicKey,
@@ -32,7 +34,7 @@ self.onmessage = async function (event) {
             merkleLeaves,
           })
         } else {
-          proof = await generateVoteProof({
+          proof = await sdk.generateVoteProof({
             serverUrl: crispServer,
             vote,
             e3Id,
