@@ -79,14 +79,14 @@ pub struct CollectingEncryptionKeysData {
     ciphernode_selected: CiphernodeSelected,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<ArcBytes>,
     sk_sss: Option<Encrypted<SharedSecret>>,
     esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
-    sk_bfv: Option<SensitiveBytes>,
-    pk_bfv: Option<ArcBytes>,
-    collected_encryption_keys: Option<Vec<Arc<EncryptionKey>>>,
+    sk_bfv: SensitiveBytes,
+    pk_bfv: ArcBytes,
+    collected_encryption_keys: Vec<Arc<EncryptionKey>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -453,9 +453,9 @@ impl ThresholdKeyshare {
                     sk_sss: None,
                     pk_share: None,
                     esi_sss: None,
-                    sk_bfv: Some(current.sk_bfv),
-                    pk_bfv: Some(current.pk_bfv),
-                    collected_encryption_keys: Some(msg.keys),
+                    sk_bfv: current.sk_bfv,
+                    pk_bfv: current.pk_bfv,
+                    collected_encryption_keys: msg.keys,
                 },
             ))
         })?;
@@ -510,30 +510,25 @@ impl ThresholdKeyshare {
             info!("try_store_esi_sss");
 
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            let pk_share = current.pk_share;
-            let sk_sss = current.sk_sss;
-            let sk_bfv = current.sk_bfv;
-            let pk_bfv = current.pk_bfv;
-            let collected_encryption_keys = current.collected_encryption_keys;
-            let next = match (pk_share, sk_sss, &sk_bfv, &collected_encryption_keys) {
+            let next = match (current.pk_share, current.sk_sss) {
                 // If the other shares are here then transition to aggregation
-                (Some(pk_share), Some(sk_sss), Some(sk_bfv_ref), Some(keys)) => {
+                (Some(pk_share), Some(sk_sss)) => {
                     K::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
-                        sk_bfv: sk_bfv_ref.clone(),
-                        collected_encryption_keys: keys.clone(),
+                        sk_bfv: current.sk_bfv,
+                        collected_encryption_keys: current.collected_encryption_keys,
                     })
                 }
-                // If the other shares are not here yet then dont transition
-                (None, None, _, _) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
+                // If the other shares are not here yet then don't transition
+                (None, None) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
                     esi_sss: Some(esi_sss),
                     pk_share: None,
                     sk_sss: None,
-                    sk_bfv,
-                    pk_bfv,
-                    collected_encryption_keys,
+                    sk_bfv: current.sk_bfv,
+                    pk_bfv: current.pk_bfv,
+                    collected_encryption_keys: current.collected_encryption_keys,
                 }),
                 _ => bail!("Inconsistent state!"),
             };
@@ -591,38 +586,26 @@ impl ThresholdKeyshare {
         self.state.try_mutate(|s| {
             info!("try_store_pk_share_and_sk_sss");
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            let esi_sss = current.esi_sss;
-            let sk_bfv = current.sk_bfv;
-            let pk_bfv = current.pk_bfv;
-            let collected_encryption_keys = current.collected_encryption_keys;
-            let next = match (esi_sss, sk_bfv, &collected_encryption_keys) {
-                // If the esi shares and BFV key are here then transition to aggregation
-                (Some(esi_sss), Some(sk_bfv), Some(keys)) => {
+            let next = match current.esi_sss {
+                // If the esi shares are here then transition to aggregation
+                Some(esi_sss) => {
                     KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
                         sk_sss,
-                        sk_bfv,
-                        collected_encryption_keys: keys.clone(),
+                        sk_bfv: current.sk_bfv,
+                        collected_encryption_keys: current.collected_encryption_keys,
                     })
                 }
                 // If esi shares are not here yet then don't transition
-                (None, sk_bfv, _) => {
-                    KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
-                        esi_sss: None,
-                        pk_share: Some(pk_share),
-                        sk_sss: Some(sk_sss),
-                        sk_bfv,
-                        pk_bfv,
-                        collected_encryption_keys,
-                    })
-                }
-                // If we have esi_sss but no sk_bfv, that's an error
-                (Some(_), None, _) => bail!("Have esi_sss but no sk_bfv - inconsistent state!"),
-                // If we have shares ready but no encryption keys, that's an error
-                (Some(_), Some(_), None) => {
-                    bail!("Have shares but no collected encryption keys - inconsistent state!")
-                }
+                None => KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
+                    esi_sss: None,
+                    pk_share: Some(pk_share),
+                    sk_sss: Some(sk_sss),
+                    sk_bfv: current.sk_bfv,
+                    pk_bfv: current.pk_bfv,
+                    collected_encryption_keys: current.collected_encryption_keys,
+                }),
             };
             s.new_state(next)
         })?;
