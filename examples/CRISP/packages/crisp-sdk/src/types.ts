@@ -191,7 +191,6 @@ export type MaskVoteProofInputs = {
 }
 
 export type MaskVoteProofRequest = {
-  serverUrl: string
   e3Id: number
   publicKey: Uint8Array
   balance: bigint
@@ -200,7 +199,6 @@ export type MaskVoteProofRequest = {
 }
 
 export type VoteProofRequest = {
-  serverUrl: string
   e3Id: number
   merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array

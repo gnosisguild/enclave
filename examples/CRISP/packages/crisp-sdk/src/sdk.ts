@@ -38,7 +38,7 @@ export class CrispSDK {
 
     let previousCiphertext: Uint8Array
     if (!isSlotEmpty) {
-      previousCiphertext = await getPreviousCiphertext(maskProofInputs.serverUrl, maskProofInputs.e3Id, maskProofInputs.slotAddress)
+      previousCiphertext = await getPreviousCiphertext(this.serverUrl, maskProofInputs.e3Id, maskProofInputs.slotAddress)
     } else {
       previousCiphertext = encryptVote(ZERO_VOTE, maskProofInputs.publicKey)
     }
@@ -61,7 +61,7 @@ export class CrispSDK {
 
     let previousCiphertext: Uint8Array
     if (!isSlotEmpty) {
-      previousCiphertext = await getPreviousCiphertext(voteProofInputs.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
+      previousCiphertext = await getPreviousCiphertext(this.serverUrl, voteProofInputs.e3Id, voteProofInputs.slotAddress)
     } else {
       previousCiphertext = encryptVote(ZERO_VOTE, voteProofInputs.publicKey)
     }

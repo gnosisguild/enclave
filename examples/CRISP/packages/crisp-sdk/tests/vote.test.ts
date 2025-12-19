@@ -220,7 +220,6 @@ describe('Vote', () => {
         merkleLeaves: LEAVES,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
-        serverUrl: CRISP_SERVER_URL,
         slotAddress,
         e3Id,
       })
@@ -250,7 +249,6 @@ describe('Vote', () => {
         publicKey,
         merkleLeaves: LEAVES,
         e3Id: 0,
-        serverUrl: CRISP_SERVER_URL,
       })
 
       expect(proof).toBeDefined()
@@ -281,7 +279,6 @@ describe('Vote', () => {
         publicKey,
         merkleLeaves: LEAVES,
         e3Id: 0,
-        serverUrl: CRISP_SERVER_URL,
       })
 
       expect(proof).toBeDefined()
