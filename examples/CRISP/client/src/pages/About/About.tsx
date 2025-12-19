@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import React from 'react'
-// import CircleIcon from '@/assets/icons/caretCircle.svg'
 import CardContent from '@/components/Cards/CardContent'
 import CircularTiles from '@/components/CircularTiles'
 

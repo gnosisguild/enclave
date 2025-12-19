@@ -117,8 +117,8 @@ export const extractSignatureComponents = async (
   }
 }
 
-export const getAddressFromSignature = async (signature: `0x${string}`, messageHash: `0x${string}`): Promise<string> => {
-  const publicKey = await recoverPublicKey({ hash: messageHash, signature })
+export const getAddressFromSignature = async (signature: `0x${string}`, messageHash?: `0x${string}`): Promise<string> => {
+  const publicKey = await recoverPublicKey({ hash: messageHash || SIGNATURE_MESSAGE_HASH, signature })
 
   return publicKeyToAddress(publicKey)
 }
