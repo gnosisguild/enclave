@@ -281,8 +281,8 @@ async fn get_token_holders_hashes(
 }
 
 /// Check if a slot is empty given an address
-/// /// # Arguments
-/// * `PreviousCiphertextRequest` - The request containing round_id and address
+/// # Arguments
+/// * `IsSlotEmptyRequest` - The request containing round_id and address
 async fn handle_is_slot_empty(
     data: web::Json<IsSlotEmptyRequest>,
 ) -> impl Responder {

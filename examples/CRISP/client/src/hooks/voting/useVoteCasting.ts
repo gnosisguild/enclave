@@ -66,7 +66,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Vote, address: string, balance: number, signature: string, messageHash: `0x${string}`, isMasking: boolean) => {
+    async (vote: Vote, address: string, balance: bigint, signature: string, messageHash: `0x${string}`, isMasking: boolean) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
       return generateProof(
         votingRound.round_id,
@@ -137,8 +137,8 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
         // voteId is either 0 or 1, so we need to encode the vote accordingly.
         // We are adapting to the current CRISP application.
-        const balance = 1
-        const vote = pollSelected.value === 0 ? { yes: balance, no: 0 } : { yes: 0, no: balance }
+        const balance = 1n
+        const vote = pollSelected.value === 0 ? { yes: balance, no: 0n } : { yes: 0n, no: balance }
 
         const encodedProof = await handleProofGeneration(vote, user.address, balance, signature, messageHash, isMasking)
 

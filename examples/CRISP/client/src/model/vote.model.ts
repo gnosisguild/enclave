@@ -57,6 +57,6 @@ export interface VoteStateLite {
 }
 
 export interface Vote {
-  yes: number
-  no: number
+  yes: bigint
+  no: bigint
 }

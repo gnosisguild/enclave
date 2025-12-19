@@ -263,7 +263,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
   // check if the slot is empty first
   const isSlotEmpty = await getIsSlotEmpty(maskVoteProofInputs.serverUrl, maskVoteProofInputs.e3Id, maskVoteProofInputs.slotAddress)
 
-  let previousCiphertext: Uint8Array | undefined
+  let previousCiphertext: Uint8Array
 
   if (!isSlotEmpty) {
     previousCiphertext = await getPreviousCiphertext(

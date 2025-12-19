@@ -240,8 +240,6 @@ describe('Vote', () => {
 
       expect(isValid).toBe(true)
     })
-
-    it('Should return the new ciphertext as output', { timeout: 100000 }, async () => {})
   })
 
   describe('generateMaskVoteProof', () => {

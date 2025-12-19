@@ -33,7 +33,7 @@ export const useSDKWorkerHook = () => {
     vote: Vote,
     publicKey: Uint8Array,
     address: string,
-    balance: number,
+    balance: bigint,
     signature: string,
     messageHash: `0x${string}`,
     isMasking: boolean,

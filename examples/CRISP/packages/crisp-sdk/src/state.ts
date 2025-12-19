@@ -80,7 +80,7 @@ export const getPreviousCiphertext = async (serverUrl: string, e3Id: number, add
 
   const data = await response.json()
 
-  return data.ciphertext as Uint8Array
+  return new Uint8Array(data.ciphertext)
 }
 
 /**
