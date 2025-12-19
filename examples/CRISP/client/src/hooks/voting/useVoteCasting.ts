@@ -11,7 +11,7 @@ import { useSignMessage } from 'wagmi'
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
-import { BroadcastVoteRequest, VoteStateLite, VotingRound } from '@/model/vote.model'
+import { BroadcastVoteRequest, Vote, VoteStateLite, VotingRound } from '@/model/vote.model'
 
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
@@ -65,25 +65,17 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (
-      vote: Poll,
-      address: string,
-      signature: string,
-      messageHash: `0x${string}`,
-      isFirstVote: boolean,
-      isMasking: boolean,
-      previousCiphertext?: Uint8Array,
-    ) => {
+    async (vote: Vote, address: string, balance: number, signature: string, messageHash: `0x${string}`, isMasking: boolean) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
       return generateProof(
-        BigInt(vote.value),
+        votingRound.round_id,
+        vote,
         new Uint8Array(votingRound.pk_bytes),
         address,
+        balance,
         signature,
         messageHash,
-        isFirstVote,
         isMasking,
-        previousCiphertext,
       )
     },
     [generateProof, votingRound],
@@ -139,7 +131,12 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, messageHash, !isVoteUpdate, isMasking)
+        // voteId is either 0 or 1, so we need to encode the vote accordingly.
+        // We are adapting to the current CRISP application.
+        const balance = 1
+        const vote = pollSelected.value === 0 ? { yes: balance, no: 0 } : { yes: 0, no: balance }
+
+        const encodedProof = await handleProofGeneration(vote, user.address, balance, signature, messageHash, isMasking)
 
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')

@@ -3,11 +3,10 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
-import { describe, it, expect, beforeAll } from 'vitest'
-import { Vote } from '../src/types'
-import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, zeroVote } from '../src/constants'
-import { generateMerkleProof } from '../src/utils'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
+import { Signature, Vote } from '../src/types'
+import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, zeroVote } from '../src/constants'
+import { extractSignatureComponents, generateMerkleProof } from '../src/utils'
 import {
   decodeTally,
   encryptVote,
@@ -21,7 +20,8 @@ import {
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
-import { ECDSA_PRIVATE_KEY, LEAVES } from './constants'
+import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
+import previousCiphertextEncoded from './previous.json'
 
 describe('Vote', () => {
   let vote: Vote
@@ -30,18 +30,40 @@ describe('Vote', () => {
   let address: string
   let slotAddress: string
   let publicKey: Uint8Array
-  let previousCiphertext: Uint8Array
+  let derivedSignatureComponents: Signature
+
+  const e3Id = 0
+
+  const mockedPreviousCiphertextResponse = {
+    ciphertext: previousCiphertextEncoded,
+  }
+
+  const mockedIsSlotEmptyTrueResponse = {
+    is_empty: true,
+  }
+
+  const mockedIsSlotEmptyFalseResponse = {
+    is_empty: false,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   // Setup the test environment.
   beforeAll(async () => {
     vote = { yes: 10n, no: 0n }
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
+    derivedSignatureComponents = await extractSignatureComponents(signature, SIGNATURE_MESSAGE_HASH)
     balance = 100n
     address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
-    previousCiphertext = encryptVote(vote, publicKey)
   })
 
   describe('decodeTally', () => {
@@ -91,14 +113,19 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
+      const sig = await extractSignatureComponents(signature, SIGNATURE_MESSAGE_HASH)
+
+      const previousCiphertext = encryptVote(zeroVote, publicKey)
+
       const crispInputs = await generateCircuitInputs({
         vote,
         publicKey,
-        signature,
+        signature: sig,
         balance,
         slotAddress: address,
         merkleProof,
         isFirstVote: true,
+        previousCiphertext,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -122,12 +149,17 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      const crispInputs = await generateCircuitInputsForMasking({
+      // update to an invalid leaf to fail auth in the circuit
+      merkleProof.leaf = 0n
+      const crispInputs = await generateCircuitInputs({
         publicKey,
         balance,
         slotAddress,
-        isFirstVote: true,
-        merkleRoot: merkleProof.proof.root,
+        isFirstVote: false,
+        merkleProof,
+        vote: zeroVote,
+        signature: derivedSignatureComponents,
+        previousCiphertext: new Uint8Array(previousCiphertextEncoded),
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -154,11 +186,12 @@ describe('Vote', () => {
       const crispInputs = await generateCircuitInputs({
         vote: zeroVote,
         publicKey,
-        signature: MASK_SIGNATURE,
+        signature: derivedSignatureComponents,
         merkleProof,
         balance,
         slotAddress,
         isFirstVote: true,
+        previousCiphertext: encryptVote(vote, publicKey),
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -180,12 +213,23 @@ describe('Vote', () => {
 
   describe('generateVoteProof', () => {
     it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
+      const mockIsSlotEmptyResponse = {
+        ok: true,
+        json: async () => mockedIsSlotEmptyTrueResponse,
+      } as Response
+
+      vi.spyOn(global, 'fetch').mockResolvedValue(mockIsSlotEmptyResponse)
+
       const proof = await generateVoteProof({
         vote,
         publicKey,
         signature,
         merkleLeaves: LEAVES,
         balance,
+        messageHash: SIGNATURE_MESSAGE_HASH,
+        serverUrl: CRISP_SERVER_URL,
+        slotAddress,
+        e3Id,
       })
 
       expect(proof).toBeDefined()
@@ -196,17 +240,26 @@ describe('Vote', () => {
 
       expect(isValid).toBe(true)
     })
+
+    it('Should return the new ciphertext as output', { timeout: 100000 }, async () => {})
   })
 
   describe('generateMaskVoteProof', () => {
-    it('Should generate a valid mask vote proof with a previous ciphertext', { timeout: 100000 }, async () => {
+    it('Should generate a valid mask vote proof when there are no votes in the slot', { timeout: 100000 }, async () => {
+      const mockIsSlotEmptyResponse = {
+        ok: true,
+        json: async () => mockedIsSlotEmptyTrueResponse,
+      } as Response
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
+
       const proof = await generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
-        previousCiphertext,
-        isFirstVote: false,
-        merkleRoot: generateMerkleProof(balance, slotAddress, LEAVES).proof.root,
+        merkleLeaves: LEAVES,
+        e3Id: 0,
+        serverUrl: CRISP_SERVER_URL,
       })
 
       expect(proof).toBeDefined()
@@ -218,13 +271,26 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('Should generate a valid mask vote proof without a previous ciphertext', { timeout: 100000 }, async () => {
+    it('Should generate a valid mask vote proof when there is a previous vote in the slot', { timeout: 100000 }, async () => {
+      const mockIsSlotEmptyResponse = {
+        ok: true,
+        json: async () => mockedIsSlotEmptyFalseResponse,
+      } as Response
+
+      const mockFetchResponse = {
+        ok: true,
+        json: async () => mockedPreviousCiphertextResponse,
+      } as Response
+
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse).mockResolvedValueOnce(mockFetchResponse)
+
       const proof = await generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
-        isFirstVote: true,
-        merkleRoot: generateMerkleProof(balance, slotAddress, LEAVES).proof.root,
+        merkleLeaves: LEAVES,
+        e3Id: 0,
+        serverUrl: CRISP_SERVER_URL,
       })
 
       expect(proof).toBeDefined()

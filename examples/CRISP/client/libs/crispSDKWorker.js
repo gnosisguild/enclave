@@ -11,12 +11,7 @@ self.onmessage = async function (event) {
   switch (type) {
     case 'generate_proof':
       try {
-        const { voteId, publicKey, address: slotAddress, signature, messageHash, isMasking, crispServer } = data
-
-        // voteId is either 0 or 1, so we need to encode the vote accordingly.
-        // We are adapting to the current CRISP application.
-        const balance = 1n
-        const vote = voteId === 0 ? { yes: 0n, no: balance } : { yes: balance, no: 0n }
+        const { voteId, vote, publicKey, balance, address: slotAddress, signature, messageHash, isMasking, crispServer } = data
 
         // todo: get the leaves from the server (pass them from the client).
         const merkleLeaves = [

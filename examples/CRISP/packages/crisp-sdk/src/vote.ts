@@ -164,10 +164,10 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
     crispInputs = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
   }
 
-  crispInputs.hashed_message = Array.from(proofInputs.messageHash).map((b) => b.toString())
-  crispInputs.public_key_x = Array.from(proofInputs.publicKeyX).map((b) => b.toString())
-  crispInputs.public_key_y = Array.from(proofInputs.publicKeyY).map((b) => b.toString())
-  crispInputs.signature = Array.from(proofInputs.signature).map((b) => b.toString())
+  crispInputs.hashed_message = Array.from(proofInputs.signature.messageHash).map((b) => b.toString())
+  crispInputs.public_key_x = Array.from(proofInputs.signature.publicKeyX).map((b) => b.toString())
+  crispInputs.public_key_y = Array.from(proofInputs.signature.publicKeyY).map((b) => b.toString())
+  crispInputs.signature = Array.from(proofInputs.signature.signature).map((b) => b.toString())
   crispInputs.slot_address = proofInputs.slotAddress.toLowerCase()
   crispInputs.balance = proofInputs.balance.toString()
   crispInputs.is_first_vote = proofInputs.isFirstVote
@@ -228,10 +228,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
   // The address slot of an actual vote always is the address of the public key that signed the message.
   const address = await getAddressFromSignature(voteProofInputs.signature, voteProofInputs.messageHash)
 
-  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(
-    voteProofInputs.signature,
-    voteProofInputs.messageHash,
-  )
+  const signature = await extractSignatureComponents(voteProofInputs.signature, voteProofInputs.messageHash)
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
 
@@ -251,9 +248,6 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     merkleProof,
     isFirstVote: isSlotEmpty,
     previousCiphertext,
-    messageHash,
-    publicKeyX,
-    publicKeyY,
     signature,
   })
 
@@ -281,7 +275,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
     previousCiphertext = encryptVote(zeroVote, maskVoteProofInputs.publicKey)
   }
 
-  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH)
+  const signature = await extractSignatureComponents(MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH)
 
   const merkleProof = generateMerkleProof(maskVoteProofInputs.balance, maskVoteProofInputs.slotAddress, maskVoteProofInputs.merkleLeaves)
 
@@ -289,9 +283,6 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
     ...maskVoteProofInputs,
     previousCiphertext,
     isFirstVote: isSlotEmpty,
-    messageHash,
-    publicKeyX,
-    publicKeyY,
     signature,
     vote: zeroVote,
     merkleProof,

@@ -55,3 +55,8 @@ export interface VoteStateLite {
   committee_public_key: number[]
   emojis: [string, string]
 }
+
+export interface Vote {
+  yes: number
+  no: number
+}
