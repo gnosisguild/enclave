@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    chunking::{ChunkCollector, ChunkReceived, Chunkable, ChunkedDocument},
     events::{
         call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
     },
@@ -30,16 +29,6 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info};
-
-impl Chunkable for ThresholdShareCreated {
-    fn max_chunk_size() -> usize {
-        10 * 1024 * 1024
-    }
-
-    fn mark_as_external(&mut self) {
-        self.external = true;
-    }
-}
 
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
@@ -389,19 +378,16 @@ async fn broadcast_document_published_notification(
 /// Responsibilities:
 /// - Outgoing: Converts ThresholdShareCreated → party-filtered PublishDocumentRequested
 /// - Incoming: Converts DocumentReceived → ThresholdShareCreated/EncryptionKeyCreated
-/// - Reassembles chunked documents via ChunkCollector
 ///
 /// Note: Party filtering is done by DocumentPublisher BEFORE fetching from DHT.
 pub struct EventConverter {
     bus: BusHandle,
-    chunk_collectors: HashMap<E3id, Addr<ChunkCollector<ThresholdShareCreated>>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum ReceivableDocument {
     ThresholdShareCreated(ThresholdShareCreated),
     EncryptionKeyCreated(EncryptionKeyCreated),
-    Chunk(ChunkedDocument),
 }
 
 impl ReceivableDocument {
@@ -416,10 +402,7 @@ impl ReceivableDocument {
 
 impl EventConverter {
     pub fn new(bus: &BusHandle) -> Self {
-        Self {
-            bus: bus.clone(),
-            chunk_collectors: HashMap::new(),
-        }
+        Self { bus: bus.clone() }
     }
 
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
@@ -427,21 +410,9 @@ impl EventConverter {
         bus.subscribe("ThresholdShareCreated", addr.clone().into());
         bus.subscribe("EncryptionKeyCreated", addr.clone().into());
         bus.subscribe("DocumentReceived", addr.clone().into());
-        bus.subscribe("E3RequestComplete", addr.clone().into());
         addr
     }
 
-    fn ensure_chunk_collector(
-        &mut self,
-        e3_id: &E3id,
-    ) -> &Addr<ChunkCollector<ThresholdShareCreated>> {
-        self.chunk_collectors
-            .entry(e3_id.clone())
-            .or_insert_with(|| {
-                debug!("Creating chunk collector for E3: {}", e3_id);
-                ChunkCollector::<ThresholdShareCreated>::setup(e3_id.clone(), self.bus.clone())
-            })
-    }
     /// Publish a receivable document with party filter
     fn publish_filtered(
         &self,
@@ -461,53 +432,6 @@ impl EventConverter {
         Ok(())
     }
 
-    /// Publish chunks for a specific party
-    fn publish_party_chunks(
-        &self,
-        chunks: &[ChunkedDocument],
-        e3_id: &E3id,
-        party_id: usize,
-    ) -> Result<()> {
-        let party_id_u64 = party_id as u64;
-
-        match chunks {
-            [single] if single.is_complete_set() => {
-                info!(
-                    "Party {} share: single chunk ({} bytes), no chunking needed",
-                    party_id,
-                    single.data.len()
-                );
-                let share = bincode::deserialize(&single.data)?;
-                self.publish_filtered(
-                    ReceivableDocument::ThresholdShareCreated(share),
-                    e3_id,
-                    party_id_u64,
-                )?;
-            }
-            multiple => {
-                info!(
-                    "Party {} share: using chunking - {} chunks",
-                    party_id,
-                    multiple.len()
-                );
-                for (idx, chunk) in multiple.iter().enumerate() {
-                    debug!(
-                        "  Chunk {}/{} (chunk_id: {})",
-                        idx + 1,
-                        multiple.len(),
-                        chunk.chunk_id
-                    );
-                    self.publish_filtered(
-                        ReceivableDocument::Chunk(chunk.clone()),
-                        e3_id,
-                        party_id_u64,
-                    )?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Local node created a threshold share. Send it as a published document.
     /// Uses party-filtered distribution: each party only receives their specific shares.
     pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
@@ -517,14 +441,13 @@ impl EventConverter {
 
         let e3_id = msg.e3_id.clone();
         let num_parties = msg.share.num_parties();
-        let total_size_mb = bincode::serialize(&msg)?.len() as f64 / (1024.0 * 1024.0);
 
         info!(
-            "Publishing ThresholdShare for E3 {} ({:.2} MB total, {} parties)",
-            e3_id, total_size_mb, num_parties
+            "Publishing ThresholdShare for E3 {} ({} parties)",
+            e3_id, num_parties
         );
 
-        // Publish party-filtered shares
+        // Publish party-filtered shares - each party gets only their share
         for party_id in 0..num_parties {
             let party_share = msg
                 .share
@@ -537,8 +460,11 @@ impl EventConverter {
                 external: false,
             };
 
-            let chunks = party_msg.into_chunks()?;
-            self.publish_party_chunks(&chunks, &e3_id, party_id)?;
+            self.publish_filtered(
+                ReceivableDocument::ThresholdShareCreated(party_msg),
+                &e3_id,
+                party_id as u64,
+            )?;
         }
 
         Ok(())
@@ -557,7 +483,7 @@ impl EventConverter {
 
     /// Convert received document to internal events.
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
-    fn handle_document_received(&mut self, msg: DocumentReceived) -> Result<()> {
+    fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
 
         match receivable {
@@ -583,15 +509,6 @@ impl EventConverter {
                     key: evt.key,
                 })?;
             }
-            ReceivableDocument::Chunk(chunk) => {
-                debug!(
-                    "Received chunk {}/{}",
-                    chunk.chunk_index + 1,
-                    chunk.total_chunks
-                );
-                let collector = self.ensure_chunk_collector(&msg.meta.e3_id);
-                collector.do_send(ChunkReceived::<ThresholdShareCreated>::new(chunk));
-            }
         }
         Ok(())
     }
@@ -608,20 +525,8 @@ impl Handler<EnclaveEvent> for EventConverter {
             EnclaveEventData::ThresholdShareCreated(data) => ctx.notify(data),
             EnclaveEventData::EncryptionKeyCreated(data) => ctx.notify(data),
             EnclaveEventData::DocumentReceived(data) => ctx.notify(data),
-            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
             _ => (),
         }
-    }
-}
-
-impl Handler<E3RequestComplete> for EventConverter {
-    type Result = ();
-    fn handle(&mut self, msg: E3RequestComplete, _ctx: &mut Self::Context) -> Self::Result {
-        debug!(
-            "EventConverter: E3RequestComplete for {}, cleaning up chunk collector",
-            msg.e3_id
-        );
-        self.chunk_collectors.remove(&msg.e3_id);
     }
 }
 
