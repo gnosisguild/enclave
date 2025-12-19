@@ -12,6 +12,7 @@ import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
 import { BroadcastVoteRequest, Vote, VoteStateLite, VotingRound } from '@/model/vote.model'
+import { hashMessage } from 'viem'
 
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
@@ -115,9 +116,12 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('signing')
         setStepMessage('Please sign the message in your wallet...')
 
+        const message = `Vote for round ${roundState.id}`
+        const messageHash = hashMessage(message)
+
         let signature: string
         try {
-          signature = await signMessageAsync({ message: SIGNATURE_MESSAGE })
+          signature = await signMessageAsync({ message })
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (signError) {
           console.log('User rejected signature or signing failed')
