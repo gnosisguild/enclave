@@ -26,7 +26,7 @@ describe('Token data fetching', () => {
       json: async () => mockHashes,
     } as Response
 
-    vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse)
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockResponse)
 
     const data = await getTreeData(CRISP_SERVER_URL, 0)
 

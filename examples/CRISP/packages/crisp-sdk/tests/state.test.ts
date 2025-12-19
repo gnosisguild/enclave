@@ -46,7 +46,7 @@ describe('State', () => {
         json: async () => mockResponse,
       } as Response
 
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse)
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockFetchResponse)
 
       const state = await getRoundDetails(CRISP_SERVER_URL, 0)
 
@@ -87,7 +87,7 @@ describe('State', () => {
         json: async () => mockResponse,
       } as Response
 
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse)
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockFetchResponse)
 
       const tokenDetails = await getRoundTokenDetails(CRISP_SERVER_URL, 0)
 
