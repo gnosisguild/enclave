@@ -8,17 +8,8 @@ import { Steps } from 'nextra/components'
 # Getting Started with CRISP
 
 This guide will walk you through the steps to set up and run CRISP locally. CRISP is a complete
-example of an E3 Program, built with a modern Hardhat-based architecture that includes smart
-contracts, frontend applications, and secure computation components.
-
-The setup includes the following:
-
-- **CRISP contracts**: Smart contracts located in the `packages/crisp-contracts/` directory
-- **Client**: React frontend application in the `client/` directory
-- **Server**: Rust coordination server in the `server/` directory
-- **Program**: RISC Zero computation program in the `program/` directory
-- **Ciphernodes**: Distributed nodes managed through the Enclave CLI via `enclave.config.yaml`
-- **Development environment**: Hardhat for contracts, Cargo for Rust components
+example of an E3 Program, built with a modern architecture that includes smart contracts,
+zero-knowledge circuits, frontend applications, and secure computation components.
 
 ## Prerequisites
 
@@ -30,53 +21,8 @@ Before getting started, ensure you have installed:
 - [NodeJS](https://nodejs.org/en/download)
 - [pnpm](https://pnpm.io)
 - [MetaMask](https://metamask.io)
-- [Noir toolchain (`nargo`, `bb`)](https://noir-lang.org/docs/getting_started/installation) —
-  required when you recompile the circuits
-
-### Install Node
-
-You can install Node following the official [documentation](https://nodejs.org/en) or using a Node
-Version Manager (e.g., [nvm](https://github.com/nvm-sh/nvm)).
-
-### Install Pnpm
-
-You can install Pnpm following the official [documentation](https://pnpm.io/installation).
-
-### Install Metamask
-
-You can add Metamask as extension to your browser following the official
-[documentation](https://metamask.io).
-
-### Install Rust and Foundry
-
-You need to install Rust and Foundry first. After installation, restart your terminal.
-
-```sh
-# Install Rust
-curl https://sh.rustup.rs -sSf | sh
-
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
-```
-
-### Install RISC Zero Toolchain
-
-Install `rzup` for the `cargo-risczero` toolchain:
-
-```sh
-# Install rzup
-curl -L https://risczero.com/install | bash
-
-# Install RISC Zero toolchain
-rzup install cargo-risczero
-```
-
-Verify the installation:
-
-```sh
-cargo risczero --version
-```
+- Noir toolchain ([`nargo`](https://noir-lang.org/docs/getting_started/quick_start),
+  [`bb`](https://barretenberg.aztec.network/docs/getting_started))
 
 ## Quick Start
 
@@ -96,7 +42,7 @@ pnpm dev:up
 2. Deploys all contracts (Enclave, CRISPProgram, verifiers, registries) via
    `scripts/crisp_deploy.sh`
 3. Starts ciphernodes using `enclave.config.yaml` via `scripts/dev_cipher.sh`
-4. Launches the program server (RISC Zero) via `scripts/dev_program.sh`
+4. Launches the program server via `scripts/dev_program.sh`
 5. Starts the coordination server (Rust) via `scripts/dev_server.sh` on port `4000`
 6. Starts the React client via `scripts/dev_client.sh` on port `3000`
 
@@ -106,7 +52,7 @@ All services run concurrently and will automatically restart if needed.
 
 ```bash
 # Recompile Noir circuits and generate verifiers
-pnpm compile:circuit
+pnpm compile:circuits
 
 # Open the interactive CLI to start voting rounds
 pnpm cli
@@ -144,10 +90,10 @@ default, it runs in development mode with fake proofs for fast local development
 
 ```yaml
 program:
-  dev: true # Uses fake proofs (fast for development)
+  dev: true # Uses fake zkVM proofs (fast for development)
 ```
 
-### Boundless Configuration (Production Proving)
+### Boundless Configuration
 
 For production-grade zero-knowledge proofs with [Boundless](https://docs.beboundless.xyz/), update
 `enclave.config.yaml`:

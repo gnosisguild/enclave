@@ -13,7 +13,8 @@ vulnerabilities.
 
 This project serves as a comprehensive example of an E3 Program, demonstrating secure and impartial
 decision-making processes with a modern Hardhat-based architecture. It showcases a complete
-full-stack implementation including frontend, backend, smart contracts, and zkVM components.
+full-stack implementation including frontend, backend, smart contracts, and zero-knowledge
+components.
 
 ## Why CRISP?
 
@@ -27,97 +28,117 @@ coercion. CRISP mitigates these risks through:
 
 ## Project Structure
 
-CRISP follows a modern Hardhat-based structure with clear separation of concerns:
+CRISP, whose implementation is available in the
+[Enclave repository](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP), follows a
+modern structure with clear separation of concerns:
 
 ```
 CRISP/
 ├── client/                  # React frontend application (Vite + @crisp-e3/sdk)
 ├── server/                  # Rust coordination server & CLI
-├── program/                 # RISC Zero guest + prover control plane
+├── program/                 # FHE program for encrypted computation + RISC Zero verification
 ├── packages/
-│   ├── crisp-contracts/     # Hardhat deployment + helpers
-│   └── crisp-sdk/           # CRISP-specific TypeScript helpers to generate a ZK proof
-├── crates/                  # Rust libraries for the CLI + services
-├── circuits/                # Noir circuits + verifiers (see [Noir Circuits](/noir-circuits))
-├── scripts/                 # dev.sh, setup.sh, compile_circuits.sh, etc.
+│   ├── crisp-contracts/     # CRISP program contract + Hardhat deployment scripts
+│   └── crisp-sdk/           # TypeScript helpers to generate a ZK proof
+├── crates/                  # Rust libraries used by the server
+├── circuits/                # Noir zero-knowledge circuits
+├── scripts/                 # Development scripts for running, testing, and deployment
 ├── enclave.config.yaml      # Ciphernodes + aggregator config
 └── docker-compose.yaml      # Optional multi-node deployment
 ```
 
----
+### Client Application
 
-### **Client Application** (`/client`)
+The [client](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/client) is a React
+application built with TypeScript that provides a voting interface. It uses the CRISP
+[SDK](/CRISP/introduction#javascript-sdk) and [server](/CRISP/introduction#coordination-server)
+endpoints to deliver the following capabilities:
 
-The client is a React application built with TypeScript that provides a voting interface and reuses
-the shared [CRISP SDK](/sdk):
+- Connecting wallets via MetaMask
+- Encrypting votes using FHE encryption before submission
+- Generating Noir zero-knowledge proofs for vote validation
+- Displaying real-time updates on voting status and results
 
-- Wallet connection with MetaMask and other wallets
-- Vote encryption using WebAssembly-based FHE encryption before submission
-- Noir zero-knowledge proof generation for vote validation
-- Real-time updates on voting status and results
+### Coordination Server
 
----
+The [server](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/server) is a Rust-based
+coordination service that manages the E3 lifecycle and drives the same SDK from a privileged wallet.
+It acts as a relayer and facilitator, handling blockchain interactions on behalf of clients.
+However, clients can bypass the server entirely and interact directly with the blockchain if they
+prefer.
 
-### **Coordination Server** (`/server`)
+The server's key responsibilities include:
 
-The server is a Rust-based coordination service that manages the E3 lifecycle and drives the same
-SDK from a privileged wallet:
+- Monitoring blockchain events and coordinating protocol progression
+- Collecting encrypted votes from smart contracts
+- Triggering FHE computations after voting rounds are closed
+- Publishing computation results back to the blockchain
+- Providing a RESTful API for client interactions
 
-- Listens to blockchain events and coordinates protocol progression
-- Collects encrypted votes from the Smart Contract
-- Triggers FHE computations after the voting round is closed.
-- Publishes results back to the blockchain
-- RESTful API for client interactions
+### FHE Program
 
----
+The [FHE program](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/program) is a Rust
+guest program that runs inside the RISC Zero zkVM to perform homomorphic addition on encrypted votes
+(BFV ciphertexts). It computes the encrypted tally without decrypting individual votes, ensuring
+voter privacy throughout the process.
 
-### **ZK Program + Noir Circuits** (`/program`, `/circuits`)
+The program decodes BFV parameters and ciphertexts, then sums all encrypted votes homomorphically to
+produce a single encrypted ciphertext containing the total. RISC Zero generates zero-knowledge
+proofs that verify the computation was executed correctly, enabling trustless verification of the
+tally results.
 
-- `program/`: Rust guest code compiled to the RISC Zero zkVM image that runs the CRISP tally logic
-- `circuits/`: Noir circuits + SAFE/GRECO libraries used for membership proofs and encryption checks
-- `scripts/compile_circuits.sh`: compiles Noir circuits, writes verification keys, and emits the
-  `CRISPVerifier.sol` contract used by `packages/crisp-contracts`
+### Zero-knowledge Circuits
 
----
+[Noir circuits](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/circuits) provide
+zero-knowledge proofs for vote validation before votes are accepted into the system. These circuits
+verify that votes are correctly encrypted using BFV fully homomorphic encryption under a valid
+public key, check that the voter's address is included in the eligibility Merkle tree, and ensure
+votes conform to the expected structure and values. The circuits also support mask votes, allowing
+anyone to submit zero votes to mask slot activity and reduce the risk of collusion and coercion.
 
-### **Smart Contracts** (`/packages/crisp-contracts`)
+For detailed documentation on how the circuit works, see the
+[main circuit implementation](https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/circuits/src/main.nr).
 
-Solidity contracts implementing the E3 program interface:
+### Smart Contracts
 
-#### **CRISPProgram.sol**
+The CRISP smart contracts implement the E3 program interface and handle the on-chain logic for
+voting rounds. The main contract is
+[CRISPProgram.sol](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol),
+which orchestrates the entire voting process.
 
-Main E3 program contract implementing the `IE3Program` interface:
+When a new voting round is initialized, the `validate()` function sets up round parameters and
+initializes a Merkle tree to store votes efficiently. As votes are submitted, `validateInput()`
+processes each encrypted vote by verifying its Noir zero-knowledge proof through the CRISPVerifier
+contract, ensuring votes are correctly encrypted and voters are eligible. Votes are stored in the
+Merkle tree with slot addresses mapping to vote indices, allowing updates while maintaining
+uniqueness.
 
-- `validate()`: Validates voting parameters and setup
-- `verify()`: Verifies zkVM proofs of computation
-- `validateInput()`: Handles vote validation and zero-knowledge proof verification:
-  - Validates encrypted vote format
-  - Verifies voter eligibility proofs
-  - Ensures vote uniqueness
+After the voting period ends and FHE computation completes, the `verify()` function validates the
+RISC Zero proof attesting to the correctness of the homomorphic tally computation, verifying it
+corresponds to the correct input Merkle root, parameters hash, and ciphertext output. Once verified,
+`decodeTally()` decodes the encrypted results into readable yes and no vote counts.
 
-#### **CRISPVerifier.sol**
+The
+[CRISPVerifier.sol](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/packages/crisp-contracts/contracts/CRISPVerifier.sol)
+contract is a Honk verifier generated from compiled Noir circuits that verifies zero-knowledge
+proofs demonstrating votes are correctly encrypted using BFV fully homomorphic encryption under the
+valid public key.
 
-Noir verifier for proof of correct encryption:
+### JavaScript SDK
 
-- Verifies if the vote was encrypted correctly
-- Verifies if the vote is valid
+The [CRISP SDK](https://github.com/gnosisguild/enclave/tree/main/examples/CRISP/packages/crisp-sdk)
+is a TypeScript library that abstracts away the complex cryptographic operations required for vote
+submission and proof generation. It fetches round details from the coordination server, queries
+token balances at snapshot blocks to verify eligibility, and generates Merkle proofs demonstrating
+voter inclusion in the eligibility tree.
 
-#### **CRISPPolicy.sol**
-
-Manages voting policies and governance:
-
-- Defines voting rules and constraints
-- Manages voter registration
-
-#### **CRISPChecker.sol**
-
-Additional verification and checking logic:
-
-- Vote format validation
-- Eligibility checking
-- Result verification
-
----
+When casting a vote, the SDK encrypts votes using BFV fully homomorphic encryption under the
+committee's public key and generates zero-knowledge proofs using compiled Noir circuits. These
+proofs demonstrate that votes are correctly encrypted and that voters are eligible to participate.
+The SDK also supports mask votes, generating proofs for zero-value votes that help reduce the risk
+of collusion and coercion. Before submission, proofs are verified locally to prevent failed
+transactions, and after voting concludes, the SDK decodes encrypted tally results into readable vote
+counts.
 
 ## Next Steps
 
