@@ -1,18 +1,19 @@
-use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
-use anyhow::{bail, Result};
+use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
+use anyhow::{anyhow, bail, Result};
 use e3_events::{
-    prelude::*, trap, BusHandle, CorrelationId, EType, EnclaveEvent, EnclaveEventData, Event,
-    GetEventsAfter, NetEventsReceived, ReceiveEvents, SyncRequest, Unsequenced,
+    prelude::*, trap, trap_fut, BusHandle, CorrelationId, EType, EnclaveEvent, EnclaveEventData,
+    Event, GetEventsAfter, NetSyncEvents, ReceiveEvents, SyncRequest, Unsequenced,
 };
-use e3_utils::OnceTake;
+use e3_utils::{retry_with_backoff, to_retry, OnceTake};
+use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tracing::debug;
 
 use crate::events::{
-    NetCommand, NetEvent, OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue,
-    SyncResponseValue,
+    call_and_await_response, NetCommand, NetEvent, OutgoingSyncRequestSucceeded,
+    SyncRequestReceived, SyncRequestValue, SyncResponseValue,
 };
 
 pub struct NetSyncManager {
@@ -20,6 +21,9 @@ pub struct NetSyncManager {
     bus: BusHandle,
     /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
+    /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
+    /// that we do not do excessive resubscribes without actually listening for events.
+    rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<GetEventsAfter>,
     requests: HashMap<CorrelationId, OnceTake<ResponseChannel<SyncResponseValue>>>,
 }
@@ -28,11 +32,14 @@ impl NetSyncManager {
     pub fn new(
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
+        rx: &Arc<broadcast::Receiver<NetEvent>>,
         eventstore: Recipient<GetEventsAfter>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),
+            rx: rx.clone(),
+
             eventstore,
             requests: HashMap::new(),
         }
@@ -45,7 +52,7 @@ impl NetSyncManager {
         eventstore: Recipient<GetEventsAfter>,
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
-        let addr = Self::new(bus, tx, eventstore).start();
+        let addr = Self::new(bus, tx, rx, eventstore).start();
 
         // Forward from NetEvent
         tokio::spawn({
@@ -84,14 +91,13 @@ impl Handler<EnclaveEvent> for NetSyncManager {
 
 /// SyncRequest is called on start up to fetch remote events
 impl Handler<SyncRequest> for NetSyncManager {
-    type Result = ();
+    type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: SyncRequest, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Net, &self.bus, || {
-            self.tx.try_send(NetCommand::OutgoingSyncRequest {
-                value: SyncRequestValue { since: msg.since },
-            })?;
-            Ok(())
-        });
+        trap_fut(
+            EType::Net,
+            &self.bus.clone(),
+            handle_sync_request_event(self.tx.clone(), self.rx.clone(), self.bus.clone(), msg),
+        )
     }
 }
 
@@ -100,7 +106,7 @@ impl Handler<OutgoingSyncRequestSucceeded> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: OutgoingSyncRequestSucceeded, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
-            self.bus.publish(NetEventsReceived {
+            self.bus.publish(NetSyncEvents {
                 events: msg
                     .value
                     .events
@@ -153,4 +159,53 @@ impl Handler<ReceiveEvents> for NetSyncManager {
             Ok(())
         })
     }
+}
+
+const SYNC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
+async fn sync_request(
+    net_cmds: mpsc::Sender<NetCommand>,
+    net_events: Arc<broadcast::Receiver<NetEvent>>,
+    since: u128,
+) -> Result<OutgoingSyncRequestSucceeded> {
+    call_and_await_response(
+        net_cmds,
+        net_events,
+        NetCommand::OutgoingSyncRequest {
+            value: SyncRequestValue { since },
+        },
+        |e| match e.clone() {
+            NetEvent::OutgoingSyncRequestSucceeded(value) => Some(Ok(value)),
+            NetEvent::OutgoingSyncRequestFailed(error) => {
+                Some(Err(anyhow!("Outgoing sync request failed: {:?}", error)))
+            }
+            _ => None,
+        },
+        SYNC_REQUEST_TIMEOUT,
+    )
+    .await
+}
+
+async fn handle_sync_request_event(
+    net_cmds: mpsc::Sender<NetCommand>,
+    net_events: Arc<broadcast::Receiver<NetEvent>>,
+    bus: BusHandle,
+    event: SyncRequest,
+) -> Result<()> {
+    let value = retry_with_backoff(
+        || sync_request(net_cmds.clone(), net_events.clone(), event.since).map_err(to_retry),
+        4,
+        1000,
+    )
+    .await?;
+
+    bus.publish(NetSyncEvents::new(
+        value
+            .value
+            .events
+            .into_iter()
+            .map(|data| data.try_into())
+            .collect::<Result<Vec<EnclaveEvent<Unsequenced>>>>()?,
+    ))?;
+    Ok(())
 }

@@ -86,6 +86,9 @@ pub struct OutgoingSyncRequestSucceeded {
     pub value: SyncResponseValue,
 }
 
+#[derive(Debug, Clone)]
+pub struct OutgoingSyncRequestFailed;
+
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
 pub enum NetCommand {
@@ -150,9 +153,13 @@ pub enum NetEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError { error: Arc<DialError> },
+    DialError {
+        error: Arc<DialError>,
+    },
     /// A connection was established to a peer
-    ConnectionEstablished { connection_id: ConnectionId },
+    ConnectionEstablished {
+        connection_id: ConnectionId,
+    },
     /// There was an error creating a connection
     OutgoingConnectionError {
         connection_id: ConnectionId,
@@ -180,12 +187,16 @@ pub enum NetEvent {
         error: PutOrStoreError,
     },
     /// GossipSubscribed
-    GossipSubscribed { count: usize, topic: TopicHash },
+    GossipSubscribed {
+        count: usize,
+        topic: TopicHash,
+    },
     /// A peer node is requesting gossipsub events since the given timestamp.
     /// Use the provided channel to send a `SyncResponse
     SyncRequestReceived(SyncRequestReceived),
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
     OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
+    OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
 }
 
 #[derive(Clone, Debug)]
@@ -210,7 +221,7 @@ impl NetEvent {
 }
 
 /// Payload that is dispatched as a net -> net gossip event from Kademlia. This event signals that
-/// a document was published and that this node might be interested in it.
+/// a document was published and that this node might be interested in it.SyncRequestSucceeded
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct DocumentPublishedNotification {

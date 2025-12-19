@@ -19,9 +19,10 @@ mod die;
 mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
+mod evm_sync_events;
 mod keyshare_created;
+mod net_sync_events;
 mod operator_activation_changed;
-mod p2p_events_received;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod publickey_aggregated;
@@ -50,9 +51,10 @@ pub use e3_request_complete::*;
 pub use e3_requested::*;
 use e3_utils::{colorize, Color};
 pub use enclave_error::*;
+pub use evm_sync_events::*;
 pub use keyshare_created::*;
+pub use net_sync_events::*;
 pub use operator_activation_changed::*;
-pub use p2p_events_received::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
@@ -118,7 +120,8 @@ pub enum EnclaveEventData {
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
     SyncRequest(SyncRequest),
-    NetEventsReceived(NetEventsReceived),
+    NetSyncEvents(NetSyncEvents),
+    EvmSyncEvents(EvmSyncEvents),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -331,7 +334,8 @@ impl_into_event_data!(
     DocumentReceived,
     ThresholdShareCreated,
     SyncRequest,
-    NetEventsReceived
+    NetSyncEvents,
+    EvmSyncEvents
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
