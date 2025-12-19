@@ -179,9 +179,6 @@ footer {
   .external-icon {
     @apply icon h-[14px] w-[14px] bg-[url('./assets/icons/arrow.svg')];
   }
-  .close-icon {
-    @apply icon h-[18px] w-[18px] bg-[url('./assets/icons/close.svg')];
-  }
 
   /* Modals */
   .modal-overlay {

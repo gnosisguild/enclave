@@ -9,24 +9,27 @@ import { useNavigate } from 'react-router-dom'
 import { PollOption, PollResult } from '@/model/poll.model'
 import VotesBadge from '@/components/VotesBadge'
 import PollCardResult from '@/components/Cards/PollCardResult'
-import { formatDate, hasPollEndedByTimestamp, markWinner } from '@/utils/methods'
+import { formatDate, markWinner } from '@/utils/methods'
 import { useVoteManagementContext } from '@/context/voteManagement'
+import { usePublicClient } from 'wagmi'
 
 const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, endTime }) => {
   const navigate = useNavigate()
   const [results, setResults] = useState<PollOption[]>(options)
-  const [isActive, setIsActive] = useState(!hasPollEndedByTimestamp(endTime))
+  const [isActive, setIsActive] = useState(true)
   const { roundState, setPollResult, currentRoundId } = useVoteManagementContext()
+  const client = usePublicClient()
 
   const isCurrentRound = roundId === currentRoundId
   const displayVoteCount = isCurrentRound && isActive ? (roundState?.vote_count ?? totalVotes) : totalVotes
 
   useEffect(() => {
-    if (!isActive) return
+    if (!isActive || !client) return
 
-    const checkPollStatus = () => {
-      const pollEnded = hasPollEndedByTimestamp(endTime)
-      if (pollEnded) {
+    const checkPollStatus = async () => {
+      const block = await client.getBlock()
+
+      if (block.timestamp >= endTime) {
         setIsActive(false)
       }
     }
@@ -35,7 +38,7 @@ const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, en
     const interval = setInterval(checkPollStatus, 1000)
 
     return () => clearInterval(interval)
-  }, [endTime, isActive])
+  }, [endTime, client, isActive])
 
   useEffect(() => {
     const newPollOptions = markWinner(options)

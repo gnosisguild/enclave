@@ -6,7 +6,7 @@
 
 import { createGenericContext } from '@/utils/create-generic-context'
 import { VoteManagementContextType, VoteManagementProviderProps, VoteStatus } from '@/context/voteManagement'
-import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
+import { useSDKWorkerHook } from '@/hooks/voting/useSDKWorker'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
@@ -59,7 +59,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
    * Voting Management Methods
    **/
-  const { isLoading: wasmLoading, generateProof } = useWebAssemblyHook()
+  const { isLoading: workerLoading, generateProof } = useSDKWorkerHook()
   const {
     isLoading: enclaveLoading,
     getRoundStateLite: getRoundStateLiteRequest,
@@ -167,11 +167,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }
 
   useEffect(() => {
-    if ([wasmLoading, enclaveLoading].includes(true)) {
+    if ([workerLoading, enclaveLoading].includes(true)) {
       return setIsLoading(true)
     }
     setIsLoading(false)
-  }, [wasmLoading, enclaveLoading])
+  }, [workerLoading, enclaveLoading])
 
   useEffect(() => {
     if (isConnected && address) {
