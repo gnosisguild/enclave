@@ -4,7 +4,40 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// This file contains ciphertext addition verification for BFV ciphertexts.
+//! # Ciphertext Addition Verification
+//!
+//! This module implements zero-knowledge proof verification for homomorphic addition of BFV
+//! (Brakerski-Fan-Vercauteren) ciphertexts. It verifies that a sum ciphertext correctly
+//! represents the addition of two input ciphertexts without revealing the plaintexts.
+//!
+//! ## Purpose
+//!
+//! In CRISP, voters can update their votes. When a vote is updated, the new vote ciphertext
+//! must be homomorphically added to the previous vote ciphertext. This module verifies that
+//! this addition was performed correctly.
+//!
+//! ## Mathematical Background
+//!
+//! BFV ciphertexts are represented as pairs (c0, c1) where:
+//! - c0 and c1 are polynomials in the ring R_q = Z_q[X]/(X^N + 1)
+//! - For CRT (Chinese Remainder Theorem) bases, we have arrays [c0_i, c1_i] for each modulus q_i
+//!
+//! Homomorphic addition is performed component-wise:
+//! - sum_c0_i = zero_c0_i + prev_c0_i + r0_i * q_i
+//! - sum_c1_i = zero_c1_i + prev_c1_i + r1_i * q_i
+//!
+//! Where r0_i and r1_i are correction terms (quotient polynomials) that account for modular
+//! reduction when coefficients exceed the modulus q_i.
+//!
+//! ## Verification Strategy
+//!
+//! The verification uses the Schwartz-Zippel lemma: if polynomial equations hold when evaluated
+//! at random points, then the polynomials are identical with high probability. The circuit:
+//!
+//! 1. Generates random challenge values using Fiat-Shamir transform
+//! 2. Evaluates all polynomials at these challenge points
+//! 3. Verifies the addition equations hold at these points
+//! 4. Checks range constraints on all coefficients
 
 use greco::CryptographicParams;
 use polynomial::{flatten, Polynomial};
@@ -15,9 +48,9 @@ use safe::SafeSponge;
 /// # Arguments
 /// * `N` - Polynomial degree.
 /// * `L` - Number of CRT bases.
-/// * `BIT_ZERO_CT` - Bit length of the zero ciphertext polynomials.
-/// * `BIT_PREV_CT` - Bit length of the previous ciphertext polynomials.
-/// * `BIT_SUM_CT` - Bit length of the sum ciphertext polynomials.
+/// * `BIT_ZERO_CT` - Bit-width bound per coefficient for zero ciphertext polynomials `zero_ct0is`/`zero_ct1is`.
+/// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
+/// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
     crypto_params: CryptographicParams<L>,
     zero_ct0is: [Polynomial<N>; L],
@@ -38,7 +71,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// * `zero_ct0is`, `zero_ct1is` - Zero ciphertext polynomials.
     /// * `prev_ct0is`, `prev_ct1is` - Previous ciphertext polynomials.
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
-    /// * `r0is`, `r1is` - Randomness polynomials.
+    /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
         crypto_params: CryptographicParams<L>,
         zero_ct0is: [Polynomial<N>; L],
@@ -87,7 +120,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         inputs = flatten::<_, _, BIT_SUM_CT>(inputs, self.sum_ct0is);
         inputs = flatten::<_, _, BIT_SUM_CT>(inputs, self.sum_ct1is);
 
-        // Flatten randomness polynomials
+        // Flatten quotient/correction polynomials
         inputs = flatten::<_, _, 1>(inputs, self.r0is);
         inputs = flatten::<_, _, 1>(inputs, self.r1is);
 
@@ -96,25 +129,47 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
 
     /// Verifies the correct addition constraints for the ciphertext addition circuit.
     ///
-    /// This function implements the core zero-knowledge proof by checking:
-    /// 1. Range constraints on all polynomials coefficients
-    /// 2. Correct addition equations
+    /// This function implements the core zero-knowledge proof verification using a three-step
+    /// process:
     ///
-    /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold
-    /// when evaluated at random points, then the polynomials are identical with
-    /// high probability.
+    /// 1. **Range Checks**: Ensures all polynomial coefficients are within expected bounds
+    /// 2. **Challenge Generation**: Uses Fiat-Shamir transform to generate random evaluation points
+    /// 3. **Polynomial Evaluation**: Verifies addition equations hold at random points
     ///
-    /// # Addition Equations
-    /// For each CRT basis i:
-    /// * sum0i(gamma) = zero_ct0i(gamma) + prev_ct0i(gamma) + r0i(gamma) * qi
-    /// * sum1i(gamma) = zero_ct1i(gamma) + prev_ct1i(gamma) + r1i(gamma) * qi
+    /// ## Verification Strategy
+    ///
+    /// The proof uses the Schwartz-Zippel lemma: if polynomial equations hold when evaluated
+    /// at random points, then the polynomials are identical with high probability.
+    ///
+    /// ## Addition Equations
+    ///
+    /// For each CRT basis i, we verify:
+    /// ```
+    /// sum_ct0i(gamma) = zero_ct0i(gamma) + prev_ct0i(gamma) + r0i(gamma) * q_i
+    /// sum_ct1i(gamma) = zero_ct1i(gamma) + prev_ct1i(gamma) + r1i(gamma) * q_i
+    /// ```
     ///
     /// Where:
-    /// * qi are constants from the cryptographic parameters
-    /// * r0i, r1i are the correction terms for each i-th CRT basis.
+    /// - `gamma` is a random challenge value (same for all evaluations)
+    /// - `q_i` is the i-th CRT modulus from cryptographic parameters
+    /// - `r0i`, `r1i` are correction/quotient polynomials accounting for modular reduction
+    ///
+    /// The correction terms `r0i` and `r1i` are necessary because when adding coefficients
+    /// that exceed `q_i`, we need to subtract multiples of `q_i` to bring them back into
+    /// the valid range [0, q_i).
+    ///
+    /// ## Linear Combination Check
+    ///
+    /// Instead of checking each equation separately, we form a linear combination:
+    /// ```
+    /// sum(gamma_i * (sum_ct0i(gamma) - zero_ct0i(gamma) - prev_ct0i(gamma) - r0i(gamma) * q_i)) +
+    /// sum(gamma_{L+i} * (sum_ct1i(gamma) - zero_ct1i(gamma) - prev_ct1i(gamma) - r1i(gamma) * q_i)) = 0
+    /// ```
+    ///
+    /// This single check ensures all equations hold simultaneously.
     ///
     /// # Returns
-    /// True if the ciphertext addition constraints are satisfied, false otherwise.
+    /// `true` if all ciphertext addition constraints are satisfied, `false` otherwise.
     pub fn verify(self) -> bool {
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
@@ -126,10 +181,28 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
         self.verify_evaluations(gammas)
     }
 
-    /// Verifies range constraints on r0is and r1is.
+    /// Verifies range constraints on the quotient polynomials r0is and r1is.
+    ///
+    /// When adding two ciphertexts, the correction terms (quotient polynomials) must be
+    /// bounded. For homomorphic addition of two ciphertexts (M=2), each coefficient of the
+    /// quotient polynomial must be in the set {-1, 0, 1}.
+    ///
+    /// This constraint ensures that the modular reduction was performed correctly and that
+    /// the sum ciphertext coefficients remain within the valid range [0, q_i) for each CRT
+    /// modulus q_i.
+    ///
+    /// # Why {-1, 0, 1}?
+    ///
+    /// When adding two coefficients a and b modulo q_i:
+    /// - If a + b < q_i: no reduction needed, quotient = 0
+    /// - If q_i <= a + b < 2*q_i: subtract q_i once, quotient = 1
+    /// - If a + b < 0 (can happen with signed arithmetic): add q_i, quotient = -1
+    ///
+    /// Since we're adding two ciphertexts, the maximum possible sum is 2*q_i - 2, so we
+    /// never need to subtract more than one multiple of q_i.
     fn check_range_bounds(self) {
         for i in 0..L {
-            // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial.
+            // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial
             // must be in {-1, 0, 1}, so the bound will always be 1 for all CRT moduli.
             self.r0is[i].range_check_2bounds::<1>(1, 1);
             self.r1is[i].range_check_2bounds::<1>(1, 1);
@@ -168,44 +241,73 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
 
     /// Verifies ciphertext addition constraints using Fiat-Shamir challenges.
     ///
+    /// This function evaluates all polynomials at random challenge points and verifies that
+    /// the addition equations hold. It uses a linear combination approach to check all 2L
+    /// equations simultaneously.
+    ///
     /// # Arguments
     /// * `gammas` - Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
+    ///   - gamma_0 is used as the evaluation point for all polynomials
+    ///   - gamma_1 through gamma_{L-1} are multipliers for the first L equations
+    ///   - gamma_L through gamma_{2L-1} are multipliers for the second L equations
+    ///
+    /// # Verification Process
+    ///
+    /// For each CRT basis i:
+    /// 1. Compute the difference polynomial: `p = sum_ct0i - (zero_ct0i + prev_ct0i + r0i * q_i)`
+    /// 2. Evaluate at gamma: p(gamma)
+    /// 3. Add to accumulator with weight gamma_i: accumulator += gamma_i * p(gamma)
+    ///
+    /// Repeat for ct1 components with weights gamma_{L+i}.
+    ///
+    /// If all equations hold, the accumulator will be zero. If any equation fails, the
+    /// accumulator will be non-zero with high probability (by Schwartz-Zippel lemma).
     ///
     /// # Returns
-    /// True if the ciphertext addition constraints are satisfied, false otherwise.
+    /// `true` if the accumulator equals zero (all constraints satisfied), `false` otherwise.
     fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
+        // Use the first challenge as the evaluation point for all polynomials
         let gamma = gammas.get(0);
 
         let mut accumulator: Field = 0;
 
-        // First L equalities: p == sum_ct0i - (zero_ct0i + prev_ct0i + r0i * q_i)
+        // First L equalities: verify sum_ct0i = zero_ct0i + prev_ct0i + r0i * q_i
+        // For i=0, use weight 1; for i>0, use weight gamma_i
         for i in 0..L {
+            // Build the expected sum: zero_ct0i + prev_ct0i + r0i * q_i
             let mut p = self.zero_ct0is[i];
             let r0i_scaled = self.r0is[i].mul_scalar(self.crypto_params.qis[i]);
 
             p = p.add(self.prev_ct0is[i]);
             p = p.add(r0i_scaled);
 
+            // Compute difference: sum_ct0i - expected_sum
             p = self.sum_ct0is[i].sub(p);
 
+            // Weight and accumulate: use gamma_i as the weight (gamma_0 = 1 for i=0)
             let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
             accumulator += gamma_i * p.eval(gamma);
         }
 
-        // Next L equalities: p == sum_ct1i - (zero_ct1i + prev_ct1i + r1i * q_i)
+        // Next L equalities: verify sum_ct1i = zero_ct1i + prev_ct1i + r1i * q_i
+        // Use weights gamma_{L+i} for these equations
         for i in 0..L {
+            // Build the expected sum: zero_ct1i + prev_ct1i + r1i * q_i
             let mut p = self.zero_ct1is[i];
             let r1i_scaled = self.r1is[i].mul_scalar(self.crypto_params.qis[i]);
 
             p = p.add(self.prev_ct1is[i]);
             p = p.add(r1i_scaled);
 
+            // Compute difference: sum_ct1i - expected_sum
             p = self.sum_ct1is[i].sub(p);
 
+            // Weight and accumulate: use gamma_{L+i} as the weight
             let gamma_i = gammas.get(L + i);
             accumulator += gamma_i * p.eval(gamma);
         }
 
+        // All equations hold if and only if the accumulator is zero
         accumulator == 0
     }
 }

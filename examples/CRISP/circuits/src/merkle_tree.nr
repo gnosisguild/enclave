@@ -7,7 +7,20 @@
 use binary_merkle_root::binary_merkle_root;
 use poseidon::poseidon::bn254::hash_2 as poseidon;
 
-// Get the Merkle root of a Merkle tree.
+/// Computes the Merkle root from a leaf value and Merkle proof.
+///
+/// This function verifies that a given (address, balance) pair exists in the eligibility
+/// Merkle tree by reconstructing the root from the leaf and proof path.
+///
+/// # Arguments
+/// * `address` - The voter's Ethereum address (as a field element)
+/// * `balance` - The voter's balance/voting power (as a field element)
+/// * `depth` - The depth of the Merkle tree (number of levels from root to leaf)
+/// * `indices` - Path direction indicators (0 = left, 1 = right) for each level
+/// * `siblings` - Sibling node values along the path from leaf to root
+///
+/// # Returns
+/// The computed Merkle root as a field element.
 pub fn get_merkle_root(
     address: Field,
     balance: Field,
@@ -15,10 +28,7 @@ pub fn get_merkle_root(
     indices: [u1; 20],
     siblings: [Field; 20],
 ) -> Field {
-    // Calculate poseidon hash of address and balance.
     let leaf = poseidon([address, balance]);
-
-    // Calculate Merkle root.
     let merkle_root = binary_merkle_root(poseidon, leaf, depth, indices, siblings);
 
     merkle_root
