@@ -28,6 +28,8 @@ where
 ///
 /// # Example
 /// ```
+/// use e3_utils::OnceTake;
+///
 /// let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
 /// let once = OnceTake::new(tx);
 /// let cloned = once.clone();
