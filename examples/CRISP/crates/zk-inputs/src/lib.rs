@@ -9,9 +9,11 @@
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
 use crisp_constants::get_default_paramset;
-use e3_sdk::bfv_helpers::build_bfv_params_arc;
+use e3_sdk::bfv_helpers::{
+    build_bfv_params_arc,
+    utils::greco::{abi_decode_greco_ciphertext, greco_to_bfv_ciphertext}
+};
 use e3_sdk::bfv_helpers::BfvParamSet;
-use e3_sdk::bfv_helpers::BfvParamSets;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -61,6 +63,79 @@ impl ZKInputsGenerator {
     /// A new ZKInputsGenerator instance with default BFV parameters
     pub fn with_defaults() -> Self {
         Self::from_set(get_default_paramset())
+    }
+
+    /// Generates CRISP ZK inputs for a vote encryption and addition operation.
+    /// Note that this accepts the previous ciphertext in GRECO ABI encoded format.
+    ///
+    /// # Arguments
+    /// * `prev_ciphertext` - Previous ciphertext bytes to add to (in GRECO ABI Encoded format)
+    /// * `public_key` - Public key bytes for encryption
+    /// * `vote` - Vote value as a vector of coefficients
+    ///
+    /// # Returns
+    /// JSON string containing the CRISP ZK inputs
+    pub fn generate_inputs_for_update(
+        &self,
+        prev_ciphertext: &[u8],
+        public_key: &[u8],
+        vote: Vec<u64>,
+    ) -> Result<String> {
+        // Deserialize the provided public key.
+        let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
+            .with_context(|| "Failed to deserialize public key")?;
+
+        // Encode the plaintext into a polynomial.
+        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
+            .with_context(|| "Failed to encode plaintext")?;
+
+        // Encrypt using the provided public key to ensure ciphertext matches the key.
+        let (ct, u_rns, e0_rns, e1_rns) = pk
+            .try_encrypt_extended(&pt, &mut thread_rng())
+            .with_context(|| "Failed to encrypt plaintext")?;
+
+        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+
+        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+        // Compute the vectors of the GRECO inputs.
+        let greco_vectors = GrecoVectors::compute(
+            &pt,
+            &u_rns,
+            &e0_rns,
+            &e1_rns,
+            &ct,
+            &pk,
+            &self.bfv_params,
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute vectors")?;
+
+        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
+            .with_context(|| "Failed to compute bounds")?;
+
+        // Ciphertext Addition Section.
+        // Deserialize the previous ciphertext.
+        let (ct0is, ct1is) = abi_decode_greco_ciphertext(prev_ciphertext, &self.bfv_params);
+        let prev_ct = greco_to_bfv_ciphertext(&ct0is, &ct1is, &self.bfv_params);
+ 
+        // Compute the ciphertext addition.
+        let sum_ct = &ct + &prev_ct;
+
+        // Compute the inputs of the ciphertext addition.
+        let ciphertext_addition_inputs =
+            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, &self.bfv_params)
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
+
+        // Construct Inputs Section.
+        let inputs = construct_inputs(
+            &crypto_params,
+            &bounds,
+            &greco_vectors.standard_form(),
+            &ciphertext_addition_inputs.standard_form(),
+        );
+
+        Ok(serialize_inputs_to_json(&inputs)?)
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.

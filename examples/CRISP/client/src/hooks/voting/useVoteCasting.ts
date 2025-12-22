@@ -6,15 +6,13 @@
 
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { hashMessage } from 'viem'
 import { useSignMessage } from 'wagmi'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
-import { BroadcastVoteRequest, VoteStateLite, VotingRound } from '@/model/vote.model'
-
-import { encryptVote } from '@crisp-e3/sdk'
+import { BroadcastVoteRequest, Vote, VoteStateLite, VotingRound } from '@/model/vote.model'
+import { hashMessage } from 'viem'
 
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
@@ -68,9 +66,18 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Poll, address: string, signature: string, messageHash: `0x${string}`, previousCiphertext?: Uint8Array) => {
+    async (vote: Vote, address: string, balance: bigint, signature: string, messageHash: `0x${string}`, isMasking: boolean) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, messageHash, previousCiphertext)
+      return generateProof(
+        votingRound.round_id,
+        vote,
+        new Uint8Array(votingRound.pk_bytes),
+        address,
+        balance,
+        signature,
+        messageHash,
+        isMasking,
+      )
     },
     [generateProof, votingRound],
   )
@@ -83,7 +90,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   }, [])
 
   const castVoteWithProof = useCallback(
-    async (pollSelected: Poll | null, isVoteUpdate: boolean = false) => {
+    async (pollSelected: Poll | null, isVoteUpdate: boolean = false, isMasking: boolean = false) => {
       if (!pollSelected) {
         console.log('Cannot cast vote: Poll option not selected.')
         showToast({ type: 'danger', message: 'Please select a poll option first.' })
@@ -108,6 +115,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setVotingStep('signing')
         setLastActiveStep('signing')
         setStepMessage('Please sign the message in your wallet...')
+
         const message = `Vote for round ${roundState.id}`
         const messageHash = hashMessage(message)
 
@@ -127,10 +135,12 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        // @todo get this from the contract or server
-        const newEncryptionTemp = encryptVote({ yes: 0n, no: 0n }, new Uint8Array(votingRound!.pk_bytes))
-        const previousCiphertext = isVoteUpdate ? newEncryptionTemp : undefined
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, messageHash, previousCiphertext)
+        // vote is either 0 or 1, so we need to encode the vote accordingly.
+        const balance = 1n
+        const vote = pollSelected.value === 0 ? { yes: balance, no: 0n } : { yes: 0n, no: balance }
+
+        const encodedProof = await handleProofGeneration(vote, user.address, balance, signature, messageHash, isMasking)
+
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')
         }
@@ -217,7 +227,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       signMessageAsync,
       markVotedInRound,
       resetVotingState,
-      votingRound,
     ],
   )
 

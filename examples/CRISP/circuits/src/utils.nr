@@ -6,61 +6,103 @@
 
 use polynomial::Polynomial;
 
-// Check that all valid coefficients are either 0 or q_mod_t and that the vote is <= balance
+use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
+
+/// Validates vote coefficients and ensures the vote amount doesn't exceed balance.
+///
+/// This function checks that:
+/// 1. All vote coefficients are binary (either 0 or `q_mod_t`)
+/// 2. At most one vote type is non-zero (YES and NO votes are mutually exclusive; both may be zero for no vote)
+/// 3. The decoded vote amount (integer value reconstructed from binary coefficients) doesn't exceed the voter's balance
+///
+/// # Arguments
+/// * `k1` - The plaintext polynomial encoding the vote
+/// * `q_mod_t` - The plaintext modulus (typically 1 for binary encoding)
+/// * `balance` - The voter's balance/voting power
 pub fn check_coefficient_values_with_balance<let D: u32>(
     k1: Polynomial<D>,
     q_mod_t: Field,
     balance: Field,
 ) {
-    // This value allows to fit 1125899906842624 for yes and 1125899906842624 for no
-    let HALF_LARGEST_MINIMUM_DEGREE = 50;
     let HALF_D = D / 2;
 
-    // After reversal, bits that were at END of first half are now at START of second half
+    // Define the boundaries for YES and NO vote regions in the polynomial
+    // YES votes are stored in the second half: [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
     let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
-
-    // Bits that were at END of second half are now at START of first half
+    // NO votes are stored in the first half: [0, HALF_LARGEST_MINIMUM_DEGREE)
     let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
 
     let mut sum_yes: u64 = 0;
     let mut sum_no: u64 = 0;
 
-    // Yes part - process from END to START (reverse order)
+    // YES votes are encoded in reverse order (LSB at highest index, MSB at lowest index)
+    // We read from END_INDEX_Y-1 down to HALF_D to reconstruct the binary value
     for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
-        // Access indices backwards: from (END_INDEX_Y - 1) down to START_INDEX_Y
+        // Access coefficients in reverse order: from (END_INDEX_Y - 1) down to HALF_D
         let idx = END_INDEX_Y - 1 - i;
         let coeff = k1.coefficients[idx];
+
         assert(0 == coeff * (q_mod_t - coeff));
 
+        // Convert coefficient to bit: 0 -> 0, q_mod_t -> 1
         let bit: u64 = if coeff == 0 { 0 } else { 1 };
+
+        // Reconstruct binary value: shift left and add new bit
+        // Reading backwards means we're building: bit_0 * 2^0 + bit_1 * 2^1 + ...
         sum_yes = sum_yes * 2 + bit;
     }
 
-    // No part - process from END to START (reverse order)
+    // NO votes are encoded in reverse order: [END_INDEX_N-1, ..., 0]
+    // We read from END_INDEX_N-1 down to 0 to reconstruct the binary value
     for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
+        // Access coefficients in reverse order: from (END_INDEX_N - 1) down to 0
         let idx = END_INDEX_N - 1 - i;
         let coeff = k1.coefficients[idx];
+
+        // Binary constraint check (same as YES votes)
         assert(0 == coeff * (q_mod_t - coeff));
 
+        // Convert coefficient to bit
         let bit: u64 = if coeff == 0 { 0 } else { 1 };
+
+        // Reconstruct binary value
         sum_no = sum_no * 2 + bit;
     }
 
     if (sum_yes != 0) {
+        // If YES vote is cast, NO vote must be zero
         assert(sum_no == 0);
+        // Vote amount must not exceed balance
         assert(sum_yes <= (balance as u64));
     }
 
     if (sum_no != 0) {
+        // If NO vote is cast, YES vote must be zero
         assert(sum_yes == 0);
+        // Vote amount must not exceed balance
         assert(sum_no <= (balance as u64));
     }
 }
 
+/// Checks if all vote coefficients are zero.
+///
+/// This function verifies that both the YES and NO vote regions contain only zeros.
+/// Used in masking operations to ensure that invalid or unauthorized votes are properly
+/// masked (set to zero) before being added to the tally.
+///
+/// # Arguments
+/// * `k1` - The plaintext polynomial encoding the vote
+///
+/// # Returns
+/// `true` if all vote coefficients are zero, `false` otherwise.
+///
+/// # Vote Regions Checked
+/// - NO votes: coefficients [0, HALF_LARGEST_MINIMUM_DEGREE)
+/// - YES votes: coefficients [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
 pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
-    let HALF_LARGEST_MINIMUM_DEGREE = 50;
     let HALF_D = D / 2;
 
+    // Define vote region boundaries
     let START_INDEX_Y = HALF_D;
     let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
 
@@ -69,18 +111,21 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
 
     let mut res = true;
 
+    // Check YES vote region: all coefficients must be zero
     for i in START_INDEX_Y..END_INDEX_Y {
         if k1.coefficients[i] != 0 {
             res = false;
         }
     }
 
+    // Check NO vote region: all coefficients must be zero
     for i in START_INDEX_N..END_INDEX_N {
         if k1.coefficients[i] != 0 {
             res = false;
         }
     }
 
+    // Return true only if both regions are completely zero
     res
 }
 
@@ -89,10 +134,10 @@ fn test_check_vote_is_within_balance_pass() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             // YES votes: bits at indices 50-52 (START of YES window)
             1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
@@ -165,10 +210,10 @@ fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             // Non-zero at index 50 (YES section)
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ],
     };
 
