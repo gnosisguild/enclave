@@ -124,25 +124,32 @@ export const getAddressFromSignature = async (signature: `0x${string}`, messageH
 }
 
 /**
- * Get optimal number of threads for proof generation
- * Leaves at least 1 core free for other operations
- * Works in both Node.js and browser environments
+ * Get optimal number of threads for proof generation.
+ * Leaves at least 1 core free for other operations.
+ * Works in both Node.js and browser environments.
  */
 export async function getOptimalThreadCount(): Promise<number> {
+  // Browser environment - check first to avoid Node.js imports in browser builds
+  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
+    return Math.max(1, navigator.hardwareConcurrency - 1)
+  }
+
   // Node.js environment - use os module if available
-  if (typeof process !== 'undefined' && process.versions?.node) {
+  // Check for Node.js without directly accessing process to avoid polyfill detection
+  const isNode = typeof window === 'undefined' && typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined'
+
+  if (isNode) {
     try {
-      const os = await import('os')
+      // Build module specifier from character codes to avoid string literal detection.
+      // This prevents bundlers and polyfill plugins from detecting 'os'.
+      const moduleName = [111, 115].map((c) => String.fromCharCode(c)).join('')
+      const dynamicImport = new Function('specifier', 'return import(specifier)')
+      const os = await dynamicImport(moduleName)
       const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
       return Math.max(1, cpuCount - 1)
     } catch {
-      // Fall through to browser check or fallback
+      // Fall through to fallback
     }
-  }
-
-  // Browser environment
-  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
-    return Math.max(1, navigator.hardwareConcurrency - 1)
   }
 
   // Fallback
