@@ -19,23 +19,60 @@ npm install @crisp-e3/sdk
 
 ## Usage
 
-### Get Round Details
+### CrispSDK Class (Recommended)
+
+The `CrispSDK` class provides a convenient interface that automatically handles server communication
+for fetching previous ciphertexts and checking slot status.
 
 ```typescript
-import { getRoundDetails } from '@crisp-e3/sdk'
+import { CrispSDK } from '@crisp-e3/sdk'
+
+const sdk = new CrispSDK(serverUrl)
+
+// Generate a vote proof (automatically fetches previous ciphertext if needed)
+const voteProof = await sdk.generateVoteProof({
+  e3Id: 1,
+  vote: { yes: 100n, no: 0n },
+  publicKey: publicKeyBytes,
+  signature: '0x...',
+  messageHash: '0x...',
+  balance: 1000n,
+  slotAddress: '0x...',
+  merkleLeaves: [...],
+})
+
+// Generate a mask vote proof (automatically fetches previous ciphertext if needed)
+const maskProof = await sdk.generateMaskVoteProof({
+  e3Id: 1,
+  balance: 1000n,
+  slotAddress: '0x...',
+  publicKey: publicKeyBytes,
+  merkleLeaves: [...],
+})
+```
+
+### Standalone Functions
+
+#### Get Round Details
+
+```typescript
+import { getRoundDetails, getRoundTokenDetails } from '@crisp-e3/sdk'
 
 const roundDetails = await getRoundDetails(serverUrl, e3Id)
+const tokenDetails = await getRoundTokenDetails(serverUrl, e3Id)
 ```
 
-### Get Token Balance
+#### Get Token Balance and Supply
 
 ```typescript
-import { getBalanceAt } from '@crisp-e3/sdk'
+import { getBalanceAt, getTotalSupplyAt, getTreeData } from '@crisp-e3/sdk'
 
 const balance = await getBalanceAt(voterAddress, tokenAddress, snapshotBlock, chainId)
+const totalSupply = await getTotalSupplyAt(tokenAddress, snapshotBlock, chainId)
+const merkleLeaves = await getTreeData(serverUrl, e3Id)
 ```
 
-### Generate Vote Proof
+#### Generate Vote Proof (Low-level)
 
 ```typescript
 import { generateVoteProof } from '@crisp-e3/sdk'
@@ -44,12 +81,15 @@ const proof = await generateVoteProof({
   vote: { yes: 100n, no: 0n },
   publicKey: publicKeyBytes,
   signature: '0x...',
+  messageHash: '0x...',
   balance: 1000n,
+  slotAddress: '0x...',
   merkleLeaves: [...],
+  previousCiphertext: previousCiphertextBytes, // optional
 })
 ```
 
-### Generate Mask Vote Proof
+#### Generate Mask Vote Proof (Low-level)
 
 ```typescript
 import { generateMaskVoteProof } from '@crisp-e3/sdk'
@@ -63,7 +103,7 @@ const maskProof = await generateMaskVoteProof({
 })
 ```
 
-### Verify Proof
+#### Verify Proof
 
 ```typescript
 import { verifyProof } from '@crisp-e3/sdk'
@@ -71,9 +111,112 @@ import { verifyProof } from '@crisp-e3/sdk'
 const isValid = await verifyProof(proof)
 ```
 
+#### Decode Tally
+
+```typescript
+import { decodeTally } from '@crisp-e3/sdk'
+
+const tally = decodeTally(tallyBytes)
+// Returns: { yes: bigint, no: bigint }
+```
+
+#### Cryptographic Utilities
+
+```typescript
+import { generatePublicKey, encryptVote, encodeSolidityProof } from '@crisp-e3/sdk'
+
+const publicKey = generatePublicKey()
+const encryptedVote = encryptVote(vote, publicKey)
+const encodedProof = encodeSolidityProof(proof)
+```
+
+#### Merkle Tree Utilities
+
+```typescript
+import {
+  generateMerkleProof,
+  generateMerkleTree,
+  hashLeaf,
+  getAddressFromSignature,
+} from '@crisp-e3/sdk'
+
+const leaf = hashLeaf(address, balance)
+const tree = generateMerkleTree(leaves)
+const proof = generateMerkleProof(balance, address, merkleLeaves)
+const address = await getAddressFromSignature(signature, messageHash)
+```
+
+#### State Utilities
+
+```typescript
+import { getPreviousCiphertext, getIsSlotEmpty } from '@crisp-e3/sdk'
+
+const previousCiphertext = await getPreviousCiphertext(serverUrl, e3Id, slotAddress)
+const isEmpty = await getIsSlotEmpty(serverUrl, e3Id, slotAddress)
+```
+
 ## API
 
-- **State**: `getRoundDetails`, `getRoundTokenDetails`
-- **Token**: `getBalanceAt`, `getTotalSupplyAt`, `getTreeData`
-- **Vote**: `generateVoteProof`, `generateMaskVoteProof`, `verifyProof`, `decodeTally`
-- **Utils**: `generateMerkleProof`, `generateMerkleTree`, `hashLeaf`, `getAddressFromSignature`
+### CrispSDK Class
+
+- `constructor(serverUrl: string)` - Create a new SDK instance
+- `generateVoteProof(voteProofRequest: VoteProofRequest): Promise<ProofData>` - Generate a vote
+  proof (automatically handles previous ciphertext)
+- `generateMaskVoteProof(maskVoteProofRequest: MaskVoteProofRequest): Promise<ProofData>` - Generate
+  a mask vote proof (automatically handles previous ciphertext)
+
+### State Functions
+
+- `getRoundDetails(serverUrl: string, e3Id: number): Promise<RoundDetails>` - Get round details
+- `getRoundTokenDetails(serverUrl: string, e3Id: number): Promise<TokenDetails>` - Get token details
+  for a round
+- `getPreviousCiphertext(serverUrl: string, e3Id: number, address: string): Promise<Uint8Array>` -
+  Get previous ciphertext for a slot
+- `getIsSlotEmpty(serverUrl: string, e3Id: number, address: string): Promise<boolean>` - Check if a
+  slot is empty
+
+### Token Functions
+
+- `getBalanceAt(voterAddress: string, tokenAddress: string, snapshotBlock: number, chainId: number): Promise<bigint>` -
+  Get token balance at a specific block
+- `getTotalSupplyAt(tokenAddress: string, snapshotBlock: number, chainId: number): Promise<bigint>` -
+  Get total supply at a specific block
+- `getTreeData(serverUrl: string, e3Id: number): Promise<bigint[]>` - Get merkle tree leaves from
+  server
+
+### Vote Functions
+
+- `generateVoteProof(voteProofInputs: VoteProofInputs): Promise<ProofData>` - Generate a vote proof
+  (low-level)
+- `generateMaskVoteProof(maskVoteProofInputs: MaskVoteProofInputs): Promise<ProofData>` - Generate a
+  mask vote proof (low-level)
+- `verifyProof(proof: ProofData): Promise<boolean>` - Verify a proof locally
+- `decodeTally(tallyBytes: string): Vote` - Decode an encoded tally
+- `generatePublicKey(): Uint8Array` - Generate a random public key
+- `encryptVote(vote: Vote, publicKey: Uint8Array): Uint8Array` - Encrypt a vote
+- `encodeSolidityProof(proof: ProofData): Hex` - Encode proof for Solidity contract
+
+### Utility Functions
+
+- `generateMerkleProof(balance: bigint, address: string, leaves: bigint[] | string[]): MerkleProof` -
+  Generate merkle proof
+- `generateMerkleTree(leaves: bigint[]): LeanIMT` - Generate merkle tree
+- `hashLeaf(address: string, balance: bigint): bigint` - Hash a leaf node
+- `getAddressFromSignature(signature: \`0x${string}\`, messageHash?: \`0x${string}\`):
+  Promise<string>` - Extract address from signature
+
+### Constants
+
+- `MERKLE_TREE_MAX_DEPTH` - Maximum depth of the merkle tree
+- `SIGNATURE_MESSAGE` - Message used for signature verification
+- `MAXIMUM_VOTE_VALUE` - Maximum allowed vote value
+- `SIGNATURE_MESSAGE_HASH` - Hash of the signature message
+
+### Types
+
+- `RoundDetails` - Round details type
+- `RoundDetailsResponse` - Server response type for round details
+- `TokenDetails` - Token details type
+- `Vote` - Vote type with `yes` and `no` bigint fields
+- `MaskVoteProofInputs` - Inputs for mask vote proof generation
+- `VoteProofInputs` - Inputs for vote proof generation
