@@ -30,7 +30,7 @@ pub struct ThresholdShare {
     pub pk_share: ArcBytes,
     /// BFV-encrypted sk_sss - each recipient can decrypt their share
     pub sk_sss: BfvEncryptedShares,
-    /// BFV-encrypted esi_sss - one per ciphertext, each recipient can decrypt their share
+    /// BFV-encrypted esi_sss - one per secret key (sk), each recipient can decrypt their share
     pub esi_sss: Vec<BfvEncryptedShares>,
 }
 
