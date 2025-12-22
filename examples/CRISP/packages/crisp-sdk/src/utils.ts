@@ -136,16 +136,12 @@ export async function getOptimalThreadCount(): Promise<number> {
 
   // Node.js environment - use os module if available
   // Check for Node.js without directly accessing process to avoid polyfill detection
-  const isNode = typeof window === 'undefined' && typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined'
-
-  if (isNode) {
+  if (typeof window === 'undefined' && typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined') {
     try {
-      // Build module specifier from character codes to avoid string literal detection.
-      // This prevents bundlers and polyfill plugins from detecting 'os'.
-      const moduleName = [111, 115].map((c) => String.fromCharCode(c)).join('')
-      const dynamicImport = new Function('specifier', 'return import(specifier)')
-      const os = await dynamicImport(moduleName)
+      const os = await import('os')
+
       const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
+
       return Math.max(1, cpuCount - 1)
     } catch {
       // Fall through to fallback
