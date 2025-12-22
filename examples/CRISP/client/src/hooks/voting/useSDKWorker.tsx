@@ -7,6 +7,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
+import { Vote } from '@/model/vote.model'
+
+const ENCLAVE_API = import.meta.env.VITE_ENCLAVE_API
 
 export const useSDKWorkerHook = () => {
   const { showToast } = useNotificationAlertContext()
@@ -26,11 +29,14 @@ export const useSDKWorkerHook = () => {
   }, [])
 
   const generateProof = async (
-    voteId: bigint,
+    e3Id: number,
+    vote: Vote,
     publicKey: Uint8Array,
     address: string,
+    balance: bigint,
     signature: string,
-    previousCiphertext?: Uint8Array,
+    messageHash: `0x${string}`,
+    isMasking: boolean,
   ): Promise<string | undefined> => {
     if (!workerRef.current) {
       console.error('Worker not initialized')
@@ -42,9 +48,8 @@ export const useSDKWorkerHook = () => {
 
       workerRef.current!.postMessage({
         type: 'generate_proof',
-        data: { voteId, publicKey, address, signature, previousCiphertext },
+        data: { e3Id, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API },
       })
-
       workerRef.current!.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data
 

@@ -235,16 +235,9 @@ jobs:
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
-      - name: pnpm-setup
-        uses: pnpm/action-setup@v4
-      - name: 'Setup node'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
       - name: 'Run network tests'
-        run: 'pnpm test:integration net --no-prebuild'
+        working-directory: tests/integration
+        run: './test.sh net --no-prebuild'
       - name: 'Add test summary'
         run: |
           echo "## Network test results" >> $GITHUB_STEP_SUMMARY

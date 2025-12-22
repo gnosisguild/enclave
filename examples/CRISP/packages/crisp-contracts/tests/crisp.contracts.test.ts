@@ -59,6 +59,7 @@ describe('CRISP Contracts', function () {
         merkleLeaves: leaves,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
+        slotAddress: address,
       })
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
@@ -89,6 +90,7 @@ describe('CRISP Contracts', function () {
         merkleLeaves: leaves,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
+        slotAddress: address,
       })
 
       const encodedProof = encodeSolidityProof(proof)

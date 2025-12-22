@@ -10,51 +10,19 @@ import { Steps } from 'nextra/components'
 In this section, we will go through all the steps to run an E3 Program using CRISP. We will run a
 complete voting round of CRISP and do the following:
 
-- Start the infrastructure (nodes and contracts)
-- Start the CRISP applications (client, server, program)
 - Request an E3 Voting Round
 - Submit votes through the web interface
 - Compute and verify results
 
-Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before proceeding.
+Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide and
+[started the application](/CRISP/setup#using-the-application) before proceeding.
 
 <Steps>
 
-### Prep Once per Checkout
-
-From the repo root run the bundled setup script (it installs dependencies, builds the CLI, prepares
-env files, and compiles contracts):
-
-```sh
-cd examples/CRISP
-pnpm dev:setup
-```
-
-You only need to re-run this when dependencies change.
-
-### Start Everything with One Command
-
-The CRISP workspace ships with a supervisor that launches Hardhat, deploys contracts, boots
-Ciphernodes, runs the RISC Zero program server, the Rust backend, and the React client. Start it in
-the example root:
-
-```sh
-pnpm dev:up
-```
-
-Behind the scenes `scripts/dev.sh` calls `scripts/dev_services.sh`, which:
-
-- Spawns a Hardhat chain on `http://localhost:8545`
-- Deploys contracts and registers five Ciphernodes against the local registry
-- Runs `enclave program start --dev true` so proving happens instantly while developing
-- Launches the Rust server with `cargo run --bin server`
-- Starts the React client via `pnpm dev-static`
-
-Keep this terminal open; logs from every service are multiplexed with `pnpm concurrently`.
-
 ### Initialize a New Voting Round
 
-Open a new terminal and launch the CLI from the example root:
+As explained in the previous section, you can launch the CLI from the example root with the
+following command:
 
 ```sh
 pnpm cli
@@ -90,15 +58,14 @@ You should see output similar to:
 
 ### Set Up MetaMask
 
-Whether you used `pnpm dev:up` or the manual flow below, you will interact with the Hardhat chain
-running at `http://localhost:8545` (chain ID `31337`). Configure MetaMask once:
+Whether you used `pnpm dev:up` or the manual flow, you will interact with the Hardhat chain running
+at `http://localhost:8545` (chain ID `31337`). Configure MetaMask once:
 
 1. Import the Hardhat deployer key so you have funds available:
    ```
    0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
    ```
 2. Add a custom network pointing to `http://localhost:8545` with symbol `ETH` and chain ID `31337`.
-3. Connect your wallet to `http://localhost:3000` when the client asks.
 
 ### Submit Votes via Web Interface
 
@@ -106,38 +73,6 @@ running at `http://localhost:8545` (chain ID `31337`). Configure MetaMask once:
 2. Connect your MetaMask wallet when prompted
 3. You should see the active voting round seeded by the CLI request
 4. Cast a vote, approve the transaction, and wait for the confirmation toast
-
-### Manual Control (Optional)
-
-If you prefer to run each process in its own terminal (or need to customize flags), replicate what
-`pnpm dev:up` does under the hood:
-
-1. **Hardhat chain + deploy contracts**
-   ```sh
-   pnpm -C packages/crisp-contracts hardhat node
-   # in another terminal
-   ./scripts/crisp_deploy.sh
-   ```
-2. **Ciphernodes & wallets**
-   ```sh
-   ./scripts/dev_cipher.sh ./.enclave/ready
-   ```
-   This script wipes previous `.enclave` state, installs dev wallets, starts `enclave nodes up -v`,
-   and waits until all nodes are registered.
-3. **Program server**
-   ```sh
-   ./scripts/dev_program.sh        # add --dev true inside to skip proofs in dev
-   ```
-4. **Rust server**
-   ```sh
-   wait-on tcp:13151 && ./scripts/dev_server.sh
-   ```
-5. **React client**
-   ```sh
-   wait-on tcp:4000 && wait-on file:./.enclave/ready && ./scripts/dev_client.sh
-   ```
-
-You can also let `./scripts/dev_services.sh` orchestrate steps 2–5 once Hardhat is up.
 
 ### Monitor the Process
 

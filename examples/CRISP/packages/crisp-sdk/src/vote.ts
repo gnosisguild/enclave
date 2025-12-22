@@ -7,7 +7,7 @@
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
 import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
-import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE } from './constants'
+import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, ZERO_VOTE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
@@ -116,37 +116,56 @@ export const decodeTally = (tallyBytes: string): Vote => {
   }
 }
 
+/**
+ * Encrypt the vote using the public key.
+ * @param vote - The vote to encrypt.
+ * @param publicKey - The public key to use for encryption.
+ * @returns The encrypted vote as a Uint8Array.
+ */
 export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
   const encodedVote = encodeVote(vote)
 
   return zkInputsGenerator.encryptVote(publicKey, encodedVote)
 }
 
+/**
+ * Generate a random public key.
+ * @returns The generated public key as a Uint8Array.
+ */
 export const generatePublicKey = (): Uint8Array => {
   return zkInputsGenerator.generatePublicKey()
 }
 
+/**
+ * Generate the circuit inputs for a vote proof.
+ * This works for both vote and masking.
+ * @param proofInputs - The proof inputs.
+ * @returns The circuit inputs as a CircuitInputs object.
+ */
 export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<CircuitInputs> => {
   const encodedVote = encodeVote(proofInputs.vote)
 
-  let crispInputs = await zkInputsGenerator.generateInputs(
-    // If no previous ciphertext is provided, a placeholder ciphertext vote will be generated.
-    // This is safe because the circuit will not check the ciphertext addition if
-    // the previous ciphertext is not provided (is_first_vote is true).
-    proofInputs.previousCiphertext || encryptVote({ yes: 0n, no: 0n }, proofInputs.publicKey),
-    proofInputs.publicKey,
-    encodedVote,
-  )
+  let crispInputs: CircuitInputs
 
-  const { messageHash, publicKeyX, publicKeyY, signature } = await extractSignatureComponents(
-    proofInputs.signature,
-    proofInputs.messageHash,
-  )
+  if (!proofInputs.previousCiphertext) {
+    crispInputs = await zkInputsGenerator.generateInputs(
+      // A placeholder ciphertext vote will be generated.
+      // This is safe because the circuit will not check the ciphertext addition if
+      // the previous ciphertext is not provided (is_first_vote is true).
+      encryptVote(ZERO_VOTE, proofInputs.publicKey),
+      proofInputs.publicKey,
+      encodedVote,
+    )
+  } else {
+    crispInputs = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
+  }
 
-  crispInputs.hashed_message = Array.from(messageHash).map((b) => b.toString())
-  crispInputs.public_key_x = Array.from(publicKeyX).map((b) => b.toString())
-  crispInputs.public_key_y = Array.from(publicKeyY).map((b) => b.toString())
-  crispInputs.signature = Array.from(signature).map((b) => b.toString())
+  const signature = await extractSignatureComponents(proofInputs.signature, proofInputs.messageHash)
+
+  crispInputs.hashed_message = Array.from(signature.messageHash).map((b) => b.toString())
+  crispInputs.public_key_x = Array.from(signature.publicKeyX).map((b) => b.toString())
+  crispInputs.public_key_y = Array.from(signature.publicKeyY).map((b) => b.toString())
+  crispInputs.signature = Array.from(signature.signature).map((b) => b.toString())
   crispInputs.slot_address = proofInputs.slotAddress.toLowerCase()
   crispInputs.balance = proofInputs.balance.toString()
   crispInputs.is_first_vote = !proofInputs.previousCiphertext
@@ -158,12 +177,22 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
   return crispInputs
 }
 
+/**
+ * Execute the circuit.
+ * @param crispInputs - The circuit inputs.
+ * @returns The execute circuit result.
+ */
 export const executeCircuit = async (crispInputs: CircuitInputs): Promise<ExecuteCircuitResult> => {
   const noir = new Noir(circuit as CompiledCircuit)
 
   return noir.execute(crispInputs) as Promise<ExecuteCircuitResult>
 }
 
+/**
+ * Generate a proof for the CRISP circuit given the circuit inputs.
+ * @param crispInputs - The circuit inputs.
+ * @returns The proof.
+ */
 export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofData> => {
   const { witness } = await executeCircuit(crispInputs)
   const backend = new UltraHonkBackend(circuit.bytecode, { threads: optimalThreadCount })
@@ -175,6 +204,11 @@ export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofDa
   return proof
 }
 
+/**
+ * Generate a vote proof for the CRISP circuit given the vote proof inputs.
+ * @param voteProofInputs - The vote proof inputs.
+ * @returns The vote proof.
+ */
 export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
   if (voteProofInputs.vote.yes > voteProofInputs.balance || voteProofInputs.vote.no > voteProofInputs.balance) {
     throw new Error('Invalid vote: vote exceeds balance')
@@ -189,7 +223,6 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     throw new Error('Invalid vote: vote is negative')
   }
 
-  // The address slot of an actual vote always is the address of the public key that signed the message.
   const address = await getAddressFromSignature(voteProofInputs.signature, voteProofInputs.messageHash)
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
@@ -198,24 +231,38 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     ...voteProofInputs,
     slotAddress: address,
     merkleProof,
+    previousCiphertext: voteProofInputs.previousCiphertext,
+    signature: voteProofInputs.signature,
+    messageHash: voteProofInputs.messageHash,
   })
 
   return generateProof(crispInputs)
 }
 
-export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs) => {
+/**
+ * Generate a proof for a vote masking operation.
+ * @param maskVoteProofInputs The mask vote proof inputs.
+ * @returns
+ */
+export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs): Promise<ProofData> => {
   const merkleProof = generateMerkleProof(maskVoteProofInputs.balance, maskVoteProofInputs.slotAddress, maskVoteProofInputs.merkleLeaves)
 
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
     signature: MASK_SIGNATURE,
-    vote: { yes: 0n, no: 0n },
+    messageHash: SIGNATURE_MESSAGE_HASH,
+    vote: ZERO_VOTE,
     merkleProof,
   })
 
   return generateProof(crispInputs)
 }
 
+/**
+ * Locally verify a Noir proof.
+ * @param proof - The proof to verify.
+ * @returns True if the proof is valid, false otherwise.
+ */
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const backend = new UltraHonkBackend((circuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
 

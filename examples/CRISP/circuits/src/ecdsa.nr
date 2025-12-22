@@ -6,7 +6,23 @@
 
 use keccak256::keccak256;
 
-/// Given a public key, signature, and hashed message, verify the signature
+/// Verifies an ECDSA signature over a hashed message.
+///
+/// This function verifies that a signature was created by the holder of the private key
+/// corresponding to the provided public key, and that it signs the given hashed message.
+///
+/// # Arguments
+/// * `hashed_message` - The Keccak256 hash of the message being signed (32 bytes)
+/// * `pub_key_x` - The x-coordinate of the public key (32 bytes, big-endian)
+/// * `pub_key_y` - The y-coordinate of the public key (32 bytes, big-endian)
+/// * `signature` - The ECDSA signature (64 bytes: r || s, both 32 bytes big-endian)
+///
+/// # Returns
+/// `true` if the signature is valid, `false` otherwise.
+///
+/// # Note
+/// The signature is verified using secp256k1 curve (same as Ethereum). The message
+/// should already be hashed before calling this function.
 pub fn verify_signature(
     hashed_message: [u8; 32],
     pub_key_x: [u8; 32],
@@ -16,7 +32,19 @@ pub fn verify_signature(
     std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message)
 }
 
-/// Given a public key, derive the Ethereum address
+/// Derives an Ethereum address from a secp256k1 public key.
+///
+/// This function implements the standard Ethereum address derivation algorithm:
+/// 1. Concatenate the public key coordinates (64 bytes total)
+/// 2. Compute Keccak256 hash of the concatenated bytes
+/// 3. Extract the last 20 bytes as the address
+///
+/// # Arguments
+/// * `pub_key_x` - The x-coordinate of the public key (32 bytes, big-endian)
+/// * `pub_key_y` - The y-coordinate of the public key (32 bytes, big-endian)
+///
+/// # Returns
+/// A 20-byte array representing the Ethereum address.
 pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
     let mut pub_key_bytes = [0; 64];
     for i in 0..32 {
@@ -36,7 +64,16 @@ pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
     derived_address
 }
 
-// Convert a 20-byte address to a field element.
+/// Converts a 20-byte Ethereum address to a field element.
+///
+/// This function interprets the address bytes as a big-endian integer and converts it
+/// to a field element.
+///
+/// # Arguments
+/// * `addr` - A 20-byte Ethereum address
+///
+/// # Returns
+/// A field element representing the address as an integer.
 pub fn address_to_field(addr: [u8; 20]) -> Field {
     let mut acc: Field = 0;
 

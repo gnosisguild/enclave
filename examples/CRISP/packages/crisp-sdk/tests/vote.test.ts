@@ -3,25 +3,16 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { Vote } from '../src/types'
-import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE } from '../src/constants'
+import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
-import {
-  decodeTally,
-  encryptVote,
-  generateVoteProof,
-  generateMaskVoteProof,
-  generatePublicKey,
-  verifyProof,
-  encodeVote,
-  generateCircuitInputs,
-  executeCircuit,
-} from '../src/vote'
+import { decodeTally, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
-import { ECDSA_PRIVATE_KEY, LEAVES } from './constants'
+import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
+import previousCiphertextEncoded from './fixtures/previous-ciphertext.json'
+import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
   let vote: Vote
@@ -30,7 +21,29 @@ describe('Vote', () => {
   let address: string
   let slotAddress: string
   let publicKey: Uint8Array
-  let previousCiphertext: Uint8Array
+
+  let e3Id: number
+  let sdk: CrispSDK
+
+  const mockGetPreviousCiphertextResponse = () =>
+    ({
+      ok: true,
+      json: async () => ({ ciphertext: previousCiphertextEncoded }),
+    }) as Response
+
+  const mockIsSlotEmptyResponse = (isEmpty: boolean) =>
+    ({
+      ok: true,
+      json: async () => ({ is_empty: isEmpty }),
+    }) as Response
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   // Setup the test environment.
   beforeAll(async () => {
@@ -41,7 +54,8 @@ describe('Vote', () => {
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
-    previousCiphertext = encryptVote(vote, publicKey)
+    e3Id = 0
+    sdk = new CrispSDK(CRISP_SERVER_URL)
   })
 
   describe('decodeTally', () => {
@@ -91,10 +105,12 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
+
       const crispInputs = await generateCircuitInputs({
         vote,
         publicKey,
         signature,
+        messageHash: SIGNATURE_MESSAGE_HASH,
         balance,
         slotAddress: address,
         merkleProof,
@@ -121,14 +137,17 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+      // update to an invalid leaf to fail auth in the circuit
+      merkleProof.leaf = 0n
       const crispInputs = await generateCircuitInputs({
-        vote: { yes: 0n, no: 0n },
         publicKey,
-        previousCiphertext,
-        signature: MASK_SIGNATURE,
-        merkleProof,
         balance,
         slotAddress,
+        merkleProof,
+        vote: ZERO_VOTE,
+        signature: MASK_SIGNATURE,
+        messageHash: SIGNATURE_MESSAGE_HASH,
+        previousCiphertext: new Uint8Array(previousCiphertextEncoded),
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -153,9 +172,10 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
       const crispInputs = await generateCircuitInputs({
-        vote: { yes: 0n, no: 0n },
+        vote: ZERO_VOTE,
         publicKey,
         signature: MASK_SIGNATURE,
+        messageHash: SIGNATURE_MESSAGE_HASH,
         merkleProof,
         balance,
         slotAddress,
@@ -180,12 +200,17 @@ describe('Vote', () => {
 
   describe('generateVoteProof', () => {
     it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
-      const proof = await generateVoteProof({
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
+
+      const proof = await sdk.generateVoteProof({
         vote,
         publicKey,
         signature,
         merkleLeaves: LEAVES,
         balance,
+        messageHash: SIGNATURE_MESSAGE_HASH,
+        slotAddress,
+        e3Id,
       })
 
       expect(proof).toBeDefined()
@@ -199,13 +224,15 @@ describe('Vote', () => {
   })
 
   describe('generateMaskVoteProof', () => {
-    it('Should generate a valid mask vote proof with a previous ciphertext', { timeout: 100000 }, async () => {
-      const proof = await generateMaskVoteProof({
+    it('Should generate a valid mask vote proof when there are no votes in the slot', { timeout: 100000 }, async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
+
+      const proof = await sdk.generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
-        previousCiphertext,
         merkleLeaves: LEAVES,
+        e3Id: 0,
       })
 
       expect(proof).toBeDefined()
@@ -217,12 +244,17 @@ describe('Vote', () => {
       expect(isValid).toBe(true)
     })
 
-    it('Should generate a valid mask vote proof without a previous ciphertext', { timeout: 100000 }, async () => {
-      const proof = await generateMaskVoteProof({
+    it('Should generate a valid mask vote proof when there is a previous vote in the slot', { timeout: 100000 }, async () => {
+      vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockIsSlotEmptyResponse(false))
+        .mockResolvedValueOnce(mockGetPreviousCiphertextResponse())
+
+      const proof = await sdk.generateMaskVoteProof({
         balance,
         slotAddress,
         publicKey,
         merkleLeaves: LEAVES,
+        e3Id: 0,
       })
 
       expect(proof).toBeDefined()
