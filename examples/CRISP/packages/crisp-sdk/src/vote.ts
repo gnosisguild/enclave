@@ -147,7 +147,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
 
   let crispInputs: CircuitInputs
 
-  if (proofInputs.isFirstVote) {
+  if (!proofInputs.previousCiphertext) {
     crispInputs = await zkInputsGenerator.generateInputs(
       // A placeholder ciphertext vote will be generated.
       // This is safe because the circuit will not check the ciphertext addition if
@@ -157,9 +157,6 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
       encodedVote,
     )
   } else {
-    if (!proofInputs.previousCiphertext) {
-      throw new Error('Previous ciphertext is required for non-first votes')
-    }
     crispInputs = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
   }
 
@@ -171,7 +168,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
   crispInputs.signature = Array.from(signature.signature).map((b) => b.toString())
   crispInputs.slot_address = proofInputs.slotAddress.toLowerCase()
   crispInputs.balance = proofInputs.balance.toString()
-  crispInputs.is_first_vote = proofInputs.isFirstVote
+  crispInputs.is_first_vote = !proofInputs.previousCiphertext
   crispInputs.merkle_root = proofInputs.merkleProof.proof.root.toString()
   crispInputs.merkle_proof_length = proofInputs.merkleProof.length.toString()
   crispInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
@@ -234,7 +231,6 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     ...voteProofInputs,
     slotAddress: address,
     merkleProof,
-    isFirstVote: voteProofInputs.isFirstVote,
     previousCiphertext: voteProofInputs.previousCiphertext,
     signature: voteProofInputs.signature,
     messageHash: voteProofInputs.messageHash,
@@ -253,8 +249,6 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
 
   const crispInputs = await generateCircuitInputs({
     ...maskVoteProofInputs,
-    previousCiphertext: maskVoteProofInputs.previousCiphertext,
-    isFirstVote: maskVoteProofInputs.isFirstVote,
     signature: MASK_SIGNATURE,
     messageHash: SIGNATURE_MESSAGE_HASH,
     vote: ZERO_VOTE,

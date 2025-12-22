@@ -170,7 +170,7 @@ export type ExecuteCircuitResult = {
 }
 
 export type ProofInputs = {
-  previousCiphertext: Uint8Array
+  previousCiphertext?: Uint8Array
   vote: Vote
   publicKey: Uint8Array
   signature: `0x${string}`
@@ -178,7 +178,6 @@ export type ProofInputs = {
   balance: bigint
   slotAddress: string
   merkleProof: MerkleProof
-  isFirstVote: boolean
 }
 
 export type MaskVoteProofInputs = {
@@ -186,8 +185,7 @@ export type MaskVoteProofInputs = {
   balance: bigint
   slotAddress: string
   merkleLeaves: string[] | bigint[]
-  isFirstVote: boolean
-  previousCiphertext: Uint8Array
+  previousCiphertext?: Uint8Array
 }
 
 export type MaskVoteProofRequest = {
@@ -196,6 +194,17 @@ export type MaskVoteProofRequest = {
   balance: bigint
   slotAddress: string
   merkleLeaves: string[] | bigint[]
+}
+
+export type VoteProofInputs = {
+  merkleLeaves: string[] | bigint[]
+  publicKey: Uint8Array
+  balance: bigint
+  vote: Vote
+  signature: `0x${string}`
+  messageHash: `0x${string}`
+  slotAddress: string
+  previousCiphertext?: Uint8Array
 }
 
 export type VoteProofRequest = {
@@ -207,23 +216,4 @@ export type VoteProofRequest = {
   signature: `0x${string}`
   messageHash: `0x${string}`
   slotAddress: string
-}
-
-export type VoteProofInputs = {
-  merkleLeaves: string[] | bigint[]
-  publicKey: Uint8Array
-  balance: bigint
-  vote: Vote
-  signature: `0x${string}`
-  messageHash: `0x${string}`
-  slotAddress: string
-  isFirstVote: boolean
-  previousCiphertext: Uint8Array
-}
-
-export type Signature = {
-  publicKeyX: Uint8Array
-  publicKeyY: Uint8Array
-  signature: Uint8Array
-  messageHash: Uint8Array
 }
