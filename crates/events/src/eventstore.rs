@@ -32,7 +32,12 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     }
 
     pub fn handle_get_events_after(&mut self, msg: GetEventsAfter) -> Result<()> {
-        let seq = self.index.seek(msg.ts)?.unwrap_or(1);
+        // if there are no events after the timestamp return an empty vector
+        let Some(seq) = self.index.seek(msg.ts)? else {
+            msg.sender.try_send(ReceiveEvents::new(vec![]))?;
+            return Ok(());
+        };
+        // read and return the events
         let evts = self
             .log
             .read_from(seq)
