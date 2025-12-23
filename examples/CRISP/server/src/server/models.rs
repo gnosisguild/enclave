@@ -223,6 +223,7 @@ pub struct E3Crisp {
     pub votes_option_1: String,
     pub votes_option_2: String,
     pub token_holder_hashes: Vec<String>,
+    pub eligible_addresses: Vec<TokenHolder>,
     pub token_address: String,
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
@@ -240,4 +241,12 @@ impl From<E3> for WebResultRequest {
             end_time: e3.expiration,
         }
     }
+}
+
+/// Represents a token holder with their address and balance.
+/// Balance is stored as a string to preserve precision for large numbers.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct TokenHolder {
+    pub address: String,
+    pub balance: String,
 }

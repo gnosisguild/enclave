@@ -30,7 +30,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
-  const { castVoteWithProof, isLoading: isCastingVote, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
+  const { castVoteWithProof, isVoting: isCastingVote, isMasking, votingStep, lastActiveStep, stepMessage } = useVoteCasting()
 
   useEffect(() => {
     ;(async () => {
@@ -64,13 +64,13 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
     }
   }
 
-  const castVote = async () => {
+  const castVote = async (isMasking: boolean) => {
     if (!user) {
       setOpen(true)
       return
     }
 
-    await castVoteWithProof(pollSelected, hasVotedInCurrentRound)
+    await castVoteWithProof(pollSelected, isMasking)
   }
 
   return (
@@ -119,8 +119,8 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
               <CountdownTimer endTime={endTime} />
             </div>
           )}
-          {isCastingVote && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
-          {loading && !isCastingVote && <LoadingAnimation isLoading={loading} />}
+          {(isCastingVote || isMasking) && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
+          {loading && !isCastingVote && !isMasking && <LoadingAnimation isLoading={loading} />}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (
               <div data-test-id={`poll-button-${poll.value}`} key={poll.label} className='col-span-2 md:col-span-1'>
@@ -139,10 +139,17 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
               )}
               <button
                 className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
-                disabled={noPollSelected || loading || !roundState || isEnded || isCastingVote}
-                onClick={castVote}
+                disabled={noPollSelected || loading || !roundState || isEnded || isCastingVote || isMasking}
+                onClick={() => castVote(false)}
               >
                 {isCastingVote ? 'Processing Vote...' : hasVotedInCurrentRound ? 'Update Vote' : 'Cast Vote'}
+              </button>
+              <button
+                className='button-outlined button-max'
+                disabled={loading || !roundState || isEnded || isCastingVote || isMasking}
+                onClick={() => castVote(true)}
+              >
+                {isMasking ? 'Masking vote...' : 'Mask vote'}
               </button>
             </div>
           )}
