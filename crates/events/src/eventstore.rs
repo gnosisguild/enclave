@@ -9,7 +9,7 @@ use crate::{
     EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
 };
 use actix::{Actor, Handler};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use tracing::error;
 
 pub struct EventStore<I: SequenceIndex, L: EventLog> {
@@ -22,6 +22,9 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         let event = msg.event;
         let sender = msg.sender;
         let ts = event.get_ts();
+        if let Some(_) = self.index.get(ts)? {
+            bail!("Event already stored at timestamp {ts}!");
+        }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
         sender.try_send(EventStored(event.into_sequenced(seq)))?;
