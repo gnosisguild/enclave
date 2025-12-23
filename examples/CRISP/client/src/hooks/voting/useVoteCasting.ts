@@ -234,7 +234,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
         const merkleLeaves = await getMerkleLeaves(roundState.id)
 
-        if (merkleLeaves?.length === 0) {
+        if (!merkleLeaves || merkleLeaves?.length === 0) {
           throw new Error('No merkle leaves available for proof generation')
         }
 
@@ -245,7 +245,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           voteData.signature,
           voteData.messageHash,
           isAMask,
-          merkleLeaves!.map((s: string) => BigInt(`0x${s}`)),
+          merkleLeaves.map((s: string) => BigInt(`0x${s}`)),
         )
 
         if (!encodedProof) {
