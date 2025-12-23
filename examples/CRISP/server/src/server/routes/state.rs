@@ -30,6 +30,7 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route("/add-result", web::post().to(handle_program_server_result))
             // Get the token holders hashes for a given round
             .route("/token-holders", web::post().to(get_token_holders_hashes))
+            .route("/elegible-addresses", web::post().to(handle_get_elegible_addresses))
             .route(
                 "/previous-ciphertext",
                 web::post().to(handle_get_previous_ciphertext),
@@ -320,4 +321,24 @@ async fn handle_is_slot_empty(
     };
 
     HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty } )
+}
+
+/// Get the elegible addresses for a given round
+/// # Arguments
+/// * `GetRoundRequest` - The request data containing the round ID
+/// # Returns
+/// * A JSON response containing the list of elegible addresses and their balances
+async fn handle_get_elegible_addresses(
+    data: web::Json<GetRoundRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    match store.e3(incoming.round_id).get_elegible_addresses().await {
+        Ok(addresses) => HttpResponse::Ok().json(addresses),
+        Err(e) => {
+            error!("Error getting elegible addresses: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get elegible addresses")
+        }
+    }
 }

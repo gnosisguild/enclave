@@ -60,3 +60,8 @@ export interface Vote {
   yes: bigint
   no: bigint
 }
+
+export interface ElegibleVoter {
+  address: string
+  balance: number
+}

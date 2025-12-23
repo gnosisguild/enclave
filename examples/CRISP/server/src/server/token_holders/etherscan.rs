@@ -4,15 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::CONFIG;
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
 use eyre::{eyre, Context, Result}; // Add this import
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::collections::{HashMap, HashSet};
 use tokio::time::{sleep, Duration};
+use crate::server::{
+    CONFIG,
+    models::TokenHolder
+};
 
 // Define the Votes contract interface for getPastVotes
 sol! {
@@ -27,14 +30,6 @@ sol! {
 // Config
 pub const ETHERSCAN_API_URL: &str = "https://api.etherscan.io/v2/api";
 const ZERO_ADDRESS: Address = Address::ZERO;
-
-/// Represents a token holder with their address and balance.
-/// Balance is stored as a string to preserve precision for large numbers.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct TokenHolder {
-    pub address: String,
-    pub balance: String,
-}
 
 // Response types
 #[derive(Debug, Deserialize)]

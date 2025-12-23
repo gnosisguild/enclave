@@ -118,6 +118,10 @@ pub async fn register_e3_requested(
                     .into());
                 }
 
+                // Store eligible addresses in the repository.
+                repo.set_elegible_addresses(token_holders.clone())
+                    .await?;
+
                 // Compute Poseidon hashes for token holder address + balance pairs.
                 let token_holder_hashes = compute_token_holder_hashes(&token_holders)
                     .with_context(|| "Failed to compute token holder hashes")?;

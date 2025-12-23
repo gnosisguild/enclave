@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::models::TokenHolder;
+
 use super::{
     database::generate_emoji,
     models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
@@ -141,6 +143,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             votes_option_2: "0".to_string(),
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
+            elegible_addresses: vec![],
             token_address,
             balance_threshold,
             ciphertext_inputs: vec![],
@@ -308,6 +311,27 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn get_token_holder_hashes(&self) -> Result<Vec<String>> {
         let e3_crisp = self.get_crisp().await?;
         Ok(e3_crisp.token_holder_hashes)
+    }
+
+    pub async fn set_elegible_addresses(&mut self, holders: Vec<TokenHolder>) -> Result<()> {
+        let key = self.crisp_key();
+        // Placeholder for future implementation
+
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.elegible_addresses = holders.clone();
+                    e
+                })
+            })
+            .await 
+            .map_err(|_| eyre::eyre!("Could not set elegible_addresses for '{key}'"))?;
+        Ok(())
+    }
+
+    pub async fn get_elegible_addresses(&self) -> Result<Vec<TokenHolder>> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.elegible_addresses)
     }
 
     fn crisp_key(&self) -> String {
