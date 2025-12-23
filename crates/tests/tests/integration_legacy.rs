@@ -8,6 +8,7 @@ use actix::prelude::*;
 use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::*;
+use e3_bfv_helpers::client::compute_pk_commitment;
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_ciphernode_builder::EventSystem;
@@ -220,9 +221,16 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     let rng_test = create_shared_rng_from_u64(42);
     let test_shares = generate_pk_shares(&params, &crpoly, &rng_test, &eth_addrs)?;
     let test_pubkey = aggregate_public_key(&test_shares)?;
+    let public_key_hash = compute_pk_commitment(
+        test_pubkey.to_bytes(),
+        params.degree(),
+        params.plaintext(),
+        params.moduli().to_vec(),
+    )?;
 
     let expected_aggregated_event = PublicKeyAggregated {
         pubkey: test_pubkey.to_bytes(),
+        public_key_hash,
         e3_id: e3_id.clone(),
         nodes: OrderedSet::from(eth_addrs.clone()),
     };
@@ -561,6 +569,12 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
+    let public_key_hash = compute_pk_commitment(
+        test_pubkey.to_bytes(),
+        params.degree(),
+        params.plaintext(),
+        params.moduli().to_vec(),
+    )?;
 
     let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
@@ -571,6 +585,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         history.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: test_pubkey.to_bytes(),
+            public_key_hash,
             e3_id: E3id::new("1234", 1),
             nodes: OrderedSet::from(eth_addrs.clone()),
         }
@@ -597,6 +612,13 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
 
+    let public_key_hash = compute_pk_commitment(
+        test_pubkey.to_bytes(),
+        params.degree(),
+        params.plaintext(),
+        params.moduli().to_vec(),
+    )?;
+
     let history = history_collector
         .send(TakeEvents::<EnclaveEvent>::new(8))
         .await?;
@@ -605,6 +627,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         history.last().cloned().unwrap().into_data(),
         PublicKeyAggregated {
             pubkey: test_pubkey.to_bytes(),
+            public_key_hash,
             e3_id: E3id::new("1234", 2),
             nodes: OrderedSet::from(eth_addrs.clone()),
         }

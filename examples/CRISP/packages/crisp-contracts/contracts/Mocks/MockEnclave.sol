@@ -11,9 +11,14 @@ import { IDecryptionVerifier } from "@enclave-e3/contracts/contracts/interfaces/
 
 contract MockEnclave {
   bytes public plaintextOutput;
+  bytes32 public committeePublicKey;
 
   function setPlaintextOutput(bytes memory plaintext) external {
     plaintextOutput = plaintext;
+  }
+
+  function setCommitteePublicKey(bytes32 publicKeyHash) external {
+    committeePublicKey = publicKeyHash;
   }
 
   function getE3(uint256 e3Id) external view returns (E3 memory) {
@@ -30,7 +35,7 @@ contract MockEnclave {
         e3ProgramParams: bytes(""),
         customParams: bytes(""),
         decryptionVerifier: IDecryptionVerifier(address(0)),
-        committeePublicKey: bytes32(0),
+        committeePublicKey: committeePublicKey,
         ciphertextOutput: bytes32(0),
         plaintextOutput: plaintextOutput
       });

@@ -2741,6 +2741,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "e3-bfv-helpers",
  "e3-config",
  "e3-data",
  "e3-events",
@@ -2775,7 +2776,7 @@ dependencies = [
  "strum",
  "thiserror 1.0.69",
  "zkfhe-greco",
- "zkfhe-shared",
+ "zkfhe-shared 0.1.0 (git+https://github.com/gnosisguild/zkfhe-generator?rev=e2c02e6ef42348b2141293cc75f61a211c801a94)",
 ]
 
 [[package]]
@@ -3296,6 +3297,7 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-bfv-helpers",
  "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
@@ -9346,7 +9348,30 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml",
- "zkfhe-shared",
+ "zkfhe-shared 0.1.0 (git+https://github.com/gnosisguild/zkfhe-generator)",
+]
+
+[[package]]
+name = "zkfhe-shared"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?rev=e2c02e6ef42348b2141293cc75f61a211c801a94#e2c02e6ef42348b2141293cc75f61a211c801a94"
+dependencies = [
+ "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "bigint-poly",
+ "chrono",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]

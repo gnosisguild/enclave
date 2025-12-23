@@ -41,7 +41,8 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function publishCommittee(
         uint256,
         address[] calldata,
-        bytes calldata
+        bytes calldata,
+        bytes32
     ) external pure {} // solhint-disable-line no-empty-blocks
 
     function getCommitteeNodes(
@@ -117,7 +118,8 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function publishCommittee(
         uint256,
         address[] calldata,
-        bytes calldata
+        bytes calldata,
+        bytes32
     ) external pure {} // solhint-disable-line no-empty-blocks
 
     function getCommitteeNodes(

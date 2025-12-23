@@ -6,7 +6,7 @@
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::I256;
-use fhe::bfv::{BfvParameters, Ciphertext};
+use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 use fhe_math::rq::{traits::TryConvertFrom, Poly, Representation};
 use itertools::izip;
 use ndarray::Array2;
@@ -182,6 +182,106 @@ pub fn abi_decode_greco_ciphertext(
     (ct0is, ct1is)
 }
 
+/// Converts a BFV coefficient (in [0, qi)) to centered format [-(qi-1)/2, (qi-1)/2].
+fn convert_bfv_coefficient_to_centered(coeff: u64, qi: u64) -> BigInt {
+    let qi_bigint = BigInt::from(qi);
+    let coeff_bigint = BigInt::from(coeff);
+
+    // Center: convert from [0, qi) to [-(qi-1)/2, (qi-1)/2]
+    // If coeff > qi/2, it represents a negative centered value
+    if coeff > (qi / 2) {
+        &coeff_bigint - &qi_bigint
+    } else {
+        coeff_bigint
+    }
+}
+
+/// Converts BFV coefficients to greco-formatted coefficients (centered, reversed, standard form).
+fn convert_bfv_coefficients_to_greco(
+    bfv_coeffs: &[u64],
+    qi: u64,
+    zkp_modulus: &BigInt,
+) -> Vec<BigInt> {
+    bfv_coeffs
+        .iter()
+        .rev()
+        .map(|coeff| {
+            let centered = convert_bfv_coefficient_to_centered(*coeff, qi);
+            // Reduce mod ZKP modulus to get standard form
+            // Handle negative values correctly
+            let centered_mod = centered % zkp_modulus;
+            if centered_mod < BigInt::from(0) {
+                centered_mod + zkp_modulus
+            } else {
+                centered_mod
+            }
+        })
+        .collect()
+}
+
+/// Converts a BFV public key to Greco format.
+///
+/// Takes a BFV public key and converts it to Greco format, returning pk0is and pk1is
+/// as vectors of coefficient vectors (one vector per modulus, standard form).
+///
+/// # Arguments
+/// * `pk` - BFV public key
+/// * `params` - BFV parameters
+///
+/// # Returns
+/// A tuple of (pk0is, pk1is) where each is Vec<Vec<BigInt>> (one vector per modulus)
+pub fn bfv_public_key_to_greco(
+    pk: &PublicKey,
+    params: &Arc<BfvParameters>,
+) -> (Vec<Vec<BigInt>>, Vec<Vec<BigInt>>) {
+    let moduli = params.moduli();
+    let degree = params.degree();
+    let zkp_modulus = get_zkp_modulus();
+
+    // Access pk0 and pk1 polynomials from the public key
+    // PublicKey has a .c field that is a Ciphertext, which contains .c with the polynomials
+    let pk0_poly = &pk.c.c[0];
+    let pk1_poly = &pk.c.c[1];
+
+    // Convert polynomials to power basis representation to access coefficients
+    let mut pk0_power = pk0_poly.clone();
+    let mut pk1_power = pk1_poly.clone();
+    pk0_power.change_representation(Representation::PowerBasis);
+    pk1_power.change_representation(Representation::PowerBasis);
+
+    let mut pk0is = Vec::with_capacity(moduli.len());
+    let mut pk1is = Vec::with_capacity(moduli.len());
+
+    // Extract coefficients for each modulus
+    for (i, qi) in moduli.iter().enumerate() {
+        let mut pk0_modulus = Vec::with_capacity(degree);
+        let mut pk1_modulus = Vec::with_capacity(degree);
+
+        for j in 0..degree {
+            // Access coefficient at (modulus_index, coefficient_index)
+            let pk0_coeff = pk0_power.coefficients()[(i, j)];
+            let pk1_coeff = pk1_power.coefficients()[(i, j)];
+
+            pk0_modulus.push(pk0_coeff);
+            pk1_modulus.push(pk1_coeff);
+        }
+
+        // Convert to greco format (centers, reverses, and reduces mod ZKP modulus)
+        pk0is.push(convert_bfv_coefficients_to_greco(
+            &pk0_modulus,
+            *qi,
+            &zkp_modulus,
+        ));
+        pk1is.push(convert_bfv_coefficients_to_greco(
+            &pk1_modulus,
+            *qi,
+            &zkp_modulus,
+        ));
+    }
+
+    (pk0is, pk1is)
+}
+
 /// Converts bytes32 (signed 256-bit, two's complement, big-endian) to BigInt
 fn bytes32_to_bigint(bytes: &[u8; 32]) -> BigInt {
     // Use I256::from_be_bytes which handles two's complement conversion automatically
@@ -280,5 +380,94 @@ mod tests {
 
         assert_eq!(reconstructed_ct.c.len(), original_ct.c.len());
         assert_eq!(reconstructed_ct.level, original_ct.level);
+    }
+
+    #[test]
+    fn test_bfv_public_key_to_greco() {
+        use crate::{BfvParamSet, BfvParamSets};
+        let params = BfvParamSet::from(BfvParamSets::InsecureSet512_10_1).build_arc();
+
+        let mut rng = thread_rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+
+        // Get expected pk0is and pk1is from GrecoVectors
+        let (_, bounds) = GrecoBounds::compute(&params, 0).unwrap();
+        let bit_pk =
+            shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
+
+        let vote = vec![1u64, 0u64, 0u64];
+        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
+        let (ct, u_rns, e0_rns, e1_rns) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
+
+        let greco_vectors =
+            GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params, bit_pk)
+                .unwrap();
+        let standard_vectors = greco_vectors.standard_form();
+        let expected_pk0is = &standard_vectors.pk0is;
+        let expected_pk1is = &standard_vectors.pk1is;
+
+        // Convert using our function
+        let (actual_pk0is, actual_pk1is) = bfv_public_key_to_greco(&pk, &params);
+
+        // Verify the structure matches
+        assert_eq!(actual_pk0is.len(), expected_pk0is.len());
+        assert_eq!(actual_pk1is.len(), expected_pk1is.len());
+        assert_eq!(actual_pk0is.len(), params.moduli().len());
+
+        // Verify coefficients match for each modulus
+        for (i, (actual_pk0i, expected_pk0i)) in
+            actual_pk0is.iter().zip(expected_pk0is.iter()).enumerate()
+        {
+            assert_eq!(
+                actual_pk0i.len(),
+                expected_pk0i.len(),
+                "pk0is[{}] length mismatch",
+                i
+            );
+            assert_eq!(
+                actual_pk0i.len(),
+                params.degree(),
+                "pk0is[{}] should have degree coefficients",
+                i
+            );
+
+            for (j, (actual_coeff, expected_coeff)) in
+                actual_pk0i.iter().zip(expected_pk0i.iter()).enumerate()
+            {
+                assert_eq!(
+                    actual_coeff, expected_coeff,
+                    "pk0is[{}][{}] coefficient mismatch",
+                    i, j
+                );
+            }
+        }
+
+        for (i, (actual_pk1i, expected_pk1i)) in
+            actual_pk1is.iter().zip(expected_pk1is.iter()).enumerate()
+        {
+            assert_eq!(
+                actual_pk1i.len(),
+                expected_pk1i.len(),
+                "pk1is[{}] length mismatch",
+                i
+            );
+            assert_eq!(
+                actual_pk1i.len(),
+                params.degree(),
+                "pk1is[{}] should have degree coefficients",
+                i
+            );
+
+            for (j, (actual_coeff, expected_coeff)) in
+                actual_pk1i.iter().zip(expected_pk1i.iter()).enumerate()
+            {
+                assert_eq!(
+                    actual_coeff, expected_coeff,
+                    "pk1is[{}][{}] coefficient mismatch",
+                    i, j
+                );
+            }
+        }
     }
 }

@@ -71,7 +71,8 @@ describe('CRISP Contracts', function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
-      const crispProgram = await deployCRISPProgram()
+      const mockEnclave = await deployMockEnclave()
+      const crispProgram = await deployCRISPProgram({ mockEnclave })
       const [signer] = await ethers.getSigners()
 
       const e3Id = 1n
@@ -92,6 +93,8 @@ describe('CRISP Contracts', function () {
         messageHash: SIGNATURE_MESSAGE_HASH,
         slotAddress: address,
       })
+
+      await mockEnclave.setCommitteePublicKey(proof.publicInputs[0])
 
       const encodedProof = encodeSolidityProof(proof)
 

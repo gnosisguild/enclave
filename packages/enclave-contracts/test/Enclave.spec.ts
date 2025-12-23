@@ -55,7 +55,7 @@ describe("Enclave", function () {
   );
 
   const data = "0xda7a";
-  const dataHash = ethers.keccak256(data);
+  const dataHash = ethers.id(data);
   const proof = "0x1337";
 
   // Hash function used to compute the tree nodes.
@@ -73,7 +73,8 @@ describe("Enclave", function () {
     await registry.connect(operator2).submitTicket(e3Id, 1);
     await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
     await registry.finalizeCommittee(e3Id);
-    await registry.publishCommittee(e3Id, nodes, publicKey);
+    const publicKeyHash = ethers.id(publicKey);
+    await registry.publishCommittee(e3Id, nodes, publicKey, publicKeyHash);
   };
 
   // Helper function to approve USDC and make request
@@ -938,7 +939,9 @@ describe("Enclave", function () {
     it("reverts if E3 does not exist", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.activate(0, ethers.ZeroHash))
+      await expect(
+        enclave.activate(0, ethers.ZeroHash, ethers.id(ethers.ZeroHash)),
+      )
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(0);
     });
@@ -972,8 +975,10 @@ describe("Enclave", function () {
       );
 
       await expect(enclave.getE3(0)).to.not.be.revert(ethers);
-      await expect(enclave.activate(0, data)).to.not.be.revert(ethers);
-      await expect(enclave.activate(0, data))
+      await expect(enclave.activate(0, data, dataHash)).to.not.be.revert(
+        ethers,
+      );
+      await expect(enclave.activate(0, data, dataHash))
         .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
         .withArgs(0);
     });
@@ -995,7 +1000,7 @@ describe("Enclave", function () {
       });
 
       await expect(
-        enclave.activate(0, ethers.ZeroHash),
+        enclave.activate(0, ethers.ZeroHash, ethers.id(ethers.ZeroHash)),
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
@@ -1030,10 +1035,9 @@ describe("Enclave", function () {
 
       await mine(2, { interval: 2000 });
 
-      await expect(enclave.activate(e3Id, data)).to.be.revertedWithCustomError(
-        enclave,
-        "E3Expired",
-      );
+      await expect(
+        enclave.activate(e3Id, data, dataHash),
+      ).to.be.revertedWithCustomError(enclave, "E3Expired");
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
@@ -1053,7 +1057,7 @@ describe("Enclave", function () {
       });
 
       await expect(
-        enclave.activate(0, ethers.ZeroHash),
+        enclave.activate(0, ethers.ZeroHash, ethers.id(ethers.ZeroHash)),
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
@@ -1085,10 +1089,9 @@ describe("Enclave", function () {
 
       await time.increaseTo(currentTime + request.duration + 100);
 
-      await expect(enclave.activate(e3Id, data)).to.be.revertedWithCustomError(
-        enclave,
-        "E3Expired",
-      );
+      await expect(
+        enclave.activate(e3Id, data, dataHash),
+      ).to.be.revertedWithCustomError(enclave, "E3Expired");
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
       const {
@@ -1111,7 +1114,7 @@ describe("Enclave", function () {
       await enclave.setCiphernodeRegistry(nextRegistry);
 
       await expect(
-        enclave.activate(0, ethers.ZeroHash),
+        enclave.activate(0, ethers.ZeroHash, ethers.id(ethers.ZeroHash)),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
 
       await enclave.setCiphernodeRegistry(prevRegistry);
@@ -1125,7 +1128,9 @@ describe("Enclave", function () {
         operator2,
       );
 
-      await expect(enclave.activate(0, data)).not.to.be.revert(ethers);
+      await expect(enclave.activate(0, data, dataHash)).not.to.be.revert(
+        ethers,
+      );
     });
 
     it("sets committeePublicKey correctly", async () => {
@@ -1165,7 +1170,7 @@ describe("Enclave", function () {
       let e3 = await enclave.getE3(e3Id);
       expect(e3.committeePublicKey).to.not.equal(publicKey);
 
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
 
       e3 = await enclave.getE3(e3Id);
       expect(e3.committeePublicKey).to.equal(publicKey);
@@ -1201,7 +1206,9 @@ describe("Enclave", function () {
         operator2,
       );
 
-      expect(await enclave.activate.staticCall(e3Id, data)).to.be.equal(true);
+      expect(
+        await enclave.activate.staticCall(e3Id, data, dataHash),
+      ).to.be.equal(true);
     });
     it("emits E3Activated event", async () => {
       const {
@@ -1234,7 +1241,7 @@ describe("Enclave", function () {
         operator2,
       );
 
-      await expect(enclave.activate(e3Id, data)).to.emit(
+      await expect(enclave.activate(e3Id, data, dataHash)).to.emit(
         enclave,
         "E3Activated",
       );
@@ -1299,7 +1306,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(0, data);
+      await enclave.activate(0, data, dataHash);
       await expect(
         enclave.publishInput(0, "0xaabbcc"),
       ).to.be.revertedWithCustomError(enclave, "InvalidInput");
@@ -1333,7 +1340,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(0, data);
+      await enclave.activate(0, data, dataHash);
 
       await mine(2, { interval: request.duration });
 
@@ -1373,7 +1380,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(0, data);
+      await enclave.activate(0, data, dataHash);
       await enclave.publishInput(0, inputData);
 
       await makeRequest(enclave, usdcToken, {
@@ -1394,7 +1401,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(1, data);
+      await enclave.activate(1, data, dataHash);
       await enclave.publishInput(1, inputData);
     });
     it("returns true if input is published successfully", async function () {
@@ -1426,7 +1433,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(0, data);
+      await enclave.activate(0, data, dataHash);
 
       expect(await enclave.publishInput.staticCall(0, inputData)).to.equal(
         true,
@@ -1483,7 +1490,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
 
       await expect(
         enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
@@ -1518,7 +1525,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
@@ -1557,7 +1564,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await expect(
         enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
@@ -1587,11 +1594,11 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
       const e3 = await enclave.getE3(e3Id);
-      expect(e3.ciphertextOutput).to.equal(dataHash);
+      expect(e3.ciphertextOutput).to.equal(ethers.keccak256(data));
     });
     it("returns true if output is published successfully", async function () {
       const {
@@ -1617,7 +1624,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       expect(
         await enclave.publishCiphertextOutput.staticCall(e3Id, data, proof),
@@ -1647,7 +1654,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
         .to.emit(enclave, "CiphertextOutputPublished")
@@ -1701,7 +1708,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
         .to.be.revertedWithCustomError(enclave, "CiphertextOutputNotPublished")
         .withArgs(e3Id);
@@ -1730,7 +1737,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await enclave.publishPlaintextOutput(e3Id, data, proof);
@@ -1765,7 +1772,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
@@ -1796,7 +1803,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(await enclave.publishPlaintextOutput(e3Id, data, proof));
@@ -1828,7 +1835,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(
@@ -1859,7 +1866,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id, data);
+      await enclave.activate(e3Id, data, dataHash);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(await enclave.publishPlaintextOutput(e3Id, data, proof))

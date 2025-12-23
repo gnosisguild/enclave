@@ -19,7 +19,7 @@ itertools = "0.14.0"
 ndarray = "0.15"
 num-bigint = { workspace = true }
 num-traits = "0.2"
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator", rev = "e2c02e6ef42348b2141293cc75f61a211c801a94" }
 strum.workspace = true
 rand.workspace = true
 thiserror = { workspace = true }

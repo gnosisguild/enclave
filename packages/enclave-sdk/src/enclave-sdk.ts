@@ -326,12 +326,12 @@ export class EnclaveSDK {
   /**
    * Activate an E3 computation
    */
-  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
+  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, publicKeyHash: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
     if (!this.initialized) {
       await this.initialize()
     }
 
-    return this.contractClient.activateE3(e3Id, publicKey, gasLimit)
+    return this.contractClient.activateE3(e3Id, publicKey, publicKeyHash, gasLimit)
   }
 
   /**

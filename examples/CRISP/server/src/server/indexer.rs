@@ -14,8 +14,10 @@ use crate::server::{
 };
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, FixedBytes, U256};
+use crisp_constants::get_default_paramset;
 use crisp_utils::decode_tally;
+use e3_sdk::bfv_helpers::client::compute_pk_commitment;
 use e3_sdk::indexer::IndexerContext;
 use e3_sdk::{
     evm_helpers::{
@@ -358,7 +360,24 @@ async fn handle_committee_time_expired(
     ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
 ) -> eyre::Result<()> {
     // If not activated activate
-    let tx = ctx.contract().activate(event.e3Id, event.publicKey).await?;
+    let params = get_default_paramset();
+
+    let public_key_hash = compute_pk_commitment(
+        event.publicKey.to_vec(),
+        params.degree,
+        params.plaintext_modulus,
+        params.moduli.to_vec(),
+    )
+    .map_err(|e| eyre::eyre!("Failed to compute PK commitment: {}", e))?;
+
+    let tx = ctx
+        .contract()
+        .activate(
+            event.e3Id,
+            event.publicKey,
+            FixedBytes::from(public_key_hash),
+        )
+        .await?;
     info!(
         "[e3_id={}] E3 activated with tx: {:?}",
         event.e3Id, tx.transaction_hash
