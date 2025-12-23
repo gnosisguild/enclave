@@ -52,7 +52,7 @@ const useToken = () => {
         abi: iERC20Abi,
         address: ROUND_TOKEN,
         functionName: 'mint',
-        args: [walletClient.account.address, BigInt(1 * 10e18)],
+        args: [walletClient.account.address, BigInt(1 * 1e18)],
         chain: getChain(),
       })
       showToast({
