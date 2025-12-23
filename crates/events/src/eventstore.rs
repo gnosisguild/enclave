@@ -57,7 +57,8 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
         match self.handle_store_event_requested(msg) {
             Ok(_) => (),
-            Err(e) => error!("{e}"),
+            Err(e) => panic!("{e}"), // panic here because when event storage fails we really need
+                                     // to just give up
         }
     }
 }
