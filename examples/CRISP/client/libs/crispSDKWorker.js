@@ -26,7 +26,6 @@ self.onmessage = async function (event) {
 
         if (isMasking) {
           proof = await sdk.generateMaskVoteProof({
-            serverUrl: crispServer,
             e3Id,
             publicKey,
             balance,
@@ -35,7 +34,6 @@ self.onmessage = async function (event) {
           })
         } else {
           proof = await sdk.generateVoteProof({
-            serverUrl: crispServer,
             vote,
             e3Id,
             publicKey,

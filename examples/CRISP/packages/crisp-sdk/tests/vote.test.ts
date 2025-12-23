@@ -7,11 +7,11 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { Vote } from '../src/types'
 import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
-import { decodeTally, encryptVote, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
+import { decodeTally, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
-import previousCiphertextEncoded from './previous.json'
+import previousCiphertextEncoded from './fixtures/previous-ciphertext.json'
 import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
@@ -22,19 +22,20 @@ describe('Vote', () => {
   let slotAddress: string
   let publicKey: Uint8Array
 
-  const e3Id = 0
+  let e3Id: number
+  let sdk: CrispSDK
 
-  const mockedPreviousCiphertextResponse = {
-    ciphertext: previousCiphertextEncoded,
-  }
+  const mockGetPreviousCiphertextResponse = () =>
+    ({
+      ok: true,
+      json: async () => ({ ciphertext: previousCiphertextEncoded }),
+    }) as Response
 
-  const mockedIsSlotEmptyTrueResponse = {
-    is_empty: true,
-  }
-
-  const mockedIsSlotEmptyFalseResponse = {
-    is_empty: false,
-  }
+  const mockIsSlotEmptyResponse = (isEmpty: boolean) =>
+    ({
+      ok: true,
+      json: async () => ({ is_empty: isEmpty }),
+    }) as Response
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -43,8 +44,6 @@ describe('Vote', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
-
-  const sdk = new CrispSDK(CRISP_SERVER_URL)
 
   // Setup the test environment.
   beforeAll(async () => {
@@ -55,6 +54,8 @@ describe('Vote', () => {
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
+    e3Id = 0
+    sdk = new CrispSDK(CRISP_SERVER_URL)
   })
 
   describe('decodeTally', () => {
@@ -105,8 +106,6 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
 
-      const previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
-
       const crispInputs = await generateCircuitInputs({
         vote,
         publicKey,
@@ -115,8 +114,6 @@ describe('Vote', () => {
         balance,
         slotAddress: address,
         merkleProof,
-        isFirstVote: true,
-        previousCiphertext,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -146,7 +143,6 @@ describe('Vote', () => {
         publicKey,
         balance,
         slotAddress,
-        isFirstVote: false,
         merkleProof,
         vote: ZERO_VOTE,
         signature: MASK_SIGNATURE,
@@ -183,8 +179,6 @@ describe('Vote', () => {
         merkleProof,
         balance,
         slotAddress,
-        isFirstVote: true,
-        previousCiphertext: encryptVote(vote, publicKey),
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -206,12 +200,7 @@ describe('Vote', () => {
 
   describe('generateVoteProof', () => {
     it('Should generate a valid vote proof', { timeout: 100000 }, async () => {
-      const mockIsSlotEmptyResponse = {
-        ok: true,
-        json: async () => mockedIsSlotEmptyTrueResponse,
-      } as Response
-
-      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
 
       const proof = await sdk.generateVoteProof({
         vote,
@@ -236,12 +225,7 @@ describe('Vote', () => {
 
   describe('generateMaskVoteProof', () => {
     it('Should generate a valid mask vote proof when there are no votes in the slot', { timeout: 100000 }, async () => {
-      const mockIsSlotEmptyResponse = {
-        ok: true,
-        json: async () => mockedIsSlotEmptyTrueResponse,
-      } as Response
-
-      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse)
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse(true))
 
       const proof = await sdk.generateMaskVoteProof({
         balance,
@@ -261,17 +245,9 @@ describe('Vote', () => {
     })
 
     it('Should generate a valid mask vote proof when there is a previous vote in the slot', { timeout: 100000 }, async () => {
-      const mockIsSlotEmptyResponse = {
-        ok: true,
-        json: async () => mockedIsSlotEmptyFalseResponse,
-      } as Response
-
-      const mockFetchResponse = {
-        ok: true,
-        json: async () => mockedPreviousCiphertextResponse,
-      } as Response
-
-      vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockIsSlotEmptyResponse).mockResolvedValueOnce(mockFetchResponse)
+      vi.spyOn(global, 'fetch')
+        .mockResolvedValueOnce(mockIsSlotEmptyResponse(false))
+        .mockResolvedValueOnce(mockGetPreviousCiphertextResponse())
 
       const proof = await sdk.generateMaskVoteProof({
         balance,
