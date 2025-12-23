@@ -126,7 +126,7 @@ impl<S: DataStore> CrispE3Repository<S> {
                 return Ok(Some(vote));
             }
         }
-        
+
         Ok(None)
     }
 
@@ -143,7 +143,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             votes_option_2: "0".to_string(),
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
-            elegible_addresses: vec![],
+            eligible_addresses: vec![],
             token_address,
             balance_threshold,
             ciphertext_inputs: vec![],
@@ -313,25 +313,25 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3_crisp.token_holder_hashes)
     }
 
-    pub async fn set_elegible_addresses(&mut self, holders: Vec<TokenHolder>) -> Result<()> {
+    pub async fn set_eligible_addresses(&mut self, holders: Vec<TokenHolder>) -> Result<()> {
         let key = self.crisp_key();
         // Placeholder for future implementation
 
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
-                    e.elegible_addresses = holders.clone();
+                    e.eligible_addresses = holders.clone();
                     e
                 })
             })
-            .await 
-            .map_err(|_| eyre::eyre!("Could not set elegible_addresses for '{key}'"))?;
+            .await
+            .map_err(|_| eyre::eyre!("Could not set eligible_addresses for '{key}'"))?;
         Ok(())
     }
 
-    pub async fn get_elegible_addresses(&self) -> Result<Vec<TokenHolder>> {
+    pub async fn get_eligible_addresses(&self) -> Result<Vec<TokenHolder>> {
         let e3_crisp = self.get_crisp().await?;
-        Ok(e3_crisp.elegible_addresses)
+        Ok(e3_crisp.eligible_addresses)
     }
 
     fn crisp_key(&self) -> String {

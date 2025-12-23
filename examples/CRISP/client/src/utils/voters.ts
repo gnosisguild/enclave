@@ -4,16 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ElegibleVoter } from '@/model/vote.model'
+import { EligibleVoter } from '@/model/vote.model'
 
 /**
- * Get a random voter details from a list of elegible voters
- * @param addresses The list of elegible voters
+ * Get a random voter details from a list of eligible voters
+ * @param addresses The list of eligible voters
  * @returns The randomly selected voter details
  */
-export const getRandomVoterToMask = (voters: ElegibleVoter[]): ElegibleVoter => {
+export const getRandomVoterToMask = (voters: EligibleVoter[]): EligibleVoter => {
+  if (voters.length === 0) {
+    throw new Error('No eligible voters available to select from.')
+  }
+
   const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % voters.length
 
-  console.log(`Selected random voter at index: ${voters[randomIndex].address}`)
   return voters[randomIndex]
 }

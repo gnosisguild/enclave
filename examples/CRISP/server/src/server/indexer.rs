@@ -119,7 +119,7 @@ pub async fn register_e3_requested(
                 }
 
                 // Store eligible addresses in the repository.
-                repo.set_elegible_addresses(token_holders.clone())
+                repo.set_eligible_addresses(token_holders.clone())
                     .await?;
 
                 // Compute Poseidon hashes for token holder address + balance pairs.

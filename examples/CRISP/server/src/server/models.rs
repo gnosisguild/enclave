@@ -223,7 +223,7 @@ pub struct E3Crisp {
     pub votes_option_1: String,
     pub votes_option_2: String,
     pub token_holder_hashes: Vec<String>,
-    pub elegible_addresses: Vec<TokenHolder>,
+    pub eligible_addresses: Vec<TokenHolder>,
     pub token_address: String,
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,

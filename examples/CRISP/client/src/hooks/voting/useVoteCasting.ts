@@ -69,7 +69,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const votingRound = customVotingRound ?? contextVotingRound
 
   const { signMessageAsync } = useSignMessage()
-  const { getElegibleVoters } = useEnclaveServer()
+  const { getEligibleVoters } = useEnclaveServer()
   const { showToast } = useNotificationAlertContext()
   const navigate = useNavigate()
   const [isVoting, setIsVoting] = useState<boolean>(false)
@@ -100,32 +100,44 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     setLastActiveStep(null)
     setStepMessage('')
     setIsVoting(false)
+    setIsMasking(false)
   }, [])
 
   /**
-   * Handles masking a vote by selecting a random elegible voter.
+   * Handles masking a vote by selecting a random eligible voter.
    */
   const handleMask = useCallback(async (): Promise<VoteData> => {
     if (!user || !roundState) {
       throw new Error('Cannot mask vote: Missing user or round state.')
     }
 
-    const elegibleVoters = await getElegibleVoters(roundState.id)
+    const eligibleVoters = await getEligibleVoters(roundState.id)
 
-    if (!elegibleVoters || elegibleVoters.length === 0) {
-      throw new Error('No elegible voters available for masking')
+    if (!eligibleVoters || eligibleVoters.length === 0) {
+      throw new Error('No eligible voters available for masking')
     }
 
-    const randomVoterToMask = getRandomVoterToMask(elegibleVoters)
+    try {
+      const randomVoterToMask = getRandomVoterToMask(eligibleVoters)
 
-    return {
-      vote: { yes: 0n, no: 0n },
-      slotAddress: randomVoterToMask.address,
-      balance: BigInt(randomVoterToMask.balance),
-      signature: '',
-      messageHash: '' as `0x${string}`,
+      return {
+        vote: { yes: 0n, no: 0n },
+        slotAddress: randomVoterToMask.address,
+        balance: BigInt(randomVoterToMask.balance),
+        signature: '',
+        messageHash: '' as `0x${string}`,
+      }
+    } catch (error) {
+      return {
+        vote: { yes: 0n, no: 0n },
+        slotAddress: '',
+        balance: 0n,
+        signature: '',
+        messageHash: '' as `0x${string}`,
+        error: (error as Error).message,
+      }
     }
-  }, [user, roundState, getElegibleVoters])
+  }, [user, roundState, getEligibleVoters])
 
   /**
    * Handles the voting process including signing the message.
@@ -160,7 +172,6 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         }
       } catch (error) {
         console.log('User rejected signature or signing failed', error)
-        showToast({ type: 'danger', message: 'Signature cancelled or failed.' })
         resetVotingState()
         return {
           signature: '',
@@ -172,7 +183,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         }
       }
     },
-    [roundState, signMessageAsync, showToast, resetVotingState],
+    [roundState, signMessageAsync, resetVotingState],
   )
 
   const castVoteWithProof = useCallback(
