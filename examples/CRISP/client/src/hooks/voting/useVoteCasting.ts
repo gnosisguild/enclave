@@ -69,7 +69,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const votingRound = customVotingRound ?? contextVotingRound
 
   const { signMessageAsync } = useSignMessage()
-  const { getEligibleVoters } = useEnclaveServer()
+  const { getEligibleVoters, getMerkleLeaves } = useEnclaveServer()
   const { showToast } = useNotificationAlertContext()
   const navigate = useNavigate()
   const [isVoting, setIsVoting] = useState<boolean>(false)
@@ -79,7 +79,15 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Vote, address: string, balance: bigint, signature: string, messageHash: `0x${string}`, isAMask: boolean) => {
+    async (
+      vote: Vote,
+      address: string,
+      balance: bigint,
+      signature: string,
+      messageHash: `0x${string}`,
+      isAMask: boolean,
+      merkleLeaves: bigint[],
+    ) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
       return generateProof(
         votingRound.round_id,
@@ -90,6 +98,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         signature,
         messageHash,
         isAMask,
+        merkleLeaves,
       )
     },
     [generateProof, votingRound],
@@ -223,6 +232,12 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
+        const merkleLeaves = await getMerkleLeaves(roundState.id)
+
+        if (merkleLeaves?.length === 0) {
+          throw new Error('No merkle leaves available for proof generation')
+        }
+
         const encodedProof = await handleProofGeneration(
           voteData.vote,
           voteData.slotAddress,
@@ -230,6 +245,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           voteData.signature,
           voteData.messageHash,
           isAMask,
+          merkleLeaves!.map((s: string) => BigInt(`0x${s}`)),
         )
 
         if (!encodedProof) {

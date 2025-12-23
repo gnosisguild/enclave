@@ -29,6 +29,7 @@ const EnclaveEndpoints = {
   BroadcastVote: `${ENCLAVE_API}/voting/broadcast`,
   GetVoteStatus: `${ENCLAVE_API}/voting/status`,
   GetEligibleVoters: `${ENCLAVE_API}/state/eligible-addresses`,
+  GetMerkleLeaves: `${ENCLAVE_API}/state/token-holders`,
 } as const
 
 export const useEnclaveServer = () => {
@@ -42,6 +43,8 @@ export const useEnclaveServer = () => {
   const getVoteStatus = (request: VoteStatusRequest) => fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
   const getEligibleVoters = (round_id: number) =>
     fetchData<EligibleVoter[], { round_id: number }>(EnclaveEndpoints.GetEligibleVoters, 'post', { round_id })
+  const getMerkleLeaves = (round_id: number) =>
+    fetchData<string[], { round_id: number }>(EnclaveEndpoints.GetMerkleLeaves, 'post', { round_id })
 
   return {
     isLoading,
@@ -52,5 +55,6 @@ export const useEnclaveServer = () => {
     broadcastVote,
     getVoteStatus,
     getEligibleVoters,
+    getMerkleLeaves,
   }
 }
