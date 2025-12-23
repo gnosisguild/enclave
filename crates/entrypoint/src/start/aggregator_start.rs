@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_ciphernode_builder::{get_enclave_bus_handle, CiphernodeBuilder};
+use e3_ciphernode_builder::{get_enclave_bus_handle, get_enclave_event_bus, CiphernodeBuilder};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
@@ -26,16 +26,14 @@ pub async fn execute(
     plaintext_write_path: Option<PathBuf>,
     experimental_trbfv: bool,
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
-    let bus = get_enclave_bus_handle(config)?;
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
     let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
-        .with_source_bus(bus.consumer())
+        .with_persistence(&config.log_file(), &config.db_file())
         .with_chains(&config.chains())
         .with_sortition_score()
         .with_contract_enclave_full()
         .with_contract_bonding_registry()
-        .with_persistence(&config.log_file(), &config.db_file())
         .with_contract_ciphernode_registry()
         .with_max_threads()
         .with_pubkey_aggregation();
@@ -50,6 +48,7 @@ pub async fn execute(
     let node = builder.build().await?;
     let store = node.store();
     let repositories = store.repositories();
+    let bus = node.bus.clone();
     let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
