@@ -19,7 +19,7 @@ type PollCardResultProps = {
   isActive?: boolean
 }
 const PollCardResult: React.FC<PollCardResultProps> = ({ isResult, results, totalVotes, isActive }) => {
-  const validVotes = results.filter((poll) => poll.votes.toString() !== '0').length
+  const validVotes = results.reduce((sum, poll) => sum + Number.parseInt(poll.votes.toString(), 10), 0)
 
   const calculatePercentage = (votes: number) => {
     return ((votes / validVotes) * 100).toFixed(0)
