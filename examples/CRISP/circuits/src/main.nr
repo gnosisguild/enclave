@@ -74,7 +74,7 @@ fn main(
     signature: [u8; 64],
     hashed_message: [u8; 32],
     // Merkle Tree Section.
-    merkle_root: Field, // todo: make this pub
+    merkle_root: pub Field, // todo: make this pub
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],

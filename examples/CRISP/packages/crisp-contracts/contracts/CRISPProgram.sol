@@ -53,6 +53,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error MerkleRootAlreadySet();
   error InvalidTallyLength();
   error SlotIsEmpty();
+  error MerkleRootNotSet();
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
@@ -123,8 +124,7 @@ contract CRISPProgram is IE3Program, Ownable {
     if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
-    // TODO: Uncomment this when we make the merkle root a public input of the circuit.
-    // if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
+    if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
 
     if (data.length == 0) revert EmptyInputData();
 
@@ -135,12 +135,13 @@ contract CRISPProgram is IE3Program, Ownable {
     (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slotAddress, voteBytes);
 
     // Set public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](2 + vote.length);
+    bytes32[] memory noirPublicInputs = new bytes32[](3 + vote.length);
 
-    noirPublicInputs[0] = bytes32(uint256(uint160(slotAddress)));
-    noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
+    noirPublicInputs[0] = bytes32(e3Data[e3Id].merkleRoot);
+    noirPublicInputs[1] = bytes32(uint256(uint160(slotAddress)));
+    noirPublicInputs[2] = bytes32(uint256(isFirstVote ? 1 : 0));
     for (uint256 i = 0; i < vote.length; i++) {
-      noirPublicInputs[i + 2] = vote[i];
+      noirPublicInputs[i + 3] = vote[i];
     }
 
     // Check if the ciphertext was encrypted correctly

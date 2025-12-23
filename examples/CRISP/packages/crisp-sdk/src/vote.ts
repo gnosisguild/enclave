@@ -280,8 +280,8 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
  * @returns The encoded proof data as a hex string.
  */
 export const encodeSolidityProof = (proof: ProofData): Hex => {
-  const vote = proof.publicInputs.slice(2) as `0x${string}`[]
-  const slotAddress = getAddress(numberToHex(BigInt(proof.publicInputs[0]), { size: 20 }))
+  const vote = proof.publicInputs.slice(3) as `0x${string}`[]
+  const slotAddress = getAddress(numberToHex(BigInt(proof.publicInputs[1]), { size: 20 }))
 
   return encodeAbiParameters(parseAbiParameters('bytes, bytes32[], address'), [bytesToHex(proof.proof), vote, slotAddress])
 }
