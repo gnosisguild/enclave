@@ -115,6 +115,7 @@ bs58 = "=0.5.1"
 base64 = "=0.22.1"
 clap = { version = "=4.5.41", features = ["derive"] }
 chrono = { version = "=0.4.41", features = ["serde"] }
+commitlog = "=0.2.0"
 compile-time = "=0.2.0"
 derivative = "=2.2.0"
 dirs = "=5.0.1"

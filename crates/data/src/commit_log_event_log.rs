@@ -24,17 +24,21 @@ impl CommitLogEventLog {
         let log = CommitLog::new(opts)?;
         Ok(Self { log })
     }
-}
 
-impl EventLog for CommitLogEventLog {
-    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
-        let bytes = bincode::serialize(event)?;
+    fn append_bytes(&mut self, bytes: &[u8]) -> Result<u64> {
         let offset = self
             .log
             .append_msg(&bytes)
             .context("Failed to append to event log")?;
         // Return 1-indexed sequence number
         Ok(offset + 1)
+    }
+}
+
+impl EventLog for CommitLogEventLog {
+    fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64> {
+        let bytes = bincode::serialize(event)?;
+        self.append_bytes(&bytes)
     }
 
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>> {
@@ -54,10 +58,10 @@ impl EventLog for CommitLogEventLog {
                 {
                     // Convert 0-indexed offset back to 1-indexed sequence number
                     events.push((msg.offset() + 1, event));
-                    current_offset = msg.offset() + 1; // Next offset to read from
                 } else {
                     error!("Error deserializing event in read_from... skipping");
                 }
+                current_offset = msg.offset() + 1; // Next offset to read from
                 count += 1;
             }
 
@@ -120,6 +124,22 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].0, 2);
         assert_eq!(events[1].0, 3);
+    }
+
+    #[test]
+    fn test_read_from_corruption_at_end_causes_infinite_loop() {
+        let dir = tempdir().unwrap();
+        let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
+
+        for i in 0..100 {
+            let e = event_from(TestEvent::new("myevent", i));
+            log.append(&e).unwrap();
+        }
+        // Corrupt the last message
+        log.append_bytes(b"I am a bad event!").unwrap();
+
+        // Ensure if last message is corrupt we don't end up in an infinite loop
+        let _: Vec<_> = log.read_from(1).collect();
     }
 
     #[test]
