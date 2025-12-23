@@ -161,7 +161,7 @@ export class ContractClient {
    * Activate an E3 computation
    * activate(uint256 e3Id, bytes memory publicKey)
    */
-  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
+  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, publicKeyHash: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
     }
@@ -180,7 +180,7 @@ export class ContractClient {
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
         functionName: 'activate',
-        args: [e3Id, publicKey],
+        args: [e3Id, publicKey, publicKeyHash],
         account,
         gas: gasLimit,
       })

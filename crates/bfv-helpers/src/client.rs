@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::build_bfv_params_arc;
+use crate::utils::greco::bfv_public_key_to_greco;
 use anyhow::{anyhow, Result};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
@@ -127,6 +128,33 @@ where
         encrypted_data: cipher_text.to_bytes(),
         circuit_inputs: standard_input_val.to_json().to_string(),
     })
+}
+
+pub fn compute_pk_commitment(
+    public_key: Vec<u8>,
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<[u8; 32]> {
+    use shared::commitments::compute_pk_commitment as compute_pk_commitment_shared;
+
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+
+    let public_key = PublicKey::from_bytes(&public_key, &params)
+        .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
+
+    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
+    let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+    let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
+    let commitment_bigint = compute_pk_commitment_shared(&pk0is, &pk1is, bit_pk);
+
+    let bytes = commitment_bigint.to_bytes_be().1;
+    let public_key_hash: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow!("Commitment must be exactly 32 bytes"))?;
+
+    Ok(public_key_hash)
 }
 
 #[cfg(test)]

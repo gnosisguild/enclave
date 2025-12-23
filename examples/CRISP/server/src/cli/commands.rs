@@ -12,10 +12,11 @@ use serde::{Deserialize, Serialize};
 
 use super::approve;
 use super::CLI_DB;
-use alloy::primitives::{Address, Bytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
+use e3_sdk::bfv_helpers::client::compute_pk_commitment;
 use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -207,7 +208,18 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
     .await?;
     let pk_bytes = Bytes::from(pk.to_bytes());
     let e3_id = U256::from(input_e3_id);
-    let res = contract.activate(e3_id, pk_bytes).await?;
+
+    let public_key_hash = compute_pk_commitment(
+        pk.to_bytes(),
+        params.degree(),
+        params.plaintext(),
+        params.moduli().to_vec(),
+    )
+    .map_err(|e| format!("Failed to compute PK commitment: {}", e))?;
+
+    let res = contract
+        .activate(e3_id, pk_bytes, FixedBytes::from(public_key_hash))
+        .await?;
     info!("E3 activated. TxHash: {:?}", res.transaction_hash);
 
     let e3_params = FHEParams {

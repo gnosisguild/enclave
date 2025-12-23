@@ -297,7 +297,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @inheritdoc IEnclave
     function activate(
         uint256 e3Id,
-        bytes calldata publicKey
+        bytes calldata publicKey,
+        bytes32 publicKeyHash
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
@@ -306,14 +307,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: handle what happens to the payment if the start window has passed.
         require(e3.startWindow[1] >= block.timestamp, E3Expired());
 
-        bytes32 publicKeyHash = ciphernodeRegistry.committeePublicKey(e3Id);
+        bytes32 registryPublicKeyHash = ciphernodeRegistry.committeePublicKey(
+            e3Id
+        );
         require(
-            keccak256(publicKey) == publicKeyHash,
+            publicKeyHash == registryPublicKeyHash,
             CommitteeSelectionFailed()
         );
         uint256 expiresAt = block.timestamp + e3.duration;
         e3s[e3Id].expiration = expiresAt;
-        e3s[e3Id].committeePublicKey = keccak256(publicKey);
+        e3s[e3Id].committeePublicKey = publicKeyHash;
 
         emit E3Activated(e3Id, expiresAt, publicKey);
 

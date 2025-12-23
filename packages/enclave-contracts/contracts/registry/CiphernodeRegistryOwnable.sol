@@ -239,10 +239,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param e3Id ID of the E3 computation
     /// @param nodes Array of ciphernode addresses selected for the committee
     /// @param publicKey Aggregated public key of the committee
+    /// @param publicKeyHash The hash of the public key
     function publishCommittee(
         uint256 e3Id,
         address[] calldata nodes,
-        bytes calldata publicKey
+        bytes calldata publicKey,
+        bytes32 publicKeyHash
     ) external onlyOwner {
         Committee storage c = committees[e3Id];
 
@@ -253,7 +255,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         // TODO: Currently we trust the owner to publish the correct committee.
         // TODO: Need a Proof that the public key is generated from the committee
-        bytes32 publicKeyHash = keccak256(publicKey);
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
         emit CommitteePublished(e3Id, nodes, publicKey);

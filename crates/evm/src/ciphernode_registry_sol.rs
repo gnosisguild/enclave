@@ -9,7 +9,7 @@ use crate::{
 };
 use actix::prelude::*;
 use alloy::{
-    primitives::{Address, Bytes, LogData, B256, U256},
+    primitives::{Address, Bytes, FixedBytes, LogData, B256, U256},
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
@@ -406,15 +406,22 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let pubkey = msg.pubkey.clone();
+        let public_key_hash = msg.public_key_hash.clone();
         let nodes = msg.nodes.clone();
         let contract_address = self.contract_address;
         let provider = self.provider.clone();
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            let result =
-                publish_committee_to_registry(provider, contract_address, e3_id, nodes, pubkey)
-                    .await;
+            let result = publish_committee_to_registry(
+                provider,
+                contract_address,
+                e3_id,
+                nodes,
+                pubkey,
+                public_key_hash,
+            )
+            .await;
             match result {
                 Ok(receipt) => {
                     info!(tx=%receipt.transaction_hash, "Committee published to registry");
@@ -483,10 +490,12 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
     e3_id: E3id,
     nodes: OrderedSet<String>,
     public_key: Vec<u8>,
+    public_key_hash: [u8; 32],
 ) -> Result<TransactionReceipt> {
     info!("Calling: contract.publishCommittee(..)");
     let e3_id: U256 = e3_id.try_into()?;
     let public_key = Bytes::from(public_key);
+    let public_key_hash = FixedBytes::from(public_key_hash);
     let nodes_vec: Vec<Address> = nodes
         .into_iter()
         .filter_map(|node| node.parse().ok())
@@ -499,7 +508,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
         .await?;
     let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
     let builder = contract
-        .publishCommittee(e3_id, nodes_vec, public_key)
+        .publishCommittee(e3_id, nodes_vec, public_key, public_key_hash)
         .nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)

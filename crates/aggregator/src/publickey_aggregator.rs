@@ -6,6 +6,7 @@
 
 use actix::prelude::*;
 use anyhow::Result;
+use e3_bfv_helpers::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
@@ -181,6 +182,13 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
             keyshares: msg.keyshares,
         })?;
 
+        let public_key_hash = compute_pk_commitment(
+            pubkey.clone(),
+            self.fhe.params.degree(),
+            self.fhe.params.plaintext(),
+            self.fhe.params.moduli().to_vec(),
+        )?;
+
         // Update the local state
         self.set_pubkey(pubkey)?;
 
@@ -194,6 +202,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
             info!("Sending PublicKeyAggregated...");
             let event = PublicKeyAggregated {
                 pubkey,
+                public_key_hash,
                 e3_id: msg.e3_id,
                 nodes,
             };
