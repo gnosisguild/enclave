@@ -239,7 +239,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         const voteRequest: BroadcastVoteRequest = {
           round_id: roundState.id,
           encoded_proof: encodedProof,
-          address: user.address,
+          address: voteData.slotAddress,
         }
 
         const broadcastVoteResponse = await broadcastVote(voteRequest)

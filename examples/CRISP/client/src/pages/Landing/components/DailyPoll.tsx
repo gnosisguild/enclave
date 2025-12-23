@@ -119,8 +119,8 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
               <CountdownTimer endTime={endTime} />
             </div>
           )}
-          {isCastingVote && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
-          {loading && !isCastingVote && <LoadingAnimation isLoading={loading} />}
+          {(isCastingVote || isMasking) && <VotingStepIndicator step={votingStep} message={stepMessage} lastActiveStep={lastActiveStep} />}
+          {loading && !isCastingVote && !isMasking && <LoadingAnimation isLoading={loading} />}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (
               <div data-test-id={`poll-button-${poll.value}`} key={poll.label} className='col-span-2 md:col-span-1'>

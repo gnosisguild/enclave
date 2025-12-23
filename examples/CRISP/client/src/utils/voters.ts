@@ -14,5 +14,6 @@ import { ElegibleVoter } from '@/model/vote.model'
 export const getRandomVoterToMask = (voters: ElegibleVoter[]): ElegibleVoter => {
   const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % voters.length
 
+  console.log(`Selected random voter at index: ${voters[randomIndex].address}`)
   return voters[randomIndex]
 }
