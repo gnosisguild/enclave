@@ -46,6 +46,7 @@ export type VoteManagementContextType = {
     signature: string,
     messageHash: `0x${string}`,
     isMasking: boolean,
+    merkleLeaves: bigint[],
   ) => Promise<string | undefined>
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>

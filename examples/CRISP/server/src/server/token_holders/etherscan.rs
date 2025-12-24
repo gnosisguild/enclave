@@ -4,15 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::CONFIG;
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
 use eyre::{eyre, Context, Result}; // Add this import
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use std::collections::{HashMap, HashSet};
 use tokio::time::{sleep, Duration};
+use crate::server::{
+    CONFIG,
+    models::TokenHolder
+};
 
 // Define the Votes contract interface for getPastVotes
 sol! {
@@ -27,14 +30,6 @@ sol! {
 // Config
 pub const ETHERSCAN_API_URL: &str = "https://api.etherscan.io/v2/api";
 const ZERO_ADDRESS: Address = Address::ZERO;
-
-/// Represents a token holder with their address and balance.
-/// Balance is stored as a string to preserve precision for large numbers.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct TokenHolder {
-    pub address: String,
-    pub balance: String,
-}
 
 // Response types
 #[derive(Debug, Deserialize)]
@@ -578,43 +573,43 @@ impl EtherscanClient {
 pub fn get_mock_token_holders() -> Vec<TokenHolder> {
     vec![
         TokenHolder {
-            address: "0x1234567890123456789012345678901234567890".to_string(),
-            balance: "1000".to_string(),
+            address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x2345678901234567890123456789012345678901".to_string(),
-            balance: "500".to_string(),
+            address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x3456789012345678901234567890123456789012".to_string(),
-            balance: "250".to_string(),
+            address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x4567890123456789012345678901234567890123".to_string(),
-            balance: "100".to_string(),
+            address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x5678901234567890123456789012345678901234".to_string(),
-            balance: "75".to_string(),
+            address: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x6789012345678901234567890123456789012345".to_string(),
-            balance: "50".to_string(),
+            address: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x7890123456789012345678901234567890123456".to_string(),
-            balance: "25".to_string(),
+            address: "0x976EA74026E726554dB657fA54763abd0C3a0aa9".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x8901234567890123456789012345678901234567".to_string(),
-            balance: "10".to_string(),
+            address: "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x9012345678901234567890123456789012345678".to_string(),
-            balance: "5".to_string(),
+            address: "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x0123456789012345678901234567890123456789".to_string(),
+            address: "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720".to_string(),
             balance: "1".to_string(),
         },
     ]

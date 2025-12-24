@@ -37,6 +37,7 @@ export const useSDKWorkerHook = () => {
     signature: string,
     messageHash: `0x${string}`,
     isMasking: boolean,
+    merkleLeaves: bigint[],
   ): Promise<string | undefined> => {
     if (!workerRef.current) {
       console.error('Worker not initialized')
@@ -48,7 +49,7 @@ export const useSDKWorkerHook = () => {
 
       workerRef.current!.postMessage({
         type: 'generate_proof',
-        data: { e3Id, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API },
+        data: { e3Id, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API, merkleLeaves },
       })
       workerRef.current!.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data
