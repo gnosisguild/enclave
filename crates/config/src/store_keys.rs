@@ -72,4 +72,8 @@ impl StoreKeys {
     pub fn finalized_committees() -> String {
         String::from("//finalized_committees")
     }
+
+    pub fn ciphernode_selector() -> String {
+        String::from("//ciphernode_selector")
+    }
 }

@@ -7,10 +7,7 @@
 use crate::Cid;
 use actix::Message;
 use anyhow::{bail, Context, Result};
-use e3_events::{
-    CorrelationId, DocumentMeta, EnclaveEvent, EventConstructorWithTimestamp, Sequenced,
-    Unsequenced,
-};
+use e3_events::{CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
 use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},

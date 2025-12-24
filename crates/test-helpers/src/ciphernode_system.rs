@@ -196,8 +196,9 @@ impl Deref for CiphernodeHistory {
 mod tests {
     use super::*;
     use actix::prelude::*;
+    use e3_ciphernode_builder::EventSystem;
     use e3_data::InMemStore;
-    use e3_events::{BusHandle, EventBus, EventBusConfig};
+    use e3_events::{EventBus, EventBusConfig};
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -205,7 +206,7 @@ mod tests {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
-        let bus = BusHandle::new_from_consumer(bus);
+        let bus = EventSystem::new("test").with_event_bus(bus).handle()?;
 
         Ok(CiphernodeHandle {
             address,

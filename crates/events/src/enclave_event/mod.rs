@@ -46,6 +46,7 @@ pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
+use e3_utils::{colorize, Color};
 pub use enclave_error::*;
 pub use keyshare_created::*;
 pub use operator_activation_changed::*;
@@ -345,7 +346,8 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
 
 impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{:?}", self))
+        let t = self.event_type();
+        f.write_str(&format!("{} {:?}", colorize(t, Color::Cyan), self))
     }
 }
 

@@ -57,3 +57,11 @@ impl<'a> IntoKey for &'a str {
         self.as_bytes().to_vec()
     }
 }
+
+/// Keys can be u128
+impl IntoKey for u128 {
+    fn into_key(self) -> Vec<u8> {
+        // Ensuring big endian for ordering
+        self.to_be_bytes().to_vec()
+    }
+}

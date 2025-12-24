@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertSync, Remove};
+use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
@@ -55,6 +55,10 @@ impl InMemStore {
     }
 }
 
+// Add a BatchInsert event that contains multiple Insert messages
+// Use the Responder pattern to manage the response
+// Have a proxy actor hold the Inserts until the BatchInsert event is called
+
 impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
@@ -63,6 +67,18 @@ impl Handler<Insert> for InMemStore {
 
         if self.capture {
             self.log.push(DataOp::Insert(event));
+        }
+    }
+}
+
+impl Handler<InsertBatch> for InMemStore {
+    type Result = ();
+    fn handle(&mut self, msg: InsertBatch, _: &mut Self::Context) -> Self::Result {
+        for cmd in msg.commands() {
+            self.db.insert(cmd.key().to_owned(), cmd.value().to_owned());
+            if self.capture {
+                self.log.push(DataOp::Insert(cmd.clone()));
+            }
         }
     }
 }
@@ -95,7 +111,8 @@ impl Handler<Get> for InMemStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
         let key = event.key();
-        self.db.get(key).cloned()
+        let r = self.db.get(key);
+        r.cloned()
     }
 }
 
