@@ -10,9 +10,10 @@ use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare,
-    ThresholdShareCollectionFailed, ThresholdShareCreated,
+    ComputeResponse, DecryptionshareCreated, Die, E3RequestComplete, E3id, EnclaveEvent,
+    EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated,
+    KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCollectionFailed,
+    ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -949,6 +950,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             EnclaveEventData::EncryptionKeyCreated(data) => {
                 let _ = self.handle_encryption_key_created(data, ctx.address());
             }
+            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
             _ => (),
         }
     }
@@ -1063,6 +1065,23 @@ impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
             error!("Failed to publish ThresholdShareCollectionFailed: {}", e);
         }
 
+        ctx.stop();
+    }
+}
+
+impl Handler<E3RequestComplete> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(&mut self, _: E3RequestComplete, ctx: &mut Self::Context) -> Self::Result {
+        self.encryption_key_collector = None;
+        self.decryption_key_collector = None;
+        ctx.notify(Die);
+    }
+}
+
+impl Handler<Die> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        warn!("ThresholdKeyshare is shutting down");
         ctx.stop();
     }
 }
