@@ -7,9 +7,12 @@
 use std::str::FromStr;
 
 use crate::server::{
-    CONFIG, app_data::AppData, models::{
-        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest, PreviousCiphertextResponse, WebhookPayload
-    }
+    app_data::AppData,
+    models::{
+        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest,
+        PreviousCiphertextResponse, WebhookPayload,
+    },
+    CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -30,6 +33,10 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route("/add-result", web::post().to(handle_program_server_result))
             // Get the token holders hashes for a given round
             .route("/token-holders", web::post().to(get_token_holders_hashes))
+            .route(
+                "/eligible-addresses",
+                web::post().to(handle_get_eligible_addresses),
+            )
             .route(
                 "/previous-ciphertext",
                 web::post().to(handle_get_previous_ciphertext),
@@ -283,9 +290,7 @@ async fn get_token_holders_hashes(
 /// Check if a slot is empty given an address
 /// # Arguments
 /// * `IsSlotEmptyRequest` - The request containing round_id and address
-async fn handle_is_slot_empty(
-    data: web::Json<IsSlotEmptyRequest>,
-) -> impl Responder {
+async fn handle_is_slot_empty(data: web::Json<IsSlotEmptyRequest>) -> impl Responder {
     let incoming = data.into_inner();
 
     let contract =
@@ -314,10 +319,29 @@ async fn handle_is_slot_empty(
         Ok(empty) => empty,
         Err(e) => {
             error!("Error checking if slot is empty: {:?}", e);
-            return HttpResponse::InternalServerError()
-                .body("Failed to check if slot is empty");
+            return HttpResponse::InternalServerError().body("Failed to check if slot is empty");
         }
     };
 
-    HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty } )
+    HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty })
+}
+
+/// Get the eligible addresses for a given round
+/// # Arguments
+/// * `GetRoundRequest` - The request data containing the round ID
+/// # Returns
+/// * A JSON response containing the list of eligible addresses and their balances
+async fn handle_get_eligible_addresses(
+    data: web::Json<GetRoundRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    match store.e3(incoming.round_id).get_eligible_addresses().await {
+        Ok(addresses) => HttpResponse::Ok().json(addresses),
+        Err(e) => {
+            error!("Error getting eligible addresses: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get eligible addresses")
+        }
+    }
 }

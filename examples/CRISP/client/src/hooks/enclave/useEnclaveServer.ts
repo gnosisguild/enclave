@@ -9,6 +9,7 @@ import {
   BroadcastVoteRequest,
   BroadcastVoteResponse,
   CurrentRound,
+  EligibleVoter,
   VoteStateLite,
   VoteStatusRequest,
   VoteStatusResponse,
@@ -27,6 +28,7 @@ const EnclaveEndpoints = {
   GetWebAllResult: `${ENCLAVE_API}/state/all`,
   BroadcastVote: `${ENCLAVE_API}/voting/broadcast`,
   GetVoteStatus: `${ENCLAVE_API}/voting/status`,
+  GetEligibleVoters: `${ENCLAVE_API}/state/eligible-addresses`,
 } as const
 
 export const useEnclaveServer = () => {
@@ -38,6 +40,8 @@ export const useEnclaveServer = () => {
   const getWebResult = () => fetchData<PollRequestResult[], void>(GetWebAllResult, 'get')
   const getWebResultByRound = (round_id: number) => fetchData<PollRequestResult, { round_id: number }>(GetWebResult, 'post', { round_id })
   const getVoteStatus = (request: VoteStatusRequest) => fetchData<VoteStatusResponse, VoteStatusRequest>(GetVoteStatus, 'post', request)
+  const getEligibleVoters = (round_id: number) =>
+    fetchData<EligibleVoter[], { round_id: number }>(EnclaveEndpoints.GetEligibleVoters, 'post', { round_id })
 
   return {
     isLoading,
@@ -47,5 +51,6 @@ export const useEnclaveServer = () => {
     getRoundStateLite,
     broadcastVote,
     getVoteStatus,
+    getEligibleVoters,
   }
 }
