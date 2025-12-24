@@ -375,7 +375,18 @@ impl ThresholdKeyshare {
         msg: ThresholdShareCreated,
         self_addr: Addr<Self>,
     ) -> Result<()> {
-        info!("Received ThresholdShareCreated forwarding to collector!");
+        let state = self.state.try_get()?;
+        let my_party_id = state.party_id;
+
+        // Filter: only process shares intended for this party
+        if msg.target_party_id != my_party_id {
+            return Ok(());
+        }
+
+        info!(
+            "Received ThresholdShareCreated from party {} for us (party {}), forwarding to collector!",
+            msg.share.party_id, my_party_id
+        );
         let collector = self.ensure_collector(self_addr)?;
         info!("got collector address!");
         collector.do_send(msg);
@@ -669,16 +680,36 @@ impl ThresholdKeyshare {
             .map(|esi| BfvEncryptedShares::encrypt_all(esi, &recipient_pks, &params, &mut rng))
             .collect::<Result<_>>()?;
 
-        self.bus.publish(ThresholdShareCreated {
-            e3_id,
-            share: Arc::new(ThresholdShare {
-                party_id,
-                pk_share,
-                sk_sss: encrypted_sk_sss,
-                esi_sss: encrypted_esi_sss,
-            }),
-            external: false,
-        })?;
+        // Create the full share with all parties' encrypted data
+        let full_share = ThresholdShare {
+            party_id,
+            pk_share,
+            sk_sss: encrypted_sk_sss,
+            esi_sss: encrypted_esi_sss,
+        };
+
+        // Domain-level splitting: publish one ThresholdShareCreated per recipient party
+        // Each party only receives the share data meant for them
+        let num_parties = full_share.num_parties();
+        info!(
+            "Publishing ThresholdShare for E3 {} to {} parties",
+            e3_id, num_parties
+        );
+
+        for recipient_party_id in 0..num_parties {
+            let party_share = full_share
+                .extract_for_party(recipient_party_id)
+                .ok_or_else(|| {
+                    anyhow!("Failed to extract share for party {}", recipient_party_id)
+                })?;
+
+            self.bus.publish(ThresholdShareCreated {
+                e3_id: e3_id.clone(),
+                share: Arc::new(party_share),
+                target_party_id: recipient_party_id as u64,
+                external: false,
+            })?;
+        }
 
         Ok(())
     }

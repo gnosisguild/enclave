@@ -62,6 +62,7 @@ impl ThresholdShare {
 pub struct ThresholdShareCreated {
     pub e3_id: E3id,
     pub share: Arc<ThresholdShare>,
+    pub target_party_id: u64,
     pub external: bool,
 }
 

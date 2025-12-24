@@ -432,40 +432,24 @@ impl EventConverter {
         Ok(())
     }
 
-    /// Local node created a threshold share. Send it as a published document.
-    /// Uses party-filtered distribution: each party only receives their specific shares.
+    /// Local node created a threshold share (already split per-party by ThresholdKeyshare).
+    /// Publishes the single-party document with appropriate filter.
     pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
         if msg.external {
             return Ok(());
         }
-
-        let e3_id = msg.e3_id.clone();
-        let num_parties = msg.share.num_parties();
+        let target_party_id = msg.target_party_id;
 
         info!(
-            "Publishing ThresholdShare for E3 {} ({} parties)",
-            e3_id, num_parties
+            "Publishing ThresholdShare from party {} for target party {} (E3 {})",
+            msg.share.party_id, target_party_id, msg.e3_id
         );
 
-        // Publish party-filtered shares - each party gets only their share
-        for party_id in 0..num_parties {
-            let party_share = msg
-                .share
-                .extract_for_party(party_id)
-                .ok_or_else(|| anyhow::anyhow!("Failed to extract share for party {}", party_id))?;
-
-            let party_msg = ThresholdShareCreated {
-                e3_id: e3_id.clone(),
-                share: Arc::new(party_share),
-                external: false,
-            };
-
-            self.publish_filtered(
-                ReceivableDocument::ThresholdShareCreated(party_msg),
-                &e3_id,
-                party_id as u64,
-            )?;
-        }
+        self.publish_filtered(
+            ReceivableDocument::ThresholdShareCreated(msg.clone()),
+            &msg.e3_id,
+            target_party_id,
+        )?;
 
         Ok(())
     }
@@ -489,13 +473,14 @@ impl EventConverter {
         match receivable {
             ReceivableDocument::ThresholdShareCreated(evt) => {
                 debug!(
-                    "Received ThresholdShareCreated from party {}",
-                    evt.share.party_id
+                    "Received ThresholdShareCreated from party {} for target party {}",
+                    evt.share.party_id, evt.target_party_id
                 );
                 self.bus.publish(ThresholdShareCreated {
                     external: true,
                     e3_id: evt.e3_id,
                     share: evt.share,
+                    target_party_id: evt.target_party_id,
                 })?;
             }
             ReceivableDocument::EncryptionKeyCreated(evt) => {
