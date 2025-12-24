@@ -136,7 +136,8 @@ pub fn compute_pk_commitment(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<[u8; 32]> {
-    use shared::commitments::compute_pk_commitment as compute_pk_commitment_shared;
+    use shared::commitments::compute_pk_commitment as _compute_pk_commitment;
+    use shared::template::calculate_bit_width;
 
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
@@ -144,10 +145,10 @@ pub fn compute_pk_commitment(
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
 
     let (_, bounds) = GrecoBounds::compute(&params, 0)?;
-    let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+    let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-    let commitment_bigint = compute_pk_commitment_shared(&pk0is, &pk1is, bit_pk);
+    let commitment_bigint = _compute_pk_commitment(&pk0is, &pk1is, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
     let public_key_hash: [u8; 32] = bytes
