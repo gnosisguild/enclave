@@ -15,6 +15,7 @@ members = [
   "crates/evm-helpers",
   "crates/fhe",
   "crates/fs", 
+  "crates/hamt", 
   "crates/indexer",
   "crates/init", 
   "crates/keyshare",
