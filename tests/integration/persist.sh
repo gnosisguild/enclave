@@ -65,8 +65,6 @@ pnpm committee:new \
   --threshold-total 5
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
-PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
-
 
 # kill aggregator
 enclave_nodes_stop ag
@@ -83,9 +81,7 @@ $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output
 
 heading "Mock activate e3-id"
 
-PUBLIC_KEY_FILE=/tmp/enclave-public-key.txt
-echo "0x${PUBLIC_KEY}" > $PUBLIC_KEY_FILE
-pnpm -s e3:activate --e3-id 0 --network localhost --public-key-file $PUBLIC_KEY_FILE
+pnpm -s e3:activate --e3-id 0 --network localhost
 
 heading "Mock publish input e3-id"
 pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678

@@ -41,7 +41,8 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function publishCommittee(
         uint256,
         address[] calldata,
-        bytes calldata
+        bytes calldata,
+        bytes32
     ) external pure {} // solhint-disable-line no-empty-blocks
 
     function getCommitteeNodes(
@@ -88,6 +89,8 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
+    error CommitteeNotPublished();
+
     function requestCommittee(
         uint256,
         uint256,
@@ -101,7 +104,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     }
 
     function committeePublicKey(uint256) external pure returns (bytes32) {
-        return bytes32(0);
+        revert CommitteeNotPublished();
     }
 
     function isCiphernodeEligible(address) external pure returns (bool) {
@@ -117,7 +120,8 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function publishCommittee(
         uint256,
         address[] calldata,
-        bytes calldata
+        bytes calldata,
+        bytes32
     ) external pure {} // solhint-disable-line no-empty-blocks
 
     function getCommitteeNodes(

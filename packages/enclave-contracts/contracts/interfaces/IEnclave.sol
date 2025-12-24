@@ -27,11 +27,11 @@ interface IEnclave {
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
     /// @param e3Id ID of the E3.
     /// @param expiration Timestamp when committee duties expire.
-    /// @param committeePublicKey Public key of the committee.
+    /// @param committeePublicKey Hash of the public key of the committee.
     event E3Activated(
         uint256 e3Id,
         uint256 expiration,
-        bytes committeePublicKey
+        bytes32 committeePublicKey
     );
 
     /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is
@@ -151,12 +151,8 @@ interface IEnclave {
     /// @dev This function MUST revert if the given E3 has not yet been requested.
     /// @dev This function MUST revert if the selected node committee has not yet published a public key.
     /// @param e3Id ID of the E3.
-    /// @param publicKey Public key of the committee.
     /// @return success True if the E3 was successfully activated.
-    function activate(
-        uint256 e3Id,
-        bytes calldata publicKey
-    ) external returns (bool success);
+    function activate(uint256 e3Id) external returns (bool success);
 
     /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the E3 is not yet activated.

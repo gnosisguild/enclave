@@ -53,7 +53,7 @@ fn main(
     sum_r1is: [Polynomial<512>; 2],
     // Greco Section.
     params: Params<512, 2>, // todo: make this pub
-    pk_commitment: Field, // todo: make this pub
+    pk_commitment: pub Field,
     pk0is: [Polynomial<512>; 2],
     pk1is: [Polynomial<512>; 2],
     ct0is: [Polynomial<512>; 2],

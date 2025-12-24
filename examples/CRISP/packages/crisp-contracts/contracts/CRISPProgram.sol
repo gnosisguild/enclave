@@ -135,13 +135,17 @@ contract CRISPProgram is IE3Program, Ownable {
     (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slotAddress, voteBytes);
 
     // Set public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](3 + vote.length);
+    bytes32[] memory noirPublicInputs = new bytes32[](4 + vote.length);
 
-    noirPublicInputs[0] = bytes32(e3Data[e3Id].merkleRoot);
-    noirPublicInputs[1] = bytes32(uint256(uint160(slotAddress)));
-    noirPublicInputs[2] = bytes32(uint256(isFirstVote ? 1 : 0));
+    // Fetch E3 to get committee public key
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    noirPublicInputs[0] = e3.committeePublicKey;
+    noirPublicInputs[1] = bytes32(e3Data[e3Id].merkleRoot);
+    noirPublicInputs[2] = bytes32(uint256(uint160(slotAddress)));
+    noirPublicInputs[3] = bytes32(uint256(isFirstVote ? 1 : 0));
     for (uint256 i = 0; i < vote.length; i++) {
-      noirPublicInputs[i + 3] = vote[i];
+      noirPublicInputs[i + 4] = vote[i];
     }
 
     // Check if the ciphertext was encrypted correctly

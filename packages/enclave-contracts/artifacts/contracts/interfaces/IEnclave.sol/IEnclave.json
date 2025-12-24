@@ -78,9 +78,9 @@
         },
         {
           "indexed": false,
-          "internalType": "bytes",
+          "internalType": "bytes32",
           "name": "committeePublicKey",
-          "type": "bytes"
+          "type": "bytes32"
         }
       ],
       "name": "E3Activated",
@@ -342,11 +342,6 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "publicKey",
-          "type": "bytes"
         }
       ],
       "name": "activate",
@@ -415,6 +410,19 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feeToken",
+      "outputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -924,5 +932,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-15da934c0854938352efc3fea207d9956917d5c6"
+  "buildInfoId": "solc-0_8_28-88174d36ce3bdcc25dc9fa934311dccaec8cde55"
 }

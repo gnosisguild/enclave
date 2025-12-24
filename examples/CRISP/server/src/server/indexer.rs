@@ -358,7 +358,7 @@ async fn handle_committee_time_expired(
     ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
 ) -> eyre::Result<()> {
     // If not activated activate
-    let tx = ctx.contract().activate(event.e3Id, event.publicKey).await?;
+    let tx = ctx.contract().activate(event.e3Id).await?;
     info!(
         "[e3_id={}] E3 activated with tx: {:?}",
         event.e3Id, tx.transaction_hash

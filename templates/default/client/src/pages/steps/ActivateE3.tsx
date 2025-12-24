@@ -71,7 +71,7 @@ const ActivateE3: React.FC = () => {
     setRequestError(null)
 
     try {
-      const hash = await activateE3(e3State.id, e3State.publicKey)
+      const hash = await activateE3(e3State.id)
       setLocalTransactionHash(hash)
       setLastTransactionHash(hash)
       setRequestSuccess(true)
