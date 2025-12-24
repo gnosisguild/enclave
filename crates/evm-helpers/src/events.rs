@@ -10,7 +10,7 @@ use alloy::sol;
 
 sol! {
     #[derive(Debug)]
-    event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
+    event E3Activated(uint256 e3Id, uint256 expiration, bytes32 committeePublicKey);
 
     #[derive(Debug)]
     event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
