@@ -7,7 +7,7 @@
 use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
-use e3_trbfv::shares::{PvwEncrypted, SharedSecret};
+use e3_trbfv::shares::BfvEncryptedShares;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,22 +15,46 @@ use std::{
     sync::Arc,
 };
 
-/// Type Representing Pvw encrypted bytes
-pub type PvwBytes = Vec<u8>;
-
-/// PVW encrypted shares list for a party in the DKG
+/// BFV-encrypted shares list for a party in the DKG.
+///
+/// Each party broadcasts their encrypted shares to all other parties.
+/// Each recipient can only decrypt the share meant for them using their
+/// BFV secret key.
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ThresholdShare {
-    /// The publishers party_id
+    /// The publisher's party_id
     pub party_id: u64,
-    /// The publishers public key share
+    /// The publisher's TrBFV public key share
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk_share: ArcBytes,
-    /// PVW encrypted sk_sss list with index determining party_id
-    pub sk_sss: PvwEncrypted<SharedSecret>,
-    /// PVW encrypted esi_sss list with index determining party_id
-    pub esi_sss: Vec<PvwEncrypted<SharedSecret>>,
+    /// BFV-encrypted sk_sss - each recipient can decrypt their share
+    pub sk_sss: BfvEncryptedShares,
+    /// BFV-encrypted esi_sss - one per secret key (sk), each recipient can decrypt their share
+    pub esi_sss: Vec<BfvEncryptedShares>,
+}
+
+impl ThresholdShare {
+    /// Extract only the shares meant for a specific party.
+    pub fn extract_for_party(&self, recipient_party_id: usize) -> Option<Self> {
+        let sk_sss = self.sk_sss.extract_for_party(recipient_party_id)?;
+        let esi_sss: Option<Vec<_>> = self
+            .esi_sss
+            .iter()
+            .map(|shares| shares.extract_for_party(recipient_party_id))
+            .collect();
+
+        esi_sss.map(|esi_sss| Self {
+            party_id: self.party_id,
+            pk_share: self.pk_share.clone(),
+            sk_sss,
+            esi_sss,
+        })
+    }
+
+    pub fn num_parties(&self) -> usize {
+        self.sk_sss.len()
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -38,6 +62,7 @@ pub struct ThresholdShare {
 pub struct ThresholdShareCreated {
     pub e3_id: E3id,
     pub share: Arc<ThresholdShare>,
+    pub target_party_id: u64,
     pub external: bool,
 }
 

@@ -6,20 +6,48 @@
 
 use crate::shares::ShamirShare;
 use anyhow::Result;
+use e3_bfv_helpers::BfvParamSets;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::mbfv::PublicKeyShare;
 use fhe::{
-    bfv::{self, BfvParameters},
+    bfv::{self, BfvParameters, SecretKey},
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
 use fhe_math::rq::Poly;
 use fhe_traits::{DeserializeWithContext, Serialize};
 use num_bigint::BigUint;
 use petname::Petnames;
+use serde::{Deserialize as SerdeDeserialize, Serialize as SerdeSerialize};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
 };
+
+/// Simple serialization wrapper for SecretKey coefficients.
+#[derive(SerdeSerialize, SerdeDeserialize)]
+struct SecretKeyData {
+    coeffs: Box<[i64]>,
+}
+
+/// Serialize a BFV SecretKey to bytes.
+pub fn serialize_secret_key(sk: &SecretKey) -> Result<Vec<u8>> {
+    let data = SecretKeyData {
+        coeffs: sk.coeffs.clone(),
+    };
+    Ok(bincode::serialize(&data)?)
+}
+
+/// Deserialize a BFV SecretKey from bytes.
+pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Result<SecretKey> {
+    let data: SecretKeyData = bincode::deserialize(bytes)?;
+    Ok(SecretKey::new(data.coeffs.to_vec(), params))
+}
+
+/// TODO: Make this modular
+pub fn get_share_encryption_params() -> Arc<BfvParameters> {
+    let param_set: e3_bfv_helpers::BfvParamSet = BfvParamSets::Set8192_144115188075855872_2.into();
+    param_set.build_arc()
+}
 
 pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly> {
     Ok(Poly::from_bytes(bytes, params.ctx_at_level(0)?)?)

@@ -11,7 +11,7 @@ use std::fmt::{self, Display};
 use actix::Message;
 use chrono::{serde::ts_seconds, DateTime, Duration, Utc};
 use e3_utils::ArcBytes;
-use filter::Filter;
+pub use filter::Filter;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 

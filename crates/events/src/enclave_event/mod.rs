@@ -19,6 +19,8 @@ mod die;
 mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
+mod encryption_key_collection_failed;
+mod encryption_key_created;
 mod keyshare_created;
 mod operator_activation_changed;
 mod plaintext_aggregated;
@@ -27,6 +29,7 @@ mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
 mod test_event;
+mod threshold_share_collection_failed;
 mod threshold_share_created;
 mod ticket_balance_updated;
 mod ticket_generated;
@@ -47,6 +50,8 @@ pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use enclave_error::*;
+pub use encryption_key_collection_failed::*;
+pub use encryption_key_created::*;
 pub use keyshare_created::*;
 pub use operator_activation_changed::*;
 pub use plaintext_aggregated::*;
@@ -56,6 +61,7 @@ pub use publish_document::*;
 pub use shutdown::*;
 use strum::IntoStaticStr;
 pub use test_event::*;
+pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
@@ -112,6 +118,9 @@ pub enum EnclaveEventData {
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
+    EncryptionKeyCreated(EncryptionKeyCreated),
+    EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
+    ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -291,6 +300,7 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::CommitteeFinalized(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -322,7 +332,10 @@ impl_into_event_data!(
     Shutdown,
     TestEvent,
     DocumentReceived,
-    ThresholdShareCreated
+    ThresholdShareCreated,
+    EncryptionKeyCreated,
+    EncryptionKeyCollectionFailed,
+    ThresholdShareCollectionFailed
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
