@@ -452,6 +452,9 @@ importers:
       '@enclave-e3/config':
         specifier: workspace:*
         version: link:../enclave-config
+      '@enclave-e3/wasm':
+        specifier: workspace:*
+        version: link:../../crates/wasm
       '@nomicfoundation/hardhat-ethers':
         specifier: '4'
         version: 4.0.3(bufferutil@4.0.9)(hardhat@3.0.11(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)

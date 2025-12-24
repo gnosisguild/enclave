@@ -3,6 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import { compute_pk_commitment, get_bfv_params } from "@enclave-e3/wasm";
 import { ZeroAddress, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
@@ -324,14 +325,21 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     defaultValue: "",
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "bfvParams",
+    description: "BFV parameters for the scheme",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
-    default: async ({ e3Id, publicKey: publicKeyArg, publicKeyFile }, hre) => {
+    default: async (
+      { e3Id, publicKey: publicKeyArg, publicKeyFile, bfvParams },
+      hre,
+    ) => {
       const publicKey =
         publicKeyArg ||
         (publicKeyFile ? fs.readFileSync(publicKeyFile, "utf8").trim() : "") ||
         process.env.PUBLIC_KEY;
-      const connection = await hre.network.connect();
-      const { ethers } = connection;
 
       if (!publicKey) throw new Error("No public key provided!");
 
@@ -343,7 +351,14 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
         hre,
       });
 
-      const publicKeyHash = ethers.id(publicKey);
+      const params = get_bfv_params(bfvParams);
+      const publicKeyHash = await compute_pk_commitment(
+        new Uint8Array(Buffer.from(publicKey, "hex")),
+        params.degree,
+        params.plaintextModulus,
+        params.moduli,
+      );
+
       const tx = await enclave.activate(e3Id, publicKey, publicKeyHash);
 
       console.log("Activating E3 program... ", tx.hash);
