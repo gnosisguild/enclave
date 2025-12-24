@@ -28,11 +28,11 @@ enclave nodes up -v &
 
 sleep 2
 
-CN1=$(cat ./enclave.config.yaml | yq -r '.nodes.cn1.address')
-CN2=$(cat ./enclave.config.yaml | yq -r '.nodes.cn2.address')
-CN3=$(cat ./enclave.config.yaml | yq -r '.nodes.cn3.address')
-CN4=$(cat ./enclave.config.yaml | yq -r '.nodes.cn4.address')
-CN5=$(cat ./enclave.config.yaml | yq -r '.nodes.cn5.address')
+CN1=$(grep -A 1 'cn1:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN2=$(grep -A 1 'cn2:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN3=$(grep -A 1 'cn3:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN4=$(grep -A 1 'cn4:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN5=$(grep -A 1 'cn5:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
 
 # Add ciphernodes using variables from config.sh
 pnpm ciphernode:add --ciphernode-address "$CN1" --network "localhost"
