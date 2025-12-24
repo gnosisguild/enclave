@@ -37,7 +37,7 @@ sol!(
 async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
     const THRESHOLD: u64 = 10;
-    const INDEXER_DELAY_MS: u64 = 10;
+    const INDEXER_DELAY_MS: u64 = 50;
 
     let (
         enclave_contract,
