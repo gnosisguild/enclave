@@ -19,7 +19,9 @@ use e3_evm_helpers::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
     },
     event_listener::EventListener,
-    events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
+    events::{
+        CiphertextOutputPublished, CommitteePublished, E3Activated, PlaintextOutputPublished,
+    },
 };
 use eyre::eyre;
 use eyre::Result;
@@ -329,19 +331,65 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             .await;
     }
 
+    async fn register_committee_published(&mut self) -> Result<()> {
+        self.add_event_handler(move |e: CommitteePublished, ctx| {
+            async move {
+                let db = ctx.store();
+                let e3_id = u64_try_from(e.e3Id)?;
+                info!(
+                    "CommitteePublished: id={}, public_key_len={}",
+                    e.e3Id,
+                    e.publicKey.len()
+                );
+
+                // Store the public key temporarily to use when E3Activated happens
+                let temp_key = format!("_committee_pubkey:{e3_id}");
+                let mut db_clone = db.clone();
+                db_clone
+                    .insert(&temp_key, &e.publicKey.to_vec())
+                    .await
+                    .map_err(|e| eyre::eyre!("Failed to store committee public key: {}", e))?;
+                info!("Stored committee_public_key temporarily for E3 {}", e3_id);
+                Ok(())
+            }
+        })
+        .await;
+        Ok(())
+    }
+
     async fn register_e3_activated(&mut self) -> Result<()> {
         self.add_event_handler(move |e: E3Activated, ctx| {
             async move {
                 let contract = ctx.contract();
                 let db = ctx.store();
                 let enclave_address = ctx.enclave_address();
-                println!(
-                    "E3Activated: id={}, expiration={}, pubkey_hash=0x{}...",
+                let e3_id = u64_try_from(e.e3Id)?;
+
+                // Get the actual public key from CommitteePublished event
+                // CommitteePublished always happens before E3Activated, so it should always be in temporary storage
+                let temp_key = format!("_committee_pubkey:{e3_id}");
+                let committee_public_key = db
+                    .get::<Vec<u8>>(&temp_key)
+                    .await
+                    .map_err(|e| eyre::eyre!("Failed to get committee public key: {}", e))?
+                    .ok_or_else(|| {
+                        eyre::eyre!(
+                            "CommitteePublished event not found for E3 {} - this should not happen",
+                            e3_id
+                        )
+                    })?;
+
+                info!(
+                    "E3Activated: id={}, expiration={}, using actual public_key (len={})",
                     e.e3Id,
                     e.expiration,
-                    hex::encode(&e.committeePublicKey[..16.min(e.committeePublicKey.len())])
+                    committee_public_key.len()
                 );
-                let e3_id = u64_try_from(e.e3Id)?;
+
+                // Remove the temporary storage
+                let mut db_clone = db.clone();
+                let _ = db_clone.modify::<Vec<u8>, _>(&temp_key, |_| None).await;
+
                 let e3 = contract.get_e3(e.e3Id).await?;
                 let duration = u64_try_from(e3.duration)?;
                 let expiration = u64_try_from(e.expiration)?;
@@ -357,7 +405,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     chain_id: ctx.chain_id(),
                     ciphertext_inputs: vec![],
                     ciphertext_output: vec![],
-                    committee_public_key: e.committeePublicKey.to_vec(),
+                    committee_public_key,
                     duration,
                     custom_params: e3.customParams.to_vec(),
                     e3_params: e3.e3ProgramParams.to_vec(),
@@ -441,6 +489,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
 
     async fn setup_listeners(&mut self) -> Result<()> {
         info!("Setting up listeners for EnclaveIndexer...");
+        self.register_committee_published().await?;
         self.register_e3_activated().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;

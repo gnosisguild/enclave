@@ -151,9 +151,21 @@ pub fn compute_pk_commitment(
     let commitment_bigint = _compute_pk_commitment(&pk0is, &pk1is, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
-    let public_key_hash: [u8; 32] = bytes
+
+    if bytes.len() > 32 {
+        return Err(anyhow!(
+            "Commitment must be at most 32 bytes, got {}",
+            bytes.len()
+        ));
+    }
+
+    let mut padded_bytes = vec![0u8; 32];
+    let start_idx = 32 - bytes.len();
+    padded_bytes[start_idx..].copy_from_slice(&bytes);
+
+    let public_key_hash: [u8; 32] = padded_bytes
         .try_into()
-        .map_err(|_| anyhow!("Commitment must be exactly 32 bytes"))?;
+        .map_err(|_| anyhow!("Failed to convert padded bytes to array"))?;
 
     Ok(public_key_hash)
 }
