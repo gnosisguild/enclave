@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { compute_pk_commitment, get_bfv_params } from "@enclave-e3/wasm";
 import { ZeroAddress, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
@@ -313,36 +312,8 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     defaultValue: 0,
     type: ArgumentType.INT,
   })
-  .addOption({
-    name: "publicKey",
-    description: "public key of the committee",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "publicKeyFile",
-    description: "path to file containing the public key",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "bfvParams",
-    description: "BFV parameters for the scheme",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
   .setAction(async () => ({
-    default: async (
-      { e3Id, publicKey: publicKeyArg, publicKeyFile, bfvParams },
-      hre,
-    ) => {
-      const publicKey =
-        publicKeyArg ||
-        (publicKeyFile ? fs.readFileSync(publicKeyFile, "utf8").trim() : "") ||
-        process.env.PUBLIC_KEY;
-
-      if (!publicKey) throw new Error("No public key provided!");
-
+    default: async ({ e3Id }, hre) => {
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
@@ -351,15 +322,7 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
         hre,
       });
 
-      const params = get_bfv_params(bfvParams);
-      const publicKeyHash = await compute_pk_commitment(
-        new Uint8Array(Buffer.from(publicKey, "hex")),
-        params.degree,
-        params.plaintextModulus,
-        params.moduli,
-      );
-
-      const tx = await enclave.activate(e3Id, publicKey, publicKeyHash);
+      const tx = await enclave.activate(e3Id);
 
       console.log("Activating E3 program... ", tx.hash);
       await tx.wait();

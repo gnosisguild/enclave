@@ -217,11 +217,11 @@ describe('Integration', () => {
     assert.strictEqual(state.type, 'committee_published')
     assert.strictEqual(state.publicKey, event.data.publicKey)
 
-    let { e3Id, publicKey } = state
+    let { e3Id } = state
 
     // ACTIVATION phase
     event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
-      await sdk.activateE3(e3Id, publicKey)
+      await sdk.activateE3(e3Id)
     })
 
     state = store.get(0n)
