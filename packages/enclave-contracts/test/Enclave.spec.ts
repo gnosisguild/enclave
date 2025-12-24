@@ -55,7 +55,6 @@ describe("Enclave", function () {
   );
 
   const data = "0xda7a";
-  const dataHash = ethers.id(data);
   const proof = "0x1337";
 
   // Hash function used to compute the tree nodes.
