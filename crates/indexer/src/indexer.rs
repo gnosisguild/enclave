@@ -336,10 +336,10 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 let db = ctx.store();
                 let enclave_address = ctx.enclave_address();
                 println!(
-                    "E3Activated: id={}, expiration={}, pubkey=0x{}...",
+                    "E3Activated: id={}, expiration={}, pubkey_hash=0x{}...",
                     e.e3Id,
                     e.expiration,
-                    hex::encode(&e.committeePublicKey[..8.min(e.committeePublicKey.len())])
+                    hex::encode(&e.committeePublicKey[..16.min(e.committeePublicKey.len())])
                 );
                 let e3_id = u64_try_from(e.e3Id)?;
                 let e3 = contract.get_e3(e.e3Id).await?;

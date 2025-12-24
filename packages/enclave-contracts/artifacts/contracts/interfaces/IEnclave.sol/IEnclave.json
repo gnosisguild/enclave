@@ -78,9 +78,9 @@
         },
         {
           "indexed": false,
-          "internalType": "bytes",
+          "internalType": "bytes32",
           "name": "committeePublicKey",
-          "type": "bytes"
+          "type": "bytes32"
         }
       ],
       "name": "E3Activated",
@@ -342,16 +342,6 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "publicKey",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "publicKeyHash",
-          "type": "bytes32"
         }
       ],
       "name": "activate",
@@ -942,5 +932,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-c50eb34c88f83554dbf0f8f704a3681d5dfc5322"
+  "buildInfoId": "solc-0_8_28-88174d36ce3bdcc25dc9fa934311dccaec8cde55"
 }

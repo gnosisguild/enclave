@@ -75,7 +75,7 @@ sol! {
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
-        function activate(uint256 e3Id,bytes calldata publicKey,bytes32 publicKeyHash) external returns (bool success);
+        function activate(uint256 e3Id) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
@@ -137,13 +137,8 @@ pub trait EnclaveWrite {
         custom_params: Bytes,
     ) -> Result<(TransactionReceipt, U256)>;
 
-    /// Activate an E3 with a public key
-    async fn activate(
-        &self,
-        e3_id: U256,
-        pub_key: Bytes,
-        pub_key_hash: FixedBytes<32>,
-    ) -> Result<TransactionReceipt>;
+    /// Activate an E3
+    async fn activate(&self, e3_id: U256) -> Result<TransactionReceipt>;
 
     /// Enable an E3 program
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt>;
@@ -405,12 +400,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         Ok((receipt, e3_id))
     }
 
-    async fn activate(
-        &self,
-        e3_id: U256,
-        pub_key: Bytes,
-        pub_key_hash: FixedBytes<32>,
-    ) -> Result<TransactionReceipt> {
+    async fn activate(&self, e3_id: U256) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
         let wallet_addr = self
             .wallet_address
@@ -418,7 +408,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.activate(e3_id, pub_key, pub_key_hash).nonce(nonce);
+        let builder = contract.activate(e3_id).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok(receipt)

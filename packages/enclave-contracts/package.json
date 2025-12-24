@@ -79,7 +79,6 @@
   },
   "devDependencies": {
     "@enclave-e3/config": "workspace:*",
-    "@enclave-e3/wasm": "workspace:*",
     "@nomicfoundation/hardhat-ethers": "4",
     "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
     "@nomicfoundation/hardhat-ignition": "^3.0.0",

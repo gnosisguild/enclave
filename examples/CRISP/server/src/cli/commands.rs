@@ -206,20 +206,9 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
         &CONFIG.enclave_address,
     )
     .await?;
-    let pk_bytes = Bytes::from(pk.to_bytes());
     let e3_id = U256::from(input_e3_id);
 
-    let public_key_hash = compute_pk_commitment(
-        pk.to_bytes(),
-        params.degree(),
-        params.plaintext(),
-        params.moduli().to_vec(),
-    )
-    .map_err(|e| format!("Failed to compute PK commitment: {}", e))?;
-
-    let res = contract
-        .activate(e3_id, pk_bytes, FixedBytes::from(public_key_hash))
-        .await?;
+    let res = contract.activate(e3_id).await?;
     info!("E3 activated. TxHash: {:?}", res.transaction_hash);
 
     let e3_params = FHEParams {

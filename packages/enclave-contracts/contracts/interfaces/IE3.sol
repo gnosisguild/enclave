@@ -24,7 +24,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @param e3ProgramParams ABI encoded computation parameters specific to the E3 program
  * @param customParams Arbitrary ABI-encoded application-defined parameters.
  * @param decryptionVerifier Address of the output verifier contract for decryption verification
- * @param committeePublicKey The public key of the selected committee for this computation
+ * @param committeePublicKey Hash of the public key of the selected committee for this computation
  * @param ciphertextOutput Hash of the encrypted output data produced by the computation
  * @param plaintextOutput Decrypted output data after committee decryption
  */
