@@ -4,22 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Collector for BFV encryption keys from all parties.
-//!
-//! Before parties can encrypt their Shamir shares, they need to collect
-//! the BFV public keys from all other parties. This actor handles that
-//! collection process.
-
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
-use actix::{Actor, Addr, Handler, Message};
-use e3_events::{EncryptionKey, EncryptionKeyCreated};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
+use e3_events::{E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated};
 use e3_trbfv::PartyId;
-use tracing::info;
+use tracing::{info, warn};
+
+const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(60);
 
 use crate::ThresholdKeyshare;
 
@@ -29,6 +25,8 @@ pub enum CollectorState {
     Collecting,
     /// All keys have been collected
     Finished,
+    /// Collection timed out
+    TimedOut,
 }
 
 /// Message sent when all encryption keys have been collected.
@@ -51,51 +49,69 @@ impl From<HashMap<u64, Arc<EncryptionKey>>> for AllEncryptionKeysCollected {
     }
 }
 
+/// Message sent when encryption key collection times out.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct EncryptionKeyCollectionTimeout;
+
 /// Actor that collects BFV encryption keys from all parties.
 ///
 /// Once all keys are collected, it sends `AllEncryptionKeysCollected` to the parent
-/// `ThresholdKeyshare` actor.
+/// `ThresholdKeyshare` actor. If collection times out, it sends `EncryptionKeyCollectionFailed`.
 pub struct EncryptionKeyCollector {
-    /// Set of party IDs we're still waiting for
+    e3_id: E3id,
     todo: HashSet<PartyId>,
-    /// Parent actor to notify when collection is complete
     parent: Addr<ThresholdKeyshare>,
-    /// Current state
     state: CollectorState,
-    /// Collected keys indexed by party_id
     keys: HashMap<PartyId, Arc<EncryptionKey>>,
+    timeout_handle: Option<SpawnHandle>,
 }
 
 impl EncryptionKeyCollector {
-    /// Create and start a new collector.
-    ///
-    /// # Arguments
-    /// * `parent` - The ThresholdKeyshare actor to notify when collection is complete
-    /// * `total` - Total number of parties (keys to collect)
-    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64) -> Addr<Self> {
-        let addr = Self {
+    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, e3_id: E3id) -> Addr<Self> {
+        let collector = Self {
+            e3_id,
             todo: (0..total).collect(),
             parent,
             state: CollectorState::Collecting,
             keys: HashMap::new(),
-        }
-        .start();
-        addr
+            timeout_handle: None,
+        };
+        collector.start()
     }
 }
 
 impl Actor for EncryptionKeyCollector {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        info!(
+            e3_id = %self.e3_id,
+            "EncryptionKeyCollector started, scheduling timeout in {:?}",
+            DEFAULT_COLLECTION_TIMEOUT
+        );
+
+        let handle = ctx.notify_later(EncryptionKeyCollectionTimeout, DEFAULT_COLLECTION_TIMEOUT);
+        self.timeout_handle = Some(handle);
+    }
 }
 
 impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
     type Result = ();
-    fn handle(&mut self, msg: EncryptionKeyCreated, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EncryptionKeyCreated, ctx: &mut Self::Context) -> Self::Result {
         let start = Instant::now();
         info!("EncryptionKeyCollector: EncryptionKeyCreated received");
 
-        if let CollectorState::Finished = self.state {
-            info!("EncryptionKeyCollector is finished, ignoring");
+        // Ignore if already finished or timed out
+        if !matches!(self.state, CollectorState::Collecting) {
+            info!(
+                "EncryptionKeyCollector is not collecting (state: {:?}), ignoring",
+                match self.state {
+                    CollectorState::Collecting => "Collecting",
+                    CollectorState::Finished => "Finished",
+                    CollectorState::TimedOut => "TimedOut",
+                }
+            );
             return;
         }
 
@@ -119,6 +135,12 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
         if self.todo.is_empty() {
             info!("All encryption keys collected!");
             self.state = CollectorState::Finished;
+
+            // Cancel the timeout since we're done
+            if let Some(handle) = self.timeout_handle.take() {
+                ctx.cancel_future(handle);
+            }
+
             let event: AllEncryptionKeysCollected = self.keys.clone().into();
             self.parent.do_send(event);
         }
@@ -127,5 +149,42 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
             "Finished processing EncryptionKeyCreated in {:?}",
             start.elapsed()
         );
+    }
+}
+
+impl Handler<EncryptionKeyCollectionTimeout> for EncryptionKeyCollector {
+    type Result = ();
+    fn handle(
+        &mut self,
+        _: EncryptionKeyCollectionTimeout,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        // Only handle timeout if we're still collecting
+        if !matches!(self.state, CollectorState::Collecting) {
+            return;
+        }
+
+        warn!(
+            e3_id = %self.e3_id,
+            missing_parties = ?self.todo,
+            "Encryption key collection timed out, {} parties missing",
+            self.todo.len()
+        );
+
+        self.state = CollectorState::TimedOut;
+
+        // Notify parent of failure
+        let missing_parties: Vec<PartyId> = self.todo.iter().copied().collect();
+        self.parent.do_send(EncryptionKeyCollectionFailed {
+            e3_id: self.e3_id.clone(),
+            reason: format!(
+                "Timeout waiting for encryption keys from {} parties",
+                missing_parties.len()
+            ),
+            missing_parties,
+        });
+
+        // Stop the actor
+        ctx.stop();
     }
 }

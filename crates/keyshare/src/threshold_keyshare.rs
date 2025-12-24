@@ -11,7 +11,8 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
     ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCreated,
+    EncryptionKeyCollectionFailed, EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -37,7 +38,7 @@ use std::{
     mem,
     sync::{Arc, Mutex},
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
 use crate::threshold_share_collector::ThresholdShareCollector;
@@ -346,9 +347,11 @@ impl ThresholdKeyshare {
             "Setting up key collector for addr: {} and {} nodes",
             state.address, state.threshold_n
         );
+        let e3_id = state.e3_id.clone();
+        let threshold_n = state.threshold_n;
         let addr = self
             .decryption_key_collector
-            .get_or_insert_with(|| ThresholdShareCollector::setup(self_addr, state.threshold_n));
+            .get_or_insert_with(|| ThresholdShareCollector::setup(self_addr, threshold_n, e3_id));
         Ok(addr.clone())
     }
 
@@ -364,9 +367,11 @@ impl ThresholdKeyshare {
             "Setting up encryption key collector for addr: {} and {} nodes",
             state.address, state.threshold_n
         );
+        let e3_id = state.e3_id.clone();
+        let threshold_n = state.threshold_n;
         let addr = self
             .encryption_key_collector
-            .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, state.threshold_n));
+            .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
         Ok(addr.clone())
     }
 
@@ -1006,5 +1011,58 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
             |act| act.handle_ciphertext_output_published(msg),
             |act, res, _| act.handle_calculate_decryption_share_response(res),
         )
+    }
+}
+
+impl Handler<EncryptionKeyCollectionFailed> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: EncryptionKeyCollectionFailed,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        warn!(
+            e3_id = %msg.e3_id,
+            missing_parties = ?msg.missing_parties,
+            "Encryption key collection failed: {}",
+            msg.reason
+        );
+
+        // Clear the collector reference since it's stopped
+        self.encryption_key_collector = None;
+
+        // Publish failure event to event bus for sync tracking
+        if let Err(e) = self.bus.publish(msg) {
+            error!("Failed to publish EncryptionKeyCollectionFailed: {}", e);
+        }
+
+        // Stop this actor since we can't proceed without all encryption keys
+        ctx.stop();
+    }
+}
+
+impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: ThresholdShareCollectionFailed,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        warn!(
+            e3_id = %msg.e3_id,
+            missing_parties = ?msg.missing_parties,
+            "Threshold share collection failed: {}",
+            msg.reason
+        );
+
+        // Clear the collector reference since it's stopped
+        self.decryption_key_collector = None;
+
+        // Publish failure event to event bus for sync tracking
+        if let Err(e) = self.bus.publish(msg) {
+            error!("Failed to publish ThresholdShareCollectionFailed: {}", e);
+        }
+
+        ctx.stop();
     }
 }
