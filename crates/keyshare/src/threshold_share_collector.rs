@@ -40,11 +40,7 @@ pub struct ThresholdShareCollector {
 }
 
 impl ThresholdShareCollector {
-    pub fn setup(
-        parent: Addr<ThresholdKeyshare>,
-        total: u64,
-        e3_id: E3id,
-    ) -> Addr<Self> {
+    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, e3_id: E3id) -> Addr<Self> {
         let collector = Self {
             e3_id,
             todo: (0..total).collect(),
