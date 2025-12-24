@@ -9,6 +9,7 @@ import Logo from '@/assets/icons/logo.svg'
 import { Link } from 'react-router-dom'
 import NavMenu from '@/components/NavMenu'
 import { ConnectKitButton } from 'connectkit'
+import useToken from '@/hooks/generic/useMintToken'
 
 const PAGES = [
   {
@@ -22,6 +23,8 @@ const PAGES = [
 ]
 
 const Navbar: React.FC = () => {
+  const { mintTokens, isMinting } = useToken()
+
   return (
     <nav className='absolute left-0 top-0 z-10 w-screen px-6 lg:px-9'>
       <div className='mx-auto max-w-screen-xl'>
@@ -34,6 +37,14 @@ const Navbar: React.FC = () => {
           </Link>
 
           <div className='flex items-center gap-2 md:gap-8'>
+            <button
+              disabled={isMinting}
+              onClick={mintTokens}
+              className='hover:text-twilight-blue-600 cursor-pointer font-bold text-slate-600 duration-300 ease-in-out hover:opacity-70 max-md:hidden'
+            >
+              Mint tokens
+            </button>
+
             {PAGES.map(({ label, path }) => (
               <Link
                 key={label}
