@@ -18,6 +18,7 @@ bs58 = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 futures-util = { workspace = true }
+hex = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

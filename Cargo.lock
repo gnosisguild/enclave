@@ -2774,6 +2774,7 @@ dependencies = [
  "e3-multithread",
  "e3-request",
  "e3-sortition",
+ "e3-trbfv",
  "e3-utils",
  "tracing",
 ]
@@ -2940,6 +2941,7 @@ dependencies = [
  "e3-trbfv",
  "e3-utils",
  "futures-util",
+ "hex",
  "once_cell",
  "proptest",
  "rand 0.8.5",
@@ -3078,6 +3080,7 @@ dependencies = [
  "e3-request",
  "e3-trbfv",
  "e3-utils",
+ "fhe",
  "fhe-traits",
  "ndarray",
  "rand 0.8.5",

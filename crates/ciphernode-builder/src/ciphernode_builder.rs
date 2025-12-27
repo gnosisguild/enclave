@@ -438,12 +438,14 @@ impl CiphernodeBuilder {
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let multithread = self.ensure_multithread();
+            let share_encryption_params = e3_trbfv::helpers::get_share_encryption_params();
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
                 &multithread,
                 &addr,
+                share_encryption_params,
             ))
         }
 
