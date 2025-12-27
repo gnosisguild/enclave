@@ -117,6 +117,7 @@ pub struct ThresholdKeyshareExtension {
     cipher: Arc<Cipher>,
     address: String,
     multithread: Addr<Multithread>,
+    share_encryption_params: Arc<fhe::bfv::BfvParameters>,
 }
 
 impl ThresholdKeyshareExtension {
@@ -125,12 +126,14 @@ impl ThresholdKeyshareExtension {
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         address: &str,
+        share_encryption_params: Arc<fhe::bfv::BfvParameters>,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             multithread: multithread.clone(),
             address: address.to_owned(),
+            share_encryption_params,
         })
     }
 }
@@ -173,6 +176,7 @@ impl E3Extension for ThresholdKeyshareExtension {
                     cipher: self.cipher.clone(),
                     multithread: self.multithread.clone(),
                     state: container,
+                    share_encryption_params: self.share_encryption_params.clone(),
                 })
                 .start()
                 .into(),
@@ -203,6 +207,7 @@ impl E3Extension for ThresholdKeyshareExtension {
             cipher: self.cipher.clone(),
             multithread: self.multithread.clone(),
             state,
+            share_encryption_params: self.share_encryption_params.clone(),
         })
         .start()
         .into();

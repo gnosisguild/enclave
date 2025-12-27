@@ -1148,7 +1148,7 @@
   "linkReferences": {},
   "deployedLinkReferences": {},
   "immutableReferences": {
-    "3415": [
+    "1944": [
       {
         "length": 32,
         "start": 872
@@ -1174,43 +1174,43 @@
         "start": 3711
       }
     ],
-    "6684": [
+    "4931": [
       {
         "length": 32,
         "start": 3942
       }
     ],
-    "6686": [
+    "4933": [
       {
         "length": 32,
         "start": 3900
       }
     ],
-    "6688": [
+    "4935": [
       {
         "length": 32,
         "start": 3858
       }
     ],
-    "6690": [
+    "4937": [
       {
         "length": 32,
         "start": 4023
       }
     ],
-    "6692": [
+    "4939": [
       {
         "length": 32,
         "start": 4063
       }
     ],
-    "6695": [
+    "4942": [
       {
         "length": 32,
         "start": 4727
       }
     ],
-    "6698": [
+    "4945": [
       {
         "length": 32,
         "start": 4772
@@ -1218,5 +1218,5 @@
     ]
   },
   "inputSourceName": "project/contracts/token/EnclaveTicketToken.sol",
-  "buildInfoId": "solc-0_8_28-572e77328edd43ea3643262ca5f82babf769c493"
+  "buildInfoId": "solc-0_8_28-bef1dec98cb6cc37e15bd06abee5a353862d85f4"
 }

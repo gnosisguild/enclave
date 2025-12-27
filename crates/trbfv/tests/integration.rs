@@ -83,7 +83,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     );
 
     // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
-    let shares_hash_map = usecase_helpers::generate_shares_hash_map(
+    let generated = usecase_helpers::generate_shares_hash_map(
         &trbfv_config,
         esi_per_ct as u64,
         &error_size,
@@ -93,9 +93,14 @@ async fn test_trbfv_isolation() -> Result<()> {
     )?;
 
     let pubkey =
-        usecase_helpers::get_public_key(&shares_hash_map, trbfv_config.params(), &crp_raw)?;
-    let shares = to_ordered_vec(shares_hash_map);
-    let decryption_keys = usecase_helpers::get_decryption_keys(shares, &cipher, &trbfv_config)?;
+        usecase_helpers::get_public_key(&generated.shares, trbfv_config.params(), &crp_raw)?;
+    let shares = to_ordered_vec(generated.shares);
+    let decryption_keys = usecase_helpers::get_decryption_keys(
+        shares,
+        &generated.bfv_secret_keys,
+        &cipher,
+        &trbfv_config,
+    )?;
     // Create the inputs
     let num_votes_per_voter = 3;
     let num_voters = 30;
