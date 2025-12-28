@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::CiphernodeHandle;
+use crate::{CiphernodeHandle, EventSystem};
 use actix::{Actor, Addr};
 use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
@@ -15,8 +15,8 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
+use e3_data::{InMemStore, Repositories, RepositoriesFactory};
+use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -32,12 +32,18 @@ use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{
-    CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
-    Sortition, SortitionBackend, SortitionRepositoryFactory,
+    CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
+    NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
+
+#[derive(Clone, Debug)]
+enum EventSystemType {
+    Persisted { log_path: PathBuf, kv_path: PathBuf },
+    InMem,
+}
 
 /// Build a ciphernode configuration.
 // NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
@@ -46,14 +52,16 @@ use tracing::{error, info};
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
+    name: String,
     address: Option<String>,
     chains: Vec<ChainConfig>,
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
     contract_components: ContractComponents,
-    datastore: Option<DataStore>,
+    in_mem_store: Option<Addr<InMemStore>>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
+    event_system: EventSystemType,
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
     multithread_capture_events: bool,
@@ -89,19 +97,26 @@ pub enum KeyshareKind {
 }
 
 impl CiphernodeBuilder {
-    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
+    /// Create a new ciphernode builder.
+    ///
+    /// - name - Unique name for the ciphernode
+    /// - rng - Arc Mutex wrapped random number generator
+    /// - cipher - Cipher for encryption and decryption of sensitive data
+    pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
+            name: name.to_owned(),
             address: None,
             chains: vec![],
             cipher,
             contract_components: ContractComponents::default(),
-            datastore: None,
+            in_mem_store: None,
             keyshare: None,
             logging: false,
             multithread_cache: None,
             plaintext_agg: false,
             pubkey_agg: false,
             multithread_concurrent_jobs: None,
+            event_system: EventSystemType::InMem,
             rng,
             source_bus: None,
             sortition_backend: SortitionBackend::score(),
@@ -139,9 +154,19 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Attach an existing in mem store to the node
-    pub fn with_datastore(mut self, store: DataStore) -> Self {
-        self.datastore = Some(store);
+    /// Use the given in-mem datastore. This is useful for injecting a store dump.
+    pub fn with_in_mem_datastore(mut self, store: &Addr<InMemStore>) -> Self {
+        self.in_mem_store = Some(store.to_owned());
+        self
+    }
+
+    /// Add persistence information for storing events and data. Without persistence information
+    /// the node will run in memory by default.
+    pub fn with_persistence(mut self, log_path: &PathBuf, kv_path: &PathBuf) -> Self {
+        self.event_system = EventSystemType::Persisted {
+            log_path: log_path.to_owned(),
+            kv_path: kv_path.to_owned(),
+        };
         self
     }
 
@@ -166,7 +191,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the given Address to represent the node
+    /// Use the given Address to represent the node. This should be unique.
     pub fn with_address(mut self, addr: &str) -> Self {
         self.address = Some(addr.to_owned());
         self
@@ -298,9 +323,6 @@ impl CiphernodeBuilder {
             None
         };
 
-        // Get a handle from the event bus
-        let bus = BusHandle::new_from_consumer(local_bus);
-
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);
             addr
@@ -310,10 +332,20 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
-        let store = self
-            .datastore
-            .clone()
-            .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
+        // Get an event system instance.
+        let event_system =
+            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
+                EventSystem::persisted(&addr, log_path, kv_path).with_event_bus(local_bus)
+            } else {
+                if let Some(ref store) = self.in_mem_store {
+                    EventSystem::in_mem_from_store(&addr, store).with_event_bus(local_bus)
+                } else {
+                    EventSystem::in_mem(&addr).with_event_bus(local_bus)
+                }
+            };
+
+        let bus = event_system.handle()?;
+        let store = event_system.store()?;
 
         let repositories = store.repositories();
 
@@ -329,7 +361,8 @@ impl CiphernodeBuilder {
         )
         .await?;
 
-        CiphernodeSelector::attach(&bus, &sortition, &addr, &store);
+        CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
+            .await?;
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;

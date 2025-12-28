@@ -13,7 +13,7 @@ mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
-use e3_ciphernode_builder::CiphernodeHandle;
+use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
     EventPublisher, HistoryCollector, Seed, Subscribe,
@@ -94,8 +94,8 @@ pub fn get_common_setup(
     let moduli = param_set.moduli;
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
-
-    Ok((bus.into(), rng, seed, params, crpoly, errors, history))
+    let handle = EventSystem::in_mem("cn1").with_event_bus(bus).handle()?;
+    Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 
 /// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
@@ -126,21 +126,17 @@ pub fn get_common_setup(
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
-        let source = node.bus().consumer();
+        let source = node.bus();
         for (_, node) in nodes.iter().enumerate() {
-            let dest = node.bus().consumer();
+            let dest = node.bus();
             if source != dest {
-                EventBus::pipe_filter(
-                    source,
-                    move |e: &EnclaveEvent| {
-                        // TODO: Document publisher events need to be
-                        // converted to DocumentReceived events
+                source.pipe_to(dest, |e: &EnclaveEvent| {
+                    // TODO: Document publisher events need to be
+                    // converted to DocumentReceived events
 
-                        NetEventTranslator::is_forwardable_event(e)
-                            || DocumentPublisher::is_document_publisher_event(e)
-                    },
-                    dest,
-                )
+                    NetEventTranslator::is_forwardable_event(e)
+                        || DocumentPublisher::is_document_publisher_event(e)
+                });
             } else {
                 println!("not piping bus to itself");
             }

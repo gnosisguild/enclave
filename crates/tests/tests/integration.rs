@@ -4,15 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Result};
-use e3_ciphernode_builder::CiphernodeBuilder;
+use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
-    E3Requested, E3id, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    OperatorActivationChanged, PlaintextAggregated, TicketBalanceUpdated,
+    E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
+    TicketBalanceUpdated,
 };
 use e3_multithread::{GetReport, Multithread};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
@@ -87,6 +86,7 @@ fn serialize_report(report: &[(&str, Duration)]) -> String {
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv_actor() -> Result<()> {
+    println!("Running test_trbfv_actor...");
     let mut report: Vec<(&str, Duration)> = vec![];
     let whole_test = Instant::now();
     use tracing_subscriber::{fmt, EnvFilter};
@@ -118,9 +118,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let bus: BusHandle = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true })
-        .start()
-        .into();
+    let system = EventSystem::new("test").with_fresh_bus();
+    let bus = system.handle()?;
 
     // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (
@@ -180,7 +179,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .testmode_with_history()
@@ -196,7 +195,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(6, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
-            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .with_trbfv()
@@ -277,7 +276,6 @@ async fn test_trbfv_actor() -> Result<()> {
     let committee_finalized_timer = Instant::now();
 
     let expected = vec!["E3Requested", "CommitteeFinalized"];
-
     let _ = nodes
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
@@ -326,6 +324,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let h = nodes
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
+
     report.push((
         "ThresholdShares -> PublicKeyAggregated",
         shares_to_pubkey_agg_timer.elapsed(),

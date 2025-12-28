@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::warn;
-use tracing::{error, info, instrument, trace};
+use tracing::{info, instrument, trace};
 
 // TODO: store event filtering here on this actor instead of is_local_only() on the event. We
 // should do this as this functionality is not global and ramifications should stay local to here

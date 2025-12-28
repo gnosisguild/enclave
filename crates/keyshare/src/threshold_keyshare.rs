@@ -416,6 +416,8 @@ impl ThresholdKeyshare {
         msg: CiphernodeSelected,
         address: Addr<Self>,
     ) -> Result<()> {
+        info!("CiphernodeSelected received.");
+        // Ensure the collector is created
         let _ = self.ensure_collector(address.clone());
         let _ = self.ensure_encryption_key_collector(address.clone());
 

@@ -4,20 +4,30 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
 
-use crate::{EnclaveEvent, EventBus, Sequenced, Unsequenced};
+use crate::{
+    events::{CommitSnapshot, EventStored, StoreEventRequested},
+    EnclaveEvent, EventBus, Sequenced, Unsequenced,
+};
 
+/// Component to sequence the storage of events
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-    seq: u64,
+    eventstore: Recipient<StoreEventRequested>,
+    buffer: Recipient<CommitSnapshot>,
 }
 
 impl Sequencer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
+    pub fn new(
+        bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
+        eventstore: impl Into<Recipient<StoreEventRequested>>,
+        buffer: impl Into<Recipient<CommitSnapshot>>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
-            seq: 0,
+            eventstore: eventstore.into(),
+            buffer: buffer.into(),
         }
     }
 }
@@ -28,22 +38,31 @@ impl Actor for Sequencer {
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
-        // NOTE: FAKE SEQUENCER FOR NOW - JUST SET THE SEQUENCE NUMBER AND UPDATE
-        self.seq += 1;
-        self.bus.do_send(msg.into_sequenced(self.seq))
+    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+        self.eventstore
+            .do_send(StoreEventRequested::new(msg, ctx.address()))
+    }
+}
+
+impl Handler<EventStored> for Sequencer {
+    type Result = ();
+    fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
+        let event = msg.into_event();
+        let seq = event.get_seq();
+        self.buffer.do_send(CommitSnapshot::new(seq));
+        self.bus.do_send(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::{prelude::*, BusHandle, EnclaveEvent, EventBus, TakeEvents, TestEvent};
-    use actix::Actor;
+    use e3_ciphernode_builder::EventSystem;
+    use e3_events::{EnclaveEvent, EventPublisher, TakeEvents, TestEvent};
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let bus = BusHandle::new_from_consumer(EventBus::<EnclaveEvent>::default().start());
+        let system = EventSystem::new("test");
+        let bus = system.handle()?;
         let history = bus.history();
 
         let event_data = vec![

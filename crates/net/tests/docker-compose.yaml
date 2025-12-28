@@ -1,9 +1,10 @@
 x-common-variables: &common-variables
   SYNC_THRESHOLD: 6
-
+x-common-image: &common-image
+  image: p2p_test:${IMAGE_TAG}
 services:
   alice:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'alice']
     environment:
       <<: *common-variables
@@ -12,9 +13,8 @@ services:
       TEST_CONFIG: 'lead'
     networks:
       - p2p_test_net
-
   bob:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'bob']
     environment:
       <<: *common-variables
@@ -22,18 +22,16 @@ services:
       DIAL_TO: '/dns4/charlie/udp/9091/quic-v1'
     networks:
       - p2p_test_net
-
   charlie:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'charlie']
     environment:
       <<: *common-variables
       QUIC_PORT: 9091
     networks:
       - p2p_test_net
-
   daniel:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'daniel']
     environment:
       <<: *common-variables
@@ -41,9 +39,8 @@ services:
       DIAL_TO: '/dns4/charlie/udp/9091/quic-v1'
     networks:
       - p2p_test_net
-
   eve:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'eve']
     environment:
       <<: *common-variables
@@ -51,9 +48,8 @@ services:
       DIAL_TO: '/dns4/charlie/udp/9091/quic-v1'
     networks:
       - p2p_test_net
-
   fabian:
-    image: p2p_test:latest
+    <<: *common-image
     command: ['/app/p2p_test', 'fabian']
     environment:
       <<: *common-variables
@@ -61,7 +57,6 @@ services:
       DIAL_TO: '/dns4/charlie/udp/9091/quic-v1'
     networks:
       - p2p_test_net
-
 networks:
   p2p_test_net:
     driver: bridge

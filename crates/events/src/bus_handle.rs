@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use actix::{Actor, Addr, Recipient};
+use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
 use tracing::error;
@@ -23,21 +23,19 @@ use crate::{
 };
 
 #[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derivative(Debug, PartialEq, Eq)]
 pub struct BusHandle {
+    /// EventBus that actors can consume sequenced events from
     consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
+    /// Sequencer that new events should be produced from
     producer: Addr<Sequencer>,
+    /// Hlc clock used to time all events created on this BusHandle
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
 }
 
 impl BusHandle {
-    pub fn new_from_consumer(consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
-        let producer = Sequencer::new(&consumer).start();
-        let hlc = Hlc::default();
-        Self::new(consumer, producer, hlc)
-    }
-
+    /// Create a new BusHandle
     pub fn new(
         consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
         producer: Addr<Sequencer>,
@@ -50,16 +48,34 @@ impl BusHandle {
         }
     }
 
+    /// Return a HistoryCollector for examining events that have passed through on the events bus
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.consumer)
     }
 
+    /// Access the producer to internally dispatch am event to
     pub fn producer(&self) -> &Addr<Sequencer> {
         &self.producer
     }
 
+    /// Access the consumer to internally subscribe to events
     pub fn consumer(&self) -> &Addr<EventBus<EnclaveEvent<Sequenced>>> {
         &self.consumer
+    }
+
+    /// Get a new timestamp. Note this ticks over the internal Hlc.
+    pub fn ts(&self) -> Result<u128> {
+        let ts = self.hlc.tick()?;
+        Ok(ts.into())
+    }
+
+    /// Pipe events from this handle to the other handle only when the predicate returns true
+    pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
+    where
+        F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+    {
+        let pipe = BusHandlePipe::new(other.to_owned(), predicate).start();
+        self.subscribe("*", pipe.into());
     }
 }
 
@@ -136,28 +152,17 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
     }
 }
 
-impl Into<BusHandle> for Addr<EventBus<EnclaveEvent>> {
-    fn into(self) -> BusHandle {
-        BusHandle::new_from_consumer(self)
-    }
-}
-
-impl Into<BusHandle> for &Addr<EventBus<EnclaveEvent>> {
-    fn into(self) -> BusHandle {
-        BusHandle::new_from_consumer(self.clone())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-    use crate::{
-        hlc::Hlc, prelude::*, sequencer::Sequencer, BusHandle, EnclaveEvent, EnclaveEventData,
-        EventBus, TestEvent,
-    };
     use actix::{Actor, Handler, Message};
+    use e3_ciphernode_builder::EventSystem;
+    // NOTE: We cannot pull from crate as the features will be missing as they are not default.
+    use e3_events::{
+        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, TestEvent,
+    };
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
+
     fn now_micros() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -212,20 +217,18 @@ mod tests {
 
         // 1. setup up two separate busses with out of sync clocks A and B. B should be 30 seconds
         //    faster than A.
-        let consumer_a = EventBus::<EnclaveEvent>::default().start();
-        let producer_a = Sequencer::new(&consumer_a).start();
-        let clock_a = Hlc::new(1).with_clock(move || now_micros().saturating_sub(30_000_000)); // Late
-        let bus_a = BusHandle::new(consumer_a, producer_a, clock_a);
-
-        let consumer_b = EventBus::<EnclaveEvent>::default().start();
-        let producer_b = Sequencer::new(&consumer_b).start();
-        let clock_b = Hlc::new(2); // in sync
-        let bus_b = BusHandle::new(consumer_b, producer_b, clock_b);
-
-        let consumer_c = EventBus::<EnclaveEvent>::default().start();
-        let producer_c = Sequencer::new(&consumer_c).start();
-        let clock_c = Hlc::new(3); // in sync
-        let bus_c = BusHandle::new(consumer_c, producer_c, clock_c);
+        let bus_a = EventSystem::new("a")
+            .with_fresh_bus()
+            .with_hlc(Hlc::new(1).with_clock(move || now_micros().saturating_sub(30_000_000))) // Late
+            .handle()?;
+        let bus_b = EventSystem::new("b")
+            .with_fresh_bus()
+            .with_hlc(Hlc::new(2))
+            .handle()?;
+        let bus_c = EventSystem::new("c")
+            .with_fresh_bus()
+            .with_hlc(Hlc::new(3))
+            .handle()?;
 
         let forwarder = Forwarder {
             dest: bus_c.clone(),
@@ -293,5 +296,45 @@ mod tests {
         }
 
         Ok(())
+    }
+}
+
+/// Actor for piping between BusHandles.
+pub struct BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    handle: BusHandle,
+    predicate: F,
+}
+
+impl<F> BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
+    /// function returns true
+    pub fn new(handle: BusHandle, predicate: F) -> Self {
+        Self { handle, predicate }
+    }
+}
+
+impl<F> Actor for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    type Context = actix::Context<Self>;
+}
+
+impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>
+where
+    F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
+{
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
+        if (self.predicate)(&msg) {
+            let (data, ts) = msg.split();
+            let _ = self.handle.publish_from_remote(data, ts);
+        }
     }
 }

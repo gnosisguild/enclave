@@ -3,8 +3,17 @@ FROM rust:1.86 AS builder
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    jq \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -L https://github.com/ethereum/solidity/releases/download/v0.8.27/solc-static-linux -o /usr/local/bin/solc \
+    && chmod +x /usr/local/bin/solc
+
 # Copy workspace files and all crates EXCEPT net
 COPY --exclude=crates/net . .
+
 COPY ./crates/net/Cargo.toml ./crates/net/Cargo.toml
 RUN mkdir -p ./crates/net/src/bin && \
     echo "fn main() {}" > ./crates/net/src/main.rs && \
