@@ -167,6 +167,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let concurrent_jobs = 1; // leaving at 1
     let max_threadroom = Multithread::get_max_threads_minus(1);
     let multithread = Multithread::attach(
+        &bus,
         rng.clone(),
         cipher.clone(),
         max_threadroom,

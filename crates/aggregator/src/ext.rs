@@ -22,7 +22,6 @@ use e3_events::{prelude::*, E3id};
 use e3_events::{BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
-use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
@@ -249,19 +248,13 @@ fn create_publickey_aggregator(
 pub struct ThresholdPlaintextAggregatorExtension {
     bus: BusHandle,
     sortition: Addr<Sortition>,
-    multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
-    pub fn create(
-        bus: &BusHandle,
-        sortition: &Addr<Sortition>,
-        multithread: &Addr<Multithread>,
-    ) -> Box<Self> {
+    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
-            multithread: multithread.clone(),
         })
     }
 }
@@ -302,7 +295,6 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
-                        multithread: self.multithread.clone(),
                     },
                     sync_state,
                 )
@@ -331,7 +323,6 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
-                multithread: self.multithread.clone(),
             },
             sync_state,
         )

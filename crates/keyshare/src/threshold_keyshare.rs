@@ -9,14 +9,13 @@ use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, DecryptionshareCreated, Die, E3RequestComplete, E3id, EnclaveEvent,
-    EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated,
-    KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCollectionFailed,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
+    ComputeResponse, CorrelationId, DecryptionshareCreated, Die, E3RequestComplete, E3id, EType,
+    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
+    EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCollectionFailed,
     ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
-use e3_multithread::Multithread;
 use e3_trbfv::{
     calculate_decryption_key::CalculateDecryptionKeyRequest,
     calculate_decryption_share::{
@@ -28,7 +27,7 @@ use e3_trbfv::{
     shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
-use e3_utils::{bail, to_ordered_vec, utility_types::ArcBytes};
+use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
@@ -302,7 +301,6 @@ impl TryInto<Decrypting> for ThresholdKeyshareState {
 pub struct ThresholdKeyshareParams {
     pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
-    pub multithread: Addr<Multithread>,
     pub state: Persistable<ThresholdKeyshareState>,
     pub share_encryption_params: Arc<BfvParameters>,
 }
@@ -312,7 +310,6 @@ pub struct ThresholdKeyshare {
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
-    multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
     share_encryption_params: Arc<BfvParameters>,
 }
@@ -324,7 +321,6 @@ impl ThresholdKeyshare {
             cipher: params.cipher,
             decryption_key_collector: None,
             encryption_key_collector: None,
-            multithread: params.multithread,
             state: params.state,
             share_encryption_params: params.share_encryption_params,
         }
@@ -410,6 +406,22 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
+    pub fn handle_compute_response(&mut self, msg: ComputeResponse) -> Result<()> {
+        match &msg.response {
+            TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
+            TrBFVResponse::GenPkShareAndSkSss(_) => {
+                self.handle_gen_pk_share_and_sk_sss_response(msg)
+            }
+            TrBFVResponse::CalculateDecryptionKey(_) => {
+                self.handle_calculate_decryption_key_response(msg)
+            }
+            TrBFVResponse::CalculateDecryptionShare(_) => {
+                self.handle_calculate_decryption_share_response(msg)
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// 1. CiphernodeSelected - Generate BFV keys and start collecting
     pub fn handle_ciphernode_selected(
         &mut self,
@@ -457,7 +469,6 @@ impl ThresholdKeyshare {
     pub fn handle_all_encryption_keys_collected(
         &mut self,
         msg: AllEncryptionKeysCollected,
-        address: Addr<Self>,
     ) -> Result<()> {
         info!(
             "AllEncryptionKeysCollected - {} keys received",
@@ -479,14 +490,16 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        address.do_send(GenEsiSss(current.ciphernode_selected.clone()));
-        address.do_send(GenPkShareAndSkSss(current.ciphernode_selected));
+        self.handle_gen_esi_sss_requested(GenEsiSss(current.ciphernode_selected.clone()))?;
+        self.handle_gen_pk_share_and_sk_sss_requested(GenPkShareAndSkSss(
+            current.ciphernode_selected,
+        ))?;
 
         Ok(())
     }
 
     /// 2. GenEsiSss
-    pub fn handle_gen_esi_sss_requested(&self, msg: GenEsiSss) -> Result<ComputeRequest> {
+    pub fn handle_gen_esi_sss_requested(&self, msg: GenEsiSss) -> Result<()> {
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.0;
@@ -495,6 +508,7 @@ impl ThresholdKeyshare {
             // bundle them in with the params
             error_size,
             esi_per_ct,
+            e3_id,
             ..
         } = evt.clone();
 
@@ -505,16 +519,21 @@ impl ThresholdKeyshare {
 
         let trbfv_config = state.get_trbfv_config();
 
-        let event = ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(
-            GenEsiSssRequest {
-                trbfv_config,
-                error_size,
-                esi_per_ct: esi_per_ct as u64,
-            }
-            .into(),
-        ));
+        let event = ComputeRequest::new(
+            TrBFVRequest::GenEsiSss(
+                GenEsiSssRequest {
+                    trbfv_config,
+                    error_size,
+                    esi_per_ct: esi_per_ct as u64,
+                }
+                .into(),
+            ),
+            CorrelationId::new(),
+            e3_id,
+        );
 
-        Ok(event)
+        self.bus.publish(event)?;
+        Ok(())
     }
 
     /// 2a. GenEsiSss result
@@ -567,12 +586,9 @@ impl ThresholdKeyshare {
     }
 
     /// 3. GenPkShareAndSkSss
-    pub fn handle_gen_pk_share_and_sk_sss_requested(
-        &self,
-        msg: GenPkShareAndSkSss,
-    ) -> Result<ComputeRequest> {
+    pub fn handle_gen_pk_share_and_sk_sss_requested(&self, msg: GenPkShareAndSkSss) -> Result<()> {
         info!("GenPkShareAndSkSss on ThresholdKeyshare");
-        let CiphernodeSelected { seed, .. } = msg.0;
+        let CiphernodeSelected { seed, e3_id, .. } = msg.0;
         let state = self
             .state
             .get()
@@ -587,16 +603,21 @@ impl ThresholdKeyshare {
             )
             .to_bytes(),
         );
-        let event = ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
-            GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
-        ));
+        let event = ComputeRequest::new(
+            TrBFVRequest::GenPkShareAndSkSss(
+                GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
+            ),
+            CorrelationId::new(),
+            e3_id,
+        );
 
-        Ok(event)
+        self.bus.publish(event)?;
+        Ok(())
     }
 
     /// 3a. GenPkShareAndSkSss result
     pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
-        let ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output)) = res else {
+        let TrBFVResponse::GenPkShareAndSkSss(output) = res.response else {
             bail!("Error extracting data from compute process")
         };
 
@@ -728,10 +749,11 @@ impl ThresholdKeyshare {
     pub fn handle_all_threshold_shares_collected(
         &self,
         msg: AllThresholdSharesCollected,
-    ) -> Result<ComputeRequest> {
+    ) -> Result<()> {
         info!("AllThresholdSharesCollected");
         let cipher = self.cipher.clone();
         let state = self.state.try_get()?;
+        let e3_id = state.get_e3_id();
         let party_id = state.party_id as usize;
         let trbfv_config = state.get_trbfv_config();
 
@@ -784,14 +806,19 @@ impl ThresholdKeyshare {
             sk_sss_collected: sk_sss_collected.encrypt(&cipher)?,
         };
 
-        let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(request));
+        let event = ComputeRequest::new(
+            TrBFVRequest::CalculateDecryptionKey(request),
+            CorrelationId::new(),
+            e3_id.clone(),
+        );
 
-        Ok(event)
+        self.bus.publish(event)?;
+        Ok(())
     }
 
     /// 5a. CalculateDecryptionKeyResponse -> KeyshareCreated
     pub fn handle_calculate_decryption_key_response(&mut self, res: ComputeResponse) -> Result<()> {
-        let ComputeResponse::TrBFV(TrBFVResponse::CalculateDecryptionKey(output)) = res else {
+        let TrBFVResponse::CalculateDecryptionKey(output) = res.response else {
             bail!("Error extracting data from compute process")
         };
 
@@ -815,13 +842,13 @@ impl ThresholdKeyshare {
         })?;
 
         let state = self.state.try_get()?;
-        let e3_id = state.get_e3_id().clone();
+        let e3_id = state.get_e3_id();
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
         self.bus.publish(KeyshareCreated {
             pubkey: current.pk_share,
-            e3_id,
+            e3_id: e3_id.clone(),
             node: address,
         })?;
 
@@ -832,7 +859,7 @@ impl ThresholdKeyshare {
     pub fn handle_ciphertext_output_published(
         &mut self,
         msg: CiphertextOutputPublished,
-    ) -> Result<ComputeRequest> {
+    ) -> Result<()> {
         // Set state to decrypting
         self.state.try_mutate(|s| {
             use KeyshareState as K;
@@ -850,20 +877,25 @@ impl ThresholdKeyshare {
 
         let ciphertext_output = msg.ciphertext_output;
         let state = self.state.try_get()?;
+        let e3_id = state.get_e3_id();
         let decrypting: Decrypting = state.clone().try_into()?;
         let trbfv_config = state.get_trbfv_config();
-        let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
-            CalculateDecryptionShareRequest {
-                name: format!("party_id({})", state.party_id),
-                ciphertexts: ciphertext_output,
-                sk_poly_sum: decrypting.sk_poly_sum,
-                es_poly_sum: decrypting.es_poly_sum,
-                trbfv_config,
-            }
-            .into(),
-        ));
-
-        Ok(event) // CalculateDecryptionShareRequest
+        let event = ComputeRequest::new(
+            TrBFVRequest::CalculateDecryptionShare(
+                CalculateDecryptionShareRequest {
+                    name: format!("party_id({})", state.party_id),
+                    ciphertexts: ciphertext_output,
+                    sk_poly_sum: decrypting.sk_poly_sum,
+                    es_poly_sum: decrypting.es_poly_sum,
+                    trbfv_config,
+                }
+                .into(),
+            ),
+            CorrelationId::new(),
+            e3_id.clone(),
+        );
+        self.bus.publish(event)?; // CalculateDecryptionShareRequest
+        Ok(())
     }
 
     /// CalculateDecryptionShareResponse
@@ -898,45 +930,6 @@ impl ThresholdKeyshare {
 
         Ok(())
     }
-
-    /// This is handling some of the dark arts of actix
-    /// This effectively calls the request function which
-    /// generates a ComputeRequest message and then runs the request
-    /// on the multithread actor and trigggers the response
-    /// handler with the results. Errors at this stage are simply
-    /// logged. Eventually we will need to configure a policy here
-    /// For example retry with exponential backoff
-    fn multithread_request<F, R>(
-        &mut self,
-        request_fn: F,
-        response_fn: R,
-    ) -> ResponseActFuture<Self, ()>
-    where
-        F: FnOnce(&mut Self) -> Result<ComputeRequest>,
-        R: FnOnce(&mut Self, ComputeResponse, &mut <Self as Actor>::Context) -> Result<()>
-            + 'static,
-    {
-        // When handling futures in actix you need a pinned box
-        // This is so that the future stays in the same spot in memory
-        Box::pin(
-            // Run the request function and print if there is an error
-            match request_fn(self) {
-                Ok(evt) => self.multithread.send(evt),
-                Err(e) => {
-                    error!("{e}");
-                    return bail(self);
-                }
-            }
-            .into_actor(self)
-            .map(move |res, act, ctx| {
-                // Run the response function and print if there is an error
-                match (|| -> Result<()> { response_fn(act, res??, ctx) })() {
-                    Ok(_) => (),
-                    Err(e) => error!("{e}"),
-                }
-            }),
-        )
-    }
 }
 
 // Will only receive events that are for this specific e3_id
@@ -953,68 +946,65 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 let _ = self.handle_encryption_key_created(data, ctx.address());
             }
             EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
+            EnclaveEventData::ComputeResponse(data) => ctx.notify(data),
             _ => (),
         }
     }
 }
 
+impl Handler<ComputeResponse> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(&mut self, msg: ComputeResponse, _: &mut Self::Context) -> Self::Result {
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.handle_compute_response(msg)
+        })
+    }
+}
+
+// XXX: Support errors from multithread
+// Currently these are handled by the bus.err from the multithread but an error demands either a
+// retry or e3 abort
+// Errors may not necessarily be caught here but could be handled when the bus is listened to.
+// impl Handler<ComputeRequestError> for ThresholdKeyshare {
+//     type Result = ();
+//     fn handle(&mut self, msg: ComputeRequestError, ctx: &mut Self::Context) -> Self::Result {
+//         // handle_compute_request_error
+//     }
+// }
+
 impl Handler<CiphernodeSelected> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_ciphernode_selected(msg, ctx.address()) {
-            Err(e) => error!("{e}"),
-            Ok(_) => (),
-        }
-    }
-}
-
-impl Handler<GenEsiSss> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, ()>;
-    fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
-        self.multithread_request(
-            |act| act.handle_gen_esi_sss_requested(msg),
-            |act, res, _| act.handle_gen_esi_sss_response(res),
-        )
-    }
-}
-
-impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, ()>;
-    fn handle(&mut self, msg: GenPkShareAndSkSss, _: &mut Self::Context) -> Self::Result {
-        self.multithread_request(
-            |act| act.handle_gen_pk_share_and_sk_sss_requested(msg),
-            |act, res, _| act.handle_gen_pk_share_and_sk_sss_response(res),
-        )
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.handle_ciphernode_selected(msg, ctx.address())
+        })
     }
 }
 
 impl Handler<AllEncryptionKeysCollected> for ThresholdKeyshare {
     type Result = ();
-    fn handle(&mut self, msg: AllEncryptionKeysCollected, ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_all_encryption_keys_collected(msg, ctx.address()) {
-            Err(e) => error!("{e}"),
-            Ok(_) => (),
-        }
+    fn handle(&mut self, msg: AllEncryptionKeysCollected, _: &mut Self::Context) -> Self::Result {
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.handle_all_encryption_keys_collected(msg)
+        })
     }
 }
 
 impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = ();
     fn handle(&mut self, msg: AllThresholdSharesCollected, _: &mut Self::Context) -> Self::Result {
-        self.multithread_request(
-            |act| act.handle_all_threshold_shares_collected(msg),
-            |act, res, _| act.handle_calculate_decryption_key_response(res),
-        )
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.handle_all_threshold_shares_collected(msg)
+        })
     }
 }
 
 impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, ()>;
+    type Result = ();
     fn handle(&mut self, msg: CiphertextOutputPublished, _: &mut Self::Context) -> Self::Result {
-        self.multithread_request(
-            |act| act.handle_ciphertext_output_published(msg),
-            |act, res, _| act.handle_calculate_decryption_share_response(res),
-        )
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.handle_ciphertext_output_published(msg)
+        })
     }
 }
 

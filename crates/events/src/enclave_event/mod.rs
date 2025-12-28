@@ -122,6 +122,9 @@ pub enum EnclaveEventData {
     EncryptionKeyCreated(EncryptionKeyCreated),
     EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
     ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
+    ComputeRequest(ComputeRequest),
+    ComputeResponse(ComputeResponse),
+    ComputeRequestError(ComputeRequestError),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -336,7 +339,10 @@ impl_into_event_data!(
     ThresholdShareCreated,
     EncryptionKeyCreated,
     EncryptionKeyCollectionFailed,
-    ThresholdShareCollectionFailed
+    ThresholdShareCollectionFailed,
+    ComputeRequest,
+    ComputeResponse,
+    ComputeRequestError
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

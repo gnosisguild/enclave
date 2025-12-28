@@ -16,7 +16,7 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -470,13 +470,12 @@ impl CiphernodeBuilder {
         let mut e3_builder = E3Router::builder(&bus, store.clone());
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
-            let multithread = self.ensure_multithread();
+            let _ = self.ensure_multithread(&bus);
             let share_encryption_params = e3_trbfv::helpers::get_share_encryption_params();
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
-                &multithread,
                 &addr,
                 share_encryption_params,
             ))
@@ -502,11 +501,9 @@ impl CiphernodeBuilder {
 
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
-            let multithread = self.ensure_multithread();
+            let _ = self.ensure_multithread(&bus);
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus,
-                &sortition,
-                &multithread,
+                &bus, &sortition,
             ))
         }
 
@@ -526,7 +523,7 @@ impl CiphernodeBuilder {
         ))
     }
 
-    fn ensure_multithread(&mut self) -> Addr<Multithread> {
+    fn ensure_multithread(&mut self, bus: &BusHandle) -> Addr<Multithread> {
         // If we have it cached return it
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
@@ -534,6 +531,7 @@ impl CiphernodeBuilder {
         info!("Setting up multithread actor...");
         // Create it
         let addr = Multithread::attach(
+            bus,
             self.rng.clone(),
             self.cipher.clone(),
             self.threads.unwrap_or(1),

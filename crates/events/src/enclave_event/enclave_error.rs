@@ -39,6 +39,7 @@ pub enum EType {
     Sortition,
     Data,
     Event,
+    Computation,
 }
 
 impl EnclaveError {

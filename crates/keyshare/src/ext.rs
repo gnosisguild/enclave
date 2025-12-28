@@ -8,14 +8,13 @@ use crate::{
     Keyshare, KeyshareParams, KeyshareRepositoryFactory, KeyshareState, ThresholdKeyshare,
     ThresholdKeyshareParams, ThresholdKeyshareRepositoryFactory, ThresholdKeyshareState,
 };
-use actix::{Actor, Addr};
+use actix::Actor;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_fhe::ext::FHE_KEY;
-use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
@@ -116,7 +115,6 @@ pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
-    multithread: Addr<Multithread>,
     share_encryption_params: Arc<fhe::bfv::BfvParameters>,
 }
 
@@ -124,14 +122,12 @@ impl ThresholdKeyshareExtension {
     pub fn create(
         bus: &BusHandle,
         cipher: &Arc<Cipher>,
-        multithread: &Addr<Multithread>,
         address: &str,
         share_encryption_params: Arc<fhe::bfv::BfvParameters>,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
-            multithread: multithread.clone(),
             address: address.to_owned(),
             share_encryption_params,
         })
@@ -174,7 +170,6 @@ impl E3Extension for ThresholdKeyshareExtension {
                 ThresholdKeyshare::new(ThresholdKeyshareParams {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
-                    multithread: self.multithread.clone(),
                     state: container,
                     share_encryption_params: self.share_encryption_params.clone(),
                 })
@@ -205,7 +200,6 @@ impl E3Extension for ThresholdKeyshareExtension {
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
-            multithread: self.multithread.clone(),
             state,
             share_encryption_params: self.share_encryption_params.clone(),
         })
