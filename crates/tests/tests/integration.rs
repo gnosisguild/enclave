@@ -14,7 +14,7 @@ use e3_events::{
     E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
     TicketBalanceUpdated,
 };
-use e3_multithread::{GetReport, Multithread, MultithreadReport, ToReport};
+use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
@@ -167,7 +167,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Seems like you cannot send more than one job at a time to rayon
     let concurrent_jobs = 1; // leaving at 1
     let max_threadroom = Multithread::get_max_threads_minus(1);
-    let thread_pool = Multithread::create_thread_pool(max_threadroom);
+    let thread_pool = Multithread::create_thread_pool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     let nodes = CiphernodeSystemBuilder::new()
@@ -178,7 +178,7 @@ async fn test_trbfv_actor() -> Result<()> {
             CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .testmode_with_history()
-                .with_shared_threadpool(thread_pool.clone())
+                .with_shared_threadpool(&thread_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
@@ -195,7 +195,7 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building normal {}", &addr);
             CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
-                .with_shared_threadpool(thread_pool.clone())
+                .with_shared_threadpool(&thread_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()

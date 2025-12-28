@@ -6,6 +6,7 @@
 
 mod report;
 
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -37,6 +38,7 @@ pub use report::MultithreadReport;
 pub use report::ToReport;
 use report::TrackDuration;
 use tokio::sync::Semaphore;
+use tokio::time::sleep;
 use tracing::error;
 use tracing::info;
 use tracing::warn;
@@ -46,8 +48,7 @@ pub struct Multithread {
     bus: BusHandle,
     rng: SharedRng,
     cipher: Arc<Cipher>,
-    rayon_limit: Arc<Semaphore>,
-    thread_pool: Arc<ThreadPool>,
+    thread_pool: MultithreadThreadpool,
     report: Option<Addr<MultithreadReport>>,
 }
 
@@ -56,18 +57,14 @@ impl Multithread {
         bus: BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        thread_pool: Arc<ThreadPool>,
-        max_simultaneous_rayon_tasks: usize,
+        thread_pool: MultithreadThreadpool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Self {
-        let rayon_limit = Arc::new(Semaphore::new(max_simultaneous_rayon_tasks));
-
         Self {
             bus,
             rng,
             cipher,
             thread_pool,
-            rayon_limit,
             report,
         }
     }
@@ -85,8 +82,7 @@ impl Multithread {
         bus: &BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        thread_pool: Arc<ThreadPool>,
-        max_simultaneous_rayon_tasks: usize,
+        thread_pool: MultithreadThreadpool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(
@@ -94,7 +90,6 @@ impl Multithread {
             rng.clone(),
             cipher.clone(),
             thread_pool,
-            max_simultaneous_rayon_tasks,
             report,
         )
         .start();
@@ -102,13 +97,8 @@ impl Multithread {
         addr
     }
 
-    pub fn create_thread_pool(threads: usize) -> Arc<ThreadPool> {
-        Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .expect("Failed to build thread pool"),
-        )
+    pub fn create_thread_pool(threads: usize, max_tasks: usize) -> MultithreadThreadpool {
+        MultithreadThreadpool::new(threads, max_tasks)
     }
 }
 
@@ -128,28 +118,16 @@ impl Handler<EnclaveEvent> for Multithread {
 }
 
 impl Handler<ComputeRequest> for Multithread {
-    // type Result = ResponseFuture<Result<ComputeResponse, ComputeRequestError>>;
     type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
-        let thread_pool = self.thread_pool.clone();
-        let semaphore = self.rayon_limit.clone();
+        let pool = self.thread_pool.clone();
         let report = self.report.clone();
         // TODO: replace with trap_fut
         Box::pin(async move {
-            match handle_compute_request_event(
-                msg,
-                bus,
-                cipher,
-                rng,
-                thread_pool,
-                semaphore,
-                report,
-            )
-            .await
-            {
+            match handle_compute_request_event(msg, bus, cipher, rng, pool, report).await {
                 Ok(_) => (),
                 Err(e) => error!("{e}"),
             }
@@ -162,81 +140,32 @@ async fn handle_compute_request_event(
     bus: BusHandle,
     cipher: Arc<Cipher>,
     rng: SharedRng,
-    thread_pool: Arc<ThreadPool>,
-    semaphore: Arc<Semaphore>,
+    pool: MultithreadThreadpool,
     report: Option<Addr<MultithreadReport>>,
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
 
-    // Block until we have enough task slots available we have to do this this way as
-    // because we use do_send() everywhere there is no backpressure on the actors
-    let _permit = semaphore
-        .acquire()
-        .await
-        .map_err(|_| ComputeRequestError::SemaphoreError(msg_string.to_string()))?;
-
-    // Warn of long running jobs
-    let warning_handle = tokio::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-        warn!(
-            "Job '{}' has been running for more than 10 seconds",
-            job_name
-        );
-        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        error!(
-            "Job '{}' has been running for more than 30 seconds",
-            job_name
-        );
-    });
-
-    // This uses channels to track pending and complete tasks when
-    // using the thread pool
-    let (tx, rx) = tokio::sync::oneshot::channel();
-
     // We spawn a thread on rayon moving to "sync"-land
-    thread_pool.spawn(move || {
-        // Do the actual work this is gonna take a while...
-        let (result, duration) = handle_compute_request(rng, cipher, msg);
-
-        // try to return the result and it's duration note this is sync as it is a oneshot sender.
-        if let Err(res) = tx.send((result, Some(duration))) {
-            error!(
-                "There was an error sending the result from the multithread actor: result = {:?}",
-                res
-            );
-        }
-    });
+    let (result, duration) = pool
+        .spawn(job_name, move || {
+            // Do the actual work this is gonna take a while...
+            handle_compute_request(rng, cipher, msg)
+        })
+        .await?;
     // we are back in async io land...
-
-    // await the oneshot
-    let (result, duration) = rx.await.unwrap_or_else(|_| {
-        (
-            Err(ComputeRequestError::RecvError(msg_string.to_string())),
-            None,
-        )
-    });
-
-    warning_handle.abort();
 
     // incase we are collecting events for a report
     if let Some(report) = report {
-        if let Some(dur) = duration {
-            report.do_send(TrackDuration::new(msg_string, dur))
-        }
+        report.do_send(TrackDuration::new(msg_string, duration))
     };
 
     match result {
         Ok(val) => bus.publish(val)?,
         Err(e) => bus.err(EType::Computation, e),
     };
-
     Ok(())
 }
-
-#[derive(Message, Debug)]
-#[rtype("Option<String>")]
-pub struct GetReport;
 
 fn timefunc<F>(
     name: &str,
@@ -341,5 +270,71 @@ fn handle_compute_request(
                 )),
             },
         ),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MultithreadThreadpool {
+    semaphore: Arc<Semaphore>,
+    thread_pool: Arc<ThreadPool>,
+}
+
+impl MultithreadThreadpool {
+    pub fn new(threads: usize, max_tasks: usize) -> MultithreadThreadpool {
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .expect("Failed to build thread pool");
+
+        Self {
+            thread_pool: Arc::new(thread_pool),
+            semaphore: Arc::new(Semaphore::new(max_tasks)),
+        }
+    }
+
+    pub async fn spawn<OP, T: Debug + Send + 'static>(&self, task_name: String, op: OP) -> Result<T>
+    where
+        OP: FnOnce() -> T + Send + 'static,
+    {
+        // Limit the requests and get them to block
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| ComputeRequestError::SemaphoreError(task_name.to_owned()))?;
+
+        // Warn of long running jobs
+        let warning_handle = tokio::spawn(async move {
+            sleep(Duration::from_secs(10)).await;
+            warn!(
+                "Job '{}' has been running for more than 10 seconds",
+                task_name
+            );
+            sleep(Duration::from_secs(30)).await;
+            error!(
+                "Job '{}' has been running for more than 30 seconds",
+                task_name
+            );
+        });
+
+        // This uses channels to track pending and complete tasks when
+        // using the thread pool
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.thread_pool.spawn(|| {
+            let t = op();
+            // try to return the result and it's duration note this is sync as it is a oneshot sender.
+            if let Err(res) = tx.send(t) {
+                error!(
+                "There was an error sending the result from the multithread actor: result = {:?}",
+                res
+            );
+            }
+        });
+
+        let output = rx.await?;
+
+        warning_handle.abort();
+
+        Ok(output)
     }
 }

@@ -29,7 +29,7 @@ use e3_evm::{
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
-use e3_multithread::{Multithread, MultithreadReport};
+use e3_multithread::{Multithread, MultithreadReport, MultithreadThreadpool};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
@@ -73,7 +73,7 @@ pub struct CiphernodeBuilder {
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     testmode_errors: bool,
     testmode_history: bool,
-    thread_pool: Option<Arc<ThreadPool>>,
+    thread_pool: Option<MultithreadThreadpool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
 }
@@ -219,8 +219,8 @@ impl CiphernodeBuilder {
     }
 
     /// Connect rayon work to the given threadpool
-    pub fn with_shared_threadpool(mut self, pool: Arc<ThreadPool>) -> Self {
-        self.thread_pool = Some(pool);
+    pub fn with_shared_threadpool(mut self, pool: &MultithreadThreadpool) -> Self {
+        self.thread_pool = Some(pool.clone());
         self
     }
 
@@ -532,13 +532,16 @@ impl CiphernodeBuilder {
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
+
         info!("Setting up multithread actor...");
 
         // Setup threadpool if not set
-        let thread_pool = self
-            .thread_pool
-            .clone()
-            .unwrap_or_else(|| Multithread::create_thread_pool(self.threads.unwrap_or(1)));
+        let thread_pool = self.thread_pool.clone().unwrap_or_else(|| {
+            Multithread::create_thread_pool(
+                self.threads.unwrap_or(1),
+                self.multithread_concurrent_jobs.unwrap_or(1),
+            )
+        });
 
         // Create it
         let addr = Multithread::attach(
@@ -546,7 +549,6 @@ impl CiphernodeBuilder {
             self.rng.clone(),
             self.cipher.clone(),
             thread_pool,
-            self.multithread_concurrent_jobs.unwrap_or(1),
             self.multithread_report.clone(),
         );
 
