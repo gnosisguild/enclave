@@ -392,8 +392,10 @@ async fn test_trbfv_actor() -> Result<()> {
         "DecryptionshareCreated",
         "DecryptionshareCreated",
         "DecryptionshareCreated",
+        "ComputeRequest",
         "DecryptionshareCreated",
         "DecryptionshareCreated",
+        "ComputeResponse",
         "PlaintextAggregated",
     ];
 
