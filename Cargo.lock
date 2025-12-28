@@ -2801,6 +2801,7 @@ dependencies = [
  "e3-trbfv",
  "e3-utils",
  "once_cell",
+ "rayon",
  "tempfile",
  "tokio",
  "tracing",

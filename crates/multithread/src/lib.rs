@@ -33,7 +33,9 @@ use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use rand::Rng;
 use rayon::{self, ThreadPool};
-use report::MultithreadReport;
+pub use report::MultithreadReport;
+pub use report::ToReport;
+use report::TrackDuration;
 use tokio::sync::Semaphore;
 use tracing::error;
 use tracing::info;
@@ -46,7 +48,7 @@ pub struct Multithread {
     cipher: Arc<Cipher>,
     rayon_limit: Arc<Semaphore>,
     thread_pool: Arc<ThreadPool>,
-    report: Option<MultithreadReport>,
+    report: Option<Addr<MultithreadReport>>,
 }
 
 impl Multithread {
@@ -54,20 +56,10 @@ impl Multithread {
         bus: BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        rayon_threads: usize,
+        thread_pool: Arc<ThreadPool>,
         max_simultaneous_rayon_tasks: usize,
-        capture_events: bool,
+        report: Option<Addr<MultithreadReport>>,
     ) -> Self {
-        let thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(rayon_threads)
-                .build()
-                .expect("Failed to create Rayon thread pool"),
-        );
-        info!(
-            "Created threadpool with {} threads.",
-            thread_pool.current_num_threads()
-        );
         let rayon_limit = Arc::new(Semaphore::new(max_simultaneous_rayon_tasks));
 
         Self {
@@ -76,14 +68,7 @@ impl Multithread {
             cipher,
             thread_pool,
             rayon_limit,
-            report: if capture_events {
-                Some(MultithreadReport::new(
-                    rayon_threads,
-                    max_simultaneous_rayon_tasks,
-                ))
-            } else {
-                None
-            },
+            report,
         }
     }
 
@@ -100,21 +85,30 @@ impl Multithread {
         bus: &BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        rayon_threads: usize,
+        thread_pool: Arc<ThreadPool>,
         max_simultaneous_rayon_tasks: usize,
-        capture_events: bool,
+        report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(
             bus.clone(),
             rng.clone(),
             cipher.clone(),
-            rayon_threads,
+            thread_pool,
             max_simultaneous_rayon_tasks,
-            capture_events,
+            report,
         )
         .start();
         bus.subscribe("ComputeRequest", addr.clone().recipient());
         addr
+    }
+
+    pub fn create_thread_pool(threads: usize) -> Arc<ThreadPool> {
+        Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .expect("Failed to build thread pool"),
+        )
     }
 }
 
@@ -125,6 +119,7 @@ impl Actor for Multithread {
 impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        info!("Multithread received EnclaveEvent!");
         match msg.get_data() {
             EnclaveEventData::ComputeRequest(data) => ctx.notify(data.clone()),
             _ => (),
@@ -135,14 +130,13 @@ impl Handler<EnclaveEvent> for Multithread {
 impl Handler<ComputeRequest> for Multithread {
     // type Result = ResponseFuture<Result<ComputeResponse, ComputeRequestError>>;
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: ComputeRequest, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
         let thread_pool = self.thread_pool.clone();
         let semaphore = self.rayon_limit.clone();
-        let self_addr = ctx.address();
-        let capture_events = self.report.is_some();
+        let report = self.report.clone();
         // TODO: replace with trap_fut
         Box::pin(async move {
             match handle_compute_request_event(
@@ -152,8 +146,7 @@ impl Handler<ComputeRequest> for Multithread {
                 rng,
                 thread_pool,
                 semaphore,
-                self_addr,
-                capture_events,
+                report,
             )
             .await
             {
@@ -171,8 +164,7 @@ async fn handle_compute_request_event(
     rng: SharedRng,
     thread_pool: Arc<ThreadPool>,
     semaphore: Arc<Semaphore>,
-    self_addr: Addr<Multithread>,
-    capture_events: bool,
+    report: Option<Addr<MultithreadReport>>,
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
@@ -228,9 +220,9 @@ async fn handle_compute_request_event(
     warning_handle.abort();
 
     // incase we are collecting events for a report
-    if capture_events {
+    if let Some(report) = report {
         if let Some(dur) = duration {
-            self_addr.do_send(TrackDuration::new(msg_string, dur))
+            report.do_send(TrackDuration::new(msg_string, dur))
         }
     };
 
@@ -240,39 +232,6 @@ async fn handle_compute_request_event(
     };
 
     Ok(())
-}
-
-impl Handler<TrackDuration> for Multithread {
-    type Result = ();
-    fn handle(&mut self, msg: TrackDuration, _: &mut Self::Context) -> Self::Result {
-        // If the report is there we are tracking durations
-        if let Some(report) = &mut self.report {
-            report.track(msg);
-        };
-    }
-}
-
-impl Handler<GetReport> for Multithread {
-    type Result = Option<String>;
-    fn handle(&mut self, _: GetReport, _: &mut Self::Context) -> Self::Result {
-        if let Some(ref report) = self.report {
-            return Some(report.to_report().to_string());
-        }
-        None
-    }
-}
-
-#[derive(Message, Debug)]
-#[rtype("()")]
-pub struct TrackDuration {
-    name: String,
-    duration: Duration,
-}
-
-impl TrackDuration {
-    pub fn new(name: String, duration: Duration) -> Self {
-        Self { name, duration }
-    }
 }
 
 #[derive(Message, Debug)]
