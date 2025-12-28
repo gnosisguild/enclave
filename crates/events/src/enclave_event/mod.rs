@@ -305,6 +305,7 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
