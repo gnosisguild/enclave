@@ -961,17 +961,6 @@ impl Handler<ComputeResponse> for ThresholdKeyshare {
     }
 }
 
-// XXX: Support errors from multithread
-// Currently these are handled by the bus.err from the multithread but an error demands either a
-// retry or e3 abort
-// Errors may not necessarily be caught here but could be handled when the bus is listened to.
-// impl Handler<ComputeRequestError> for ThresholdKeyshare {
-//     type Result = ();
-//     fn handle(&mut self, msg: ComputeRequestError, ctx: &mut Self::Context) -> Self::Result {
-//         // handle_compute_request_error
-//     }
-// }
-
 impl Handler<CiphernodeSelected> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
