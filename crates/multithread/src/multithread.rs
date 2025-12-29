@@ -18,6 +18,7 @@ use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_events::BusHandle;
+use e3_events::ComputeRequestErrorKind;
 use e3_events::EType;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
@@ -178,12 +179,7 @@ fn handle_compute_request(
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     let id: u8 = rand::thread_rng().gen();
 
-    let ComputeRequest {
-        correlation_id,
-        e3_id,
-        request,
-    } = request;
-    match request {
+    match request.request.clone() {
         TrBFVRequest::GenPkShareAndSkSss(req) => {
             timefunc(
                 "gen_pk_share_and_sk_sss",
@@ -191,12 +187,15 @@ fn handle_compute_request(
                 || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
                     Ok(o) => Ok(ComputeResponse::new(
                         TrBFVResponse::GenPkShareAndSkSss(o),
-                        correlation_id,
-                        e3_id,
+                        request.correlation_id,
+                        request.e3_id,
                     )),
-                    Err(e) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss(
-                        e.to_string(),
-                    ))),
+                    Err(e) => Err(ComputeRequestError::new(
+                        ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(
+                            e.to_string(),
+                        )),
+                        request,
+                    )),
                 },
             )
         }
@@ -204,12 +203,13 @@ fn handle_compute_request(
             match gen_esi_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::new(
                     TrBFVResponse::GenEsiSss(o),
-                    correlation_id,
-                    e3_id,
+                    request.correlation_id,
+                    request.e3_id,
                 )),
-                Err(e) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss(
-                    e.to_string(),
-                ))),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(TrBFVError::GenEsiSss(e.to_string())),
+                    request,
+                )),
             }
         }),
         TrBFVRequest::CalculateDecryptionKey(req) => timefunc(
@@ -218,13 +218,16 @@ fn handle_compute_request(
             || match calculate_decryption_key(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::new(
                     TrBFVResponse::CalculateDecryptionKey(o),
-                    correlation_id,
-                    e3_id,
+                    request.correlation_id,
+                    request.e3_id,
                 )),
                 Err(e) => {
                     error!("Error calculating decryption key: {}", e);
-                    Err(ComputeRequestError::TrBFV(
-                        TrBFVError::CalculateDecryptionKey(e.to_string()),
+                    Err(ComputeRequestError::new(
+                        ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateDecryptionKey(
+                            e.to_string(),
+                        )),
+                        request,
                     ))
                 }
             },
@@ -235,11 +238,14 @@ fn handle_compute_request(
             || match calculate_decryption_share(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::new(
                     TrBFVResponse::CalculateDecryptionShare(o),
-                    correlation_id,
-                    e3_id,
+                    request.correlation_id,
+                    request.e3_id,
                 )),
-                Err(e) => Err(ComputeRequestError::TrBFV(
-                    TrBFVError::CalculateDecryptionShare(e.to_string()),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateDecryptionShare(
+                        e.to_string(),
+                    )),
+                    request,
                 )),
             },
         ),
@@ -249,11 +255,14 @@ fn handle_compute_request(
             || match calculate_threshold_decryption(req) {
                 Ok(o) => Ok(ComputeResponse::new(
                     TrBFVResponse::CalculateThresholdDecryption(o),
-                    correlation_id,
-                    e3_id,
+                    request.correlation_id,
+                    request.e3_id,
                 )),
-                Err(e) => Err(ComputeRequestError::TrBFV(
-                    TrBFVError::CalculateThresholdDecryption(e.to_string()),
+                Err(e) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateThresholdDecryption(
+                        e.to_string(),
+                    )),
+                    request,
                 )),
             },
         ),

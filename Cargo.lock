@@ -3146,6 +3146,7 @@ dependencies = [
  "e3-utils",
  "rand 0.8.5",
  "rayon",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "zeroize",

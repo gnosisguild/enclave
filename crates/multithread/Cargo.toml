@@ -18,4 +18,5 @@ rand = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 zeroize = { workspace = true }

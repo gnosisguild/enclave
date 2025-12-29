@@ -4,12 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
-use e3_events::ComputeRequestError;
 use rayon::ThreadPool;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::{sync::Arc, time::Duration};
+use thiserror::Error;
+use tokio::sync::oneshot::error::RecvError;
 use tokio::{sync::Semaphore, time::sleep};
 use tracing::{debug, error, info, warn, Level};
 
@@ -18,6 +18,15 @@ use tracing::{debug, error, info, warn, Level};
 pub struct TaskPool {
     semaphore: Arc<Semaphore>,
     thread_pool: Arc<ThreadPool>,
+}
+
+#[derive(Debug, Error)]
+pub enum TaskPoolError {
+    #[error("{0}")]
+    SemaphoreError(String),
+
+    #[error("{0}")]
+    RecvError(RecvError),
 }
 
 impl TaskPool {
@@ -39,7 +48,7 @@ impl TaskPool {
         task_name: String,
         timed_logs: impl Into<TaskTimeouts>, // [(10, Level::WARN), (30, Level::ERROR)]
         op: OP,
-    ) -> Result<T>
+    ) -> Result<T, TaskPoolError>
     where
         OP: FnOnce() -> T + Send + 'static,
     {
@@ -49,7 +58,7 @@ impl TaskPool {
             .semaphore
             .acquire()
             .await
-            .map_err(|_| ComputeRequestError::SemaphoreError(task_name.to_owned()))?;
+            .map_err(|_| TaskPoolError::SemaphoreError(task_name.to_owned()))?;
 
         // Warn of long running jobs
         let warning_handle = tokio::spawn(async move {
@@ -81,7 +90,7 @@ impl TaskPool {
             }
         });
 
-        let output = rx.await?;
+        let output = rx.await.map_err(|r| TaskPoolError::RecvError(r))?;
 
         warning_handle.abort();
 

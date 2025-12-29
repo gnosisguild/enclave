@@ -64,11 +64,9 @@ impl ToString for ComputeRequest {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputeResponse {
-    /// By Protocol
     pub response: e3_trbfv::TrBFVResponse,
     pub correlation_id: CorrelationId,
     pub e3_id: E3id,
-    // Eg. TFHE(TFHEResponse)
 }
 
 impl ComputeResponse {
@@ -89,34 +87,41 @@ impl ComputeResponse {
 /// This enum provides protocol disambiguation
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub enum ComputeRequestError {
-    /// By Protocol
+pub struct ComputeRequestError {
+    kind: ComputeRequestErrorKind,
+    request: ComputeRequest,
+}
+
+impl ComputeRequestError {
+    pub fn new(kind: ComputeRequestErrorKind, request: ComputeRequest) -> Self {
+        Self { kind, request }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ComputeRequestErrorKind {
     TrBFV(e3_trbfv::TrBFVError),
-    RecvError(String),
-    SemaphoreError(String),
-    // Eg. TFHE(TFHEError)
+}
+
+impl ComputeRequestError {
+    pub fn get_err(&self) -> &ComputeRequestErrorKind {
+        &self.kind
+    }
 }
 
 impl std::error::Error for ComputeRequestError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ComputeRequestError::TrBFV(err) => Some(err),
-            _ => None,
+        match self.get_err() {
+            ComputeRequestErrorKind::TrBFV(err) => Some(err),
         }
     }
 }
 
 impl fmt::Display for ComputeRequestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ComputeRequestError::TrBFV(err) => {
+        match self.get_err() {
+            ComputeRequestErrorKind::TrBFV(err) => {
                 write!(f, "We had an error number crunching: {:?}", err)
-            }
-            ComputeRequestError::SemaphoreError(name) => {
-                write!(f, "Multithread SemaphoreError. This means there was a problem acquiring the semaphore lock for this ComputeRequest: '{name}'")
-            }
-            ComputeRequestError::RecvError(name) => {
-                write!(f, "Multithread RecvError. This means there was a problem receiving a response for this ComputeRequest: '{name}'")
             }
         }
     }
