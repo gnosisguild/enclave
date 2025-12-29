@@ -167,7 +167,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // Seems like you cannot send more than one job at a time to rayon
     let concurrent_jobs = 1; // leaving at 1
     let max_threadroom = Multithread::get_max_threads_minus(1);
-    let thread_pool = Multithread::create_thread_pool(max_threadroom, concurrent_jobs);
+    let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     let nodes = CiphernodeSystemBuilder::new()
@@ -178,7 +178,7 @@ async fn test_trbfv_actor() -> Result<()> {
             CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .testmode_with_history()
-                .with_shared_threadpool(&thread_pool)
+                .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
@@ -195,7 +195,7 @@ async fn test_trbfv_actor() -> Result<()> {
             println!("Building normal {}", &addr);
             CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
                 .with_address(&addr)
-                .with_shared_threadpool(&thread_pool)
+                .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()

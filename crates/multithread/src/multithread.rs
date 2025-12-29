@@ -4,16 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::fmt::Debug;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
 use crate::report::MultithreadReport;
-use crate::report::ToReport;
 use crate::report::TrackDuration;
-use crate::MultithreadThreadpool;
+use crate::TaskPool;
+use crate::TaskTimeouts;
 use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
@@ -35,19 +34,15 @@ use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use rand::Rng;
-use rayon::{self, ThreadPool};
-use tokio::sync::Semaphore;
-use tokio::time::sleep;
 use tracing::error;
 use tracing::info;
-use tracing::warn;
 
 /// Multithread actor
 pub struct Multithread {
     bus: BusHandle,
     rng: SharedRng,
     cipher: Arc<Cipher>,
-    thread_pool: MultithreadThreadpool,
+    task_pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
 }
 
@@ -56,14 +51,14 @@ impl Multithread {
         bus: BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        thread_pool: MultithreadThreadpool,
+        task_pool: TaskPool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Self {
         Self {
             bus,
             rng,
             cipher,
-            thread_pool,
+            task_pool,
             report,
         }
     }
@@ -81,23 +76,16 @@ impl Multithread {
         bus: &BusHandle,
         rng: SharedRng,
         cipher: Arc<Cipher>,
-        thread_pool: MultithreadThreadpool,
+        task_pool: TaskPool,
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
-        let addr = Self::new(
-            bus.clone(),
-            rng.clone(),
-            cipher.clone(),
-            thread_pool,
-            report,
-        )
-        .start();
+        let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
         bus.subscribe("ComputeRequest", addr.clone().recipient());
         addr
     }
 
-    pub fn create_thread_pool(threads: usize, max_tasks: usize) -> MultithreadThreadpool {
-        MultithreadThreadpool::new(threads, max_tasks)
+    pub fn create_taskpool(threads: usize, max_tasks: usize) -> TaskPool {
+        TaskPool::new(threads, max_tasks)
     }
 }
 
@@ -122,7 +110,7 @@ impl Handler<ComputeRequest> for Multithread {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
-        let pool = self.thread_pool.clone();
+        let pool = self.task_pool.clone();
         let report = self.report.clone();
         // TODO: replace with trap_fut
         Box::pin(async move {
@@ -139,7 +127,7 @@ async fn handle_compute_request_event(
     bus: BusHandle,
     cipher: Arc<Cipher>,
     rng: SharedRng,
-    pool: MultithreadThreadpool,
+    pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
@@ -147,7 +135,7 @@ async fn handle_compute_request_event(
 
     // We spawn a thread on rayon moving to "sync"-land
     let (result, duration) = pool
-        .spawn(job_name, move || {
+        .spawn(job_name, TaskTimeouts::default(), move || {
             // Do the actual work this is gonna take a while...
             handle_compute_request(rng, cipher, msg)
         })
