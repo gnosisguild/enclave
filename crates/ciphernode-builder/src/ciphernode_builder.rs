@@ -16,7 +16,7 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -29,13 +29,14 @@ use e3_evm::{
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
-use e3_multithread::Multithread;
+use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
+use rayon::ThreadPool;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -52,26 +53,27 @@ enum EventSystemType {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
-    name: String,
     address: Option<String>,
     chains: Vec<ChainConfig>,
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
     contract_components: ContractComponents,
+    event_system: EventSystemType,
     in_mem_store: Option<Addr<InMemStore>>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
-    event_system: EventSystemType,
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
-    multithread_capture_events: bool,
+    multithread_report: Option<Addr<MultithreadReport>>,
+    name: String,
     plaintext_agg: bool,
     pubkey_agg: bool,
     rng: SharedRng,
-    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     sortition_backend: SortitionBackend,
+    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     testmode_errors: bool,
     testmode_history: bool,
+    task_pool: Option<TaskPool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
 }
@@ -104,26 +106,27 @@ impl CiphernodeBuilder {
     /// - cipher - Cipher for encryption and decryption of sensitive data
     pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
-            name: name.to_owned(),
             address: None,
             chains: vec![],
             cipher,
             contract_components: ContractComponents::default(),
+            event_system: EventSystemType::InMem,
             in_mem_store: None,
             keyshare: None,
             logging: false,
             multithread_cache: None,
+            multithread_concurrent_jobs: None,
+            multithread_report: None,
+            name: name.to_owned(),
             plaintext_agg: false,
             pubkey_agg: false,
-            multithread_concurrent_jobs: None,
-            event_system: EventSystemType::InMem,
             rng,
-            source_bus: None,
             sortition_backend: SortitionBackend::score(),
+            source_bus: None,
             testmode_errors: false,
             testmode_history: false,
+            task_pool: None,
             threads: None,
-            multithread_capture_events: false,
             threshold_plaintext_agg: false,
         }
     }
@@ -215,9 +218,15 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Inject a preexisting multithread actor. This is mainly used for testing.
-    pub fn with_injected_multithread(mut self, multithread: Addr<Multithread>) -> Self {
-        self.multithread_cache = Some(multithread);
+    /// Connect rayon work to the given threadpool
+    pub fn with_shared_taskpool(mut self, pool: &TaskPool) -> Self {
+        self.task_pool = Some(pool.clone());
+        self
+    }
+
+    /// Shared MultithreadReport for benchmarking
+    pub fn with_shared_multithread_report(mut self, report: &Addr<MultithreadReport>) -> Self {
+        self.multithread_report = Some(report.clone());
         self
     }
 
@@ -243,11 +252,6 @@ impl CiphernodeBuilder {
     /// Set the number of concurrent jobs defaults to 1
     pub fn with_multithread_concurrent_jobs(mut self, jobs: usize) -> Self {
         self.multithread_concurrent_jobs = if jobs >= 1 { Some(jobs) } else { None };
-        self
-    }
-
-    pub fn with_multithread_capture_events(mut self) -> Self {
-        self.multithread_capture_events = true;
         self
     }
 
@@ -470,13 +474,12 @@ impl CiphernodeBuilder {
         let mut e3_builder = E3Router::builder(&bus, store.clone());
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
-            let multithread = self.ensure_multithread();
+            let _ = self.ensure_multithread(&bus);
             let share_encryption_params = e3_trbfv::helpers::get_share_encryption_params();
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
-                &multithread,
                 &addr,
                 share_encryption_params,
             ))
@@ -502,11 +505,9 @@ impl CiphernodeBuilder {
 
         if self.threshold_plaintext_agg {
             info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
-            let multithread = self.ensure_multithread();
+            let _ = self.ensure_multithread(&bus);
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus,
-                &sortition,
-                &multithread,
+                &bus, &sortition,
             ))
         }
 
@@ -526,19 +527,29 @@ impl CiphernodeBuilder {
         ))
     }
 
-    fn ensure_multithread(&mut self) -> Addr<Multithread> {
+    fn ensure_multithread(&mut self, bus: &BusHandle) -> Addr<Multithread> {
         // If we have it cached return it
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
+
         info!("Setting up multithread actor...");
+
+        // Setup threadpool if not set
+        let task_pool = self.task_pool.clone().unwrap_or_else(|| {
+            Multithread::create_taskpool(
+                self.threads.unwrap_or(1),
+                self.multithread_concurrent_jobs.unwrap_or(1),
+            )
+        });
+
         // Create it
         let addr = Multithread::attach(
+            bus,
             self.rng.clone(),
             self.cipher.clone(),
-            self.threads.unwrap_or(1),
-            self.multithread_concurrent_jobs.unwrap_or(1),
-            self.multithread_capture_events,
+            task_pool,
+            self.multithread_report.clone(),
         );
 
         // Set the cache

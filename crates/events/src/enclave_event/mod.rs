@@ -122,6 +122,9 @@ pub enum EnclaveEventData {
     EncryptionKeyCreated(EncryptionKeyCreated),
     EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
     ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
+    ComputeRequest(ComputeRequest),
+    ComputeResponse(ComputeResponse),
+    ComputeRequestError(ComputeRequestError),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -302,6 +305,7 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::TicketGenerated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -336,7 +340,10 @@ impl_into_event_data!(
     ThresholdShareCreated,
     EncryptionKeyCreated,
     EncryptionKeyCollectionFailed,
-    ThresholdShareCollectionFailed
+    ThresholdShareCollectionFailed,
+    ComputeRequest,
+    ComputeResponse,
+    ComputeRequestError
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

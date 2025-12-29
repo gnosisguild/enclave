@@ -17,28 +17,41 @@ use e3_trbfv::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::{CorrelationId, E3id};
+
 /// The compute instruction for a threadpool computation.
 /// This enum provides protocol disambiguation
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "Result<ComputeResponse,ComputeRequestError>")]
-pub enum ComputeRequest {
-    /// By Protocol
-    TrBFV(e3_trbfv::TrBFVRequest),
-    // Eg. TFHE(TFHERequest)
+// #[rtype(result = "Result<ComputeResponse,ComputeRequestError>")]
+#[rtype(result = "()")]
+pub struct ComputeRequest {
+    // TODO: Disambiguate protocol later
+    pub request: e3_trbfv::TrBFVRequest,
+    pub correlation_id: CorrelationId,
+    pub e3_id: E3id, // It may come to pass this should be option
+                     // but our initial need is only within the e3 flow
 }
-
+impl ComputeRequest {
+    pub fn new(
+        request: e3_trbfv::TrBFVRequest,
+        correlation_id: CorrelationId,
+        e3_id: E3id,
+    ) -> Self {
+        Self {
+            request,
+            correlation_id,
+            e3_id,
+        }
+    }
+}
 impl ToString for ComputeRequest {
     fn to_string(&self) -> String {
-        match self {
-            Self::TrBFV(e3_trbfv::TrBFVRequest::GenEsiSss(_)) => "GenEsiSss",
-            Self::TrBFV(e3_trbfv::TrBFVRequest::GenPkShareAndSkSss(_)) => "GenPkShareAndSkSss",
-            Self::TrBFV(e3_trbfv::TrBFVRequest::CalculateDecryptionKey(_)) => {
-                "CalculateDecryptionKey"
-            }
-            Self::TrBFV(e3_trbfv::TrBFVRequest::CalculateDecryptionShare(_)) => {
-                "CalculateDecryptionShare"
-            }
-            Self::TrBFV(e3_trbfv::TrBFVRequest::CalculateThresholdDecryption(_)) => {
+        match self.request {
+            e3_trbfv::TrBFVRequest::GenEsiSss(_) => "GenEsiSss",
+            e3_trbfv::TrBFVRequest::GenPkShareAndSkSss(_) => "GenPkShareAndSkSss",
+            e3_trbfv::TrBFVRequest::CalculateDecryptionKey(_) => "CalculateDecryptionKey",
+            e3_trbfv::TrBFVRequest::CalculateDecryptionShare(_) => "CalculateDecryptionShare",
+            e3_trbfv::TrBFVRequest::CalculateThresholdDecryption(_) => {
                 "CalculateThresholdDecryption"
             }
         }
@@ -50,43 +63,65 @@ impl ToString for ComputeRequest {
 /// This enum provides protocol disambiguation
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub enum ComputeResponse {
-    /// By Protocol
-    TrBFV(e3_trbfv::TrBFVResponse),
-    // Eg. TFHE(TFHEResponse)
+pub struct ComputeResponse {
+    pub response: e3_trbfv::TrBFVResponse,
+    pub correlation_id: CorrelationId,
+    pub e3_id: E3id,
+}
+
+impl ComputeResponse {
+    pub fn new(
+        response: e3_trbfv::TrBFVResponse,
+        correlation_id: CorrelationId,
+        e3_id: E3id,
+    ) -> ComputeResponse {
+        ComputeResponse {
+            response,
+            correlation_id,
+            e3_id,
+        }
+    }
 }
 
 /// An error from a threadpool computation
 /// This enum provides protocol disambiguation
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct ComputeRequestError {
+    kind: ComputeRequestErrorKind,
+    request: ComputeRequest,
+}
+
+impl ComputeRequestError {
+    pub fn new(kind: ComputeRequestErrorKind, request: ComputeRequest) -> Self {
+        Self { kind, request }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ComputeRequestError {
-    /// By Protocol
+pub enum ComputeRequestErrorKind {
     TrBFV(e3_trbfv::TrBFVError),
-    RecvError(String),
-    SemaphoreError(String),
-    // Eg. TFHE(TFHEError)
+}
+
+impl ComputeRequestError {
+    pub fn get_err(&self) -> &ComputeRequestErrorKind {
+        &self.kind
+    }
 }
 
 impl std::error::Error for ComputeRequestError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ComputeRequestError::TrBFV(err) => Some(err),
-            _ => None,
+        match self.get_err() {
+            ComputeRequestErrorKind::TrBFV(err) => Some(err),
         }
     }
 }
 
 impl fmt::Display for ComputeRequestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ComputeRequestError::TrBFV(err) => {
+        match self.get_err() {
+            ComputeRequestErrorKind::TrBFV(err) => {
                 write!(f, "We had an error number crunching: {:?}", err)
-            }
-            ComputeRequestError::SemaphoreError(name) => {
-                write!(f, "Multithread SemaphoreError. This means there was a problem acquiring the semaphore lock for this ComputeRequest: '{name}'")
-            }
-            ComputeRequestError::RecvError(name) => {
-                write!(f, "Multithread RecvError. This means there was a problem receiving a response for this ComputeRequest: '{name}'")
             }
         }
     }
@@ -95,8 +130,8 @@ impl fmt::Display for ComputeRequestError {
 impl TryFrom<ComputeResponse> for CalculateDecryptionShareResponse {
     type Error = anyhow::Error;
     fn try_from(value: ComputeResponse) -> Result<Self, Self::Error> {
-        match value {
-            ComputeResponse::TrBFV(TrBFVResponse::CalculateDecryptionShare(data)) => Ok(data),
+        match value.response {
+            TrBFVResponse::CalculateDecryptionShare(data) => Ok(data),
             _ => {
                 bail!("Expected CalculateDecryptionShareResponse in response but it was not found")
             }
@@ -107,8 +142,8 @@ impl TryFrom<ComputeResponse> for CalculateDecryptionShareResponse {
 impl TryFrom<ComputeResponse> for CalculateDecryptionKeyResponse {
     type Error = anyhow::Error;
     fn try_from(value: ComputeResponse) -> Result<Self, Self::Error> {
-        match value {
-            ComputeResponse::TrBFV(TrBFVResponse::CalculateDecryptionKey(data)) => Ok(data),
+        match value.response {
+            TrBFVResponse::CalculateDecryptionKey(data) => Ok(data),
             _ => {
                 bail!("Expected CalculateDecryptionKeyResponse in response but it was not found")
             }
@@ -119,8 +154,8 @@ impl TryFrom<ComputeResponse> for CalculateDecryptionKeyResponse {
 impl TryFrom<ComputeResponse> for GenPkShareAndSkSssResponse {
     type Error = anyhow::Error;
     fn try_from(value: ComputeResponse) -> Result<Self, Self::Error> {
-        match value {
-            ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(data)) => Ok(data),
+        match value.response {
+            TrBFVResponse::GenPkShareAndSkSss(data) => Ok(data),
             _ => {
                 bail!("Expected GenPkShareAndSkSssResponse in response but it was not found")
             }
@@ -131,8 +166,8 @@ impl TryFrom<ComputeResponse> for GenPkShareAndSkSssResponse {
 impl TryFrom<ComputeResponse> for GenEsiSssResponse {
     type Error = anyhow::Error;
     fn try_from(value: ComputeResponse) -> Result<Self, Self::Error> {
-        match value {
-            ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(data)) => Ok(data),
+        match value.response {
+            TrBFVResponse::GenEsiSss(data) => Ok(data),
             _ => {
                 bail!("Expected GenEsiSssResponse in response but it was not found")
             }
@@ -143,8 +178,8 @@ impl TryFrom<ComputeResponse> for GenEsiSssResponse {
 impl TryFrom<ComputeResponse> for CalculateThresholdDecryptionResponse {
     type Error = anyhow::Error;
     fn try_from(value: ComputeResponse) -> Result<Self, Self::Error> {
-        match value {
-            ComputeResponse::TrBFV(TrBFVResponse::CalculateThresholdDecryption(data)) => Ok(data),
+        match value.response {
+            TrBFVResponse::CalculateThresholdDecryption(data) => Ok(data),
             _ => {
                 bail!("Expected CalculateThresholdDecryptionResponse in response but it was not found")
             }
