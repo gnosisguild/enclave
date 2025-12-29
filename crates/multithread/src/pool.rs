@@ -62,10 +62,17 @@ impl TaskPool {
 
         // Warn of long running jobs
         let warning_handle = tokio::spawn(async move {
+            let mut elapsed = Duration::ZERO;
+
             for log in timeouts.iter() {
-                let delay = Duration::from_secs(log.0);
-                sleep(delay).await;
-                let msg = format!("Job '{}' has been running for {:?}", task_name, delay);
+                let target = Duration::from_secs(log.0);
+
+                // Sleep only for the remaining time to reach target
+                if target > elapsed {
+                    sleep(target - elapsed).await;
+                    elapsed = target;
+                }
+                let msg = format!("Job '{}' has been running for {:?}", task_name, target);
                 match log.1 {
                     Level::WARN => warn!(msg),
                     Level::ERROR => error!(msg),
