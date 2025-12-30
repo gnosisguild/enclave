@@ -9,17 +9,17 @@ use std::fmt::Display;
 
 use crate::id::Id;
 
-/// CorrelationId provides a way to correlate commands and the events they create.
+/// SpanId provides a way to track spans between events
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct CorrelationId(Id);
+pub struct SpanId(Id);
 
-impl CorrelationId {
+impl SpanId {
     pub fn new() -> Self {
         Self(Id::new())
     }
 }
 
-impl Display for CorrelationId {
+impl Display for SpanId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
