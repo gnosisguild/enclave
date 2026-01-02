@@ -7,7 +7,7 @@
 use alloy::providers::fillers::BlobGasFiller;
 use alloy::{
     network::{Ethereum, EthereumWallet},
-    primitives::{Address, Bytes, FixedBytes, U256},
+    primitives::{Address, Bytes, U256},
     providers::fillers::{
         ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
     },

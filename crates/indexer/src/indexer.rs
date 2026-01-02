@@ -399,6 +399,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     u64_try_from(e3.startWindow[0])?,
                     u64_try_from(e3.startWindow[1])?,
                 ];
+
                 // NOTE: we are only saving protocol specific info
                 // here and not CRISP specific info so E3 corresponds to the solidity E3
                 let e3_obj = E3 {

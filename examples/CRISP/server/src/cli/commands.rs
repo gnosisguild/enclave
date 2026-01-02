@@ -16,7 +16,6 @@ use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
-use e3_sdk::bfv_helpers::client::compute_pk_commitment;
 use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, E3};
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};

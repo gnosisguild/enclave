@@ -6,13 +6,17 @@
 
 mod helpers;
 use alloy::{
-    primitives::{Bytes, Uint},
+    primitives::{Bytes, FixedBytes, Uint},
     sol,
 };
+use e3_bfv_helpers::{build_bfv_params_from_set_arc, client::compute_pk_commitment, BfvParamSets};
 use e3_evm_helpers::contracts::ReadOnly;
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
+use fhe::bfv::{PublicKey, SecretKey};
+use fhe_traits::Serialize;
 use helpers::setup_two_contracts;
+use rand::thread_rng;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -38,6 +42,9 @@ async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
     const THRESHOLD: u64 = 10;
     const INDEXER_DELAY_MS: u64 = 10;
+
+    let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
+    let params = build_bfv_params_from_set_arc(param_set);
 
     let (
         enclave_contract,
@@ -87,16 +94,34 @@ async fn test_indexer() -> Result<()> {
     let indexer_listening = indexer.clone();
     let _ = tokio::spawn(async move { indexer_listening.listen().await });
 
-    let public_key = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let mut rng = thread_rng();
+    let sk = SecretKey::random(&params, &mut rng);
+    let pk = PublicKey::new(&sk, &mut rng);
+
+    let public_key_commitment = compute_pk_commitment(
+        pk.to_bytes(),
+        params.degree(),
+        params.plaintext(),
+        params.moduli().to_vec(),
+    )
+    .expect("Failed to compute public key commitment");
     let input_data = "Random data that wont actually be a string".to_string();
     let input_data_bytes = Bytes::from(input_data.clone().into_bytes());
     let ciphertext_output_data = vec![9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+    // first publish committee pk
+    enclave_contract
+        .emitCommitteePublished(Uint::from(E3_ID), Bytes::from(pk.to_bytes()))
+        .send()
+        .await?
+        .watch()
+        .await?;
 
     enclave_contract
         .emitE3Activated(
             Uint::from(E3_ID),
             Uint::from(THRESHOLD),
-            Bytes::from(public_key.clone()),
+            FixedBytes::from(public_key_commitment),
         )
         .send()
         .await?
@@ -172,6 +197,7 @@ async fn test_indexer() -> Result<()> {
     sleep(Duration::from_millis(INDEXER_DELAY_MS)).await;
 
     let e3_state_after_output = indexer.get_e3(E3_ID).await?;
+
     assert_eq!(
         e3_state_after_output.ciphertext_output,
         ciphertext_output_data
