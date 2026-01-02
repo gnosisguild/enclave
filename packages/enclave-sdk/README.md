@@ -217,7 +217,7 @@ await sdk.requestE3({
 });
 
 // Activate an E3 computation
-await sdk.activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint);
+await sdk.activateE3(e3Id: bigint, gasLimit?: bigint);
 
 // Publish input data
 await sdk.publishInput(e3Id: bigint, data: `0x${string}`, gasLimit?: bigint);
