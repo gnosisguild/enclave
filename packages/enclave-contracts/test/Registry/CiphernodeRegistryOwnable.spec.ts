@@ -28,7 +28,7 @@ const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
-const dataHash = ethers.keccak256(data);
+const dataHash = ethers.id(data);
 const SORTITION_SUBMISSION_WINDOW = 3;
 
 // Hash function used to compute the tree nodes.
@@ -343,6 +343,7 @@ describe("CiphernodeRegistryOwnable", function () {
             request.e3Id,
             [await operator1.getAddress(), await operator2.getAddress()],
             data,
+            dataHash,
           ),
       ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
     });
@@ -361,6 +362,7 @@ describe("CiphernodeRegistryOwnable", function () {
         request.e3Id,
         [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        dataHash,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
         dataHash,
@@ -381,6 +383,7 @@ describe("CiphernodeRegistryOwnable", function () {
           request.e3Id,
           [await operator1.getAddress(), await operator2.getAddress()],
           data,
+          dataHash,
         ),
       )
         .to.emit(registry, "CommitteePublished")
@@ -507,6 +510,7 @@ describe("CiphernodeRegistryOwnable", function () {
         request.e3Id,
         [await operator1.getAddress(), await operator2.getAddress()],
         data,
+        dataHash,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
         dataHash,

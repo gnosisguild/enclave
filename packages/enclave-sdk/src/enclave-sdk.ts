@@ -30,6 +30,7 @@ import {
   bfv_encrypt_vector,
   bfv_verifiable_encrypt_number,
   bfv_verifiable_encrypt_vector,
+  compute_pk_commitment,
   get_bfv_params,
 } from '@enclave-e3/wasm'
 import { generateProof } from './greco'
@@ -130,6 +131,18 @@ export class EnclaveSDK {
       case FheProtocol.TRBFV:
         return await this.getBfvParamsSet('INSECURE_SET_512_10_1')
     }
+  }
+
+  public async computePublicKeyCommitment(publicKey: Uint8Array): Promise<Uint8Array> {
+    await initializeWasm()
+    const protocolParams = await this.getProtocolParams()
+
+    return compute_pk_commitment(
+      publicKey,
+      protocolParams.degree,
+      protocolParams.plaintextModulus,
+      BigUint64Array.from(protocolParams.moduli),
+    )
   }
 
   /**
@@ -326,12 +339,12 @@ export class EnclaveSDK {
   /**
    * Activate an E3 computation
    */
-  public async activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
+  public async activateE3(e3Id: bigint, gasLimit?: bigint): Promise<Hash> {
     if (!this.initialized) {
       await this.initialize()
     }
 
-    return this.contractClient.activateE3(e3Id, publicKey, gasLimit)
+    return this.contractClient.activateE3(e3Id, gasLimit)
   }
 
   /**

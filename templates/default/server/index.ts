@@ -211,6 +211,7 @@ async function setupEventListeners() {
   console.log('📡 Setting up event listeners...')
 
   sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent)
+
   await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n)
 
   console.log('✅ Event listeners set up successfully')

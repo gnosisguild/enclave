@@ -1147,7 +1147,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1158,7 +1158,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2524,7 +2524,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 2.0.111",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -2677,7 +2677,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2741,6 +2741,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "e3-bfv-helpers",
  "e3-config",
  "e3-data",
  "e3-events",
@@ -3070,8 +3071,12 @@ dependencies = [
  "alloy",
  "async-trait",
  "bincode",
+ "e3-bfv-helpers",
  "e3-evm-helpers",
  "eyre",
+ "fhe",
+ "fhe-traits",
+ "rand 0.8.5",
  "serde",
  "thiserror 1.0.69",
  "tokio",
@@ -3296,6 +3301,7 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-bfv-helpers",
  "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
@@ -3536,7 +3542,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3623,7 +3629,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#f588e090d69488a9cffa2a891bd068a295553348"
+source = "git+https://github.com/gnosisguild/fhe.rs#3824c52cb457c55551ffcdaeeaef9f3c53145a93"
 dependencies = [
  "bincode",
  "doc-comment",
@@ -3649,7 +3655,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#f588e090d69488a9cffa2a891bd068a295553348"
+source = "git+https://github.com/gnosisguild/fhe.rs#3824c52cb457c55551ffcdaeeaef9f3c53145a93"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3672,7 +3678,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#f588e090d69488a9cffa2a891bd068a295553348"
+source = "git+https://github.com/gnosisguild/fhe.rs#3824c52cb457c55551ffcdaeeaef9f3c53145a93"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3680,7 +3686,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#f588e090d69488a9cffa2a891bd068a295553348"
+source = "git+https://github.com/gnosisguild/fhe.rs#3824c52cb457c55551ffcdaeeaef9f3c53145a93"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -6035,7 +6041,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -7114,7 +7120,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7211,7 +7217,7 @@ dependencies = [
 [[package]]
 name = "safe"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#c9b72d1e42d8e37a19473f423978ef76f92454d6"
+source = "git+https://github.com/gnosisguild/enclave#ad8c74becdb97608f3279f6a6cb1feba9e68dd1c"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -7891,7 +7897,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9326,7 +9332,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#46d8579f8fc3c53d2c74e89e7c75c280f63e432f"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#9acbf0eaa73214646e472ef8df7499d1fce72ce0"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -9341,7 +9347,6 @@ dependencies = [
  "num-traits",
  "rand 0.8.5",
  "rayon",
- "safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
  "serde",
  "serde_json",
  "tempfile",
@@ -9352,7 +9357,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#46d8579f8fc3c53d2c74e89e7c75c280f63e432f"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#9acbf0eaa73214646e472ef8df7499d1fce72ce0"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -9365,6 +9370,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
+ "safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

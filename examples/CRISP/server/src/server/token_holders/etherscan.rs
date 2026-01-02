@@ -618,6 +618,7 @@ pub fn get_mock_token_holders() -> Vec<TokenHolder> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::CONFIG;
 
     #[test]
     fn test_extract_addresses() {

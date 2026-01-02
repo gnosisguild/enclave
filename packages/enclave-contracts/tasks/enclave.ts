@@ -255,8 +255,14 @@ export const publishCommittee = task(
     defaultValue: "",
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "publicKeyHash",
+    description: "hash of the public key (bytes32)",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
-    default: async ({ e3Id, nodes, publicKey }, hre) => {
+    default: async ({ e3Id, nodes, publicKey, publicKeyHash }, hre) => {
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
@@ -281,10 +287,15 @@ export const publishCommittee = task(
         throw new Error("Invalid nodes format: no valid addresses found");
       }
 
+      if (!publicKeyHash) {
+        throw new Error("publicKeyHash is required");
+      }
+
       const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,
+        publicKeyHash,
       );
 
       console.log("Publishing committee... ", tx.hash);
@@ -301,27 +312,8 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     defaultValue: 0,
     type: ArgumentType.INT,
   })
-  .addOption({
-    name: "publicKey",
-    description: "public key of the committee",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "publicKeyFile",
-    description: "path to file containing the public key",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
   .setAction(async () => ({
-    default: async ({ e3Id, publicKey: publicKeyArg, publicKeyFile }, hre) => {
-      const publicKey =
-        publicKeyArg ||
-        (publicKeyFile ? fs.readFileSync(publicKeyFile, "utf8").trim() : "") ||
-        process.env.PUBLIC_KEY;
-
-      if (!publicKey) throw new Error("No public key provided!");
-
+    default: async ({ e3Id }, hre) => {
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
@@ -330,7 +322,7 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
         hre,
       });
 
-      const tx = await enclave.activate(e3Id, publicKey);
+      const tx = await enclave.activate(e3Id);
 
       console.log("Activating E3 program... ", tx.hash);
       await tx.wait();

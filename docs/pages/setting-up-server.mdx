@@ -265,9 +265,7 @@ class E3CoordinationServer {
       console.log(`Auto-activating E3 ${e3Id}`)
 
       try {
-        // In a real implementation, you'd generate/retrieve the public key
-        const publicKey = '0x...' // Your FHE public key
-        await this.sdk.activateE3(e3Id, publicKey)
+        await this.sdk.activateE3(e3Id)
       } catch (error) {
         console.error(`Failed to activate E3 ${e3Id}:`, error)
       }

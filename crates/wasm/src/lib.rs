@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_bfv_helpers::{
-    client::{bfv_encrypt, bfv_verifiable_encrypt},
+    client::{
+        bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
+    },
     BfvParamSet, BfvParamSets,
 };
 use serde::{Deserialize, Serialize};
@@ -39,6 +41,30 @@ pub fn bfv_encrypt_number(
     let encrypted_data = bfv_encrypt([data], public_key, degree, plaintext_modulus, &moduli)
         .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
     Ok(encrypted_data)
+}
+
+#[wasm_bindgen]
+/// A function to compute the public key commitment for a given public key.
+///
+/// # Arguments
+///
+/// * `public_key` - The public key to compute the commitment for
+///
+/// # Returns
+/// Returns a `Result<Vec<u8>, JsValue>` containing the commitment and any errors.
+///
+/// # Panics
+///
+/// Panics if the public key cannot be computed
+pub fn compute_pk_commitment(
+    public_key: Vec<u8>,
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<Vec<u8>, JsValue> {
+    let commitment = _compute_pk_commitment(public_key, degree, plaintext_modulus, moduli)
+        .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+    Ok(commitment.to_vec())
 }
 
 #[wasm_bindgen]

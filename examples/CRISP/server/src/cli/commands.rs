@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::approve;
 use super::CLI_DB;
-use alloy::primitives::{Address, Bytes, U256};
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
@@ -205,9 +205,9 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
         &CONFIG.enclave_address,
     )
     .await?;
-    let pk_bytes = Bytes::from(pk.to_bytes());
     let e3_id = U256::from(input_e3_id);
-    let res = contract.activate(e3_id, pk_bytes).await?;
+
+    let res = contract.activate(e3_id).await?;
     info!("E3 activated. TxHash: {:?}", res.transaction_hash);
 
     let e3_params = FHEParams {
