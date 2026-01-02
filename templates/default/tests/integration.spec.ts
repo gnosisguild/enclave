@@ -212,6 +212,8 @@ describe('Integration', () => {
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
     event = await waitForEvent(RegistryEventType.COMMITTEE_PUBLISHED)
 
+    const publicKeyBytes = hexToBytes(event.data.publicKey as `0x${string}`)
+
     state = store.get(0n)
     assert(state, 'store should have E3State but it was falsey')
     assert.strictEqual(state.type, 'committee_published')
@@ -232,7 +234,6 @@ describe('Integration', () => {
     console.log('PUBLISHING PRIVATE INPUT')
     const num1 = 12n
     const num2 = 21n
-    const publicKeyBytes = hexToBytes(state.publicKey)
 
     console.log('ENCRYPTING NUMBERS')
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
