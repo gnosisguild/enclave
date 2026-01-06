@@ -26,4 +26,5 @@ pub struct E3 {
     pub seed: [u8; 32],
     pub start_window: [u64; 2],
     pub threshold: [u32; 2],
+    pub requester: String,
 }

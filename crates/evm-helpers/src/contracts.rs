@@ -54,6 +54,7 @@ sol! {
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;
         bytes plaintextOutput;
+        address requester;
     }
 
     #[derive(Debug)]

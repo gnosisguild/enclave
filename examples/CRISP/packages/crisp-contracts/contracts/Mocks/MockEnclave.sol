@@ -37,7 +37,8 @@ contract MockEnclave {
         decryptionVerifier: IDecryptionVerifier(address(0)),
         committeePublicKey: committeePublicKey,
         ciphertextOutput: bytes32(0),
-        plaintextOutput: plaintextOutput
+        plaintextOutput: plaintextOutput,
+        requester: address(0)
       });
   }
 }
