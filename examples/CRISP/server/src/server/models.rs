@@ -106,11 +106,6 @@ pub struct GetRoundRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GetRoundsByRequester {
-    pub requester: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct PreviousCiphertextRequest {
     pub round_id: u64,
     pub address: String,
