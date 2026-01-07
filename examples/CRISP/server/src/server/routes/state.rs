@@ -12,7 +12,7 @@ use crate::server::{
     }
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::{primitives::{Address, Bytes, U256}, rlp::Encodable};
+use alloy::{primitives::{Address, Bytes, U256}};
 use e3_sdk::evm_helpers::contracts::{
     EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
 };
