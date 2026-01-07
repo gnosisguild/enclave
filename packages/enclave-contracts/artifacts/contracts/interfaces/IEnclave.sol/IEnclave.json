@@ -192,6 +192,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "indexed": false,
@@ -525,6 +530,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "internalType": "struct E3",
@@ -796,6 +806,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "internalType": "struct E3",
@@ -932,5 +947,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-88174d36ce3bdcc25dc9fa934311dccaec8cde55"
+  "buildInfoId": "solc-0_8_28-723f70610433e7159eeb1220688bb4d784c9ed3e"
 }

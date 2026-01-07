@@ -177,6 +177,8 @@ pub struct E3StateLite {
 
     pub token_address: String,
     pub balance_threshold: String,
+
+    pub requester: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -212,6 +214,9 @@ pub struct E3 {
 
     // Custom Parameters
     pub custom_params: CustomParams,
+
+    // The address that requested the E3
+    pub requester: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -227,6 +232,7 @@ pub struct E3Crisp {
     pub token_address: String,
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
+    pub requester: String,
 }
 
 impl From<E3> for WebResultRequest {

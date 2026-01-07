@@ -27,6 +27,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @param committeePublicKey Hash of the public key of the selected committee for this computation
  * @param ciphertextOutput Hash of the encrypted output data produced by the computation
  * @param plaintextOutput Decrypted output data after committee decryption
+ * @param requester Address of the entity that requested the E3 computation
  */
 struct E3 {
     uint256 seed;
@@ -43,4 +44,5 @@ struct E3 {
     bytes32 committeePublicKey;
     bytes32 ciphertextOutput;
     bytes plaintextOutput;
+    address requester;
 }
