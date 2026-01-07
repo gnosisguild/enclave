@@ -8,6 +8,7 @@ mod bus_handle;
 mod correlation_id;
 mod e3id;
 mod enclave_event;
+mod event_ctx;
 mod event_id;
 mod eventbus;
 mod events;

@@ -9,7 +9,7 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::{EnclaveEvent, Unsequenced};
+use crate::{EnclaveEvent, EventId, Unsequenced};
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:

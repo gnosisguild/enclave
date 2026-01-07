@@ -165,6 +165,15 @@ impl SeqState for Sequenced {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
+pub struct ContextEvent<T> {
+    pub data: T,
+    pub correlation_id: EventId,
+    pub causation_id: Option<EventId>,
+    pub ts: u128,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
 pub struct EnclaveEvent<S: SeqState = Sequenced> {
     id: EventId,
     payload: EnclaveEventData,
