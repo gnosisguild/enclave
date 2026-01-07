@@ -6,9 +6,11 @@
 
 use std::{fmt, ops::Deref};
 
-use crate::{E3id, EventId};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy)]
+use crate::{E3id, EventContext, EventId};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AggregateId(usize);
 
 impl AggregateId {
@@ -41,7 +43,8 @@ impl fmt::Display for AggregateId {
     }
 }
 
-pub struct EventCtx {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ConcreteEventCtx {
     id: EventId,
     causation_id: EventId,
     origin_id: EventId,
@@ -50,7 +53,7 @@ pub struct EventCtx {
     ts: u128,
 }
 
-impl EventCtx {
+impl ConcreteEventCtx {
     pub fn new(
         id: EventId,
         causation_id: EventId,
@@ -68,28 +71,30 @@ impl EventCtx {
             ts,
         }
     }
+}
 
-    pub fn id(&self) -> EventId {
+impl EventContext for ConcreteEventCtx {
+    fn id(&self) -> EventId {
         self.id
     }
 
-    pub fn causation_id(&self) -> EventId {
+    fn causation_id(&self) -> EventId {
         self.causation_id
     }
 
-    pub fn origin_id(&self) -> EventId {
+    fn origin_id(&self) -> EventId {
         self.origin_id
     }
 
-    pub fn aggregate_id(&self) -> AggregateId {
+    fn aggregate_id(&self) -> AggregateId {
         self.aggregate_id
     }
 
-    pub fn seq(&self) -> u64 {
+    fn seq(&self) -> u64 {
         self.seq
     }
 
-    pub fn ts(&self) -> u128 {
+    fn ts(&self) -> u128 {
         self.ts
     }
 }

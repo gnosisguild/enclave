@@ -9,7 +9,7 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::{EnclaveEvent, EventId, Unsequenced};
+use crate::{event_context::AggregateId, EnclaveEvent, EventId, Unsequenced};
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:
@@ -114,4 +114,20 @@ pub trait EventLog: Unpin + 'static {
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
+}
+
+/// EventContext allows consumers to extract infrastructure metadata from event objects
+pub trait EventContext {
+    /// This event id
+    fn id(&self) -> EventId;
+    /// The id of the event that directly caused this
+    fn causation_id(&self) -> EventId;
+    /// The original event that started the causal chain
+    fn origin_id(&self) -> EventId;
+    /// The aggregate id associated with the event
+    fn aggregate_id(&self) -> AggregateId;
+    /// The sequence number of the event
+    fn seq(&self) -> u64;
+    /// The timestamp for the event
+    fn ts(&self) -> u128;
 }

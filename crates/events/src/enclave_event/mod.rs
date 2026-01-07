@@ -34,6 +34,7 @@ mod threshold_share_created;
 mod ticket_balance_updated;
 mod ticket_generated;
 mod ticket_submitted;
+mod typed_event;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
@@ -161,15 +162,6 @@ impl SeqState for Unsequenced {
 
 impl SeqState for Sequenced {
     type Seq = u64;
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct ContextEvent<T> {
-    pub data: T,
-    pub correlation_id: EventId,
-    pub causation_id: Option<EventId>,
-    pub ts: u128,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
