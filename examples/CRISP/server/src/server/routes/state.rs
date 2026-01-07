@@ -7,15 +7,12 @@
 use std::str::FromStr;
 
 use crate::server::{
-    app_data::AppData,
-    models::{
-        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest,
-        PreviousCiphertextResponse, WebhookPayload,
-    },
-    CONFIG,
+    CONFIG, app_data::AppData, models::{
+        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest, PreviousCiphertextResponse, RoundRequestWithRequester, WebhookPayload
+    }
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::primitives::{Address, Bytes, U256};
+use alloy::{primitives::{Address, Bytes, U256}, rlp::Encodable};
 use e3_sdk::evm_helpers::contracts::{
     EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
 };
@@ -222,7 +219,9 @@ async fn get_round_result(
 /// # Returns
 ///
 /// * A JSON response containing the results for all rounds
-async fn get_all_round_results(store: web::Data<AppData>) -> impl Responder {
+async fn get_all_round_results(data: web::Json::<RoundRequestWithRequester>, store: web::Data<AppData>) -> impl Responder {
+    let incoming = data.into_inner();
+
     let round_count = match store.current_round().get_current_round_id().await {
         Ok(count) => count,
         Err(e) => {
@@ -233,10 +232,26 @@ async fn get_all_round_results(store: web::Data<AppData>) -> impl Responder {
 
     let mut states = Vec::new();
 
+    let requesters_array;
+    if let Some(requesters) = incoming.requesters {
+        requesters_array = requesters;
+    } else {
+        requesters_array = vec![];
+    }
+
     // FIXME: This assumes ids are ordered
     for i in 0..round_count + 1 {
         match store.e3(i).get_web_result_request().await {
-            Ok(w) => states.push(w),
+            Ok(w) => {
+                if requesters_array.length() > 0 {
+                    // if we have any requesters to filter by, do it
+                    if requesters_array.contains(&w.requester) {
+                        states.push(w);
+                    }
+                } else {
+                    states.push(w);
+                }
+            }
             Err(e) => {
                 info!("Error retrieving state for round {}: {:?}", i, e);
                 continue;

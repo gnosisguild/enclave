@@ -106,6 +106,18 @@ pub struct GetRoundRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct CurrentRoundRequestWithRequester {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requester: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RoundRequestWithRequester {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requesters: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PreviousCiphertextRequest {
     pub round_id: u64,
     pub address: String,
@@ -156,6 +168,7 @@ pub struct WebResultRequest {
     pub option_2_emoji: String,
     pub total_votes: u64,
     pub end_time: u64,
+    pub requester: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -245,6 +258,7 @@ impl From<E3> for WebResultRequest {
             option_2_emoji: e3.emojis[1].clone(),
             total_votes: e3.vote_count,
             end_time: e3.expiration,
+            requester: e3.requester,
         }
     }
 }
