@@ -106,15 +106,8 @@ pub struct GetRoundRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct CurrentRoundRequestWithRequester {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub requester: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct RoundRequestWithRequester {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub requesters: Option<Vec<String>>,
+    pub requesters: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

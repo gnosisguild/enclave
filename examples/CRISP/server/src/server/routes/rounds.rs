@@ -7,8 +7,7 @@
 use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
-    RoundRequestWithRequester,
+    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest, RoundRequestWithRequester
 };
 
 use actix_web::{web, HttpResponse, Responder};
@@ -23,7 +22,7 @@ use log::{error, info};
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/rounds")
-            .route("/current", web::get().to(get_current_round))
+            .route("/current", web::post().to(get_current_round))
             .route("/public-key", web::post().to(get_public_key))
             .route("/ciphertext", web::post().to(get_ciphertext))
             .route("/request", web::post().to(request_new_round)),
@@ -81,15 +80,13 @@ async fn get_current_round(
 ) -> impl Responder {
     let incoming = data.into_inner();
 
-    // Determine if we should filter by requester
-    let requester = incoming
-        .requesters
-        .and_then(|r| if r.is_empty() { None } else { Some(r[0].clone()) });
-
-    // Get the current round (either overall or for specific requester)
-    let result = if let Some(req) = requester {
-        store.current_round().get_current_round_for_requester(req).await
+    // Get the first requester if any exist
+    // .get(0) returns Option<&String>, so we need to handle that
+    let result = if let Some(requester) = incoming.requesters.get(0) {
+        // We have a requester, filter by it
+        store.current_round().get_current_round_for_requester(requester.clone()).await
     } else {
+        // No requester provided (empty array)
         store.current_round().get_current_round().await
     };
 

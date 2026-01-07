@@ -23,7 +23,7 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/state")
             .route("/result", web::post().to(get_round_result))
-            .route("/all", web::get().to(get_all_round_results))
+            .route("/all", web::post().to(get_all_round_results))
             .route("/lite", web::post().to(get_round_state_lite))
             // Do we need protection on this endpoint? technically they would need to send a valid proof for it to
             // be included on chain
@@ -231,21 +231,15 @@ async fn get_all_round_results(data: web::Json::<RoundRequestWithRequester>, sto
     };
 
     let mut states = Vec::new();
-
-    let requesters_array;
-    if let Some(requesters) = incoming.requesters {
-        requesters_array = requesters;
-    } else {
-        requesters_array = vec![];
-    }
+    let requesters = incoming.requesters;
 
     // FIXME: This assumes ids are ordered
     for i in 0..round_count + 1 {
         match store.e3(i).get_web_result_request().await {
             Ok(w) => {
-                if requesters_array.length() > 0 {
+                if !requesters.is_empty() {
                     // if we have any requesters to filter by, do it
-                    if requesters_array.contains(&w.requester) {
+                    if requesters.contains(&w.requester) {
                         states.push(w);
                     }
                 } else {
