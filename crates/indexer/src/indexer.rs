@@ -419,6 +419,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     seed,
                     start_window,
                     threshold: e3.threshold,
+                    requester: e3.requester.to_string(),
                 };
 
                 let mut repo = E3Repository::new(db, e3_id);

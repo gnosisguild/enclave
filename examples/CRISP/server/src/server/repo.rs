@@ -134,6 +134,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         &mut self,
         token_address: String,
         balance_threshold: String,
+        requester: String,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
@@ -147,6 +148,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             token_address,
             balance_threshold,
             ciphertext_inputs: vec![],
+            requester
         })
         .await
     }
@@ -237,6 +239,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             committee_public_key: e3.committee_public_key,
             token_address: e3_crisp.token_address,
             balance_threshold: e3_crisp.balance_threshold,
+            requester: e3_crisp.requester,
         })
     }
 
@@ -315,7 +318,6 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn set_eligible_addresses(&mut self, holders: Vec<TokenHolder>) -> Result<()> {
         let key = self.crisp_key();
-        // Placeholder for future implementation
 
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {

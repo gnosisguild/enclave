@@ -46,9 +46,13 @@ pub async fn register_e3_requested(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
 
+            let contract = ctx.contract();
+
             info!("[e3_id={}] E3Requested: {:?}", e3_id, event);
 
             async move {
+                let e3 = contract.get_e3(event.e3Id).await?;
+
                 // Convert custom params bytes back to token address and balance threshold.
 
                 // Use sol_data types instead of primitives
@@ -71,7 +75,7 @@ pub async fn register_e3_requested(
                     .with_context(|| "Invalid token address")?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold)
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold, e3.requester.to_string())
                     .await?;
 
                 // Get token holders from Etherscan API or mocked data.

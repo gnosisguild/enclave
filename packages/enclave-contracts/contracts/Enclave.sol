@@ -257,6 +257,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.committeePublicKey = hex"";
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";
+        e3.requester = msg.sender;
 
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
