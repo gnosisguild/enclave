@@ -10,8 +10,8 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event_context::{AggregateId, ConcreteEventContext},
-    EventContext, EventContextSeq, EventId,
+    event_context::{AggregateId, EventContext},
+    EventContextAccessors, EventContextSeq, EventId,
 };
 
 use super::Sequenced;
@@ -20,7 +20,7 @@ use super::Sequenced;
 #[rtype(result = "()")]
 pub struct TypedEvent<T> {
     inner: T,
-    ctx: ConcreteEventContext<Sequenced>,
+    ctx: EventContext<Sequenced>,
 }
 
 impl<T> Deref for TypedEvent<T> {
@@ -30,7 +30,7 @@ impl<T> Deref for TypedEvent<T> {
     }
 }
 
-impl<T> EventContext for TypedEvent<T> {
+impl<T> EventContextAccessors for TypedEvent<T> {
     fn id(&self) -> EventId {
         self.ctx.id()
     }
@@ -46,10 +46,6 @@ impl<T> EventContext for TypedEvent<T> {
     fn causation_id(&self) -> EventId {
         self.ctx.causation_id()
     }
-
-    fn aggregate_id(&self) -> AggregateId {
-        self.ctx.aggregate_id()
-    }
 }
 
 impl<T> EventContextSeq for TypedEvent<T> {
@@ -58,8 +54,8 @@ impl<T> EventContextSeq for TypedEvent<T> {
     }
 }
 
-impl<T> From<(T, ConcreteEventContext<Sequenced>)> for TypedEvent<T> {
-    fn from(value: (T, ConcreteEventContext<Sequenced>)) -> Self {
+impl<T> From<(T, EventContext<Sequenced>)> for TypedEvent<T> {
+    fn from(value: (T, EventContext<Sequenced>)) -> Self {
         Self {
             inner: value.0,
             ctx: value.1,

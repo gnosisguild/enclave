@@ -10,8 +10,8 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 use crate::{
-    event_context::{AggregateId, ConcreteEventContext},
-    EnclaveEvent, EventId, Sequenced, Unsequenced, WithAggregateId,
+    event_context::{AggregateId, EventContext},
+    EnclaveEvent, EventId, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus
@@ -39,7 +39,7 @@ pub trait ErrorEvent: Event {
         err_type: Self::ErrType,
         error: impl Into<Self::FromError>,
         ts: u128,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> Result<Self>;
 }
 
@@ -51,7 +51,7 @@ pub trait EventFactory<E: Event> {
     fn event_from(
         &self,
         data: impl Into<E::Data>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
@@ -60,7 +60,7 @@ pub trait EventFactory<E: Event> {
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<E>;
 }
@@ -72,7 +72,7 @@ pub trait ErrorFactory<E: ErrorEvent> {
         &self,
         err_type: E::ErrType,
         error: impl Into<E::FromError>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> Result<E>;
 }
 
@@ -109,11 +109,8 @@ pub trait EventSubscriber<E: Event> {
 /// Trait to create an event with a timestamp from its associated type data
 pub trait EventConstructorWithTimestamp: Event + Sized {
     /// Create an event passing attaching a specific timestamp.
-    fn new_with_timestamp(
-        data: Self::Data,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
-        ts: u128,
-    ) -> Self;
+    fn new_with_timestamp(data: Self::Data, ctx: Option<EventContext<Sequenced>>, ts: u128)
+        -> Self;
 }
 
 pub trait CompositeEvent: EventConstructorWithTimestamp {}
@@ -139,15 +136,13 @@ pub trait EventLog: Unpin + 'static {
 }
 
 /// EventContext allows consumers to extract infrastructure metadata from event objects
-pub trait EventContext {
+pub trait EventContextAccessors {
     /// This event id
     fn id(&self) -> EventId;
     /// The id of the event that directly caused this
     fn causation_id(&self) -> EventId;
     /// The original event that started the causal chain
     fn origin_id(&self) -> EventId;
-    /// The aggregate id associated with the event
-    fn aggregate_id(&self) -> AggregateId;
     /// The timestamp for the event
     fn ts(&self) -> u128;
 }
@@ -155,4 +150,9 @@ pub trait EventContext {
 pub trait EventContextSeq {
     /// The sequence number of the event
     fn seq(&self) -> u64;
+}
+
+pub trait WithAggregateId {
+    /// Extract the aggregate id from the object
+    fn get_aggregate_id(&self) -> AggregateId;
 }

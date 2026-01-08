@@ -12,7 +12,7 @@ use derivative::Derivative;
 use tracing::error;
 
 use crate::{
-    event_context::ConcreteEventContext,
+    event_context::EventContext,
     hlc::Hlc,
     sequencer::Sequencer,
     traits::{
@@ -34,7 +34,7 @@ pub struct BusHandle {
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
     /// Temporary context for events the bus publishes
-    ctx: Option<ConcreteEventContext<Sequenced>>,
+    ctx: Option<EventContext<Sequenced>>,
 }
 
 impl BusHandle {
@@ -114,7 +114,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
@@ -127,7 +127,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from_remote_source(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
@@ -144,7 +144,7 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         err_type: EType,
         error: impl Into<anyhow::Error>,
-        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
         EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into(), ctx)
