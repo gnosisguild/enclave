@@ -257,6 +257,7 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
         self.payload.event_type()
     }
 
+    // TODO: remove?
     fn event_id(&self) -> Self::Id {
         self.id()
     }
