@@ -199,7 +199,7 @@ mod tests {
         impl Handler<EnclaveEvent> for Forwarder {
             type Result = ();
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-                let ts = msg.get_ts();
+                let ts = msg.ts();
                 self.dest.publish_from_remote(msg.into_data(), ts).unwrap()
             }
         }
@@ -270,7 +270,7 @@ mod tests {
 
         // Sort by HLC timestamp
         let mut sorted_events = events.clone();
-        sorted_events.sort_by_key(|e| e.get_ts());
+        sorted_events.sort_by_key(|e| e.ts());
 
         // Extract the payloads/names in HLC-sorted order
         let ordered_names: Vec<_> = sorted_events
@@ -289,7 +289,7 @@ mod tests {
         );
 
         // ASSERTION 2: All timestamps are unique (HLC guarantee)
-        let timestamps: Vec<_> = sorted_events.iter().map(|e| e.get_ts()).collect();
+        let timestamps: Vec<_> = sorted_events.iter().map(|e| e.ts()).collect();
         let unique_timestamps: std::collections::HashSet<_> = timestamps.iter().collect();
         assert_eq!(
             timestamps.len(),

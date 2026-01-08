@@ -6,7 +6,7 @@
 
 use crate::{
     events::{EventStored, StoreEventRequested},
-    EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
+    EventContextAccessors, EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
@@ -21,7 +21,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
         let event = msg.event;
         let sender = msg.sender;
-        let ts = event.get_ts();
+        let ts = event.ts();
         if let Some(_) = self.index.get(ts)? {
             bail!("Event already stored at timestamp {ts}!");
         }

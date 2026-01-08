@@ -72,7 +72,7 @@ pub use ticket_submitted::*;
 use crate::{
     event_context::{AggregateId, EventContext},
     traits::{ErrorEvent, Event, EventConstructorWithTimestamp, EventContextAccessors},
-    E3id, EventId, WithAggregateId,
+    E3id, EventContextSeq, EventId, WithAggregateId,
 };
 use actix::Message;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -172,10 +172,7 @@ impl SeqState for Sequenced {
     deserialize = "S: SeqState, S::Seq: DeserializeOwned"
 ))]
 pub struct EnclaveEvent<S: SeqState = Sequenced> {
-    id: EventId, // XXX: move to context
     payload: EnclaveEventData,
-    seq: S::Seq, // XXX: move to context
-    ts: u128,    // XXX: move to context
     ctx: EventContext<S>,
 }
 
@@ -191,26 +188,40 @@ where
         bincode::deserialize(bytes)
     }
 
-    pub fn get_id(&self) -> EventId {
-        self.into()
-    }
-
-    pub fn get_ts(&self) -> u128 {
-        self.ts
-    }
-
     pub fn split(self) -> (EnclaveEventData, u128) {
-        (self.payload, self.ts)
+        (self.payload, self.ctx.ts())
+    }
+}
+
+impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
+    fn causation_id(&self) -> EventId {
+        self.ctx.causation_id()
+    }
+    fn origin_id(&self) -> EventId {
+        self.ctx.origin_id()
+    }
+    fn ts(&self) -> u128 {
+        self.ctx.ts()
+    }
+    fn id(&self) -> EventId {
+        self.ctx.id()
+    }
+}
+
+impl EventContextSeq for EnclaveEvent<Sequenced> {
+    fn seq(&self) -> u64 {
+        self.ctx.seq()
     }
 }
 
 impl EnclaveEvent<Sequenced> {
+    // TOOD: remove
     pub fn get_seq(&self) -> u64 {
-        self.seq
+        self.seq()
     }
 
     pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
-        let ts = self.get_ts();
+        let ts = self.ts();
         let data = self.clone().into_data();
         EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts)
     }
@@ -219,10 +230,7 @@ impl EnclaveEvent<Sequenced> {
 impl EnclaveEvent<Unsequenced> {
     pub fn into_sequenced(self, seq: u64) -> EnclaveEvent<Sequenced> {
         EnclaveEvent::<Sequenced> {
-            id: self.id,
             payload: self.payload,
-            ts: self.ts,
-            seq,
             ctx: self.ctx.sequence(seq),
         }
     }
@@ -250,7 +258,7 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
     }
 
     fn event_id(&self) -> Self::Id {
-        self.get_id()
+        self.id()
     }
 
     fn get_data(&self) -> &EnclaveEventData {
@@ -282,9 +290,6 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
 
         Ok(EnclaveEvent {
             payload: payload.into(),
-            id,
-            seq: (),
-            ts,
             ctx,
         })
     }
@@ -292,13 +297,13 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
 
 impl<S: SeqState> From<EnclaveEvent<S>> for EventId {
     fn from(value: EnclaveEvent<S>) -> Self {
-        value.id
+        value.id()
     }
 }
 
 impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
     fn from(value: &EnclaveEvent<S>) -> Self {
-        value.id.clone()
+        value.id()
     }
 }
 
@@ -327,12 +332,6 @@ impl EnclaveEventData {
     }
 }
 
-impl<S: SeqState> EnclaveEvent<S> {
-    pub fn get_e3_id(&self) -> Option<E3id> {
-        self.payload.get_e3_id()
-    }
-}
-
 impl WithAggregateId for EnclaveEventData {
     fn get_aggregate_id(&self) -> AggregateId {
         let maybe_e3_id = self.get_e3_id();
@@ -341,6 +340,18 @@ impl WithAggregateId for EnclaveEventData {
         } else {
             AggregateId::new(0)
         }
+    }
+}
+
+impl<S: SeqState> EnclaveEvent<S> {
+    pub fn get_e3_id(&self) -> Option<E3id> {
+        self.payload.get_e3_id()
+    }
+}
+
+impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
+    fn get_aggregate_id(&self) -> AggregateId {
+        self.payload.get_aggregate_id()
     }
 }
 
@@ -413,10 +424,7 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         let payload = data.into();
         let id = EventId::hash(&payload);
         EnclaveEvent {
-            id,
             payload,
-            seq: (),
-            ts,
             ctx: if let Some(ctx) = ctx {
                 EventContext::new(ctx.id(), ctx.causation_id(), ctx.origin_id(), ts)
             } else {
