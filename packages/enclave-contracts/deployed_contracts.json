@@ -89,7 +89,7 @@
         "initialOwner": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
         "proxyAddress": "0x01E657C16192854E8d7D7055228C7D6532E345Be",
         "proxyAdminAddress": "0xdCc2f599D6E09a161244c9c97aeA8c5d49Cf67cA",
-        "implementationAddress": "0x957C3cbBD33C8Db4D7b7921334FD7A626B672051"
+        "implementationAddress": "0x48A9304e08504e7e76821da3dDe7a199BFd320dD"
       },
       "blockNumber": 9761354,
       "address": "0x01E657C16192854E8d7D7055228C7D6532E345Be"
