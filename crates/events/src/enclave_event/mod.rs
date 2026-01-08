@@ -273,11 +273,11 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         err_type: Self::ErrType,
         msg: impl Into<Self::FromError>,
         ts: u128,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
-        let ctx = ctx
+        let ctx = caused_by
             .map(|cause| EventContext::from_cause(id, cause, ts))
             .unwrap_or_else(|| EventContext::new_origin(id, ts));
 

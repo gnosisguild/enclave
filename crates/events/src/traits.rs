@@ -38,7 +38,7 @@ pub trait ErrorEvent: Event {
         err_type: Self::ErrType,
         error: impl Into<Self::FromError>,
         ts: u128,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<Self>;
 }
 
@@ -50,7 +50,7 @@ pub trait EventFactory<E: Event> {
     fn event_from(
         &self,
         data: impl Into<E::Data>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
@@ -59,7 +59,7 @@ pub trait EventFactory<E: Event> {
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<E>;
 }
@@ -71,7 +71,7 @@ pub trait ErrorFactory<E: ErrorEvent> {
         &self,
         err_type: E::ErrType,
         error: impl Into<E::FromError>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<E>;
 }
 

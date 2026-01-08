@@ -114,12 +114,12 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
-            ctx,
+            caused_by,
             ts.into(),
         ))
     }
@@ -127,13 +127,13 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from_remote_source(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
-            ctx,
+            caused_by,
             ts.into(),
         ))
     }
@@ -144,10 +144,10 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         err_type: EType,
         error: impl Into<anyhow::Error>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
-        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into(), ctx)
+        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into(), caused_by)
     }
 }
 
