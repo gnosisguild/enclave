@@ -54,13 +54,6 @@ pub struct EventContext<S: SeqState> {
     ts: u128,
 }
 
-impl EventContext<Sequenced> {
-    /// Tracks events as they create other events
-    pub fn causes(self, id: EventId, ts: u128) -> EventContext<Unsequenced> {
-        EventContext::<Unsequenced>::new(id, self.id, self.origin_id, ts)
-    }
-}
-
 impl EventContext<Unsequenced> {
     pub fn new(id: EventId, causation_id: EventId, origin_id: EventId, ts: u128) -> Self {
         Self {
@@ -70,6 +63,14 @@ impl EventContext<Unsequenced> {
             seq: (),
             ts,
         }
+    }
+
+    pub fn new_origin(id: EventId, ts: u128) -> Self {
+        Self::new(id, id, id, ts)
+    }
+
+    pub fn from_cause(id: EventId, cause: EventContext<Sequenced>, ts: u128) -> Self {
+        EventContext::new(id, cause.id(), cause.origin_id(), ts)
     }
 
     pub fn sequence(self, value: u64) -> EventContext<Sequenced> {
@@ -109,10 +110,7 @@ impl EventContextSeq for EventContext<Sequenced> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        event_context::{AggregateId, EventContext},
-        EventId,
-    };
+    use crate::{event_context::EventContext, EventId};
 
     #[test]
     fn test_event_context_cycle() {
@@ -122,10 +120,10 @@ mod tests {
             EventContext::new(EventId::hash(1), EventId::hash(1), EventId::hash(1), 1).sequence(1);
         events.push(one.clone());
 
-        let two = one.causes(EventId::hash(2), 2).sequence(2);
+        let two = EventContext::from_cause(EventId::hash(2), one, 2).sequence(2);
         events.push(two.clone());
 
-        let three = two.causes(EventId::hash(3), 3).sequence(3);
+        let three = EventContext::from_cause(EventId::hash(3), two, 3).sequence(3);
         events.push(three.clone());
 
         assert_eq!(

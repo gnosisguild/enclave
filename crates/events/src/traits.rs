@@ -109,8 +109,11 @@ pub trait EventSubscriber<E: Event> {
 /// Trait to create an event with a timestamp from its associated type data
 pub trait EventConstructorWithTimestamp: Event + Sized {
     /// Create an event passing attaching a specific timestamp.
-    fn new_with_timestamp(data: Self::Data, ctx: Option<EventContext<Sequenced>>, ts: u128)
-        -> Self;
+    fn new_with_timestamp(
+        data: Self::Data,
+        caused_by: Option<EventContext<Sequenced>>,
+        ts: u128,
+    ) -> Self;
 }
 
 pub trait CompositeEvent: EventConstructorWithTimestamp {}

@@ -279,15 +279,13 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         err_type: Self::ErrType,
         msg: impl Into<Self::FromError>,
         ts: u128,
-        mut ctx: Option<EventContext<Sequenced>>,
+        ctx: Option<EventContext<Sequenced>>,
     ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
-        let ctx = if let Some(ctx) = ctx.take() {
-            ctx.causes(id, ts)
-        } else {
-            EventContext::<Unsequenced>::new(id, id, id, ts)
-        };
+        let ctx = ctx
+            .map(|cause| EventContext::from_cause(id, cause, ts))
+            .unwrap_or_else(|| EventContext::new_origin(id, ts));
 
         Ok(EnclaveEvent {
             payload: payload.into(),
@@ -419,18 +417,16 @@ impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
 impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
     fn new_with_timestamp(
         data: Self::Data,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Self {
         let payload = data.into();
         let id = EventId::hash(&payload);
         EnclaveEvent {
             payload,
-            ctx: if let Some(ctx) = ctx {
-                EventContext::new(ctx.id(), ctx.causation_id(), ctx.origin_id(), ts)
-            } else {
-                EventContext::new(id, id, id, ts)
-            },
+            ctx: caused_by
+                .map(|cause| EventContext::from_cause(id, cause, ts))
+                .unwrap_or_else(|| EventContext::new_origin(id, ts)),
         }
     }
 }
