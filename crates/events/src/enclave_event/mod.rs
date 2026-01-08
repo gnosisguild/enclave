@@ -70,8 +70,9 @@ pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
 use crate::{
+    event_context::{AggregateId, ConcreteEventContext},
     traits::{ErrorEvent, Event, EventConstructorWithTimestamp},
-    E3id, EventId,
+    E3id, EventContext, EventId,
 };
 use actix::Message;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -166,11 +167,16 @@ impl SeqState for Sequenced {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
+#[serde(bound(
+    serialize = "S: SeqState, S::Seq: Serialize",
+    deserialize = "S: SeqState, S::Seq: DeserializeOwned"
+))]
 pub struct EnclaveEvent<S: SeqState = Sequenced> {
     id: EventId,
     payload: EnclaveEventData,
     seq: S::Seq,
     ts: u128,
+    ctx: ConcreteEventContext<S>,
 }
 
 impl<S> EnclaveEvent<S>
@@ -206,7 +212,7 @@ impl EnclaveEvent<Sequenced> {
     pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
         let ts = self.get_ts();
         let data = self.clone().into_data();
-        EnclaveEvent::new_with_timestamp(data, ts)
+        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts)
     }
 }
 
@@ -217,6 +223,7 @@ impl EnclaveEvent<Unsequenced> {
             payload: self.payload,
             ts: self.ts,
             seq,
+            ctx: self.ctx.sequence(seq),
         }
     }
 }
@@ -225,7 +232,7 @@ impl EnclaveEvent<Unsequenced> {
 impl EnclaveEvent<Sequenced> {
     /// test-helpers only utility function to create a new unsequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_sequenced(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time).into_sequenced(seq)
     }
 
     /// test-helpers only utility function to remove time information from an event
@@ -263,14 +270,23 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         err_type: Self::ErrType,
         msg: impl Into<Self::FromError>,
         ts: u128,
+        mut ctx: Option<ConcreteEventContext<Sequenced>>,
     ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
+        let ctx = if let Some(ctx) = ctx.take() {
+            let aggregate_id = ctx.aggregate_id();
+            ctx.causes(id, aggregate_id, ts)
+        } else {
+            ConcreteEventContext::<Unsequenced>::new(id, id, id, AggregateId::new(0), ts)
+        };
+
         Ok(EnclaveEvent {
             payload: payload.into(),
             id,
             seq: (),
             ts,
+            ctx,
         })
     }
 }
@@ -287,9 +303,9 @@ impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
     }
 }
 
-impl<S: SeqState> EnclaveEvent<S> {
+impl EnclaveEventData {
     pub fn get_e3_id(&self) -> Option<E3id> {
-        match self.payload {
+        match self {
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
@@ -308,6 +324,27 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             _ => None,
+        }
+    }
+}
+
+impl<S: SeqState> EnclaveEvent<S> {
+    pub fn get_e3_id(&self) -> Option<E3id> {
+        self.payload.get_e3_id()
+    }
+}
+
+pub trait WithAggregateId {
+    fn get_aggregate_id(&self) -> AggregateId;
+}
+
+impl WithAggregateId for EnclaveEventData {
+    fn get_aggregate_id(&self) -> AggregateId {
+        let maybe_e3_id = self.get_e3_id();
+        if let Some(e3_id) = maybe_e3_id {
+            AggregateId::new(e3_id.chain_id() as usize)
+        } else {
+            AggregateId::new(0)
         }
     }
 }
@@ -373,7 +410,12 @@ impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
 }
 
 impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
-    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
+    fn new_with_timestamp(
+        data: Self::Data,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ts: u128,
+    ) -> Self {
+        let aggregate_id = data.get_aggregate_id();
         let payload = data.into();
         let id = EventId::hash(&payload);
         EnclaveEvent {
@@ -381,6 +423,17 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
             payload,
             seq: (),
             ts,
+            ctx: if let Some(ctx) = ctx {
+                ConcreteEventContext::new(
+                    ctx.id(),
+                    ctx.causation_id(),
+                    ctx.origin_id(),
+                    ctx.aggregate_id(),
+                    ts,
+                )
+            } else {
+                ConcreteEventContext::new(id, id, id, aggregate_id, ts)
+            },
         }
     }
 }

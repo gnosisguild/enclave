@@ -10,15 +10,17 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event_context::{AggregateId, ConcreteEventCtx},
-    EventContext, EventId,
+    event_context::{AggregateId, ConcreteEventContext},
+    EventContext, EventContextSeq, EventId,
 };
+
+use super::Sequenced;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct TypedEvent<T> {
     inner: T,
-    ctx: ConcreteEventCtx,
+    ctx: ConcreteEventContext<Sequenced>,
 }
 
 impl<T> Deref for TypedEvent<T> {
@@ -37,10 +39,6 @@ impl<T> EventContext for TypedEvent<T> {
         self.ctx.ts()
     }
 
-    fn seq(&self) -> u64 {
-        self.ctx.seq()
-    }
-
     fn origin_id(&self) -> EventId {
         self.ctx.origin_id()
     }
@@ -54,8 +52,14 @@ impl<T> EventContext for TypedEvent<T> {
     }
 }
 
-impl<T> From<(T, ConcreteEventCtx)> for TypedEvent<T> {
-    fn from(value: (T, ConcreteEventCtx)) -> Self {
+impl<T> EventContextSeq for TypedEvent<T> {
+    fn seq(&self) -> u64 {
+        self.ctx.seq()
+    }
+}
+
+impl<T> From<(T, ConcreteEventContext<Sequenced>)> for TypedEvent<T> {
+    fn from(value: (T, ConcreteEventContext<Sequenced>)) -> Self {
         Self {
             inner: value.0,
             ctx: value.1,

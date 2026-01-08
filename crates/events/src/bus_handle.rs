@@ -12,6 +12,7 @@ use derivative::Derivative;
 use tracing::error;
 
 use crate::{
+    event_context::ConcreteEventContext,
     hlc::Hlc,
     sequencer::Sequencer,
     traits::{
@@ -32,6 +33,8 @@ pub struct BusHandle {
     /// Hlc clock used to time all events created on this BusHandle
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
+    /// Temporary context for events the bus publishes
+    ctx: Option<ConcreteEventContext<Sequenced>>,
 }
 
 impl BusHandle {
@@ -45,6 +48,7 @@ impl BusHandle {
             consumer,
             producer,
             hlc: Arc::new(hlc),
+            ctx: None,
         }
     }
 
@@ -81,13 +85,13 @@ impl BusHandle {
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
-        let evt = self.event_from(data)?;
+        let evt = self.event_from(data, self.ctx.clone())?;
         self.producer.do_send(evt);
         Ok(())
     }
 
     fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
-        let evt = self.event_from_remote_source(data, ts)?;
+        let evt = self.event_from_remote_source(data, self.ctx.clone(), ts)?;
         self.producer.do_send(evt);
         Ok(())
     }
@@ -99,7 +103,7 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        match self.event_from_error(err_type, error) {
+        match self.event_from_error(err_type, error, self.ctx.clone()) {
             Ok(evt) => self.producer.do_send(evt),
             Err(e) => error!("{e}"),
         }
@@ -107,10 +111,15 @@ impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
 }
 
 impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
-    fn event_from(&self, data: impl Into<EnclaveEventData>) -> Result<EnclaveEvent<Unsequenced>> {
+    fn event_from(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+    ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
+            ctx,
             ts.into(),
         ))
     }
@@ -118,11 +127,13 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from_remote_source(
         &self,
         data: impl Into<EnclaveEventData>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
         ts: u128,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
+            ctx,
             ts.into(),
         ))
     }
@@ -133,9 +144,10 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         err_type: EType,
         error: impl Into<anyhow::Error>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
-        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into())
+        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into(), ctx)
     }
 }
 

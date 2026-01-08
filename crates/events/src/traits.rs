@@ -9,7 +9,10 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::{event_context::AggregateId, EnclaveEvent, EventId, Unsequenced};
+use crate::{
+    event_context::{AggregateId, ConcreteEventContext},
+    EnclaveEvent, EventId, Sequenced, Unsequenced, WithAggregateId,
+};
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:
@@ -18,7 +21,7 @@ pub trait Event:
     type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
 
     /// Payload for the Event
-    type Data;
+    type Data: WithAggregateId;
 
     fn event_type(&self) -> String;
     fn event_id(&self) -> Self::Id;
@@ -36,6 +39,7 @@ pub trait ErrorEvent: Event {
         err_type: Self::ErrType,
         error: impl Into<Self::FromError>,
         ts: u128,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
     ) -> Result<Self>;
 }
 
@@ -44,18 +48,32 @@ pub trait EventFactory<E: Event> {
     /// Create a new event from the given event data, apply a local HLC timestamp.
     ///
     /// This method should be used for events that have originated locally.
-    fn event_from(&self, data: impl Into<E::Data>) -> Result<E>;
+    fn event_from(
+        &self,
+        data: impl Into<E::Data>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+    ) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> Result<E>;
+    fn event_from_remote_source(
+        &self,
+        data: impl Into<E::Data>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ts: u128,
+    ) -> Result<E>;
 }
 
 /// An ErrorFactory creates errors.
 pub trait ErrorFactory<E: ErrorEvent> {
     /// Create an error event from the given error.
-    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> Result<E>;
+    fn event_from_error(
+        &self,
+        err_type: E::ErrType,
+        error: impl Into<E::FromError>,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+    ) -> Result<E>;
 }
 
 /// An EventPublisher publishes events on it's internal EventBus
@@ -91,7 +109,11 @@ pub trait EventSubscriber<E: Event> {
 /// Trait to create an event with a timestamp from its associated type data
 pub trait EventConstructorWithTimestamp: Event + Sized {
     /// Create an event passing attaching a specific timestamp.
-    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
+    fn new_with_timestamp(
+        data: Self::Data,
+        ctx: Option<ConcreteEventContext<Sequenced>>,
+        ts: u128,
+    ) -> Self;
 }
 
 pub trait CompositeEvent: EventConstructorWithTimestamp {}
@@ -126,8 +148,11 @@ pub trait EventContext {
     fn origin_id(&self) -> EventId;
     /// The aggregate id associated with the event
     fn aggregate_id(&self) -> AggregateId;
-    /// The sequence number of the event
-    fn seq(&self) -> u64;
     /// The timestamp for the event
     fn ts(&self) -> u128;
+}
+
+pub trait EventContextSeq {
+    /// The sequence number of the event
+    fn seq(&self) -> u64;
 }

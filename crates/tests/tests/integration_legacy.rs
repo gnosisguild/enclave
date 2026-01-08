@@ -662,7 +662,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
-        bus.event_from(event.clone())?.to_bytes()?,
+        bus.event_from(event.clone(), None)?.to_bytes()?,
     )));
 
     // check the history of the event bus

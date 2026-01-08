@@ -255,7 +255,7 @@ mod tests {
     fn test_enclave_event_gossip_lifecycle() -> anyhow::Result<()> {
         // event is created locally
         let event: EnclaveEvent<Unsequenced> =
-            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), 31415);
+            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), None, 31415);
 
         // event is sequenced after bus.publish() adds a sequence number
         let event: EnclaveEvent<Sequenced> = event.into_sequenced(90210);
