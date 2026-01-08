@@ -7,6 +7,8 @@
 use greco::{Greco, Params};
 use polynomial::Polynomial;
 
+mod hash;
+use hash::generate_commitment;
 mod constants;
 mod ciphertext_addition;
 use ciphertext_addition::CiphertextAddition;
@@ -45,8 +47,9 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 ///
 fn main(
     // Ciphertext Addition Section
-    prev_ct0is: [Polynomial<512>; 2], // todo: make this pub
-    prev_ct1is: [Polynomial<512>; 2], // todo: make this pub
+    prev_ct0is: [Polynomial<512>; 2],
+    prev_ct1is: [Polynomial<512>; 2],
+    prev_ct_commitment: pub Field,
     sum_ct0is: [Polynomial<512>; 2],
     sum_ct1is: [Polynomial<512>; 2],
     sum_r0is: [Polynomial<512>; 2],
@@ -82,7 +85,7 @@ fn main(
     slot_address: pub Field,
     balance: Field,
     is_first_vote: pub bool,
-) -> pub ([Polynomial<512>; 2], [Polynomial<512>; 2]) {
+) -> pub Field {
     // ============================================================================
     // STEP 1: Authentication - Derive voter's address from signature
     // ============================================================================
@@ -116,6 +119,7 @@ fn main(
         merkle_proof_indices,
         merkle_proof_siblings,
     );
+
     assert(merkle_root_calculated == merkle_root);
 
     // ============================================================================
@@ -146,6 +150,7 @@ fn main(
         p1is,
         p2is,
     );
+
     assert(greco.verify());
 
     // ============================================================================
@@ -157,17 +162,26 @@ fn main(
     //
     // Mask votes add zero to the previous ciphertext, creating a different ciphertext
     // with the same plaintext as the previous ciphertext.
+    assert(prev_ct_commitment == generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is));
+
+    let ct_commitment = generate_commitment::<512, 2, 36>(ct0is, ct1is);
+    let sum_ct_commitment = generate_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
+
     let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
         params.crypto_params(),
         ct0is,
         ct1is,
+        ct_commitment,
         prev_ct0is,
         prev_ct1is,
+        prev_ct_commitment,
         sum_ct0is,
         sum_ct1is,
+        sum_ct_commitment,
         sum_r0is,
         sum_r1is,
     );
+
     let is_ct_add_valid = ct_add.verify();
 
     // ============================================================================
@@ -190,17 +204,17 @@ fn main(
     if (is_signature_valid == true) & (slot_address == address) {
         check_coefficient_values_with_balance(k1, params.crypto_params().q_mod_t, balance);
 
-        (ct0is, ct1is)
+        ct_commitment
     } else {
         let is_vote_zero = check_coefficient_zero(k1);
         assert(is_vote_zero == true);
 
         if is_first_vote {
-            (ct0is, ct1is)
+            ct_commitment
         } else {
             assert(is_ct_add_valid);
 
-            (sum_ct0is, sum_ct1is)
+            sum_ct_commitment
         }
     }
 }

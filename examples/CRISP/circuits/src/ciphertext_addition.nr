@@ -23,8 +23,8 @@
 //! - For CRT (Chinese Remainder Theorem) bases, we have arrays [c0_i, c1_i] for each modulus q_i
 //!
 //! Homomorphic addition is performed component-wise:
-//! - sum_c0_i = zero_c0_i + prev_c0_i + r0_i * q_i
-//! - sum_c1_i = zero_c1_i + prev_c1_i + r1_i * q_i
+//! - sum_c0_i = ct0_i + prev_c0_i + r0_i * q_i
+//! - sum_c1_i = ct1_i + prev_c1_i + r1_i * q_i
 //!
 //! Where r0_i and r1_i are correction terms (quotient polynomials) that account for modular
 //! reduction when coefficients exceed the modulus q_i.
@@ -40,91 +40,70 @@
 //! 4. Checks range constraints on all coefficients
 
 use greco::CryptographicParams;
-use polynomial::{flatten, Polynomial};
-use safe::SafeSponge;
+use polynomial::Polynomial;
+
+use crate::hash::generate_hash;
 
 /// Parameters for ciphertext addition verification.
 ///
 /// # Arguments
 /// * `N` - Polynomial degree.
 /// * `L` - Number of CRT bases.
-/// * `BIT_ZERO_CT` - Bit-width bound per coefficient for zero ciphertext polynomials `zero_ct0is`/`zero_ct1is`.
+/// * `BIT_CT` - Bit-width bound per coefficient for ciphertext polynomials `ct0is`/`ct1is`.
 /// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
 /// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
-pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
+pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
     crypto_params: CryptographicParams<L>,
-    zero_ct0is: [Polynomial<N>; L],
-    zero_ct1is: [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L],
+    ct1is: [Polynomial<N>; L],
+    ct_commitment: Field,
     prev_ct0is: [Polynomial<N>; L],
     prev_ct1is: [Polynomial<N>; L],
+    prev_ct_commitment: Field,
     sum_ct0is: [Polynomial<N>; L],
     sum_ct1is: [Polynomial<N>; L],
+    sum_ct_commitment: Field,
     r0is: [Polynomial<N>; L],
     r1is: [Polynomial<N>; L],
 }
 
-impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> CiphertextAddition<N, L, BIT_ZERO_CT, BIT_PREV_CT, BIT_SUM_CT> {
+impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> CiphertextAddition<N, L, BIT_CT, BIT_PREV_CT, BIT_SUM_CT> {
     /// Creates a new CiphertextAddition instance.
     ///
     /// # Arguments
     /// * `crypto_params` - Cryptographic parameters for the ciphertext addition circuit.
-    /// * `zero_ct0is`, `zero_ct1is` - Zero ciphertext polynomials.
+    /// * `ct0is`, `ct1is` - Ciphertext polynomials.
     /// * `prev_ct0is`, `prev_ct1is` - Previous ciphertext polynomials.
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
         crypto_params: CryptographicParams<L>,
-        zero_ct0is: [Polynomial<N>; L],
-        zero_ct1is: [Polynomial<N>; L],
+        ct0is: [Polynomial<N>; L],
+        ct1is: [Polynomial<N>; L],
+        ct_commitment: Field,
         prev_ct0is: [Polynomial<N>; L],
         prev_ct1is: [Polynomial<N>; L],
+        prev_ct_commitment: Field,
         sum_ct0is: [Polynomial<N>; L],
         sum_ct1is: [Polynomial<N>; L],
+        sum_ct_commitment: Field,
         r0is: [Polynomial<N>; L],
         r1is: [Polynomial<N>; L],
     ) -> Self {
         Self {
             crypto_params,
-            zero_ct0is,
-            zero_ct1is,
+            ct0is,
+            ct1is,
+            ct_commitment,
             prev_ct0is,
             prev_ct1is,
+            prev_ct_commitment,
             sum_ct0is,
             sum_ct1is,
+            sum_ct_commitment,
             r0is,
             r1is,
         }
-    }
-
-    /// Flattens all polynomials coefficients into a single array for challenge generation.
-    ///
-    /// This function serializes all polynomial coefficients into a 1D array to enable
-    /// the generation of random challenge values using the Fiat-Shamir transform.
-    /// The coefficients are arranged in a specific order to ensure deterministic
-    /// challenge generation.
-    ///
-    /// # Returns
-    /// An array containing all polynomials coefficients in flattened form
-    fn payload(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        // Flatten zero ciphertext polynomials
-        inputs = flatten::<_, _, BIT_ZERO_CT>(inputs, self.zero_ct0is);
-        inputs = flatten::<_, _, BIT_ZERO_CT>(inputs, self.zero_ct1is);
-
-        // Flatten previous ciphertext polynomials
-        inputs = flatten::<_, _, BIT_PREV_CT>(inputs, self.prev_ct0is);
-        inputs = flatten::<_, _, BIT_PREV_CT>(inputs, self.prev_ct1is);
-
-        // Flatten sum ciphertext polynomials
-        inputs = flatten::<_, _, BIT_SUM_CT>(inputs, self.sum_ct0is);
-        inputs = flatten::<_, _, BIT_SUM_CT>(inputs, self.sum_ct1is);
-
-        // Flatten quotient/correction polynomials
-        inputs = flatten::<_, _, 1>(inputs, self.r0is);
-        inputs = flatten::<_, _, 1>(inputs, self.r1is);
-
-        inputs
     }
 
     /// Verifies the correct addition constraints for the ciphertext addition circuit.
@@ -145,8 +124,8 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     ///
     /// For each CRT basis i, we verify:
     /// ```
-    /// sum_ct0i(gamma) = zero_ct0i(gamma) + prev_ct0i(gamma) + r0i(gamma) * q_i
-    /// sum_ct1i(gamma) = zero_ct1i(gamma) + prev_ct1i(gamma) + r1i(gamma) * q_i
+    /// sum_ct0i(gamma) = ct0i(gamma) + prev_ct0i(gamma) + r0i(gamma) * q_i
+    /// sum_ct1i(gamma) = ct1i(gamma) + prev_ct1i(gamma) + r1i(gamma) * q_i
     /// ```
     ///
     /// Where:
@@ -162,8 +141,8 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     ///
     /// Instead of checking each equation separately, we form a linear combination:
     /// ```
-    /// sum(gamma_i * (sum_ct0i(gamma) - zero_ct0i(gamma) - prev_ct0i(gamma) - r0i(gamma) * q_i)) +
-    /// sum(gamma_{L+i} * (sum_ct1i(gamma) - zero_ct1i(gamma) - prev_ct1i(gamma) - r1i(gamma) * q_i)) = 0
+    /// sum(gamma_i * (sum_ct0i(gamma) - ct0i(gamma) - prev_ct0i(gamma) - r0i(gamma) * q_i)) +
+    /// sum(gamma_{L+i} * (sum_ct1i(gamma) - ct1i(gamma) - prev_ct1i(gamma) - r1i(gamma) * q_i)) = 0
     /// ```
     ///
     /// This single check ensures all equations hold simultaneously.
@@ -217,25 +196,14 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let inputs = self.payload();
+        let mut inputs = Vec::new();
 
-        // Domain separator for ciphertext addition circuit - "CiphertextAddition" in hex
-        let domain_separator = [
-            0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x74, 0x65, 0x78, 0x74, 0x41, 0x64, 0x64, 0x69,
-            0x74, 0x69, 0x6f, 0x6e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
+        inputs.push(self.ct_commitment);
+        inputs.push(self.prev_ct_commitment);
+        inputs.push(self.sum_ct_commitment);
 
-        // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = inputs.len();
-        let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+        let gammas = generate_hash::<L>(inputs);
 
-        let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-        sponge.absorb(inputs);
-        let gammas = sponge.squeeze();
-        sponge.finish();
         gammas
     }
 
@@ -254,7 +222,7 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
     /// # Verification Process
     ///
     /// For each CRT basis i:
-    /// 1. Compute the difference polynomial: `p = sum_ct0i - (zero_ct0i + prev_ct0i + r0i * q_i)`
+    /// 1. Compute the difference polynomial: `p = sum_ct0i - (ct0i + prev_ct0i + r0i * q_i)`
     /// 2. Evaluate at gamma: p(gamma)
     /// 3. Add to accumulator with weight gamma_i: accumulator += gamma_i * p(gamma)
     ///
@@ -271,11 +239,11 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
 
         let mut accumulator: Field = 0;
 
-        // First L equalities: verify sum_ct0i = zero_ct0i + prev_ct0i + r0i * q_i
+        // First L equalities: verify sum_ct0i = ct0i + prev_ct0i + r0i * q_i
         // For i=0, use weight 1; for i>0, use weight gamma_i
         for i in 0..L {
-            // Build the expected sum: zero_ct0i + prev_ct0i + r0i * q_i
-            let mut p = self.zero_ct0is[i];
+            // Build the expected sum: ct0i + prev_ct0i + r0i * q_i
+            let mut p = self.ct0is[i];
             let r0i_scaled = self.r0is[i].mul_scalar(self.crypto_params.qis[i]);
 
             p = p.add(self.prev_ct0is[i]);
@@ -289,11 +257,11 @@ impl<let N: u32, let L: u32, let BIT_ZERO_CT: u32, let BIT_PREV_CT: u32, let BIT
             accumulator += gamma_i * p.eval(gamma);
         }
 
-        // Next L equalities: verify sum_ct1i = zero_ct1i + prev_ct1i + r1i * q_i
+        // Next L equalities: verify sum_ct1i = ct1i + prev_ct1i + r1i * q_i
         // Use weights gamma_{L+i} for these equations
         for i in 0..L {
-            // Build the expected sum: zero_ct1i + prev_ct1i + r1i * q_i
-            let mut p = self.zero_ct1is[i];
+            // Build the expected sum: ct1i + prev_ct1i + r1i * q_i
+            let mut p = self.ct1is[i];
             let r1i_scaled = self.r1is[i].mul_scalar(self.crypto_params.qis[i]);
 
             p = p.add(self.prev_ct1is[i]);
