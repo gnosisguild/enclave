@@ -9,10 +9,7 @@ use std::ops::Deref;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    event_context::{AggregateId, EventContext},
-    EventContextAccessors, EventContextSeq, EventId,
-};
+use crate::{event_context::EventContext, EventContextAccessors, EventContextSeq, EventId};
 
 use super::Sequenced;
 

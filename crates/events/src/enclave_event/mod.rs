@@ -215,11 +215,6 @@ impl EventContextSeq for EnclaveEvent<Sequenced> {
 }
 
 impl EnclaveEvent<Sequenced> {
-    // TOOD: remove
-    pub fn get_seq(&self) -> u64 {
-        self.seq()
-    }
-
     pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
         let ts = self.ts();
         let data = self.clone().into_data();
@@ -245,7 +240,7 @@ impl EnclaveEvent<Sequenced> {
 
     /// test-helpers only utility function to remove time information from an event
     pub fn strip_ts(&self) -> EnclaveEvent {
-        EnclaveEvent::new_stored_event(self.get_data().clone(), 0, self.get_seq())
+        EnclaveEvent::new_stored_event(self.get_data().clone(), 0, self.seq())
     }
 }
 
@@ -253,13 +248,12 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
     type Id = EventId;
     type Data = EnclaveEventData;
 
-    fn event_type(&self) -> String {
-        self.payload.event_type()
+    fn event_id(&self) -> Self::Id {
+        self.ctx.id()
     }
 
-    // TODO: remove?
-    fn event_id(&self) -> Self::Id {
-        self.id()
+    fn event_type(&self) -> String {
+        self.payload.event_type()
     }
 
     fn get_data(&self) -> &EnclaveEventData {
@@ -296,13 +290,13 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
 
 impl<S: SeqState> From<EnclaveEvent<S>> for EventId {
     fn from(value: EnclaveEvent<S>) -> Self {
-        value.id()
+        value.ctx.id()
     }
 }
 
 impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
     fn from(value: &EnclaveEvent<S>) -> Self {
-        value.id()
+        value.ctx.id()
     }
 }
 

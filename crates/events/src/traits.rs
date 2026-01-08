@@ -22,9 +22,8 @@ pub trait Event:
 
     /// Payload for the Event
     type Data: WithAggregateId;
-
-    fn event_type(&self) -> String;
     fn event_id(&self) -> Self::Id;
+    fn event_type(&self) -> String;
     fn get_data(&self) -> &Self::Data;
     fn into_data(self) -> Self::Data;
 }
