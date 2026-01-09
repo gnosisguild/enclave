@@ -19,13 +19,13 @@ pub trait AutoPersist<T>
 where
     T: PersistableData,
 {
-    /// Load the data from the repository into an auto persist container
+    /// Load the data from the source into an auto persist container
     async fn load(&self) -> Result<Persistable<T>>;
-    /// Create a new auto persist container and set some data on it to send back to the repository
+    /// Create a new auto persist container and set some data on it to send back to the source
     fn send(&self, data: Option<T>) -> Persistable<T>;
-    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
+    /// Load the data from the source into an auto persist container. If there is no persisted data then persist the given default data  
     async fn load_or_default(&self, default: T) -> Result<Persistable<T>>;
-    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
+    /// Load the data from the source into an auto persist container. If there is no persisted data then persist the given default data  
     async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
     where
         F: Send + FnOnce() -> Result<T>;
