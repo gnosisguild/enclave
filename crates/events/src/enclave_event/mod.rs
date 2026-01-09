@@ -68,6 +68,7 @@ pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
+pub use typed_event::*;
 
 use crate::{
     event_context::{AggregateId, EventContext},
@@ -191,6 +192,10 @@ where
     pub fn split(self) -> (EnclaveEventData, u128) {
         (self.payload, self.ctx.ts())
     }
+
+    pub fn get_ctx(&self) -> &EventContext<S> {
+        &self.ctx
+    }
 }
 
 impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
@@ -219,6 +224,11 @@ impl EnclaveEvent<Sequenced> {
         let ts = self.ts();
         let data = self.clone().into_data();
         EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts)
+    }
+
+    pub fn to_typed_event<T>(&self, data: T) -> TypedEvent<T> {
+        let ctx: EventContext<Sequenced> = self.get_ctx().clone();
+        TypedEvent::new(data, ctx)
     }
 }
 

@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use anyhow::Result;
 
-use crate::DataStore;
+use crate::{DataStore, StoreConnector};
 
 #[derive(Debug)]
 pub struct Repository<S> {
@@ -23,6 +23,15 @@ impl<S> Repository<S> {
             store,
             _p: PhantomData,
         }
+    }
+
+    pub fn to_connector(&self) -> Result<StoreConnector> {
+        Ok(StoreConnector::new(
+            self.store.scope_bytes(),
+            self.store.get_recipient(),
+            self.store.insert_recipient(),
+            self.store.remove_recipient(),
+        ))
     }
 }
 

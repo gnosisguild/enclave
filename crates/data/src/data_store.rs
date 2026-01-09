@@ -99,6 +99,22 @@ impl DataStore {
         &self.addr
     }
 
+    pub fn get_recipient(&self) -> Recipient<Get> {
+        self.get.clone()
+    }
+
+    pub fn remove_recipient(&self) -> Recipient<Remove> {
+        self.remove.clone()
+    }
+
+    pub fn insert_recipient(&self) -> Recipient<Insert> {
+        self.insert.clone()
+    }
+
+    pub fn scope_bytes(&self) -> Vec<u8> {
+        self.scope.clone()
+    }
+
     /// Changes the scope for the data store.
     /// Note that if the scope does not start with a slash one is appended.
     /// ```

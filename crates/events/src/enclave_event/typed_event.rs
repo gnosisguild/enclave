@@ -20,6 +20,20 @@ pub struct TypedEvent<T> {
     ctx: EventContext<Sequenced>,
 }
 
+impl<T> TypedEvent<T> {
+    pub fn new(inner: T, ctx: EventContext<Sequenced>) -> Self {
+        Self { inner, ctx }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    pub fn get_ctx(&self) -> &EventContext<Sequenced> {
+        &self.ctx
+    }
+}
+
 impl<T> Deref for TypedEvent<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -51,11 +65,11 @@ impl<T> EventContextSeq for TypedEvent<T> {
     }
 }
 
-impl<T> From<(T, EventContext<Sequenced>)> for TypedEvent<T> {
-    fn from(value: (T, EventContext<Sequenced>)) -> Self {
+impl<T> From<(T, &EventContext<Sequenced>)> for TypedEvent<T> {
+    fn from(value: (T, &EventContext<Sequenced>)) -> Self {
         Self {
             inner: value.0,
-            ctx: value.1,
+            ctx: value.1.clone(),
         }
     }
 }

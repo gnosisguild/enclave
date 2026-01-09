@@ -13,7 +13,7 @@ use e3_events::{
     ComputeResponse, CorrelationId, DecryptionshareCreated, Die, E3RequestComplete, E3id, EType,
     EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
     EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated,
+    ThresholdShareCreated, TypedEvent,
 };
 use e3_fhe::create_crp;
 use e3_trbfv::{
@@ -406,7 +406,9 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    pub fn handle_compute_response(&mut self, msg: ComputeResponse) -> Result<()> {
+    pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+        self.bus.set_ctx(msg.get_ctx());
+        self.state.set_ctx(msg.get_ctx());
         match &msg.response {
             TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
             TrBFVResponse::GenPkShareAndSkSss(_) => {
@@ -425,7 +427,7 @@ impl ThresholdKeyshare {
     /// 1. CiphernodeSelected - Generate BFV keys and start collecting
     pub fn handle_ciphernode_selected(
         &mut self,
-        msg: CiphernodeSelected,
+        msg: TypedEvent<CiphernodeSelected>,
         address: Addr<Self>,
     ) -> Result<()> {
         info!("CiphernodeSelected received.");
@@ -447,7 +449,7 @@ impl ThresholdKeyshare {
                 CollectingEncryptionKeysData {
                     sk_bfv: sk_bfv_encrypted.clone(),
                     pk_bfv: pk_bfv_bytes.clone(),
-                    ciphernode_selected: msg.clone(),
+                    ciphernode_selected: msg.into_inner(),
                 },
             ))
         })?;
@@ -537,8 +539,8 @@ impl ThresholdKeyshare {
     }
 
     /// 2a. GenEsiSss result
-    pub fn handle_gen_esi_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
-        let output: GenEsiSssResponse = res.try_into()?;
+    pub fn handle_gen_esi_sss_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
+        let output: GenEsiSssResponse = res.into_inner().try_into()?;
 
         let esi_sss = output.esi_sss;
 
@@ -616,8 +618,11 @@ impl ThresholdKeyshare {
     }
 
     /// 3a. GenPkShareAndSkSss result
-    pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
-        let TrBFVResponse::GenPkShareAndSkSss(output) = res.response else {
+    pub fn handle_gen_pk_share_and_sk_sss_response(
+        &mut self,
+        res: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
+        let TrBFVResponse::GenPkShareAndSkSss(output) = res.into_inner().response else {
             bail!("Error extracting data from compute process")
         };
 
@@ -817,8 +822,11 @@ impl ThresholdKeyshare {
     }
 
     /// 5a. CalculateDecryptionKeyResponse -> KeyshareCreated
-    pub fn handle_calculate_decryption_key_response(&mut self, res: ComputeResponse) -> Result<()> {
-        let TrBFVResponse::CalculateDecryptionKey(output) = res.response else {
+    pub fn handle_calculate_decryption_key_response(
+        &mut self,
+        res: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
+        let TrBFVResponse::CalculateDecryptionKey(output) = res.into_inner().response else {
             bail!("Error extracting data from compute process")
         };
 
@@ -901,9 +909,9 @@ impl ThresholdKeyshare {
     /// CalculateDecryptionShareResponse
     pub fn handle_calculate_decryption_share_response(
         &mut self,
-        res: ComputeResponse,
+        res: TypedEvent<ComputeResponse>,
     ) -> Result<()> {
-        let msg: CalculateDecryptionShareResponse = res.try_into()?;
+        let msg: CalculateDecryptionShareResponse = res.into_inner().try_into()?;
         let state = self.state.try_get()?;
         let party_id = state.party_id;
         let node = state.address;
@@ -936,8 +944,8 @@ impl ThresholdKeyshare {
 impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
+        match msg.clone().into_data() {
+            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(msg.to_typed_event(data)),
             EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
             EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
@@ -946,24 +954,28 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 let _ = self.handle_encryption_key_created(data, ctx.address());
             }
             EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
-            EnclaveEventData::ComputeResponse(data) => ctx.notify(data),
+            EnclaveEventData::ComputeResponse(data) => ctx.notify(msg.to_typed_event(data)),
             _ => (),
         }
     }
 }
 
-impl Handler<ComputeResponse> for ThresholdKeyshare {
+impl Handler<TypedEvent<ComputeResponse>> for ThresholdKeyshare {
     type Result = ();
-    fn handle(&mut self, msg: ComputeResponse, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<ComputeResponse>, _: &mut Self::Context) -> Self::Result {
         trap(EType::KeyGeneration, &self.bus.clone(), || {
             self.handle_compute_response(msg)
         })
     }
 }
 
-impl Handler<CiphernodeSelected> for ThresholdKeyshare {
+impl Handler<TypedEvent<CiphernodeSelected>> for ThresholdKeyshare {
     type Result = ();
-    fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CiphernodeSelected>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         trap(EType::KeyGeneration, &self.bus.clone(), || {
             self.handle_ciphernode_selected(msg, ctx.address())
         })
