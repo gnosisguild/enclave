@@ -37,22 +37,22 @@ where
     T: PersistableData,
 {
     async fn load(&self) -> Result<Persistable<T>> {
-        Persistable::load(self.to_connector()).await
+        self.to_connector().load().await
     }
 
     fn send(&self, data: Option<T>) -> Persistable<T> {
-        Persistable::new(data, self.to_connector()).save()
+        self.to_connector().send(data)
     }
 
     async fn load_or_default(&self, default: T) -> Result<Persistable<T>> {
-        Persistable::load_or_default(self.to_connector(), default).await
+        self.to_connector().load_or_default(default).await
     }
 
     async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
     where
         F: Send + FnOnce() -> Result<T>,
     {
-        Persistable::load_or_else(self.to_connector(), f).await
+        self.to_connector().load_or_else(f).await
     }
 }
 
@@ -78,6 +78,31 @@ impl StoreConnector {
             insert,
             remove,
         }
+    }
+}
+
+#[async_trait]
+impl<T> AutoPersist<T> for StoreConnector
+where
+    T: PersistableData,
+{
+    async fn load(&self) -> Result<Persistable<T>> {
+        Persistable::load(self.clone()).await
+    }
+
+    fn send(&self, data: Option<T>) -> Persistable<T> {
+        Persistable::new(data, self.clone()).save()
+    }
+
+    async fn load_or_default(&self, default: T) -> Result<Persistable<T>> {
+        Persistable::load_or_default(self.clone(), default).await
+    }
+
+    async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
+    where
+        F: Send + FnOnce() -> Result<T>,
+    {
+        Persistable::load_or_else(self.clone(), f).await
     }
 }
 
