@@ -37,22 +37,22 @@ where
     T: PersistableData,
 {
     async fn load(&self) -> Result<Persistable<T>> {
-        Persistable::load(self.to_connector()?).await
+        Persistable::load(self.to_connector()).await
     }
 
     fn send(&self, data: Option<T>) -> Persistable<T> {
-        Persistable::new(data, self.to_connector().unwrap()).save()
+        Persistable::new(data, self.to_connector()).save()
     }
 
     async fn load_or_default(&self, default: T) -> Result<Persistable<T>> {
-        Persistable::load_or_default(self.to_connector()?, default).await
+        Persistable::load_or_default(self.to_connector(), default).await
     }
 
     async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
     where
         F: Send + FnOnce() -> Result<T>,
     {
-        Persistable::load_or_else(self.to_connector()?, f).await
+        Persistable::load_or_else(self.to_connector(), f).await
     }
 }
 

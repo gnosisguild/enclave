@@ -25,13 +25,13 @@ impl<S> Repository<S> {
         }
     }
 
-    pub fn to_connector(&self) -> Result<StoreConnector> {
-        Ok(StoreConnector::new(
+    pub fn to_connector(&self) -> StoreConnector {
+        StoreConnector::new(
             self.store.scope_bytes(),
             self.store.get_recipient(),
             self.store.insert_recipient(),
             self.store.remove_recipient(),
-        ))
+        )
     }
 }
 
