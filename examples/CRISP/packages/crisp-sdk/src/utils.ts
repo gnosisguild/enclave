@@ -6,7 +6,7 @@
 
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
-import type { MerkleProof } from './types'
+import type { MerkleProof, Polynomial } from './types'
 import { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
 import { publicKeyToAddress } from 'viem/utils'
 import { hexToBytes, recoverPublicKey } from 'viem'
@@ -150,4 +150,14 @@ export async function getOptimalThreadCount(): Promise<number> {
 
   // Fallback
   return 5
+}
+
+/**
+ * Flatten the ciphertext polynomials into a single array of coefficients
+ * @param ct0is The first set of ciphertext polynomials
+ * @param ct1is The second set of ciphertext polynomials
+ * @returns The flattened ciphertext polynomials as an array of coefficients
+ */
+export const flattenCiphertext = (ct0is: Polynomial[], ct1is: Polynomial[]): `0x${string}`[] => {
+  return [...ct0is.flatMap((p) => p.coefficients), ...ct1is.flatMap((p) => p.coefficients)] as `0x${string}`[]
 }

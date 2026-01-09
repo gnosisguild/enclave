@@ -7,7 +7,15 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { Vote } from '../src/types'
 import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
-import { decodeTally, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
+import {
+  decodeTally,
+  generatePublicKey,
+  verifyProof,
+  encodeVote,
+  generateCircuitInputs,
+  executeCircuit,
+  computeCommitment,
+} from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
@@ -117,19 +125,9 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
-      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
+      expect(returnValue).toEqual(commitment)
     })
 
     it('Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote', async () => {
@@ -151,19 +149,9 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
 
-      const sumCt0is = crispInputs.sum_ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const sumCt1is = crispInputs.sum_ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputSumCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputSumCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputSumCt0is, ...outputSumCt1is]).toEqual([...sumCt0is, ...sumCt1is])
+      expect(returnValue).toEqual(commitment)
     })
 
     it('Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext', async () => {
@@ -182,19 +170,9 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
-      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
+      expect(returnValue).toEqual(commitment)
     })
   })
 

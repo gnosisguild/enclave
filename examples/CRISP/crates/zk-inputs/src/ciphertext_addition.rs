@@ -18,6 +18,8 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
 
+use shared::commitments::compute_pk_commitment;
+
 /// Set of inputs for validation of a ciphertext addition.
 ///
 /// This struct contains all the necessary data to prove that a ciphertext addition
@@ -26,6 +28,7 @@ use std::sync::Arc;
 pub struct CiphertextAdditionInputs {
     pub prev_ct0is: Vec<Vec<BigInt>>,
     pub prev_ct1is: Vec<Vec<BigInt>>,
+    pub prev_ct_commitment: BigInt,
     pub sum_ct0is: Vec<Vec<BigInt>>,
     pub sum_ct1is: Vec<Vec<BigInt>>,
     pub r0is: Vec<Vec<BigInt>>,
@@ -42,6 +45,7 @@ impl CiphertextAdditionInputs {
         CiphertextAdditionInputs {
             prev_ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
             prev_ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
+            prev_ct_commitment: BigInt::zero(),
             sum_ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
             sum_ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
             r0is: vec![vec![BigInt::zero(); degree]; num_moduli],
@@ -57,6 +61,7 @@ impl CiphertextAdditionInputs {
     /// * `ct` - The ciphertext being added (from Greco)
     /// * `sum_ct` - The result of the ciphertext addition
     /// * `params` - BFV parameters
+    /// * `bit_ct` - Bit width for ciphertext bounds (used for packing)
     ///
     /// # Returns
     /// CiphertextAdditionInputs containing all necessary proof data
@@ -66,6 +71,7 @@ impl CiphertextAdditionInputs {
         ct: &Ciphertext,
         sum_ct: &Ciphertext,
         params: &BfvParameters,
+        bit_ct: u32,
     ) -> Result<CiphertextAdditionInputs> {
         let ctx: &Arc<fhe_math::rq::Context> = params
             .ctx_at_level(pt.level())
@@ -226,6 +232,8 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
+        res.prev_ct_commitment = compute_pk_commitment(&res.prev_ct0is, &res.prev_ct1is, bit_ct);
+
         Ok(res)
     }
 
@@ -238,6 +246,7 @@ impl CiphertextAdditionInputs {
         CiphertextAdditionInputs {
             prev_ct0is: reduce_coefficients_2d(&self.prev_ct0is, zkp_modulus),
             prev_ct1is: reduce_coefficients_2d(&self.prev_ct1is, zkp_modulus),
+            prev_ct_commitment: self.prev_ct_commitment.clone() % zkp_modulus,
             sum_ct0is: reduce_coefficients_2d(&self.sum_ct0is, zkp_modulus),
             sum_ct1is: reduce_coefficients_2d(&self.sum_ct1is, zkp_modulus),
             r0is: reduce_coefficients_2d(&self.r0is, zkp_modulus),
@@ -274,6 +283,13 @@ mod tests {
         Plaintext::try_encode(&message_data, Encoding::poly(), params).unwrap()
     }
 
+    fn calculate_bit_ct(params: &Arc<BfvParameters>) -> u32 {
+        use greco::bounds::GrecoBounds;
+        use shared::template::calculate_bit_width;
+        let (_, bounds) = GrecoBounds::compute(params, 0).unwrap();
+        calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap()
+    }
+
     #[test]
     fn test_new_initialization() {
         let inputs = CiphertextAdditionInputs::new(2, 1024);
@@ -303,7 +319,9 @@ mod tests {
         let sum_ct = &ct1 + &ct2;
 
         // Compute ciphertext addition inputs.
-        let result = CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, &bfv_params);
+        let bit_ct = calculate_bit_ct(&bfv_params);
+        let result =
+            CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, &bfv_params, bit_ct);
 
         assert!(result.is_ok());
         let inputs = result.unwrap();
@@ -327,8 +345,10 @@ mod tests {
         let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
         let sum_ct = &ct1 + &ct2;
 
+        let bit_ct = calculate_bit_ct(&bfv_params);
         let inputs =
-            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, &bfv_params).unwrap();
+            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, &bfv_params, bit_ct)
+                .unwrap();
         let standard_form = inputs.standard_form();
 
         // Verify structure is preserved.

@@ -25,6 +25,8 @@ rand = "0.8.5"
 hex = "0.4.3"
 itertools = "0.14.0"
 eyre.workspace = true
+ark-bn254 = "0.5"
+ark-ff = "0.5"
 
 
 

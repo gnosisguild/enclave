@@ -5,11 +5,27 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import { type CircuitInputs, type Vote, ExecuteCircuitResult, MaskVoteProofInputs, ProofInputs, VoteProofInputs } from './types'
-import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
+import {
+  type CircuitInputs,
+  type Vote,
+  ExecuteCircuitResult,
+  MaskVoteProofInputs,
+  ProofInputs,
+  ProofData,
+  VoteProofInputs,
+  Polynomial,
+} from './types'
+import {
+  generateMerkleProof,
+  toBinary,
+  extractSignatureComponents,
+  getAddressFromSignature,
+  getOptimalThreadCount,
+  flattenCiphertext,
+} from './utils'
 import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, ZERO_VOTE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import { UltraHonkBackend } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
 import { Hex } from 'viem'
@@ -137,6 +153,22 @@ export const generatePublicKey = (): Uint8Array => {
 }
 
 /**
+ * Compute the commitment to a set of ciphertext polynomials.
+ * This function is used for testing purposes only. It is not part of the public API.
+ * @param ct0is - The first component of the ciphertext polynomials.
+ * @param ct1is - The second component of the ciphertext polynomials.
+ * @returns The commitment as a bigint.
+ */
+export const computeCommitment = (ct0is: Polynomial[], ct1is: Polynomial[]): bigint => {
+  const commitment = zkInputsGenerator.computeCommitment(
+    ct0is.map((p) => p.coefficients),
+    ct1is.map((p) => p.coefficients),
+  )
+
+  return BigInt(commitment)
+}
+
+/**
  * Generate the circuit inputs for a vote proof.
  * This works for both vote and masking.
  * @param proofInputs - The proof inputs.
@@ -185,7 +217,9 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
 export const executeCircuit = async (crispInputs: CircuitInputs): Promise<ExecuteCircuitResult> => {
   const noir = new Noir(circuit as CompiledCircuit)
 
-  return noir.execute(crispInputs) as Promise<ExecuteCircuitResult>
+  const { witness, returnValue } = await noir.execute(crispInputs)
+
+  return { witness, returnValue: BigInt(returnValue as `0x${string}`) }
 }
 
 /**
@@ -193,7 +227,7 @@ export const executeCircuit = async (crispInputs: CircuitInputs): Promise<Execut
  * @param crispInputs - The circuit inputs.
  * @returns The proof.
  */
-export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofData> => {
+export const generateProof = async (crispInputs: CircuitInputs) => {
   const { witness } = await executeCircuit(crispInputs)
   const backend = new UltraHonkBackend(circuit.bytecode, { threads: optimalThreadCount })
 
@@ -209,7 +243,7 @@ export const generateProof = async (crispInputs: CircuitInputs): Promise<ProofDa
  * @param voteProofInputs - The vote proof inputs.
  * @returns The vote proof.
  */
-export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
+export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promise<ProofData> => {
   if (voteProofInputs.vote.yes > voteProofInputs.balance || voteProofInputs.vote.no > voteProofInputs.balance) {
     throw new Error('Invalid vote: vote exceeds balance')
   }
@@ -236,7 +270,9 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs) => {
     messageHash: voteProofInputs.messageHash,
   })
 
-  return generateProof(crispInputs)
+  const encryptedVote = flattenCiphertext(crispInputs.ct0is, crispInputs.ct1is)
+
+  return { ...(await generateProof(crispInputs)), encryptedVote }
 }
 
 /**
@@ -255,7 +291,15 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
     merkleProof,
   })
 
-  return generateProof(crispInputs)
+  let encryptedVote: `0x${string}`[]
+
+  if (crispInputs.is_first_vote) {
+    encryptedVote = flattenCiphertext(crispInputs.ct0is, crispInputs.ct1is)
+  } else {
+    encryptedVote = flattenCiphertext(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
+  }
+
+  return { ...(await generateProof(crispInputs)), encryptedVote }
 }
 
 /**
@@ -279,9 +323,8 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
  * @param proof The proof data.
  * @returns The encoded proof data as a hex string.
  */
-export const encodeSolidityProof = (proof: ProofData): Hex => {
-  const vote = proof.publicInputs.slice(4) as `0x${string}`[]
-  const slotAddress = getAddress(numberToHex(BigInt(proof.publicInputs[2]), { size: 20 }))
+export const encodeSolidityProof = ({ publicInputs, proof, encryptedVote }: ProofData): Hex => {
+  const slotAddress = getAddress(numberToHex(BigInt(publicInputs[2]), { size: 20 }))
 
-  return encodeAbiParameters(parseAbiParameters('bytes, bytes32[], address'), [bytesToHex(proof.proof), vote, slotAddress])
+  return encodeAbiParameters(parseAbiParameters('bytes, bytes32[], address'), [bytesToHex(proof), encryptedVote, slotAddress])
 }
