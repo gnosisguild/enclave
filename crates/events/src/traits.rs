@@ -59,6 +59,8 @@ pub trait EventFactory<E: Event> {
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
+        // NOTE: `caused_by` makes sense here as we could be sending out requests and receiving
+        // responses that relate to the request
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<E>;
@@ -157,4 +159,9 @@ pub trait EventContextSeq {
 pub trait WithAggregateId {
     /// Extract the aggregate id from the object
     fn get_aggregate_id(&self) -> AggregateId;
+}
+
+pub trait EventContextManager {
+    fn set_ctx(&mut self, value: EventContext<Sequenced>);
+    fn get_ctx(&self) -> Option<EventContext<Sequenced>>;
 }

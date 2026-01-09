@@ -19,8 +19,8 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, HistoryCollector, Sequenced,
-    Subscribe, Unsequenced,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager,
+    HistoryCollector, Sequenced, Subscribe, Unsequenced,
 };
 
 #[derive(Clone, Derivative)]
@@ -85,13 +85,13 @@ impl BusHandle {
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
-        let evt = self.event_from(data, self.ctx.clone())?;
+        let evt = self.event_from(data, self.get_ctx())?;
         self.sequencer.do_send(evt);
         Ok(())
     }
 
     fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
-        let evt = self.event_from_remote_source(data, self.ctx.clone(), ts)?;
+        let evt = self.event_from_remote_source(data, self.get_ctx(), ts)?;
         self.sequencer.do_send(evt);
         Ok(())
     }
@@ -103,7 +103,7 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        match self.event_from_error(err_type, error, self.ctx.clone()) {
+        match self.event_from_error(err_type, error, self.get_ctx()) {
             Ok(evt) => self.sequencer.do_send(evt),
             Err(e) => error!("{e}"),
         }
@@ -162,6 +162,15 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
             self.event_bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
+    }
+}
+
+impl EventContextManager for BusHandle {
+    fn set_ctx(&mut self, value: EventContext<Sequenced>) {
+        self.ctx = Some(value);
+    }
+    fn get_ctx(&self) -> Option<EventContext<Sequenced>> {
+        self.ctx.clone()
     }
 }
 
