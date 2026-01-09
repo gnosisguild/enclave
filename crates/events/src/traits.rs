@@ -9,7 +9,10 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::{EnclaveEvent, Unsequenced};
+use crate::{
+    event_context::{AggregateId, EventContext},
+    EnclaveEvent, EventId, Sequenced, Unsequenced,
+};
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:
@@ -18,10 +21,9 @@ pub trait Event:
     type Id: Hash + Eq + Clone + Unpin + Send + Sync + Display;
 
     /// Payload for the Event
-    type Data;
-
-    fn event_type(&self) -> String;
+    type Data: WithAggregateId;
     fn event_id(&self) -> Self::Id;
+    fn event_type(&self) -> String;
     fn get_data(&self) -> &Self::Data;
     fn into_data(self) -> Self::Data;
 }
@@ -36,6 +38,7 @@ pub trait ErrorEvent: Event {
         err_type: Self::ErrType,
         error: impl Into<Self::FromError>,
         ts: u128,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<Self>;
 }
 
@@ -44,18 +47,34 @@ pub trait EventFactory<E: Event> {
     /// Create a new event from the given event data, apply a local HLC timestamp.
     ///
     /// This method should be used for events that have originated locally.
-    fn event_from(&self, data: impl Into<E::Data>) -> Result<E>;
+    fn event_from(
+        &self,
+        data: impl Into<E::Data>,
+        caused_by: Option<EventContext<Sequenced>>,
+    ) -> Result<E>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn event_from_remote_source(&self, data: impl Into<E::Data>, ts: u128) -> Result<E>;
+    fn event_from_remote_source(
+        &self,
+        data: impl Into<E::Data>,
+        // NOTE: `caused_by` makes sense here as we could be sending out requests and receiving
+        // responses that relate to the request
+        caused_by: Option<EventContext<Sequenced>>,
+        ts: u128,
+    ) -> Result<E>;
 }
 
 /// An ErrorFactory creates errors.
 pub trait ErrorFactory<E: ErrorEvent> {
     /// Create an error event from the given error.
-    fn event_from_error(&self, err_type: E::ErrType, error: impl Into<E::FromError>) -> Result<E>;
+    fn event_from_error(
+        &self,
+        err_type: E::ErrType,
+        error: impl Into<E::FromError>,
+        caused_by: Option<EventContext<Sequenced>>,
+    ) -> Result<E>;
 }
 
 /// An EventPublisher publishes events on it's internal EventBus
@@ -91,7 +110,11 @@ pub trait EventSubscriber<E: Event> {
 /// Trait to create an event with a timestamp from its associated type data
 pub trait EventConstructorWithTimestamp: Event + Sized {
     /// Create an event passing attaching a specific timestamp.
-    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self;
+    fn new_with_timestamp(
+        data: Self::Data,
+        caused_by: Option<EventContext<Sequenced>>,
+        ts: u128,
+    ) -> Self;
 }
 
 pub trait CompositeEvent: EventConstructorWithTimestamp {}
@@ -114,4 +137,33 @@ pub trait EventLog: Unpin + 'static {
     fn append(&mut self, event: &EnclaveEvent<Unsequenced>) -> Result<u64>;
     /// Read all events starting from the given sequence number (inclusive)
     fn read_from(&self, from: u64) -> Box<dyn Iterator<Item = (u64, EnclaveEvent<Unsequenced>)>>;
+}
+
+/// EventContext allows consumers to extract infrastructure metadata from event objects
+pub trait EventContextAccessors {
+    /// This event id
+    fn id(&self) -> EventId;
+    /// The id of the event that directly caused this
+    fn causation_id(&self) -> EventId;
+    /// The original event that started the causal chain
+    fn origin_id(&self) -> EventId;
+    /// The timestamp for the event
+    fn ts(&self) -> u128;
+}
+
+pub trait EventContextSeq {
+    /// The sequence number of the event
+    fn seq(&self) -> u64;
+}
+
+pub trait WithAggregateId {
+    /// Extract the aggregate id from the object
+    fn get_aggregate_id(&self) -> AggregateId;
+}
+
+/// An EventContextManager hold the current event context for use in event publishing and
+/// persistence management
+pub trait EventContextManager {
+    fn set_ctx(&mut self, value: &EventContext<Sequenced>);
+    fn get_ctx(&self) -> Option<EventContext<Sequenced>>;
 }
