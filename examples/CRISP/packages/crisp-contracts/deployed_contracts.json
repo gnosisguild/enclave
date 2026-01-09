@@ -110,16 +110,22 @@
       "address": "0xd21D7b4A70129A4a20236Df197aDaB2F46E10ec3"
     },
     "HonkVerifier": {
-      "address": "0x97acc66d62B44623F952423Cf37E3acf312CcE6b"
+      "address": "0xE553e72A9400785C6dc7aAE6B2a667f0958748F5",
+      "blockNumber": 10003260
     },
     "CRISPProgram": {
-      "address": "0xD89BBff309BA3ec888540a3Eb424810eE1083690",
+      "address": "0x412dCEdfBdDe8E4256c18154b58083c7dE810d0b",
+      "blockNumber": 10003260,
       "constructorArgs": {
         "enclave": "0x01E657C16192854E8d7D7055228C7D6532E345Be",
-        "verifierAddress": "0xd21D7b4A70129A4a20236Df197aDaB2F46E10ec3",
-        "honkVerifierAddress": "0x97acc66d62B44623F952423Cf37E3acf312CcE6b",
+        "verifierAddress": "0x3E1b9A7d0cc3cB9bc251A3c79415206e666362B4",
+        "honkVerifierAddress": "0xE553e72A9400785C6dc7aAE6B2a667f0958748F5",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
+    },
+    "RiscZeroGroth16Verifier": {
+      "address": "0x3E1b9A7d0cc3cB9bc251A3c79415206e666362B4",
+      "blockNumber": 10003257
     }
   }
 }

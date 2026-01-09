@@ -7,7 +7,7 @@
 use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
+    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest, RoundRequestWithRequester
 };
 
 use actix_web::{web, HttpResponse, Responder};
@@ -22,7 +22,7 @@ use log::{error, info};
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/rounds")
-            .route("/current", web::get().to(get_current_round))
+            .route("/current", web::post().to(get_current_round))
             .route("/public-key", web::post().to(get_public_key))
             .route("/ciphertext", web::post().to(get_ciphertext))
             .route("/request", web::post().to(request_new_round)),
@@ -74,8 +74,23 @@ async fn request_new_round(data: web::Json<RoundRequest>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the current round
-async fn get_current_round(store: web::Data<AppData>) -> impl Responder {
-    match store.current_round().get_current_round().await {
+async fn get_current_round(
+    data: web::Json<RoundRequestWithRequester>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    // Get the first requester if any exist
+    // .get(0) returns Option<&String>, so we need to handle that
+    let result = if let Some(requester) = incoming.requesters.get(0) {
+        // We have a requester, filter by it
+        store.current_round().get_current_round_for_requester(requester.clone()).await
+    } else {
+        // No requester provided (empty array)
+        store.current_round().get_current_round().await
+    };
+
+    match result {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
