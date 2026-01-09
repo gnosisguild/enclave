@@ -26,7 +26,7 @@ pub fn generate_commitment<let N: u32, let L: u32, let BIT: u32>(
     inputs = flatten::<_, _, BIT>(inputs, poly0is);
     inputs = flatten::<_, _, BIT>(inputs, poly1is);
 
-    let hash = generate_hash::<L>(inputs);
+    let hash = generate_hash::<L>(inputs, 1);
 
     hash.get(0)
 }
@@ -36,9 +36,13 @@ pub fn generate_commitment<let N: u32, let L: u32, let BIT: u32>(
 /// The sponge absorbs all field elements and squeezes out a single deterministic field element
 /// that will be used as the hash.
 ///
+/// # Arguments
+/// * `inputs` - The input field elements to hash.
+/// * `squeeze_count` - The number of field elements to squeeze out of the sponge.
+///
 /// # Returns
 /// A field element representing the hash.
-pub fn generate_hash<let L: u32>(inputs: Vec<Field>) -> Vec<Field> {
+pub fn generate_hash<let L: u32>(inputs: Vec<Field>, squeeze_count: u32) -> Vec<Field> {
     // Domain separator for CRISP - "CRISP" in hex
     let domain_separator = [
         0x43, 0x52, 0x49, 0x53, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -50,7 +54,7 @@ pub fn generate_hash<let L: u32>(inputs: Vec<Field>) -> Vec<Field> {
 
     // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
     let input_size = inputs.len();
-    let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
+    let io_pattern = [0x80000000 | input_size, 0x00000000 | squeeze_count];
 
     let mut sponge = SafeSponge::start(io_pattern, domain_separator);
 

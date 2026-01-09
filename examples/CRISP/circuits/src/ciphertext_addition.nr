@@ -202,7 +202,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         inputs.push(self.prev_ct_commitment);
         inputs.push(self.sum_ct_commitment);
 
-        let gammas = generate_hash::<L>(inputs);
+        let gammas = generate_hash::<L>(inputs, 2 * L);
 
         gammas
     }
