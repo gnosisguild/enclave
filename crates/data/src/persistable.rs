@@ -7,6 +7,7 @@
 use crate::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use anyhow::*;
 use async_trait::async_trait;
+use e3_events::{EventContext, EventContextManager, Sequenced};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub trait PersistableData: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
@@ -64,6 +65,7 @@ where
 pub struct Persistable<T> {
     data: Option<T>,
     repo: Repository<T>,
+    ctx: Option<EventContext<Sequenced>>,
 }
 
 impl<T> Persistable<T>
@@ -75,6 +77,7 @@ where
         Self {
             data,
             repo: repo.clone(),
+            ctx: None,
         }
     }
 
@@ -164,6 +167,16 @@ where
             Some(data) => f(data),
             None => Err(anyhow!("Data was not set on container.")),
         }
+    }
+}
+
+impl<T> EventContextManager for Persistable<T> {
+    fn get_ctx(&self) -> Option<EventContext<Sequenced>> {
+        self.ctx.clone()
+    }
+
+    fn set_ctx(&mut self, value: EventContext<Sequenced>) {
+        self.ctx = Some(value)
     }
 }
 

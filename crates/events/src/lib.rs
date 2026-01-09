@@ -24,6 +24,7 @@ pub use bus_handle::*;
 pub use correlation_id::*;
 pub use e3id::*;
 pub use enclave_event::*;
+pub use event_context::*;
 pub use event_id::*;
 pub use eventbus::*;
 pub use events::*;
