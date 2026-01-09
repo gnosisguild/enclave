@@ -125,6 +125,7 @@ export type CircuitInputs = {
   // Ciphertext Addition Section.
   prev_ct0is: Polynomial[]
   prev_ct1is: Polynomial[]
+  prev_ct_commitment: string
   sum_ct0is: Polynomial[]
   sum_ct1is: Polynomial[]
   sum_r0is: Polynomial[]
@@ -164,9 +165,15 @@ export type CircuitInputs = {
   is_first_vote: boolean
 }
 
+export type ProofData = {
+  publicInputs: string[]
+  proof: Uint8Array
+  encryptedVote: `0x${string}`[]
+}
+
 export type ExecuteCircuitResult = {
   witness: Uint8Array
-  returnValue: [Polynomial[][], Polynomial[][]]
+  returnValue: bigint
 }
 
 export type ProofInputs = {

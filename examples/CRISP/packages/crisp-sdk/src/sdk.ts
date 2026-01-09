@@ -7,8 +7,7 @@
 import { getIsSlotEmpty, getPreviousCiphertext } from './state'
 import { generateMaskVoteProof, generateVoteProof } from './vote'
 
-import type { ProofData } from '@aztec/bb.js'
-import type { MaskVoteProofRequest, VoteProofRequest } from './types'
+import type { MaskVoteProofRequest, ProofData, VoteProofRequest } from './types'
 
 /**
  * A class representing the CRISP SDK.

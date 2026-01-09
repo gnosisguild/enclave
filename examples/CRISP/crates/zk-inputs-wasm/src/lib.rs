@@ -9,6 +9,7 @@
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
 
 use js_sys;
+use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
 use zk_inputs::ZKInputsGenerator as CoreZKInputsGenerator;
 
@@ -102,6 +103,61 @@ impl ZKInputsGenerator {
     pub fn generate_public_key(&self) -> Result<Vec<u8>, JsValue> {
         match self.generator.generate_public_key() {
             Ok(public_key_bytes) => Ok(public_key_bytes),
+            Err(e) => Err(JsValue::from_str(&e.to_string())),
+        }
+    }
+
+    /// Compute the commitment to a set of ciphertext polynomials from JavaScript.
+    #[wasm_bindgen(js_name = "computeCommitment")]
+    pub fn compute_ct_commitment(&self, ct0is: JsValue, ct1is: JsValue) -> Result<String, JsValue> {
+        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb)
+        let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
+        let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
+
+        let mut ct0is_vec: Vec<Vec<BigInt>> = Vec::new();
+        for i in 0..ct0is_array.length() {
+            let inner_array = ct0is_array
+                .get(i)
+                .dyn_into::<js_sys::Array>()
+                .map_err(|_| JsValue::from_str("Expected array of arrays for ct0is"))?;
+
+            let mut coefficients: Vec<BigInt> = Vec::new();
+            for j in 0..inner_array.length() {
+                let s = inner_array
+                    .get(j)
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let bigint = s
+                    .parse::<BigInt>()
+                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
+                coefficients.push(bigint);
+            }
+            ct0is_vec.push(coefficients);
+        }
+
+        let mut ct1is_vec: Vec<Vec<BigInt>> = Vec::new();
+        for i in 0..ct1is_array.length() {
+            let inner_array = ct1is_array
+                .get(i)
+                .dyn_into::<js_sys::Array>()
+                .map_err(|_| JsValue::from_str("Expected array of arrays for ct1is"))?;
+
+            let mut coefficients: Vec<BigInt> = Vec::new();
+            for j in 0..inner_array.length() {
+                let s = inner_array
+                    .get(j)
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let bigint = s
+                    .parse::<BigInt>()
+                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
+                coefficients.push(bigint);
+            }
+            ct1is_vec.push(coefficients);
+        }
+
+        match self.generator.compute_commitment(&ct0is_vec, &ct1is_vec) {
+            Ok(commitment) => Ok(commitment.to_string()),
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
     }

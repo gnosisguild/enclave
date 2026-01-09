@@ -20,6 +20,7 @@ use serde::Serialize;
 pub struct ZKInputs {
     prev_ct0is: Vec<serde_json::Value>,
     prev_ct1is: Vec<serde_json::Value>,
+    prev_ct_commitment: String,
     sum_ct0is: Vec<serde_json::Value>,
     sum_ct1is: Vec<serde_json::Value>,
     sum_r0is: Vec<serde_json::Value>,
@@ -108,6 +109,9 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
+        prev_ct_commitment: ciphertext_addition_inputs_standard
+            .prev_ct_commitment
+            .to_string(),
         sum_ct0is: ciphertext_addition_inputs_standard
             .sum_ct0is
             .iter()
@@ -357,6 +361,7 @@ mod tests {
         CiphertextAdditionInputs {
             prev_ct0is: vec![vec![BigInt::from(1), BigInt::from(2)]],
             prev_ct1is: vec![vec![BigInt::from(3), BigInt::from(4)]],
+            prev_ct_commitment: BigInt::from(0),
             sum_ct0is: vec![vec![BigInt::from(5), BigInt::from(6)]],
             sum_ct1is: vec![vec![BigInt::from(7), BigInt::from(8)]],
             r0is: vec![vec![BigInt::from(9), BigInt::from(10)]],
