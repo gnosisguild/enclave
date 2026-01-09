@@ -162,6 +162,18 @@ fn main(
     //
     // Mask votes add zero to the previous ciphertext, creating a different ciphertext
     // with the same plaintext as the previous ciphertext.
+    //
+    // Commitments are cryptographic hashes of the polynomial coefficients that bind the
+    // prover to specific ciphertext values. Three commitments are generated:
+    // - prev_ct_commitment: commitment to the previous ciphertext (prev_ct0is, prev_ct1is)
+    // - ct_commitment: commitment to the new vote ciphertext (ct0is, ct1is)
+    // - sum_ct_commitment: commitment to the sum ciphertext (sum_ct0is, sum_ct1is)
+    //
+    // The prev_ct_commitment is verified against the actual polynomials to ensure the
+    // prover hasn't tampered with the previous ciphertext. The commitments are then used
+    // in the Fiat-Shamir transform to generate random challenges for the Schwartz-Zippel
+    // lemma verification, ensuring the addition equations hold without revealing the full
+    // polynomial coefficients.
     assert(prev_ct_commitment == generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is));
 
     let ct_commitment = generate_commitment::<512, 2, 36>(ct0is, ct1is);
