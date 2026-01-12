@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-
 export default buildModule("Enclave", (m) => {
   const params = m.getParameter("params");
   const owner = m.getParameter("owner");

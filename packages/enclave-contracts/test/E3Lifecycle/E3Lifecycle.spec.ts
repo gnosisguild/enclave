@@ -183,9 +183,7 @@ describe("E3Lifecycle", function () {
       await e3Lifecycle
         .connect(enclave)
         .initializeE3(0, await requester.getAddress());
-      const tx = await e3Lifecycle
-        .connect(enclave)
-        .onCommitteeFinalized(0);
+      const tx = await e3Lifecycle.connect(enclave).onCommitteeFinalized(0);
       const block = await ethers.provider.getBlock(tx.blockNumber!);
 
       const deadlines = await e3Lifecycle.getDeadlines(0);
@@ -320,7 +318,6 @@ describe("E3Lifecycle", function () {
         inputDeadline + defaultTimeoutConfig.computeWindow,
       );
     });
-
   });
 
   describe("onCiphertextPublished()", function () {
@@ -383,7 +380,6 @@ describe("E3Lifecycle", function () {
       const stage = await e3Lifecycle.getE3Stage(0);
       expect(stage).to.equal(6); // E3Stage.Complete = 6
     });
-
   });
 
   describe("markE3Failed()", function () {
@@ -440,9 +436,7 @@ describe("E3Lifecycle", function () {
       await e3Lifecycle.connect(enclave).onActivated(0, inputDeadline);
 
       // Fast forward past compute deadline
-      await time.increase(
-        ONE_DAY + defaultTimeoutConfig.computeWindow + 1,
-      );
+      await time.increase(ONE_DAY + defaultTimeoutConfig.computeWindow + 1);
 
       await e3Lifecycle.markE3Failed(0);
 
@@ -522,9 +516,10 @@ describe("E3Lifecycle", function () {
     it("reverts if E3 does not exist", async function () {
       const { e3Lifecycle } = await loadFixture(setup);
 
-      await expect(
-        e3Lifecycle.markE3Failed(99),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "InvalidStage");
+      await expect(e3Lifecycle.markE3Failed(99)).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "InvalidStage",
+      );
     });
 
     it("reverts if E3 is already complete", async function () {
@@ -542,9 +537,10 @@ describe("E3Lifecycle", function () {
       await e3Lifecycle.connect(enclave).onCiphertextPublished(0);
       await e3Lifecycle.connect(enclave).onComplete(0);
 
-      await expect(
-        e3Lifecycle.markE3Failed(0),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "E3AlreadyComplete");
+      await expect(e3Lifecycle.markE3Failed(0)).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "E3AlreadyComplete",
+      );
     });
 
     it("reverts if E3 is already failed", async function () {
@@ -557,9 +553,10 @@ describe("E3Lifecycle", function () {
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
       await e3Lifecycle.markE3Failed(0);
 
-      await expect(
-        e3Lifecycle.markE3Failed(0),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "E3AlreadyFailed");
+      await expect(e3Lifecycle.markE3Failed(0)).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "E3AlreadyFailed",
+      );
     });
 
     it("reverts if failure condition not met", async function () {
@@ -570,9 +567,10 @@ describe("E3Lifecycle", function () {
         .initializeE3(0, await requester.getAddress());
 
       // Don't advance time - deadline not passed
-      await expect(
-        e3Lifecycle.markE3Failed(0),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "FailureConditionNotMet");
+      await expect(e3Lifecycle.markE3Failed(0)).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "FailureConditionNotMet",
+      );
     });
   });
 
@@ -585,7 +583,10 @@ describe("E3Lifecycle", function () {
           ...defaultTimeoutConfig,
           committeeFormationWindow: ONE_HOUR,
         }),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "OwnableUnauthorizedAccount",
+      );
     });
 
     it("updates timeout config", async function () {
@@ -622,8 +623,10 @@ describe("E3Lifecycle", function () {
         gracePeriod: 2 * ONE_HOUR,
       };
 
-      await expect(e3Lifecycle.setTimeoutConfig(newConfig))
-        .to.emit(e3Lifecycle, "TimeoutConfigUpdated");
+      await expect(e3Lifecycle.setTimeoutConfig(newConfig)).to.emit(
+        e3Lifecycle,
+        "TimeoutConfigUpdated",
+      );
     });
 
     it("reverts if any window is zero", async function () {
@@ -667,7 +670,10 @@ describe("E3Lifecycle", function () {
         e3Lifecycle
           .connect(notTheOwner)
           .setEnclave(await operator1.getAddress()),
-      ).to.be.revertedWithCustomError(e3Lifecycle, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(
+        e3Lifecycle,
+        "OwnableUnauthorizedAccount",
+      );
     });
 
     it("updates enclave address", async function () {
