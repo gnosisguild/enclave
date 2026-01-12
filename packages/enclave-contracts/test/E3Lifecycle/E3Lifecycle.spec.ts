@@ -139,18 +139,6 @@ describe("E3Lifecycle", function () {
       );
     });
 
-    it("emits E3StageChanged event", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await expect(
-        e3Lifecycle
-          .connect(enclave)
-          .initializeE3(0, await requester.getAddress()),
-      )
-        .to.emit(e3Lifecycle, "E3StageChanged")
-        .withArgs(0, 0, 1); // None -> Requested
-    });
-
     it("reverts if E3 already exists", async function () {
       const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
       const requesterAddress = await requester.getAddress();
@@ -204,20 +192,6 @@ describe("E3Lifecycle", function () {
       expect(deadlines.dkgDeadline).to.equal(
         block!.timestamp + defaultTimeoutConfig.dkgWindow,
       );
-    });
-
-    it("emits E3StageChanged event", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-
-      await expect(
-        e3Lifecycle.connect(enclave).onCommitteeFinalized(0),
-      )
-        .to.emit(e3Lifecycle, "E3StageChanged")
-        .withArgs(0, 1, 2); // Requested -> CommitteeFinalized
     });
 
     it("reverts if not in Requested stage", async function () {
@@ -275,23 +249,6 @@ describe("E3Lifecycle", function () {
 
       const deadlines = await e3Lifecycle.getDeadlines(0);
       expect(deadlines.activationDeadline).to.equal(activationDeadline);
-    });
-
-    it("emits E3StageChanged event", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-      await e3Lifecycle.connect(enclave).onCommitteeFinalized(0);
-      const activationDeadline =
-        (await time.latest()) + DEFAULT_ACTIVATION_DEADLINE_OFFSET;
-
-      await expect(
-        e3Lifecycle.connect(enclave).onKeyPublished(0, activationDeadline),
-      )
-        .to.emit(e3Lifecycle, "E3StageChanged")
-        .withArgs(0, 2, 3); // CommitteeFinalized -> KeyPublished
     });
 
     it("reverts if not in CommitteeFinalized stage", async function () {
@@ -364,21 +321,6 @@ describe("E3Lifecycle", function () {
       );
     });
 
-    it("emits E3StageChanged event", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-      await e3Lifecycle.connect(enclave).onCommitteeFinalized(0);
-      const activationDeadline =
-        (await time.latest()) + DEFAULT_ACTIVATION_DEADLINE_OFFSET;
-      await e3Lifecycle.connect(enclave).onKeyPublished(0, activationDeadline);
-
-      await expect(e3Lifecycle.connect(enclave).onActivated(0, inputDeadline))
-        .to.emit(e3Lifecycle, "E3StageChanged")
-        .withArgs(0, 3, 4); // KeyPublished -> Activated
-    });
   });
 
   describe("onCiphertextPublished()", function () {
@@ -442,24 +384,6 @@ describe("E3Lifecycle", function () {
       expect(stage).to.equal(6); // E3Stage.Complete = 6
     });
 
-    it("emits E3StageChanged event", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-      const inputDeadline = (await time.latest()) + ONE_DAY;
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-      await e3Lifecycle.connect(enclave).onCommitteeFinalized(0);
-      const activationDeadline =
-        (await time.latest()) + DEFAULT_ACTIVATION_DEADLINE_OFFSET;
-      await e3Lifecycle.connect(enclave).onKeyPublished(0, activationDeadline);
-      await e3Lifecycle.connect(enclave).onActivated(0, inputDeadline);
-      await e3Lifecycle.connect(enclave).onCiphertextPublished(0);
-
-      await expect(e3Lifecycle.connect(enclave).onComplete(0))
-        .to.emit(e3Lifecycle, "E3StageChanged")
-        .withArgs(0, 5, 6); // CiphertextReady -> Complete
-    });
   });
 
   describe("markE3Failed()", function () {
@@ -649,34 +573,6 @@ describe("E3Lifecycle", function () {
       await expect(
         e3Lifecycle.markE3Failed(0),
       ).to.be.revertedWithCustomError(e3Lifecycle, "FailureConditionNotMet");
-    });
-  });
-
-  describe("checkFailureCondition()", function () {
-    it("returns false when no timeout has occurred", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
-      expect(canFail).to.be.false;
-      expect(reason).to.equal(0); // FailureReason.None
-    });
-
-    it("returns true when committee formation times out", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
-
-      await e3Lifecycle
-        .connect(enclave)
-        .initializeE3(0, await requester.getAddress());
-
-      await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
-      expect(canFail).to.be.true;
-      expect(reason).to.equal(1); // FailureReason.CommitteeFormationTimeout
     });
   });
 

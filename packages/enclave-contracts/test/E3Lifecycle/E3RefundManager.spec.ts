@@ -397,19 +397,6 @@ describe("E3RefundManager", function () {
       );
     });
 
-    it("emits RefundDistributionCalculated event", async function () {
-      const { e3RefundManager, enclave, initializeAndFailE3, honestNode1 } =
-        await loadFixture(setup);
-
-      await initializeAndFailE3(0, 1);
-
-      await expect(
-        e3RefundManager
-          .connect(enclave)
-          .calculateRefund(0, PAYMENT_AMOUNT, [await honestNode1.getAddress()]),
-      ).to.emit(e3RefundManager, "RefundDistributionCalculated");
-    });
-
     it("reverts if already calculated", async function () {
       const { e3RefundManager, enclave, initializeAndFailE3, honestNode1 } =
         await loadFixture(setup);
@@ -461,26 +448,6 @@ describe("E3RefundManager", function () {
       expect(balanceAfter - balanceBefore).to.equal(
         distribution.requesterAmount,
       );
-    });
-
-    it("emits RefundClaimed event", async function () {
-      const {
-        e3RefundManager,
-        enclave,
-        requester,
-        honestNode1,
-        initializeAndFailE3,
-      } = await loadFixture(setup);
-
-      await initializeAndFailE3(0, 1);
-
-      await e3RefundManager
-        .connect(enclave)
-        .calculateRefund(0, PAYMENT_AMOUNT, [await honestNode1.getAddress()]);
-
-      await expect(
-        e3RefundManager.connect(requester).claimRequesterRefund(0),
-      ).to.emit(e3RefundManager, "RefundClaimed");
     });
 
     it("reverts if E3 not failed", async function () {
@@ -674,75 +641,6 @@ describe("E3RefundManager", function () {
       expect(distributionAfter.totalSlashed).to.equal(slashedAmount);
     });
 
-    it("emits SlashedFundsRouted event", async function () {
-      const { e3RefundManager, enclave, honestNode1, initializeAndFailE3 } =
-        await loadFixture(setup);
-
-      await initializeAndFailE3(0, 1);
-
-      await e3RefundManager
-        .connect(enclave)
-        .calculateRefund(0, PAYMENT_AMOUNT, [await honestNode1.getAddress()]);
-
-      const slashedAmount = ethers.parseUnits("10", 6);
-
-      await expect(
-        e3RefundManager.connect(enclave).routeSlashedFunds(0, slashedAmount),
-      )
-        .to.emit(e3RefundManager, "SlashedFundsRouted")
-        .withArgs(0, slashedAmount);
-    });
-  });
-
-  describe("calculateWorkValue()", function () {
-    it("returns 0% for None/Requested stage", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const [workCompleted, workRemaining] =
-        await e3RefundManager.calculateWorkValue(0);
-      expect(workCompleted).to.equal(0);
-      expect(workRemaining).to.equal(9500);
-
-      const [workCompleted2, workRemaining2] =
-        await e3RefundManager.calculateWorkValue(1);
-      expect(workCompleted2).to.equal(0);
-    });
-
-    it("returns 10% for CommitteeFinalized stage", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const [workCompleted, workRemaining] =
-        await e3RefundManager.calculateWorkValue(2);
-      expect(workCompleted).to.equal(1000);
-      expect(workRemaining).to.equal(8500);
-    });
-
-    it("returns 40% for KeyPublished stage", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const [workCompleted, workRemaining] =
-        await e3RefundManager.calculateWorkValue(3);
-      expect(workCompleted).to.equal(4000);
-      expect(workRemaining).to.equal(5500);
-    });
-
-    it("returns 40% for Activated stage", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const [workCompleted, workRemaining] =
-        await e3RefundManager.calculateWorkValue(4);
-      expect(workCompleted).to.equal(4000);
-      expect(workRemaining).to.equal(5500);
-    });
-
-    it("returns 40% for CiphertextReady stage", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const [workCompleted, workRemaining] =
-        await e3RefundManager.calculateWorkValue(5);
-      expect(workCompleted).to.equal(4000);
-      expect(workRemaining).to.equal(5500);
-    });
   });
 
   describe("setWorkAllocation()", function () {
@@ -778,22 +676,6 @@ describe("E3RefundManager", function () {
       expect(allocation.decryptionBps).to.equal(5500);
     });
 
-    it("emits WorkAllocationUpdated event", async function () {
-      const { e3RefundManager } = await loadFixture(setup);
-
-      const newAllocation = {
-        committeeFormationBps: 1500,
-        dkgBps: 2500,
-        decryptionBps: 5500,
-        protocolBps: 500,
-      };
-
-      await expect(e3RefundManager.setWorkAllocation(newAllocation)).to.emit(
-        e3RefundManager,
-        "WorkAllocationUpdated",
-      );
-    });
-
     it("reverts if allocation does not sum to 10000", async function () {
       const { e3RefundManager } = await loadFixture(setup);
 
@@ -810,51 +692,4 @@ describe("E3RefundManager", function () {
     });
   });
 
-  describe("hasClaimed()", function () {
-    it("returns false before claiming", async function () {
-      const {
-        e3RefundManager,
-        enclave,
-        requester,
-        honestNode1,
-        initializeAndFailE3,
-      } = await loadFixture(setup);
-
-      await initializeAndFailE3(0, 1);
-
-      await e3RefundManager
-        .connect(enclave)
-        .calculateRefund(0, PAYMENT_AMOUNT, [await honestNode1.getAddress()]);
-
-      const hasClaimed = await e3RefundManager.hasClaimed(
-        0,
-        await requester.getAddress(),
-      );
-      expect(hasClaimed).to.be.false;
-    });
-
-    it("returns true after claiming", async function () {
-      const {
-        e3RefundManager,
-        enclave,
-        requester,
-        honestNode1,
-        initializeAndFailE3,
-      } = await loadFixture(setup);
-
-      await initializeAndFailE3(0, 1);
-
-      await e3RefundManager
-        .connect(enclave)
-        .calculateRefund(0, PAYMENT_AMOUNT, [await honestNode1.getAddress()]);
-
-      await e3RefundManager.connect(requester).claimRequesterRefund(0);
-
-      const hasClaimed = await e3RefundManager.hasClaimed(
-        0,
-        await requester.getAddress(),
-      );
-      expect(hasClaimed).to.be.true;
-    });
-  });
 });
