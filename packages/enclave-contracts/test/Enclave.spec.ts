@@ -11,6 +11,8 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
+import E3LifecycleModule from "../ignition/modules/e3Lifecycle";
+import E3RefundManagerModule from "../ignition/modules/e3RefundManager";
 import EnclaveModule from "../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../ignition/modules/enclaveToken";
@@ -20,15 +22,13 @@ import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVeri
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
-import E3LifecycleModule from "../ignition/modules/e3Lifecycle";
-import E3RefundManagerModule from "../ignition/modules/e3RefundManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  Enclave__factory as EnclaveFactory,
-  MockUSDC__factory as MockUSDCFactory,
   E3Lifecycle__factory as E3LifecycleFactory,
   E3RefundManager__factory as E3RefundManagerFactory,
+  Enclave__factory as EnclaveFactory,
+  MockUSDC__factory as MockUSDCFactory,
 } from "../types";
 import type { Enclave } from "../types/contracts/Enclave";
 import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";

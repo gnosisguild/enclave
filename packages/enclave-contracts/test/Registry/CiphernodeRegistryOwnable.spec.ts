@@ -11,21 +11,21 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import E3LifecycleModule from "../../ignition/modules/e3Lifecycle";
+import E3RefundManagerModule from "../../ignition/modules/e3RefundManager";
 import EnclaveModule from "../../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import E3LifecycleModule from "../../ignition/modules/e3Lifecycle";
-import E3RefundManagerModule from "../../ignition/modules/e3RefundManager";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
+import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
-  Enclave__factory as EnclaveFactory,
   E3Lifecycle__factory as E3LifecycleFactory,
   E3RefundManager__factory as E3RefundManagerFactory,
+  Enclave__factory as EnclaveFactory,
 } from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
@@ -737,8 +737,13 @@ describe("CiphernodeRegistryOwnable", function () {
       expect(await registry.committeePublicKey(e3Id)).to.equal(dataHash);
     });
     it("reverts if the committee has not been published", async function () {
-      const { registry, enclave, usdcToken, mockE3Program, mockDecryptionVerifier } =
-        await loadFixture(setup);
+      const {
+        registry,
+        enclave,
+        usdcToken,
+        mockE3Program,
+        mockDecryptionVerifier,
+      } = await loadFixture(setup);
       const e3Id = 0;
       await makeRequest(
         enclave,
@@ -783,8 +788,14 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("rootAt()", function () {
     it("returns the root of the ciphernode registry merkle tree at the given e3Id", async function () {
-      const { registry, tree, enclave, usdcToken, mockE3Program, mockDecryptionVerifier } =
-        await loadFixture(setup);
+      const {
+        registry,
+        tree,
+        enclave,
+        usdcToken,
+        mockE3Program,
+        mockDecryptionVerifier,
+      } = await loadFixture(setup);
       const e3Id = 0;
       await makeRequest(
         enclave,

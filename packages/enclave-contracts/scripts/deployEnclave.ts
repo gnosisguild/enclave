@@ -9,8 +9,8 @@ import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import {
-  deployAndSaveE3Lifecycle,
   DEFAULT_TIMEOUT_CONFIG,
+  deployAndSaveE3Lifecycle,
 } from "./deployAndSave/e3Lifecycle";
 import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";

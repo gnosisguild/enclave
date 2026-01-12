@@ -39,7 +39,7 @@ describe("E3RefundManager", function () {
     gracePeriod: ONE_HOUR,
   };
 
-  // Work allocation in basis points (10000 = 100%) 
+  // Work allocation in basis points (10000 = 100%)
   const defaultWorkAllocation = {
     committeeFormationBps: 1000,
     dkgBps: 3000,
@@ -640,7 +640,6 @@ describe("E3RefundManager", function () {
       );
       expect(distributionAfter.totalSlashed).to.equal(slashedAmount);
     });
-
   });
 
   describe("setWorkAllocation()", function () {
@@ -691,5 +690,4 @@ describe("E3RefundManager", function () {
       ).to.be.revertedWith("Must sum to 10000");
     });
   });
-
 });
