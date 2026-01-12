@@ -193,23 +193,23 @@ mod tests {
         let mut config = HashMap::new();
         config.insert(aggregate_id.clone(), 1_000_000); // 1 second in microseconds
 
-        // Use current time of 2 seconds, so old insert (0.5s) should expire,
-        // new insert (3s) and insert without context should remain
+        // Use current time of 2 seconds, so old insert (0.5s) and insert without context should expire,
+        // new insert (3s) should remain
         let now = 2_000_000; // 2 seconds in microseconds
 
         let (updated_buffers, expired_inserts) =
             process_expired_inserts(&aggregate_buffers, &config, now);
 
-        // Verify expired inserts
-        assert_eq!(expired_inserts.len(), 1);
-        assert_eq!(expired_inserts[0], old_insert);
+        // Verify expired inserts (old insert and insert without context)
+        assert_eq!(expired_inserts.len(), 2);
+        assert!(expired_inserts.contains(&old_insert));
+        assert!(expired_inserts.contains(&insert_no_ctx));
 
         // Verify remaining inserts in buffer
         assert_eq!(updated_buffers.len(), 1);
         let remaining_buffer = updated_buffers.get(&aggregate_id).unwrap();
-        assert_eq!(remaining_buffer.buffer.len(), 2);
+        assert_eq!(remaining_buffer.buffer.len(), 1);
         assert!(remaining_buffer.buffer.contains(&new_insert));
-        assert!(remaining_buffer.buffer.contains(&insert_no_ctx));
     }
 }
 
