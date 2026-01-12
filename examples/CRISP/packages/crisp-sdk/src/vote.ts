@@ -15,14 +15,7 @@ import {
   VoteProofInputs,
   Polynomial,
 } from './types'
-import {
-  generateMerkleProof,
-  toBinary,
-  extractSignatureComponents,
-  getAddressFromSignature,
-  getOptimalThreadCount,
-  flattenCiphertext,
-} from './utils'
+import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
 import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, ZERO_VOTE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend } from '@aztec/bb.js'
@@ -172,15 +165,18 @@ export const computeCommitment = (ct0is: Polynomial[], ct1is: Polynomial[]): big
  * Generate the circuit inputs for a vote proof.
  * This works for both vote and masking.
  * @param proofInputs - The proof inputs.
- * @returns The circuit inputs as a CircuitInputs object.
+ * @returns The circuit inputs as a CircuitInputs object and the encrypted vote as a Uint8Array.
  */
-export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<CircuitInputs> => {
+export const generateCircuitInputs = async (
+  proofInputs: ProofInputs,
+): Promise<{ crispInputs: CircuitInputs; encryptedVote: Uint8Array }> => {
   const encodedVote = encodeVote(proofInputs.vote)
 
   let crispInputs: CircuitInputs
+  let encryptedVote: Uint8Array
 
   if (!proofInputs.previousCiphertext) {
-    crispInputs = await zkInputsGenerator.generateInputs(
+    const result = await zkInputsGenerator.generateInputs(
       // A placeholder ciphertext vote will be generated.
       // This is safe because the circuit will not check the ciphertext addition if
       // the previous ciphertext is not provided (is_first_vote is true).
@@ -188,8 +184,14 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
       proofInputs.publicKey,
       encodedVote,
     )
+
+    crispInputs = result.inputs
+    encryptedVote = result.encryptedVote
   } else {
-    crispInputs = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
+    const result = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
+
+    crispInputs = result.inputs
+    encryptedVote = result.encryptedVote
   }
 
   const signature = await extractSignatureComponents(proofInputs.signature, proofInputs.messageHash)
@@ -206,7 +208,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<C
   crispInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
   crispInputs.merkle_proof_siblings = proofInputs.merkleProof.proof.siblings.map((s) => s.toString())
 
-  return crispInputs
+  return { crispInputs, encryptedVote }
 }
 
 /**
@@ -261,7 +263,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promi
 
   const merkleProof = generateMerkleProof(voteProofInputs.balance, address, voteProofInputs.merkleLeaves)
 
-  const crispInputs = await generateCircuitInputs({
+  const { crispInputs, encryptedVote } = await generateCircuitInputs({
     ...voteProofInputs,
     slotAddress: address,
     merkleProof,
@@ -269,8 +271,6 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promi
     signature: voteProofInputs.signature,
     messageHash: voteProofInputs.messageHash,
   })
-
-  const encryptedVote = flattenCiphertext(crispInputs.ct0is, crispInputs.ct1is)
 
   return { ...(await generateProof(crispInputs)), encryptedVote }
 }
@@ -283,21 +283,13 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promi
 export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofInputs): Promise<ProofData> => {
   const merkleProof = generateMerkleProof(maskVoteProofInputs.balance, maskVoteProofInputs.slotAddress, maskVoteProofInputs.merkleLeaves)
 
-  const crispInputs = await generateCircuitInputs({
+  const { crispInputs, encryptedVote } = await generateCircuitInputs({
     ...maskVoteProofInputs,
     signature: MASK_SIGNATURE,
     messageHash: SIGNATURE_MESSAGE_HASH,
     vote: ZERO_VOTE,
     merkleProof,
   })
-
-  let encryptedVote: `0x${string}`[]
-
-  if (crispInputs.is_first_vote) {
-    encryptedVote = flattenCiphertext(crispInputs.ct0is, crispInputs.ct1is)
-  } else {
-    encryptedVote = flattenCiphertext(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
-  }
 
   return { ...(await generateProof(crispInputs)), encryptedVote }
 }
@@ -324,7 +316,13 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
  * @returns The encoded proof data as a hex string.
  */
 export const encodeSolidityProof = ({ publicInputs, proof, encryptedVote }: ProofData): Hex => {
-  const slotAddress = getAddress(numberToHex(BigInt(publicInputs[2]), { size: 20 }))
+  const slotAddress = getAddress(numberToHex(BigInt(publicInputs[3]), { size: 20 }))
+  const encryptedVoteCommitment = publicInputs[5] as `0x${string}`
 
-  return encodeAbiParameters(parseAbiParameters('bytes, bytes32[], address'), [bytesToHex(proof), encryptedVote, slotAddress])
+  return encodeAbiParameters(parseAbiParameters('bytes, address, bytes32, bytes'), [
+    bytesToHex(proof),
+    slotAddress,
+    encryptedVoteCommitment,
+    bytesToHex(encryptedVote),
+  ])
 }

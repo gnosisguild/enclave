@@ -62,10 +62,20 @@ impl ZKInputsGenerator {
             .generator
             .generate_inputs(prev_ciphertext, public_key, vote_vec)
         {
-            Ok(inputs_json) => {
-                // Parse the JSON string and return as JsValue.
+            Ok((ciphertext_bytes, inputs_json)) => {
+                // Parse the JSON string and return as an object with both encryptedVote and inputs.
+                let result = js_sys::Object::new();
+
+                // Set encryptedVote as Uint8Array
+                let ciphertext_array = js_sys::Uint8Array::from(&ciphertext_bytes[..]);
+                js_sys::Reflect::set(&result, &"encryptedVote".into(), &ciphertext_array.into())?;
+
+                // Parse and set inputs JSON
                 match js_sys::JSON::parse(&inputs_json) {
-                    Ok(js_value) => Ok(js_value),
+                    Ok(js_value) => {
+                        js_sys::Reflect::set(&result, &"inputs".into(), &js_value)?;
+                        Ok(result.into())
+                    }
                     Err(_) => Err(JsValue::from_str("Failed to parse inputs JSON")),
                 }
             }
@@ -87,10 +97,20 @@ impl ZKInputsGenerator {
             .generator
             .generate_inputs_for_update(prev_ciphertext, public_key, vote_vec)
         {
-            Ok(inputs_json) => {
-                // Parse the JSON string and return as JsValue.
+            Ok((ciphertext_bytes, inputs_json)) => {
+                // Parse the JSON string and return as an object with both encryptedVote and inputs.
+                let result = js_sys::Object::new();
+
+                // Set encryptedVote as Uint8Array
+                let ciphertext_array = js_sys::Uint8Array::from(&ciphertext_bytes[..]);
+                js_sys::Reflect::set(&result, &"encryptedVote".into(), &ciphertext_array.into())?;
+
+                // Parse and set inputs JSON
                 match js_sys::JSON::parse(&inputs_json) {
-                    Ok(js_value) => Ok(js_value),
+                    Ok(js_value) => {
+                        js_sys::Reflect::set(&result, &"inputs".into(), &js_value)?;
+                        Ok(result.into())
+                    }
                     Err(_) => Err(JsValue::from_str("Failed to parse inputs JSON")),
                 }
             }
@@ -237,7 +257,15 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let inputs = result.unwrap();
+        let result_obj = result.unwrap();
+        // Extract encryptedVote and inputs from the result object
+        let encrypted_vote = js_sys::Reflect::get(&result_obj, &"encryptedVote".into()).unwrap();
+        let inputs = js_sys::Reflect::get(&result_obj, &"inputs".into()).unwrap();
+
+        // Verify encryptedVote is a Uint8Array and not empty
+        assert!(encrypted_vote.is_object());
+        let encrypted_vote_array = encrypted_vote.dyn_into::<js_sys::Uint8Array>().unwrap();
+        assert!(encrypted_vote_array.length() > 0);
 
         // Convert JsValue to string for testing.
         let inputs_str = js_sys::JSON::stringify(&inputs)
@@ -263,7 +291,15 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let inputs = result.unwrap();
+        let result_obj = result.unwrap();
+        // Extract encryptedVote and inputs from the result object
+        let encrypted_vote = js_sys::Reflect::get(&result_obj, &"encryptedVote".into()).unwrap();
+        let inputs = js_sys::Reflect::get(&result_obj, &"inputs".into()).unwrap();
+
+        // Verify encryptedVote is a Uint8Array and not empty
+        assert!(encrypted_vote.is_object());
+        let encrypted_vote_array = encrypted_vote.dyn_into::<js_sys::Uint8Array>().unwrap();
+        assert!(encrypted_vote_array.length() > 0);
 
         // Convert JsValue to string for testing.
         let inputs_str = js_sys::JSON::stringify(&inputs)

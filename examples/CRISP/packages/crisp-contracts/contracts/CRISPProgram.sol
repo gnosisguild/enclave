@@ -128,32 +128,31 @@ contract CRISPProgram is IE3Program, Ownable {
 
     if (data.length == 0) revert EmptyInputData();
 
-    (bytes memory noirProof, bytes32[] memory vote, address slotAddress) = abi.decode(data, (bytes, bytes32[], address));
+    (bytes memory noirProof, address slotAddress, bytes32 encryptedVoteCommitment, bytes memory encryptedVote) = abi.decode(
+      data,
+      (bytes, address, bytes32, bytes)
+    );
 
-    bytes memory voteBytes = abi.encode(vote);
-
-    (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slotAddress, voteBytes);
-
-    // Set public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](4 + vote.length);
+    (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
 
     // Fetch E3 to get committee public key
     E3 memory e3 = enclave.getE3(e3Id);
 
-    noirPublicInputs[0] = e3.committeePublicKey;
-    noirPublicInputs[1] = bytes32(e3Data[e3Id].merkleRoot);
-    noirPublicInputs[2] = bytes32(uint256(uint160(slotAddress)));
-    noirPublicInputs[3] = bytes32(uint256(isFirstVote ? 1 : 0));
-    for (uint256 i = 0; i < vote.length; i++) {
-      noirPublicInputs[i + 4] = vote[i];
-    }
+    // Set the public inputs for the proof. Order must match Noir circuit.
+    bytes32[] memory noirPublicInputs = new bytes32[](6);
+    noirPublicInputs[0] = previousEncryptedVoteCommitment;
+    noirPublicInputs[1] = e3.committeePublicKey;
+    noirPublicInputs[2] = bytes32(e3Data[e3Id].merkleRoot);
+    noirPublicInputs[3] = bytes32(uint256(uint160(slotAddress)));
+    noirPublicInputs[4] = bytes32(uint256(previousEncryptedVoteCommitment == bytes32(0) ? 1 : 0));
+    noirPublicInputs[5] = encryptedVoteCommitment;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
       revert InvalidNoirProof();
     }
 
-    emit InputPublished(e3Id, voteBytes, voteIndex);
+    emit InputPublished(e3Id, encryptedVote, voteIndex);
   }
 
   /// @notice Decode the tally from the plaintext output
@@ -220,22 +219,26 @@ contract CRISPProgram is IE3Program, Ownable {
 
   /// @notice Process a vote: insert or update in the merkle tree depending
   /// on whether it's the first vote or an override.
-  function _processVote(uint256 e3Id, address slotAddress, bytes memory vote) internal returns (uint40 voteIndex, bool isFirstVote) {
+  function _processVote(
+    uint256 e3Id,
+    address slotAddress,
+    bytes32 encryptedVoteCommitment
+  ) internal returns (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) {
     uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
 
     // we treat the index 0 as not voted yet
     // any valid index will be index + 1
     if (storedIndexPlusOne == 0) {
       // FIRST VOTE
-      isFirstVote = true;
+      previousEncryptedVoteCommitment = bytes32(0);
       voteIndex = e3Data[e3Id].votes.numberOfLeaves;
       e3Data[e3Id].voteSlots[slotAddress] = voteIndex + 1;
-      e3Data[e3Id].votes._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
+      e3Data[e3Id].votes._insert(uint256(encryptedVoteCommitment));
     } else {
       // RE-VOTE
-      isFirstVote = false;
       voteIndex = storedIndexPlusOne - 1;
-      e3Data[e3Id].votes._update(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]), voteIndex);
+      previousEncryptedVoteCommitment = bytes32(e3Data[e3Id].votes.elements[voteIndex]);
+      e3Data[e3Id].votes._update(uint256(encryptedVoteCommitment), voteIndex);
     }
   }
 

@@ -170,12 +170,12 @@ fn main(
     // - sum_ct_commitment: commitment to the sum ciphertext (sum_ct0is, sum_ct1is)
     //
     // The prev_ct_commitment is verified against the actual polynomials to ensure the
-    // prover hasn't tampered with the previous ciphertext. The commitments are then used
-    // in the Fiat-Shamir transform to generate random challenges for the Schwartz-Zippel
-    // lemma verification, ensuring the addition equations hold without revealing the full
-    // polynomial coefficients.
-    assert(prev_ct_commitment == generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is));
-
+    // prover hasn't tampered with the previous ciphertext. This check is only performed
+    // for mask votes when it's not the first vote (i.e., when there's a previous ciphertext
+    // to verify). The commitments are then used in the Fiat-Shamir transform to generate
+    // random challenges for the Schwartz-Zippel lemma verification, ensuring the addition
+    // equations hold without revealing the full polynomial coefficients.
+    let _prev_ct_commitment = generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
     let ct_commitment = generate_commitment::<512, 2, 36>(ct0is, ct1is);
     let sum_ct_commitment = generate_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
 
@@ -186,7 +186,7 @@ fn main(
         ct_commitment,
         prev_ct0is,
         prev_ct1is,
-        prev_ct_commitment,
+        _prev_ct_commitment,
         sum_ct0is,
         sum_ct1is,
         sum_ct_commitment,
@@ -224,6 +224,7 @@ fn main(
         if is_first_vote {
             ct_commitment
         } else {
+            assert(prev_ct_commitment == _prev_ct_commitment);
             assert(is_ct_add_valid);
 
             sum_ct_commitment

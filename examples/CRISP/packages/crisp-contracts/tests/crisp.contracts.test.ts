@@ -94,7 +94,7 @@ describe('CRISP Contracts', function () {
         slotAddress: address,
       })
 
-      await mockEnclave.setCommitteePublicKey(proof.publicInputs[0])
+      await mockEnclave.setCommitteePublicKey(proof.publicInputs[1])
 
       const encodedProof = encodeSolidityProof(proof)
 

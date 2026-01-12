@@ -151,13 +151,3 @@ export async function getOptimalThreadCount(): Promise<number> {
   // Fallback
   return 5
 }
-
-/**
- * Flatten the ciphertext polynomials into a single array of coefficients
- * @param ct0is The first set of ciphertext polynomials
- * @param ct1is The second set of ciphertext polynomials
- * @returns The flattened ciphertext polynomials as an array of coefficients
- */
-export const flattenCiphertext = (ct0is: Polynomial[], ct1is: Polynomial[]): `0x${string}`[] => {
-  return [...ct0is.flatMap((p) => p.coefficients), ...ct1is.flatMap((p) => p.coefficients)] as `0x${string}`[]
-}

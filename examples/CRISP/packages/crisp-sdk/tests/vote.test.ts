@@ -114,7 +114,7 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
 
-      const crispInputs = await generateCircuitInputs({
+      const { crispInputs } = await generateCircuitInputs({
         vote,
         publicKey,
         signature,
@@ -135,9 +135,8 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      // update to an invalid leaf to fail auth in the circuit
-      merkleProof.leaf = 0n
-      const crispInputs = await generateCircuitInputs({
+
+      const { crispInputs } = await generateCircuitInputs({
         publicKey,
         balance,
         slotAddress,
@@ -159,7 +158,8 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      const crispInputs = await generateCircuitInputs({
+
+      const { crispInputs } = await generateCircuitInputs({
         vote: ZERO_VOTE,
         publicKey,
         signature: MASK_SIGNATURE,

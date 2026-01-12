@@ -24,6 +24,7 @@ use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
+use num_traits::Zero;
 use rand::thread_rng;
 use shared::commitments::compute_poly_commitment;
 use std::sync::Arc;
@@ -76,13 +77,13 @@ impl ZKInputsGenerator {
     /// * `vote` - Vote value as a vector of coefficients
     ///
     /// # Returns
-    /// JSON string containing the CRISP ZK inputs
+    /// Tuple containing the sum ciphertext bytes and JSON string with CRISP ZK inputs
     pub fn generate_inputs_for_update(
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
         vote: Vec<u64>,
-    ) -> Result<String> {
+    ) -> Result<(Vec<u8>, String)> {
         // Deserialize the provided public key.
         let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
             .with_context(|| "Failed to deserialize public key")?;
@@ -143,7 +144,11 @@ impl ZKInputsGenerator {
             &ciphertext_addition_inputs.standard_form(),
         );
 
-        Ok(serialize_inputs_to_json(&inputs)?)
+        let inputs_json = serialize_inputs_to_json(&inputs)?;
+        // For updates, return the sum ciphertext (ct + prev_ct)
+        let ciphertext_bytes = sum_ct.to_bytes();
+
+        Ok((ciphertext_bytes, inputs_json))
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.
@@ -154,13 +159,13 @@ impl ZKInputsGenerator {
     /// * `vote` - Vote value as a vector of coefficients
     ///
     /// # Returns
-    /// JSON string containing the CRISP ZK inputs
+    /// Tuple containing the vote ciphertext bytes and JSON string with CRISP ZK inputs
     pub fn generate_inputs(
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
         vote: Vec<u64>,
-    ) -> Result<String> {
+    ) -> Result<(Vec<u8>, String)> {
         // Deserialize the provided public key.
         let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
             .with_context(|| "Failed to deserialize public key")?;
@@ -203,7 +208,7 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
             &pt,
             &prev_ct,
             &ct,
@@ -213,6 +218,9 @@ impl ZKInputsGenerator {
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
+        // For first votes, set prev_ct_commitment to 0 since there's no previous ciphertext
+        ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
+
         // Construct Inputs Section.
         let inputs = construct_inputs(
             &crypto_params,
@@ -221,7 +229,10 @@ impl ZKInputsGenerator {
             &ciphertext_addition_inputs.standard_form(),
         );
 
-        Ok(serialize_inputs_to_json(&inputs)?)
+        let inputs_json = serialize_inputs_to_json(&inputs)?;
+        let ciphertext_bytes = ct.to_bytes();
+
+        Ok((ciphertext_bytes, inputs_json))
     }
 
     /// Encrypts a vote using the provided public key.
@@ -308,7 +319,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -333,7 +346,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -353,7 +368,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -393,7 +410,8 @@ mod tests {
 
         let result = generator.generate_inputs(&ciphertext, &public_key, vote.clone());
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        assert!(!ciphertext_bytes.is_empty());
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
@@ -433,10 +451,12 @@ mod tests {
         // Test vote = 0.
         let result_0 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_0.is_ok());
+        let (_, _) = result_0.unwrap();
 
         // Test vote = 1.
         let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_1.is_ok());
+        let (_, _) = result_1.unwrap();
     }
 
     #[test]
@@ -452,7 +472,8 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        assert!(!ciphertext_bytes.is_empty());
 
         // Parse JSON to verify structure.
         let parsed: serde_json::Value =

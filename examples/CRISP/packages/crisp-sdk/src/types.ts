@@ -168,7 +168,7 @@ export type CircuitInputs = {
 export type ProofData = {
   publicInputs: string[]
   proof: Uint8Array
-  encryptedVote: `0x${string}`[]
+  encryptedVote: Uint8Array
 }
 
 export type ExecuteCircuitResult = {
