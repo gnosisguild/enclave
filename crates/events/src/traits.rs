@@ -147,7 +147,7 @@ pub trait EventContextAccessors {
     fn causation_id(&self) -> EventId;
     /// The root event that caused this event to occur
     fn origin_id(&self) -> EventId;
-    /// The timestamp when the event occurred
+    /// The timestamp when the event occurred timestamp is encoded HlcTimestamp format
     fn ts(&self) -> u128;
     /// The aggregate id for this event
     fn aggregate_id(&self) -> AggregateId;
