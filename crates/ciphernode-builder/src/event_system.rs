@@ -14,6 +14,7 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
 use once_cell::sync::OnceCell;
+use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
@@ -171,7 +172,10 @@ impl EventSystem {
     pub fn buffer(&self) -> Addr<WriteBuffer> {
         let buffer = self
             .buffer
-            .get_or_init(|| WriteBuffer::new().start())
+            .get_or_init(|| {
+                let default_config = HashMap::new();
+                WriteBuffer::with_config(default_config).start()
+            })
             .clone();
         self.wire_if_ready();
         buffer

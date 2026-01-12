@@ -5,13 +5,15 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler, Message, Recipient};
-use e3_events::CommitSnapshot;
+use e3_events::{AggregateId, CommitSnapshot};
+use std::collections::HashMap;
 
 use crate::{Insert, InsertBatch};
 
 pub struct WriteBuffer {
     dest: Option<Recipient<InsertBatch>>,
     buffer: Vec<Insert>,
+    config: HashMap<AggregateId, u128>,
 }
 
 impl Actor for WriteBuffer {
@@ -23,6 +25,15 @@ impl WriteBuffer {
         Self {
             dest: None,
             buffer: Vec::new(),
+            config: HashMap::new(),
+        }
+    }
+
+    pub fn with_config(config: HashMap<AggregateId, u128>) -> Self {
+        Self {
+            dest: None,
+            buffer: Vec::new(),
+            config,
         }
     }
 }
