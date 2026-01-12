@@ -7,11 +7,19 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { Vote } from '../src/types'
 import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
 import { generateMerkleProof } from '../src/utils'
-import { decodeTally, generatePublicKey, verifyProof, encodeVote, generateCircuitInputs, executeCircuit } from '../src/vote'
+import {
+  decodeTally,
+  generatePublicKey,
+  verifyProof,
+  encodeVote,
+  generateCircuitInputs,
+  executeCircuit,
+  computeCommitment,
+  encryptVote,
+} from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
-import previousCiphertextEncoded from './fixtures/previous-ciphertext.json'
 import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
@@ -21,14 +29,14 @@ describe('Vote', () => {
   let address: string
   let slotAddress: string
   let publicKey: Uint8Array
-
+  let previousCiphertext: Uint8Array
   let e3Id: number
   let sdk: CrispSDK
 
   const mockGetPreviousCiphertextResponse = () =>
     ({
       ok: true,
-      json: async () => ({ ciphertext: previousCiphertextEncoded }),
+      json: async () => ({ ciphertext: previousCiphertext }),
     }) as Response
 
   const mockIsSlotEmptyResponse = (isEmpty: boolean) =>
@@ -54,6 +62,7 @@ describe('Vote', () => {
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
+    previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
     e3Id = 0
     sdk = new CrispSDK(CRISP_SERVER_URL)
   })
@@ -106,7 +115,7 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, LEAVES)
 
-      const crispInputs = await generateCircuitInputs({
+      const { crispInputs } = await generateCircuitInputs({
         vote,
         publicKey,
         signature,
@@ -117,19 +126,9 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
-      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
+      expect(returnValue).toEqual(commitment)
     })
 
     it('Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote', async () => {
@@ -137,9 +136,8 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      // update to an invalid leaf to fail auth in the circuit
-      merkleProof.leaf = 0n
-      const crispInputs = await generateCircuitInputs({
+
+      const { crispInputs } = await generateCircuitInputs({
         publicKey,
         balance,
         slotAddress,
@@ -147,23 +145,13 @@ describe('Vote', () => {
         vote: ZERO_VOTE,
         signature: MASK_SIGNATURE,
         messageHash: SIGNATURE_MESSAGE_HASH,
-        previousCiphertext: new Uint8Array(previousCiphertextEncoded),
+        previousCiphertext,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
 
-      const sumCt0is = crispInputs.sum_ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const sumCt1is = crispInputs.sum_ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputSumCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputSumCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputSumCt0is, ...outputSumCt1is]).toEqual([...sumCt0is, ...sumCt1is])
+      expect(returnValue).toEqual(commitment)
     })
 
     it('Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext', async () => {
@@ -171,7 +159,8 @@ describe('Vote', () => {
 
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-      const crispInputs = await generateCircuitInputs({
+
+      const { crispInputs } = await generateCircuitInputs({
         vote: ZERO_VOTE,
         publicKey,
         signature: MASK_SIGNATURE,
@@ -182,19 +171,9 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
+      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
-      const ct0is = crispInputs.ct0is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const ct1is = crispInputs.ct1is.flatMap((p) => p.coefficients).map((b) => BigInt(b))
-      const outputCt0is = returnValue[0]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-      const outputCt1is = returnValue[1]
-        .flat()
-        .flatMap((p) => p.coefficients)
-        .map((b) => BigInt(b))
-
-      expect([...outputCt0is, ...outputCt1is]).toEqual([...ct0is, ...ct1is])
+      expect(returnValue).toEqual(commitment)
     })
   })
 

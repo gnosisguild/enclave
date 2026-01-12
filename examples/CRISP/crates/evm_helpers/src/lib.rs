@@ -32,7 +32,7 @@ sol! {
 }
 
 sol! {
-    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+    event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
 }
 
 /// Type alias for read-only provider (no wallet)
@@ -138,7 +138,11 @@ impl CRISPContract<CRISPReadProvider> {
     ) -> Result<bool> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
 
-        match contract.isSlotEmptyByAddress(e3_id, slot_address).call().await {
+        match contract
+            .isSlotEmptyByAddress(e3_id, slot_address)
+            .call()
+            .await
+        {
             Ok(is_empty) => Ok(is_empty),
             Err(e) => Err(eyre::eyre!("Failed to check if slot is empty: {}", e)),
         }

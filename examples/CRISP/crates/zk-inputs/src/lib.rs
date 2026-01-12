@@ -9,10 +9,7 @@
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
 use crisp_constants::get_default_paramset;
-use e3_sdk::bfv_helpers::{
-    build_bfv_params_arc,
-    utils::greco::{abi_decode_greco_ciphertext, greco_to_bfv_ciphertext}
-};
+use e3_sdk::bfv_helpers::build_bfv_params_arc;
 use e3_sdk::bfv_helpers::BfvParamSet;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
@@ -23,7 +20,10 @@ use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
+use num_bigint::BigInt;
+use num_traits::Zero;
 use rand::thread_rng;
+use shared::commitments::compute_poly_commitment;
 use std::sync::Arc;
 mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
@@ -74,85 +74,13 @@ impl ZKInputsGenerator {
     /// * `vote` - Vote value as a vector of coefficients
     ///
     /// # Returns
-    /// JSON string containing the CRISP ZK inputs
+    /// Tuple containing the sum ciphertext bytes and JSON string with CRISP ZK inputs
     pub fn generate_inputs_for_update(
         &self,
         prev_ciphertext: &[u8],
         public_key: &[u8],
         vote: Vec<u64>,
-    ) -> Result<String> {
-        // Deserialize the provided public key.
-        let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
-            .with_context(|| "Failed to deserialize public key")?;
-
-        // Encode the plaintext into a polynomial.
-        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
-            .with_context(|| "Failed to encode plaintext")?;
-
-        // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut thread_rng())
-            .with_context(|| "Failed to encrypt plaintext")?;
-
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-
-        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        // Compute the vectors of the GRECO inputs.
-        let greco_vectors = GrecoVectors::compute(
-            &pt,
-            &u_rns,
-            &e0_rns,
-            &e1_rns,
-            &ct,
-            &pk,
-            &self.bfv_params,
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute vectors")?;
-
-        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .with_context(|| "Failed to compute bounds")?;
-
-        // Ciphertext Addition Section.
-        // Deserialize the previous ciphertext.
-        let (ct0is, ct1is) = abi_decode_greco_ciphertext(prev_ciphertext, &self.bfv_params);
-        let prev_ct = greco_to_bfv_ciphertext(&ct0is, &ct1is, &self.bfv_params);
- 
-        // Compute the ciphertext addition.
-        let sum_ct = &ct + &prev_ct;
-
-        // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs =
-            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, &self.bfv_params)
-                .with_context(|| "Failed to compute ciphertext addition inputs")?;
-
-        // Construct Inputs Section.
-        let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs.standard_form(),
-        );
-
-        Ok(serialize_inputs_to_json(&inputs)?)
-    }
-
-    /// Generates CRISP ZK inputs for a vote encryption and addition operation.
-    ///
-    /// # Arguments
-    /// * `prev_ciphertext` - Previous ciphertext bytes to add to
-    /// * `public_key` - Public key bytes for encryption
-    /// * `vote` - Vote value as a vector of coefficients
-    ///
-    /// # Returns
-    /// JSON string containing the CRISP ZK inputs
-    pub fn generate_inputs(
-        &self,
-        prev_ciphertext: &[u8],
-        public_key: &[u8],
-        vote: Vec<u64>,
-    ) -> Result<String> {
+    ) -> Result<(Vec<u8>, String)> {
         // Deserialize the provided public key.
         let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
             .with_context(|| "Failed to deserialize public key")?;
@@ -195,9 +123,15 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs =
-            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, &self.bfv_params)
-                .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+            &pt,
+            &prev_ct,
+            &ct,
+            &sum_ct,
+            &self.bfv_params,
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
@@ -207,7 +141,95 @@ impl ZKInputsGenerator {
             &ciphertext_addition_inputs.standard_form(),
         );
 
-        Ok(serialize_inputs_to_json(&inputs)?)
+        let inputs_json = serialize_inputs_to_json(&inputs)?;
+        // For updates, return the sum ciphertext (ct + prev_ct)
+        let ciphertext_bytes = sum_ct.to_bytes();
+
+        Ok((ciphertext_bytes, inputs_json))
+    }
+
+    /// Generates CRISP ZK inputs for a vote encryption and addition operation.
+    ///
+    /// # Arguments
+    /// * `prev_ciphertext` - Previous ciphertext bytes to add to
+    /// * `public_key` - Public key bytes for encryption
+    /// * `vote` - Vote value as a vector of coefficients
+    ///
+    /// # Returns
+    /// Tuple containing the vote ciphertext bytes and JSON string with CRISP ZK inputs
+    pub fn generate_inputs(
+        &self,
+        prev_ciphertext: &[u8],
+        public_key: &[u8],
+        vote: Vec<u64>,
+    ) -> Result<(Vec<u8>, String)> {
+        // Deserialize the provided public key.
+        let pk = PublicKey::from_bytes(public_key, &self.bfv_params)
+            .with_context(|| "Failed to deserialize public key")?;
+
+        // Encode the plaintext into a polynomial.
+        let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
+            .with_context(|| "Failed to encode plaintext")?;
+
+        // Encrypt using the provided public key to ensure ciphertext matches the key.
+        let (ct, u_rns, e0_rns, e1_rns) = pk
+            .try_encrypt_extended(&pt, &mut thread_rng())
+            .with_context(|| "Failed to encrypt plaintext")?;
+
+        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+
+        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+        // Compute the vectors of the GRECO inputs.
+        let greco_vectors = GrecoVectors::compute(
+            &pt,
+            &u_rns,
+            &e0_rns,
+            &e1_rns,
+            &ct,
+            &pk,
+            &self.bfv_params,
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute vectors")?;
+
+        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
+            .with_context(|| "Failed to compute bounds")?;
+
+        // Ciphertext Addition Section.
+        // Deserialize the previous ciphertext.
+        let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
+            .with_context(|| "Failed to deserialize previous ciphertext")?;
+
+        // Compute the ciphertext addition.
+        let sum_ct = &ct + &prev_ct;
+
+        // Compute the inputs of the ciphertext addition.
+        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+            &pt,
+            &prev_ct,
+            &ct,
+            &sum_ct,
+            &self.bfv_params,
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+
+        // For first votes, set prev_ct_commitment to 0 since there's no previous ciphertext
+        ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
+
+        // Construct Inputs Section.
+        let inputs = construct_inputs(
+            &crypto_params,
+            &bounds,
+            &greco_vectors.standard_form(),
+            &ciphertext_addition_inputs.standard_form(),
+        );
+
+        let inputs_json = serialize_inputs_to_json(&inputs)?;
+        let ciphertext_bytes = ct.to_bytes();
+
+        Ok((ciphertext_bytes, inputs_json))
     }
 
     /// Encrypts a vote using the provided public key.
@@ -245,6 +267,25 @@ impl ZKInputsGenerator {
         Ok(pk.to_bytes())
     }
 
+    /// Computes the commitment to a set of ciphertext polynomials.
+    ///
+    /// # Arguments
+    /// * `ct0is` - The first component of the ciphertext polynomials.
+    /// * `ct1is` - The second component of the ciphertext polynomials.
+    ///
+    /// # Returns
+    /// The commitment as a BigInt.
+    pub fn compute_commitment(
+        &self,
+        ct0is: &[Vec<BigInt>],
+        ct1is: &[Vec<BigInt>],
+    ) -> Result<BigInt> {
+        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+        let bit = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+        Ok(compute_poly_commitment(ct0is, ct1is, bit))
+    }
+
     /// Returns a clone of the BFV parameters used by this generator.
     pub fn get_bfv_params(&self) -> Arc<BfvParameters> {
         self.bfv_params.clone()
@@ -275,7 +316,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -300,7 +343,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -320,7 +365,9 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        // Verify ciphertext is not empty
+        assert!(!ciphertext_bytes.is_empty());
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
@@ -360,7 +407,8 @@ mod tests {
 
         let result = generator.generate_inputs(&ciphertext, &public_key, vote.clone());
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        assert!(!ciphertext_bytes.is_empty());
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
@@ -400,10 +448,12 @@ mod tests {
         // Test vote = 0.
         let result_0 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_0.is_ok());
+        let (_, _) = result_0.unwrap();
 
         // Test vote = 1.
         let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
         assert!(result_1.is_ok());
+        let (_, _) = result_1.unwrap();
     }
 
     #[test]
@@ -419,7 +469,8 @@ mod tests {
         let result = generator.generate_inputs(&prev_ciphertext, &public_key, vote.clone());
 
         assert!(result.is_ok());
-        let json_output = result.unwrap();
+        let (ciphertext_bytes, json_output) = result.unwrap();
+        assert!(!ciphertext_bytes.is_empty());
 
         // Parse JSON to verify structure.
         let parsed: serde_json::Value =
