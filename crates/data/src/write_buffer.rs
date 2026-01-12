@@ -21,10 +21,14 @@ impl AggregateBuffer {
 }
 
 pub struct WriteBuffer {
+    /// Destination recipient for batched inserts
     dest: Option<Recipient<InsertBatch>>,
+    /// Buffer for storing individual inserts
     buffer: Vec<Insert>,
+    /// Per-aggregate buffers for organizing inserts
     aggregate_buffers: HashMap<AggregateId, AggregateBuffer>,
-    config: HashMap<AggregateId, u128>,
+    /// Per-aggregate wait time (microseconds) before sending inserts to destination
+    config: HashMap<AggregateId, u64>,
 }
 
 impl Actor for WriteBuffer {
@@ -41,7 +45,7 @@ impl WriteBuffer {
         }
     }
 
-    pub fn with_config(config: HashMap<AggregateId, u128>) -> Self {
+    pub fn with_config(config: HashMap<AggregateId, u64>) -> Self {
         Self {
             dest: None,
             buffer: Vec::new(),
