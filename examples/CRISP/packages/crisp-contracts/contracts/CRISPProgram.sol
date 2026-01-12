@@ -10,7 +10,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import { LazyIMTData, InternalLazyIMT, PoseidonT3 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import { LazyIMTData, InternalLazyIMT } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 import { HonkVerifier } from "./CRISPVerifier.sol";
 
 contract CRISPProgram is IE3Program, Ownable {
@@ -56,7 +56,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error MerkleRootNotSet();
 
   // Events
-  event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+  event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
 
   /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
   /// @param _enclave The enclave address

@@ -18,3 +18,4 @@ ark-ff = "=0.4.2"
 ark-bn254 = "=0.4.0"
 rayon = "=1.10.0"
 zk-kit-imt = "0.0.7"
+e3-bfv-helpers = { workspace = true }

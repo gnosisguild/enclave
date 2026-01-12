@@ -2847,6 +2847,7 @@ version = "0.1.7"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
+ "e3-bfv-helpers",
  "hex",
  "lean-imt",
  "light-poseidon",

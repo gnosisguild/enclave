@@ -9,11 +9,8 @@
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
 use crisp_constants::get_default_paramset;
+use e3_sdk::bfv_helpers::build_bfv_params_arc;
 use e3_sdk::bfv_helpers::BfvParamSet;
-use e3_sdk::bfv_helpers::{
-    build_bfv_params_arc,
-    utils::greco::{abi_decode_greco_ciphertext, greco_to_bfv_ciphertext},
-};
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -119,8 +116,8 @@ impl ZKInputsGenerator {
 
         // Ciphertext Addition Section.
         // Deserialize the previous ciphertext.
-        let (ct0is, ct1is) = abi_decode_greco_ciphertext(prev_ciphertext, &self.bfv_params);
-        let prev_ct = greco_to_bfv_ciphertext(&ct0is, &ct1is, &self.bfv_params);
+        let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
+            .with_context(|| "Failed to deserialize previous ciphertext")?;
 
         // Compute the ciphertext addition.
         let sum_ct = &ct + &prev_ct;

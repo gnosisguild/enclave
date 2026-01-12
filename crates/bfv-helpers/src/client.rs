@@ -5,14 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::build_bfv_params_arc;
-use crate::utils::greco::bfv_public_key_to_greco;
+use crate::utils::greco::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
 use anyhow::{anyhow, Result};
-use fhe::bfv::{Encoding, Plaintext, PublicKey};
+use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
 use rand::thread_rng;
+use shared::commitments::compute_poly_commitment;
+use shared::template::calculate_bit_width;
 
 /// Encrypt some data using BFV homomorphic encryption
 ///
@@ -130,15 +132,12 @@ where
     })
 }
 
-pub fn compute_poly_commitment(
+pub fn compute_pk_commitment(
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<[u8; 32]> {
-    use shared::commitments::compute_poly_commitment as _compute_poly_commitment;
-    use shared::template::calculate_bit_width;
-
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
     let public_key = PublicKey::from_bytes(&public_key, &params)
@@ -148,7 +147,7 @@ pub fn compute_poly_commitment(
     let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-    let commitment_bigint = _compute_poly_commitment(&pk0is, &pk1is, bit_pk);
+    let commitment_bigint = compute_poly_commitment(&pk0is, &pk1is, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
 
@@ -168,6 +167,37 @@ pub fn compute_poly_commitment(
         .map_err(|_| anyhow!("Failed to convert padded bytes to array"))?;
 
     Ok(public_key_hash)
+}
+
+pub fn compute_ct_commitment(
+    ct: Vec<u8>,
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<[u8; 32]> {
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+
+    let ct = Ciphertext::from_bytes(&ct, &params)
+        .map_err(|e| anyhow!("Error deserializing ciphertext: {}", e))?;
+
+    let (ct0is, ct1is) = bfv_ciphertext_to_greco(&ct, &params);
+
+    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
+    let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+    let commitment_bigint = compute_poly_commitment(&ct0is, &ct1is, bit_ct);
+
+    let bytes = commitment_bigint.to_bytes_be().1;
+
+    let mut padded_bytes = vec![0u8; 32];
+    let start_idx = 32 - bytes.len();
+    padded_bytes[start_idx..].copy_from_slice(&bytes);
+
+    let ciphertext_hash: [u8; 32] = padded_bytes
+        .try_into()
+        .map_err(|_| anyhow!("Failed to convert padded bytes to array"))?;
+
+    Ok(ciphertext_hash)
 }
 
 #[cfg(test)]

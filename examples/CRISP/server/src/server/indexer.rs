@@ -393,10 +393,10 @@ pub async fn register_input_published(
                     "InputPublished: e3_id={}, index={}, data=0x{}...",
                     event.e3Id,
                     event.index,
-                    hex::encode(&event.vote[..8.min(event.vote.len())])
+                    hex::encode(&event.encryptedVote[..8.min(event.encryptedVote.len())])
                 );
 
-                repo.insert_ciphertext_input(event.vote.to_vec(), event.index.to::<u64>())
+                repo.insert_ciphertext_input(event.encryptedVote.to_vec(), event.index.to::<u64>())
                     .await?;
                 Ok(())
             }

@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_bfv_helpers::{
-    client::{bfv_encrypt, bfv_verifiable_encrypt, compute_poly_commitment},
+    client::{
+        bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
+    },
     BfvParamSet, BfvParamSets,
 };
 use serde::{Deserialize, Serialize};
@@ -60,7 +62,7 @@ pub fn compute_pk_commitment(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<Vec<u8>, JsValue> {
-    let commitment = compute_poly_commitment(public_key, degree, plaintext_modulus, moduli)
+    let commitment = _compute_pk_commitment(public_key, degree, plaintext_modulus, moduli)
         .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
     Ok(commitment.to_vec())
 }
