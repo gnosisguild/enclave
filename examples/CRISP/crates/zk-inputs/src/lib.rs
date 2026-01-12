@@ -25,7 +25,7 @@ use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use rand::thread_rng;
-use shared::commitments::compute_pk_commitment;
+use shared::commitments::compute_poly_commitment;
 use std::sync::Arc;
 mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
@@ -275,7 +275,7 @@ impl ZKInputsGenerator {
         let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
         let bit = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
-        Ok(compute_pk_commitment(ct0is, ct1is, bit))
+        Ok(compute_poly_commitment(ct0is, ct1is, bit))
     }
 
     /// Returns a clone of the BFV parameters used by this generator.

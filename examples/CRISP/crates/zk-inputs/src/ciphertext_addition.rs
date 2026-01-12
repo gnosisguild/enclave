@@ -18,7 +18,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
 
-use shared::commitments::compute_pk_commitment;
+use shared::commitments::compute_poly_commitment;
 
 /// Set of inputs for validation of a ciphertext addition.
 ///
@@ -232,7 +232,7 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
-        res.prev_ct_commitment = compute_pk_commitment(&res.prev_ct0is, &res.prev_ct1is, bit_ct);
+        res.prev_ct_commitment = compute_poly_commitment(&res.prev_ct0is, &res.prev_ct1is, bit_ct);
 
         Ok(res)
     }

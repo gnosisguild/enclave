@@ -130,13 +130,13 @@ where
     })
 }
 
-pub fn compute_pk_commitment(
+pub fn compute_poly_commitment(
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<[u8; 32]> {
-    use shared::commitments::compute_pk_commitment as _compute_pk_commitment;
+    use shared::commitments::compute_poly_commitment as _compute_poly_commitment;
     use shared::template::calculate_bit_width;
 
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
@@ -148,7 +148,7 @@ pub fn compute_pk_commitment(
     let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-    let commitment_bigint = _compute_pk_commitment(&pk0is, &pk1is, bit_pk);
+    let commitment_bigint = _compute_poly_commitment(&pk0is, &pk1is, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
 

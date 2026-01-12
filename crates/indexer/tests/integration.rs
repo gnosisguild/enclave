@@ -9,7 +9,9 @@ use alloy::{
     primitives::{Bytes, FixedBytes, Uint},
     sol,
 };
-use e3_bfv_helpers::{build_bfv_params_from_set_arc, client::compute_pk_commitment, BfvParamSets};
+use e3_bfv_helpers::{
+    build_bfv_params_from_set_arc, client::compute_poly_commitment, BfvParamSets,
+};
 use e3_evm_helpers::contracts::ReadOnly;
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
@@ -98,7 +100,7 @@ async fn test_indexer() -> Result<()> {
     let sk = SecretKey::random(&params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);
 
-    let public_key_commitment = compute_pk_commitment(
+    let public_key_commitment = compute_poly_commitment(
         pk.to_bytes(),
         params.degree(),
         params.plaintext(),

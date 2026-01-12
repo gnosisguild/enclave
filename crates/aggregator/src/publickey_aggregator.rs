@@ -6,7 +6,7 @@
 
 use actix::prelude::*;
 use anyhow::Result;
-use e3_bfv_helpers::client::compute_pk_commitment;
+use e3_bfv_helpers::client::compute_poly_commitment;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
@@ -182,7 +182,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
             keyshares: msg.keyshares,
         })?;
 
-        let public_key_hash = compute_pk_commitment(
+        let public_key_hash = compute_poly_commitment(
             pubkey.clone(),
             self.fhe.params.degree(),
             self.fhe.params.plaintext(),
