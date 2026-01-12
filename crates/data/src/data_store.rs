@@ -99,24 +99,29 @@ impl DataStore {
         &self.addr
     }
 
-    pub fn get_recipient(&self) -> Recipient<Get> {
-        self.get.clone()
+    /// Get a reference to the Recipient<Get>
+    pub fn get_recipient(&self) -> &Recipient<Get> {
+        &self.get
     }
 
-    pub fn remove_recipient(&self) -> Recipient<Remove> {
-        self.remove.clone()
+    /// Get a reference to the Recipient<Remove>
+    pub fn remove_recipient(&self) -> &Recipient<Remove> {
+        &self.remove
     }
 
-    pub fn insert_recipient(&self) -> Recipient<Insert> {
-        self.insert.clone()
+    /// Get a reference to the Recipient<Insert>
+    pub fn insert_recipient(&self) -> &Recipient<Insert> {
+        &self.insert
     }
 
-    pub fn insert_sync_recipient(&self) -> Recipient<InsertSync> {
-        self.insert_sync.clone()
+    /// Get a reference to the Recipient<InsertSync>
+    pub fn insert_sync_recipient(&self) -> &Recipient<InsertSync> {
+        &self.insert_sync
     }
 
-    pub fn scope_bytes(&self) -> Vec<u8> {
-        self.scope.clone()
+    /// Get a clone of the scope bytes
+    pub fn scope_bytes(&self) -> &[u8] {
+        &self.scope
     }
 
     /// Changes the scope for the data store.

@@ -67,16 +67,16 @@ pub struct StoreConnector {
 
 impl StoreConnector {
     pub fn new(
-        key: Vec<u8>,
-        get: Recipient<Get>,
-        insert: Recipient<Insert>,
-        remove: Recipient<Remove>,
+        key: &[u8],
+        get: &Recipient<Get>,
+        insert: &Recipient<Insert>,
+        remove: &Recipient<Remove>,
     ) -> Self {
         Self {
-            key,
-            get,
-            insert,
-            remove,
+            key: key.to_owned(),
+            get: get.clone(),
+            insert: insert.clone(),
+            remove: remove.clone(),
         }
     }
 }
