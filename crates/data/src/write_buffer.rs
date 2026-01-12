@@ -6,7 +6,10 @@
 
 use actix::{Actor, Handler, Message, Recipient};
 use e3_events::{AggregateId, CommitSnapshot, EventContextAccessors};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{Insert, InsertBatch};
 
@@ -23,8 +26,6 @@ impl AggregateBuffer {
 pub struct WriteBuffer {
     /// Destination recipient for batched inserts
     dest: Option<Recipient<InsertBatch>>,
-    /// Buffer for storing individual inserts
-    buffer: Vec<Insert>,
     /// Per-aggregate buffers for organizing inserts
     aggregate_buffers: HashMap<AggregateId, AggregateBuffer>,
     /// Per-aggregate wait time (microseconds) before sending inserts to destination
@@ -39,7 +40,6 @@ impl WriteBuffer {
     pub fn new() -> Self {
         Self {
             dest: None,
-            buffer: Vec::new(),
             aggregate_buffers: HashMap::new(),
             config: HashMap::new(),
         }
@@ -48,7 +48,6 @@ impl WriteBuffer {
     pub fn with_config(config: HashMap<AggregateId, u64>) -> Self {
         Self {
             dest: None,
-            buffer: Vec::new(),
             aggregate_buffers: HashMap::new(),
             config,
         }
@@ -66,28 +65,66 @@ impl Handler<Insert> for WriteBuffer {
     type Result = ();
 
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
-        if let Some(event_ctx) = msg.ctx() {
-            let aggregate_id = event_ctx.aggregate_id().clone();
-            let agg_buffer = self
-                .aggregate_buffers
-                .entry(aggregate_id)
-                .or_insert_with(|| AggregateBuffer::new());
-            agg_buffer.buffer.push(msg.clone());
-        }
-        self.buffer.push(msg);
+        let aggregate_id = if let Some(event_ctx) = msg.ctx() {
+            event_ctx.aggregate_id().clone()
+        } else {
+            AggregateId::new(0)
+        };
+
+        let agg_buffer = self
+            .aggregate_buffers
+            .entry(aggregate_id)
+            .or_insert_with(|| AggregateBuffer::new());
+        agg_buffer.buffer.push(msg.clone());
     }
 }
 
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_millis();
+
         if let Some(ref dest) = self.dest {
-            if !self.buffer.is_empty() {
-                let mut inserts = std::mem::take(&mut self.buffer);
-                inserts.push(Insert::new("//seq", msg.seq().to_be_bytes().to_vec()));
-                let batch = InsertBatch::new(inserts);
-                dest.do_send(batch);
+            let mut aggregates_to_remove = Vec::new();
+
+            for (aggregate_id, agg_buffer) in &mut self.aggregate_buffers {
+                let delay_micros = self.config.get(aggregate_id).copied().unwrap_or(0);
+                let delay_ms = delay_micros / 1000;
+                let cutoff_time = now.saturating_sub(delay_ms as u128);
+
+                let mut expired_inserts = Vec::new();
+                let mut remaining_inserts = Vec::new();
+
+                for insert in &agg_buffer.buffer {
+                    if let Some(ctx) = insert.ctx() {
+                        if ctx.ts() < cutoff_time {
+                            expired_inserts.push(insert.clone());
+                        } else {
+                            remaining_inserts.push(insert.clone());
+                        }
+                    } else {
+                        remaining_inserts.push(insert.clone());
+                    }
+                }
+
+                if !expired_inserts.is_empty() {
+                    let batch = InsertBatch::new(expired_inserts);
+                    dest.do_send(batch);
+                }
+
+                agg_buffer.buffer = remaining_inserts;
+
+                if agg_buffer.buffer.is_empty() {
+                    aggregates_to_remove.push(aggregate_id.clone());
+                }
+            }
+
+            for aggregate_id in aggregates_to_remove {
+                self.aggregate_buffers.remove(&aggregate_id);
             }
         }
     }
