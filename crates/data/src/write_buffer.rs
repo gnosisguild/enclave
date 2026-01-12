@@ -5,14 +5,25 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler, Message, Recipient};
-use e3_events::{AggregateId, CommitSnapshot};
+use e3_events::{AggregateId, CommitSnapshot, EventContextAccessors};
 use std::collections::HashMap;
 
 use crate::{Insert, InsertBatch};
 
+struct AggregateBuffer {
+    buffer: Vec<Insert>,
+}
+
+impl AggregateBuffer {
+    fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+}
+
 pub struct WriteBuffer {
     dest: Option<Recipient<InsertBatch>>,
     buffer: Vec<Insert>,
+    aggregate_buffers: HashMap<AggregateId, AggregateBuffer>,
     config: HashMap<AggregateId, u128>,
 }
 
@@ -25,6 +36,7 @@ impl WriteBuffer {
         Self {
             dest: None,
             buffer: Vec::new(),
+            aggregate_buffers: HashMap::new(),
             config: HashMap::new(),
         }
     }
@@ -33,6 +45,7 @@ impl WriteBuffer {
         Self {
             dest: None,
             buffer: Vec::new(),
+            aggregate_buffers: HashMap::new(),
             config,
         }
     }
@@ -49,6 +62,14 @@ impl Handler<Insert> for WriteBuffer {
     type Result = ();
 
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
+        if let Some(event_ctx) = msg.ctx() {
+            let aggregate_id = event_ctx.aggregate_id().clone();
+            let agg_buffer = self
+                .aggregate_buffers
+                .entry(aggregate_id)
+                .or_insert_with(|| AggregateBuffer::new());
+            agg_buffer.buffer.push(msg.clone());
+        }
         self.buffer.push(msg);
     }
 }
