@@ -14,6 +14,7 @@ use std::{
 
 use crate::{Insert, InsertBatch};
 
+#[derive(Debug)]
 struct AggregateBuffer {
     buffer: Vec<Insert>,
 }
@@ -91,7 +92,6 @@ fn process_expired_inserts(
     for (aggregate_id, agg_buffer) in aggregate_buffers {
         let delay_micros = config.get(aggregate_id).copied().unwrap_or(0);
         let cutoff_time = now.saturating_sub(delay_micros);
-
         let mut expired_inserts = Vec::new();
         let mut remaining_inserts = Vec::new();
 
@@ -104,7 +104,8 @@ fn process_expired_inserts(
                     remaining_inserts.push(insert.clone());
                 }
             } else {
-                remaining_inserts.push(insert.clone());
+                // If there is no context just flush it
+                expired_inserts.push(insert.clone());
             }
         }
 
@@ -132,7 +133,6 @@ impl Handler<CommitSnapshot> for WriteBuffer {
         if let Some(ref dest) = self.dest {
             let (updated_buffers, expired_inserts) =
                 process_expired_inserts(&self.aggregate_buffers, &self.config, now);
-
             if !expired_inserts.is_empty() {
                 let batch = InsertBatch::new(expired_inserts);
                 dest.do_send(batch);
