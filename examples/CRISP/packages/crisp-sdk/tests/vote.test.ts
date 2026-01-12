@@ -15,11 +15,11 @@ import {
   generateCircuitInputs,
   executeCircuit,
   computeCommitment,
+  encryptVote,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
-import previousCiphertextEncoded from './fixtures/previous-ciphertext.json'
 import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
@@ -29,14 +29,14 @@ describe('Vote', () => {
   let address: string
   let slotAddress: string
   let publicKey: Uint8Array
-
+  let previousCiphertext: Uint8Array
   let e3Id: number
   let sdk: CrispSDK
 
   const mockGetPreviousCiphertextResponse = () =>
     ({
       ok: true,
-      json: async () => ({ ciphertext: previousCiphertextEncoded }),
+      json: async () => ({ ciphertext: previousCiphertext }),
     }) as Response
 
   const mockIsSlotEmptyResponse = (isEmpty: boolean) =>
@@ -62,6 +62,7 @@ describe('Vote', () => {
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
+    previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
     e3Id = 0
     sdk = new CrispSDK(CRISP_SERVER_URL)
   })
@@ -144,7 +145,7 @@ describe('Vote', () => {
         vote: ZERO_VOTE,
         signature: MASK_SIGNATURE,
         messageHash: SIGNATURE_MESSAGE_HASH,
-        previousCiphertext: new Uint8Array(previousCiphertextEncoded),
+        previousCiphertext,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
