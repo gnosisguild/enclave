@@ -8,6 +8,8 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
+import { IE3Lifecycle } from "./interfaces/IE3Lifecycle.sol";
+import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -38,6 +40,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Address of the Bonding Registry contract.
     /// @dev Handles staking and reward distribution for ciphernodes.
     IBondingRegistry public bondingRegistry;
+
+    /// @notice E3 Lifecycle contract for stage tracking and timeout enforcement.
+    /// @dev Manages E3 state machine and failure detection.
+    IE3Lifecycle public e3Lifecycle;
+
+    /// @notice E3 Refund Manager contract for handling failed E3 refunds.
+    /// @dev Manages refund calculation and claiming for failed E3s.
+    IE3RefundManager public e3RefundManager;
 
     /// @notice Address of the ERC20 token used for E3 fees.
     /// @dev All E3 request fees must be paid in this token.
@@ -196,6 +206,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         IBondingRegistry _bondingRegistry,
+        IE3Lifecycle _e3Lifecycle,
+        IE3RefundManager _e3RefundManager,
         IERC20 _feeToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
@@ -204,6 +216,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
+        setE3Lifecycle(_e3Lifecycle);
+        setE3RefundManager(_e3RefundManager);
         setFeeToken(_feeToken);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
@@ -291,6 +305,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ),
             CommitteeSelectionFailed()
         );
+        e3Lifecycle.initializeE3(e3Id, msg.sender);
 
         emit E3Requested(e3Id, e3, requestParams.e3Program);
     }
@@ -309,6 +324,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 expiresAt = block.timestamp + e3.duration;
         e3s[e3Id].expiration = expiresAt;
         e3s[e3Id].committeePublicKey = publicKeyHash;
+        e3Lifecycle.onActivated(e3Id, expiresAt);
 
         emit E3Activated(e3Id, expiresAt, publicKeyHash);
 
@@ -361,6 +377,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
         require(success, InvalidOutput(ciphertextOutput));
+        e3Lifecycle.onCiphertextPublished(e3Id);
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
@@ -393,6 +410,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(success, InvalidOutput(plaintextOutput));
 
+        e3Lifecycle.onComplete(e3Id);
         _distributeRewards(e3Id);
 
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
@@ -433,6 +451,34 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         feeToken.approve(address(bondingRegistry), 0);
 
         emit RewardsDistributed(e3Id, committeeNodes, amounts);
+    }
+
+    /// @notice Retrieves the honest committee nodes for a given E3.
+    /// @dev Determines honest nodes based on failure reason and committee publication status.
+    /// @param e3Id The ID of the E3.
+    /// @return honestNodes An array of addresses of honest committee nodes.
+    function _getHonestNodes(
+        uint256 e3Id
+    ) private view returns (address[] memory) {
+        IE3Lifecycle.FailureReason reason = e3Lifecycle.getFailureReason(e3Id);
+
+        // Early failures have no committee
+        if (
+            reason == IE3Lifecycle.FailureReason.CommitteeFormationTimeout ||
+            reason == IE3Lifecycle.FailureReason.InsufficientCommitteeMembers
+        ) {
+            return new address[](0);
+        }
+
+        // Try to get published committee nodes
+        try ciphernodeRegistry.getCommitteeNodes(e3Id) returns (
+            address[] memory nodes
+        ) {
+            // TODO: Implement fault attribution to filter honest from faulting nodes
+            return nodes; // Assume all are honest for now
+        } catch {
+            return new address[](0); // Committee not published (DKG failed)
+        }
     }
 
     ////////////////////////////////////////////////////////////
@@ -558,6 +604,102 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         }
         success = true;
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
+    }
+
+    /// @notice Sets the E3 Lifecycle contract address
+    /// @param _e3Lifecycle The new E3 Lifecycle contract address
+    /// @return success True if the operation succeeded
+    function setE3Lifecycle(
+        IE3Lifecycle _e3Lifecycle
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_e3Lifecycle) != address(0),
+            "Invalid E3Lifecycle address"
+        );
+        e3Lifecycle = _e3Lifecycle;
+        success = true;
+        emit E3LifecycleSet(address(_e3Lifecycle));
+    }
+
+    /// @notice Sets the E3 Refund Manager contract address
+    /// @param _e3RefundManager The new E3 Refund Manager contract address
+    /// @return success True if the operation succeeded
+    function setE3RefundManager(
+        IE3RefundManager _e3RefundManager
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_e3RefundManager) != address(0),
+            "Invalid E3RefundManager address"
+        );
+        e3RefundManager = _e3RefundManager;
+        success = true;
+        emit E3RefundManagerSet(address(_e3RefundManager));
+    }
+
+    /// @notice Process a failed E3 and calculate refunds
+    /// @dev Can be called by anyone once E3 is in failed state
+    /// @param e3Id The ID of the failed E3
+    function processE3Failure(uint256 e3Id) external {
+        require(address(e3Lifecycle) != address(0), "Lifecycle not set");
+        require(
+            address(e3RefundManager) != address(0),
+            "RefundManager not set"
+        );
+
+        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
+        require(stage == IE3Lifecycle.E3Stage.Failed, "E3 not failed");
+
+        uint256 payment = e3Payments[e3Id];
+        require(payment > 0, "No payment to refund");
+        e3Payments[e3Id] = 0; // Prevent double processing
+
+        address[] memory honestNodes = _getHonestNodes(e3Id);
+
+        feeToken.safeTransfer(address(e3RefundManager), payment);
+        e3RefundManager.calculateRefund(e3Id, payment, honestNodes);
+
+        emit E3FailureProcessed(e3Id, payment, honestNodes.length);
+    }
+
+    /// @inheritdoc IEnclave
+    function onCommitteeFinalized(uint256 e3Id) external {
+        require(
+            msg.sender == address(ciphernodeRegistry),
+            "Only CiphernodeRegistry"
+        );
+
+        // Update E3 lifecycle stage - committee finalized, DKG starting
+        e3Lifecycle.onCommitteeFinalized(e3Id);
+
+        emit CommitteeFinalized(e3Id);
+    }
+
+    /// @inheritdoc IEnclave
+    function onCommitteePublished(uint256 e3Id) external {
+        require(
+            msg.sender == address(ciphernodeRegistry),
+            "Only CiphernodeRegistry"
+        );
+
+        // DKG complete, key published
+        E3 memory e3 = e3s[e3Id];
+        e3Lifecycle.onKeyPublished(e3Id, e3.startWindow[1]);
+
+        emit CommitteeFormed(e3Id);
+    }
+
+    /// @inheritdoc IEnclave
+    function onE3Failed(uint256 e3Id, uint8 reason) external {
+        require(
+            msg.sender == address(ciphernodeRegistry),
+            "Only CiphernodeRegistry"
+        );
+
+        // Mark E3 as failed with the given reason
+        e3Lifecycle.markE3FailedWithReason(
+            e3Id,
+            IE3Lifecycle.FailureReason(reason)
+        );
     }
 
     ////////////////////////////////////////////////////////////

@@ -1,0 +1,404 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+pragma solidity >=0.8.27;
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
+import { IE3Lifecycle } from "./interfaces/IE3Lifecycle.sol";
+import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
+
+/**
+ * @title E3RefundManager
+ * @notice Manages refund distribution for failed E3 computations
+ * @dev Implements fault-attribution based refund system
+ *
+ */
+contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
+    using SafeERC20 for IERC20;
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                 Storage Variables                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @notice The E3Lifecycle contract
+    IE3Lifecycle public e3Lifecycle;
+    /// @notice The fee token used for payments
+    IERC20 public feeToken;
+    /// @notice The bonding registry for node rewards
+    IBondingRegistry public bondingRegistry;
+    /// @notice Authorized caller (typically Enclave contract)
+    address public enclave;
+    /// @notice Protocol treasury for protocol fee collection
+    address public treasury;
+    /// @notice Work value allocation configuration
+    WorkValueAllocation internal _workAllocation;
+    /// @notice Maps E3 ID to refund distribution
+    mapping(uint256 e3Id => RefundDistribution) internal _distributions;
+    /// @notice Tracks claims per E3 per address
+    mapping(uint256 e3Id => mapping(address => bool)) internal _claimed;
+    /// @notice Maps E3 ID to honest node addresses
+    mapping(uint256 e3Id => address[]) internal _honestNodes;
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                       Modifiers                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @notice Restricts function to Enclave contract only
+    modifier onlyEnclave() {
+        if (msg.sender != enclave) revert Unauthorized();
+        _;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Initialization                       //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @notice Constructor that disables initializers
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @notice Initializes the E3RefundManager contract
+    /// @param _owner The owner address
+    /// @param _enclave The Enclave contract address
+    /// @param _e3Lifecycle The E3Lifecycle contract address
+    /// @param _feeToken The fee token address
+    /// @param _bondingRegistry The bonding registry address
+    /// @param _treasury The protocol treasury address
+    function initialize(
+        address _owner,
+        address _enclave,
+        address _e3Lifecycle,
+        address _feeToken,
+        address _bondingRegistry,
+        address _treasury
+    ) public initializer {
+        __Ownable_init(msg.sender);
+
+        require(_enclave != address(0), "Invalid enclave");
+        require(_e3Lifecycle != address(0), "Invalid lifecycle");
+        require(_feeToken != address(0), "Invalid fee token");
+        require(_bondingRegistry != address(0), "Invalid bonding registry");
+        require(_treasury != address(0), "Invalid treasury");
+
+        enclave = _enclave;
+        e3Lifecycle = IE3Lifecycle(_e3Lifecycle);
+        feeToken = IERC20(_feeToken);
+        bondingRegistry = IBondingRegistry(_bondingRegistry);
+        treasury = _treasury;
+
+        _workAllocation = WorkValueAllocation({
+            committeeFormationBps: 1000,
+            dkgBps: 3000,
+            decryptionBps: 5500,
+            protocolBps: 500
+        });
+
+        if (_owner != owner()) transferOwnership(_owner);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //               Refund Calculation                       //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @inheritdoc IE3RefundManager
+    function calculateRefund(
+        uint256 e3Id,
+        uint256 originalPayment,
+        address[] calldata honestNodes
+    ) external onlyEnclave {
+        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
+        if (stage != IE3Lifecycle.E3Stage.Failed) {
+            revert E3NotFailed(e3Id);
+        }
+
+        require(!_distributions[e3Id].calculated, "Already calculated");
+        require(originalPayment > 0, "No payment");
+
+        // Calculate work value based on stage
+        IE3Lifecycle.E3Stage failedAt = _getFailedAtStage(e3Id);
+        (uint16 workCompletedBps, uint16 workRemainingBps) = calculateWorkValue(
+            failedAt
+        );
+
+        // Calculate base distribution
+        uint256 honestNodeAmount = (originalPayment * workCompletedBps) / 10000;
+        uint256 requesterAmount = (originalPayment * workRemainingBps) / 10000;
+        uint256 protocolAmount = originalPayment -
+            honestNodeAmount -
+            requesterAmount;
+
+        // Store distribution
+        _distributions[e3Id] = RefundDistribution({
+            requesterAmount: requesterAmount,
+            honestNodeAmount: honestNodeAmount,
+            protocolAmount: protocolAmount,
+            totalSlashed: 0,
+            honestNodeCount: honestNodes.length,
+            calculated: true
+        });
+
+        // Store honest nodes
+        for (uint256 i = 0; i < honestNodes.length; i++) {
+            _honestNodes[e3Id].push(honestNodes[i]);
+        }
+
+        // Transfer protocol fee to treasury immediately
+        if (protocolAmount > 0) {
+            feeToken.safeTransfer(treasury, protocolAmount);
+        }
+
+        emit RefundDistributionCalculated(
+            e3Id,
+            requesterAmount,
+            honestNodeAmount,
+            protocolAmount,
+            0
+        );
+    }
+
+    /// @notice Get the stage at which E3 failed (for work calculation)
+    function _getFailedAtStage(
+        uint256 e3Id
+    ) internal view returns (IE3Lifecycle.E3Stage) {
+        IE3Lifecycle.FailureReason reason = e3Lifecycle.getFailureReason(e3Id);
+
+        // Map failure reason to stage
+        if (
+            reason == IE3Lifecycle.FailureReason.CommitteeFormationTimeout ||
+            reason == IE3Lifecycle.FailureReason.InsufficientCommitteeMembers
+        ) {
+            return IE3Lifecycle.E3Stage.Requested;
+        }
+        if (
+            reason == IE3Lifecycle.FailureReason.DKGTimeout ||
+            reason == IE3Lifecycle.FailureReason.DKGInvalidShares
+        ) {
+            return IE3Lifecycle.E3Stage.CommitteeFinalized;
+        }
+        if (reason == IE3Lifecycle.FailureReason.ActivationWindowExpired) {
+            return IE3Lifecycle.E3Stage.KeyPublished;
+        }
+        if (reason == IE3Lifecycle.FailureReason.NoInputsReceived) {
+            return IE3Lifecycle.E3Stage.Activated;
+        }
+        if (
+            reason == IE3Lifecycle.FailureReason.ComputeTimeout ||
+            reason == IE3Lifecycle.FailureReason.ComputeProviderExpired ||
+            reason == IE3Lifecycle.FailureReason.ComputeProviderFailed ||
+            reason == IE3Lifecycle.FailureReason.RequesterCancelled
+        ) {
+            return IE3Lifecycle.E3Stage.Activated;
+        }
+        if (
+            reason == IE3Lifecycle.FailureReason.DecryptionTimeout ||
+            reason == IE3Lifecycle.FailureReason.DecryptionInvalidShares ||
+            reason == IE3Lifecycle.FailureReason.VerificationFailed
+        ) {
+            return IE3Lifecycle.E3Stage.CiphertextReady;
+        }
+
+        return IE3Lifecycle.E3Stage.None;
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function calculateWorkValue(
+        IE3Lifecycle.E3Stage stage
+    ) public view returns (uint16 workCompletedBps, uint16 workRemainingBps) {
+        WorkValueAllocation memory alloc = _workAllocation;
+
+        if (
+            stage == IE3Lifecycle.E3Stage.Requested ||
+            stage == IE3Lifecycle.E3Stage.None
+        ) {
+            // Failed at Requested = no work done
+            workCompletedBps = 0;
+        } else if (stage == IE3Lifecycle.E3Stage.CommitteeFinalized) {
+            // Failed during DKG = sortition work done
+            workCompletedBps = alloc.committeeFormationBps;
+        } else if (stage == IE3Lifecycle.E3Stage.KeyPublished) {
+            // Failed before activation = sortition + DKG done
+            workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
+        } else if (stage == IE3Lifecycle.E3Stage.Activated) {
+            // Failed during active phase = sortition + DKG done (no additional work)
+            workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
+        } else if (stage == IE3Lifecycle.E3Stage.CiphertextReady) {
+            // Failed during decryption = sortition + DKG done (awaiting decryption shares)
+            workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
+        }
+
+        workRemainingBps = 10000 - workCompletedBps - alloc.protocolBps;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Claiming Functions                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @inheritdoc IE3RefundManager
+    function claimRequesterRefund(
+        uint256 e3Id
+    ) external returns (uint256 amount) {
+        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
+        if (stage != IE3Lifecycle.E3Stage.Failed) {
+            revert E3NotFailed(e3Id);
+        }
+
+        RefundDistribution storage dist = _distributions[e3Id];
+        if (!dist.calculated) revert RefundNotCalculated(e3Id);
+
+        address requester = e3Lifecycle.getRequester(e3Id);
+        if (msg.sender != requester) revert NotRequester(e3Id, msg.sender);
+
+        if (_claimed[e3Id][msg.sender]) revert AlreadyClaimed(e3Id, msg.sender);
+
+        amount = dist.requesterAmount;
+        if (amount == 0) revert NoRefundAvailable(e3Id);
+
+        _claimed[e3Id][msg.sender] = true;
+
+        feeToken.safeTransfer(msg.sender, amount);
+
+        emit RefundClaimed(e3Id, msg.sender, amount, "REQUESTER");
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function claimHonestNodeReward(
+        uint256 e3Id
+    ) external returns (uint256 amount) {
+        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
+        if (stage != IE3Lifecycle.E3Stage.Failed) {
+            revert E3NotFailed(e3Id);
+        }
+
+        RefundDistribution storage dist = _distributions[e3Id];
+        if (!dist.calculated) revert RefundNotCalculated(e3Id);
+
+        if (_claimed[e3Id][msg.sender]) revert AlreadyClaimed(e3Id, msg.sender);
+
+        // Check if caller is an honest node
+        bool isHonest = false;
+        address[] storage nodes = _honestNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == msg.sender) {
+                isHonest = true;
+                break;
+            }
+        }
+        if (!isHonest) revert NotHonestNode(e3Id, msg.sender);
+
+        // Calculate per-node amount
+        if (dist.honestNodeCount == 0) revert NoRefundAvailable(e3Id);
+        amount = dist.honestNodeAmount / dist.honestNodeCount;
+        if (amount == 0) revert NoRefundAvailable(e3Id);
+
+        _claimed[e3Id][msg.sender] = true;
+
+        // Route through BondingRegistry for proper accounting
+        feeToken.approve(address(bondingRegistry), amount);
+
+        address[] memory nodeArray = new address[](1);
+        nodeArray[0] = msg.sender;
+        uint256[] memory amountArray = new uint256[](1);
+        amountArray[0] = amount;
+
+        bondingRegistry.distributeRewards(feeToken, nodeArray, amountArray);
+
+        feeToken.approve(address(bondingRegistry), 0);
+
+        emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function routeSlashedFunds(
+        uint256 e3Id,
+        uint256 amount
+    ) external onlyEnclave {
+        RefundDistribution storage dist = _distributions[e3Id];
+        require(dist.calculated, "Not calculated");
+
+        // Add slashed funds to distribution
+        // 50% to requester, 50% to honest nodes for non-participation
+        uint256 toRequester = amount / 2;
+        uint256 toHonestNodes = amount - toRequester;
+
+        dist.requesterAmount += toRequester;
+        dist.honestNodeAmount += toHonestNodes;
+        dist.totalSlashed += amount;
+
+        emit SlashedFundsRouted(e3Id, amount);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                    View Functions                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @inheritdoc IE3RefundManager
+    function getRefundDistribution(
+        uint256 e3Id
+    ) external view returns (RefundDistribution memory) {
+        return _distributions[e3Id];
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function hasClaimed(
+        uint256 e3Id,
+        address claimant
+    ) external view returns (bool) {
+        return _claimed[e3Id][claimant];
+    }
+
+    /// @inheritdoc IE3RefundManager
+    function getWorkAllocation()
+        external
+        view
+        returns (WorkValueAllocation memory)
+    {
+        return _workAllocation;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Admin Functions                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+    /// @inheritdoc IE3RefundManager
+    function setWorkAllocation(
+        WorkValueAllocation calldata allocation
+    ) external onlyOwner {
+        uint256 total = uint256(allocation.committeeFormationBps) +
+            uint256(allocation.dkgBps) +
+            uint256(allocation.decryptionBps) +
+            uint256(allocation.protocolBps);
+        require(total == 10000, "Must sum to 10000");
+
+        _workAllocation = allocation;
+
+        emit WorkAllocationUpdated(allocation);
+    }
+
+    /// @notice Set the Enclave contract address
+    /// @param _enclave New Enclave address
+    function setEnclave(address _enclave) external onlyOwner {
+        require(_enclave != address(0), "Invalid enclave");
+        enclave = _enclave;
+    }
+
+    /// @notice Set the treasury address
+    /// @param _treasury New treasury address
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Invalid treasury");
+        treasury = _treasury;
+    }
+}

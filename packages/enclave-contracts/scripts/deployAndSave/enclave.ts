@@ -22,6 +22,8 @@ export interface EnclaveArgs {
   maxDuration?: string;
   registry?: string;
   bondingRegistry?: string;
+  e3Lifecycle?: string;
+  e3RefundManager?: string;
   feeToken?: string;
   hre: HardhatRuntimeEnvironment;
 }
@@ -37,6 +39,8 @@ export const deployAndSaveEnclave = async ({
   maxDuration,
   registry,
   bondingRegistry,
+  e3Lifecycle,
+  e3RefundManager,
   feeToken,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
@@ -53,11 +57,15 @@ export const deployAndSaveEnclave = async ({
     !maxDuration ||
     !registry ||
     !bondingRegistry ||
+    !e3Lifecycle ||
+    !e3RefundManager ||
     !feeToken ||
     (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
       preDeployedArgs?.constructorArgs?.registry === registry &&
       preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
+      preDeployedArgs?.constructorArgs?.e3Lifecycle === e3Lifecycle &&
+      preDeployedArgs?.constructorArgs?.e3RefundManager === e3RefundManager &&
       preDeployedArgs?.constructorArgs?.feeToken === feeToken &&
       areArraysEqual(
         preDeployedArgs?.constructorArgs?.params as string[],
@@ -85,6 +93,8 @@ export const deployAndSaveEnclave = async ({
     owner,
     registry,
     bondingRegistry,
+    e3Lifecycle,
+    e3RefundManager,
     feeToken,
     maxDuration,
     params,
@@ -105,6 +115,8 @@ export const deployAndSaveEnclave = async ({
         owner,
         registry,
         bondingRegistry,
+        e3Lifecycle,
+        e3RefundManager,
         feeToken,
         maxDuration,
         params,
