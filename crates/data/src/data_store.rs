@@ -111,6 +111,10 @@ impl DataStore {
         self.insert.clone()
     }
 
+    pub fn insert_sync_recipient(&self) -> Recipient<InsertSync> {
+        self.insert_sync.clone()
+    }
+
     pub fn scope_bytes(&self) -> Vec<u8> {
         self.scope.clone()
     }
