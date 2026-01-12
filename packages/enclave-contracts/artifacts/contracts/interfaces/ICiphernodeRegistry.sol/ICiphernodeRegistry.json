@@ -114,6 +114,31 @@
         },
         {
           "indexed": false,
+          "internalType": "uint256",
+          "name": "nodesSubmitted",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "thresholdRequired",
+          "type": "uint256"
+        }
+      ],
+      "name": "CommitteeFormationFailed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
           "internalType": "address[]",
           "name": "nodes",
           "type": "address[]"
@@ -158,7 +183,7 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "submissionDeadline",
+          "name": "committeeDeadline",
           "type": "uint256"
         }
       ],
@@ -263,7 +288,13 @@
         }
       ],
       "name": "finalizeCommittee",
-      "outputs": [],
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -466,7 +497,7 @@
     {
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "contract IBondingRegistry",
           "name": "_bondingRegistry",
           "type": "address"
         }
@@ -479,7 +510,7 @@
     {
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "contract IEnclave",
           "name": "_enclave",
           "type": "address"
         }
@@ -540,5 +571,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-e1018ade42270e3293a7c3b47ab6b91dfdeea5fe"
+  "buildInfoId": "solc-0_8_28-15112a5a277d7846347c8e3a91ba0ec7bb3521bd"
 }

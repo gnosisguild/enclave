@@ -8,6 +8,11 @@ import hre from "hardhat";
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import {
+  deployAndSaveE3Lifecycle,
+  DEFAULT_TIMEOUT_CONFIG,
+} from "./deployAndSave/e3Lifecycle";
+import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
@@ -121,6 +126,29 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
   console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
+  console.log("Deploying E3Lifecycle...");
+  const { e3Lifecycle } = await deployAndSaveE3Lifecycle({
+    owner: ownerAddress,
+    enclave: addressOne, // Will be set after Enclave deployment
+    timeoutConfig: DEFAULT_TIMEOUT_CONFIG,
+    hre,
+  });
+  const e3LifecycleAddress = await e3Lifecycle.getAddress();
+  console.log("E3Lifecycle deployed to:", e3LifecycleAddress);
+
+  console.log("Deploying E3RefundManager...");
+  const { e3RefundManager } = await deployAndSaveE3RefundManager({
+    owner: ownerAddress,
+    enclave: addressOne, // Will be set after Enclave deployment
+    e3Lifecycle: e3LifecycleAddress,
+    feeToken: feeTokenAddress,
+    bondingRegistry: bondingRegistryAddress,
+    treasury: ownerAddress, // Protocol treasury
+    hre,
+  });
+  const e3RefundManagerAddress = await e3RefundManager.getAddress();
+  console.log("E3RefundManager deployed to:", e3RefundManagerAddress);
+
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
     params: [encoded],
@@ -128,6 +156,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
+    e3Lifecycle: e3LifecycleAddress,
+    e3RefundManager: e3RefundManagerAddress,
     feeToken: feeTokenAddress,
     hre,
   });
@@ -166,6 +196,12 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
+
+  console.log("Setting Enclave address in E3Lifecycle...");
+  await e3Lifecycle.setEnclave(enclaveAddress);
+
+  console.log("Setting Enclave address in E3RefundManager...");
+  await e3RefundManager.setEnclave(enclaveAddress);
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
@@ -206,6 +242,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
+    E3Lifecycle: ${e3LifecycleAddress}
+    E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}
     ============================================
   `);
