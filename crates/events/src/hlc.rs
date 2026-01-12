@@ -44,6 +44,11 @@ impl HlcTimestamp {
         Self { ts, counter, node }
     }
 
+    /// Extract wall time from a u128 timestamp without full HLC conversion
+    pub fn wall_time(ts: u128) -> u64 {
+        (ts >> 64) as u64
+    }
+
     /// Packs the HLC timestamp into a 128bit big-endian representation.
     ///
     /// Layout:
