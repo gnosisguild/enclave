@@ -141,14 +141,16 @@ pub trait EventLog: Unpin + 'static {
 
 /// EventContext allows consumers to extract infrastructure metadata from event objects
 pub trait EventContextAccessors {
-    /// This event id
+    /// The unique id for this event
     fn id(&self) -> EventId;
-    /// The id of the event that directly caused this
+    /// The event that caused this event to occur
     fn causation_id(&self) -> EventId;
-    /// The original event that started the causal chain
+    /// The root event that caused this event to occur
     fn origin_id(&self) -> EventId;
-    /// The timestamp for the event
+    /// The timestamp when the event occurred
     fn ts(&self) -> u128;
+    /// The aggregate id for this event
+    fn aggregate_id(&self) -> AggregateId;
 }
 
 pub trait EventContextSeq {

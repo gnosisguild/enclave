@@ -52,25 +52,38 @@ pub struct EventContext<S: SeqState> {
     origin_id: EventId,
     seq: S::Seq,
     ts: u128,
+    aggregate_id: AggregateId,
 }
 
 impl EventContext<Unsequenced> {
-    pub fn new(id: EventId, causation_id: EventId, origin_id: EventId, ts: u128) -> Self {
+    pub fn new(
+        id: EventId,
+        causation_id: EventId,
+        origin_id: EventId,
+        ts: u128,
+        aggregate_id: AggregateId,
+    ) -> Self {
         Self {
             id,
             causation_id,
             origin_id,
             seq: (),
             ts,
+            aggregate_id,
         }
     }
 
-    pub fn new_origin(id: EventId, ts: u128) -> Self {
-        Self::new(id, id, id, ts)
+    pub fn new_origin(id: EventId, ts: u128, aggregate_id: AggregateId) -> Self {
+        Self::new(id, id, id, ts, aggregate_id)
     }
 
-    pub fn from_cause(id: EventId, cause: EventContext<Sequenced>, ts: u128) -> Self {
-        EventContext::new(id, cause.id(), cause.origin_id(), ts)
+    pub fn from_cause(
+        id: EventId,
+        cause: EventContext<Sequenced>,
+        ts: u128,
+        aggregate_id: AggregateId,
+    ) -> Self {
+        EventContext::new(id, cause.id(), cause.origin_id(), ts, aggregate_id)
     }
 
     pub fn sequence(self, value: u64) -> EventContext<Sequenced> {
@@ -80,6 +93,7 @@ impl EventContext<Unsequenced> {
             causation_id: self.causation_id,
             origin_id: self.origin_id,
             ts: self.ts,
+            aggregate_id: self.aggregate_id,
         }
     }
 }
@@ -100,6 +114,10 @@ impl<S: SeqState> EventContextAccessors for EventContext<S> {
     fn ts(&self) -> u128 {
         self.ts
     }
+
+    fn aggregate_id(&self) -> AggregateId {
+        self.aggregate_id
+    }
 }
 
 impl EventContextSeq for EventContext<Sequenced> {
@@ -110,20 +128,31 @@ impl EventContextSeq for EventContext<Sequenced> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{event_context::EventContext, EventId};
+    use crate::{
+        event_context::{AggregateId, EventContext},
+        EventId,
+    };
 
     #[test]
     fn test_event_context_cycle() {
         let mut events = vec![];
 
-        let one =
-            EventContext::new(EventId::hash(1), EventId::hash(1), EventId::hash(1), 1).sequence(1);
+        let one = EventContext::new(
+            EventId::hash(1),
+            EventId::hash(1),
+            EventId::hash(1),
+            1,
+            AggregateId::new(1),
+        )
+        .sequence(1);
         events.push(one.clone());
 
-        let two = EventContext::from_cause(EventId::hash(2), one, 2).sequence(2);
+        let two =
+            EventContext::from_cause(EventId::hash(2), one, 2, AggregateId::new(1)).sequence(2);
         events.push(two.clone());
 
-        let three = EventContext::from_cause(EventId::hash(3), two, 3).sequence(3);
+        let three =
+            EventContext::from_cause(EventId::hash(3), two, 3, AggregateId::new(1)).sequence(3);
         events.push(three.clone());
 
         assert_eq!(
@@ -135,6 +164,7 @@ mod tests {
                     origin_id: EventId::hash(1),
                     causation_id: EventId::hash(1),
                     ts: 1,
+                    aggregate_id: AggregateId::new(1),
                 },
                 EventContext {
                     seq: 2,
@@ -142,6 +172,7 @@ mod tests {
                     origin_id: EventId::hash(1),
                     causation_id: EventId::hash(1),
                     ts: 2,
+                    aggregate_id: AggregateId::new(1),
                 },
                 EventContext {
                     seq: 3,
@@ -149,6 +180,7 @@ mod tests {
                     origin_id: EventId::hash(1),
                     causation_id: EventId::hash(2),
                     ts: 3,
+                    aggregate_id: AggregateId::new(1),
                 },
             ]
         )

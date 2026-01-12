@@ -9,7 +9,10 @@ use std::ops::Deref;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{event_context::EventContext, EventContextAccessors, EventContextSeq, EventId};
+use crate::{
+    event_context::{AggregateId, EventContext},
+    EventContextAccessors, EventContextSeq, EventId,
+};
 
 use super::Sequenced;
 
@@ -56,6 +59,10 @@ impl<T> EventContextAccessors for TypedEvent<T> {
 
     fn causation_id(&self) -> EventId {
         self.ctx.causation_id()
+    }
+
+    fn aggregate_id(&self) -> AggregateId {
+        self.ctx.aggregate_id()
     }
 }
 

@@ -211,6 +211,9 @@ impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
     fn id(&self) -> EventId {
         self.ctx.id()
     }
+    fn aggregate_id(&self) -> AggregateId {
+        self.ctx.aggregate_id()
+    }
 }
 
 impl EventContextSeq for EnclaveEvent<Sequenced> {
@@ -287,9 +290,11 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
     ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
+        let aggregate_id = AggregateId::new(0); // Error events use default aggregate_id
+
         let ctx = caused_by
-            .map(|cause| EventContext::from_cause(id, cause, ts))
-            .unwrap_or_else(|| EventContext::new_origin(id, ts));
+            .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
+            .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id));
 
         Ok(EnclaveEvent {
             payload: payload.into(),
@@ -424,13 +429,14 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Self {
-        let payload = data.into();
+        let payload: EnclaveEventData = data.into();
         let id = EventId::hash(&payload);
+        let aggregate_id = payload.get_aggregate_id();
         EnclaveEvent {
             payload,
             ctx: caused_by
-                .map(|cause| EventContext::from_cause(id, cause, ts))
-                .unwrap_or_else(|| EventContext::new_origin(id, ts)),
+                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
+                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id)),
         }
     }
 }
