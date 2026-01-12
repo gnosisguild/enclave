@@ -189,6 +189,13 @@ pub fn compute_ct_commitment(
 
     let bytes = commitment_bigint.to_bytes_be().1;
 
+    if bytes.len() > 32 {
+        return Err(anyhow!(
+            "Commitment must be at most 32 bytes, got {}",
+            bytes.len()
+        ));
+    }
+
     let mut padded_bytes = vec![0u8; 32];
     let start_idx = 32 - bytes.len();
     padded_bytes[start_idx..].copy_from_slice(&bytes);
