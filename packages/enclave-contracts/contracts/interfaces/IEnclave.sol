@@ -106,6 +106,32 @@ interface IEnclave {
     /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
     event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
 
+    /// @notice Emitted when E3Lifecycle contract is set.
+    /// @param e3Lifecycle The address of the E3Lifecycle contract.
+    event E3LifecycleSet(address indexed e3Lifecycle);
+
+    /// @notice Emitted when E3RefundManager contract is set.
+    /// @param e3RefundManager The address of the E3RefundManager contract.
+    event E3RefundManagerSet(address indexed e3RefundManager);
+
+    /// @notice Emitted when a failed E3 is processed for refunds.
+    /// @param e3Id The ID of the failed E3.
+    /// @param paymentAmount The original payment amount being refunded.
+    /// @param honestNodeCount The number of honest nodes in the refund distribution.
+    event E3FailureProcessed(
+        uint256 indexed e3Id,
+        uint256 paymentAmount,
+        uint256 honestNodeCount
+    );
+
+    /// @notice Emitted when a committee is published and E3 lifecycle is updated.
+    /// @param e3Id The ID of the E3.
+    event CommitteeFormed(uint256 indexed e3Id);
+
+    /// @notice Emitted when a committee is finalized (sortition complete, DKG starting).
+    /// @param e3Id The ID of the E3.
+    event CommitteeFinalized(uint256 indexed e3Id);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Structs                               //
@@ -293,4 +319,20 @@ interface IEnclave {
 
     /// @notice Returns the ERC20 token used to pay for E3 fees.
     function feeToken() external view returns (IERC20);
+
+    /// @notice Called by CiphernodeRegistry when committee is finalized (sortition complete).
+    /// @dev Updates E3 lifecycle to CommitteeFinalized stage, starts DKG deadline.
+    /// @param e3Id ID of the E3.
+    function onCommitteeFinalized(uint256 e3Id) external;
+
+    /// @notice Called by CiphernodeRegistry when committee public key is published (DKG complete).
+    /// @dev Updates E3 lifecycle to KeyPublished stage.
+    /// @param e3Id ID of the E3.
+    function onCommitteePublished(uint256 e3Id) external;
+
+    /// @notice Called by authorized contracts to mark an E3 as failed with a specific reason.
+    /// @dev Routes to E3Lifecycle.markE3FailedWithReason.
+    /// @param e3Id ID of the E3.
+    /// @param reason The failure reason from IE3Lifecycle.FailureReason enum.
+    function onE3Failed(uint256 e3Id, uint8 reason) external;
 }

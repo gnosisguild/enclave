@@ -5,12 +5,15 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
+
 export default buildModule("Enclave", (m) => {
   const params = m.getParameter("params");
   const owner = m.getParameter("owner");
   const maxDuration = m.getParameter("maxDuration");
   const registry = m.getParameter("registry");
   const bondingRegistry = m.getParameter("bondingRegistry");
+  const e3Lifecycle = m.getParameter("e3Lifecycle");
+  const e3RefundManager = m.getParameter("e3RefundManager");
   const feeToken = m.getParameter("feeToken");
 
   const enclaveImpl = m.contract("Enclave", []);
@@ -19,6 +22,8 @@ export default buildModule("Enclave", (m) => {
     owner,
     registry,
     bondingRegistry,
+    e3Lifecycle,
+    e3RefundManager,
     feeToken,
     maxDuration,
     [params],
