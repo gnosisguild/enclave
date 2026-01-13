@@ -249,36 +249,34 @@ contract E3Lifecycle is IE3Lifecycle, OwnableUpgradeable {
         uint256 e3Id,
         E3Stage stage
     ) internal view returns (bool canFail, FailureReason reason) {
-        E3Deadlines storage deadlines = _e3Deadlines[e3Id];
+        E3Deadlines storage d = _e3Deadlines[e3Id];
 
-        if (stage == E3Stage.Requested) {
-            // Committee must be finalized by committeeDeadline
-            if (block.timestamp > deadlines.committeeDeadline) {
-                return (true, FailureReason.CommitteeFormationTimeout);
-            }
-        } else if (stage == E3Stage.CommitteeFinalized) {
-            // DKG must complete and key must be published by dkgDeadline
-            if (block.timestamp > deadlines.dkgDeadline) {
-                return (true, FailureReason.DKGTimeout);
-            }
-        } else if (stage == E3Stage.KeyPublished) {
-            // E3 must be activated before activationDeadline (startWindow[1])
-            if (
-                deadlines.activationDeadline > 0 &&
-                block.timestamp > deadlines.activationDeadline
-            ) {
-                return (true, FailureReason.ActivationWindowExpired);
-            }
-        } else if (stage == E3Stage.Activated) {
-            // Ciphertext must be published by computeDeadline (expiration + computeWindow)
-            if (block.timestamp > deadlines.computeDeadline) {
-                return (true, FailureReason.ComputeTimeout);
-            }
-        } else if (stage == E3Stage.CiphertextReady) {
-            // Plaintext must be published by decryptionDeadline
-            if (block.timestamp > deadlines.decryptionDeadline) {
-                return (true, FailureReason.DecryptionTimeout);
-            }
+        if (
+            stage == E3Stage.Requested && block.timestamp > d.committeeDeadline
+        ) {
+            return (true, FailureReason.CommitteeFormationTimeout);
+        }
+        if (
+            stage == E3Stage.CommitteeFinalized &&
+            block.timestamp > d.dkgDeadline
+        ) {
+            return (true, FailureReason.DKGTimeout);
+        }
+        if (
+            stage == E3Stage.KeyPublished &&
+            d.activationDeadline > 0 &&
+            block.timestamp > d.activationDeadline
+        ) {
+            return (true, FailureReason.ActivationWindowExpired);
+        }
+        if (stage == E3Stage.Activated && block.timestamp > d.computeDeadline) {
+            return (true, FailureReason.ComputeTimeout);
+        }
+        if (
+            stage == E3Stage.CiphertextReady &&
+            block.timestamp > d.decryptionDeadline
+        ) {
+            return (true, FailureReason.DecryptionTimeout);
         }
 
         return (false, FailureReason.None);
