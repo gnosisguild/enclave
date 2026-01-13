@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import type { Signer } from "ethers";
 import { network } from "hardhat";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
@@ -21,7 +20,7 @@ import {
 } from "../../types";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
-const { loadFixture, time, mine } = networkHelpers;
+const { loadFixture, time } = networkHelpers;
 
 describe("E3RefundManager", function () {
   // Time constants in seconds
@@ -421,7 +420,6 @@ describe("E3RefundManager", function () {
     it("allows requester to claim refund", async function () {
       const {
         e3RefundManager,
-        e3Lifecycle,
         enclave,
         requester,
         usdcToken,
@@ -538,10 +536,6 @@ describe("E3RefundManager", function () {
       await e3RefundManager
         .connect(enclave)
         .calculateRefund(0, PAYMENT_AMOUNT, honestNodes);
-
-      const distribution = await e3RefundManager.getRefundDistribution(0);
-      const expectedAmount =
-        distribution.honestNodeAmount / BigInt(honestNodes.length);
 
       // Note: The actual transfer goes through BondingRegistry.distributeRewards
       // which has its own logic. This test just verifies the claim succeeds.
