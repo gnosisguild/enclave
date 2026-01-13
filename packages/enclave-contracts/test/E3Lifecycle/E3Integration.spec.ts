@@ -31,7 +31,7 @@ import {
 } from "../../types";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
-const { loadFixture, time, mine } = networkHelpers;
+const { loadFixture, time } = networkHelpers;
 
 /**
  * Integration tests for E3 Refund/Timeout Mechanism
@@ -289,7 +289,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     const makeRequest = async (
       signer: Signer = requester,
     ): Promise<{ e3Id: number }> => {
-      const signerAddress = await signer.getAddress();
       const startTime = (await time.latest()) + 100;
 
       const requestParams = {
@@ -312,8 +311,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const fee = await enclave.getE3Quote(requestParams);
       await usdcToken.connect(signer).approve(enclaveAddress, fee);
 
-      const tx = await enclave.connect(signer).request(requestParams);
-      const receipt = await tx.wait();
+      await enclave.connect(signer).request(requestParams);
 
       // Get e3Id from event (it's 0 for first request)
       return { e3Id: 0 };
@@ -341,8 +339,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("E3 Request with Lifecycle Integration", function () {
     it("initializes E3 lifecycle when request is made", async function () {
-      const { enclave, e3Lifecycle, makeRequest, requester } =
-        await loadFixture(setup);
+      const { e3Lifecycle, makeRequest, requester } = await loadFixture(setup);
 
       await makeRequest();
 
@@ -379,8 +376,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       bondingRegistry: any,
       enclToken: any,
       usdcToken: any,
-      registry: any,
-      owner: Signer,
+      _registry: any,
+      _owner: Signer,
     ): Promise<void> {
       const operatorAddress = await operator.getAddress();
 
@@ -419,7 +416,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
     it("transitions to CommitteeFormed when publishCommittee is called", async function () {
       const {
-        enclave,
         e3Lifecycle,
         registry,
         bondingRegistry,
@@ -489,7 +485,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     it("emits CommitteeFormed event when committee is published", async function () {
       const {
         enclave,
-        e3Lifecycle,
         registry,
         bondingRegistry,
         usdcToken,
@@ -586,14 +581,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("processes failure and calculates refund for committee formation timeout", async function () {
-      const {
-        enclave,
-        e3Lifecycle,
-        e3RefundManager,
-        makeRequest,
-        requester,
-        usdcToken,
-      } = await loadFixture(setup);
+      const { enclave, e3Lifecycle, e3RefundManager, makeRequest } =
+        await loadFixture(setup);
 
       await makeRequest();
 
@@ -717,7 +706,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Slashed Funds Routing", function () {
     it("routes slashed funds 50/50 to requester and honest nodes", async function () {
-      const { enclave, e3Lifecycle, e3RefundManager, makeRequest, requester } =
+      const { enclave, e3Lifecycle, e3RefundManager, makeRequest } =
         await loadFixture(setup);
 
       await makeRequest();
@@ -993,7 +982,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const {
         enclave,
         e3Lifecycle,
-        e3RefundManager,
         usdcToken,
         requester,
         owner,

@@ -4,18 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
-import type { Signer } from "ethers";
 import { network } from "hardhat";
 
 import E3LifecycleModule from "../../ignition/modules/e3Lifecycle";
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
-import {
-  E3Lifecycle__factory as E3LifecycleFactory,
-  MockUSDC__factory as MockUSDCFactory,
-} from "../../types";
+import { E3Lifecycle__factory as E3LifecycleFactory } from "../../types";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
-const { loadFixture, time, mine } = networkHelpers;
+const { loadFixture, time } = networkHelpers;
 
 describe("E3Lifecycle", function () {
   // Time constants in seconds
@@ -193,7 +188,7 @@ describe("E3Lifecycle", function () {
     });
 
     it("reverts if not in Requested stage", async function () {
-      const { e3Lifecycle, enclave, requester } = await loadFixture(setup);
+      const { e3Lifecycle, enclave } = await loadFixture(setup);
 
       // E3 doesn't exist - stage is None
       await expect(

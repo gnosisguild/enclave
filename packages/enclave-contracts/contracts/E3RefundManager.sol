@@ -276,35 +276,30 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function claimHonestNodeReward(
         uint256 e3Id
     ) external returns (uint256 amount) {
-        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
-        if (stage != IE3Lifecycle.E3Stage.Failed) {
-            revert E3NotFailed(e3Id);
-        }
+        require(
+            e3Lifecycle.getE3Stage(e3Id) == IE3Lifecycle.E3Stage.Failed,
+            E3NotFailed(e3Id)
+        );
 
         RefundDistribution storage dist = _distributions[e3Id];
-        if (!dist.calculated) revert RefundNotCalculated(e3Id);
+        require(dist.calculated, RefundNotCalculated(e3Id));
+        require(!_claimed[e3Id][msg.sender], AlreadyClaimed(e3Id, msg.sender));
 
-        if (_claimed[e3Id][msg.sender]) revert AlreadyClaimed(e3Id, msg.sender);
-
-        // Check if caller is an honest node
-        bool isHonest = false;
+        // Check if caller is honest node
         address[] storage nodes = _honestNodes[e3Id];
-        for (uint256 i = 0; i < nodes.length; i++) {
-            if (nodes[i] == msg.sender) {
-                isHonest = true;
-                break;
-            }
+        bool isHonest = false;
+        for (uint256 i = 0; i < nodes.length && !isHonest; i++) {
+            isHonest = (nodes[i] == msg.sender);
         }
-        if (!isHonest) revert NotHonestNode(e3Id, msg.sender);
+        require(isHonest, NotHonestNode(e3Id, msg.sender));
 
-        // Calculate per-node amount
-        if (dist.honestNodeCount == 0) revert NoRefundAvailable(e3Id);
+        require(dist.honestNodeCount > 0, NoRefundAvailable(e3Id));
         amount = dist.honestNodeAmount / dist.honestNodeCount;
-        if (amount == 0) revert NoRefundAvailable(e3Id);
+        require(amount > 0, NoRefundAvailable(e3Id));
 
         _claimed[e3Id][msg.sender] = true;
 
-        // Route through BondingRegistry for proper accounting
+        // Distribute reward through bonding registry
         feeToken.approve(address(bondingRegistry), amount);
 
         address[] memory nodeArray = new address[](1);
@@ -313,7 +308,6 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         amountArray[0] = amount;
 
         bondingRegistry.distributeRewards(feeToken, nodeArray, amountArray);
-
         feeToken.approve(address(bondingRegistry), 0);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
