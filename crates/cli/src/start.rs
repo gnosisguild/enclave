@@ -33,6 +33,7 @@ pub async fn execute(
         } => {
             e3_entrypoint::start::aggregator_start::execute(
                 &config,
+                address,
                 pubkey_write_path,
                 plaintext_write_path,
                 experimental_trbfv,

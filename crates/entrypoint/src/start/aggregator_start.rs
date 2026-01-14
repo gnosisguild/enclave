@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
@@ -22,6 +23,7 @@ use tokio::task::JoinHandle;
 
 pub async fn execute(
     config: &AppConfig,
+    address: Address,
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
     experimental_trbfv: bool,
@@ -29,6 +31,7 @@ pub async fn execute(
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
     let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
+        .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_chains(&config.chains())
         .with_sortition_score()
