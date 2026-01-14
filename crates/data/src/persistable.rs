@@ -112,6 +112,7 @@ pub struct Persistable<T> {
     data: Option<T>,
     connector: StoreConnector,
     ctx: Option<EventContext<Sequenced>>,
+    staging_mode: bool,
 }
 
 impl<T> Persistable<T>
@@ -124,6 +125,7 @@ where
             data,
             connector,
             ctx: None,
+            staging_mode: false,
         }
     }
 
@@ -164,6 +166,10 @@ where
     }
 
     fn write_to_store(&self) {
+        if self.staging_mode {
+            return;
+        }
+
         let Some(ref data) = self.data else {
             return;
         };
@@ -227,6 +233,17 @@ where
     pub fn has(&self) -> bool {
         self.data.is_some()
     }
+
+    /// Enter staging mode - changes held in memory only
+    pub fn stage(&mut self) {
+        self.staging_mode = true;
+    }
+
+    /// Commit mode - writes current state and enables persistence
+    pub fn commit(&mut self) {
+        self.staging_mode = false;
+        self.write_to_store();
+    }
 }
 
 impl<T> EventContextManager for Persistable<T> {
@@ -236,5 +253,110 @@ impl<T> EventContextManager for Persistable<T> {
 
     fn set_ctx(&mut self, value: &EventContext<Sequenced>) {
         self.ctx = Some(value.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use actix::{Actor, Addr, Handler, Message};
+
+    use crate::{Get, Insert, Remove};
+
+    use super::{Persistable, StoreConnector};
+
+    #[derive(Debug, Clone)]
+    enum Evts {
+        Get,
+        Insert(Insert),
+        Remove,
+    }
+
+    struct MockConnector {
+        key: Vec<u8>,
+        events: Vec<Evts>,
+    }
+    #[derive(Message)]
+    #[rtype("Vec<Evts>")]
+    struct GetEvents;
+
+    impl Actor for MockConnector {
+        type Context = actix::Context<Self>;
+    }
+
+    impl Handler<GetEvents> for MockConnector {
+        type Result = Vec<Evts>;
+        fn handle(&mut self, msg: GetEvents, ctx: &mut Self::Context) -> Self::Result {
+            self.events.clone()
+        }
+    }
+
+    impl Handler<Get> for MockConnector {
+        type Result = Option<Vec<u8>>;
+        fn handle(&mut self, msg: Get, ctx: &mut Self::Context) -> Self::Result {
+            self.events.push(Evts::Get);
+            None
+        }
+    }
+
+    impl Handler<Insert> for MockConnector {
+        type Result = ();
+        fn handle(&mut self, msg: Insert, ctx: &mut Self::Context) -> Self::Result {
+            self.events.push(Evts::Insert(msg));
+        }
+    }
+
+    impl Handler<Remove> for MockConnector {
+        type Result = ();
+        fn handle(&mut self, msg: Remove, ctx: &mut Self::Context) -> Self::Result {
+            self.events.push(Evts::Remove);
+        }
+    }
+
+    impl MockConnector {
+        fn new(key: impl Into<Vec<u8>>) -> Self {
+            Self {
+                key: key.into(),
+                events: Vec::new(),
+            }
+        }
+
+        fn to_store_connector(self) -> (Addr<MockConnector>, StoreConnector) {
+            let key = self.key.clone();
+            let addr = self.start();
+            (
+                addr.clone(),
+                StoreConnector::new(
+                    &key,
+                    &addr.clone().recipient(),
+                    &addr.clone().recipient(),
+                    &addr.clone().recipient(),
+                ),
+            )
+        }
+    }
+
+    #[actix::test]
+    async fn test_persistable_staging() {
+        let (addr, connector) = MockConnector::new(b"loc").to_store_connector();
+        let mut p = Persistable::new(Some(42i32), connector);
+
+        p.set(100);
+        let events = addr.send(GetEvents).await.unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0], Evts::Insert(msg) if msg.value() == &bincode::serialize(&100i32).unwrap())
+        );
+
+        p.stage();
+        p.set(200);
+        let events = addr.send(GetEvents).await.unwrap();
+        assert_eq!(events.len(), 1);
+
+        p.commit();
+        let events = addr.send(GetEvents).await.unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(
+            matches!(&events[1], Evts::Insert(msg) if msg.value() == &bincode::serialize(&200i32).unwrap())
+        );
     }
 }
