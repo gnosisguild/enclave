@@ -23,6 +23,7 @@ sol! {
     #[sol(rpc)]
     contract ERC20Votes {
         function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
+        function balanceOf(address account) external view returns (uint256);
         function decimals() external view returns (uint8);
     }
 }
@@ -448,13 +449,19 @@ impl EtherscanClient {
         let provider = ProviderBuilder::new().connect_http(url);
         let token = ERC20Votes::new(token_address, provider);
 
-        let votes = token
-            .getPastVotes(voter_address, U256::from(block_number - 1))
-            .call()
-            .await
-            .context("Failed to call getPastVotes")?;
 
-        Ok(votes)
+        match token.getPastVotes(voter_address, U256::from(block_number - 1)).call().await {
+            Ok(votes) => Ok(votes),
+            Err(_) => {
+                // Fallback to balanceOf if getPastVotes fails
+                let balance = token
+                    .balanceOf(voter_address)
+                    .call()
+                    .await
+                    .context("Failed to call balanceOf")?;
+                Ok(balance)
+            },
+        }
     }
 
     /// Get the token decimals
