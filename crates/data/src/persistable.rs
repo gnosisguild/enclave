@@ -242,6 +242,7 @@ where
     /// Commit mode - writes current state and enables persistence
     pub fn commit(&mut self) {
         self.staging_mode = false;
+        self.write_to_store();
     }
 }
 
