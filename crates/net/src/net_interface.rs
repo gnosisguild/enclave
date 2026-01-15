@@ -223,9 +223,13 @@ async fn process_swarm_event(
             peer_id,
             endpoint,
             connection_id,
+            num_established,
             ..
         } => {
-            info!("Connected to {peer_id}");
+            // Only log on first connection to this peer to avoid spam
+            if num_established.get() == 1 {
+                info!("Connected to {peer_id}");
+            }
             let remote_addr = endpoint.get_remote_address().clone();
             swarm
                 .behaviour_mut()
@@ -240,6 +244,13 @@ async fn process_swarm_event(
             error,
             connection_id,
         } => {
+            let error_str = format!("{}", error);
+            if error_str.contains("Unexpected peer ID") {
+                if let Some(expected_peer) = &peer_id {
+                    info!("Removing stale peer {expected_peer} due to peer ID mismatch");
+                    swarm.behaviour_mut().kademlia.remove_peer(expected_peer);
+                }
+            }
             warn!("Failed to dial {peer_id:?}: {error}");
             event_tx.send(NetEvent::OutgoingConnectionError {
                 connection_id,
@@ -248,7 +259,13 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
-            warn!("{:#}", anyhow::Error::from(error))
+            let error_str = format!("{:#}", anyhow::Error::from(error));
+            // Downgrade self dial attempts to debug
+            if error_str.contains("Local peer ID") {
+                debug!("{}", error_str);
+            } else {
+                warn!("{}", error_str);
+            }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(

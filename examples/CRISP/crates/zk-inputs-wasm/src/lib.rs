@@ -9,6 +9,7 @@
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
 
 use js_sys;
+use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
 use zk_inputs::ZKInputsGenerator as CoreZKInputsGenerator;
 
@@ -61,10 +62,20 @@ impl ZKInputsGenerator {
             .generator
             .generate_inputs(prev_ciphertext, public_key, vote_vec)
         {
-            Ok(inputs_json) => {
-                // Parse the JSON string and return as JsValue.
+            Ok((ciphertext_bytes, inputs_json)) => {
+                // Parse the JSON string and return as an object with both encryptedVote and inputs.
+                let result = js_sys::Object::new();
+
+                // Set encryptedVote as Uint8Array
+                let ciphertext_array = js_sys::Uint8Array::from(&ciphertext_bytes[..]);
+                js_sys::Reflect::set(&result, &"encryptedVote".into(), &ciphertext_array.into())?;
+
+                // Parse and set inputs JSON
                 match js_sys::JSON::parse(&inputs_json) {
-                    Ok(js_value) => Ok(js_value),
+                    Ok(js_value) => {
+                        js_sys::Reflect::set(&result, &"inputs".into(), &js_value)?;
+                        Ok(result.into())
+                    }
                     Err(_) => Err(JsValue::from_str("Failed to parse inputs JSON")),
                 }
             }
@@ -86,10 +97,20 @@ impl ZKInputsGenerator {
             .generator
             .generate_inputs_for_update(prev_ciphertext, public_key, vote_vec)
         {
-            Ok(inputs_json) => {
-                // Parse the JSON string and return as JsValue.
+            Ok((ciphertext_bytes, inputs_json)) => {
+                // Parse the JSON string and return as an object with both encryptedVote and inputs.
+                let result = js_sys::Object::new();
+
+                // Set encryptedVote as Uint8Array
+                let ciphertext_array = js_sys::Uint8Array::from(&ciphertext_bytes[..]);
+                js_sys::Reflect::set(&result, &"encryptedVote".into(), &ciphertext_array.into())?;
+
+                // Parse and set inputs JSON
                 match js_sys::JSON::parse(&inputs_json) {
-                    Ok(js_value) => Ok(js_value),
+                    Ok(js_value) => {
+                        js_sys::Reflect::set(&result, &"inputs".into(), &js_value)?;
+                        Ok(result.into())
+                    }
                     Err(_) => Err(JsValue::from_str("Failed to parse inputs JSON")),
                 }
             }
@@ -102,6 +123,61 @@ impl ZKInputsGenerator {
     pub fn generate_public_key(&self) -> Result<Vec<u8>, JsValue> {
         match self.generator.generate_public_key() {
             Ok(public_key_bytes) => Ok(public_key_bytes),
+            Err(e) => Err(JsValue::from_str(&e.to_string())),
+        }
+    }
+
+    /// Compute the commitment to a set of ciphertext polynomials from JavaScript.
+    #[wasm_bindgen(js_name = "computeCommitment")]
+    pub fn compute_ct_commitment(&self, ct0is: JsValue, ct1is: JsValue) -> Result<String, JsValue> {
+        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb)
+        let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
+        let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
+
+        let mut ct0is_vec: Vec<Vec<BigInt>> = Vec::new();
+        for i in 0..ct0is_array.length() {
+            let inner_array = ct0is_array
+                .get(i)
+                .dyn_into::<js_sys::Array>()
+                .map_err(|_| JsValue::from_str("Expected array of arrays for ct0is"))?;
+
+            let mut coefficients: Vec<BigInt> = Vec::new();
+            for j in 0..inner_array.length() {
+                let s = inner_array
+                    .get(j)
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let bigint = s
+                    .parse::<BigInt>()
+                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
+                coefficients.push(bigint);
+            }
+            ct0is_vec.push(coefficients);
+        }
+
+        let mut ct1is_vec: Vec<Vec<BigInt>> = Vec::new();
+        for i in 0..ct1is_array.length() {
+            let inner_array = ct1is_array
+                .get(i)
+                .dyn_into::<js_sys::Array>()
+                .map_err(|_| JsValue::from_str("Expected array of arrays for ct1is"))?;
+
+            let mut coefficients: Vec<BigInt> = Vec::new();
+            for j in 0..inner_array.length() {
+                let s = inner_array
+                    .get(j)
+                    .as_string()
+                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let bigint = s
+                    .parse::<BigInt>()
+                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
+                coefficients.push(bigint);
+            }
+            ct1is_vec.push(coefficients);
+        }
+
+        match self.generator.compute_commitment(&ct0is_vec, &ct1is_vec) {
+            Ok(commitment) => Ok(commitment.to_string()),
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
     }
@@ -181,7 +257,15 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let inputs = result.unwrap();
+        let result_obj = result.unwrap();
+        // Extract encryptedVote and inputs from the result object
+        let encrypted_vote = js_sys::Reflect::get(&result_obj, &"encryptedVote".into()).unwrap();
+        let inputs = js_sys::Reflect::get(&result_obj, &"inputs".into()).unwrap();
+
+        // Verify encryptedVote is a Uint8Array and not empty
+        assert!(encrypted_vote.is_object());
+        let encrypted_vote_array = encrypted_vote.dyn_into::<js_sys::Uint8Array>().unwrap();
+        assert!(encrypted_vote_array.length() > 0);
 
         // Convert JsValue to string for testing.
         let inputs_str = js_sys::JSON::stringify(&inputs)
@@ -207,7 +291,15 @@ mod tests {
 
         assert!(result.is_ok());
 
-        let inputs = result.unwrap();
+        let result_obj = result.unwrap();
+        // Extract encryptedVote and inputs from the result object
+        let encrypted_vote = js_sys::Reflect::get(&result_obj, &"encryptedVote".into()).unwrap();
+        let inputs = js_sys::Reflect::get(&result_obj, &"inputs".into()).unwrap();
+
+        // Verify encryptedVote is a Uint8Array and not empty
+        assert!(encrypted_vote.is_object());
+        let encrypted_vote_array = encrypted_vote.dyn_into::<js_sys::Uint8Array>().unwrap();
+        assert!(encrypted_vote_array.length() > 0);
 
         // Convert JsValue to string for testing.
         let inputs_str = js_sys::JSON::stringify(&inputs)
