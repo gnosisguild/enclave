@@ -54,6 +54,45 @@ impl WriteBuffer {
             config,
         }
     }
+
+    fn handle_insert(&mut self, msg: Insert) {
+        let aggregate_id = if let Some(event_ctx) = msg.ctx() {
+            event_ctx.aggregate_id().clone()
+        } else {
+            AggregateId::new(0)
+        };
+
+        let agg_buffer = self
+            .aggregate_buffers
+            .entry(aggregate_id)
+            .or_insert_with(|| AggregateBuffer::new());
+        agg_buffer.buffer.push(msg.clone());
+    }
+
+    fn handle_commit_snapshot(&mut self, msg: CommitSnapshot) {
+        // Store the sequence number as an Insert message so snapshots hold the most recent event
+        // they were created against
+        self.handle_insert(Insert::new(
+            &format!("//aggregate_seq/{}", msg.aggregate_id()),
+            msg.seq().to_le_bytes().to_vec(), // Same as bincode avoiding result
+        ));
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
+            .as_micros() as u64;
+
+        if let Some(ref dest) = self.dest {
+            let (updated_buffers, expired_inserts) =
+                process_expired_inserts(&self.aggregate_buffers, &self.config, now);
+            if !expired_inserts.is_empty() {
+                let batch = InsertBatch::new(expired_inserts);
+                dest.do_send(batch);
+            }
+
+            self.aggregate_buffers = updated_buffers;
+        }
+    }
 }
 
 impl Handler<ForwardTo> for WriteBuffer {
@@ -67,17 +106,7 @@ impl Handler<Insert> for WriteBuffer {
     type Result = ();
 
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
-        let aggregate_id = if let Some(event_ctx) = msg.ctx() {
-            event_ctx.aggregate_id().clone()
-        } else {
-            AggregateId::new(0)
-        };
-
-        let agg_buffer = self
-            .aggregate_buffers
-            .entry(aggregate_id)
-            .or_insert_with(|| AggregateBuffer::new());
-        agg_buffer.buffer.push(msg.clone());
+        self.handle_insert(msg)
     }
 }
 
@@ -124,22 +153,8 @@ fn process_expired_inserts(
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
 
-    fn handle(&mut self, _msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
-            .as_micros() as u64;
-
-        if let Some(ref dest) = self.dest {
-            let (updated_buffers, expired_inserts) =
-                process_expired_inserts(&self.aggregate_buffers, &self.config, now);
-            if !expired_inserts.is_empty() {
-                let batch = InsertBatch::new(expired_inserts);
-                dest.do_send(batch);
-            }
-
-            self.aggregate_buffers = updated_buffers;
-        }
+    fn handle(&mut self, msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
+        self.handle_commit_snapshot(msg)
     }
 }
 

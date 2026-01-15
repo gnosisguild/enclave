@@ -491,7 +491,6 @@ impl ThresholdKeyshare {
                 },
             ))
         })?;
-
         self.handle_gen_esi_sss_requested(GenEsiSss(current.ciphernode_selected.clone()))?;
         self.handle_gen_pk_share_and_sk_sss_requested(GenPkShareAndSkSss(
             current.ciphernode_selected,
@@ -666,7 +665,7 @@ impl ThresholdKeyshare {
     }
 
     /// 4. SharesGenerated - Encrypt shares with BFV and publish
-    pub fn handle_shares_generated(&self) -> Result<()> {
+    pub fn handle_shares_generated(&mut self) -> Result<()> {
         let Some(ThresholdKeyshareState {
             state:
                 KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
@@ -744,7 +743,6 @@ impl ThresholdKeyshare {
                 external: false,
             })?;
         }
-
         Ok(())
     }
 
