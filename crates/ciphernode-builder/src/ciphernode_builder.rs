@@ -294,6 +294,16 @@ impl CiphernodeBuilder {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
 
+    async fn validate_chains_and_build_delays(
+        &self,
+        provider_cache: &mut ProviderCaches,
+    ) -> anyhow::Result<HashMap<u64, u64>> {
+        // Use cached providers instead of creating new ones
+        provider_cache
+            .ensure_providers_and_build_delays(&self.chains)
+            .await
+    }
+
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
         // Local bus for ciphernode events can either be forked from a bus or it can be directly
         // attached to a source bus
@@ -336,15 +346,29 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
+        // Create provider cache early to use for chain validation
+        let mut provider_cache = ProviderCaches::new();
+
+        // Validate chains and build finalization delays using cached providers
+        let chain_delays = self
+            .validate_chains_and_build_delays(&mut provider_cache)
+            .await?;
+
         // Get an event system instance.
         let event_system =
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(&addr, log_path, kv_path).with_event_bus(local_bus)
+                EventSystem::persisted(&addr, log_path, kv_path)
+                    .with_event_bus(local_bus)
+                    .with_chain_delays(chain_delays)
             } else {
                 if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(&addr, store).with_event_bus(local_bus)
+                    EventSystem::in_mem_from_store(&addr, store)
+                        .with_event_bus(local_bus)
+                        .with_chain_delays(chain_delays)
                 } else {
-                    EventSystem::in_mem(&addr).with_event_bus(local_bus)
+                    EventSystem::in_mem(&addr)
+                        .with_event_bus(local_bus)
+                        .with_chain_delays(chain_delays)
                 }
             };
 
@@ -368,7 +392,6 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
             .await?;
 
-        let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
         let coordinator = HistoricalEventCoordinator::setup(bus.clone());
@@ -575,6 +598,36 @@ impl ProviderCaches {
             read_provider_cache: HashMap::new(),
             write_provider_cache: HashMap::new(),
         }
+    }
+
+    /// Ensure all chains have cached providers and return chain_id → finalization_delay mapping
+    pub async fn ensure_providers_and_build_delays(
+        &mut self,
+        chains: &[ChainConfig],
+    ) -> anyhow::Result<HashMap<u64, u64>> {
+        let mut chain_delays = HashMap::new();
+
+        for chain in chains {
+            // Ensure provider is cached and get chain_id in one operation
+            let provider = self.ensure_read_provider(chain).await?;
+            let chain_id = provider.chain_id();
+
+            // Store finalization time if configured
+            if let Some(finalization_ms) = chain.finalization_ms {
+                info!(
+                    "Chain {} (ID: {}) finalization time: {}ms",
+                    chain.name, chain_id, finalization_ms
+                );
+                chain_delays.insert(chain_id, finalization_ms * 1000); // ms → microseconds
+            } else {
+                info!(
+                    "Chain {} (ID: {}) no finalization time configured",
+                    chain.name, chain_id
+                );
+            }
+        }
+
+        Ok(chain_delays)
     }
 
     pub async fn ensure_signer(

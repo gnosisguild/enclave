@@ -12,7 +12,9 @@ use e3_data::{
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
+use e3_events::{
+    AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer,
+};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -82,6 +84,8 @@ pub struct EventSystem {
     wired: OnceCell<()>,
     /// Hlc override
     hlc: OnceCell<Hlc>,
+    /// Chain-specific finalization delays (chain_id → delay_us)
+    chain_delays: OnceCell<HashMap<u64, u64>>,
 }
 
 impl EventSystem {
@@ -104,6 +108,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            chain_delays: OnceCell::new(),
         }
     }
 
@@ -121,6 +126,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            chain_delays: OnceCell::new(),
         }
     }
 
@@ -140,6 +146,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            chain_delays: OnceCell::new(),
         }
     }
 
@@ -163,6 +170,12 @@ impl EventSystem {
         self
     }
 
+    /// Add chain-specific finalization delays (chain_id → delay_us)
+    pub fn with_chain_delays(self, delays: HashMap<u64, u64>) -> Self {
+        let _ = self.chain_delays.set(delays);
+        self
+    }
+
     /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
@@ -173,8 +186,19 @@ impl EventSystem {
         let buffer = self
             .buffer
             .get_or_init(|| {
-                let default_config = HashMap::new();
-                WriteBuffer::with_config(default_config).start()
+                let config = self
+                    .chain_delays
+                    .get()
+                    .map(|delays| {
+                        delays
+                            .iter()
+                            .map(|(chain_id, delay_us)| {
+                                (AggregateId::new(*chain_id as usize), *delay_us)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                WriteBuffer::with_config(config).start()
             })
             .clone();
         self.wire_if_ready();
