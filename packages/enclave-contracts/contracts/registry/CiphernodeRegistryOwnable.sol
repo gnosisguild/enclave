@@ -344,7 +344,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             SubmissionWindowNotClosed()
         );
         // TODO: Handle what happens if the threshold is not met.
-        require(c.topNodes.length >= c.threshold[0], ThresholdNotMet());
+        require(c.topNodes.length >= c.threshold[1], ThresholdNotMet());
 
         c.finalized = true;
         c.committee = c.topNodes;
