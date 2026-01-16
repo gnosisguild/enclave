@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+    event_reader::EvmEventReaderState,
+    helpers::{send_tx_with_retry, EthProvider},
+    EnclaveEvmEvent, EvmEventReader,
 };
 use actix::prelude::*;
 use alloy::{
@@ -442,49 +444,66 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
     }
 }
 
-pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
+pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
     ticket_number: u64,
 ) -> Result<TransactionReceipt> {
-    info!("Calling: contract.submitTicket(..)");
-    let e3_id: U256 = e3_id.try_into()?;
-    let ticket_number = U256::from(ticket_number);
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
-        .submitTicket(e3_id, ticket_number)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
-    Ok(receipt)
+    let e3_id_u256: U256 = e3_id.try_into()?;
+    let ticket_number_u256 = U256::from(ticket_number);
+
+    // 0xd4c1d970 = CommitteeNotRequested()
+    send_tx_with_retry("submitTicket", &["0xd4c1d970"], || {
+        let provider = provider.clone();
+        async move {
+            info!("Calling: contract.submitTicket(..)");
+            let from_address = provider.provider().default_signer_address();
+            let current_nonce = provider
+                .provider()
+                .get_transaction_count(from_address)
+                .pending()
+                .await?;
+            let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+            let builder = contract
+                .submitTicket(e3_id_u256, ticket_number_u256)
+                .nonce(current_nonce);
+            let receipt = builder.send().await?.get_receipt().await?;
+            Ok(receipt)
+        }
+    })
+    .await
 }
 
-pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone>(
+pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
 ) -> Result<TransactionReceipt> {
-    info!("Calling: contract.finalizeCommittee(..)");
-    let e3_id: U256 = e3_id.try_into()?;
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract.finalizeCommittee(e3_id).nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
-    Ok(receipt)
+    let e3_id_u256: U256 = e3_id.try_into()?;
+
+    // 0x5e043d1a = SubmissionWindowNotClosed(),
+    // 0xd4c1d970 = CommitteeNotRequested()
+    send_tx_with_retry("finalizeCommittee", &["0x5e043d1a", "0xd4c1d970"], || {
+        let provider = provider.clone();
+        async move {
+            info!("Calling: contract.finalizeCommittee(..)");
+            let from_address = provider.provider().default_signer_address();
+            let current_nonce = provider
+                .provider()
+                .get_transaction_count(from_address)
+                .pending()
+                .await?;
+            let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+            let builder = contract.finalizeCommittee(e3_id_u256).nonce(current_nonce);
+            let receipt = builder.send().await?.get_receipt().await?;
+            Ok(receipt)
+        }
+    })
+    .await
 }
 
-pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>(
+pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
@@ -492,26 +511,41 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>
     public_key: Vec<u8>,
     public_key_hash: [u8; 32],
 ) -> Result<TransactionReceipt> {
-    info!("Calling: contract.publishCommittee(..)");
-    let e3_id: U256 = e3_id.try_into()?;
-    let public_key = Bytes::from(public_key);
-    let public_key_hash = FixedBytes::from(public_key_hash);
+    let e3_id_u256: U256 = e3_id.try_into()?;
+    let public_key_bytes = Bytes::from(public_key);
+    let public_key_hash_fixed = FixedBytes::from(public_key_hash);
     let nodes_vec: Vec<Address> = nodes
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider
-        .provider()
-        .get_transaction_count(from_address)
-        .pending()
-        .await?;
-    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-    let builder = contract
-        .publishCommittee(e3_id, nodes_vec, public_key, public_key_hash)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
-    Ok(receipt)
+
+    // 0x9e968c3e = CommitteeNotFinalized() - RPC may not have synced finalization yet
+    send_tx_with_retry("publishCommittee", &["0x9e968c3e"], || {
+        let provider = provider.clone();
+        let nodes_vec = nodes_vec.clone();
+        let public_key_bytes = public_key_bytes.clone();
+        async move {
+            info!("Calling: contract.publishCommittee(..)");
+            let from_address = provider.provider().default_signer_address();
+            let current_nonce = provider
+                .provider()
+                .get_transaction_count(from_address)
+                .pending()
+                .await?;
+            let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+            let builder = contract
+                .publishCommittee(
+                    e3_id_u256,
+                    nodes_vec,
+                    public_key_bytes,
+                    public_key_hash_fixed,
+                )
+                .nonce(current_nonce);
+            let receipt = builder.send().await?.get_receipt().await?;
+            Ok(receipt)
+        }
+    })
+    .await
 }
 
 /// Wrapper for a reader and writer
