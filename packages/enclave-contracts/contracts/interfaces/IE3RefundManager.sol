@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
-import { IE3Lifecycle } from "./IE3Lifecycle.sol";
+import { IEnclave } from "./IEnclave.sol";
 
 /**
  * @title IE3RefundManager
@@ -132,7 +132,7 @@ interface IE3RefundManager {
     /// @return workCompletedBps Work completed in basis points
     /// @return workRemainingBps Work remaining in basis points
     function calculateWorkValue(
-        IE3Lifecycle.E3Stage stage
+        IEnclave.E3Stage stage
     ) external view returns (uint16 workCompletedBps, uint16 workRemainingBps);
 
     /// @notice Set work value allocation
