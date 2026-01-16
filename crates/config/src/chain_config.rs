@@ -21,8 +21,8 @@ pub struct ChainConfig {
     #[serde(default)]
     pub rpc_auth: RpcAuth,
     pub contracts: ContractAddresses,
-    #[serde(default)]
     pub finalization_ms: Option<u64>,
+    pub chain_id: Option<u64>,
 }
 
 impl ChainConfig {

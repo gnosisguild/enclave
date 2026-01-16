@@ -610,19 +610,33 @@ impl ProviderCaches {
         for chain in chains {
             // Ensure provider is cached and get chain_id in one operation
             let provider = self.ensure_read_provider(chain).await?;
-            let chain_id = provider.chain_id();
+            let actual_chain_id = provider.chain_id();
+
+            // Validate chain_id if specified in configuration
+            if let Some(expected_chain_id) = chain.chain_id {
+                if actual_chain_id != expected_chain_id {
+                    return Err(anyhow::anyhow!(
+                        "Chain '{}' validation failed: expected chain_id {}, but provider returned chain_id {}",
+                        chain.name, expected_chain_id, actual_chain_id
+                    ));
+                }
+                info!(
+                    "Chain '{}' (ID: {}) chain_id validation passed",
+                    chain.name, actual_chain_id
+                );
+            }
 
             // Store finalization time if configured
             if let Some(finalization_ms) = chain.finalization_ms {
                 info!(
                     "Chain {} (ID: {}) finalization time: {}ms",
-                    chain.name, chain_id, finalization_ms
+                    chain.name, actual_chain_id, finalization_ms
                 );
-                chain_delays.insert(chain_id, finalization_ms * 1000); // ms → microseconds
+                chain_delays.insert(actual_chain_id, finalization_ms * 1000); // ms → microseconds
             } else {
                 info!(
                     "Chain {} (ID: {}) no finalization time configured",
-                    chain.name, chain_id
+                    chain.name, actual_chain_id
                 );
             }
         }
