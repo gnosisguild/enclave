@@ -28,6 +28,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
+use e3_evm::send_tx_with_retry;
 use evm_helpers::{CRISPContractFactory, InputPublished};
 use eyre::Context;
 use log::info;
@@ -375,7 +376,18 @@ async fn handle_committee_time_expired(
     ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
 ) -> eyre::Result<()> {
     // If not activated activate
-    let tx = ctx.contract().activate(event.e3Id).await?;
+    let tx = send_tx_with_retry("activate", &["0x45ccf3c6"], ||  {
+        let value = ctx.clone();
+        async move {
+            info!("[e3_id={}] Calling Enclave.Activate", event.e3Id);
+            let receipt = value.contract().activate(event.e3Id).await
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            anyhow::Ok(receipt)  
+        }
+    })
+    .await
+    .map_err(|e| eyre::eyre!("{:?}", e))?;
+    
     info!(
         "[e3_id={}] E3 activated with tx: {:?}",
         event.e3Id, tx.transaction_hash

@@ -23,4 +23,5 @@ pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
 pub use event_reader::{EnclaveEvmEvent, EvmEventReader, EvmEventReaderState, ExtractorFn};
 pub use historical_event_coordinator::{CoordinatorStart, HistoricalEventCoordinator};
+pub use helpers::send_tx_with_retry;
 pub use repo::*;
