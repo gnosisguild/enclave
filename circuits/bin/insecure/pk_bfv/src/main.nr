@@ -1,0 +1,8 @@
+use lib::configs::insecure::bfv::{L, N, PK_BFV_BIT_PK};
+use lib::core::bfv_pk::BfvPkCommit;
+use lib::math::polynomial::Polynomial;
+
+fn main(pk0is: [Polynomial<N>; L], pk1is: [Polynomial<N>; L]) -> pub Field {
+    let pk_bfv: BfvPkCommit<N, L, PK_BFV_BIT_PK> = BfvPkCommit::new(pk0is, pk1is);
+    pk_bfv.verify()
+}

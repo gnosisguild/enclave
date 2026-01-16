@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "pk_bfv",
+    "pk_trbfv",
+    "verify_shares_trbfv_sk",
+    "verify_shares_trbfv_e_sm",
+    "enc_bfv_sk",
+    "enc_bfv_e_sm",
+    "dec_bfv_sk",
+    "dec_bfv_e_sm",
+    "pk_agg_trbfv",
+    "greco",
+    "dec_share_trbfv",
+    "dec_share_agg_trbfv"
+]
