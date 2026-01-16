@@ -180,16 +180,19 @@ impl EventSystem {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
     }
 
+    /// Get the aggregate configuration
+    pub fn aggregate_config(&self) -> AggregateConfig {
+        self.aggregate_config
+            .get_or_init(|| AggregateConfig::new(HashMap::new()))
+            .clone()
+    }
+
     /// Get the buffer address
     pub fn buffer(&self) -> Addr<WriteBuffer> {
         let buffer = self
             .buffer
             .get_or_init(|| {
-                let config = self
-                    .aggregate_config
-                    .get()
-                    .cloned()
-                    .unwrap_or_else(|| AggregateConfig::new(HashMap::new()));
+                let config = self.aggregate_config();
                 WriteBuffer::with_config(config).start()
             })
             .clone();
