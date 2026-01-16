@@ -20,7 +20,30 @@ use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
-/// Hold the InMem EventStore instance and InMemStore
+/// Central configuration for aggregates in the EventSystem
+#[derive(Debug, Clone)]
+pub struct AggregateConfig {
+    pub delays: HashMap<AggregateId, u64>,
+}
+
+impl AggregateConfig {
+    /// Create a new AggregateConfig with the specified delays
+    pub fn new(delays: HashMap<AggregateId, u64>) -> Self {
+        Self { delays }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            delays: HashMap::new(),
+        }
+    }
+
+    pub fn with_delay(mut self, aggregate_id: AggregateId, delay_us: u64) -> Self {
+        self.delays.insert(aggregate_id, delay_us);
+        self
+    }
+}
+
 struct InMemBackend {
     eventstore: OnceCell<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>,
     store: OnceCell<Addr<InMemStore>>,
@@ -84,8 +107,8 @@ pub struct EventSystem {
     wired: OnceCell<()>,
     /// Hlc override
     hlc: OnceCell<Hlc>,
-    /// Chain-specific finalization delays (chain_id → delay_us)
-    chain_delays: OnceCell<HashMap<u64, u64>>,
+    /// Central configuration for aggregates, including delays and other settings
+    aggregate_config: OnceCell<AggregateConfig>,
 }
 
 impl EventSystem {
@@ -108,7 +131,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
-            chain_delays: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
         }
     }
 
@@ -126,7 +149,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
-            chain_delays: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
         }
     }
 
@@ -146,7 +169,7 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
-            chain_delays: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
         }
     }
 
@@ -170,9 +193,9 @@ impl EventSystem {
         self
     }
 
-    /// Add chain-specific finalization delays (chain_id → delay_us)
-    pub fn with_chain_delays(self, delays: HashMap<u64, u64>) -> Self {
-        let _ = self.chain_delays.set(delays);
+    /// Add aggregate configuration including delays and other settings
+    pub fn with_aggregate_config(self, config: AggregateConfig) -> Self {
+        let _ = self.aggregate_config.set(config);
         self
     }
 
@@ -186,19 +209,12 @@ impl EventSystem {
         let buffer = self
             .buffer
             .get_or_init(|| {
-                let config = self
-                    .chain_delays
+                let delays = self
+                    .aggregate_config
                     .get()
-                    .map(|delays| {
-                        delays
-                            .iter()
-                            .map(|(chain_id, delay_us)| {
-                                (AggregateId::new(*chain_id as usize), *delay_us)
-                            })
-                            .collect()
-                    })
+                    .map(|config| config.delays.clone())
                     .unwrap_or_default();
-                WriteBuffer::with_config(config).start()
+                WriteBuffer::with_config(delays).start()
             })
             .clone();
         self.wire_if_ready();
