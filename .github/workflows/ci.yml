@@ -588,18 +588,10 @@ jobs:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Check formatting
-        run: |
-          for dir in circuits/lib circuits/bin/aggregation circuits/bin/production circuits/bin/insecure; do
-            if [ -d "$dir" ]; then
-              echo "Checking formatting in $dir..."
-              (cd "$dir" && nargo fmt --check)
-            fi
-          done
+        run: ./scripts/lint-circuits.sh
 
       - name: Test Noir circuits
-        working-directory: ./circuits/lib
-        run: |
-          nargo test --workspace
+        run: ./scripts/test-circuits.sh
 
       - name: Upload circuit artifacts
         uses: actions/upload-artifact@v4
