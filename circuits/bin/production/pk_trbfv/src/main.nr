@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::production::trbfv::{
     L, N, PK_TRBFV_BIT_E_SM, PK_TRBFV_BIT_EEK, PK_TRBFV_BIT_PK, PK_TRBFV_BIT_R1, PK_TRBFV_BIT_R2,
     PK_TRBFV_BIT_SK, PK_TRBFV_CONFIGS,

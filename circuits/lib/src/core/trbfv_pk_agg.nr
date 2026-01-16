@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::commitments::compute_greco_pk_agg_commitment;
 use crate::math::commitments::{compute_pk_trbfv_commitment, prepare_pk_commitment_payload};
 use crate::math::modulo::U128::ModU128;

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! Helper functions for circuit construction and cryptographic operations.
 use crate::math::polynomial::Polynomial;
 use crate::math::safe::SafeSponge;

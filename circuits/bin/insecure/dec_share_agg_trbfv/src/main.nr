@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::insecure::trbfv::{DEC_SHARES_AGG_BIT_NOISE, DEC_SHARES_AGG_CONFIGS, L};
 use lib::core::trbfv_dec_shares_agg::DecryptionSharesAggregation;
 use lib::math::polynomial::Polynomial;

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::insecure::trbfv::{
     DEC_SHARES_BIT_CT, DEC_SHARES_BIT_D, DEC_SHARES_BIT_E, DEC_SHARES_BIT_R1, DEC_SHARES_BIT_R2,
     DEC_SHARES_BIT_S, DEC_SHARES_CONFIGS, L, N,

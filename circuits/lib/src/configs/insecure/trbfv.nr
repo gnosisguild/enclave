@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::core::greco::Configs as GrecoConfigs;
 use crate::core::trbfv_dec_share::Configs as DecShareTrBfvConfigs;
 use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;

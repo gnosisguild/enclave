@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::commitments::{
     compute_pk_trbfv_commitment, compute_secret_commitment, compute_trbfv_pk_challenge_commitment,
     prepare_pk_commitment_payload, prepare_single_polynomial_commitment_payload,
