@@ -31,17 +31,6 @@ impl AggregateConfig {
     pub fn new(delays: HashMap<AggregateId, u64>) -> Self {
         Self { delays }
     }
-
-    pub fn empty() -> Self {
-        Self {
-            delays: HashMap::new(),
-        }
-    }
-
-    pub fn with_delay(mut self, aggregate_id: AggregateId, delay_us: u64) -> Self {
-        self.delays.insert(aggregate_id, delay_us);
-        self
-    }
 }
 
 struct InMemBackend {
