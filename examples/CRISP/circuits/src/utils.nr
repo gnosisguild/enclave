@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::Polynomial;
+use lib::math::polynomial::Polynomial;
 
 use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
 

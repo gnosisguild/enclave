@@ -4,8 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::{flatten, Polynomial};
-use safe::SafeSponge;
+use lib::math::helpers::flatten;
+use lib::math::polynomial::Polynomial;
+use lib::math::safe::SafeSponge;
 
 /// Generates a commitment to a set of polynomials by hashing the polynomial coefficients.
 /// This is done by flattening the polynomial coefficients and hashing them.
