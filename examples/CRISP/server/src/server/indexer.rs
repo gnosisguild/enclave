@@ -16,7 +16,6 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
 use crisp_utils::decode_tally;
-use e3_evm::send_tx_with_retry;
 use e3_sdk::indexer::IndexerContext;
 use e3_sdk::{
     evm_helpers::{
