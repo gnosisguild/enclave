@@ -5,10 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::rpc::types::TransactionReceipt;
+use e3_utils::{retry_with_backoff, RetryError};
 use std::future::Future;
 use tokio::time::{sleep, Duration};
 use tracing::info;
-use e3_utils::{retry_with_backoff, RetryError};
 
 const RETRY_MAX_ATTEMPTS: u32 = 3;
 const RETRY_INITIAL_DELAY_MS: u64 = 2000;
@@ -44,8 +44,7 @@ where
                 let error_str = format!("{}", e);
                 let retry_refs: Vec<&str> = retry_codes.iter().map(|s| s.as_str()).collect();
 
-                if should_retry_error(&error_str, &retry_refs) && attempts < RETRY_MAX_ATTEMPTS
-                {
+                if should_retry_error(&error_str, &retry_refs) && attempts < RETRY_MAX_ATTEMPTS {
                     info!(
                         "{}: error (attempt {}/{}), will retry after {}ms: {}",
                         op_name, attempts, RETRY_MAX_ATTEMPTS, delay, e
