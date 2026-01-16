@@ -12,7 +12,7 @@ import {
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
-import { IE3Lifecycle } from "./interfaces/IE3Lifecycle.sol";
+import { IEnclave } from "./interfaces/IEnclave.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
 
 /**
@@ -28,14 +28,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     //                 Storage Variables                      //
     //                                                        //
     ////////////////////////////////////////////////////////////
-    /// @notice The E3Lifecycle contract
-    IE3Lifecycle public e3Lifecycle;
+    /// @notice The Enclave contract (contains lifecycle functionality)
+    IEnclave public enclave;
     /// @notice The fee token used for payments
     IERC20 public feeToken;
     /// @notice The bonding registry for node rewards
     IBondingRegistry public bondingRegistry;
-    /// @notice Authorized caller (typically Enclave contract)
-    address public enclave;
     /// @notice Protocol treasury for protocol fee collection
     address public treasury;
     /// @notice Work value allocation configuration
@@ -53,7 +51,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
     /// @notice Restricts function to Enclave contract only
     modifier onlyEnclave() {
-        if (msg.sender != enclave) revert Unauthorized();
+        if (msg.sender != address(enclave)) revert Unauthorized();
         _;
     }
 
@@ -70,14 +68,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Initializes the E3RefundManager contract
     /// @param _owner The owner address
     /// @param _enclave The Enclave contract address
-    /// @param _e3Lifecycle The E3Lifecycle contract address
     /// @param _feeToken The fee token address
     /// @param _bondingRegistry The bonding registry address
     /// @param _treasury The protocol treasury address
     function initialize(
         address _owner,
         address _enclave,
-        address _e3Lifecycle,
         address _feeToken,
         address _bondingRegistry,
         address _treasury
@@ -85,13 +81,11 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         __Ownable_init(msg.sender);
 
         require(_enclave != address(0), "Invalid enclave");
-        require(_e3Lifecycle != address(0), "Invalid lifecycle");
         require(_feeToken != address(0), "Invalid fee token");
         require(_bondingRegistry != address(0), "Invalid bonding registry");
         require(_treasury != address(0), "Invalid treasury");
 
-        enclave = _enclave;
-        e3Lifecycle = IE3Lifecycle(_e3Lifecycle);
+        enclave = IEnclave(_enclave);
         feeToken = IERC20(_feeToken);
         bondingRegistry = IBondingRegistry(_bondingRegistry);
         treasury = _treasury;
@@ -117,8 +111,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         uint256 originalPayment,
         address[] calldata honestNodes
     ) external onlyEnclave {
-        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
-        if (stage != IE3Lifecycle.E3Stage.Failed) {
+        IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
+        if (stage != IEnclave.E3Stage.Failed) {
             revert E3NotFailed(e3Id);
         }
 
@@ -126,7 +120,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(originalPayment > 0, "No payment");
 
         // Calculate work value based on stage
-        IE3Lifecycle.E3Stage failedAt = _getFailedAtStage(e3Id);
+        IEnclave.E3Stage failedAt = _getFailedAtStage(e3Id);
         (uint16 workCompletedBps, uint16 workRemainingBps) = calculateWorkValue(
             failedAt
         );
@@ -170,69 +164,69 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Get the stage at which E3 failed (for work calculation)
     function _getFailedAtStage(
         uint256 e3Id
-    ) internal view returns (IE3Lifecycle.E3Stage) {
-        IE3Lifecycle.FailureReason reason = e3Lifecycle.getFailureReason(e3Id);
+    ) internal view returns (IEnclave.E3Stage) {
+        IEnclave.FailureReason reason = enclave.getFailureReason(e3Id);
 
         // Map failure reason to stage
         if (
-            reason == IE3Lifecycle.FailureReason.CommitteeFormationTimeout ||
-            reason == IE3Lifecycle.FailureReason.InsufficientCommitteeMembers
+            reason == IEnclave.FailureReason.CommitteeFormationTimeout ||
+            reason == IEnclave.FailureReason.InsufficientCommitteeMembers
         ) {
-            return IE3Lifecycle.E3Stage.Requested;
+            return IEnclave.E3Stage.Requested;
         }
         if (
-            reason == IE3Lifecycle.FailureReason.DKGTimeout ||
-            reason == IE3Lifecycle.FailureReason.DKGInvalidShares
+            reason == IEnclave.FailureReason.DKGTimeout ||
+            reason == IEnclave.FailureReason.DKGInvalidShares
         ) {
-            return IE3Lifecycle.E3Stage.CommitteeFinalized;
+            return IEnclave.E3Stage.CommitteeFinalized;
         }
-        if (reason == IE3Lifecycle.FailureReason.ActivationWindowExpired) {
-            return IE3Lifecycle.E3Stage.KeyPublished;
+        if (reason == IEnclave.FailureReason.ActivationWindowExpired) {
+            return IEnclave.E3Stage.KeyPublished;
         }
-        if (reason == IE3Lifecycle.FailureReason.NoInputsReceived) {
-            return IE3Lifecycle.E3Stage.Activated;
+        if (reason == IEnclave.FailureReason.NoInputsReceived) {
+            return IEnclave.E3Stage.Activated;
         }
         if (
-            reason == IE3Lifecycle.FailureReason.ComputeTimeout ||
-            reason == IE3Lifecycle.FailureReason.ComputeProviderExpired ||
-            reason == IE3Lifecycle.FailureReason.ComputeProviderFailed ||
-            reason == IE3Lifecycle.FailureReason.RequesterCancelled
+            reason == IEnclave.FailureReason.ComputeTimeout ||
+            reason == IEnclave.FailureReason.ComputeProviderExpired ||
+            reason == IEnclave.FailureReason.ComputeProviderFailed ||
+            reason == IEnclave.FailureReason.RequesterCancelled
         ) {
-            return IE3Lifecycle.E3Stage.Activated;
+            return IEnclave.E3Stage.Activated;
         }
         if (
-            reason == IE3Lifecycle.FailureReason.DecryptionTimeout ||
-            reason == IE3Lifecycle.FailureReason.DecryptionInvalidShares ||
-            reason == IE3Lifecycle.FailureReason.VerificationFailed
+            reason == IEnclave.FailureReason.DecryptionTimeout ||
+            reason == IEnclave.FailureReason.DecryptionInvalidShares ||
+            reason == IEnclave.FailureReason.VerificationFailed
         ) {
-            return IE3Lifecycle.E3Stage.CiphertextReady;
+            return IEnclave.E3Stage.CiphertextReady;
         }
 
-        return IE3Lifecycle.E3Stage.None;
+        return IEnclave.E3Stage.None;
     }
 
     /// @inheritdoc IE3RefundManager
     function calculateWorkValue(
-        IE3Lifecycle.E3Stage stage
+        IEnclave.E3Stage stage
     ) public view returns (uint16 workCompletedBps, uint16 workRemainingBps) {
         WorkValueAllocation memory alloc = _workAllocation;
 
         if (
-            stage == IE3Lifecycle.E3Stage.Requested ||
-            stage == IE3Lifecycle.E3Stage.None
+            stage == IEnclave.E3Stage.Requested ||
+            stage == IEnclave.E3Stage.None
         ) {
             // Failed at Requested = no work done
             workCompletedBps = 0;
-        } else if (stage == IE3Lifecycle.E3Stage.CommitteeFinalized) {
+        } else if (stage == IEnclave.E3Stage.CommitteeFinalized) {
             // Failed during DKG = sortition work done
             workCompletedBps = alloc.committeeFormationBps;
-        } else if (stage == IE3Lifecycle.E3Stage.KeyPublished) {
+        } else if (stage == IEnclave.E3Stage.KeyPublished) {
             // Failed before activation = sortition + DKG done
             workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
-        } else if (stage == IE3Lifecycle.E3Stage.Activated) {
+        } else if (stage == IEnclave.E3Stage.Activated) {
             // Failed during active phase = sortition + DKG done (no additional work)
             workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
-        } else if (stage == IE3Lifecycle.E3Stage.CiphertextReady) {
+        } else if (stage == IEnclave.E3Stage.CiphertextReady) {
             // Failed during decryption = sortition + DKG done (awaiting decryption shares)
             workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
         }
@@ -249,15 +243,15 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function claimRequesterRefund(
         uint256 e3Id
     ) external returns (uint256 amount) {
-        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
-        if (stage != IE3Lifecycle.E3Stage.Failed) {
+        IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
+        if (stage != IEnclave.E3Stage.Failed) {
             revert E3NotFailed(e3Id);
         }
 
         RefundDistribution storage dist = _distributions[e3Id];
         if (!dist.calculated) revert RefundNotCalculated(e3Id);
 
-        address requester = e3Lifecycle.getRequester(e3Id);
+        address requester = enclave.getRequester(e3Id);
         if (msg.sender != requester) revert NotRequester(e3Id, msg.sender);
 
         if (_claimed[e3Id][msg.sender]) revert AlreadyClaimed(e3Id, msg.sender);
@@ -277,7 +271,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         uint256 e3Id
     ) external returns (uint256 amount) {
         require(
-            e3Lifecycle.getE3Stage(e3Id) == IE3Lifecycle.E3Stage.Failed,
+            enclave.getE3Stage(e3Id) == IEnclave.E3Stage.Failed,
             E3NotFailed(e3Id)
         );
 
@@ -386,7 +380,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @param _enclave New Enclave address
     function setEnclave(address _enclave) external onlyOwner {
         require(_enclave != address(0), "Invalid enclave");
-        enclave = _enclave;
+        enclave = IEnclave(_enclave);
     }
 
     /// @notice Set the treasury address
