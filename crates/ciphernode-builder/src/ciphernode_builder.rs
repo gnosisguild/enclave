@@ -645,25 +645,6 @@ fn build_delays_from_chains(
     delays
 }
 
-/// Build aggregate configuration from chains with provider factory function
-pub async fn build_aggregate_config_from_chains<F, Fut>(
-    chains: &[ChainConfig],
-    mut provider_factory: F,
-) -> anyhow::Result<AggregateConfig>
-where
-    F: FnMut(&ChainConfig) -> Fut,
-    Fut: std::future::Future<Output = Result<EthProvider<ConcreteReadProvider>>>,
-{
-    let mut chain_providers = Vec::new();
-    for chain in chains {
-        let provider = provider_factory(chain).await?;
-        chain_providers.push((chain.clone(), provider));
-    }
-
-    let delays = build_delays_from_chains(&chain_providers);
-    Ok(AggregateConfig::new(delays))
-}
-
 impl ProviderCaches {
     pub fn new() -> Self {
         ProviderCaches {

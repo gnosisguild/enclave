@@ -285,14 +285,14 @@ mod tests {
 
     impl Handler<GetEvents> for MockConnector {
         type Result = Vec<Evts>;
-        fn handle(&mut self, msg: GetEvents, ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _msg: GetEvents, _ctx: &mut Self::Context) -> Self::Result {
             self.events.clone()
         }
     }
 
     impl Handler<Get> for MockConnector {
         type Result = Option<Vec<u8>>;
-        fn handle(&mut self, msg: Get, ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _msg: Get, _ctx: &mut Self::Context) -> Self::Result {
             self.events.push(Evts::Get);
             None
         }
@@ -300,14 +300,14 @@ mod tests {
 
     impl Handler<Insert> for MockConnector {
         type Result = ();
-        fn handle(&mut self, msg: Insert, ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, msg: Insert, _ctx: &mut Self::Context) -> Self::Result {
             self.events.push(Evts::Insert(msg));
         }
     }
 
     impl Handler<Remove> for MockConnector {
         type Result = ();
-        fn handle(&mut self, msg: Remove, ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, _msg: Remove, _ctx: &mut Self::Context) -> Self::Result {
             self.events.push(Evts::Remove);
         }
     }
