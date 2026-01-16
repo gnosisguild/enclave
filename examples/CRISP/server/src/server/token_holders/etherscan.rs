@@ -4,18 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::{models::TokenHolder, CONFIG};
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
 use eyre::{eyre, Context, Result}; // Add this import
 use reqwest;
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use tokio::time::{sleep, Duration};
-use crate::server::{
-    CONFIG,
-    models::TokenHolder
-};
 
 // Define the Votes contract interface for getPastVotes
 sol! {
@@ -449,8 +446,11 @@ impl EtherscanClient {
         let provider = ProviderBuilder::new().connect_http(url);
         let token = ERC20Votes::new(token_address, provider);
 
-
-        match token.getPastVotes(voter_address, U256::from(block_number - 1)).call().await {
+        match token
+            .getPastVotes(voter_address, U256::from(block_number - 1))
+            .call()
+            .await
+        {
             Ok(votes) => Ok(votes),
             Err(_) => {
                 // Fallback to balanceOf if getPastVotes fails
@@ -460,7 +460,7 @@ impl EtherscanClient {
                     .await
                     .context("Failed to call balanceOf")?;
                 Ok(balance)
-            },
+            }
         }
     }
 
