@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::production::trbfv::{L, N, PK_AGG_TRBFV_BIT_PK, PK_AGG_TRBFV_CONFIGS};
 use lib::core::trbfv_pk_agg::TrbfvPublicKeyAggregation;
 use lib::math::polynomial::Polynomial;

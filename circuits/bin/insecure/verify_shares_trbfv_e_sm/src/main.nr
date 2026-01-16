@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::insecure::trbfv::{
     L, N, VERIFY_SHARES_BIT_SECRET_E_SM, VERIFY_SHARES_BIT_SHARE, VERIFY_SHARES_CONFIGS_E_SM,
 };

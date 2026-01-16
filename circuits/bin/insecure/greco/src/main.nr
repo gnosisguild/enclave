@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use lib::configs::insecure::trbfv::{
     GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
     GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N,

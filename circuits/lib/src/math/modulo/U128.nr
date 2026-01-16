@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 //! Constrained modular arithmetic operations for u128 values.
 //!
 //! This module provides a `ModU128` struct that implements modular arithmetic operations

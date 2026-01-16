@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_shares_party_modulus_commitment,
     prepare_aggregated_shares_commitment_payload, prepare_single_polynomial_commitment_payload,
