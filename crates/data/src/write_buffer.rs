@@ -25,6 +25,16 @@ impl AggregateConfig {
     pub fn new(delays: HashMap<AggregateId, u64>) -> Self {
         Self { delays }
     }
+
+    /// Get the indexed aggregate IDs, defaulting to [0] if no delays are configured
+    pub fn indexed_ids(&self) -> Vec<usize> {
+        let indexes: Vec<usize> = self.delays.keys().map(|id| **id).collect();
+        if indexes.is_empty() {
+            vec![0]
+        } else {
+            indexes
+        }
+    }
 }
 
 #[derive(Debug)]

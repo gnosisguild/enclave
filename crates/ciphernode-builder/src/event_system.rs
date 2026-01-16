@@ -260,8 +260,7 @@ impl EventSystem {
                 match &self.backend {
                     EventSystemBackend::InMem(b) => {
                         let config = self.aggregate_config();
-                        let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
-                        let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+                        let indexes = config.indexed_ids();
 
                         let addrs = b
                             .eventstores
@@ -284,8 +283,7 @@ impl EventSystem {
                     }
                     EventSystemBackend::Persisted(b) => {
                         let config = self.aggregate_config();
-                        let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
-                        let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+                        let indexes = config.indexed_ids();
 
                         let addrs = b
                             .eventstores
