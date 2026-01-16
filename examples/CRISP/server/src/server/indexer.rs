@@ -24,6 +24,7 @@ use e3_sdk::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
             PlaintextOutputPublished,
         },
+        retry::call_with_retry,
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
@@ -51,7 +52,13 @@ pub async fn register_e3_requested(
             info!("[e3_id={}] E3Requested: {:?}", e3_id, event);
 
             async move {
-                let e3 = contract.get_e3(event.e3Id).await?;
+                // 0xcd6f4a4f = E3DoesNotExist()
+                let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
+                    let contract = contract.clone();
+                    let event_e3_id = event.e3Id;
+                    async move { contract.get_e3(event_e3_id).await }
+                })
+                .await?;
 
                 // Convert custom params bytes back to token address and balance threshold.
 
@@ -330,7 +337,13 @@ pub async fn register_committee_published(
                 // We need to do this to ensure this is idempotent.
                 // TODO: conserve bandwidth and check for E3AlreadyActivated error instead of
                 // making two calls to contract
-                let e3 = contract.get_e3(event.e3Id).await?;
+                // 0xcd6f4a4f = E3DoesNotExist()
+                let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
+                    let contract = contract.clone();
+                    let event_e3_id = event.e3Id;
+                    async move { contract.get_e3(event_e3_id).await }
+                })
+                .await?;
                 if u64::try_from(e3.expiration)? > 0 {
                     info!("[e3_id={}] E3 already activated", event.e3Id);
                     return Ok(());
