@@ -8,7 +8,6 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
-import { IE3Lifecycle } from "./interfaces/IE3Lifecycle.sol";
 import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
@@ -40,10 +39,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Address of the Bonding Registry contract.
     /// @dev Handles staking and reward distribution for ciphernodes.
     IBondingRegistry public bondingRegistry;
-
-    /// @notice E3 Lifecycle contract for stage tracking and timeout enforcement.
-    /// @dev Manages E3 state machine and failure detection.
-    IE3Lifecycle public e3Lifecycle;
 
     /// @notice E3 Refund Manager contract for handling failed E3 refunds.
     /// @dev Manages refund calculation and claiming for failed E3s.
@@ -81,6 +76,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Mapping tracking fee payments for each E3.
     /// @dev Stores the amount paid for an E3, distributed to committee upon completion.
     mapping(uint256 e3Id => uint256 e3Payment) public e3Payments;
+
+    /// @notice Maps E3 ID to its current stage
+    mapping(uint256 e3Id => E3Stage) internal _e3Stages;
+
+    /// @notice Maps E3 ID to its deadlines
+    mapping(uint256 e3Id => E3Deadlines) internal _e3Deadlines;
+
+    /// @notice Maps E3 ID to failure reason (if failed)
+    mapping(uint256 e3Id => FailureReason) internal _e3FailureReasons;
+
+    /// @notice Maps E3 ID to requester address
+    mapping(uint256 e3Id => address) internal _e3Requesters;
+
+    /// @notice Global timeout configuration
+    E3TimeoutConfig internal _timeoutConfig;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -181,6 +191,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param feeToken The invalid fee token address.
     error InvalidFeeToken(IERC20 feeToken);
 
+    /// @notice E3 is not in expected stage
+    error InvalidStage(uint256 e3Id, E3Stage expected, E3Stage actual);
+
+    /// @notice E3 has already been marked as failed
+    error E3AlreadyFailed(uint256 e3Id);
+
+    /// @notice E3 has already completed
+    error E3AlreadyComplete(uint256 e3Id);
+
+    /// @notice Failure condition not yet met
+    error FailureConditionNotMet(uint256 e3Id);
+
+    /// @notice Caller not authorized
+    error Unauthorized();
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
@@ -199,26 +224,28 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _owner The owner address of this contract.
     /// @param _ciphernodeRegistry The address of the Ciphernode Registry contract.
     /// @param _bondingRegistry The address of the Bonding Registry contract.
+    /// @param _e3RefundManager The address of the E3 Refund Manager contract.
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @param config Initial timeout configuration for E3 lifecycle stages.
     /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         IBondingRegistry _bondingRegistry,
-        IE3Lifecycle _e3Lifecycle,
         IE3RefundManager _e3RefundManager,
         IERC20 _feeToken,
         uint256 _maxDuration,
+        E3TimeoutConfig calldata config,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
-        setE3Lifecycle(_e3Lifecycle);
         setE3RefundManager(_e3RefundManager);
         setFeeToken(_feeToken);
+        _setTimeoutConfig(config);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -305,9 +332,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ),
             CommitteeSelectionFailed()
         );
-        e3Lifecycle.initializeE3(e3Id, msg.sender);
+
+        // Initialize E3 lifecycle
+        _e3Stages[e3Id] = E3Stage.Requested;
+        _e3Requesters[e3Id] = msg.sender;
+        _e3Deadlines[e3Id].committeeDeadline =
+            block.timestamp +
+            _timeoutConfig.committeeFormationWindow;
 
         emit E3Requested(e3Id, e3, requestParams.e3Program);
+        emit E3StageChanged(e3Id, E3Stage.None, E3Stage.Requested);
     }
 
     /// @inheritdoc IEnclave
@@ -324,9 +358,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 expiresAt = block.timestamp + e3.duration;
         e3s[e3Id].expiration = expiresAt;
         e3s[e3Id].committeePublicKey = publicKeyHash;
-        e3Lifecycle.onActivated(e3Id, expiresAt);
+
+        // Update lifecycle stage
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.KeyPublished) {
+            revert InvalidStage(e3Id, E3Stage.KeyPublished, current);
+        }
+        _e3Stages[e3Id] = E3Stage.Activated;
+        _e3Deadlines[e3Id].computeDeadline =
+            expiresAt +
+            _timeoutConfig.computeWindow;
 
         emit E3Activated(e3Id, expiresAt, publicKeyHash);
+        emit E3StageChanged(e3Id, E3Stage.KeyPublished, E3Stage.Activated);
 
         return true;
     }
@@ -377,9 +421,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
         require(success, InvalidOutput(ciphertextOutput));
-        e3Lifecycle.onCiphertextPublished(e3Id);
+
+        // Update lifecycle stage
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.Activated) {
+            revert InvalidStage(e3Id, E3Stage.Activated, current);
+        }
+        _e3Stages[e3Id] = E3Stage.CiphertextReady;
+        _e3Deadlines[e3Id].decryptionDeadline =
+            block.timestamp +
+            _timeoutConfig.decryptionWindow;
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
+        emit E3StageChanged(e3Id, E3Stage.Activated, E3Stage.CiphertextReady);
     }
 
     /// @inheritdoc IEnclave
@@ -410,10 +464,17 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(success, InvalidOutput(plaintextOutput));
 
-        e3Lifecycle.onComplete(e3Id);
+        // Update lifecycle stage to Complete
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.CiphertextReady) {
+            revert InvalidStage(e3Id, E3Stage.CiphertextReady, current);
+        }
+        _e3Stages[e3Id] = E3Stage.Complete;
+
         _distributeRewards(e3Id);
 
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
+        emit E3StageChanged(e3Id, E3Stage.CiphertextReady, E3Stage.Complete);
     }
 
     ////////////////////////////////////////////////////////////
@@ -460,12 +521,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function _getHonestNodes(
         uint256 e3Id
     ) private view returns (address[] memory) {
-        IE3Lifecycle.FailureReason reason = e3Lifecycle.getFailureReason(e3Id);
+        FailureReason reason = _e3FailureReasons[e3Id];
 
         // Early failures have no committee
         if (
-            reason == IE3Lifecycle.FailureReason.CommitteeFormationTimeout ||
-            reason == IE3Lifecycle.FailureReason.InsufficientCommitteeMembers
+            reason == FailureReason.CommitteeFormationTimeout ||
+            reason == FailureReason.InsufficientCommitteeMembers
         ) {
             return new address[](0);
         }
@@ -606,20 +667,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
-    /// @notice Sets the E3 Lifecycle contract address
-    /// @param _e3Lifecycle The new E3 Lifecycle contract address
-    /// @return success True if the operation succeeded
-    function setE3Lifecycle(
-        IE3Lifecycle _e3Lifecycle
-    ) public onlyOwner returns (bool success) {
-        require(
-            address(_e3Lifecycle) != address(0),
-            "Invalid E3Lifecycle address"
-        );
-        e3Lifecycle = _e3Lifecycle;
-        success = true;
-        emit E3LifecycleSet(address(_e3Lifecycle));
-    }
 
     /// @notice Sets the E3 Refund Manager contract address
     /// @param _e3RefundManager The new E3 Refund Manager contract address
@@ -640,14 +687,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Can be called by anyone once E3 is in failed state
     /// @param e3Id The ID of the failed E3
     function processE3Failure(uint256 e3Id) external {
-        require(address(e3Lifecycle) != address(0), "Lifecycle not set");
         require(
             address(e3RefundManager) != address(0),
             "RefundManager not set"
         );
 
-        IE3Lifecycle.E3Stage stage = e3Lifecycle.getE3Stage(e3Id);
-        require(stage == IE3Lifecycle.E3Stage.Failed, "E3 not failed");
+        E3Stage stage = _e3Stages[e3Id];
+        require(stage == E3Stage.Failed, "E3 not failed");
 
         uint256 payment = e3Payments[e3Id];
         require(payment > 0, "No payment to refund");
@@ -669,9 +715,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         // Update E3 lifecycle stage - committee finalized, DKG starting
-        e3Lifecycle.onCommitteeFinalized(e3Id);
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.Requested) {
+            revert InvalidStage(e3Id, E3Stage.Requested, current);
+        }
+        _e3Stages[e3Id] = E3Stage.CommitteeFinalized;
+        _e3Deadlines[e3Id].dkgDeadline =
+            block.timestamp +
+            _timeoutConfig.dkgWindow;
 
         emit CommitteeFinalized(e3Id);
+        emit E3StageChanged(
+            e3Id,
+            E3Stage.Requested,
+            E3Stage.CommitteeFinalized
+        );
     }
 
     /// @inheritdoc IEnclave
@@ -683,9 +741,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // DKG complete, key published
         E3 memory e3 = e3s[e3Id];
-        e3Lifecycle.onKeyPublished(e3Id, e3.startWindow[1]);
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.CommitteeFinalized) {
+            revert InvalidStage(e3Id, E3Stage.CommitteeFinalized, current);
+        }
+        _e3Stages[e3Id] = E3Stage.KeyPublished;
+        _e3Deadlines[e3Id].activationDeadline = e3.startWindow[1];
 
         emit CommitteeFormed(e3Id);
+        emit E3StageChanged(
+            e3Id,
+            E3Stage.CommitteeFinalized,
+            E3Stage.KeyPublished
+        );
     }
 
     /// @inheritdoc IEnclave
@@ -696,10 +764,174 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         // Mark E3 as failed with the given reason
-        e3Lifecycle.markE3FailedWithReason(
+        _markE3FailedWithReason(e3Id, FailureReason(reason));
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Lifecycle Functions                  //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Anyone can mark an E3 as failed if timeout passed
+    /// @param e3Id The E3 ID
+    /// @return reason The failure reason
+    function markE3Failed(
+        uint256 e3Id
+    ) external returns (FailureReason reason) {
+        E3Stage current = _e3Stages[e3Id];
+
+        if (current == E3Stage.None)
+            revert InvalidStage(e3Id, E3Stage.Requested, current);
+        if (current == E3Stage.Complete) revert E3AlreadyComplete(e3Id);
+        if (current == E3Stage.Failed) revert E3AlreadyFailed(e3Id);
+
+        (bool canFail, FailureReason detectedReason) = _checkFailureCondition(
             e3Id,
-            IE3Lifecycle.FailureReason(reason)
+            current
         );
+        if (!canFail) revert FailureConditionNotMet(e3Id);
+
+        _e3Stages[e3Id] = E3Stage.Failed;
+        _e3FailureReasons[e3Id] = detectedReason;
+
+        emit E3Failed(e3Id, current, detectedReason);
+
+        return detectedReason;
+    }
+
+    /// @notice Internal function to mark E3 as failed with specific reason
+    /// @param e3Id The E3 ID
+    /// @param reason The failure reason
+    function _markE3FailedWithReason(
+        uint256 e3Id,
+        FailureReason reason
+    ) internal {
+        E3Stage current = _e3Stages[e3Id];
+
+        if (current == E3Stage.None)
+            revert InvalidStage(e3Id, E3Stage.Requested, current);
+        if (current == E3Stage.Complete) revert E3AlreadyComplete(e3Id);
+        if (current == E3Stage.Failed) revert E3AlreadyFailed(e3Id);
+
+        _e3Stages[e3Id] = E3Stage.Failed;
+        _e3FailureReasons[e3Id] = reason;
+
+        emit E3Failed(e3Id, current, reason);
+    }
+
+    /// @notice Check if E3 can be marked as failed
+    /// @param e3Id The E3 ID
+    /// @return canFail Whether failure condition is met
+    /// @return reason The failure reason if applicable
+    function checkFailureCondition(
+        uint256 e3Id
+    ) external view returns (bool canFail, FailureReason reason) {
+        E3Stage current = _e3Stages[e3Id];
+        return _checkFailureCondition(e3Id, current);
+    }
+
+    /// @notice Internal function to check failure conditions
+    function _checkFailureCondition(
+        uint256 e3Id,
+        E3Stage stage
+    ) internal view returns (bool canFail, FailureReason reason) {
+        E3Deadlines storage d = _e3Deadlines[e3Id];
+
+        if (
+            stage == E3Stage.Requested && block.timestamp > d.committeeDeadline
+        ) {
+            return (true, FailureReason.CommitteeFormationTimeout);
+        }
+        if (
+            stage == E3Stage.CommitteeFinalized &&
+            block.timestamp > d.dkgDeadline
+        ) {
+            return (true, FailureReason.DKGTimeout);
+        }
+        if (
+            stage == E3Stage.KeyPublished &&
+            d.activationDeadline > 0 &&
+            block.timestamp > d.activationDeadline
+        ) {
+            return (true, FailureReason.ActivationWindowExpired);
+        }
+        if (stage == E3Stage.Activated && block.timestamp > d.computeDeadline) {
+            return (true, FailureReason.ComputeTimeout);
+        }
+        if (
+            stage == E3Stage.CiphertextReady &&
+            block.timestamp > d.decryptionDeadline
+        ) {
+            return (true, FailureReason.DecryptionTimeout);
+        }
+
+        return (false, FailureReason.None);
+    }
+
+    /// @notice Get current stage of an E3
+    /// @param e3Id The E3 ID
+    /// @return stage The current stage
+    function getE3Stage(uint256 e3Id) external view returns (E3Stage stage) {
+        return _e3Stages[e3Id];
+    }
+
+    /// @notice Get failure reason for an E3
+    /// @param e3Id The E3 ID
+    /// @return reason The failure reason
+    function getFailureReason(
+        uint256 e3Id
+    ) external view returns (FailureReason reason) {
+        return _e3FailureReasons[e3Id];
+    }
+
+    /// @notice Get requester address for an E3
+    /// @param e3Id The E3 ID
+    /// @return requester The requester address
+    function getRequester(
+        uint256 e3Id
+    ) external view returns (address requester) {
+        return _e3Requesters[e3Id];
+    }
+
+    /// @notice Get deadlines for an E3
+    /// @param e3Id The E3 ID
+    /// @return deadlines The E3 deadlines
+    function getDeadlines(
+        uint256 e3Id
+    ) external view returns (E3Deadlines memory deadlines) {
+        return _e3Deadlines[e3Id];
+    }
+
+    /// @notice Get timeout configuration
+    /// @return config The current timeout config
+    function getTimeoutConfig()
+        external
+        view
+        returns (E3TimeoutConfig memory config)
+    {
+        return _timeoutConfig;
+    }
+
+    /// @notice Set timeout configuration
+    /// @param config The new timeout config
+    function setTimeoutConfig(E3TimeoutConfig calldata config) external onlyOwner {
+        _setTimeoutConfig(config);
+    }
+
+    /// @notice Internal function to set timeout config
+    function _setTimeoutConfig(E3TimeoutConfig calldata config) internal {
+        require(
+            config.committeeFormationWindow > 0,
+            "Invalid committee window"
+        );
+        require(config.dkgWindow > 0, "Invalid DKG window");
+        require(config.computeWindow > 0, "Invalid compute window");
+        require(config.decryptionWindow > 0, "Invalid decryption window");
+
+        _timeoutConfig = config;
+
+        emit TimeoutConfigUpdated(config);
     }
 
     ////////////////////////////////////////////////////////////
