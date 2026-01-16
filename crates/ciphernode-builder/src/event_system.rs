@@ -12,26 +12,13 @@ use e3_data::{
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{
-    AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer,
-};
+use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
-/// Central configuration for aggregates in the EventSystem
-#[derive(Debug, Clone)]
-pub struct AggregateConfig {
-    pub delays: HashMap<AggregateId, u64>,
-}
-
-impl AggregateConfig {
-    /// Create a new AggregateConfig with the specified delays
-    pub fn new(delays: HashMap<AggregateId, u64>) -> Self {
-        Self { delays }
-    }
-}
+pub use e3_data::AggregateConfig;
 
 struct InMemBackend {
     eventstore: OnceCell<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>,
@@ -198,12 +185,12 @@ impl EventSystem {
         let buffer = self
             .buffer
             .get_or_init(|| {
-                let delays = self
+                let config = self
                     .aggregate_config
                     .get()
-                    .map(|config| config.delays.clone())
-                    .unwrap_or_default();
-                WriteBuffer::with_config(delays).start()
+                    .cloned()
+                    .unwrap_or_else(|| AggregateConfig::new(HashMap::new()));
+                WriteBuffer::with_config(config).start()
             })
             .clone();
         self.wire_if_ready();

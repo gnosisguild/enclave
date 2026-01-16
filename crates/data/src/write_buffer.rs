@@ -14,6 +14,19 @@ use std::{
 
 use crate::{Insert, InsertBatch};
 
+/// Central configuration for aggregates in the WriteBuffer
+#[derive(Debug, Clone)]
+pub struct AggregateConfig {
+    pub delays: HashMap<AggregateId, u64>,
+}
+
+impl AggregateConfig {
+    /// Create a new AggregateConfig with the specified delays
+    pub fn new(delays: HashMap<AggregateId, u64>) -> Self {
+        Self { delays }
+    }
+}
+
 #[derive(Debug)]
 struct AggregateBuffer {
     buffer: Vec<Insert>,
@@ -30,8 +43,8 @@ pub struct WriteBuffer {
     dest: Option<Recipient<InsertBatch>>,
     /// Per-aggregate buffers for organizing inserts
     aggregate_buffers: HashMap<AggregateId, AggregateBuffer>,
-    /// Per-aggregate wait time (microseconds) before sending inserts to destination
-    config: HashMap<AggregateId, u64>,
+    /// Per-aggregate wait time configuration
+    config: AggregateConfig,
 }
 
 impl Actor for WriteBuffer {
@@ -43,11 +56,11 @@ impl WriteBuffer {
         Self {
             dest: None,
             aggregate_buffers: HashMap::new(),
-            config: HashMap::new(),
+            config: AggregateConfig::new(HashMap::new()),
         }
     }
 
-    pub fn with_config(config: HashMap<AggregateId, u64>) -> Self {
+    pub fn with_config(config: AggregateConfig) -> Self {
         Self {
             dest: None,
             aggregate_buffers: HashMap::new(),
@@ -84,7 +97,7 @@ impl WriteBuffer {
 
         if let Some(ref dest) = self.dest {
             let (updated_buffers, expired_inserts) =
-                process_expired_inserts(&self.aggregate_buffers, &self.config, now);
+                process_expired_inserts(&self.aggregate_buffers, &self.config.delays, now);
             if !expired_inserts.is_empty() {
                 let batch = InsertBatch::new(expired_inserts);
                 dest.do_send(batch);
@@ -205,15 +218,16 @@ mod tests {
         aggregate_buffers.insert(aggregate_id.clone(), agg_buffer);
 
         // Set config with 1 second delay
-        let mut config = HashMap::new();
-        config.insert(aggregate_id.clone(), 1_000_000); // 1 second in microseconds
+        let mut delays = HashMap::new();
+        delays.insert(aggregate_id.clone(), 1_000_000); // 1 second in microseconds
+        let config = AggregateConfig::new(delays);
 
         // Use current time of 2 seconds, so old insert (0.5s) and insert without context should expire,
         // new insert (3s) should remain
         let now = 2_000_000; // 2 seconds in microseconds
 
         let (updated_buffers, expired_inserts) =
-            process_expired_inserts(&aggregate_buffers, &config, now);
+            process_expired_inserts(&aggregate_buffers, &config.delays, now);
 
         // Verify expired inserts (old insert and insert without context)
         assert_eq!(expired_inserts.len(), 2);
