@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "fold",
+    "pk_trbfv_wrapper",
+    "insecure/verify_shares_trbfv_wrapper",
+    "production/verify_shares_trbfv_wrapper"
+]

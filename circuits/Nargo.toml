@@ -1,6 +1,0 @@
-[workspace]
-members = [
-    "crates/libs/greco",
-    "crates/libs/safe/",
-    "crates/libs/polynomial"
-]
