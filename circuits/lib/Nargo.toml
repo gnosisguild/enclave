@@ -1,5 +1,5 @@
 [package]
-name = "lib"
+name = "pvss_lib"
 type = "lib"
 authors = ["Gnosis Guild / Enclave"]
 version = "1.0.0-beta.15"
