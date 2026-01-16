@@ -76,7 +76,7 @@ pub fn enumerate_path(path: &PathBuf, index: usize) -> PathBuf {
 }
 
 struct InMemBackend {
-    eventstore: OnceCell<Vec<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
+    eventstore: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
@@ -84,7 +84,7 @@ struct InMemBackend {
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
-    eventstore: OnceCell<Vec<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
+    eventstore: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
     store: OnceCell<Addr<SledStore>>,
 }
 
@@ -94,23 +94,41 @@ enum EventSystemBackend {
     Persisted(PersistedBackend),
 }
 
+#[derive(Clone)]
 pub enum EventStoreAddrs {
-    InMem(Vec<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>),
-    Persisted(Vec<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
+    InMem(HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>),
+    Persisted(HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
 }
 
 impl TryFrom<EventStoreAddrs> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
     type Error = anyhow::Error;
     fn try_from(value: EventStoreAddrs) -> std::result::Result<Self, Self::Error> {
-        if let EventStoreAddrs::InMem(mut addrs) = value {
-            if let Some(addr) = addrs.pop() {
-                Ok(addr)
+        if let EventStoreAddrs::InMem(addrs) = value {
+            if let Some(addr) = addrs.get(&0) {
+                Ok(addr.clone())
             } else {
-                Err(anyhow!("InMem event store addresses vector is empty"))
+                Err(anyhow!("InMem event store addresses hashmap is empty"))
             }
         } else {
             Err(anyhow!(
                 "address was not EventStore<InMemSequenceIndex, InMemEventLog>"
+            ))
+        }
+    }
+}
+
+impl TryFrom<EventStoreAddrs> for Addr<EventStore<SledSequenceIndex, CommitLogEventLog>> {
+    type Error = anyhow::Error;
+    fn try_from(value: EventStoreAddrs) -> std::result::Result<Self, Self::Error> {
+        if let EventStoreAddrs::Persisted(addrs) = value {
+            if let Some(addr) = addrs.get(&0) {
+                Ok(addr.clone())
+            } else {
+                Err(anyhow!("Persisted event store addresses hashmap is empty"))
+            }
+        } else {
+            Err(anyhow!(
+                "address was not EventStore<SledSequenceIndex, CommitLogEventLog>"
             ))
         }
     }
@@ -265,14 +283,14 @@ impl EventSystem {
             .get_or_try_init(|| match self.eventstores()? {
                 EventStoreAddrs::InMem(addrs) => {
                     let es = addrs
-                        .get(0)
+                        .get(&0)
                         .ok_or_else(|| anyhow!("No event stores available"))?
                         .clone();
                     Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
                 }
                 EventStoreAddrs::Persisted(addrs) => {
                     let es = addrs
-                        .get(0)
+                        .get(&0)
                         .ok_or_else(|| anyhow!("No event stores available"))?
                         .clone();
                     Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
@@ -285,26 +303,50 @@ impl EventSystem {
     pub fn eventstores(&self) -> Result<EventStoreAddrs> {
         match &self.backend {
             EventSystemBackend::InMem(b) => {
+                let config = self.aggregate_config();
+                let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
+                let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+
                 let addrs = b
                     .eventstore
                     .get_or_init(|| {
-                        vec![
-                            EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new())
-                                .start(),
-                        ]
+                        let mut eventstore_map = std::collections::HashMap::new();
+                        for &index in &indexes {
+                            eventstore_map.insert(
+                                index,
+                                EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new())
+                                    .start(),
+                            );
+                        }
+                        eventstore_map
                     })
                     .clone();
                 Ok(EventStoreAddrs::InMem(addrs))
             }
             EventSystemBackend::Persisted(b) => {
+                let config = self.aggregate_config();
+                let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
+                let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+
                 let addrs = b
                     .eventstore
                     .get_or_try_init(|| -> Result<_> {
-                        // For now, create only one event store with the original sequence_index tree name
-                        // In the future, this could be extended to create multiple stores with enumerated names
-                        let index = SledSequenceIndex::new(&b.sled_path, "sequence_index")?;
-                        let log = CommitLogEventLog::new(&b.log_path)?;
-                        Ok(vec![EventStore::new(index, log).start()])
+                        let mut eventstore_map = std::collections::HashMap::new();
+                        for &index in &indexes {
+                            // Enumerate the log path for each eventstore
+                            let enumerated_log_path = enumerate_path(&b.log_path, index);
+                            // Enumerate the sequence_index tree name for each eventstore
+                            let tree_name = if index == 0 {
+                                "sequence_index".to_string()
+                            } else {
+                                format!("sequence_index.{}", index)
+                            };
+
+                            let index_store = SledSequenceIndex::new(&b.sled_path, &tree_name)?;
+                            let log = CommitLogEventLog::new(&enumerated_log_path)?;
+                            eventstore_map.insert(index, EventStore::new(index_store, log).start());
+                        }
+                        Ok(eventstore_map)
                     })?
                     .clone();
                 Ok(EventStoreAddrs::Persisted(addrs))
@@ -561,6 +603,61 @@ mod tests {
         // Pull the events off the listsner since the timestamp
         let events = listener.send(GetEvents).await?;
         assert_eq!(events, vec!["yellow", "red", "white"]);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_multiple_eventstores() -> Result<()> {
+        use e3_events::AggregateId;
+
+        // Create an AggregateConfig with multiple AggregateIds
+        let mut delays = std::collections::HashMap::new();
+        delays.insert(AggregateId::new(0), 1000); // 1ms delay
+        delays.insert(AggregateId::new(1), 2000); // 2ms delay
+        delays.insert(AggregateId::new(2), 3000); // 3ms delay
+        let aggregate_config = AggregateConfig::new(delays);
+
+        // Test in-memory eventstores
+        let system = EventSystem::in_mem("test_multi").with_aggregate_config(aggregate_config);
+        let eventstores = system.eventstores()?;
+
+        // Should create 3 eventstores for 3 AggregateIds
+        match &eventstores {
+            EventStoreAddrs::InMem(addrs) => {
+                assert_eq!(addrs.len(), 3);
+                // Test that we can access the first eventstore (index 0)
+                assert!(addrs.contains_key(&0));
+                assert!(addrs.contains_key(&1));
+                assert!(addrs.contains_key(&2));
+                // Test that we can access the first eventstore
+                let _es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> =
+                    eventstores.clone().try_into()?;
+            }
+            EventStoreAddrs::Persisted(_) => panic!("Expected InMem eventstores"),
+        }
+
+        // Test persistent eventstores
+        let tmp = TempDir::new().unwrap();
+        let persisted_system = EventSystem::persisted(
+            "test_persisted",
+            tmp.path().join("log"),
+            tmp.path().join("sled"),
+        )
+        .with_aggregate_config(AggregateConfig::new(std::collections::HashMap::new()));
+
+        let persisted_eventstores = persisted_system.eventstores()?;
+
+        // Should create at least 1 eventstore (even with empty config)
+        match &persisted_eventstores {
+            EventStoreAddrs::Persisted(addrs) => {
+                assert_eq!(addrs.len(), 1);
+                assert!(addrs.contains_key(&0));
+                let _es: Addr<EventStore<SledSequenceIndex, CommitLogEventLog>> =
+                    persisted_eventstores.clone().try_into()?;
+            }
+            EventStoreAddrs::InMem(_) => panic!("Expected Persisted eventstores"),
+        }
+
         Ok(())
     }
 }
