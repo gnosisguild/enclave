@@ -8,7 +8,7 @@ use crate::eventstore::EventStore;
 use crate::{
     events::StoreEventRequested, AggregateId, EventContextAccessors, EventLog, SequenceIndex,
 };
-use actix::{Actor, Handler};
+use actix::{Actor, Addr, Handler};
 use std::collections::HashMap;
 
 pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
@@ -22,11 +22,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         }
     }
 
-    pub fn register_store(
-        &mut self,
-        aggregate_id: AggregateId,
-        store: actix::Addr<EventStore<I, L>>,
-    ) {
+    pub fn register_store(&mut self, aggregate_id: AggregateId, store: Addr<EventStore<I, L>>) {
         self.stores.insert(aggregate_id, store);
     }
 

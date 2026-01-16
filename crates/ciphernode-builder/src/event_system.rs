@@ -12,7 +12,10 @@ use e3_data::{
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
+use e3_events::{
+    AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter,
+    Sequencer, StoreEventRequested,
+};
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
@@ -22,7 +25,7 @@ use std::path::PathBuf;
 pub use e3_data::AggregateConfig;
 
 struct InMemBackend {
-    eventstore: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
@@ -30,7 +33,7 @@ struct InMemBackend {
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
-    eventstore: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
     store: OnceCell<Addr<SledStore>>,
 }
 
@@ -108,6 +111,8 @@ pub struct EventSystem {
     hlc: OnceCell<Hlc>,
     /// Central configuration for aggregates, including delays and other settings
     aggregate_config: OnceCell<AggregateConfig>,
+    /// Cached EventStoreAddrs for idempotency
+    cached_eventstores: OnceCell<EventStoreAddrs>,
 }
 
 impl EventSystem {
@@ -121,7 +126,7 @@ impl EventSystem {
         Self {
             node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::new(),
             }),
             buffer: OnceCell::new(),
@@ -131,6 +136,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
+            cached_eventstores: OnceCell::new(),
         }
     }
 
@@ -139,7 +145,7 @@ impl EventSystem {
         Self {
             node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::from(store.to_owned()),
             }),
             buffer: OnceCell::new(),
@@ -149,6 +155,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
+            cached_eventstores: OnceCell::new(),
         }
     }
 
@@ -159,7 +166,7 @@ impl EventSystem {
             backend: EventSystemBackend::Persisted(PersistedBackend {
                 log_path,
                 sled_path,
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::new(),
             }),
             buffer: OnceCell::new(),
@@ -169,6 +176,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
+            cached_eventstores: OnceCell::new(),
         }
     }
 
@@ -247,55 +255,79 @@ impl EventSystem {
 
     /// Get the EventStore addresses
     pub fn eventstores(&self) -> Result<EventStoreAddrs> {
-        match &self.backend {
-            EventSystemBackend::InMem(b) => {
-                let config = self.aggregate_config();
-                let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
-                let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+        self.cached_eventstores
+            .get_or_try_init(|| {
+                match &self.backend {
+                    EventSystemBackend::InMem(b) => {
+                        let config = self.aggregate_config();
+                        let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
+                        let indexes = if indexes.is_empty() { vec![0] } else { indexes };
 
-                let addrs = b
-                    .eventstore
-                    .get_or_init(|| {
-                        let mut eventstore_map = HashMap::new();
-                        for &index in &indexes {
-                            eventstore_map.insert(
-                                index,
-                                EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new())
-                                    .start(),
-                            );
-                        }
-                        eventstore_map
-                    })
-                    .clone();
-                Ok(EventStoreAddrs::InMem(addrs))
+                        let addrs = b
+                            .eventstores
+                            .get_or_init(|| {
+                                let mut eventstore_map = HashMap::new();
+                                for &index in &indexes {
+                                    eventstore_map.insert(
+                                        index,
+                                        EventStore::new(
+                                            InMemSequenceIndex::new(),
+                                            InMemEventLog::new(),
+                                        )
+                                        .start(),
+                                    );
+                                }
+                                eventstore_map
+                            })
+                            .clone();
+                        Ok(EventStoreAddrs::InMem(addrs))
+                    }
+                    EventSystemBackend::Persisted(b) => {
+                        let config = self.aggregate_config();
+                        let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
+                        let indexes = if indexes.is_empty() { vec![0] } else { indexes };
+
+                        let addrs = b
+                            .eventstores
+                            .get_or_try_init(|| -> Result<_> {
+                                let mut eventstore_map = HashMap::new();
+                                for &index in &indexes {
+                                    // Enumerate the log path for each eventstore
+                                    let enumerated_log_path = enumerate_path(&b.log_path, index);
+                                    let tree_name = format!("sequence_index.{}", index);
+                                    let index_store =
+                                        SledSequenceIndex::new(&b.sled_path, &tree_name)?;
+                                    let log = CommitLogEventLog::new(&enumerated_log_path)?;
+                                    eventstore_map
+                                        .insert(index, EventStore::new(index_store, log).start());
+                                }
+                                Ok(eventstore_map)
+                            })?
+                            .clone();
+                        Ok(EventStoreAddrs::Persisted(addrs))
+                    }
+                }
+            })
+            .cloned()
+    }
+
+    /// Get an EventStoreRouter
+    pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
+        let eventstores = self.eventstores()?;
+        match eventstores {
+            EventStoreAddrs::InMem(addrs) => {
+                let mut router = EventStoreRouter::new();
+                for (index, addr) in addrs {
+                    router.register_store(AggregateId::new(index), addr);
+                }
+                Ok(router.start().recipient())
             }
-            EventSystemBackend::Persisted(b) => {
-                let config = self.aggregate_config();
-                let indexes: Vec<usize> = config.delays.keys().map(|id| **id).collect();
-                let indexes = if indexes.is_empty() { vec![0] } else { indexes };
-
-                let addrs = b
-                    .eventstore
-                    .get_or_try_init(|| -> Result<_> {
-                        let mut eventstore_map = HashMap::new();
-                        for &index in &indexes {
-                            // Enumerate the log path for each eventstore
-                            let enumerated_log_path = enumerate_path(&b.log_path, index);
-                            // Enumerate the sequence_index tree name for each eventstore
-                            let tree_name = if index == 0 {
-                                "sequence_index".to_string()
-                            } else {
-                                format!("sequence_index.{}", index)
-                            };
-
-                            let index_store = SledSequenceIndex::new(&b.sled_path, &tree_name)?;
-                            let log = CommitLogEventLog::new(&enumerated_log_path)?;
-                            eventstore_map.insert(index, EventStore::new(index_store, log).start());
-                        }
-                        Ok(eventstore_map)
-                    })?
-                    .clone();
-                Ok(EventStoreAddrs::Persisted(addrs))
+            EventStoreAddrs::Persisted(addrs) => {
+                let mut router = EventStoreRouter::new();
+                for (index, addr) in addrs {
+                    router.register_store(AggregateId::new(index), addr);
+                }
+                Ok(router.start().recipient())
             }
         }
     }
