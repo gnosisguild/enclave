@@ -298,14 +298,14 @@ impl CiphernodeBuilder {
     async fn create_aggregate_config(
         &self,
         provider_cache: &mut ProviderCaches,
-    ) -> anyhow::Result<AggregateConfig> {
+    ) -> Result<AggregateConfig> {
         let mut chain_providers = Vec::new();
         for chain in &self.chains {
             let provider = provider_cache.ensure_read_provider(chain).await?;
-            chain_providers.push((chain.clone(), provider));
+            chain_providers.push((chain.clone(), provider.chain_id()));
         }
 
-        let delays = create_aggregate_delays(&chain_providers);
+        let delays = create_aggregate_delays(&chain_providers)?;
         Ok(AggregateConfig::new(delays))
     }
 
@@ -602,47 +602,34 @@ fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
                 chain.name, expected_chain_id, actual_chain_id
             ));
         }
-        info!(
-            "Chain '{}' (ID: {}) chain_id validation passed",
-            chain.name, actual_chain_id
-        );
     }
     Ok(())
 }
 
 /// Build delay configuration for a specific chain
-fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> Option<(AggregateId, u64)> {
-    if let Some(finalization_ms) = chain.finalization_ms {
-        let aggregate_id = e3_events::AggregateId::new(actual_chain_id as usize);
-        let delay_us = finalization_ms * 1000; // ms → microseconds
-        Some((aggregate_id, delay_us))
-    } else {
-        None
-    }
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, u64) {
+    let aggregate_id = AggregateId::new(actual_chain_id as usize);
+    let finalization_ms = chain.finalization_ms.unwrap_or(0);
+    let delay_us = finalization_ms * 1000; // ms → microseconds
+    (aggregate_id, delay_us)
 }
 
 /// Build delays configuration from chain providers
 fn create_aggregate_delays(
-    chain_providers: &[(ChainConfig, EthProvider<ConcreteReadProvider>)],
-) -> HashMap<AggregateId, u64> {
+    chain_providers: &[(ChainConfig, u64)],
+) -> Result<HashMap<AggregateId, u64>> {
     let mut delays = HashMap::new();
 
-    for (chain, provider) in chain_providers {
-        let actual_chain_id = provider.chain_id();
-
+    for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
         // Validate chain_id if specified in configuration
-        if let Err(e) = validate_chain_id(chain, actual_chain_id) {
-            error!("Chain validation failed: {}", e);
-            continue; // Skip this chain and continue with others
-        }
+        validate_chain_id(&chain, actual_chain_id)?;
 
         // Add delay if configured
-        if let Some((aggregate_id, delay_us)) = create_aggregate_delay(chain, actual_chain_id) {
-            delays.insert(aggregate_id, delay_us);
-        }
+        let (aggregate_id, delay_us) = create_aggregate_delay(&chain, actual_chain_id);
+        delays.insert(aggregate_id, delay_us);
     }
 
-    delays
+    Ok(delays)
 }
 
 impl ProviderCaches {

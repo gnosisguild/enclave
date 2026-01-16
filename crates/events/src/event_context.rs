@@ -19,6 +19,10 @@ impl AggregateId {
     pub fn new(value: usize) -> Self {
         Self(value)
     }
+
+    pub fn to_usize(&self) -> usize {
+        self.0
+    }
 }
 
 impl From<Option<E3id>> for AggregateId {
