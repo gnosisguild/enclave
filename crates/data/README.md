@@ -170,5 +170,5 @@ struct MyActor {
 
 We have also extracted the key calculation mechanism to a
 [`StoreKeys`](https://github.com/gnosisguild/enclave/blob/main/crates/config/src/store_keys.rs)
-struct. This is used in various places when creating repsitory factories for example
+struct. This is used in various places when creating repository factories for example
 [here](https://github.com/gnosisguild/enclave/blob/main/crates/aggregator/src/repositories.rs)
