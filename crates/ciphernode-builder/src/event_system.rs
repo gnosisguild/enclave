@@ -20,8 +20,63 @@ use std::path::PathBuf;
 
 pub use e3_data::AggregateConfig;
 
+/// Enumerates a PathBuf by inserting an index before the file extension
+/// or at the end if there is no extension
+///
+/// Examples:
+/// - "/foo/bar/thing.pdf" -> "/foo/bar/thing.0.pdf"
+/// - "/foo/bar/thing" -> "/foo/bar/thing.0"
+pub fn enumerate_path(path: &PathBuf, index: usize) -> PathBuf {
+    if let Some(parent) = path.parent() {
+        if let Some(file_name) = path.file_name() {
+            if let Some(file_name_str) = file_name.to_str() {
+                if let Some(dot_pos) = file_name_str.rfind('.') {
+                    // Has extension
+                    let (stem, extension) = file_name_str.split_at(dot_pos);
+                    let new_name = format!("{}.{}{}", stem, index, extension);
+                    parent.join(new_name)
+                } else {
+                    // No extension
+                    let new_name = format!("{}.{}", file_name_str, index);
+                    parent.join(new_name)
+                }
+            } else {
+                // Invalid UTF-8 in filename, append index directly
+                let new_name = format!("{}.{}", file_name.to_string_lossy(), index);
+                parent.join(new_name)
+            }
+        } else {
+            // Path ends with '/', just append index
+            path.join(format!("{}", index))
+        }
+    } else {
+        // No parent, just modify the filename directly
+        if let Some(file_name) = path.file_name() {
+            if let Some(file_name_str) = file_name.to_str() {
+                if let Some(dot_pos) = file_name_str.rfind('.') {
+                    // Has extension
+                    let (stem, extension) = file_name_str.split_at(dot_pos);
+                    let new_name = format!("{}.{}{}", stem, index, extension);
+                    PathBuf::from(new_name)
+                } else {
+                    // No extension
+                    let new_name = format!("{}.{}", file_name_str, index);
+                    PathBuf::from(new_name)
+                }
+            } else {
+                // Invalid UTF-8 in filename, append index directly
+                let new_name = format!("{}.{}", file_name.to_string_lossy(), index);
+                PathBuf::from(new_name)
+            }
+        } else {
+            // Empty path, just return the index as a path
+            PathBuf::from(format!("{}", index))
+        }
+    }
+}
+
 struct InMemBackend {
-    eventstore: OnceCell<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>,
+    eventstore: OnceCell<Vec<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
@@ -29,7 +84,7 @@ struct InMemBackend {
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
-    eventstore: OnceCell<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>,
+    eventstore: OnceCell<Vec<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
     store: OnceCell<Addr<SledStore>>,
 }
 
@@ -39,16 +94,20 @@ enum EventSystemBackend {
     Persisted(PersistedBackend),
 }
 
-pub enum EventStoreAddr {
-    InMem(Addr<EventStore<InMemSequenceIndex, InMemEventLog>>),
-    Persisted(Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>),
+pub enum EventStoreAddrs {
+    InMem(Vec<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>),
+    Persisted(Vec<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
 }
 
-impl TryFrom<EventStoreAddr> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
+impl TryFrom<EventStoreAddrs> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
     type Error = anyhow::Error;
-    fn try_from(value: EventStoreAddr) -> std::result::Result<Self, Self::Error> {
-        if let EventStoreAddr::InMem(addr) = value {
-            Ok(addr)
+    fn try_from(value: EventStoreAddrs) -> std::result::Result<Self, Self::Error> {
+        if let EventStoreAddrs::InMem(mut addrs) = value {
+            if let Some(addr) = addrs.pop() {
+                Ok(addr)
+            } else {
+                Err(anyhow!("InMem event store addresses vector is empty"))
+            }
         } else {
             Err(anyhow!(
                 "address was not EventStore<InMemSequenceIndex, InMemEventLog>"
@@ -203,39 +262,52 @@ impl EventSystem {
     /// Get the sequencer address
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
-            .get_or_try_init(|| match self.eventstore()? {
-                EventStoreAddr::InMem(es) => {
+            .get_or_try_init(|| match self.eventstores()? {
+                EventStoreAddrs::InMem(addrs) => {
+                    let es = addrs
+                        .get(0)
+                        .ok_or_else(|| anyhow!("No event stores available"))?
+                        .clone();
                     Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
                 }
-                EventStoreAddr::Persisted(es) => {
+                EventStoreAddrs::Persisted(addrs) => {
+                    let es = addrs
+                        .get(0)
+                        .ok_or_else(|| anyhow!("No event stores available"))?
+                        .clone();
                     Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
                 }
             })
             .cloned()
     }
 
-    /// Get the EventStore address
-    pub fn eventstore(&self) -> Result<EventStoreAddr> {
+    /// Get the EventStore addresses
+    pub fn eventstores(&self) -> Result<EventStoreAddrs> {
         match &self.backend {
             EventSystemBackend::InMem(b) => {
-                let addr = b
+                let addrs = b
                     .eventstore
                     .get_or_init(|| {
-                        EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new()).start()
+                        vec![
+                            EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new())
+                                .start(),
+                        ]
                     })
                     .clone();
-                Ok(EventStoreAddr::InMem(addr))
+                Ok(EventStoreAddrs::InMem(addrs))
             }
             EventSystemBackend::Persisted(b) => {
-                let addr = b
+                let addrs = b
                     .eventstore
                     .get_or_try_init(|| -> Result<_> {
+                        // For now, create only one event store with the original sequence_index tree name
+                        // In the future, this could be extended to create multiple stores with enumerated names
                         let index = SledSequenceIndex::new(&b.sled_path, "sequence_index")?;
                         let log = CommitLogEventLog::new(&b.log_path)?;
-                        Ok(EventStore::new(index, log).start())
+                        Ok(vec![EventStore::new(index, log).start()])
                     })?
                     .clone();
-                Ok(EventStoreAddr::Persisted(addr))
+                Ok(EventStoreAddrs::Persisted(addrs))
             }
         }
     }
@@ -417,7 +489,7 @@ mod tests {
         let system = EventSystem::in_mem("cn1").with_fresh_bus();
         let handle = system.handle()?;
         let datastore = system.store()?;
-        let eventstore = system.eventstore()?;
+        let eventstores = system.eventstores()?;
         let listener = Listener {
             logs: Vec::new(),
             events: Vec::new(),
@@ -479,8 +551,8 @@ mod tests {
         let logs = listener.send(GetLogs).await?;
         assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
 
-        // Get the in mem address for the event store
-        let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstore.try_into()?;
+        // Get the in mem address for the event store (using index 0)
+        let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstores.try_into()?;
 
         // Get all events after the given timestamp and send them to the listener
         es.do_send(GetEventsAfter::new(ts, listener.clone()));
