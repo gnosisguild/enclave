@@ -3019,7 +3019,9 @@ name = "e3-evm-helpers"
 version = "0.1.7"
 dependencies = [
  "alloy",
+ "anyhow",
  "async-trait",
+ "e3-utils",
  "eyre",
  "futures",
  "futures-util",

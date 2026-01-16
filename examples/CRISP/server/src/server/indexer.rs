@@ -25,7 +25,7 @@ use e3_sdk::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
             PlaintextOutputPublished,
         },
-        retry::call_with_retry,
+        retry::{call_with_retry, send_tx_with_retry},
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
