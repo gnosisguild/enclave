@@ -14,6 +14,66 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IEnclave {
     ////////////////////////////////////////////////////////////
     //                                                        //
+    //                         Enums                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Lifecycle stages of an E3 computation
+    enum E3Stage {
+        None,
+        Requested,
+        CommitteeFinalized,
+        KeyPublished,
+        Activated,
+        CiphertextReady,
+        Complete,
+        Failed
+    }
+
+    /// @notice Reasons why an E3 failed
+    enum FailureReason {
+        None,
+        CommitteeFormationTimeout,
+        InsufficientCommitteeMembers,
+        DKGTimeout,
+        DKGInvalidShares,
+        ActivationWindowExpired,
+        NoInputsReceived,
+        ComputeTimeout,
+        ComputeProviderExpired,
+        ComputeProviderFailed,
+        RequesterCancelled,
+        DecryptionTimeout,
+        DecryptionInvalidShares,
+        VerificationFailed
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                        Structs                         //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Timeout configuration for E3 stages
+    struct E3TimeoutConfig {
+        uint256 committeeFormationWindow;
+        uint256 dkgWindow;
+        uint256 computeWindow;
+        uint256 decryptionWindow;
+        uint256 gracePeriod;
+    }
+
+    /// @notice Deadlines for each E3
+    struct E3Deadlines {
+        uint256 committeeDeadline;
+        uint256 dkgDeadline;
+        uint256 activationDeadline;
+        uint256 computeDeadline;
+        uint256 decryptionDeadline;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
     //                         Events                         //
     //                                                        //
     ////////////////////////////////////////////////////////////
@@ -106,10 +166,6 @@ interface IEnclave {
     /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
     event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
 
-    /// @notice Emitted when E3Lifecycle contract is set.
-    /// @param e3Lifecycle The address of the E3Lifecycle contract.
-    event E3LifecycleSet(address indexed e3Lifecycle);
-
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
     event E3RefundManagerSet(address indexed e3RefundManager);
@@ -132,9 +188,26 @@ interface IEnclave {
     /// @param e3Id The ID of the E3.
     event CommitteeFinalized(uint256 indexed e3Id);
 
+    /// @notice Emitted when E3 stage changes
+    event E3StageChanged(
+        uint256 indexed e3Id,
+        E3Stage previousStage,
+        E3Stage newStage
+    );
+
+    /// @notice Emitted when an E3 is marked as failed
+    event E3Failed(
+        uint256 indexed e3Id,
+        E3Stage failedAtStage,
+        FailureReason reason
+    );
+
+    /// @notice Emitted when timeout config is updated
+    event TimeoutConfigUpdated(E3TimeoutConfig config);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
-    //                  Structs                               //
+    //                  Request Params                        //
     //                                                        //
     ////////////////////////////////////////////////////////////
 
@@ -331,8 +404,64 @@ interface IEnclave {
     function onCommitteePublished(uint256 e3Id) external;
 
     /// @notice Called by authorized contracts to mark an E3 as failed with a specific reason.
-    /// @dev Routes to E3Lifecycle.markE3FailedWithReason.
+    /// @dev Updates E3 lifecycle to Failed stage with the given reason.
     /// @param e3Id ID of the E3.
-    /// @param reason The failure reason from IE3Lifecycle.FailureReason enum.
+    /// @param reason The failure reason from FailureReason enum.
     function onE3Failed(uint256 e3Id, uint8 reason) external;
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                  Lifecycle Functions                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Anyone can mark an E3 as failed if timeout passed
+    /// @param e3Id The E3 ID
+    /// @return reason The failure reason
+    function markE3Failed(uint256 e3Id) external returns (FailureReason reason);
+
+    /// @notice Check if E3 can be marked as failed
+    /// @param e3Id The E3 ID
+    /// @return canFail Whether failure condition is met
+    /// @return reason The failure reason if applicable
+    function checkFailureCondition(
+        uint256 e3Id
+    ) external view returns (bool canFail, FailureReason reason);
+
+    /// @notice Get current stage of an E3
+    /// @param e3Id The E3 ID
+    /// @return stage The current stage
+    function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
+
+    /// @notice Get failure reason for an E3
+    /// @param e3Id The E3 ID
+    /// @return reason The failure reason
+    function getFailureReason(
+        uint256 e3Id
+    ) external view returns (FailureReason reason);
+
+    /// @notice Get requester address for an E3
+    /// @param e3Id The E3 ID
+    /// @return requester The requester address
+    function getRequester(
+        uint256 e3Id
+    ) external view returns (address requester);
+
+    /// @notice Get deadlines for an E3
+    /// @param e3Id The E3 ID
+    /// @return deadlines The E3 deadlines
+    function getDeadlines(
+        uint256 e3Id
+    ) external view returns (E3Deadlines memory deadlines);
+
+    /// @notice Get timeout configuration
+    /// @return config The current timeout config
+    function getTimeoutConfig()
+        external
+        view
+        returns (E3TimeoutConfig memory config);
+
+    /// @notice Set timeout configuration
+    /// @param config The new timeout config
+    function setTimeoutConfig(E3TimeoutConfig calldata config) external;
 }
