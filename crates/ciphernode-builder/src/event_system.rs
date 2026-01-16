@@ -112,7 +112,7 @@ pub struct EventSystem {
     /// Central configuration for aggregates, including delays and other settings
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
-    cached_eventstores: OnceCell<EventStoreAddrs>,
+    eventstores: OnceCell<EventStoreAddrs>,
 }
 
 impl EventSystem {
@@ -136,7 +136,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            cached_eventstores: OnceCell::new(),
+            eventstores: OnceCell::new(),
         }
     }
 
@@ -155,7 +155,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            cached_eventstores: OnceCell::new(),
+            eventstores: OnceCell::new(),
         }
     }
 
@@ -176,7 +176,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            cached_eventstores: OnceCell::new(),
+            eventstores: OnceCell::new(),
         }
     }
 
@@ -255,7 +255,7 @@ impl EventSystem {
 
     /// Get the EventStore addresses
     pub fn eventstores(&self) -> Result<EventStoreAddrs> {
-        self.cached_eventstores
+        self.eventstores
             .get_or_try_init(|| {
                 match &self.backend {
                     EventSystemBackend::InMem(b) => {
