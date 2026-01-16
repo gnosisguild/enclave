@@ -234,21 +234,9 @@ impl EventSystem {
     /// Get the sequencer address
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
-            .get_or_try_init(|| match self.eventstores()? {
-                EventStoreAddrs::InMem(addrs) => {
-                    let es = addrs
-                        .get(&0)
-                        .ok_or_else(|| anyhow!("No event stores available"))?
-                        .clone();
-                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
-                }
-                EventStoreAddrs::Persisted(addrs) => {
-                    let es = addrs
-                        .get(&0)
-                        .ok_or_else(|| anyhow!("No event stores available"))?
-                        .clone();
-                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
-                }
+            .get_or_try_init(|| {
+                let router = self.eventstore_router()?;
+                Ok(Sequencer::new(&self.eventbus(), router, self.buffer()).start())
             })
             .cloned()
     }
