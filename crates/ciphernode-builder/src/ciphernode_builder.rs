@@ -305,7 +305,7 @@ impl CiphernodeBuilder {
             chain_providers.push((chain.clone(), provider));
         }
 
-        let delays = build_delays_from_chains(&chain_providers);
+        let delays = create_aggregate_delays(&chain_providers);
         Ok(AggregateConfig::new(delays))
     }
 
@@ -611,7 +611,7 @@ fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
 }
 
 /// Build delay configuration for a specific chain
-fn build_delay_for_chain(chain: &ChainConfig, actual_chain_id: u64) -> Option<(AggregateId, u64)> {
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> Option<(AggregateId, u64)> {
     if let Some(finalization_ms) = chain.finalization_ms {
         let aggregate_id = e3_events::AggregateId::new(actual_chain_id as usize);
         let delay_us = finalization_ms * 1000; // ms → microseconds
@@ -622,7 +622,7 @@ fn build_delay_for_chain(chain: &ChainConfig, actual_chain_id: u64) -> Option<(A
 }
 
 /// Build delays configuration from chain providers
-fn build_delays_from_chains(
+fn create_aggregate_delays(
     chain_providers: &[(ChainConfig, EthProvider<ConcreteReadProvider>)],
 ) -> HashMap<AggregateId, u64> {
     let mut delays = HashMap::new();
@@ -637,7 +637,7 @@ fn build_delays_from_chains(
         }
 
         // Add delay if configured
-        if let Some((aggregate_id, delay_us)) = build_delay_for_chain(chain, actual_chain_id) {
+        if let Some((aggregate_id, delay_us)) = create_aggregate_delay(chain, actual_chain_id) {
             delays.insert(aggregate_id, delay_us);
         }
     }
