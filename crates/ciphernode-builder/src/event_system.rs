@@ -13,67 +13,13 @@ use e3_data::{
 };
 use e3_events::hlc::Hlc;
 use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
+use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
 pub use e3_data::AggregateConfig;
-
-/// Enumerates a PathBuf by inserting an index before the file extension
-/// or at the end if there is no extension
-///
-/// Examples:
-/// - "/foo/bar/thing.pdf" -> "/foo/bar/thing.0.pdf"
-/// - "/foo/bar/thing" -> "/foo/bar/thing.0"
-pub fn enumerate_path(path: &PathBuf, index: usize) -> PathBuf {
-    if let Some(parent) = path.parent() {
-        if let Some(file_name) = path.file_name() {
-            if let Some(file_name_str) = file_name.to_str() {
-                if let Some(dot_pos) = file_name_str.rfind('.') {
-                    // Has extension
-                    let (stem, extension) = file_name_str.split_at(dot_pos);
-                    let new_name = format!("{}.{}{}", stem, index, extension);
-                    parent.join(new_name)
-                } else {
-                    // No extension
-                    let new_name = format!("{}.{}", file_name_str, index);
-                    parent.join(new_name)
-                }
-            } else {
-                // Invalid UTF-8 in filename, append index directly
-                let new_name = format!("{}.{}", file_name.to_string_lossy(), index);
-                parent.join(new_name)
-            }
-        } else {
-            // Path ends with '/', just append index
-            path.join(format!("{}", index))
-        }
-    } else {
-        // No parent, just modify the filename directly
-        if let Some(file_name) = path.file_name() {
-            if let Some(file_name_str) = file_name.to_str() {
-                if let Some(dot_pos) = file_name_str.rfind('.') {
-                    // Has extension
-                    let (stem, extension) = file_name_str.split_at(dot_pos);
-                    let new_name = format!("{}.{}{}", stem, index, extension);
-                    PathBuf::from(new_name)
-                } else {
-                    // No extension
-                    let new_name = format!("{}.{}", file_name_str, index);
-                    PathBuf::from(new_name)
-                }
-            } else {
-                // Invalid UTF-8 in filename, append index directly
-                let new_name = format!("{}.{}", file_name.to_string_lossy(), index);
-                PathBuf::from(new_name)
-            }
-        } else {
-            // Empty path, just return the index as a path
-            PathBuf::from(format!("{}", index))
-        }
-    }
-}
 
 struct InMemBackend {
     eventstore: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
@@ -310,7 +256,7 @@ impl EventSystem {
                 let addrs = b
                     .eventstore
                     .get_or_init(|| {
-                        let mut eventstore_map = std::collections::HashMap::new();
+                        let mut eventstore_map = HashMap::new();
                         for &index in &indexes {
                             eventstore_map.insert(
                                 index,
@@ -331,7 +277,7 @@ impl EventSystem {
                 let addrs = b
                     .eventstore
                     .get_or_try_init(|| -> Result<_> {
-                        let mut eventstore_map = std::collections::HashMap::new();
+                        let mut eventstore_map = HashMap::new();
                         for &index in &indexes {
                             // Enumerate the log path for each eventstore
                             let enumerated_log_path = enumerate_path(&b.log_path, index);
@@ -611,7 +557,7 @@ mod tests {
         use e3_events::AggregateId;
 
         // Create an AggregateConfig with multiple AggregateIds
-        let mut delays = std::collections::HashMap::new();
+        let mut delays = HashMap::new();
         delays.insert(AggregateId::new(0), 1000); // 1ms delay
         delays.insert(AggregateId::new(1), 2000); // 2ms delay
         delays.insert(AggregateId::new(2), 3000); // 3ms delay
@@ -643,7 +589,7 @@ mod tests {
             tmp.path().join("log"),
             tmp.path().join("sled"),
         )
-        .with_aggregate_config(AggregateConfig::new(std::collections::HashMap::new()));
+        .with_aggregate_config(AggregateConfig::new(HashMap::new()));
 
         let persisted_eventstores = persisted_system.eventstores()?;
 
