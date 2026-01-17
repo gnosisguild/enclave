@@ -30,11 +30,13 @@ pub async fn execute(config: &AppConfig) -> Result<PeerId> {
 pub async fn autonetkey(config: &AppConfig) -> Result<()> {
     let repositories = get_repositories(config)?;
     if !repositories.libp2p_keypair().has().await {
-        warn!("Auto-generating network keypair because 'autonetkey: true' is set and no keypair exists.");
-        warn!("This will create a NEW peer identity. If your data directory is not persistent");
-        warn!("(e.g., running in Docker without volumes), a new identity will be generated on each restart,");
-        warn!("which will cause network connectivity issues with other peers.");
-        warn!("For production use, run 'enclave net keypair (generate)/(set --net-keypair <YOUR_PEER_ID>)' once and ensure data persistence.");
+        warn!(
+            "Auto-generating network keypair because 'autonetkey: true' is set and no keypair exists. \
+            This will create a NEW peer identity. If your data directory is not persistent \
+            (e.g., running in Docker without volumes), a new identity will be generated on each restart, \
+            which will cause network connectivity issues with other peers. \
+            For production use, run 'enclave net keypair (generate)/(set --net-keypair <YOUR_PEER_ID>)' once and ensure data persistence."
+        );
         execute(config).await?;
     }
     Ok(())
