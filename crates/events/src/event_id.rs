@@ -12,7 +12,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct EventId(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub [u8; 32]);
 

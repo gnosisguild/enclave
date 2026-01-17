@@ -60,7 +60,7 @@ async fn setup_local_ciphernode(
     let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
         .with_keyshare()
         .with_address(addr)
-        .testmode_with_forked_bus(bus.consumer())
+        .testmode_with_forked_bus(bus.event_bus())
         .testmode_with_history()
         .testmode_with_errors()
         .with_pubkey_aggregation()
@@ -662,7 +662,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
-        bus.event_from(event.clone())?.to_bytes()?,
+        bus.event_from(event.clone(), None)?.to_bytes()?,
     )));
 
     // check the history of the event bus

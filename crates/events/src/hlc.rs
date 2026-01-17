@@ -33,8 +33,11 @@ pub enum HlcError {
 /// HLC timestamp
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HlcTimestamp {
+    /// Physical timestamp in microseconds since UNIX epoch
     pub ts: u64,
+    /// Logical counter for same-timestamp ordering
     pub counter: u32,
+    /// Unique node identifier for tie-breaking
     pub node: u32,
 }
 
@@ -42,6 +45,11 @@ impl HlcTimestamp {
     /// Create a new Timestamp
     pub fn new(ts: u64, counter: u32, node: u32) -> Self {
         Self { ts, counter, node }
+    }
+
+    /// Extract wall time from a u128 timestamp
+    pub fn wall_time(ts: u128) -> u64 {
+        Self::from_u128(ts).ts
     }
 
     /// Packs the HLC timestamp into a 128bit big-endian representation.
@@ -173,7 +181,9 @@ pub struct Hlc {
 
 #[derive(PartialEq)]
 struct HlcInner {
+    /// Current timestamp value
     ts: u64,
+    /// Current logical counter
     counter: u32,
 }
 

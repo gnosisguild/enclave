@@ -44,6 +44,8 @@ exclude = [
 ]
 resolver = "3"
 msrv = "1.86.0"
+
+[workspace.metadata.release]
 shared-version = true
 pre-release-commit-message = "chore: Release {{crate_name}} v{{version}}"
 pre-release-replacements = [

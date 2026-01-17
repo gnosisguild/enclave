@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::event_system::AggregateConfig;
 use crate::{CiphernodeHandle, EventSystem};
 use actix::{Actor, Addr};
 use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
@@ -16,7 +17,7 @@ use e3_aggregator::ext::{
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
@@ -36,7 +37,6 @@ use e3_sortition::{
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
-use rayon::ThreadPool;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -294,6 +294,21 @@ impl CiphernodeBuilder {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
 
+    /// Create aggregate configuration from configured chains
+    async fn create_aggregate_config(
+        &self,
+        provider_cache: &mut ProviderCaches,
+    ) -> Result<AggregateConfig> {
+        let mut chain_providers = Vec::new();
+        for chain in &self.chains {
+            let provider = provider_cache.ensure_read_provider(chain).await?;
+            chain_providers.push((chain.clone(), provider.chain_id()));
+        }
+
+        let delays = create_aggregate_delays(&chain_providers)?;
+        Ok(AggregateConfig::new(delays))
+    }
+
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
         // Local bus for ciphernode events can either be forked from a bus or it can be directly
         // attached to a source bus
@@ -336,15 +351,26 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
+        // Create provider cache early to use for chain validation
+        let mut provider_cache = ProviderCaches::new();
+
+        let aggregate_config = self.create_aggregate_config(&mut provider_cache).await?;
+
         // Get an event system instance.
         let event_system =
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(&addr, log_path, kv_path).with_event_bus(local_bus)
+                EventSystem::persisted(&addr, log_path, kv_path)
+                    .with_event_bus(local_bus)
+                    .with_aggregate_config(aggregate_config)
             } else {
                 if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(&addr, store).with_event_bus(local_bus)
+                    EventSystem::in_mem_from_store(&addr, store)
+                        .with_event_bus(local_bus)
+                        .with_aggregate_config(aggregate_config.clone())
                 } else {
-                    EventSystem::in_mem(&addr).with_event_bus(local_bus)
+                    EventSystem::in_mem(&addr)
+                        .with_event_bus(local_bus)
+                        .with_aggregate_config(aggregate_config.clone())
                 }
             };
 
@@ -368,7 +394,6 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
             .await?;
 
-        let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
 
         let coordinator = HistoricalEventCoordinator::setup(bus.clone());
@@ -566,6 +591,45 @@ struct ProviderCaches {
     signer_cache: Option<LocalSigner<SigningKey>>,
     read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
     write_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteWriteProvider>>,
+}
+
+/// Validate chain ID matches expected configuration
+fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
+    if let Some(expected_chain_id) = chain.chain_id {
+        if actual_chain_id != expected_chain_id {
+            return Err(anyhow::anyhow!(
+                "Chain '{}' validation failed: expected chain_id {}, but provider returned chain_id {}",
+                chain.name, expected_chain_id, actual_chain_id
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Build delay configuration for a specific chain
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, u64) {
+    let aggregate_id = AggregateId::new(actual_chain_id as usize);
+    let finalization_ms = chain.finalization_ms.unwrap_or(0);
+    let delay_us = finalization_ms * 1000; // ms → microseconds
+    (aggregate_id, delay_us)
+}
+
+/// Build delays configuration from chain providers
+fn create_aggregate_delays(
+    chain_providers: &[(ChainConfig, u64)],
+) -> Result<HashMap<AggregateId, u64>> {
+    let mut delays = HashMap::new();
+
+    for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
+        // Validate chain_id if specified in configuration
+        validate_chain_id(&chain, actual_chain_id)?;
+
+        // Add delay if configured
+        let (aggregate_id, delay_us) = create_aggregate_delay(&chain, actual_chain_id);
+        delays.insert(aggregate_id, delay_us);
+    }
+
+    Ok(delays)
 }
 
 impl ProviderCaches {
