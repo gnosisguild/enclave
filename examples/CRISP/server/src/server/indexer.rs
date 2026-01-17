@@ -24,7 +24,7 @@ use e3_sdk::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
             PlaintextOutputPublished,
         },
-        retry::{call_with_retry, send_tx_with_retry},
+        retry::call_with_retry,
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
@@ -56,9 +56,15 @@ pub async fn register_e3_requested(
                 let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
                     let contract = contract.clone();
                     let event_e3_id = event.e3Id;
-                    async move { contract.get_e3(event_e3_id).await }
+                    async move {
+                        contract
+                            .get_e3(event_e3_id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!("{}", e))
+                    }
                 })
-                .await?;
+                .await
+                .map_err(|e| eyre::eyre!("{}", e))?;
 
                 // Convert custom params bytes back to token address and balance threshold.
 
@@ -341,9 +347,15 @@ pub async fn register_committee_published(
                 let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
                     let contract = contract.clone();
                     let event_e3_id = event.e3Id;
-                    async move { contract.get_e3(event_e3_id).await }
+                    async move {
+                        contract
+                            .get_e3(event_e3_id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!("{}", e))
+                    }
                 })
-                .await?;
+                .await
+                .map_err(|e| eyre::eyre!("{}", e))?;
                 if u64::try_from(e3.expiration)? > 0 {
                     info!("[e3_id={}] E3 already activated", event.e3Id);
                     return Ok(());
@@ -375,7 +387,7 @@ async fn handle_committee_time_expired(
     ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
 ) -> eyre::Result<()> {
     // If not activated activate
-    let tx = send_tx_with_retry("activate", &["0x45ccf3c6"], || {
+    let tx = call_with_retry("activate", &["0x45ccf3c6"], || {
         let value = ctx.clone();
         async move {
             info!("[e3_id={}] Calling Enclave.Activate", event.e3Id);
