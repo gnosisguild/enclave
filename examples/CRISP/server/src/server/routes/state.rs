@@ -7,12 +7,15 @@
 use std::str::FromStr;
 
 use crate::server::{
-    CONFIG, app_data::AppData, models::{
-        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest, PreviousCiphertextResponse, RoundRequestWithRequester, WebhookPayload
-    }
+    app_data::AppData,
+    models::{
+        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest,
+        PreviousCiphertextResponse, RoundRequestWithRequester, WebhookPayload,
+    },
+    CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::{primitives::{Address, Bytes, U256}};
+use alloy::primitives::{Address, Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{
     EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
 };
@@ -219,7 +222,10 @@ async fn get_round_result(
 /// # Returns
 ///
 /// * A JSON response containing the results for all rounds
-async fn get_all_round_results(data: web::Json::<RoundRequestWithRequester>, store: web::Data<AppData>) -> impl Responder {
+async fn get_all_round_results(
+    data: web::Json<RoundRequestWithRequester>,
+    store: web::Data<AppData>,
+) -> impl Responder {
     let incoming = data.into_inner();
 
     let round_count = match store.current_round().get_current_round_id().await {

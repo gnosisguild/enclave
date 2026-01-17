@@ -45,20 +45,23 @@ impl<S: DataStore> CurrentRoundRepository<S> {
     }
 
     /// Get the current (most recent) round for a specific requester
-    /// 
+    ///
     /// # Arguments
     /// * `requester` - The requester address to find the current round for
-    /// 
+    ///
     /// # Returns
     /// * The CurrentRound object for the most recent round by this requester, or None if not found
-    pub async fn get_current_round_for_requester(&self, requester: String) -> Result<Option<CurrentRound>> {
+    pub async fn get_current_round_for_requester(
+        &self,
+        requester: String,
+    ) -> Result<Option<CurrentRound>> {
         // Get the current round count to iterate through all rounds
         let round_count = self.get_current_round_id().await?;
-        
+
         // Iterate backwards from the most recent round to find the latest one for this requester
         for round_id in (0..=round_count).rev() {
             let crisp_repo = CrispE3Repository::new(self.store.clone(), round_id);
-            
+
             match crisp_repo.get_e3_state_lite().await {
                 Ok(state) => {
                     if state.requester == requester {
@@ -180,7 +183,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             token_address,
             balance_threshold,
             ciphertext_inputs: vec![],
-            requester
+            requester,
         })
         .await
     }
