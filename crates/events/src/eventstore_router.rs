@@ -20,14 +20,12 @@ pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
 }
 
 impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
-    pub fn new() -> Self {
-        Self {
-            stores: HashMap::new(),
-        }
-    }
-
-    pub fn register_store(&mut self, aggregate_id: AggregateId, store: Addr<EventStore<I, L>>) {
-        self.stores.insert(aggregate_id, store);
+    pub fn new(stores: HashMap<usize, Addr<EventStore<I, L>>>) -> Self {
+        let stores = stores
+            .into_iter()
+            .map(|(index, addr)| (AggregateId::new(index), addr))
+            .collect();
+        Self { stores }
     }
 
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {

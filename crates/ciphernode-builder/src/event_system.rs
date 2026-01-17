@@ -13,8 +13,8 @@ use e3_data::{
 };
 use e3_events::hlc::Hlc;
 use e3_events::{
-    AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter,
-    Sequencer, StoreEventRequested,
+    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter, Sequencer,
+    StoreEventRequested,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -302,17 +302,11 @@ impl EventSystem {
         let eventstores = self.eventstores()?;
         match eventstores {
             EventStoreAddrs::InMem(addrs) => {
-                let mut router = EventStoreRouter::new();
-                for (index, addr) in addrs {
-                    router.register_store(AggregateId::new(index), addr);
-                }
+                let router = EventStoreRouter::new(addrs);
                 Ok(router.start().recipient())
             }
             EventStoreAddrs::Persisted(addrs) => {
-                let mut router = EventStoreRouter::new();
-                for (index, addr) in addrs {
-                    router.register_store(AggregateId::new(index), addr);
-                }
+                let router = EventStoreRouter::new(addrs);
                 Ok(router.start().recipient())
             }
         }
