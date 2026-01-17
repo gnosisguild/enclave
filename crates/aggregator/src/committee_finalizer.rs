@@ -62,7 +62,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
         let e3_id = msg.e3_id.clone();
         let submission_deadline = msg.submission_deadline;
 
-        const FINALIZATION_BUFFER_SECONDS: u64 = 5;
+        const FINALIZATION_BUFFER_SECONDS: u64 = 1;
 
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
