@@ -13,6 +13,7 @@ use alloy::{
         },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
+    rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     transports::{
         http::{
@@ -31,7 +32,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use std::{env, sync::Arc};
+use e3_utils::{retry_with_backoff, RetryError};
+use std::{env, future::Future, sync::Arc};
+use tracing::info;
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -222,6 +225,56 @@ pub async fn get_current_timestamp() -> Result<u64> {
         .ok_or_else(|| anyhow::anyhow!("Latest block not found"))?;
 
     Ok(block.header.timestamp)
+}
+
+const TX_RETRY_MAX_ATTEMPTS: u32 = 3;
+const TX_RETRY_INITIAL_DELAY_MS: u64 = 2000;
+
+fn should_retry_error(error: &str, retry_on_errors: &[&str]) -> bool {
+    if retry_on_errors.is_empty() {
+        return true;
+    }
+    retry_on_errors.iter().any(|code| error.contains(code))
+}
+
+pub async fn send_tx_with_retry<F, Fut>(
+    operation_name: &str,
+    retry_on_errors: &[&str],
+    tx_fn: F,
+) -> Result<TransactionReceipt>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<TransactionReceipt>>,
+{
+    let op_name = operation_name.to_string();
+    let retry_codes: Vec<String> = retry_on_errors.iter().map(|s| s.to_string()).collect();
+
+    retry_with_backoff(
+        || {
+            let op_name = op_name.clone();
+            let retry_codes = retry_codes.clone();
+            let fut = tx_fn();
+            async move {
+                match fut.await {
+                    Ok(receipt) => Ok(receipt),
+                    Err(e) => {
+                        let error_str = format!("{}", e);
+                        let retry_refs: Vec<&str> =
+                            retry_codes.iter().map(|s| s.as_str()).collect();
+                        if should_retry_error(&error_str, &retry_refs) {
+                            info!("{}: error, will retry: {}", op_name, e);
+                            Err(RetryError::Retry(e))
+                        } else {
+                            Err(RetryError::Failure(e))
+                        }
+                    }
+                }
+            }
+        },
+        TX_RETRY_MAX_ATTEMPTS,
+        TX_RETRY_INITIAL_DELAY_MS,
+    )
+    .await
 }
 
 #[cfg(test)]
