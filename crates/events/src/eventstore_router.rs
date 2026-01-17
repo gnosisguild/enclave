@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use tracing::error;
 
 pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
-    stores: HashMap<AggregateId, actix::Addr<EventStore<I, L>>>,
+    stores: HashMap<AggregateId, Addr<EventStore<I, L>>>,
 }
 
 impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
