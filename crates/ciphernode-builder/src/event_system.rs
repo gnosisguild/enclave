@@ -297,18 +297,38 @@ impl EventSystem {
             .cloned()
     }
 
-    /// Get an EventStoreRouter
+    /// Get an EventStoreRouter for InMem backend
+    pub fn in_mem_eventstore_router(
+        &self,
+    ) -> Result<Addr<EventStoreRouter<InMemSequenceIndex, InMemEventLog>>> {
+        let eventstores = self.eventstores()?;
+        if let EventStoreAddrs::InMem(addrs) = eventstores {
+            let router = EventStoreRouter::new(addrs);
+            Ok(router.start())
+        } else {
+            Err(anyhow!("Expected InMem backend but got Persisted"))
+        }
+    }
+
+    /// Get an EventStoreRouter for Persisted backend
+    pub fn persisted_eventstore_router(
+        &self,
+    ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
+        let eventstores = self.eventstores()?;
+        if let EventStoreAddrs::Persisted(addrs) = eventstores {
+            let router = EventStoreRouter::new(addrs);
+            Ok(router.start())
+        } else {
+            Err(anyhow!("Expected Persisted backend but got InMem"))
+        }
+    }
+
+    /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
         let eventstores = self.eventstores()?;
         match eventstores {
-            EventStoreAddrs::InMem(addrs) => {
-                let router = EventStoreRouter::new(addrs);
-                Ok(router.start().recipient())
-            }
-            EventStoreAddrs::Persisted(addrs) => {
-                let router = EventStoreRouter::new(addrs);
-                Ok(router.start().recipient())
-            }
+            EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
+            EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
         }
     }
 
@@ -561,6 +581,39 @@ mod tests {
         // Pull the events off the listsner since the timestamp
         let events = listener.send(GetEvents).await?;
         assert_eq!(events, vec!["yellow", "red", "white"]);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_specific_eventstore_routers() -> Result<()> {
+        // Test in-memory eventstore router
+        let system = EventSystem::in_mem("test_in_mem");
+        let router = system.in_mem_eventstore_router()?;
+        // Verify we can call methods on the router address
+        let _recipient: Recipient<StoreEventRequested> = router.clone().recipient();
+
+        // Test persistent eventstore router
+        let tmp = TempDir::new().unwrap();
+        let persisted_system = EventSystem::persisted(
+            "test_persisted",
+            tmp.path().join("log"),
+            tmp.path().join("sled"),
+        );
+        let persisted_router = persisted_system.persisted_eventstore_router()?;
+        // Verify we can call methods on the router address
+        let _recipient: Recipient<StoreEventRequested> = persisted_router.clone().recipient();
+
+        // Test that wrong backend type returns error
+        let in_mem_system = EventSystem::in_mem("test_wrong");
+        assert!(in_mem_system.persisted_eventstore_router().is_err());
+
+        let persisted_system = EventSystem::persisted(
+            "test_wrong2",
+            tmp.path().join("log2"),
+            tmp.path().join("sled2"),
+        );
+        assert!(persisted_system.in_mem_eventstore_router().is_err());
+
         Ok(())
     }
 
