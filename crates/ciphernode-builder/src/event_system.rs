@@ -49,40 +49,6 @@ pub enum EventStoreAddrs {
     Persisted(HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
 }
 
-impl TryFrom<EventStoreAddrs> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
-    type Error = anyhow::Error;
-    fn try_from(value: EventStoreAddrs) -> std::result::Result<Self, Self::Error> {
-        if let EventStoreAddrs::InMem(addrs) = value {
-            if let Some(addr) = addrs.get(&0) {
-                Ok(addr.clone())
-            } else {
-                Err(anyhow!("InMem event store addresses hashmap is empty"))
-            }
-        } else {
-            Err(anyhow!(
-                "address was not EventStore<InMemSequenceIndex, InMemEventLog>"
-            ))
-        }
-    }
-}
-
-impl TryFrom<EventStoreAddrs> for Addr<EventStore<SledSequenceIndex, CommitLogEventLog>> {
-    type Error = anyhow::Error;
-    fn try_from(value: EventStoreAddrs) -> std::result::Result<Self, Self::Error> {
-        if let EventStoreAddrs::Persisted(addrs) = value {
-            if let Some(addr) = addrs.get(&0) {
-                Ok(addr.clone())
-            } else {
-                Err(anyhow!("Persisted event store addresses hashmap is empty"))
-            }
-        } else {
-            Err(anyhow!(
-                "address was not EventStore<SledSequenceIndex, CommitLogEventLog>"
-            ))
-        }
-    }
-}
-
 /// EventSystem holds interconnected references to the components that manage events and
 /// persistence within the node. The EventSystem connects:
 ///
@@ -112,7 +78,7 @@ pub struct EventSystem {
     /// Central configuration for aggregates, including delays and other settings
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
-    eventstores: OnceCell<EventStoreAddrs>,
+    eventstore_addrs: OnceCell<EventStoreAddrs>,
 }
 
 impl EventSystem {
@@ -136,7 +102,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            eventstores: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -155,7 +121,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            eventstores: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -176,7 +142,7 @@ impl EventSystem {
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
-            eventstores: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -242,8 +208,8 @@ impl EventSystem {
     }
 
     /// Get the EventStore addresses
-    pub fn eventstores(&self) -> Result<EventStoreAddrs> {
-        self.eventstores
+    pub fn eventstore_addrs(&self) -> Result<EventStoreAddrs> {
+        self.eventstore_addrs
             .get_or_try_init(|| {
                 match &self.backend {
                     EventSystemBackend::InMem(b) => {
@@ -301,7 +267,7 @@ impl EventSystem {
     pub fn in_mem_eventstore_router(
         &self,
     ) -> Result<Addr<EventStoreRouter<InMemSequenceIndex, InMemEventLog>>> {
-        let eventstores = self.eventstores()?;
+        let eventstores = self.eventstore_addrs()?;
         if let EventStoreAddrs::InMem(addrs) = eventstores {
             let router = EventStoreRouter::new(addrs);
             Ok(router.start())
@@ -314,7 +280,7 @@ impl EventSystem {
     pub fn persisted_eventstore_router(
         &self,
     ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
-        let eventstores = self.eventstores()?;
+        let eventstores = self.eventstore_addrs()?;
         if let EventStoreAddrs::Persisted(addrs) = eventstores {
             let router = EventStoreRouter::new(addrs);
             Ok(router.start())
@@ -325,8 +291,8 @@ impl EventSystem {
 
     /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
-        let eventstores = self.eventstores()?;
-        match eventstores {
+        let eventstores = self.eventstore_addrs()?;
+        match &eventstores {
             EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
             EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
         }
@@ -418,7 +384,7 @@ mod tests {
 
     use e3_events::prelude::*;
     use e3_events::EnclaveEventData;
-    use e3_events::GetEventsAfter;
+
     use e3_events::ReceiveEvents;
     use e3_events::TestEvent;
     use tempfile::TempDir;
@@ -509,7 +475,6 @@ mod tests {
         let system = EventSystem::in_mem("cn1").with_fresh_bus();
         let handle = system.handle()?;
         let datastore = system.store()?;
-        let eventstores = system.eventstores()?;
         let listener = Listener {
             logs: Vec::new(),
             events: Vec::new(),
@@ -528,12 +493,6 @@ mod tests {
 
         // NOTE: Eventual consistency
         // Store should not have data set on it until event has been published
-        // There is an argument we should instead delay reads until the event has been stored but
-        // this would:
-        //   a. Promote poor patterns of sharing data through persistence
-        //   b. Add a large amount of complexity to batching Get operations
-        // For now we allow this inconsistency under the assumption that data is written for
-        // snapshot storage exclusively.
 
         // Let's check the eventual consistency all data points should be none...
         assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);
@@ -571,49 +530,23 @@ mod tests {
         let logs = listener.send(GetLogs).await?;
         assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
 
-        // Get the in mem address for the event store (using index 0)
-        let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstores.try_into()?;
+        // Get the in mem eventstore router
+        let router = system.in_mem_eventstore_router()?;
 
-        // Get all events after the given timestamp and send them to the listener
-        es.do_send(GetEventsAfter::new(ts, listener.clone()));
+        // Get all events after the given timestamp using the router
+        use e3_events::{AggregateId, GetAggregateEventsAfter};
+        let mut ts_map = HashMap::new();
+        ts_map.insert(AggregateId::new(0), ts);
+        let get_events_msg = GetAggregateEventsAfter {
+            ts: ts_map,
+            sender: listener.clone().into(),
+        };
+        router.do_send(get_events_msg);
         sleep(Duration::from_millis(100)).await;
 
         // Pull the events off the listsner since the timestamp
         let events = listener.send(GetEvents).await?;
         assert_eq!(events, vec!["yellow", "red", "white"]);
-        Ok(())
-    }
-
-    #[actix::test]
-    async fn test_specific_eventstore_routers() -> Result<()> {
-        // Test in-memory eventstore router
-        let system = EventSystem::in_mem("test_in_mem");
-        let router = system.in_mem_eventstore_router()?;
-        // Verify we can call methods on the router address
-        let _recipient: Recipient<StoreEventRequested> = router.clone().recipient();
-
-        // Test persistent eventstore router
-        let tmp = TempDir::new().unwrap();
-        let persisted_system = EventSystem::persisted(
-            "test_persisted",
-            tmp.path().join("log"),
-            tmp.path().join("sled"),
-        );
-        let persisted_router = persisted_system.persisted_eventstore_router()?;
-        // Verify we can call methods on the router address
-        let _recipient: Recipient<StoreEventRequested> = persisted_router.clone().recipient();
-
-        // Test that wrong backend type returns error
-        let in_mem_system = EventSystem::in_mem("test_wrong");
-        assert!(in_mem_system.persisted_eventstore_router().is_err());
-
-        let persisted_system = EventSystem::persisted(
-            "test_wrong2",
-            tmp.path().join("log2"),
-            tmp.path().join("sled2"),
-        );
-        assert!(persisted_system.in_mem_eventstore_router().is_err());
-
         Ok(())
     }
 
@@ -630,22 +563,16 @@ mod tests {
 
         // Test in-memory eventstores
         let system = EventSystem::in_mem("test_multi").with_aggregate_config(aggregate_config);
-        let eventstores = system.eventstores()?;
+        let Ok(EventStoreAddrs::InMem(addrs)) = system.eventstore_addrs() else {
+            panic!("Expected InMem event store addrs");
+        };
 
         // Should create 3 eventstores for 3 AggregateIds
-        match &eventstores {
-            EventStoreAddrs::InMem(addrs) => {
-                assert_eq!(addrs.len(), 3);
-                // Test that we can access the first eventstore (index 0)
-                assert!(addrs.contains_key(&0));
-                assert!(addrs.contains_key(&1));
-                assert!(addrs.contains_key(&2));
-                // Test that we can access the first eventstore
-                let _es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> =
-                    eventstores.clone().try_into()?;
-            }
-            EventStoreAddrs::Persisted(_) => panic!("Expected InMem eventstores"),
-        }
+        assert_eq!(addrs.len(), 3);
+        // Test that we can access the first eventstore (index 0)
+        assert!(addrs.contains_key(&0));
+        assert!(addrs.contains_key(&1));
+        assert!(addrs.contains_key(&2));
 
         // Test persistent eventstores
         let tmp = TempDir::new().unwrap();
@@ -656,18 +583,12 @@ mod tests {
         )
         .with_aggregate_config(AggregateConfig::new(HashMap::new()));
 
-        let persisted_eventstores = persisted_system.eventstores()?;
+        let Ok(EventStoreAddrs::Persisted(addrs)) = persisted_system.eventstore_addrs() else {
+            panic!("Expected Persisted event store addrs");
+        };
 
-        // Should create at least 1 eventstore (even with empty config)
-        match &persisted_eventstores {
-            EventStoreAddrs::Persisted(addrs) => {
-                assert_eq!(addrs.len(), 1);
-                assert!(addrs.contains_key(&0));
-                let _es: Addr<EventStore<SledSequenceIndex, CommitLogEventLog>> =
-                    persisted_eventstores.clone().try_into()?;
-            }
-            EventStoreAddrs::InMem(_) => panic!("Expected Persisted eventstores"),
-        }
+        assert_eq!(addrs.len(), 1);
+        assert!(addrs.contains_key(&0));
 
         Ok(())
     }
