@@ -264,7 +264,7 @@ async fn process_swarm_event(
             let error_str = format!("{}", error);
             if error_str.contains("Unexpected peer ID") {
                 if let Some(expected_peer) = &peer_id {
-                    info!("Removing stale peer {expected_peer} due to peer ID mismatch");
+                    debug!("Removing stale peer {expected_peer} due to peer ID mismatch");
                     swarm.behaviour_mut().kademlia.remove_peer(expected_peer);
                 }
             }
