@@ -14,6 +14,17 @@ import {
 } from "../utils";
 
 /**
+ * Timeout configuration for E3 stages
+ */
+export interface E3TimeoutConfig {
+  committeeFormationWindow: number;
+  dkgWindow: number;
+  computeWindow: number;
+  decryptionWindow: number;
+  gracePeriod: number;
+}
+
+/**
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
@@ -22,9 +33,9 @@ export interface EnclaveArgs {
   maxDuration?: string;
   registry?: string;
   bondingRegistry?: string;
-  e3Lifecycle?: string;
   e3RefundManager?: string;
   feeToken?: string;
+  timeoutConfig?: E3TimeoutConfig;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -39,9 +50,9 @@ export const deployAndSaveEnclave = async ({
   maxDuration,
   registry,
   bondingRegistry,
-  e3Lifecycle,
   e3RefundManager,
   feeToken,
+  timeoutConfig,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
   const { ethers } = await hre.network.connect();
@@ -57,14 +68,13 @@ export const deployAndSaveEnclave = async ({
     !maxDuration ||
     !registry ||
     !bondingRegistry ||
-    !e3Lifecycle ||
     !e3RefundManager ||
     !feeToken ||
+    !timeoutConfig ||
     (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
       preDeployedArgs?.constructorArgs?.registry === registry &&
       preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
-      preDeployedArgs?.constructorArgs?.e3Lifecycle === e3Lifecycle &&
       preDeployedArgs?.constructorArgs?.e3RefundManager === e3RefundManager &&
       preDeployedArgs?.constructorArgs?.feeToken === feeToken &&
       areArraysEqual(
@@ -93,10 +103,10 @@ export const deployAndSaveEnclave = async ({
     owner,
     registry,
     bondingRegistry,
-    e3Lifecycle,
     e3RefundManager,
     feeToken,
     maxDuration,
+    timeoutConfig,
     params,
   ]);
 
@@ -115,10 +125,10 @@ export const deployAndSaveEnclave = async ({
         owner,
         registry,
         bondingRegistry,
-        e3Lifecycle,
         e3RefundManager,
         feeToken,
         maxDuration,
+        timeoutConfig: JSON.stringify(timeoutConfig),
         params,
       },
       proxyRecords: {

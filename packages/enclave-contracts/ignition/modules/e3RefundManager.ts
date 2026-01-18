@@ -8,7 +8,6 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 export default buildModule("E3RefundManager", (m) => {
   const owner = m.getParameter("owner");
   const enclave = m.getParameter("enclave");
-  const e3Lifecycle = m.getParameter("e3Lifecycle");
   const feeToken = m.getParameter("feeToken");
   const bondingRegistry = m.getParameter("bondingRegistry");
   const treasury = m.getParameter("treasury");
@@ -18,7 +17,6 @@ export default buildModule("E3RefundManager", (m) => {
   const initData = m.encodeFunctionCall(e3RefundManagerImpl, "initialize", [
     owner,
     enclave,
-    e3Lifecycle,
     feeToken,
     bondingRegistry,
     treasury,

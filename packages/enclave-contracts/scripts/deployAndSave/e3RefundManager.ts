@@ -18,7 +18,6 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 export interface E3RefundManagerArgs {
   owner?: string;
   enclave?: string;
-  e3Lifecycle?: string;
   feeToken?: string;
   bondingRegistry?: string;
   treasury?: string;
@@ -33,7 +32,6 @@ export interface E3RefundManagerArgs {
 export const deployAndSaveE3RefundManager = async ({
   owner,
   enclave,
-  e3Lifecycle,
   feeToken,
   bondingRegistry,
   treasury,
@@ -48,13 +46,11 @@ export const deployAndSaveE3RefundManager = async ({
   if (
     !owner ||
     !enclave ||
-    !e3Lifecycle ||
     !feeToken ||
     !bondingRegistry ||
     !treasury ||
     (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.enclave === enclave &&
-      preDeployedArgs?.constructorArgs?.e3Lifecycle === e3Lifecycle &&
       preDeployedArgs?.constructorArgs?.feeToken === feeToken &&
       preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
       preDeployedArgs?.constructorArgs?.treasury === treasury)
@@ -84,7 +80,7 @@ export const deployAndSaveE3RefundManager = async ({
 
   const initData = e3RefundManagerFactory.interface.encodeFunctionData(
     "initialize",
-    [owner, enclave, e3Lifecycle, feeToken, bondingRegistry, treasury],
+    [owner, enclave, feeToken, bondingRegistry, treasury],
   );
 
   const ProxyCF = await ethers.getContractFactory(
@@ -101,7 +97,6 @@ export const deployAndSaveE3RefundManager = async ({
       constructorArgs: {
         owner,
         enclave,
-        e3Lifecycle,
         feeToken,
         bondingRegistry,
         treasury,
