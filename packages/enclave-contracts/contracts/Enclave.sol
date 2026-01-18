@@ -667,7 +667,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
-
     /// @notice Sets the E3 Refund Manager contract address
     /// @param _e3RefundManager The new E3 Refund Manager contract address
     /// @return success True if the operation succeeded
@@ -915,7 +914,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Set timeout configuration
     /// @param config The new timeout config
-    function setTimeoutConfig(E3TimeoutConfig calldata config) external onlyOwner {
+    function setTimeoutConfig(
+        E3TimeoutConfig calldata config
+    ) external onlyOwner {
         _setTimeoutConfig(config);
     }
 
