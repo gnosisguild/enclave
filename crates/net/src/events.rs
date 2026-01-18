@@ -7,15 +7,17 @@
 use crate::Cid;
 use actix::Message;
 use anyhow::{bail, Context, Result};
-use e3_events::{CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
-use e3_utils::ArcBytes;
+use e3_events::{AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError, PutRecordError},
+    request_response::{InboundRequestId, ResponseChannel},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     hash::Hash,
     sync::Arc,
     time::{Duration, Instant},
@@ -61,6 +63,33 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncRequestValue {
+    pub since: HashMap<AggregateId, u128>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SyncResponseValue {
+    pub events: Vec<GossipData>,
+}
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+pub struct SyncRequestReceived {
+    pub request_id: InboundRequestId,
+    pub value: SyncRequestValue,
+    pub channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+}
+
+#[derive(Message, Clone, Debug)]
+#[rtype("()")]
+pub struct OutgoingSyncRequestSucceeded {
+    pub value: SyncResponseValue,
+}
+
+#[derive(Debug, Clone)]
+pub struct OutgoingSyncRequestFailed;
+
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
 pub enum NetCommand {
@@ -86,6 +115,14 @@ pub enum NetCommand {
     },
     /// Shutdown signal
     Shutdown,
+    /// Called from the syning node to request libp2p events from a random peer node starting
+    /// from the given timestamp.
+    OutgoingSyncRequest { value: SyncRequestValue },
+    /// Send libp2p events back to a peer that requested a sync.
+    SyncResponse {
+        value: SyncResponseValue,
+        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+    },
 }
 
 impl NetCommand {
@@ -117,9 +154,13 @@ pub enum NetEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError { error: Arc<DialError> },
+    DialError {
+        error: Arc<DialError>,
+    },
     /// A connection was established to a peer
-    ConnectionEstablished { connection_id: ConnectionId },
+    ConnectionEstablished {
+        connection_id: ConnectionId,
+    },
     /// There was an error creating a connection
     OutgoingConnectionError {
         connection_id: ConnectionId,
@@ -147,7 +188,16 @@ pub enum NetEvent {
         error: PutOrStoreError,
     },
     /// GossipSubscribed
-    GossipSubscribed { count: usize, topic: TopicHash },
+    GossipSubscribed {
+        count: usize,
+        topic: TopicHash,
+    },
+    /// A peer node is requesting gossipsub events since the given timestamp.
+    /// Use the provided channel to send a `SyncResponse
+    SyncRequestReceived(SyncRequestReceived),
+    /// Received gossipsub events from a peer in response to a `SyncRequest`.
+    OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
+    OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
 }
 
 #[derive(Clone, Debug)]

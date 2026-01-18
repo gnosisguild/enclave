@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::eventstore::EventStore;
-use crate::ReceiveEvents;
 use crate::{
     events::{GetEventsAfter, StoreEventRequested},
     AggregateId, EventContextAccessors, EventLog, SequenceIndex,
 };
+use crate::{CorrelationId, ReceiveEvents};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -46,9 +46,10 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     }
 
     pub fn handle_get_events_after(&mut self, msg: GetAggregateEventsAfter) -> Result<()> {
-        for (aggregate_id, ts) in msg.ts {
+        for (aggregate_id, ts) in msg.ts() {
             if let Some(store_addr) = self.stores.get(&aggregate_id) {
-                let get_events_msg = GetEventsAfter::new(ts, msg.sender.clone());
+                let get_events_msg =
+                    GetEventsAfter::new(msg.id(), ts.to_owned(), msg.sender.clone());
                 store_addr.do_send(get_events_msg);
             }
         }
@@ -83,6 +84,29 @@ impl<I: SequenceIndex, L: EventLog> Handler<GetAggregateEventsAfter> for EventSt
 #[derive(Message, Debug)]
 #[rtype("()")]
 pub struct GetAggregateEventsAfter {
+    pub correlation_id: CorrelationId,
     pub ts: HashMap<AggregateId, u128>,
     pub sender: Recipient<ReceiveEvents>,
+}
+
+impl GetAggregateEventsAfter {
+    pub fn new(
+        correlation_id: CorrelationId,
+        ts: HashMap<AggregateId, u128>,
+        sender: Recipient<ReceiveEvents>,
+    ) -> Self {
+        Self {
+            correlation_id,
+            ts,
+            sender,
+        }
+    }
+
+    pub fn id(&self) -> CorrelationId {
+        self.correlation_id
+    }
+
+    pub fn ts(&self) -> &HashMap<AggregateId, u128> {
+        &self.ts
+    }
 }

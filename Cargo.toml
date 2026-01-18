@@ -182,6 +182,8 @@ libp2p = { version = "=0.54.1", features = [
   "ping",
   "quic",
   "tokio",
+  "request-response",
+  "cbor"
 ]}
 zeroize = "=1.8.1"
 

@@ -10,6 +10,7 @@ mod document_publisher;
 pub mod events;
 mod net_event_translator;
 mod net_interface;
+mod net_sync_manager;
 mod repo;
 
 pub use cid::Cid;

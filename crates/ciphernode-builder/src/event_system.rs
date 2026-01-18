@@ -383,6 +383,7 @@ mod tests {
     use actix::Message;
 
     use e3_events::prelude::*;
+    use e3_events::CorrelationId;
     use e3_events::EnclaveEventData;
 
     use e3_events::ReceiveEvents;
@@ -537,10 +538,8 @@ mod tests {
         use e3_events::{AggregateId, GetAggregateEventsAfter};
         let mut ts_map = HashMap::new();
         ts_map.insert(AggregateId::new(0), ts);
-        let get_events_msg = GetAggregateEventsAfter {
-            ts: ts_map,
-            sender: listener.clone().into(),
-        };
+        let get_events_msg =
+            GetAggregateEventsAfter::new(CorrelationId::new(), ts_map, listener.clone().into());
         router.do_send(get_events_msg);
         sleep(Duration::from_millis(100)).await;
 
