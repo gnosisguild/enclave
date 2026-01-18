@@ -28,10 +28,10 @@ export const deployCRISPContracts = async () => {
 
   const useMocks = Boolean(process.env.USE_MOCKS)
 
-  let tokenAddress;
+  let tokenAddress
   if (useMocks) {
-    const token = await ethers.deployContract("MockVotingToken");
-    tokenAddress = await token.getAddress();  
+    const token = await ethers.deployContract('MockVotingToken')
+    tokenAddress = await token.getAddress()
 
     storeDeploymentArgs(
       {
