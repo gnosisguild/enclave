@@ -26,11 +26,24 @@ export const deployCRISPContracts = async () => {
 
   const chain = hre.globalOptions.network
 
-  const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER)
+  const useMocks = Boolean(process.env.USE_MOCKS)
 
-  console.log('useMockVerifier', useMockVerifier)
+  let tokenAddress;
+  if (useMocks) {
+    const token = await ethers.deployContract("MockVotingToken");
+    tokenAddress = await token.getAddress();  
 
-  const verifier = await deployVerifier(useMockVerifier)
+    storeDeploymentArgs(
+      {
+        address: tokenAddress,
+        blockNumber: await ethers.provider.getBlockNumber(),
+      },
+      'MockCRISPToken',
+      chain,
+    )
+  }
+
+  const verifier = await deployVerifier(useMocks)
 
   const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
   if (!enclaveAddress) {
@@ -101,6 +114,7 @@ export const deployCRISPContracts = async () => {
       Risc0Verifier: ${verifier}
       HonkVerifier: ${honkVerifierAddress}
       CRISPProgram: ${crispAddress}
+      TokenAddress: ${tokenAddress}
       `)
 }
 

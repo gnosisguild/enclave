@@ -328,7 +328,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setIsMasking(false)
       }
     },
-    [user, roundState, broadcastVote, setTxUrl, showToast, navigate, handleProofGeneration, markVotedInRound, handleMask, handleVote],
+    [user, roundState, broadcastVote, setTxUrl, showToast, navigate, handleProofGeneration, markVotedInRound, handleMask, handleVote, getMerkleLeaves],
   )
 
   return {
