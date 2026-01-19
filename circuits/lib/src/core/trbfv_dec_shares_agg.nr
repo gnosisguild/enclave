@@ -241,9 +241,12 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let BIT_NOISE: u3
 
         for coeff_idx in 0..MAX_MSG_NON_ZERO_COEFFS {
             // Compute (t * u_global) mod Q using BigNum
-            let u_bn_q = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
+            let u_bn = Enclave_TRBFV_8192::from(self.u_global.coefficients[coeff_idx]);
             let t_bn_q = Enclave_TRBFV_8192::from(self.configs.plaintext_modulus);
-            let t_times_u_bn_q = t_bn_q * u_bn_q;
+            let u_bn_mod_q = u_bn.umod(q_bn);
+            let t_bn_mod_q = t_bn_q.umod(q_bn);
+            let t_times_u_bn_q = (t_bn_mod_q * u_bn_mod_q).umod(q_bn);
+
             let m = ModU128::new(self.configs.plaintext_modulus);
 
             // Check if centering is needed
