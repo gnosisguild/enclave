@@ -9,7 +9,6 @@ import { network } from "hardhat";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import E3LifecycleModule from "../../ignition/modules/e3Lifecycle";
 import E3RefundManagerModule from "../../ignition/modules/e3RefundManager";
 import EnclaveModule from "../../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
@@ -21,7 +20,6 @@ import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  E3Lifecycle__factory as E3LifecycleFactory,
   E3RefundManager__factory as E3RefundManagerFactory,
   Enclave__factory as EnclaveFactory,
   EnclaveToken__factory as EnclaveTokenFactory,
@@ -37,9 +35,9 @@ const { loadFixture, time } = networkHelpers;
  * Integration tests for E3 Refund/Timeout Mechanism
  *
  * These tests verify the full integration between:
- * - Enclave.sol (main coordinator)
- * - E3Lifecycle.sol (stage tracking and timeout detection)
+ * - Enclave.sol (main coordinator with integrated lifecycle management)
  * - E3RefundManager.sol (refund calculation and claiming)
+ * - CiphernodeRegistryOwnable.sol (committee management)
  */
 describe("E3 Integration - Refund/Timeout Mechanism", function () {
   // Time constants
@@ -168,10 +166,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS,
           registry: addressOne,
-          e3Lifecycle: addressOne,
           e3RefundManager: addressOne,
           bondingRegistry: await bondingRegistry.getAddress(),
           feeToken: await usdcToken.getAddress(),
+          timeoutConfig: defaultTimeoutConfig,
         },
       },
     });
@@ -195,20 +193,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       owner,
     );
 
-    // Deploy E3Lifecycle
-    const e3LifecycleContract = await ignition.deploy(E3LifecycleModule, {
-      parameters: {
-        E3Lifecycle: {
-          owner: ownerAddress,
-          enclave: enclaveAddress,
-          ...defaultTimeoutConfig,
-        },
-      },
-    });
-    const e3LifecycleAddress =
-      await e3LifecycleContract.e3Lifecycle.getAddress();
-    const e3Lifecycle = E3LifecycleFactory.connect(e3LifecycleAddress, owner);
-
     // Deploy E3RefundManager
     const e3RefundManagerContract = await ignition.deploy(
       E3RefundManagerModule,
@@ -217,7 +201,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           E3RefundManager: {
             owner: ownerAddress,
             enclave: enclaveAddress,
-            e3Lifecycle: e3LifecycleAddress,
             feeToken: await usdcToken.getAddress(),
             bondingRegistry: await bondingRegistry.getAddress(),
             treasury: treasuryAddress,
@@ -256,7 +239,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
     // Wire up all the contracts
     await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
-    await enclave.setE3Lifecycle(e3LifecycleAddress);
     await enclave.setE3RefundManager(e3RefundManagerAddress);
     await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.setDecryptionVerifier(
@@ -265,7 +247,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     );
 
     // Setup bonding registry connections
-    await bondingRegistry.setRewardDistributor(e3RefundManagerAddress);
+    await bondingRegistry.setRewardDistributor(enclaveAddress);
     await bondingRegistry.setRegistry(ciphernodeRegistryAddress);
     await bondingRegistry.setSlashingManager(
       await slashingManagerContract.slashingManager.getAddress(),
@@ -319,7 +301,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
     return {
       enclave,
-      e3Lifecycle,
       e3RefundManager,
       bondingRegistry,
       registry,
@@ -337,29 +318,71 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     };
   };
 
+  // Helper to setup an operator for sortition (shared across tests)
+  async function setupOperatorForSortition(
+    operator: Signer,
+    bondingRegistry: any,
+    enclToken: any,
+    usdcToken: any,
+    _registry: any,
+    _owner: Signer,
+  ): Promise<void> {
+    const operatorAddress = await operator.getAddress();
+
+    // Enable token transfers
+    await enclToken.setTransferRestriction(false);
+
+    // Mint license tokens to operator
+    await enclToken.mintAllocation(
+      operatorAddress,
+      ethers.parseEther("10000"),
+      "Test allocation",
+    );
+
+    // Mint USDC to operator
+    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
+
+    // Approve and bond license
+    await enclToken
+      .connect(operator)
+      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
+    await bondingRegistry
+      .connect(operator)
+      .bondLicense(ethers.parseEther("1000"));
+    await bondingRegistry.connect(operator).registerOperator();
+
+    // Get ticket token address from bonding registry and add ticket balance
+    const ticketTokenAddress = await bondingRegistry.ticketToken();
+    const ticketAmount = ethers.parseUnits("100", 6);
+    await usdcToken.connect(operator).approve(ticketTokenAddress, ticketAmount);
+    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
+
+    // Note: addCiphernode is called internally by registerOperator via bondingRegistry
+  }
+
   describe("E3 Request with Lifecycle Integration", function () {
     it("initializes E3 lifecycle when request is made", async function () {
-      const { e3Lifecycle, makeRequest, requester } = await loadFixture(setup);
+      const { enclave, makeRequest, requester } = await loadFixture(setup);
 
       await makeRequest();
 
       // Check that E3 lifecycle was initialized
-      const stage = await e3Lifecycle.getE3Stage(0);
+      const stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(1); // E3Stage.Requested
 
       // Check requester is tracked
-      const storedRequester = await e3Lifecycle.getRequester(0);
+      const storedRequester = await enclave.getRequester(0);
       expect(storedRequester).to.equal(await requester.getAddress());
     });
 
     it("sets committee formation deadline on request", async function () {
-      const { e3Lifecycle, makeRequest } = await loadFixture(setup);
+      const { enclave, makeRequest } = await loadFixture(setup);
 
       const beforeTime = await time.latest();
       await makeRequest();
       const afterTime = await time.latest();
 
-      const deadlines = await e3Lifecycle.getDeadlines(0);
+      const deadlines = await enclave.getDeadlines(0);
       expect(deadlines.committeeDeadline).to.be.gte(
         beforeTime + defaultTimeoutConfig.committeeFormationWindow,
       );
@@ -370,53 +393,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
   });
 
   describe("Committee Formed Integration", function () {
-    // Helper to setup an operator for sortition
-    async function setupOperatorForSortition(
-      operator: Signer,
-      bondingRegistry: any,
-      enclToken: any,
-      usdcToken: any,
-      _registry: any,
-      _owner: Signer,
-    ): Promise<void> {
-      const operatorAddress = await operator.getAddress();
-
-      // Enable token transfers
-      await enclToken.setTransferRestriction(false);
-
-      // Mint license tokens to operator
-      await enclToken.mintAllocation(
-        operatorAddress,
-        ethers.parseEther("10000"),
-        "Test allocation",
-      );
-
-      // Mint USDC to operator
-      await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
-
-      // Approve and bond license
-      await enclToken
-        .connect(operator)
-        .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
-      await bondingRegistry
-        .connect(operator)
-        .bondLicense(ethers.parseEther("1000"));
-      await bondingRegistry.connect(operator).registerOperator();
-
-      // Get ticket token address from bonding registry and add ticket balance
-      const ticketTokenAddress = await bondingRegistry.ticketToken();
-      const ticketAmount = ethers.parseUnits("100", 6);
-      await usdcToken
-        .connect(operator)
-        .approve(ticketTokenAddress, ticketAmount);
-      await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-
-      // Note: addCiphernode is called internally by registerOperator via bondingRegistry
-    }
-
     it("transitions to CommitteeFormed when publishCommittee is called", async function () {
       const {
-        e3Lifecycle,
+        enclave,
         registry,
         bondingRegistry,
         usdcToken,
@@ -449,7 +428,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await makeRequest();
 
       // Verify stage is Requested
-      let stage = await e3Lifecycle.getE3Stage(0);
+      let stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(1); // E3Stage.Requested
 
       // Submit tickets for sortition
@@ -473,11 +452,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
 
       // Verify stage transitioned to KeyPublished (after publishCommittee which calls onKeyPublished)
-      stage = await e3Lifecycle.getE3Stage(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // E3Stage.KeyPublished
 
       // Verify deadlines were set
-      const deadlines = await e3Lifecycle.getDeadlines(0);
+      const deadlines = await enclave.getDeadlines(0);
       expect(deadlines.dkgDeadline).to.be.gt(0);
       expect(deadlines.activationDeadline).to.be.gt(0);
     });
@@ -553,7 +532,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
             maxDuration: THIRTY_DAYS,
             registry: await enclave.ciphernodeRegistry(),
             bondingRegistry: await enclave.bondingRegistry(),
-            e3Lifecycle: addressOne,
             e3RefundManager: addressOne,
             feeToken: await enclave.feeToken(),
           },
@@ -581,7 +559,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("processes failure and calculates refund for committee formation timeout", async function () {
-      const { enclave, e3Lifecycle, e3RefundManager, makeRequest } =
+      const { enclave, e3RefundManager, makeRequest } =
         await loadFixture(setup);
 
       await makeRequest();
@@ -590,9 +568,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
 
       // Mark E3 as failed
-      await e3Lifecycle.markE3Failed(0);
+      await enclave.markE3Failed(0);
 
-      const stage = await e3Lifecycle.getE3Stage(0);
+      const stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // E3Stage.Failed
 
       // Process the failure
@@ -607,14 +585,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("allows requester to claim refund after failure processing", async function () {
-      const {
-        enclave,
-        e3Lifecycle,
-        e3RefundManager,
-        makeRequest,
-        requester,
-        usdcToken,
-      } = await loadFixture(setup);
+      const { enclave, e3RefundManager, makeRequest, requester, usdcToken } =
+        await loadFixture(setup);
 
       await makeRequest();
 
@@ -625,7 +597,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // Fast forward and fail E3
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-      await e3Lifecycle.markE3Failed(0);
+      await enclave.markE3Failed(0);
       await enclave.processE3Failure(0);
 
       // Claim refund
@@ -638,12 +610,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("reverts if trying to process failure twice", async function () {
-      const { enclave, e3Lifecycle, makeRequest } = await loadFixture(setup);
+      const { enclave, makeRequest } = await loadFixture(setup);
 
       await makeRequest();
 
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-      await e3Lifecycle.markE3Failed(0);
+      await enclave.markE3Failed(0);
       await enclave.processE3Failure(0);
 
       // Second call should fail - payment already cleared
@@ -655,32 +627,26 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Full Failure Flow - Committee Formation Timeout", function () {
     it("complete flow: request -> timeout -> fail -> process -> claim", async function () {
-      const {
-        enclave,
-        e3Lifecycle,
-        e3RefundManager,
-        makeRequest,
-        requester,
-        usdcToken,
-      } = await loadFixture(setup);
+      const { enclave, e3RefundManager, makeRequest, requester, usdcToken } =
+        await loadFixture(setup);
 
       // 1. Make request
       await makeRequest();
 
       // Verify stage
-      let stage = await e3Lifecycle.getE3Stage(0);
+      let stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(1); // Requested
 
       // 2. Fast forward past deadline
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
 
       // 3. Anyone can mark as failed
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
+      const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
       expect(reason).to.equal(1); // CommitteeFormationTimeout
 
-      await e3Lifecycle.markE3Failed(0);
-      stage = await e3Lifecycle.getE3Stage(0);
+      await enclave.markE3Failed(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // Failed
 
       // 4. Process failure
@@ -706,26 +672,29 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Slashed Funds Routing", function () {
     it("routes slashed funds 50/50 to requester and honest nodes", async function () {
-      const { enclave, e3Lifecycle, e3RefundManager, makeRequest } =
+      const { enclave, e3RefundManager, makeRequest, owner } =
         await loadFixture(setup);
 
       await makeRequest();
 
       // Fail the E3
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-      await e3Lifecycle.markE3Failed(0);
+      await enclave.markE3Failed(0);
       await enclave.processE3Failure(0);
 
       const distributionBefore = await e3RefundManager.getRefundDistribution(0);
       const slashedAmount = ethers.parseUnits("100", 6);
 
-      // Route slashed funds (normally called by SlashingManager integration)
-      // We test via enclave's permission
-      await e3RefundManager.setEnclave(await enclave.owner());
-      await e3RefundManager.routeSlashedFunds(0, slashedAmount);
+      // Route slashed funds (normally called by SlashingManager through Enclave)
+      // For testing, temporarily set enclave to owner to call this permissioned function
+      const originalEnclave = await e3RefundManager.enclave();
+      await e3RefundManager.setEnclave(await owner.getAddress());
+      await e3RefundManager.connect(owner).routeSlashedFunds(0, slashedAmount);
+      await e3RefundManager.setEnclave(originalEnclave);
 
       const distributionAfter = await e3RefundManager.getRefundDistribution(0);
 
+      // Verify slashed funds are split 50/50 between requester and honest nodes
       expect(distributionAfter.requesterAmount).to.equal(
         distributionBefore.requesterAmount + slashedAmount / 2n,
       );
@@ -740,41 +709,63 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     it("complete flow: request -> committee formed -> DKG timeout -> fail -> process -> claim", async function () {
       const {
         enclave,
-        e3Lifecycle,
         e3RefundManager,
+        registry,
+        bondingRegistry,
+        usdcToken,
+        enclToken,
         makeRequest,
         requester,
-        usdcToken,
         owner,
+        operator1,
+        operator2,
       } = await loadFixture(setup);
+
+      // Setup operators for sortition
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
 
       // 1. Make request
       await makeRequest();
-      let stage = await e3Lifecycle.getE3Stage(0);
+      let stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(1); // Requested
 
-      // 2. Simulate committee finalized (DKG starts but will timeout)
-      // For DKG timeout, we only call onCommitteeFinalized - key is never published
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      // 2. Complete sortition (committee finalized, DKG starts)
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
 
-      stage = await e3Lifecycle.getE3Stage(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(2); // CommitteeFinalized
 
-      // 3. Fast forward past DKG deadline (key never published)
+      // 3. Fast forward past DKG deadline (key never published - simulating DKG failure)
       await time.increase(defaultTimeoutConfig.dkgWindow + 1);
 
       // 4. Check failure condition and mark as failed
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
+      const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
       expect(reason).to.equal(3); // DKGTimeout
 
-      await e3Lifecycle.markE3Failed(0);
-      stage = await e3Lifecycle.getE3Stage(0);
+      await enclave.markE3Failed(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // Failed
 
-      const failureReason = await e3Lifecycle.getFailureReason(0);
+      const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(3); // DKGTimeout
 
       // 5. Process failure and claim refund
@@ -799,41 +790,98 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     it("complete flow: request -> committee formed -> activation expires -> fail -> process -> claim", async function () {
       const {
         enclave,
-        e3Lifecycle,
         e3RefundManager,
-        makeRequest,
-        requester,
+        registry,
+        bondingRegistry,
         usdcToken,
+        enclToken,
+        e3Program,
+        decryptionVerifier,
+        requester,
         owner,
+        operator1,
+        operator2,
       } = await loadFixture(setup);
 
-      // 1. Make request
-      await makeRequest();
+      // Setup operators
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
 
-      // 2. Form committee with short activation deadline
-      const activationDeadline = (await time.latest()) + ONE_HOUR; // Only 1 hour to activate
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle.connect(owner).onKeyPublished(0, activationDeadline);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      // 1. Make request with short activation window
+      const currentTime = await time.latest();
+      const startTime = currentTime + 100;
+      const activationDeadline = startTime + ONE_HOUR;
 
-      let stage = await e3Lifecycle.getE3Stage(0);
+      const requestParams = {
+        threshold: [2, 2] as [number, number],
+        startWindow: [startTime, activationDeadline] as [number, number],
+        duration: ONE_DAY,
+        e3Program: await e3Program.getAddress(),
+        e3ProgramParams: encodedE3ProgramParams,
+        computeProviderParams: abiCoder.encode(
+          ["address"],
+          [await decryptionVerifier.getAddress()],
+        ),
+        customParams: abiCoder.encode(
+          ["address"],
+          ["0x1234567890123456789012345678901234567890"],
+        ),
+      };
+
+      const fee = await enclave.getE3Quote(requestParams);
+      await usdcToken
+        .connect(requester)
+        .approve(await enclave.getAddress(), fee);
+      await enclave.connect(requester).request(requestParams);
+
+      let stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(1); // Requested
+
+      // 2. Complete sortition and DKG
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
+
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
+
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
 
-      // 3. Fast forward past activation deadline (but not DKG deadline)
-      await time.increase(ONE_HOUR + 1);
+      // 3. Wait past activation deadline without activating
+      await time.increase(ONE_HOUR + 200);
 
       // 4. Check failure condition
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
+      const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
       expect(reason).to.equal(5); // ActivationWindowExpired
 
       // 5. Mark as failed
-      await e3Lifecycle.markE3Failed(0);
-      stage = await e3Lifecycle.getE3Stage(0);
+      await enclave.markE3Failed(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // Failed
 
-      const failureReason = await e3Lifecycle.getFailureReason(0);
+      const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(5); // ActivationWindowExpired
 
       // 6. Process and claim
@@ -847,7 +895,10 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         await requester.getAddress(),
       );
 
-      expect(balanceAfter).to.be.gt(balanceBefore);
+      const distribution = await e3RefundManager.getRefundDistribution(0);
+      expect(balanceAfter - balanceBefore).to.equal(
+        distribution.requesterAmount,
+      );
     });
   });
 
@@ -855,45 +906,80 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     it("complete flow: request -> activated -> compute timeout -> fail -> process -> claim", async function () {
       const {
         enclave,
-        e3Lifecycle,
         e3RefundManager,
+        registry,
+        bondingRegistry,
+        usdcToken,
+        enclToken,
         makeRequest,
         requester,
-        usdcToken,
         owner,
+        operator1,
+        operator2,
       } = await loadFixture(setup);
+
+      // Setup operators
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
 
       // 1. Make request
       await makeRequest();
+      let stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(1); // Requested
 
-      // 2. Form committee
-      const activationDeadline = (await time.latest()) + SEVEN_DAYS;
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle.connect(owner).onKeyPublished(0, activationDeadline);
+      // 2. Complete sortition and DKG
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
 
-      // 3. Activate (with input deadline in the future)
-      const inputDeadline = (await time.latest()) + ONE_DAY;
-      await e3Lifecycle.connect(owner).onActivated(0, inputDeadline);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
 
-      let stage = await e3Lifecycle.getE3Stage(0);
+      stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(3); // KeyPublished
+
+      // 3. Activate E3
+      await time.increase(100);
+      await enclave.activate(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(4); // Activated
 
-      // 4. Fast forward past compute deadline
-      // computeDeadline = inputDeadline + computeWindow
-      await time.increase(ONE_DAY + defaultTimeoutConfig.computeWindow + 1);
+      // 4. Wait past compute deadline (ciphertext never published)
+      const e3 = await enclave.getE3(0);
+      const computeDeadline =
+        Number(e3.expiration) + defaultTimeoutConfig.computeWindow;
+      await time.increaseTo(computeDeadline + 1);
 
       // 5. Check failure condition and mark as failed
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
+      const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
       expect(reason).to.equal(7); // ComputeTimeout
 
-      await e3Lifecycle.markE3Failed(0);
-      stage = await e3Lifecycle.getE3Stage(0);
+      await enclave.markE3Failed(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // Failed
 
-      const failureReason = await e3Lifecycle.getFailureReason(0);
+      const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(7); // ComputeTimeout
 
       // 6. Process and claim
@@ -918,47 +1004,90 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     it("complete flow: request -> ciphertext published -> decryption timeout -> fail -> process -> claim", async function () {
       const {
         enclave,
-        e3Lifecycle,
         e3RefundManager,
+        registry,
+        bondingRegistry,
+        usdcToken,
+        enclToken,
         makeRequest,
         requester,
-        usdcToken,
         owner,
+        operator1,
+        operator2,
       } = await loadFixture(setup);
+
+      // Setup operators
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
 
       // 1. Make request
       await makeRequest();
+      let stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(1); // Requested
 
-      // 2. Advance through all stages
-      const activationDeadline = (await time.latest()) + SEVEN_DAYS;
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle.connect(owner).onKeyPublished(0, activationDeadline);
+      // 2. Complete sortition and DKG
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
 
-      const inputDeadline = (await time.latest()) + ONE_DAY;
-      await e3Lifecycle.connect(owner).onActivated(0, inputDeadline);
-      await e3Lifecycle.connect(owner).onCiphertextPublished(0);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
 
-      let stage = await e3Lifecycle.getE3Stage(0);
+      stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(3); // KeyPublished
+
+      // 3. Activate E3
+      await time.increase(100);
+      await enclave.activate(0);
+      stage = await enclave.getE3Stage(0);
+      expect(stage).to.equal(4); // Activated
+
+      // 4. Publish ciphertext output
+      const e3 = await enclave.getE3(0);
+      await time.increaseTo(Number(e3.expiration) + 1);
+
+      const ciphertextOutput = "0x" + "ab".repeat(100);
+      const proof = "0x1337";
+      await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(5); // CiphertextReady
 
-      // 3. Fast forward past decryption deadline
+      // 5. Wait past decryption deadline (plaintext never published)
       await time.increase(defaultTimeoutConfig.decryptionWindow + 1);
 
-      // 4. Check failure condition and mark as failed
-      const [canFail, reason] = await e3Lifecycle.checkFailureCondition(0);
+      // 6. Check failure condition and mark as failed
+      const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
       expect(reason).to.equal(11); // DecryptionTimeout
 
-      await e3Lifecycle.markE3Failed(0);
-      stage = await e3Lifecycle.getE3Stage(0);
+      await enclave.markE3Failed(0);
+      stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(7); // Failed
 
-      const failureReason = await e3Lifecycle.getFailureReason(0);
+      const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(11); // DecryptionTimeout
 
-      // 5. Process and claim
+      // 7. Process failure and claim refund
       await enclave.processE3Failure(0);
 
       const balanceBefore = await usdcToken.balanceOf(
@@ -979,20 +1108,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Multiple E3 Requests Isolation", function () {
     it("tracks multiple E3s independently", async function () {
-      const {
-        enclave,
-        e3Lifecycle,
-        usdcToken,
-        requester,
-        owner,
-        e3Program,
-        decryptionVerifier,
-      } = await loadFixture(setup);
+      const { enclave, usdcToken, requester, e3Program, decryptionVerifier } =
+        await loadFixture(setup);
 
       const enclaveAddress = await enclave.getAddress();
-      const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-      // Helper to make requests with unique IDs
+      // Helper to make requests
       const makeRequestN = async (n: number) => {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
@@ -1022,47 +1143,42 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await makeRequestN(2);
 
       // Verify all are in Requested stage
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(1);
-      expect(await e3Lifecycle.getE3Stage(1)).to.equal(1);
-      expect(await e3Lifecycle.getE3Stage(2)).to.equal(1);
+      expect(await enclave.getE3Stage(0)).to.equal(1);
+      expect(await enclave.getE3Stage(1)).to.equal(1);
+      expect(await enclave.getE3Stage(2)).to.equal(1);
 
-      // Advance E3 #1 to CommitteeFormed
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(1);
-      await e3Lifecycle
-        .connect(owner)
-        .onKeyPublished(1, (await time.latest()) + SEVEN_DAYS);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
-
-      // Verify stages are independent
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(1); // Still Requested
-      expect(await e3Lifecycle.getE3Stage(1)).to.equal(3); // KeyPublished
-      expect(await e3Lifecycle.getE3Stage(2)).to.equal(1); // Still Requested
-
-      // Fail E3 #0 (deadline has passed)
+      // Fail E3 #0 by waiting past its deadline
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-      await e3Lifecycle.markE3Failed(0);
+      await enclave.markE3Failed(0);
 
-      // E3 #0 is failed, E3 #1 is still KeyPublished (different deadline)
-      // E3 #2 CAN be failed but hasn't been marked yet
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(7); // Failed
-      expect(await e3Lifecycle.getE3Stage(1)).to.equal(3); // Still KeyPublished (has activation deadline)
+      // E3 #0 is failed, but E3 #1 and #2 are still active
+      expect(await enclave.getE3Stage(0)).to.equal(7); // Failed
+      expect(await enclave.getE3Stage(1)).to.equal(1); // Still Requested
+      expect(await enclave.getE3Stage(2)).to.equal(1); // Still Requested
 
-      // E3 #2 is still Requested until we explicitly mark it failed
-      // Even though its deadline has passed, it doesn't auto-fail
-      const [canFail2] = await e3Lifecycle.checkFailureCondition(2);
+      // E3 #1 and #2 also can be failed now (their deadlines have also passed)
+      const [canFail1] = await enclave.checkFailureCondition(1);
+      const [canFail2] = await enclave.checkFailureCondition(2);
+      expect(canFail1).to.be.true;
       expect(canFail2).to.be.true;
-      expect(await e3Lifecycle.getE3Stage(2)).to.equal(1); // Still Requested (not auto-failed)
 
-      // Now mark E3 #2 as failed
-      await e3Lifecycle.markE3Failed(2);
-      expect(await e3Lifecycle.getE3Stage(2)).to.equal(7); // Now Failed
+      // But they haven't auto-failed - must be explicitly marked
+      expect(await enclave.getE3Stage(1)).to.equal(1);
+      expect(await enclave.getE3Stage(2)).to.equal(1);
+
+      // Now mark E3 #2 as failed (but not #1)
+      await enclave.markE3Failed(2);
+      expect(await enclave.getE3Stage(2)).to.equal(7); // Now Failed
+      expect(await enclave.getE3Stage(1)).to.equal(1); // Still Requested
+
+      // Verify each E3 has independent failure reasons
+      expect(await enclave.getFailureReason(0)).to.equal(1); // CommitteeFormationTimeout
+      expect(await enclave.getFailureReason(2)).to.equal(1); // CommitteeFormationTimeout
     });
 
     it("allows claiming refunds for each failed E3 independently", async function () {
       const {
         enclave,
-        e3Lifecycle,
         e3RefundManager,
         usdcToken,
         requester,
@@ -1071,7 +1187,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       } = await loadFixture(setup);
 
       const enclaveAddress = await enclave.getAddress();
-      const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
       // Make 2 requests
       for (let i = 0; i < 2; i++) {
@@ -1098,8 +1213,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // Fail both
       await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
-      await e3Lifecycle.markE3Failed(0);
-      await e3Lifecycle.markE3Failed(1);
+      await enclave.markE3Failed(0);
+      await enclave.markE3Failed(1);
 
       // Process both
       await enclave.processE3Failure(0);
@@ -1131,63 +1246,151 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Success Path (Complete E3)", function () {
     it("transitions through all stages to completion", async function () {
-      const { e3Lifecycle, makeRequest, owner, enclave } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        registry,
+        bondingRegistry,
+        usdcToken,
+        enclToken,
+        makeRequest,
+        owner,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
+      // Setup operators for sortition
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+
+      // 1. Make request
       await makeRequest();
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(1); // Requested
+      expect(await enclave.getE3Stage(0)).to.equal(1); // Requested
 
-      await e3Lifecycle.setEnclave(await owner.getAddress());
+      // 2. Complete sortition and publish committee (CommitteeFinalized -> KeyPublished)
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
 
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle
-        .connect(owner)
-        .onKeyPublished(0, (await time.latest()) + SEVEN_DAYS);
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(3); // KeyPublished
+      expect(await enclave.getE3Stage(0)).to.equal(2); // CommitteeFinalized
 
-      await e3Lifecycle
-        .connect(owner)
-        .onActivated(0, (await time.latest()) + ONE_DAY);
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(4); // Activated
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
 
-      await e3Lifecycle.connect(owner).onCiphertextPublished(0);
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(5); // CiphertextReady
+      expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
-      await e3Lifecycle.connect(owner).onComplete(0);
-      expect(await e3Lifecycle.getE3Stage(0)).to.equal(6); // Complete
+      // 3. Activate E3
+      await time.increase(100); // Move past start window[0]
+      await enclave.activate(0);
+      expect(await enclave.getE3Stage(0)).to.equal(4); // Activated
 
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      // 4. Publish ciphertext output (after input deadline)
+      const e3 = await enclave.getE3(0);
+      await time.increaseTo(Number(e3.expiration) + 1);
+
+      const ciphertextOutput = "0x" + "ab".repeat(100);
+      const proof = "0x1337";
+      await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
+      expect(await enclave.getE3Stage(0)).to.equal(5); // CiphertextReady
+
+      // 5. Publish plaintext output
+      const plaintextOutput = "0x" + "cd".repeat(100);
+      await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
+      expect(await enclave.getE3Stage(0)).to.equal(6); // Complete
 
       // Cannot mark completed E3 as failed
-      await expect(e3Lifecycle.markE3Failed(0)).to.be.revertedWithCustomError(
-        e3Lifecycle,
+      await expect(enclave.markE3Failed(0)).to.be.revertedWithCustomError(
+        enclave,
         "E3AlreadyComplete",
       );
     });
 
     it("prevents refund claims for completed E3", async function () {
       const {
-        e3Lifecycle,
+        enclave,
         e3RefundManager,
+        registry,
+        bondingRegistry,
+        usdcToken,
+        enclToken,
         makeRequest,
         owner,
-        enclave,
         requester,
+        operator1,
+        operator2,
       } = await loadFixture(setup);
 
+      // Setup operators
+      await setupOperatorForSortition(
+        operator1,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+      await setupOperatorForSortition(
+        operator2,
+        bondingRegistry,
+        enclToken,
+        usdcToken,
+        registry,
+        owner,
+      );
+
+      // Complete full E3 flow
       await makeRequest();
 
-      await e3Lifecycle.setEnclave(await owner.getAddress());
-      await e3Lifecycle.connect(owner).onCommitteeFinalized(0);
-      await e3Lifecycle
-        .connect(owner)
-        .onKeyPublished(0, (await time.latest()) + SEVEN_DAYS);
-      await e3Lifecycle
-        .connect(owner)
-        .onActivated(0, (await time.latest()) + ONE_DAY);
-      await e3Lifecycle.connect(owner).onCiphertextPublished(0);
-      await e3Lifecycle.connect(owner).onComplete(0);
-      await e3Lifecycle.setEnclave(await enclave.getAddress());
+      // Complete sortition
+      await registry.connect(operator1).submitTicket(0, 1);
+      await registry.connect(operator2).submitTicket(0, 1);
+      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
+      await registry.finalizeCommittee(0);
+
+      const nodes = [
+        await operator1.getAddress(),
+        await operator2.getAddress(),
+      ];
+      const publicKey = "0x1234567890abcdef1234567890abcdef";
+      const publicKeyHash = ethers.keccak256(publicKey);
+      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
+
+      // Activate
+      await time.increase(100);
+      await enclave.activate(0);
+
+      // Publish outputs
+      const e3 = await enclave.getE3(0);
+      await time.increaseTo(Number(e3.expiration) + 1);
+
+      const ciphertextOutput = "0x" + "ab".repeat(100);
+      const proof = "0x1337";
+      await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
+
+      const plaintextOutput = "0x" + "cd".repeat(100);
+      await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
+
+      // Verify E3 is complete
+      expect(await enclave.getE3Stage(0)).to.equal(6); // Complete
 
       // Refund should not be claimable for completed E3
       await expect(
