@@ -237,20 +237,11 @@ pub fn construct_inputs(
             "coefficients": to_string_1d_vec(&vectors_standard.e0)
         }),
         e0_quotients: vectors_standard
-            .e0is
+            .e0_quotients
             .iter()
-            .enumerate()
-            .map(|(i, e0i)| {
-                // Compute quotients: e0_quotient[i][j] = (e0[j] - e0is[i][j]) / qis[i]
-                let qi = &crypto_params.moduli[i];
-                let quotients: Vec<BigInt> = vectors_standard
-                    .e0
-                    .iter()
-                    .zip(e0i.iter())
-                    .map(|(e0_coeff, e0i_coeff)| (e0_coeff - e0i_coeff) / qi)
-                    .collect();
+            .map(|v| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(&quotients)
+                    "coefficients": to_string_1d_vec(v)
                 })
             })
             .collect(),

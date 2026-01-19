@@ -6,7 +6,7 @@
 
 use lib::configs::insecure::trbfv::{
     GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
-    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N, Q_MOD_T,
+    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N, Q_MOD_T_MOD_P,
 };
 use lib::core::greco::Greco;
 use lib::math::polynomial::Polynomial;
@@ -217,7 +217,7 @@ fn main(
     //   - If first vote in slot: return zero ciphertext (ct0is, ct1is)
     //   - If updating slot: verify addition and return sum of previous votes
     if (is_signature_valid == true) & (slot_address == address) {
-        check_coefficient_values_with_balance(k1, Q_MOD_T, balance);
+        check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
 
         ct_commitment
     } else {
