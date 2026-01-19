@@ -143,11 +143,12 @@ impl<let N: u32> Polynomial<N> {
 
     /// Performs range checking on polynomial coefficients using asymmetric bounds.
     ///
-    /// This function constrains all polynomial coefficients to be in the range [lower_bound, upper_bound].
+    /// This function constrains all polynomial coefficients to be in the range [-lower_bound, upper_bound],
+    /// where `lower_bound` is a non-negative magnitude.
     /// It uses a shifting technique to handle negative numbers efficiently:
     /// 1. Shifts each coefficient by adding `lower_bound`: c' = c + lower_bound
     /// 2. Checks that shifted coefficients are in [0, upper_bound + lower_bound] using bit-size assertions
-    /// 3. This ensures original coefficients are in [lower_bound, upper_bound]
+    /// 3. This ensures original coefficients are in [-lower_bound, upper_bound]
     ///
     /// The function uses two bit-size checks per coefficient to ensure the value is within bounds:
     /// - `shifted_coefficient.assert_max_bit_size::<BIT + 1>()` ensures c' >= 0
@@ -155,12 +156,12 @@ impl<let N: u32> Polynomial<N> {
     ///
     /// # Arguments
     /// * `upper_bound` - The upper bound for coefficient range checking
-    /// * `lower_bound` - The lower bound for coefficient range checking
-    ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
+    /// * `lower_bound` - Non-negative magnitude of the negative bound
+    ///                   Coefficients must satisfy: -lower_bound <= c <= upper_bound
     ///
     /// # Generic Parameters
-    /// * `BIT` - The bit-length of the total range `upper_bound - lower_bound`
-    ///           (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked
+    /// * `BIT` - The bit-length of the total range `upper_bound + lower_bound`
+    ///           (choose `BIT` so `upper_bound + lower_bound < 2^BIT`). Since all checked
     ///           values lie in `[0, upper_bound + lower_bound]`, they cannot exceed `BIT + 1` bits.
     ///
     /// # Panics
