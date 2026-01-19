@@ -40,6 +40,7 @@ pub struct DecryptionSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
 
     /// Party IDs (x-coordinates) for interpolation (public inputs)
+    /// Note: Must be in strictly increasing order for correct Lagrange sign computation
     party_ids: [Field; T + 1],
 
     /// Message polynomial m(x) (public output)
