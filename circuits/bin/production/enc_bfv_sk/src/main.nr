@@ -12,8 +12,8 @@ use lib::core::bfv_enc::EncryptionBfv;
 use lib::math::polynomial::Polynomial;
 
 fn main(
-    expected_pk_commitment: Field,
-    expected_message_commitment: Field,
+    expected_pk_commitment: pub Field,
+    expected_message_commitment: pub Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],

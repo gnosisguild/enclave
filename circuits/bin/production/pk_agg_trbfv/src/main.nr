@@ -12,7 +12,7 @@ use lib::math::polynomial::Polynomial;
 pub global H: u32 = 5;
 
 fn main(
-    expected_pk_trbfv_commitments: [Field; H],
+    expected_pk_trbfv_commitments: pub [Field; H],
     pk0: [[Polynomial<N>; L]; H],
     pk1: [[Polynomial<N>; L]; H],
     pk0_agg: [Polynomial<N>; L],

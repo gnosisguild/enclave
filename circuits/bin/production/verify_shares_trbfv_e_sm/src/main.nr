@@ -16,7 +16,7 @@ pub global N_PARTIES: u32 = 5;
 pub global T: u32 = 2;
 
 fn main(
-    expected_secret_commitment: Field,
+    expected_secret_commitment: pub Field,
     secret_e_sm: [Polynomial<N>; L],
     y: [[[Field; N_PARTIES + 1]; L]; N],
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
