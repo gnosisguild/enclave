@@ -392,13 +392,8 @@ describe("E3RefundManager", function () {
 
   describe("claimRequesterRefund()", function () {
     it("allows requester to claim refund after E3 failure", async function () {
-      const {
-        enclave,
-        e3RefundManager,
-        makeRequest,
-        requester,
-        usdcToken,
-      } = await loadFixture(setup);
+      const { enclave, e3RefundManager, makeRequest, requester, usdcToken } =
+        await loadFixture(setup);
 
       await makeRequest();
 
