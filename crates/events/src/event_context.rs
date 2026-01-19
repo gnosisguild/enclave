@@ -4,50 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{fmt, ops::Deref};
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    E3id, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced, Unsequenced,
+    aggregate_id::AggregateId, EventContextAccessors, EventContextSeq, EventId, SeqState,
+    Sequenced, Unsequenced,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AggregateId(usize);
-
-impl AggregateId {
-    pub fn new(value: usize) -> Self {
-        Self(value)
-    }
-
-    pub fn to_usize(&self) -> usize {
-        self.0
-    }
-}
-
-impl From<Option<E3id>> for AggregateId {
-    fn from(value: Option<E3id>) -> Self {
-        if let Some(e3_id) = value {
-            Self::new(e3_id.chain_id() as usize)
-        } else {
-            Self::new(0)
-        }
-    }
-}
-
-impl Deref for AggregateId {
-    type Target = usize;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for AggregateId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.0)
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventContext<S: SeqState> {
@@ -132,10 +94,7 @@ impl EventContextSeq for EventContext<Sequenced> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        event_context::{AggregateId, EventContext},
-        EventId,
-    };
+    use crate::{aggregate_id::AggregateId, event_context::EventContext, EventId};
 
     #[test]
     fn test_event_context_cycle() {

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod aggregate_id;
 mod bus_handle;
 mod correlation_id;
 mod e3id;
@@ -21,6 +22,7 @@ mod seed;
 mod sequencer;
 mod traits;
 
+pub use aggregate_id::*;
 pub use bus_handle::*;
 pub use correlation_id::*;
 pub use e3id::*;

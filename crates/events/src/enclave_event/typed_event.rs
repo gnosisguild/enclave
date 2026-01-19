@@ -10,8 +10,8 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    event_context::{AggregateId, EventContext},
-    EventContextAccessors, EventContextSeq, EventId,
+    aggregate_id::AggregateId, event_context::EventContext, EventContextAccessors, EventContextSeq,
+    EventId,
 };
 
 use super::Sequenced;

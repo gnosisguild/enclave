@@ -10,8 +10,8 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 use crate::{
-    event_context::{AggregateId, EventContext},
-    EnclaveEvent, EventId, Sequenced, Unsequenced,
+    aggregate_id::AggregateId, event_context::EventContext, EnclaveEvent, EventId, Sequenced,
+    Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus

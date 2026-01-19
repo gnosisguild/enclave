@@ -77,7 +77,8 @@ pub use ticket_submitted::*;
 pub use typed_event::*;
 
 use crate::{
-    event_context::{AggregateId, EventContext},
+    aggregate_id::AggregateId,
+    event_context::EventContext,
     traits::{ErrorEvent, Event, EventConstructorWithTimestamp, EventContextAccessors},
     E3id, EventContextSeq, EventId, WithAggregateId,
 };
