@@ -14,9 +14,9 @@ pub global MAX_MSG_NON_ZERO_COEFFS: u32 = 80;
 pub global T: u32 = 2;
 
 fn main(
-    decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
-    party_ids: [Field; T + 1],
-    message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+    decryption_shares: pub [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
+    party_ids: pub [Field; T + 1],
+    message: pub Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
     u_global: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
     crt_quotients: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 ) {
