@@ -73,6 +73,15 @@ pub unconstrained fn __neg(val: Field, m: Field) -> Field {
 /// - `result = (lhs - rhs) mod m`
 /// - `underflow = true` if `lhs < rhs`, `false` otherwise
 ///
+/// # Overflow Warning
+/// The computation `lhs_u128 + m_u128 - rhs_u128` can overflow u128 if
+/// `lhs_u128 + m_u128 > 2^128 - 1`. To avoid overflow, ensure that for the
+/// underflow case, `lhs_u128 + m_u128` does not exceed u128::MAX.
+///
+/// # Safe Input Range
+/// For typical use cases with moduli < 2^64, this is safe. For larger moduli
+/// approaching 2^128, ensure `lhs < 2^128 - m` to prevent intermediate overflow.
+///
 /// # Safety
 /// This is an unconstrained function. The result must be verified in constrained code.
 pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (Field, bool) {
@@ -82,7 +91,11 @@ pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (
 
     let underflow = lhs_u128 < rhs_u128;
     let result = if underflow {
-        (lhs_u128 + m_u128 - rhs_u128) as Field
+        // Compute (lhs - rhs + m) mod m safely to avoid u128 overflow
+        // Since lhs < rhs, we compute: m - (rhs - lhs)
+        // This avoids the potential overflow in lhs + m
+        let diff = rhs_u128 - lhs_u128; // This is safe since rhs > lhs
+        (m_u128 - diff) as Field
     } else {
         (lhs_u128 - rhs_u128) as Field
     };
