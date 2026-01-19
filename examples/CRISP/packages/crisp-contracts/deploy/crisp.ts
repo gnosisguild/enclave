@@ -28,21 +28,6 @@ export const deployCRISPContracts = async () => {
 
   const useMocks = Boolean(process.env.USE_MOCKS)
 
-  let tokenAddress
-  if (useMocks) {
-    const token = await ethers.deployContract('MockVotingToken')
-    tokenAddress = await token.getAddress()
-
-    storeDeploymentArgs(
-      {
-        address: tokenAddress,
-        blockNumber: await ethers.provider.getBlockNumber(),
-      },
-      'MockCRISPToken',
-      chain,
-    )
-  }
-
   const verifier = await deployVerifier(useMocks)
 
   const enclaveAddress = readDeploymentArgs('Enclave', chain)?.address
@@ -106,6 +91,22 @@ export const deployCRISPContracts = async () => {
   // enable the program on Enclave
   const tx = await enclave.enableE3Program(crispAddress)
   await tx.wait()
+
+  let tokenAddress
+  if (useMocks) {
+    const token = await ethers.deployContract('MockVotingToken')
+    await token.waitForDeployment()
+    tokenAddress = await token.getAddress()
+
+    storeDeploymentArgs(
+      {
+        address: tokenAddress,
+        blockNumber: await ethers.provider.getBlockNumber(),
+      },
+      'MockCRISPToken',
+      chain,
+    )
+  }
 
   console.log(`
       Deployments:
