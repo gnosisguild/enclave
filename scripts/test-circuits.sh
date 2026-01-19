@@ -2,6 +2,6 @@
 set -euo pipefail
 
 cd circuits/lib
-nargo test --workspace
+nargo test
 
 echo "Noir circuits tested successfully"
