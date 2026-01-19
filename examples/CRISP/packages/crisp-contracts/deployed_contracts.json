@@ -127,6 +127,10 @@
     "MockRISC0Verifier": {
       "address": "0x51D31a22cBe13dE01C4c1CD8cEd3955fa58a4aC3",
       "blockNumber": 10043288
+    },
+    "MockCRISPToken": {
+      "address": "0x77da6521A1A22e81Df08E98b4Af41D71413EA354",
+      "blockNumber": 10073653
     }
   }
 }
