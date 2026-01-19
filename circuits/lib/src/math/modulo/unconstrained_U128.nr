@@ -101,15 +101,24 @@ pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (
 /// # Returns
 /// A tuple `(quotient, remainder)` where `lhs * rhs = m * quotient + remainder`
 ///
-/// # Note
-/// For u128 values, the product can overflow Field, but for typical use cases
-/// (e.g., party IDs <= 100), this is safe.
+/// # Overflow Warning
+/// Field multiplication wraps modulo the field prime (~254 bits). For two u128 values
+/// near 2^128, their product (up to 2^256) exceeds the Field modulus, causing silent
+/// wraparound before the mod reduction. This can produce incorrect results.
+///
+/// # Safe Input Range
+/// To avoid overflow, ensure `lhs * rhs < Field::MODULUS`. For typical use cases:
+/// - Party IDs, polynomial coefficients, and small cryptographic values (< 2^64) are safe
+/// - Arbitrary u128 values may overflow and should be validated by callers
 ///
 /// # Safety
 /// This is an unconstrained function. The result must be verified in constrained code.
+/// Callers must ensure inputs are within the safe range to prevent silent overflow.
 pub unconstrained fn __mul_with_quotient(lhs: Field, rhs: Field, m: Field) -> (Field, Field) {
-    // For u128 values, product can overflow Field
-    // But since our values are small (party IDs <= 100), this is safe
+    // WARNING: Field multiplication can overflow for large inputs.
+    // For u128 values near 2^128, the product (up to 2^256) exceeds Field modulus (~2^254),
+    // causing wraparound. This is safe for typical use cases (party IDs, small coefficients),
+    // but callers must validate input ranges for arbitrary u128 values.
     let product = lhs * rhs;
     __compute_mod_reduction(product, m)
 }

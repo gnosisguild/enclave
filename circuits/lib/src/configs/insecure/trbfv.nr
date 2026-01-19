@@ -164,13 +164,13 @@ pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> =
 
 /************************************
 -------------------------------------
-dec_share_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
+dec_shares_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
 -------------------------------------
 ************************************/
 
-// dec_share_agg_trbfv - bit parameters
+// dec_shares_agg_trbfv - bit parameters
 pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 69;
 
-// dec_share_agg_trbfv - configs
+// dec_shares_agg_trbfv - configs
 pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
     DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);

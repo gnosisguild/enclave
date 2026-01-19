@@ -24,13 +24,14 @@ for dir in "${DIRS[@]}"; do
     
     # Find all package directories and create empty Prover.toml to prevent nargo from creating them
     created_files=()
-    while IFS= read -r -d '' pkg_dir; do
+    while IFS= read -r -d '' nargo_file; do
+        pkg_dir=$(dirname "$nargo_file")
         prover_file="${pkg_dir}/Prover.toml"
         if [ ! -f "$prover_file" ]; then
             touch "$prover_file"
             created_files+=("$prover_file")
         fi
-    done < <(find . -name "Nargo.toml" -type f -print0 2>/dev/null | xargs -0 dirname 2>/dev/null || true)
+    done < <(find . -name "Nargo.toml" -type f -print0 2>/dev/null || true)
     
     # Checking circuit format.
     if ! (nargo fmt --check); then

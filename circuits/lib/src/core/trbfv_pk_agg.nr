@@ -31,7 +31,7 @@ pub struct TrbfvPublicKeyAggregation<let N: u32, let H: u32, let L: u32, let BIT
     configs: Configs<L>,
 
     /// Expected commitments to public key TRBFV (from C1)
-    /// We need one comment from each honest party (H).
+    /// We need one commitment from each honest party (H).
     expected_pk_trbfv_commitments: [Field; H],
 
     /// Individual public keys from H honest parties (public inputs)
@@ -111,7 +111,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
         // 0. Verify pk commitments
         self.verify_pk_commitments();
 
-        // 1. Verify pk & pk1 aggregations for each basis
+        // 1. Verify pk0 & pk1 aggregations for each basis
         for basis_idx in 0..L {
             self.verify_pk_for_basis(self.pk0, self.pk0_agg, basis_idx);
             self.verify_pk_for_basis(self.pk1, self.pk1_agg, basis_idx);

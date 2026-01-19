@@ -128,13 +128,13 @@ impl<let N: u32> Polynomial<N> {
         for i in 1..len {
             acc = acc * x + self.coefficients[i];
             // Only reduce if accumulator exceeds q
-            if acc as u64 >= m as u64 {
+            if acc as u128 >= m as u128 {
                 acc = q.reduce_mod(acc);
             }
         }
 
         // Final reduction to ensure result is in [0, q)
-        if acc as u64 >= m as u64 {
+        if acc as u128 >= m as u128 {
             q.reduce_mod(acc)
         } else {
             acc
@@ -394,7 +394,7 @@ fn test_eval_mod() {
     let poly4 = Polynomial::new([5, 3, 7]);
     let q = ModU128::new(17);
     let result4 = poly4.eval_mod(4, q);
-    assert(result4 as u64 < q.get_mod_field() as u64);
+    assert(result4 as u128 < q.get_mod_field() as u128);
 
     // Test 5: Compare with regular eval for small values
     let poly5 = Polynomial::new([1, 2, 1]);

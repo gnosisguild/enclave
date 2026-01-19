@@ -64,7 +64,7 @@ impl ModU128 {
         // Safety: __compute_mod_reduction is safe to call here because we assert the properties of the output
         let (q, r) = unsafe { __compute_mod_reduction(n, self.m) };
 
-        // Ensure remainder is in [0, q)
+        // Ensure remainder is in [0, m)
         assert(r as u128 < self.m as u128);
         // Verify the reduction is correct
         assert(n == q * self.m + r);
