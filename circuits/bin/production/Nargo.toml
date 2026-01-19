@@ -11,5 +11,5 @@ members = [
     "pk_agg_trbfv",
     "greco",
     "dec_share_trbfv",
-    "dec_share_agg_trbfv"   
+    "dec_shares_agg_trbfv"   
 ]
