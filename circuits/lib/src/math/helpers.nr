@@ -299,6 +299,7 @@ fn test_safe_hashing_with_safe_helper() {
 
     assert(digests2.len() == 1);
     assert(digests2.get(0) != 0);
+    assert(digests2.get(0) == digests1.get(0));
 }
 
 #[test]
