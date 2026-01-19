@@ -64,8 +64,6 @@ describe("E3RefundManager", function () {
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
 
-  const PAYMENT_AMOUNT = ethers.parseUnits("100", 6); // 100 USDC
-
   const setup = async () => {
     const [
       owner,
