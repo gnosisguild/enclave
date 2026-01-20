@@ -115,17 +115,21 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     /// is used to generate the Fiat-Shamir challenge via the SAFE sponge API.
     ///
     /// The order of serialization is:
-    /// 1. Ciphertext components `c_0` for each CRT basis
-    /// 2. Ciphertext components `c_1` for each CRT basis
-    /// 3. Aggregated secret shares `s` for each CRT basis
-    /// 4. Aggregated noise shares `e` for each CRT basis
-    /// 5. Quotient polynomials `r_1` for each CRT basis
-    /// 6. Quotient polynomials `r_2` for each CRT basis
-    /// 7. Decryption shares `d` for each CRT basis
+    /// 1. Commitment to aggregated secret shares `s` (expected_s_commitment)
+    /// 2. Commitment to aggregated noise shares `e` (expected_e_commitment)
+    /// 3. Ciphertext components `c_0` for each CRT basis (serialized coefficients)
+    /// 4. Ciphertext components `c_1` for each CRT basis (serialized coefficients)
+    /// 5. Quotient polynomials `r_1` for each CRT basis (serialized coefficients)
+    /// 6. Quotient polynomials `r_2` for each CRT basis (serialized coefficients)
+    /// 7. Decryption shares `d` for each CRT basis (serialized coefficients)
+    ///
+    /// Note: Aggregated secret shares `s` and noise shares `e` are represented by their
+    /// commitments rather than serialized coefficients. This saves constraints while
+    /// still binding them to the transcript.
     ///
     /// # Returns
-    /// A vector containing all polynomial coefficients in flattened form, ready for
-    /// hashing to generate the Fiat-Shamir challenge.
+    /// A vector containing commitments and polynomial coefficients in flattened form,
+    /// ready for hashing to generate the Fiat-Shamir challenge.
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
@@ -213,7 +217,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
     ///
     /// This function implements the Fiat-Shamir transform for the decryption share circuit:
-    /// 1. Flattens all witness data (ciphertexts, secrets, quotients, shares) into a single array
+    /// 1. Flattens all witness data (commitments for s/e, ciphertexts c_0/c_1, quotients r_1/r_2, decryption shares d) into a single array
     /// 2. Absorbs the flattened data into the SAFE sponge
     /// 3. Squeezes a single challenge value
     ///
