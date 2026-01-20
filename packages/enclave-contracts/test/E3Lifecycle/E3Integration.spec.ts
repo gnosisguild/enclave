@@ -297,6 +297,33 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       return { e3Id: 0 };
     };
 
+    async function setupOperator(operator: Signer) {
+      const operatorAddress = await operator.getAddress();
+
+      await enclToken.setTransferRestriction(false);
+      await enclToken.mintAllocation(
+        operatorAddress,
+        ethers.parseEther("10000"),
+        "Test allocation",
+      );
+      await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
+
+      await enclToken
+        .connect(operator)
+        .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
+      await bondingRegistry
+        .connect(operator)
+        .bondLicense(ethers.parseEther("1000"));
+      await bondingRegistry.connect(operator).registerOperator();
+
+      const ticketTokenAddress = await bondingRegistry.ticketToken();
+      const ticketAmount = ethers.parseUnits("100", 6);
+      await usdcToken
+        .connect(operator)
+        .approve(ticketTokenAddress, ticketAmount);
+      await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
+    }
+
     return {
       enclave,
       e3RefundManager,
@@ -313,54 +340,23 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       operator2,
       computeProvider,
       makeRequest,
+      setupOperator,
     };
   };
 
-  // Helper to setup an operator for sortition (shared across tests)
-  async function setupOperatorForSortition(
-    operator: Signer,
-    bondingRegistry: any,
-    enclToken: any,
-    usdcToken: any,
-    _registry: any,
-    _owner: Signer,
-  ): Promise<void> {
-    const operatorAddress = await operator.getAddress();
-
-    // Enable token transfers
-    await enclToken.setTransferRestriction(false);
-
-    // Mint license tokens to operator
-    await enclToken.mintAllocation(
-      operatorAddress,
-      ethers.parseEther("10000"),
-      "Test allocation",
-    );
-
-    // Mint USDC to operator
-    await usdcToken.mint(operatorAddress, ethers.parseUnits("100000", 6));
-
-    // Approve and bond license
-    await enclToken
-      .connect(operator)
-      .approve(await bondingRegistry.getAddress(), ethers.parseEther("2000"));
-    await bondingRegistry
-      .connect(operator)
-      .bondLicense(ethers.parseEther("1000"));
-    await bondingRegistry.connect(operator).registerOperator();
-
-    // Get ticket token address from bonding registry and add ticket balance
-    const ticketTokenAddress = await bondingRegistry.ticketToken();
-    const ticketAmount = ethers.parseUnits("100", 6);
-    await usdcToken.connect(operator).approve(ticketTokenAddress, ticketAmount);
-    await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-
-    // Note: addCiphernode is called internally by registerOperator via bondingRegistry
-  }
-
   describe("E3 Request with Lifecycle Integration", function () {
     it("initializes E3 lifecycle when request is made", async function () {
-      const { enclave, makeRequest, requester } = await loadFixture(setup);
+      const {
+        enclave,
+        makeRequest,
+        requester,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -374,7 +370,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("sets committee formation deadline on request", async function () {
-      const { enclave, makeRequest } = await loadFixture(setup);
+      const { enclave, makeRequest, operator1, operator2, setupOperator } =
+        await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       const beforeTime = await time.latest();
       await makeRequest();
@@ -395,32 +395,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const {
         enclave,
         registry,
-        bondingRegistry,
-        usdcToken,
-        enclToken,
         makeRequest,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators for sortition
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // Make a request first
       await makeRequest();
@@ -463,32 +445,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const {
         enclave,
         registry,
-        bondingRegistry,
-        usdcToken,
-        enclToken,
         makeRequest,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators for sortition
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // Make a request
       await makeRequest();
@@ -517,7 +481,17 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("processE3Failure()", function () {
     it("reverts if lifecycle is not a valid contract", async function () {
-      const { enclave, owner, makeRequest } = await loadFixture(setup);
+      const {
+        enclave,
+        owner,
+        makeRequest,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -546,7 +520,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("reverts if E3 not in failed state", async function () {
-      const { enclave, makeRequest } = await loadFixture(setup);
+      const { enclave, makeRequest, operator1, operator2, setupOperator } =
+        await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -557,8 +535,17 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("processes failure and calculates refund for committee formation timeout", async function () {
-      const { enclave, e3RefundManager, makeRequest } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -583,8 +570,19 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("allows requester to claim refund after failure processing", async function () {
-      const { enclave, e3RefundManager, makeRequest, requester, usdcToken } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        requester,
+        usdcToken,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -608,7 +606,11 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     });
 
     it("reverts if trying to process failure twice", async function () {
-      const { enclave, makeRequest } = await loadFixture(setup);
+      const { enclave, makeRequest, operator1, operator2, setupOperator } =
+        await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -621,12 +623,83 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         "No payment to refund",
       );
     });
+
+    it("reverts if requester tries to claim refund twice", async function () {
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        requester,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
+
+      await makeRequest();
+
+      await time.increase(defaultTimeoutConfig.committeeFormationWindow + 1);
+      await enclave.markE3Failed(0);
+      await enclave.processE3Failure(0);
+
+      // First claim succeeds
+      await e3RefundManager.connect(requester).claimRequesterRefund(0);
+
+      // Second claim should fail
+      await expect(
+        e3RefundManager.connect(requester).claimRequesterRefund(0),
+      ).to.be.revertedWithCustomError(e3RefundManager, "AlreadyClaimed");
+    });
+
+    it("reverts if refund not yet calculated", async function () {
+      const {
+        e3RefundManager,
+        makeRequest,
+        requester,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
+
+      await makeRequest();
+
+      // Try to claim before failure is processed
+      await expect(
+        e3RefundManager.connect(requester).claimRequesterRefund(0),
+      ).to.be.revertedWithCustomError(e3RefundManager, "RefundNotCalculated");
+    });
+  });
+
+  describe("E3RefundManager Initialization", function () {
+    it("correctly sets enclave address", async function () {
+      const { enclave, e3RefundManager } = await loadFixture(setup);
+
+      expect(await e3RefundManager.enclave()).to.equal(
+        await enclave.getAddress(),
+      );
+    });
   });
 
   describe("Full Failure Flow - Committee Formation Timeout", function () {
     it("complete flow: request -> timeout -> fail -> process -> claim", async function () {
-      const { enclave, e3RefundManager, makeRequest, requester, usdcToken } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        requester,
+        usdcToken,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request
       await makeRequest();
@@ -670,8 +743,18 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Slashed Funds Routing", function () {
     it("routes slashed funds 50/50 to requester and honest nodes", async function () {
-      const { enclave, e3RefundManager, makeRequest, owner } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        e3RefundManager,
+        makeRequest,
+        owner,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       await makeRequest();
 
@@ -709,33 +792,16 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         enclave,
         e3RefundManager,
         registry,
-        bondingRegistry,
         usdcToken,
-        enclToken,
         makeRequest,
         requester,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators for sortition
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request
       await makeRequest();
@@ -790,34 +856,17 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         enclave,
         e3RefundManager,
         registry,
-        bondingRegistry,
         usdcToken,
-        enclToken,
         e3Program,
         decryptionVerifier,
         requester,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request with short activation window
       const currentTime = await time.latest();
@@ -906,33 +955,16 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         enclave,
         e3RefundManager,
         registry,
-        bondingRegistry,
         usdcToken,
-        enclToken,
         makeRequest,
         requester,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request
       await makeRequest();
@@ -1004,33 +1036,16 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         enclave,
         e3RefundManager,
         registry,
-        bondingRegistry,
         usdcToken,
-        enclToken,
         makeRequest,
         requester,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request
       await makeRequest();
@@ -1106,8 +1121,19 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   describe("Multiple E3 Requests Isolation", function () {
     it("tracks multiple E3s independently", async function () {
-      const { enclave, usdcToken, requester, e3Program, decryptionVerifier } =
-        await loadFixture(setup);
+      const {
+        enclave,
+        usdcToken,
+        requester,
+        e3Program,
+        decryptionVerifier,
+        operator1,
+        operator2,
+        setupOperator,
+      } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       const enclaveAddress = await enclave.getAddress();
 
@@ -1182,7 +1208,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         requester,
         e3Program,
         decryptionVerifier,
+        operator1,
+        operator2,
+        setupOperator,
       } = await loadFixture(setup);
+
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       const enclaveAddress = await enclave.getAddress();
 
@@ -1247,32 +1279,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const {
         enclave,
         registry,
-        bondingRegistry,
-        usdcToken,
-        enclToken,
         makeRequest,
-        owner,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators for sortition
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // 1. Make request
       await makeRequest();
@@ -1327,33 +1341,15 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         enclave,
         e3RefundManager,
         registry,
-        bondingRegistry,
-        usdcToken,
-        enclToken,
         makeRequest,
-        owner,
         requester,
         operator1,
         operator2,
+        setupOperator,
       } = await loadFixture(setup);
 
-      // Setup operators
-      await setupOperatorForSortition(
-        operator1,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
-      await setupOperatorForSortition(
-        operator2,
-        bondingRegistry,
-        enclToken,
-        usdcToken,
-        registry,
-        owner,
-      );
+      await setupOperator(operator1);
+      await setupOperator(operator2);
 
       // Complete full E3 flow
       await makeRequest();

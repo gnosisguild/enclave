@@ -220,9 +220,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external onlyEnclave returns (bool success) {
         Committee storage c = committees[e3Id];
         require(!c.initialized, CommitteeAlreadyRequested());
+
+        uint256 activeCount = bondingRegistry.numActiveOperators();
         require(
-            threshold[1] <= numCiphernodes,
-            InsufficientCiphernodes(threshold[1], numCiphernodes)
+            threshold[1] <= activeCount,
+            InsufficientCiphernodes(threshold[1], activeCount)
         );
 
         c.initialized = true;
