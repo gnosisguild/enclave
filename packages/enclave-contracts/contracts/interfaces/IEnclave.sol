@@ -296,72 +296,51 @@ interface IEnclave {
 
     /// @notice This function should be called to set the maximum duration of requested computations.
     /// @param _maxDuration The maximum duration of a computation in seconds.
-    /// @return success True if the max duration was successfully set.
-    function setMaxDuration(
-        uint256 _maxDuration
-    ) external returns (bool success);
+    function setMaxDuration(uint256 _maxDuration) external;
 
     /// @notice Sets the Ciphernode Registry contract address.
     /// @dev This function MUST revert if the address is zero or the same as the current registry.
     /// @param _ciphernodeRegistry The address of the new Ciphernode Registry contract.
-    /// @return success True if the registry was successfully set.
     function setCiphernodeRegistry(
         ICiphernodeRegistry _ciphernodeRegistry
-    ) external returns (bool success);
+    ) external;
 
     /// @notice Sets the Bonding Registry contract address.
     /// @dev This function MUST revert if the address is zero or the same as the current registry.
     /// @param _bondingRegistry The address of the new Bonding Registry contract.
-    /// @return success True if the registry was successfully set.
-    function setBondingRegistry(
-        IBondingRegistry _bondingRegistry
-    ) external returns (bool success);
+    function setBondingRegistry(IBondingRegistry _bondingRegistry) external;
 
     /// @notice Sets the fee token used for E3 payments.
     /// @dev This function MUST revert if the address is zero or the same as the current fee token.
     /// @param _feeToken The address of the new fee token.
-    /// @return success True if the fee token was successfully set.
-    function setFeeToken(IERC20 _feeToken) external returns (bool success);
+    function setFeeToken(IERC20 _feeToken) external;
 
     /// @notice This function should be called to enable an E3 Program.
     /// @param e3Program The address of the E3 Program.
-    /// @return success True if the E3 Program was successfully enabled.
-    function enableE3Program(
-        IE3Program e3Program
-    ) external returns (bool success);
+    function enableE3Program(IE3Program e3Program) external;
 
     /// @notice This function should be called to disable an E3 Program.
     /// @param e3Program The address of the E3 Program.
-    /// @return success True if the E3 Program was successfully disabled.
-    function disableE3Program(
-        IE3Program e3Program
-    ) external returns (bool success);
+    function disableE3Program(IE3Program e3Program) external;
 
     /// @notice Sets or enables a decryption verifier for a specific encryption scheme.
     /// @dev This function MUST revert if the verifier address is zero or already set to the same value.
     /// @param encryptionSchemeId The unique identifier for the encryption scheme.
     /// @param decryptionVerifier The address of the decryption verifier contract.
-    /// @return success True if the verifier was successfully set.
     function setDecryptionVerifier(
         bytes32 encryptionSchemeId,
         IDecryptionVerifier decryptionVerifier
-    ) external returns (bool success);
+    ) external;
 
     /// @notice Disables a previously enabled encryption scheme.
     /// @dev This function MUST revert if the encryption scheme is not currently enabled.
     /// @param encryptionSchemeId The unique identifier for the encryption scheme to disable.
-    /// @return success True if the encryption scheme was successfully disabled.
-    function disableEncryptionScheme(
-        bytes32 encryptionSchemeId
-    ) external returns (bool success);
+    function disableEncryptionScheme(bytes32 encryptionSchemeId) external;
 
     /// @notice Sets the allowed E3 program parameters.
     /// @dev This function enables specific parameter sets for E3 programs (e.g., BFV encryption parameters).
     /// @param _e3ProgramsParams Array of ABI encoded parameter sets to allow.
-    /// @return success True if the parameters were successfully set.
-    function setE3ProgramsParams(
-        bytes[] memory _e3ProgramsParams
-    ) external returns (bool success);
+    function setE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
