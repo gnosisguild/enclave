@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, AsyncContext, Handler, Message};
+use actix::{Actor, AsyncContext, Context, Handler, Message};
 use e3_events::{prelude::*, trap, BusHandle, EType, EnclaveEventData};
 use tracing::info;
 
@@ -14,30 +14,16 @@ pub struct BufferedEvent {
     pub event: EnclaveEventData,
 }
 
-/// Message from EvmEventReaders containing historical events
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct HistoricalEvents {
-    pub events: Vec<BufferedEvent>,
-}
-
-/// Message from EvmEventReaders to register with sync actor
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct RegisterReader;
-
-/// Message from EvmEventReaders signaling historical sync is complete
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct ReaderComplete;
-
-/// Union of all messages the Sync actor can receive
+/// Messages equivalent to EnclaveEvmEvent for compatibility
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum SyncMessage {
     RegisterReader,
-    ReaderComplete,
-    HistoricalEvents(HistoricalEvents),
+    HistoricalSyncComplete,
+    Event {
+        event: EnclaveEventData,
+        block: Option<u64>,
+    },
 }
 
 /// Coordinates historical replay across all EvmEventReaders.
@@ -51,8 +37,6 @@ pub struct Sync {
     buffered_events: Vec<BufferedEvent>,
     /// Target to forward events to (typically EventBus)
     target: BusHandle,
-    /// Whether we've started forwarding events
-    started: bool,
 }
 
 impl Sync {
@@ -62,7 +46,6 @@ impl Sync {
             completed_count: 0,
             buffered_events: Vec::new(),
             target: bus,
-            started: false,
         }
     }
 }
@@ -91,7 +74,7 @@ impl Handler<SyncMessage> for Sync {
                 self.registered_count += 1;
                 info!("Sync: reader registered (total: {})", self.registered_count);
             }
-            SyncMessage::ReaderComplete => {
+            SyncMessage::HistoricalSyncComplete => {
                 self.completed_count += 1;
                 info!("Sync: reader completed (total: {})", self.completed_count);
 
@@ -102,18 +85,19 @@ impl Handler<SyncMessage> for Sync {
                     });
 
                     // Publish SyncEnd to trigger live streaming
+                    let sync_end = EnclaveEventData::SyncEnd(e3_events::SyncEnd);
                     trap(EType::Sync, &self.target.clone(), || {
-                        self.target
-                            .publish(EnclaveEventData::SyncEnd(e3_events::SyncEnd))
+                        self.target.publish(sync_end)
                     });
                 }
             }
-            SyncMessage::HistoricalEvents(events) => {
-                let event_count = events.events.len();
-                self.buffered_events.extend(events.events);
+            SyncMessage::Event { event, block } => {
+                self.buffered_events.push(BufferedEvent {
+                    block: block.unwrap_or(0),
+                    event,
+                });
                 info!(
-                    "Sync: received {} events (total buffered: {})",
-                    event_count,
+                    "Sync: buffered event (total: {})",
                     self.buffered_events.len()
                 );
             }

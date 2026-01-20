@@ -6,7 +6,7 @@
 
 use crate::event_system::AggregateConfig;
 use crate::{CiphernodeHandle, EventSystem};
-use actix::{Actor, Addr};
+use actix::{Actor, Addr, Handler};
 use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
 use derivative::Derivative;
@@ -35,7 +35,35 @@ use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
-use e3_sync::Sync;
+use e3_sync::{BufferedEvent, Sync, SyncMessage};
+
+/// Bridge actor to convert EnclaveEvmEvent to SyncMessage
+struct EventBridge {
+    sync: actix::Addr<Sync>,
+}
+
+impl EventBridge {
+    fn new(sync: actix::Addr<Sync>) -> Self {
+        Self { sync }
+    }
+}
+
+impl Actor for EventBridge {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<e3_evm::EnclaveEvmEvent> for EventBridge {
+    type Result = ();
+
+    fn handle(&mut self, msg: e3_evm::EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
+        let sync_msg = match msg {
+            e3_evm::EnclaveEvmEvent::RegisterReader => SyncMessage::RegisterReader,
+            e3_evm::EnclaveEvmEvent::HistoricalSyncComplete => SyncMessage::HistoricalSyncComplete,
+            e3_evm::EnclaveEvmEvent::Event { event, block } => SyncMessage::Event { event, block },
+        };
+        self.sync.do_send(sync_msg);
+    }
+}
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -396,8 +424,10 @@ impl CiphernodeBuilder {
 
         let cipher = &self.cipher;
 
+        // Create Sync actor for coordination
         let sync = Sync::new(bus.clone()).start();
-        let processor = sync.recipient(); // Use Sync as processor for now to maintain compatibility
+        let bridge = EventBridge::new(sync.clone()).start();
+        let processor = bridge.recipient(); // Bridge converts EnclaveEvmEvent to SyncMessage
 
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
