@@ -63,27 +63,26 @@ pub unconstrained fn __neg(val: Field, m: Field) -> Field {
 /// Computes `(lhs - rhs) mod m`, handling the case where `lhs < rhs` by adding
 /// the modulus. Returns both the result and a flag indicating if underflow occurred.
 ///
+/// # Preconditions
+/// Inputs must be reduced modulo `m` such that `lhs, rhs in [0, m)`. This ensures
+/// that the computed difference is bounded and cannot overflow `u128`.
+///
 /// # Arguments
-/// * `lhs` - Left-hand side value (minuend)
-/// * `rhs` - Right-hand side value (subtrahend)
-/// * `m` - The modulus
+/// * `lhs` - Left-hand side value (minuend), must be in `[0, m)`
+/// * `rhs` - Right-hand side value (subtrahend), must be in `[0, m)`
+/// * `m` - The modulus, must satisfy `m <= u128::MAX`
 ///
 /// # Returns
 /// A tuple `(result, underflow)` where:
 /// - `result = (lhs - rhs) mod m`
 /// - `underflow = true` if `lhs < rhs`, `false` otherwise
 ///
-/// # Overflow Warning
-/// The computation `lhs_u128 + m_u128 - rhs_u128` can overflow u128 if
-/// `lhs_u128 + m_u128 > 2^128 - 1`. To avoid overflow, ensure that for the
-/// underflow case, `lhs_u128 + m_u128` does not exceed u128::MAX.
-///
-/// # Safe Input Range
-/// For typical use cases with moduli < 2^64, this is safe. For larger moduli
-/// approaching 2^128, ensure `lhs < 2^128 - m` to prevent intermediate overflow.
-///
 /// # Safety
 /// This is an unconstrained function. The result must be verified in constrained code.
+/// As long as inputs are reduced modulo `m` (and `m <= u128::MAX`), the subtraction-with-underflow
+/// logic is safe and will not overflow `u128`. This function is used by the constrained `sub` method
+/// in `modulo::U128`, which ensures inputs are properly reduced before calling `__sub_with_underflow`.
+/// See the surrounding `modulo/unconstrained_U128` module documentation for details.
 pub unconstrained fn __sub_with_underflow(lhs: Field, rhs: Field, m: Field) -> (Field, bool) {
     let lhs_u128 = lhs as u128;
     let rhs_u128 = rhs as u128;
