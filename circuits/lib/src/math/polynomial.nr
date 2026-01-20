@@ -110,9 +110,9 @@ impl<let N: u32> Polynomial<N> {
     /// modular reductions to prevent overflow. The result is guaranteed to be in
     /// the range `[0, q)`.
     ///
-    /// The function performs lazy reduction: it only reduces the accumulator modulo
-    /// `q` when it exceeds the modulus, which is more efficient than reducing after
-    /// every operation while still preventing overflow.
+    /// The function performs modular reduction after each multiplication and addition
+    /// to ensure the accumulator always remains in the range `[0, q)`, preventing
+    /// any potential overflow issues.
     ///
     /// # Arguments
     /// * `x` - The point at which to evaluate the polynomial
@@ -121,24 +121,15 @@ impl<let N: u32> Polynomial<N> {
     /// # Returns
     /// The value `P(x) mod q` in the range `[0, q)`
     pub fn eval_mod(self, x: Field, q: ModU128) -> Field {
-        let m = q.get_mod_field();
         let mut acc = self.coefficients[0];
         let len = self.coefficients.len();
 
         for i in 1..len {
-            acc = acc * x + self.coefficients[i];
-            // Only reduce if accumulator exceeds q
-            if acc as u128 >= m as u128 {
-                acc = q.reduce_mod(acc);
-            }
+            acc = q.mul_mod(acc, x);
+            acc = q.add(acc, self.coefficients[i]);
         }
 
-        // Final reduction to ensure result is in [0, q)
-        if acc as u128 >= m as u128 {
-            q.reduce_mod(acc)
-        } else {
-            acc
-        }
+        acc
     }
 
     /// Performs range checking on polynomial coefficients using asymmetric bounds.
