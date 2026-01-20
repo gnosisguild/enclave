@@ -241,7 +241,6 @@ describe("Enclave", function () {
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     await enclave.setE3RefundManager(e3RefundManagerAddress);
 
-
     const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
       parameters: {
         CiphernodeRegistry: {
