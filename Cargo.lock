@@ -2808,6 +2808,7 @@ dependencies = [
  "e3-multithread",
  "e3-request",
  "e3-sortition",
+ "e3-sync",
  "e3-trbfv",
  "e3-utils",
  "once_cell",
@@ -3013,6 +3014,7 @@ dependencies = [
  "e3-entrypoint",
  "e3-events",
  "e3-sortition",
+ "e3-sync",
  "e3-utils",
  "futures-util",
  "num-bigint",
@@ -3274,6 +3276,9 @@ name = "e3-sync"
 version = "0.1.7"
 dependencies = [
  "actix",
+ "anyhow",
+ "e3-events",
+ "tracing",
 ]
 
 [[package]]

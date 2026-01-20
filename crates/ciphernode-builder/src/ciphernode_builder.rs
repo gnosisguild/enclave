@@ -24,9 +24,8 @@ use e3_evm::{
         ProviderConfig,
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
-    EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
-    HistoricalEventCoordinator,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -36,6 +35,7 @@ use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
+use e3_sync::Sync;
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -396,8 +396,8 @@ impl CiphernodeBuilder {
 
         let cipher = &self.cipher;
 
-        let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-        let processor = coordinator.clone().recipient();
+        let sync = Sync::new(bus.clone()).start();
+        let processor = sync.recipient(); // Use Sync as processor for now to maintain compatibility
 
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
@@ -492,8 +492,7 @@ impl CiphernodeBuilder {
             }
         }
 
-        // We start after all readers have registered
-        coordinator.do_send(CoordinatorStart);
+        // Sync actor auto-starts and publishes SyncStart when created
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());

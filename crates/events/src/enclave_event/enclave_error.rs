@@ -44,6 +44,7 @@ pub enum EType {
     Data,
     Event,
     Computation,
+    Sync,
 }
 
 impl EnclaveError {

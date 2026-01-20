@@ -30,7 +30,9 @@ mod plaintext_output_published;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
+mod sync_end;
 mod sync_request;
+mod sync_start;
 mod test_event;
 mod threshold_share_collection_failed;
 mod threshold_share_created;
@@ -67,7 +69,9 @@ pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 use strum::IntoStaticStr;
+pub use sync_end::*;
 pub use sync_request::*;
+pub use sync_start::*;
 pub use test_event::*;
 pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
@@ -136,6 +140,8 @@ pub enum EnclaveEventData {
     ComputeResponse(ComputeResponse),
     ComputeRequestError(ComputeRequestError),
     SyncRequest(SyncRequest),
+    SyncStart(SyncStart),
+    SyncEnd(SyncEnd),
     NetSyncEvents(NetSyncEvents),
     EvmSyncEvents(EvmSyncEvents),
     /// This is a test event to use in testing
