@@ -11,11 +11,6 @@ use lib::configs::production::trbfv::{
 use lib::core::trbfv_dec_share::DecryptionShare;
 use lib::math::polynomial::Polynomial;
 
-/// Number of parties.
-pub global N_PARTIES: u32 = 5;
-/// Threshold.
-pub global T: u32 = 2;
-
 fn main(
     expected_s_commitment: pub Field,
     expected_e_commitment: pub Field,
