@@ -36,14 +36,14 @@ pub struct DecryptionSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: 
     /// Circuit parameters including crypto constants
     configs: Configs<L>,
 
-    /// Decryption shares from t+1 parties (public inputs)
+    /// Decryption shares from t+1 parties (public witnesses)
     decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
 
-    /// Party IDs (x-coordinates) for interpolation (public inputs)
+    /// Party IDs (x-coordinates) for interpolation (public witnesses)
     /// Note: Must be in strictly increasing order for correct Lagrange sign computation
     party_ids: [Field; T + 1],
 
-    /// Message polynomial m(x) (public output)
+    /// Message polynomial m(x) (public witness)
     message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
 
     /// Global u polynomial (secret witness)

@@ -16,8 +16,8 @@ fn main(
     expected_message_commitment: pub Field,
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
-    ct0is: [Polynomial<N>; L],
-    ct1is: [Polynomial<N>; L],
+    ct0is: pub [Polynomial<N>; L],
+    ct1is: pub [Polynomial<N>; L],
     u: Polynomial<N>,
     e0: Polynomial<N>,
     e0is: [Polynomial<N>; L],
@@ -28,7 +28,7 @@ fn main(
     r2is: [Polynomial<N - 1>; L],
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
-) -> pub bool {
+) {
     let enc_bfv: EncryptionBfv<N, L, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
         ENC_BFV_CONFIGS_E_SM,
         expected_pk_commitment,
@@ -48,5 +48,5 @@ fn main(
         p1is,
         p2is,
     );
-    enc_bfv.verify()
+    enc_bfv.verify();
 }

@@ -38,12 +38,14 @@ pub struct DecryptionShare<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u
     configs: Configs<L>,
 
     /// Expected commitment to aggregated shares s (from BFV decryption circuit)
+    /// (public witness)
     expected_s_commitment: Field,
 
     /// Expected commitment to aggregated noise e (from BFV decryption circuit)
+    /// (public witness)
     expected_e_commitment: Field,
 
-    /// Ciphertext components (public inputs)
+    /// Ciphertext components (public witnesses)
     /// c_0 components for each CRT basis (degree N-1 polynomials with N coefficients)
     c_0: [Polynomial<N>; L],
     /// c_1 components for each CRT basis (degree N-1 polynomials with N coefficients)
@@ -60,7 +62,8 @@ pub struct DecryptionShare<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u
     r_1: [Polynomial<2 * N - 1>; L],
     r_2: [Polynomial<N - 1>; L],
 
-    /// Party's computed decryption share (public output)
+    /// Party's computed decryption share
+    /// (public witnesses)
     d: [Polynomial<N>; L],
 }
 

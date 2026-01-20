@@ -35,16 +35,20 @@ impl<let L: u32> Configs<L> {
 pub struct VerifySharesSk<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to secret (from C1)
+    /// (public witness)
     expected_secret_commitment: Field,
     /// Secret key polynomial: Polynomial<N>
     /// trinary coefficients
+    /// (secret witness)
     secret_sk: Polynomial<N>,
     /// Shares: y[coeff_idx][mod_idx][0..N_PARTIES+1]
     /// y[i][j][0] = secret_sk[i] = f(0), y[i][j][k] = f(k) for k = 1..N_PARTIES
+    /// (secret witnesses)
     y: [[[Field; N_PARTIES + 1]; L]; N],
     /// Parity check matrices: H[mod_idx][row][col]
     /// Size per modulus: (N_PARTIES - T) * (N_PARTIES + 1)
     /// H * y^T = 0 mod q_j
+    /// (public constants)
     h: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L],
 }
 

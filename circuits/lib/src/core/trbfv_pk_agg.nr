@@ -32,18 +32,23 @@ pub struct TrbfvPublicKeyAggregation<let N: u32, let H: u32, let L: u32, let BIT
 
     /// Expected commitments to public key TRBFV (from C1)
     /// We need one commitment from each honest party (H).
+    /// (public witness)
     expected_pk_trbfv_commitments: [Field; H],
 
-    /// Individual public keys from H honest parties (public inputs)
+    /// Individual public keys from H honest parties
     /// pk0[party_idx][basis_idx] - first component of public key for each party and CRT basis
+    /// (committed witnesses)
     pk0: [[Polynomial<N>; L]; H],
     /// pk1[party_idx][basis_idx] - second component of public key for each party and CRT basis
+    /// (committed witnesses)
     pk1: [[Polynomial<N>; L]; H],
 
-    /// Claimed aggregated public key (public inputs)
+    /// Claimed aggregated public key
     /// pk0_agg[basis_idx] - first component of aggregated public key for each CRT basis
+    /// (committed witnesses)
     pk0_agg: [Polynomial<N>; L],
     /// pk1_agg[basis_idx] - second component of aggregated public key for each CRT basis
+    /// (committed witnesses)
     pk1_agg: [Polynomial<N>; L],
 }
 

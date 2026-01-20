@@ -92,16 +92,18 @@ pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u3
     /// Circuit parameters
     configs: Configs<L>,
     /// Expected commitment to public key (from Circuit 0)
+    /// (public witness)
     expected_pk_commitment: Field,
     /// Expected commitment to message (from SK shares verification circuit)
+    /// (public witness)
     expected_message_commitment: Field,
-    /// Public key component 0 for each CRT basis (public inputs)
+    /// Public key component 0 for each CRT basis (committed witnesses)
     pk0is: [Polynomial<N>; L],
-    /// Public key component 1 for each CRT basis (public inputs)
+    /// Public key component 1 for each CRT basis (committed witnesses)
     pk1is: [Polynomial<N>; L],
-    /// Ciphertext component 0 for each CRT basis (public inputs)
+    /// Ciphertext component 0 for each CRT basis (public witnesses)
     ct0is: [Polynomial<N>; L],
-    /// Ciphertext component 1 for each CRT basis (public inputs)
+    /// Ciphertext component 1 for each CRT basis (public witnesses)
     ct1is: [Polynomial<N>; L],
     /// Random ternary polynomial u (secret witness)
     u: Polynomial<N>,
@@ -262,7 +264,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     }
 
     /// Main verification function
-    pub fn verify(self) -> bool {
+    pub fn verify(self) {
         // Step 1: Verify public key commitment matches expected
         self.verify_pk_commitment();
 
@@ -332,7 +334,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     }
 
     /// Verifies BFV encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma
-    fn verify_evaluations(self, gammas: Vec<Field>, k1: Polynomial<N>) -> bool {
+    fn verify_evaluations(self, gammas: Vec<Field>, k1: Polynomial<N>) {
         let gamma = gammas.get(0);
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
         let u_at_gamma = self.u.eval(gamma);
@@ -370,6 +372,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             );
         }
 
-        sum.0 == sum.1
+        assert(sum.0 == sum.1);
     }
 }

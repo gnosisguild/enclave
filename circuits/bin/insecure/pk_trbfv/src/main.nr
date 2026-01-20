@@ -12,7 +12,7 @@ use lib::core::trbfv_pk::TrbfvPublicKey;
 use lib::math::polynomial::Polynomial;
 
 fn main(
-    a: [Polynomial<N>; L],
+    a: pub [Polynomial<N>; L],
     eek: Polynomial<N>,
     sk: Polynomial<N>,
     e_sm: Polynomial<N>,

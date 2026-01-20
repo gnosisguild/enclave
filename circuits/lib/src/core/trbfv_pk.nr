@@ -55,7 +55,7 @@ pub struct TrbfvPublicKey<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: 
     /// Cryptographic parameters including bounds, moduli, and constants.
     configs: Configs<N, L>,
 
-    /// Common Reference String polynomials (public)
+    /// Common Reference String polynomials (public witnesses)
     /// One polynomial per modulus i
     a: [Polynomial<N>; L],
 
@@ -71,13 +71,13 @@ pub struct TrbfvPublicKey<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: 
     /// Used for threshold decryption security
     e_sm: Polynomial<N>,
 
-    /// Quotients from polynomial operations (secret witness)
+    /// Quotients from polynomial operations (secret witnesses)
     /// r1[i] are quotients from modulus switching for modulus i (can be negative, degree 2*N-1)
     r1: [Polynomial<2 * N - 1>; L],
     /// r2[i] are quotients from cyclotomic reduction for modulus i (typically positive, degree N-1)
     r2: [Polynomial<N - 1>; L],
 
-    /// TRBFV public key components (public output)
+    /// TRBFV public key components (committed witnesses)
     /// pk0[i] is the first component of the public key for modulus i
     pk0: [Polynomial<N>; L],
     /// pk1[i] is the second component of the public key for modulus i (should equal a[i])

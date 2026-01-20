@@ -18,9 +18,11 @@ use crate::math::polynomial::Polynomial;
 /// 3. Returns commitment to aggregated shares
 pub struct BfvDecCommitVerify<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> {
     /// Expected commitments from Circuit 3 for H honest parties: [party_idx][mod_idx]
+    /// (public witness)
     expected_commitments: [[Field; L]; H],
 
     /// Decrypted shares from H honest parties: [party_idx][mod_idx]
+    /// (secret witnesses)
     decrypted_shares: [[Polynomial<N>; L]; H],
 }
 
