@@ -11,7 +11,7 @@ fi
 cd circuits
 
 # Directories to check
-DIRS=("lib" "bin/aggregation" "bin/insecure" "bin/production")
+DIRS=("lib" "bin/aggregation/fold" "bin/aggregation/insecure" "bin/aggregation/production" "bin/insecure" "bin/production")
 
 for dir in "${DIRS[@]}"; do
     if [ ! -d "$dir" ]; then
