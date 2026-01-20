@@ -105,10 +105,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param e3Program The E3 program address that is not allowed.
     error E3ProgramNotAllowed(IE3Program e3Program);
 
-    /// @notice Thrown when attempting to activate an E3 that is already activated.
-    /// @param e3Id The ID of the E3 that is already activated.
-    error E3AlreadyActivated(uint256 e3Id);
-
     /// @notice Thrown when the E3 start window or computation period has expired.
     error E3Expired();
 
@@ -361,8 +357,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @inheritdoc IEnclave
     function activate(uint256 e3Id) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+        E3Stage current = _e3Stages[e3Id];
+        if (current != E3Stage.KeyPublished) {
+            revert InvalidStage(e3Id, E3Stage.KeyPublished, current);
+        }
 
-        require(e3.expiration == 0, E3AlreadyActivated(e3Id));
         require(e3.startWindow[0] <= block.timestamp, E3NotReady());
         // TODO: handle what happens to the payment if the start window has passed.
         require(e3.startWindow[1] >= block.timestamp, E3Expired());
@@ -373,11 +372,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id].expiration = expiresAt;
         e3s[e3Id].committeePublicKey = publicKeyHash;
 
-        // Update lifecycle stage
-        E3Stage current = _e3Stages[e3Id];
-        if (current != E3Stage.KeyPublished) {
-            revert InvalidStage(e3Id, E3Stage.KeyPublished, current);
-        }
         _e3Stages[e3Id] = E3Stage.Activated;
         _e3Deadlines[e3Id].computeDeadline =
             expiresAt +
