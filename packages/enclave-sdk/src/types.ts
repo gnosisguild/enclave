@@ -175,7 +175,7 @@ export interface CommitteeRequestedData {
   seed: bigint
   threshold: [bigint, bigint]
   requestBlock: bigint
-  submissionDeadline: bigint
+  committeeDeadline: bigint
 }
 
 export interface CommitteePublishedData {

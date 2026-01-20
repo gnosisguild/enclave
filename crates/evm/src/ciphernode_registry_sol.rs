@@ -99,7 +99,7 @@ impl From<CommitteeRequestedWithChainId> for e3_events::CommitteeRequested {
             seed: Seed(value.0.seed.to_be_bytes()),
             threshold: [value.0.threshold[0] as usize, value.0.threshold[1] as usize],
             request_block: value.0.requestBlock.to(),
-            submission_deadline: value.0.submissionDeadline.to(),
+            committee_deadline: value.0.committeeDeadline.to(),
             chain_id: value.1,
         }
     }
