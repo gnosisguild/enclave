@@ -564,75 +564,61 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     /// @inheritdoc IEnclave
-    function setMaxDuration(
-        uint256 _maxDuration
-    ) public onlyOwner returns (bool success) {
+    function setMaxDuration(uint256 _maxDuration) public onlyOwner {
         maxDuration = _maxDuration;
-        success = true;
         emit MaxDurationSet(_maxDuration);
     }
 
     /// @inheritdoc IEnclave
     function setCiphernodeRegistry(
         ICiphernodeRegistry _ciphernodeRegistry
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         require(
             address(_ciphernodeRegistry) != address(0) &&
                 _ciphernodeRegistry != ciphernodeRegistry,
             InvalidCiphernodeRegistry(_ciphernodeRegistry)
         );
         ciphernodeRegistry = _ciphernodeRegistry;
-        success = true;
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
     }
 
     /// @inheritdoc IEnclave
     function setBondingRegistry(
         IBondingRegistry _bondingRegistry
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         require(
             address(_bondingRegistry) != address(0) &&
                 _bondingRegistry != bondingRegistry,
             InvalidBondingRegistry(_bondingRegistry)
         );
         bondingRegistry = _bondingRegistry;
-        success = true;
         emit BondingRegistrySet(address(_bondingRegistry));
     }
 
     /// @inheritdoc IEnclave
-    function setFeeToken(
-        IERC20 _feeToken
-    ) public onlyOwner returns (bool success) {
+    function setFeeToken(IERC20 _feeToken) public onlyOwner {
         require(
             address(_feeToken) != address(0) && _feeToken != feeToken,
             InvalidFeeToken(_feeToken)
         );
         feeToken = _feeToken;
-        success = true;
         emit FeeTokenSet(address(_feeToken));
     }
 
     /// @inheritdoc IEnclave
-    function enableE3Program(
-        IE3Program e3Program
-    ) public onlyOwner returns (bool success) {
+    function enableE3Program(IE3Program e3Program) public onlyOwner {
         require(
             !e3Programs[e3Program],
             ModuleAlreadyEnabled(address(e3Program))
         );
         e3Programs[e3Program] = true;
-        success = true;
         emit E3ProgramEnabled(e3Program);
     }
 
     /// @inheritdoc IEnclave
-    function disableE3Program(
-        IE3Program e3Program
-    ) public onlyOwner returns (bool success) {
+    function disableE3Program(IE3Program e3Program) public onlyOwner {
         require(e3Programs[e3Program], ModuleNotEnabled(address(e3Program)));
         delete e3Programs[e3Program];
-        success = true;
         emit E3ProgramDisabled(e3Program);
     }
 
@@ -640,21 +626,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function setDecryptionVerifier(
         bytes32 encryptionSchemeId,
         IDecryptionVerifier decryptionVerifier
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         require(
             decryptionVerifier != IDecryptionVerifier(address(0)) &&
                 decryptionVerifiers[encryptionSchemeId] != decryptionVerifier,
             InvalidEncryptionScheme(encryptionSchemeId)
         );
         decryptionVerifiers[encryptionSchemeId] = decryptionVerifier;
-        success = true;
         emit EncryptionSchemeEnabled(encryptionSchemeId);
     }
 
     /// @inheritdoc IEnclave
     function disableEncryptionScheme(
         bytes32 encryptionSchemeId
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         require(
             decryptionVerifiers[encryptionSchemeId] !=
                 IDecryptionVerifier(address(0)),
@@ -663,14 +648,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         decryptionVerifiers[encryptionSchemeId] = IDecryptionVerifier(
             address(0)
         );
-        success = true;
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
     /// @inheritdoc IEnclave
     function setE3ProgramsParams(
         bytes[] memory _e3ProgramsParams
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         uint256 length = _e3ProgramsParams.length;
         for (uint256 i; i < length; ) {
             e3ProgramsParams[_e3ProgramsParams[i]] = true;
@@ -678,22 +662,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
                 ++i;
             }
         }
-        success = true;
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
     /// @notice Sets the E3 Refund Manager contract address
     /// @param _e3RefundManager The new E3 Refund Manager contract address
-    /// @return success True if the operation succeeded
     function setE3RefundManager(
         IE3RefundManager _e3RefundManager
-    ) public onlyOwner returns (bool success) {
+    ) public onlyOwner {
         require(
             address(_e3RefundManager) != address(0),
             "Invalid E3RefundManager address"
         );
         e3RefundManager = _e3RefundManager;
-        success = true;
         emit E3RefundManagerSet(address(_e3RefundManager));
     }
 
