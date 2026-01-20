@@ -85,7 +85,7 @@ pub struct EvmEventReader<P> {
     /// Event bus for error propagation only
     bus: BusHandle,
     /// The auto persistable state of the event reader
-    state: Persistable<EvmEventReaderState>,
+    state: Persistable<EvmEventReaderState>, // XXX: would be best to avoid persistable state outside of domain
     /// The RPC URL for the provider
     rpc_url: String,
 }
@@ -183,6 +183,9 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     }
 }
 
+// TODO: split this up into:
+// 1. historical request (will finish)
+// 2. current listener (run indefinitely)
 #[instrument(name = "evm_event_reader", skip_all)]
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
@@ -300,6 +303,8 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> 
     }
 }
 
+// XXX: Sync should handle the tracking of the last block based on what has been stored in the
+// eventlog
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<P> {
     type Result = ();
 
@@ -311,6 +316,9 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
             }
 
             EnclaveEvmEvent::Event { event, block } => {
+                // XXX: Should not need state
+                // 1. deduplication already happens at the event bus
+                // 2. cursor is kept by sync
                 match self.state.try_mutate(|mut state| {
                     let temp_wrapped = EnclaveEvmEvent::Event {
                         event: event.clone(),
