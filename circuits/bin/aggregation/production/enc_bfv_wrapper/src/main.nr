@@ -8,27 +8,27 @@ use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ult
 use lib::math::commitments::compute_aggregation_commitment;
 
 // Number of proofs.
-pub global N_PROOFS: u32 = 1;
-/// Number of commitments per proof.
-pub global N_COMMITMENTS: u32 = 3;
+pub global N_PROOFS: u32 = 2;
+/// Number of public inputs/outputs per proof.
+pub global N_PUBLIC_INPUTS: u32 = 32770;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
     proofs: [UltraHonkProof; N_PROOFS],
-    commitments: pub [[Field; N_COMMITMENTS]; N_PROOFS],
+    public_inputs: pub [[Field; N_PUBLIC_INPUTS]; N_PROOFS],
     key_hash: Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_ultrahonk_proof(verification_key, proofs[i], commitments[i], key_hash);
+        verify_ultrahonk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
     }
 
-    let mut aggregated_commitments = Vec::new();
+    let mut aggregated_public_inputs = Vec::new();
 
     for i in 0..N_PROOFS {
-        for j in 0..N_COMMITMENTS {
-            aggregated_commitments.push(commitments[i][j]);
+        for j in 0..N_PUBLIC_INPUTS {
+            aggregated_public_inputs.push(public_inputs[i][j]);
         }
     }
 
-    compute_aggregation_commitment(aggregated_commitments)
+    compute_aggregation_commitment(aggregated_public_inputs)
 }

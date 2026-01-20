@@ -8,9 +8,9 @@ use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ult
 use lib::math::commitments::compute_aggregation_commitment;
 
 // Number of proofs.
-pub global N_PROOFS: u32 = 2;
+pub global N_PROOFS: u32 = 1;
 /// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = 11;
+pub global N_PUBLIC_INPUTS: u32 = 32771;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
