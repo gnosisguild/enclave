@@ -198,8 +198,6 @@ describe("E3RefundManager", function () {
           E3RefundManager: {
             owner: ownerAddress,
             enclave: enclaveAddress,
-            feeToken: await usdcToken.getAddress(),
-            bondingRegistry: await bondingRegistry.getAddress(),
             treasury: treasuryAddress,
           },
         },
@@ -417,7 +415,7 @@ describe("E3RefundManager", function () {
       );
     });
 
-    it("reverts if E3 not failed", async function () {
+    it("reverts if E3 not failed (refund not calculated)", async function () {
       const { e3RefundManager, makeRequest, requester } =
         await loadFixture(setup);
 
@@ -425,7 +423,7 @@ describe("E3RefundManager", function () {
 
       await expect(
         e3RefundManager.connect(requester).claimRequesterRefund(0),
-      ).to.be.revertedWithCustomError(e3RefundManager, "E3NotFailed");
+      ).to.be.revertedWithCustomError(e3RefundManager, "RefundNotCalculated");
     });
 
     it("reverts if already claimed", async function () {

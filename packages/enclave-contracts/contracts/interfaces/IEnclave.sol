@@ -393,6 +393,9 @@ interface IEnclave {
     /// @notice Returns the ERC20 token used to pay for E3 fees.
     function feeToken() external view returns (IERC20);
 
+    /// @notice Returns the BondingRegistry contract.
+    function bondingRegistry() external view returns (IBondingRegistry);
+
     /// @notice Called by CiphernodeRegistry when committee is finalized (sortition complete).
     /// @dev Updates E3 lifecycle to CommitteeFinalized stage, starts DKG deadline.
     /// @param e3Id ID of the E3.
