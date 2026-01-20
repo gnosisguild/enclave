@@ -143,6 +143,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Caller is not authorized
     error Unauthorized();
 
+    /// @notice Not enough registered ciphernodes to meet threshold
+    /// @param requested The requested committee size (N)
+    /// @param available The number of registered ciphernodes
+    error InsufficientCiphernodes(uint256 requested, uint256 available);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                     Modifiers                          //
@@ -215,6 +220,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external onlyEnclave returns (bool success) {
         Committee storage c = committees[e3Id];
         require(!c.initialized, CommitteeAlreadyRequested());
+        require(
+            threshold[1] <= numCiphernodes,
+            InsufficientCiphernodes(threshold[1], numCiphernodes)
+        );
 
         c.initialized = true;
         c.finalized = false;
@@ -346,18 +355,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             block.timestamp >= c.committeeDeadline,
             SubmissionWindowNotClosed()
         );
-        // TODO: Handle what happens if the threshold is not met.
-        require(c.topNodes.length >= c.threshold[1], ThresholdNotMet());
-
         c.finalized = true;
-        bool thresholdMet = c.topNodes.length >= c.threshold[0];
+        bool thresholdMet = c.topNodes.length >= c.threshold[1];
 
         if (!thresholdMet) {
             c.failed = true;
             emit CommitteeFormationFailed(
                 e3Id,
                 c.topNodes.length,
-                c.threshold[0]
+                c.threshold[1]
             );
             enclave.onE3Failed(e3Id, 2); // FailureReason.InsufficientCommitteeMembers
             return false;
