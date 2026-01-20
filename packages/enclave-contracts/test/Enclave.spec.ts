@@ -420,11 +420,6 @@ describe("Enclave", function () {
       await enclave.setMaxDuration(1);
       expect(await enclave.maxDuration()).to.equal(1);
     });
-    it("returns true if max duration is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.setMaxDuration.staticCall(1);
-      expect(result).to.be.true;
-    });
     it("emits MaxDurationSet event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setMaxDuration(1))
@@ -470,13 +465,6 @@ describe("Enclave", function () {
       expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
 
-    it("returns true if ciphernodeRegistry is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
-
     it("emits CiphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -507,15 +495,6 @@ describe("Enclave", function () {
       await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
       expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0]!)).to.be
         .true;
-    });
-
-    it("returns true if parameters are set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setE3ProgramsParams.staticCall(
-        encodedE3ProgramsParams,
-      );
-      expect(result).to.be.true;
     });
 
     it("emits AllowedE3ProgramsParamsSet event", async function () {
@@ -636,16 +615,6 @@ describe("Enclave", function () {
       ).to.equal(await mocks.decryptionVerifier.getAddress());
     });
 
-    it("returns true if decryption verifier is enabled successfully", async function () {
-      const { enclave, mocks } = await loadFixture(setup);
-
-      const result = await enclave.setDecryptionVerifier.staticCall(
-        newEncryptionSchemeId,
-        await mocks.decryptionVerifier.getAddress(),
-      );
-      expect(result).to.be.true;
-    });
-
     it("emits EncryptionSchemeEnabled", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -687,13 +656,6 @@ describe("Enclave", function () {
         ethers.ZeroAddress,
       );
     });
-    it("returns true if encryption scheme is disabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result =
-        await enclave.disableEncryptionScheme.staticCall(encryptionSchemeId);
-      expect(result).to.be.true;
-    });
     it("emits EncryptionSchemeDisabled", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -733,11 +695,6 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
-    it("returns true if E3 Program is enabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.enableE3Program.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
     it("emits E3ProgramEnabled event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.enableE3Program(AddressTwo))
@@ -772,15 +729,6 @@ describe("Enclave", function () {
 
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
-    });
-    it("returns true if E3 Program is disabled successfully", async function () {
-      const {
-        enclave,
-        mocks: { e3Program },
-      } = await loadFixture(setup);
-      const result = await enclave.disableE3Program.staticCall(e3Program);
-
-      expect(result).to.be.true;
     });
     it("emits E3ProgramDisabled event", async function () {
       const {

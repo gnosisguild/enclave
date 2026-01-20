@@ -877,5 +877,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-da4a581af27ab69caa1cf6abcd8ee2a68f95a2b0"
+  "buildInfoId": "solc-0_8_28-c92417ab07bef6b6f77b46e4d5e0b6272c494b40"
 }
