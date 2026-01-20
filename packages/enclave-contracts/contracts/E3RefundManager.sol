@@ -68,26 +68,20 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Initializes the E3RefundManager contract
     /// @param _owner The owner address
     /// @param _enclave The Enclave contract address
-    /// @param _feeToken The fee token address
-    /// @param _bondingRegistry The bonding registry address
     /// @param _treasury The protocol treasury address
     function initialize(
         address _owner,
         address _enclave,
-        address _feeToken,
-        address _bondingRegistry,
         address _treasury
     ) public initializer {
         __Ownable_init(msg.sender);
 
         require(_enclave != address(0), "Invalid enclave");
-        require(_feeToken != address(0), "Invalid fee token");
-        require(_bondingRegistry != address(0), "Invalid bonding registry");
         require(_treasury != address(0), "Invalid treasury");
 
         enclave = IEnclave(_enclave);
-        feeToken = IERC20(_feeToken);
-        bondingRegistry = IBondingRegistry(_bondingRegistry);
+        feeToken = enclave.feeToken();
+        bondingRegistry = enclave.bondingRegistry();
         treasury = _treasury;
 
         _workAllocation = WorkValueAllocation({
@@ -111,11 +105,6 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         uint256 originalPayment,
         address[] calldata honestNodes
     ) external onlyEnclave {
-        IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
-        if (stage != IEnclave.E3Stage.Failed) {
-            revert E3NotFailed(e3Id);
-        }
-
         require(!_distributions[e3Id].calculated, "Already calculated");
         require(originalPayment > 0, "No payment");
 
@@ -243,11 +232,6 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function claimRequesterRefund(
         uint256 e3Id
     ) external returns (uint256 amount) {
-        IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
-        if (stage != IEnclave.E3Stage.Failed) {
-            revert E3NotFailed(e3Id);
-        }
-
         RefundDistribution storage dist = _distributions[e3Id];
         if (!dist.calculated) revert RefundNotCalculated(e3Id);
 
@@ -270,17 +254,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function claimHonestNodeReward(
         uint256 e3Id
     ) external returns (uint256 amount) {
-        require(
-            enclave.getE3Stage(e3Id) == IEnclave.E3Stage.Failed,
-            E3NotFailed(e3Id)
-        );
-
         RefundDistribution storage dist = _distributions[e3Id];
         require(dist.calculated, RefundNotCalculated(e3Id));
         require(!_claimed[e3Id][msg.sender], AlreadyClaimed(e3Id, msg.sender));
 
         // Check if caller is honest node
-        address[] storage nodes = _honestNodes[e3Id];
+        address[] memory nodes = _honestNodes[e3Id];
         bool isHonest = false;
         for (uint256 i = 0; i < nodes.length && !isHonest; i++) {
             isHonest = (nodes[i] == msg.sender);
@@ -302,7 +281,6 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         amountArray[0] = amount;
 
         bondingRegistry.distributeRewards(feeToken, nodeArray, amountArray);
-        feeToken.approve(address(bondingRegistry), 0);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
     }

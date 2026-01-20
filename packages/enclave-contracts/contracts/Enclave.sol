@@ -208,8 +208,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
-    //                   Initialization                       //
+    //                       Modifiers                        //
     //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Restricts function to CiphernodeRegistry contract only
+    modifier onlyCiphernodeRegistry() {
+        require(
+            msg.sender == address(ciphernodeRegistry),
+            "Only CiphernodeRegistry"
+        );
+        _;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Initialization                       //
     ////////////////////////////////////////////////////////////
 
     /// @notice Constructor that disables initializers.
@@ -686,11 +700,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Can be called by anyone once E3 is in failed state
     /// @param e3Id The ID of the failed E3
     function processE3Failure(uint256 e3Id) external {
-        require(
-            address(e3RefundManager) != address(0),
-            "RefundManager not set"
-        );
-
         E3Stage stage = _e3Stages[e3Id];
         require(stage == E3Stage.Failed, "E3 not failed");
 
@@ -707,12 +716,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function onCommitteeFinalized(uint256 e3Id) external {
-        require(
-            msg.sender == address(ciphernodeRegistry),
-            "Only CiphernodeRegistry"
-        );
-
+    function onCommitteeFinalized(
+        uint256 e3Id
+    ) external onlyCiphernodeRegistry {
         // Update E3 lifecycle stage - committee finalized, DKG starting
         E3Stage current = _e3Stages[e3Id];
         if (current != E3Stage.Requested) {
@@ -732,12 +738,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function onCommitteePublished(uint256 e3Id) external {
-        require(
-            msg.sender == address(ciphernodeRegistry),
-            "Only CiphernodeRegistry"
-        );
-
+    function onCommitteePublished(
+        uint256 e3Id
+    ) external onlyCiphernodeRegistry {
         // DKG complete, key published
         E3 memory e3 = e3s[e3Id];
         E3Stage current = _e3Stages[e3Id];
@@ -756,12 +759,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function onE3Failed(uint256 e3Id, uint8 reason) external {
-        require(
-            msg.sender == address(ciphernodeRegistry),
-            "Only CiphernodeRegistry"
-        );
-
+    function onE3Failed(
+        uint256 e3Id,
+        uint8 reason
+    ) external onlyCiphernodeRegistry {
         // Mark E3 as failed with the given reason
         _markE3FailedWithReason(e3Id, FailureReason(reason));
     }
@@ -785,18 +786,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         if (current == E3Stage.Complete) revert E3AlreadyComplete(e3Id);
         if (current == E3Stage.Failed) revert E3AlreadyFailed(e3Id);
 
-        (bool canFail, FailureReason detectedReason) = _checkFailureCondition(
-            e3Id,
-            current
-        );
+        bool canFail;
+        (canFail, reason) = _checkFailureCondition(e3Id, current);
         if (!canFail) revert FailureConditionNotMet(e3Id);
 
         _e3Stages[e3Id] = E3Stage.Failed;
-        _e3FailureReasons[e3Id] = detectedReason;
+        _e3FailureReasons[e3Id] = reason;
 
-        emit E3Failed(e3Id, current, detectedReason);
-
-        return detectedReason;
+        emit E3Failed(e3Id, current, reason);
     }
 
     /// @notice Internal function to mark E3 as failed with specific reason
@@ -835,7 +832,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         E3Stage stage
     ) internal view returns (bool canFail, FailureReason reason) {
-        E3Deadlines storage d = _e3Deadlines[e3Id];
+        E3Deadlines memory d = _e3Deadlines[e3Id];
 
         if (
             stage == E3Stage.Requested && block.timestamp > d.committeeDeadline

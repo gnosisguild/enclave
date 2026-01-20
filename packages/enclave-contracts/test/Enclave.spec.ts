@@ -24,7 +24,6 @@ import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
-  E3RefundManager__factory as E3RefundManagerFactory,
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
 } from "../types";
@@ -199,26 +198,6 @@ describe("Enclave", function () {
       },
     );
 
-    // Deploy E3RefundManager with addressOne as placeholder for enclave
-    const e3RefundManagerContract = await ignition.deploy(
-      E3RefundManagerModule,
-      {
-        parameters: {
-          E3RefundManager: {
-            owner: ownerAddress,
-            enclave: addressOne, // placeholder, will be updated after Enclave deployment
-            feeToken: await usdcToken.getAddress(),
-            bondingRegistry:
-              await bondingRegistryContract.bondingRegistry.getAddress(),
-            treasury: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const e3RefundManagerAddress =
-      await e3RefundManagerContract.e3RefundManager.getAddress();
-
     const enclaveContract = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
@@ -228,7 +207,7 @@ describe("Enclave", function () {
           registry: addressOne,
           bondingRegistry:
             await bondingRegistryContract.bondingRegistry.getAddress(),
-          e3RefundManager: e3RefundManagerAddress,
+          e3RefundManager: addressOne, // placeholder, will be updated
           feeToken: await usdcToken.getAddress(),
           timeoutConfig: {
             committeeFormationWindow: 3600, // 1 hour
@@ -243,12 +222,25 @@ describe("Enclave", function () {
 
     const enclaveAddress = await enclaveContract.enclave.getAddress();
 
-    // Update E3RefundManager with correct enclave address
-    const e3RefundManager = E3RefundManagerFactory.connect(
-      e3RefundManagerAddress,
-      owner,
+    const e3RefundManagerContract = await ignition.deploy(
+      E3RefundManagerModule,
+      {
+        parameters: {
+          E3RefundManager: {
+            owner: ownerAddress,
+            enclave: enclaveAddress,
+            treasury: ownerAddress,
+          },
+        },
+      },
     );
-    await e3RefundManager.setEnclave(enclaveAddress);
+
+    const e3RefundManagerAddress =
+      await e3RefundManagerContract.e3RefundManager.getAddress();
+
+    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+    await enclave.setE3RefundManager(e3RefundManagerAddress);
+
 
     const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
       parameters: {
@@ -263,7 +255,6 @@ describe("Enclave", function () {
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
 
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
       ciphernodeRegistryAddress,
       owner,

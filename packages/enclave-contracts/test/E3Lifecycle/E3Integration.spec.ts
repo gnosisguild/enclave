@@ -201,8 +201,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           E3RefundManager: {
             owner: ownerAddress,
             enclave: enclaveAddress,
-            feeToken: await usdcToken.getAddress(),
-            bondingRegistry: await bondingRegistry.getAddress(),
             treasury: treasuryAddress,
           },
         },
@@ -1392,10 +1390,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // Verify E3 is complete
       expect(await enclave.getE3Stage(0)).to.equal(6); // Complete
 
-      // Refund should not be claimable for completed E3
       await expect(
         e3RefundManager.connect(requester).claimRequesterRefund(0),
-      ).to.be.revertedWithCustomError(e3RefundManager, "E3NotFailed");
+      ).to.be.revertedWithCustomError(e3RefundManager, "RefundNotCalculated");
     });
   });
 });

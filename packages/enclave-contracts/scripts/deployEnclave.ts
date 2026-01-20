@@ -128,18 +128,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
   console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
-  console.log("Deploying E3RefundManager...");
-  const { e3RefundManager } = await deployAndSaveE3RefundManager({
-    owner: ownerAddress,
-    enclave: addressOne, // Will be set after Enclave deployment
-    feeToken: feeTokenAddress,
-    bondingRegistry: bondingRegistryAddress,
-    treasury: ownerAddress, // Protocol treasury
-    hre,
-  });
-  const e3RefundManagerAddress = await e3RefundManager.getAddress();
-  console.log("E3RefundManager deployed to:", e3RefundManagerAddress);
-
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
     params: [encoded],
@@ -147,13 +135,26 @@ export const deployEnclave = async (withMocks?: boolean) => {
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
-    e3RefundManager: e3RefundManagerAddress,
+    e3RefundManager: addressOne, // placeholder, will be updated
     feeToken: feeTokenAddress,
     timeoutConfig: DEFAULT_TIMEOUT_CONFIG,
     hre,
   });
   const enclaveAddress = await enclave.getAddress();
   console.log("Enclave deployed to:", enclaveAddress);
+
+  console.log("Deploying E3RefundManager...");
+  const { e3RefundManager } = await deployAndSaveE3RefundManager({
+    owner: ownerAddress,
+    enclave: enclaveAddress,
+    treasury: ownerAddress, // Protocol treasury
+    hre,
+  });
+  const e3RefundManagerAddress = await e3RefundManager.getAddress();
+  console.log("E3RefundManager deployed to:", e3RefundManagerAddress);
+
+  console.log("Setting E3RefundManager in Enclave...");
+  await enclave.setE3RefundManager(e3RefundManagerAddress);
 
   ///////////////////////////////////////////
   // Configure cross-contract dependencies
@@ -188,8 +189,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
 
-  console.log("Setting Enclave address in E3RefundManager...");
-  await e3RefundManager.setEnclave(enclaveAddress);
+  // E3RefundManager already has correct enclave from deployment
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
