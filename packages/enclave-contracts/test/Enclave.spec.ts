@@ -948,12 +948,20 @@ describe("Enclave", function () {
 
       await expect(enclave.getE3(0)).to.not.be.revert(ethers);
       await expect(enclave.activate(0)).to.not.be.revert(ethers);
+
       await expect(enclave.activate(0))
-        .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
-        .withArgs(0);
+        .to.be.revertedWithCustomError(enclave, "InvalidStage")
+        .withArgs(0, 3, 4);
     });
     it("reverts if E3 is not yet ready to start", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1000,
         (await time.latest()) + 2000,
@@ -968,6 +976,15 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
       });
+
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        0,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -1011,28 +1028,6 @@ describe("Enclave", function () {
         "E3Expired",
       );
     });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const startTime = [
-        (await time.latest()) + 1000,
-        (await time.latest()) + 2000,
-      ] as [number, number];
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: startTime,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
-        enclave,
-        "E3NotReady",
-      );
-    });
     it("reverts if E3 start has expired", async function () {
       const {
         enclave,
@@ -1068,12 +1063,27 @@ describe("Enclave", function () {
       );
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, request);
 
-      const prevRegistry = await enclave.ciphernodeRegistry();
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        0,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
 
+      const prevRegistry = await enclave.ciphernodeRegistry();
       const reg = await ignition.deploy(MockCiphernodeRegistryEmptyKeyModule);
       const nextRegistry =
         await reg.mockCiphernodeRegistryEmptyKey.getAddress();
