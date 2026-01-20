@@ -119,9 +119,8 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external {
-    // it should only be called via Enclave for now
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+  function publishInput(uint256 e3Id, address, bytes memory data) external {
+    E3 memory e3 = enclave.getE3(e3Id);
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
     if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
@@ -134,9 +133,6 @@ contract CRISPProgram is IE3Program, Ownable {
     );
 
     (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
-
-    // Fetch E3 to get committee public key
-    E3 memory e3 = enclave.getE3(e3Id);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
     bytes32[] memory noirPublicInputs = new bytes32[](6);

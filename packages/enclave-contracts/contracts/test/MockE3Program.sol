@@ -33,7 +33,7 @@ contract MockE3Program is IE3Program {
         return ENCRYPTION_SCHEME_ID;
     }
 
-    function validateInput(
+    function publishInput(
         uint256,
         address sender,
         bytes memory data
