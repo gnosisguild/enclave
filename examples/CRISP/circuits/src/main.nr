@@ -88,23 +88,10 @@ fn main(
     slot_address: pub Field,
     balance: Field,
     is_first_vote: pub bool,
+    is_mask_vote: pub bool,
 ) -> pub Field {
     // ============================================================================
-    // STEP 1: Authentication - Derive voter's address from signature
-    // ============================================================================
-    // Verify that a constant message was signed by the holder of the private key
-    // corresponding to the provided public key. Then the address is derived from
-    // that public key and compared later to the slot address if the vote is an actual
-    // vote.
-    //
-    // For ACTUAL VOTES: Signature must be valid (voter authenticates themselves)
-    // For MASK VOTES: Signature may be invalid (anyone can submit mask votes)
-    let is_signature_valid =
-        verify_signature(hashed_message, public_key_x, public_key_y, signature);
-    let address = address_to_field(derive_address(public_key_x, public_key_y));
-
-    // ============================================================================
-    // STEP 2: Eligibility - Merkle Tree Proof
+    // STEP 1: Eligibility - Merkle Tree Proof
     // ============================================================================
     // Verify that the (slot_address, balance) pair exists in the eligibility
     // Merkle tree. The proof demonstrates membership without revealing the entire tree.
@@ -126,7 +113,7 @@ fn main(
     assert(merkle_root_calculated == merkle_root);
 
     // ============================================================================
-    // STEP 3: BFV Encryption Verification (GRECO)
+    // STEP 2: BFV Encryption Verification (GRECO)
     // ============================================================================
     // Verify that the ciphertext (ct0is, ct1is) is a valid encryption of the
     // plaintext k1 under the public key (pk0is, pk1is). This enusres the ciphertext
@@ -157,7 +144,7 @@ fn main(
     assert(greco.verify());
 
     // ============================================================================
-    // STEP 4: Ciphertext Addition Verification
+    // STEP 3: Ciphertext Addition Verification
     // ============================================================================
     // Verify that the sum ciphertext correctly represents the homomorphic addition
     // of a zero vote to the previous ciphertext without decrypting. This is only checked
@@ -200,29 +187,35 @@ fn main(
     let is_ct_add_valid = ct_add.verify();
 
     // ============================================================================
-    // STEP 5: Vote Type Detection and Return Logic
+    // STEP 4: Vote Type Detection and Return Logic
     // ============================================================================
-    // The circuit branches into two cases based on signature validity and address match:
+    // The circuit branches into two cases based on the is_mask_vote flag:
     //
-    // CASE 1: ACTUAL VOTE
-    //   Condition: Signature valid AND address matches slot
+    // CASE 1: ACTUAL VOTE (is_mask_vote == false)
     //   - This is an eligible voter casting a vote
+    //   - Verify signature is valid (voter authenticates themselves)
+    //   - Verify address matches slot address
     //   - Verify vote amount <= balance
-    //   - Return new vote ciphertext (ct0is, ct1is)
+    //   - Return new vote ciphertext commitment (ct_commitment)
     //
-    // CASE 2: MASK VOTE
-    //   Condition: Signature invalid OR address mismatch
+    // CASE 2: MASK VOTE (is_mask_vote == true)
     //   - This is anyone submitting a zero vote to mask slot activity
     //   - Verify vote is actually zero (k1 must be zero)
-    //   - If first vote in slot: return zero ciphertext (ct0is, ct1is)
-    //   - If updating slot: verify addition and return sum of previous votes
-    if (is_signature_valid == true) & (slot_address == address) {
+    //   - If first vote in slot: return zero ciphertext commitment (ct_commitment)
+    //   - If updating slot: verify addition and return sum ciphertext commitment (sum_ct_commitment)
+    if is_mask_vote == false {
+        let is_signature_valid =
+            verify_signature(hashed_message, public_key_x, public_key_y, signature);
+        let voter_address = address_to_field(derive_address(public_key_x, public_key_y));
+
+        assert(is_signature_valid == true);
+        assert(slot_address == voter_address);
+
         check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
 
         ct_commitment
     } else {
-        let is_vote_zero = check_coefficient_zero(k1);
-        assert(is_vote_zero == true);
+        check_coefficient_zero(k1);
 
         if is_first_vote {
             ct_commitment
