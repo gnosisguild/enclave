@@ -70,6 +70,14 @@ pub enum BfvParamSets {
 
     /// 128bits security BFV parameters set (PRODUCTION READY).
     /// - Degree: 8192
+    /// - Plaintext modulus: 100
+    /// - Moduli: [0x0008000000820001, 0x0010000000060001, 0x00100000003e0001, 0x00100000006e0001]
+    /// - Error2 Variance: 1004336277661868922213726307713258317841382576849282939643494400
+    #[strum(serialize = "SET_8192_100_4")]
+    Set8192_100_4,
+
+    /// 128bits security BFV parameters set (PRODUCTION READY).
+    /// - Degree: 8192
     /// - Plaintext modulus: 144115188075855872
     /// - Moduli: [288230376173076481, 288230376167047169]
     #[strum(serialize = "SET_8192_144115188075855872_2")]
@@ -130,6 +138,19 @@ impl From<BfvParamSets> for BfvParamSet {
                 ],
                 error1_variance: Some(
                     "52309181128222339698631578526730685514457152477762943514050560000",
+                ),
+            },
+            B::Set8192_100_4 => BfvParamSet {
+                degree: 8192,
+                plaintext_modulus: 100,
+                moduli: &[
+                    0x0008000000820001,
+                    0x0010000000060001,
+                    0x00100000003e0001,
+                    0x00100000006e0001,
+                ],
+                error1_variance: Some(
+                    "1004336277661868922213726307713258317841382576849282939643494400",
                 ),
             },
             B::Set8192_144115188075855872_2 => BfvParamSet {

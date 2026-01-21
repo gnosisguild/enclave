@@ -39,8 +39,8 @@
 //! 3. Verifies the addition equations hold at these points
 //! 4. Checks range constraints on all coefficients
 
-use greco::CryptographicParams;
-use polynomial::Polynomial;
+use lib::core::greco::Configs as GrecoConfigs;
+use lib::math::polynomial::Polynomial;
 
 use crate::hash::generate_hash;
 
@@ -53,7 +53,7 @@ use crate::hash::generate_hash;
 /// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
 /// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
-    crypto_params: CryptographicParams<L>,
+    configs: GrecoConfigs<N, L>,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     ct_commitment: Field,
@@ -71,13 +71,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// Creates a new CiphertextAddition instance.
     ///
     /// # Arguments
-    /// * `crypto_params` - Cryptographic parameters for the ciphertext addition circuit.
+    /// * `configs` - Cryptographic configuration for the ciphertext addition circuit.
     /// * `ct0is`, `ct1is` - Ciphertext polynomials.
     /// * `prev_ct0is`, `prev_ct1is` - Previous ciphertext polynomials.
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
-        crypto_params: CryptographicParams<L>,
+        configs: GrecoConfigs<N, L>,
         ct0is: [Polynomial<N>; L],
         ct1is: [Polynomial<N>; L],
         ct_commitment: Field,
@@ -91,7 +91,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         r1is: [Polynomial<N>; L],
     ) -> Self {
         Self {
-            crypto_params,
+            configs,
             ct0is,
             ct1is,
             ct_commitment,
@@ -253,7 +253,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct0i + prev_ct0i + r0i * q_i
             let mut p = self.ct0is[i];
-            let r0i_scaled = self.r0is[i].mul_scalar(self.crypto_params.qis[i]);
+            let r0i_scaled = self.r0is[i].mul_scalar(self.configs.qis[i]);
 
             p = p.add(self.prev_ct0is[i]);
             p = p.add(r0i_scaled);
@@ -271,7 +271,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct1i + prev_ct1i + r1i * q_i
             let mut p = self.ct1is[i];
-            let r1i_scaled = self.r1is[i].mul_scalar(self.crypto_params.qis[i]);
+            let r1i_scaled = self.r1is[i].mul_scalar(self.configs.qis[i]);
 
             p = p.add(self.prev_ct1is[i]);
             p = p.add(r1i_scaled);

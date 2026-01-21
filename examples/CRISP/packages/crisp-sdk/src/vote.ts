@@ -203,6 +203,7 @@ export const generateCircuitInputs = async (
   crispInputs.slot_address = proofInputs.slotAddress.toLowerCase()
   crispInputs.balance = proofInputs.balance.toString()
   crispInputs.is_first_vote = !proofInputs.previousCiphertext
+  crispInputs.is_mask_vote = proofInputs.isMaskVote
   crispInputs.merkle_root = proofInputs.merkleProof.proof.root.toString()
   crispInputs.merkle_proof_length = proofInputs.merkleProof.length.toString()
   crispInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
@@ -270,6 +271,7 @@ export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promi
     previousCiphertext: voteProofInputs.previousCiphertext,
     signature: voteProofInputs.signature,
     messageHash: voteProofInputs.messageHash,
+    isMaskVote: false,
   })
 
   return { ...(await generateProof(crispInputs)), encryptedVote }
@@ -289,6 +291,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
     messageHash: SIGNATURE_MESSAGE_HASH,
     vote: ZERO_VOTE,
     merkleProof,
+    isMaskVote: true,
   })
 
   return { ...(await generateProof(crispInputs)), encryptedVote }
