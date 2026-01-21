@@ -141,8 +141,6 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     decrypted_output: Vec<u8>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
-    let decrypted_output = Bytes::from(decrypted_output);
-    let proof = Bytes::from(vec![1]);
 
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider
@@ -151,16 +149,20 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let contract = IEnclave::new(contract_address, provider.provider());
-
+    // 0x0cb083bc = CiphertextOutputNotPublished() - RPC may not have synced ciphertext output being published yet
     send_tx_with_retry("publishPlaintextOutput", &["0x0cb083bc"], || {
         info!("publishPlaintextOutput() e3_id={:?}", e3_id);
+        let proof = Bytes::from(vec![1]);
+        let decrypted_output = Bytes::from(decrypted_output.clone());
+        let contract = IEnclave::new(contract_address, provider.provider());
+
         async move {
-            contract
+            let builder = contract
                 .publishPlaintextOutput(e3_id, decrypted_output, proof)
                 .nonce(current_nonce);
             let receipt = builder.send().await?.get_receipt().await?;
             Ok(receipt)
         }
     })
+    .await
 }
