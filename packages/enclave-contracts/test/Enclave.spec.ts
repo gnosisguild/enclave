@@ -339,7 +339,7 @@ describe("Enclave", function () {
         number,
         number,
       ],
-      inputDeadline: await time.latest() + 300,
+      inputDeadline: (await time.latest()) + 300,
       duration: time.duration.days(30),
       e3Program: await e3Program.mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
@@ -1317,11 +1317,10 @@ describe("Enclave", function () {
       );
       await enclave.activate(e3Id);
       await mine(2, { interval: request.duration });
-      await expect(enclave.publishCiphertextOutput(e3Id, data, proof)).to.be.revertedWithCustomError(
-        enclave,
-        "CommiteeDutiesCompleted",
-      )
-    })
+      await expect(
+        enclave.publishCiphertextOutput(e3Id, data, proof),
+      ).to.be.revertedWithCustomError(enclave, "CommiteeDutiesCompleted");
+    });
     it("reverts if output is not valid", async function () {
       const {
         enclave,

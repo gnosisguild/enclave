@@ -38,12 +38,9 @@ interface IE3Program {
     ) external returns (bool success);
 
     /// @notice Validate and process input data for a computation
-    /// @dev This function is called by data providers when they want to submit their 
-    /// encrypted data 
+    /// @dev This function is called by data providers when they want to submit their
+    /// encrypted data
     /// @param e3Id ID of the E3 computation
     /// @param data The input data to be validated
-    function publishInput(
-        uint256 e3Id,
-        bytes memory data
-    ) external;
+    function publishInput(uint256 e3Id, bytes memory data) external;
 }

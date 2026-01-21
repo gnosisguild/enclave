@@ -1,6 +1,6 @@
-import { WalletClient } from "viem";
-import { getCheckedEnvVars } from "./utils";
-import { MyProgram__factory as MyProgram } from "../types/factories/contracts";
+import { WalletClient } from 'viem'
+import { getCheckedEnvVars } from './utils'
+import { MyProgram__factory as MyProgram } from '../types/factories/contracts'
 
 /**
  * Publish an input to the program
@@ -9,15 +9,20 @@ import { MyProgram__factory as MyProgram } from "../types/factories/contracts";
  * @param input - The input data
  * @param sender - The sender address
  */
-export const publishInput = async (walletClient: WalletClient, e3Id: bigint, input: `0x${string}`, sender: `0x${string}`): Promise<void> => {
-    const { E3_PROGRAM_ADDRESS: programAddress } = getCheckedEnvVars()
+export const publishInput = async (
+  walletClient: WalletClient,
+  e3Id: bigint,
+  input: `0x${string}`,
+  sender: `0x${string}`,
+): Promise<void> => {
+  const { E3_PROGRAM_ADDRESS: programAddress } = getCheckedEnvVars()
 
-    await walletClient.writeContract({
-        address: programAddress as `0x${string}`,
-        abi: MyProgram.abi,
-        functionName: "publishInput",
-        args: [e3Id, sender, input],
-        chain: walletClient.chain,
-        account: sender,
-    });
+  await walletClient.writeContract({
+    address: programAddress as `0x${string}`,
+    abi: MyProgram.abi,
+    functionName: 'publishInput',
+    args: [e3Id, sender, input],
+    chain: walletClient.chain,
+    account: sender,
+  })
 }

@@ -160,7 +160,7 @@ describe('Integration', () => {
 
   const contracts = getContractAddresses()
 
-  const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' 
+  const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
 
   const store = new Map<bigint, E3State>()
   const sdk = EnclaveSDK.create({
@@ -175,13 +175,12 @@ describe('Integration', () => {
     protocol: FheProtocol.BFV,
   })
 
-  
   const account = privateKeyToAccount(testPrivateKey)
 
   const walletClient = createWalletClient({
-        account,
-        chain: hardhat,
-        transport: http('http://localhost:8545'),
+    account,
+    chain: hardhat,
+    transport: http('http://localhost:8545'),
   })
 
   it('should run an integration test', async () => {
@@ -239,13 +238,13 @@ describe('Integration', () => {
 
     let { e3Id } = state
 
-    console.log("activated??")
+    console.log('activated??')
     // ACTIVATION phase
     event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
       await sdk.activateE3(e3Id)
     })
 
-    console.log("activated!")
+    console.log('activated!')
     state = store.get(0n)
     assert(state, 'store should have activated state but it was falsey')
     assert.strictEqual(state.type, 'activated')
@@ -259,8 +258,18 @@ describe('Integration', () => {
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes)
 
-    await publishInput(walletClient, e3Id, `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`, account.address)
-    await publishInput(walletClient, e3Id, `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`, account.address)
+    await publishInput(
+      walletClient,
+      e3Id,
+      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
+      account.address,
+    )
+    await publishInput(
+      walletClient,
+      e3Id,
+      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
+      account.address,
+    )
 
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 

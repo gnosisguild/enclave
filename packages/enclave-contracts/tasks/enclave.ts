@@ -47,7 +47,7 @@ export const requestCommittee = task(
   .addOption({
     name: "inputDeadline",
     description: "deadline for input submission (default: now + 2 days)",
-    defaultValue: Math.floor(Date.now() / 1000) + (86400 * 2),
+    defaultValue: Math.floor(Date.now() / 1000) + 86400 * 2,
     type: ArgumentType.INT,
   })
   .addOption({

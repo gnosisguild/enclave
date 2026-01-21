@@ -33,10 +33,7 @@ contract MockE3Program is IE3Program {
         return ENCRYPTION_SCHEME_ID;
     }
 
-    function publishInput(
-        uint256,
-        bytes memory data
-    ) external pure {
+    function publishInput(uint256, bytes memory data) external pure {
         if (data.length == 3) {
             revert InvalidInput();
         }
