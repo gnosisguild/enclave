@@ -206,10 +206,8 @@ fn main(
                 sum_r1is,
             );
 
-            let is_ct_add_valid = ct_add.verify();
-
             assert(prev_ct_commitment == _prev_ct_commitment);
-            assert(is_ct_add_valid);
+            assert(ct_add.verify());
 
             sum_ct_commitment
         }
