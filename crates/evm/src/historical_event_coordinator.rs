@@ -118,6 +118,7 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
                 }
                 Ok(())
             }
+            _ => Ok(()),
         })
     }
 }

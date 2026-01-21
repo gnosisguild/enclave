@@ -34,6 +34,12 @@ pub enum EnclaveEvmEvent {
         event: EnclaveEventData,
         block: Option<u64>,
     },
+    /// Raw log data from the provider
+    Log {
+        data: LogData,
+        topic: Option<B256>,
+        chain_id: u64,
+    },
 }
 
 impl EnclaveEvmEvent {
@@ -355,6 +361,8 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
                     Err(err) => self.bus.err(EType::Evm, err),
                 }
             }
+
+            _ => (),
         }
     }
 }
