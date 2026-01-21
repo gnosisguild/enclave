@@ -163,6 +163,8 @@ export type CircuitInputs = {
   balance: string
   // Whether this is the first vote for this slot.
   is_first_vote: boolean
+  // Whether this is a mask vote.
+  is_mask_vote: boolean
 }
 
 export type ProofData = {
@@ -185,6 +187,7 @@ export type ProofInputs = {
   balance: bigint
   slotAddress: string
   merkleProof: MerkleProof
+  isMaskVote: boolean
 }
 
 export type MaskVoteProofInputs = {

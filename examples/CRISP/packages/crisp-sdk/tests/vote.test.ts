@@ -123,6 +123,7 @@ describe('Vote', () => {
         balance,
         slotAddress: address,
         merkleProof,
+        isMaskVote: false,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -146,6 +147,7 @@ describe('Vote', () => {
         signature: MASK_SIGNATURE,
         messageHash: SIGNATURE_MESSAGE_HASH,
         previousCiphertext,
+        isMaskVote: true,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
@@ -168,6 +170,7 @@ describe('Vote', () => {
         merkleProof,
         balance,
         slotAddress,
+        isMaskVote: true,
       })
 
       const { returnValue } = await executeCircuit(crispInputs)

@@ -93,13 +93,10 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
 ///
-/// # Returns
-/// `true` if all vote coefficients are zero, `false` otherwise.
-///
 /// # Vote Regions Checked
 /// - NO votes: coefficients [0, HALF_LARGEST_MINIMUM_DEGREE)
 /// - YES votes: coefficients [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
     let HALF_D = D / 2;
 
     // Define vote region boundaries
@@ -109,24 +106,15 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
     let START_INDEX_N = 0;
     let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
 
-    let mut res = true;
-
     // Check YES vote region: all coefficients must be zero
     for i in START_INDEX_Y..END_INDEX_Y {
-        if k1.coefficients[i] != 0 {
-            res = false;
-        }
+        assert(k1.coefficients[i] == 0);
     }
 
     // Check NO vote region: all coefficients must be zero
     for i in START_INDEX_N..END_INDEX_N {
-        if k1.coefficients[i] != 0 {
-            res = false;
-        }
+        assert(k1.coefficients[i] == 0);
     }
-
-    // Return true only if both regions are completely zero
-    res
 }
 
 #[test]
@@ -205,7 +193,7 @@ fn test_check_coefficient_values_fail() {
     check_coefficient_values_with_balance(pol, 1, 100);
 }
 
-#[test]
+#[test(should_fail)]
 fn test_check_coefficient_zero_fail() {
     let pol = Polynomial {
         coefficients: [
@@ -217,7 +205,7 @@ fn test_check_coefficient_zero_fail() {
         ],
     };
 
-    assert(check_coefficient_zero(pol) == false);
+    check_coefficient_zero(pol);
 }
 
 #[test]
@@ -231,5 +219,5 @@ fn test_check_coefficient_zero() {
         ],
     };
 
-    assert(check_coefficient_zero(pol) == true);
+    check_coefficient_zero(pol);
 }
