@@ -4,8 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use greco::{Greco, Params};
-use polynomial::Polynomial;
+use lib::configs::insecure::trbfv::{
+    GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
+    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N, Q_MOD_T_MOD_P,
+};
+use lib::core::greco::Greco;
+use lib::math::polynomial::Polynomial;
 
 mod hash;
 use hash::generate_commitment;
@@ -47,37 +51,36 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 ///
 fn main(
     // Ciphertext Addition Section
-    prev_ct0is: [Polynomial<512>; 2],
-    prev_ct1is: [Polynomial<512>; 2],
+    prev_ct0is: [Polynomial<N>; L],
+    prev_ct1is: [Polynomial<N>; L],
     prev_ct_commitment: pub Field,
-    sum_ct0is: [Polynomial<512>; 2],
-    sum_ct1is: [Polynomial<512>; 2],
-    sum_r0is: [Polynomial<512>; 2],
-    sum_r1is: [Polynomial<512>; 2],
+    sum_ct0is: [Polynomial<N>; L],
+    sum_ct1is: [Polynomial<N>; L],
+    sum_r0is: [Polynomial<N>; L],
+    sum_r1is: [Polynomial<N>; L],
     // Greco Section.
-    params: Params<512, 2>, // todo: make this pub
     pk_commitment: pub Field,
-    pk0is: [Polynomial<512>; 2],
-    pk1is: [Polynomial<512>; 2],
-    ct0is: [Polynomial<512>; 2],
-    ct1is: [Polynomial<512>; 2],
-    u: Polynomial<512>,
-    e0: Polynomial<512>,
-    e0is: [Polynomial<512>; 2],
-    e0_quotients: [Polynomial<512>; 2],
-    e1: Polynomial<512>,
-    k1: Polynomial<512>,
-    r1is: [Polynomial<1023>; 2],
-    r2is: [Polynomial<511>; 2],
-    p1is: [Polynomial<1023>; 2],
-    p2is: [Polynomial<511>; 2],
+    pk0is: [Polynomial<N>; L],
+    pk1is: [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L],
+    ct1is: [Polynomial<N>; L],
+    u: Polynomial<N>,
+    e0: Polynomial<N>,
+    e0is: [Polynomial<N>; L],
+    e0_quotients: [Polynomial<N>; L],
+    e1: Polynomial<N>,
+    k1: Polynomial<N>,
+    r1is: [Polynomial<(2 * N) - 1>; L],
+    r2is: [Polynomial<N - 1>; L],
+    p1is: [Polynomial<(2 * N) - 1>; L],
+    p2is: [Polynomial<N - 1>; L],
     // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
     signature: [u8; 64],
     hashed_message: [u8; 32],
     // Merkle Tree Section.
-    merkle_root: pub Field, // todo: make this pub
+    merkle_root: pub Field,
     merkle_proof_length: u32,
     merkle_proof_indices: [u1; 20],
     merkle_proof_siblings: [Field; 20],
@@ -132,8 +135,8 @@ fn main(
     // This check applies to BOTH cases:
     // - For actual votes: verifies the vote ciphertext is correctly formed
     // - For mask votes: verifies the zero vote ciphertext is correctly formed
-    let greco: Greco<512, 2, 36, 36, 2, 6, 6, 4, 10, 36, 10, 36> = Greco::new(
-        params,
+    let greco: Greco<N, L, GRECO_BIT_PK, GRECO_BIT_CT, GRECO_BIT_U, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_P1, GRECO_BIT_P2> = Greco::new(
+        GRECO_CONFIGS,
         pk_commitment,
         pk0is,
         pk1is,
@@ -175,12 +178,12 @@ fn main(
     // to verify). The commitments are then used in the Fiat-Shamir transform to generate
     // random challenges for the Schwartz-Zippel lemma verification, ensuring the addition
     // equations hold without revealing the full polynomial coefficients.
-    let _prev_ct_commitment = generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
-    let ct_commitment = generate_commitment::<512, 2, 36>(ct0is, ct1is);
-    let sum_ct_commitment = generate_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
+    let _prev_ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(prev_ct0is, prev_ct1is);
+    let ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(ct0is, ct1is);
+    let sum_ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(sum_ct0is, sum_ct1is);
 
-    let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
-        params.crypto_params(),
+    let ct_add: CiphertextAddition<N, L, GRECO_BIT_CT, GRECO_BIT_CT, GRECO_BIT_CT> = CiphertextAddition::new(
+        GRECO_CONFIGS,
         ct0is,
         ct1is,
         ct_commitment,
@@ -214,7 +217,7 @@ fn main(
     //   - If first vote in slot: return zero ciphertext (ct0is, ct1is)
     //   - If updating slot: verify addition and return sum of previous votes
     if (is_signature_valid == true) & (slot_address == address) {
-        check_coefficient_values_with_balance(k1, params.crypto_params().q_mod_t, balance);
+        check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
 
         ct_commitment
     } else {

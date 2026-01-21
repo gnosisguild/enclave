@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::Polynomial;
+use lib::math::polynomial::Polynomial;
 
 use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
 
@@ -17,7 +17,7 @@ use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
 ///
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
-/// * `q_mod_t` - The plaintext modulus (typically 1 for binary encoding)
+/// * `q_mod_t` - The field representation of 1 (Q_MOD_T_MOD_P for binary encoding)
 /// * `balance` - The voter's balance/voting power
 pub fn check_coefficient_values_with_balance<let D: u32>(
     k1: Polynomial<D>,

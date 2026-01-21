@@ -1,0 +1,9 @@
+[package]
+name = "verify_shares_trbfv_wrapper"
+type = "bin"
+authors = ["Gnosis Guild / Enclave"]
+version = "1.0.0-beta.15"
+
+[dependencies]
+lib = { path = "../../../../lib" }
+bb_proof_verification = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v3.0.0-nightly.20251104", directory = "barretenberg/noir/bb_proof_verification" }
