@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { WalletClient } from 'viem'
 import { getCheckedEnvVars } from './utils'
 import { MyProgram__factory as MyProgram } from '../types/factories/contracts'
