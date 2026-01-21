@@ -17,7 +17,7 @@ mod constants;
 mod ciphertext_addition;
 use ciphertext_addition::CiphertextAddition;
 mod ecdsa;
-use ecdsa::{address_to_field, derive_address, verify_signature};
+use ecdsa::{address_to_field, derive_address, validate_signature};
 mod merkle_tree;
 use merkle_tree::get_merkle_root;
 mod utils;
@@ -43,11 +43,11 @@ use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 /// impossible for a voter to prove which ciphertext was their actual vote, preventing them from
 /// providing a verifiable receipt to a coercer or briber.
 ///
-/// The circuit verifies all inputs and returns the appropriate ciphertext.
-/// Specifically, it returns a tuple of ciphertext components depending on the case:
-/// - **Actual vote**: `(ct0is, ct1is)` - the new vote ciphertext
-/// - **Mask vote (first vote)**: `(ct0is, ct1is)` - zero ciphertext
-/// - **Mask vote (updating slot)**: `(sum_ct0is, sum_ct1is)` - sum of previous votes in slot
+/// The circuit verifies all inputs and returns the appropriate ciphertext commitment.
+/// Specifically, it returns a Field commitment depending on the case:
+/// - **Actual vote**: `ct_commitment` - commitment to the new vote ciphertext
+/// - **Mask vote (first vote)**: `ct_commitment` - commitment to the zero ciphertext
+/// - **Mask vote (updating slot)**: `sum_ct_commitment` - commitment to the sum of previous votes in slot
 ///
 fn main(
     // Ciphertext Addition Section
@@ -116,7 +116,7 @@ fn main(
     // STEP 2: BFV Encryption Verification (GRECO)
     // ============================================================================
     // Verify that the ciphertext (ct0is, ct1is) is a valid encryption of the
-    // plaintext k1 under the public key (pk0is, pk1is). This enusres the ciphertext
+    // plaintext k1 under the public key (pk0is, pk1is). This ensures the ciphertext
     // is correctly formed.
     //
     // This check applies to BOTH cases:
@@ -144,74 +144,42 @@ fn main(
     assert(greco.verify());
 
     // ============================================================================
-    // STEP 3: Ciphertext Addition Verification
-    // ============================================================================
-    // Verify that the sum ciphertext correctly represents the homomorphic addition
-    // of a zero vote to the previous ciphertext without decrypting. This is only checked
-    // for mask votes, and only when the slot is not empty.
-    //
-    // Mask votes add zero to the previous ciphertext, creating a different ciphertext
-    // with the same plaintext as the previous ciphertext.
-    //
-    // Commitments are cryptographic hashes of the polynomial coefficients that bind the
-    // prover to specific ciphertext values. Three commitments are generated:
-    // - prev_ct_commitment: commitment to the previous ciphertext (prev_ct0is, prev_ct1is)
-    // - ct_commitment: commitment to the new vote ciphertext (ct0is, ct1is)
-    // - sum_ct_commitment: commitment to the sum ciphertext (sum_ct0is, sum_ct1is)
-    //
-    // The prev_ct_commitment is verified against the actual polynomials to ensure the
-    // prover hasn't tampered with the previous ciphertext. This check is only performed
-    // for mask votes when it's not the first vote (i.e., when there's a previous ciphertext
-    // to verify). The commitments are then used in the Fiat-Shamir transform to generate
-    // random challenges for the Schwartz-Zippel lemma verification, ensuring the addition
-    // equations hold without revealing the full polynomial coefficients.
-    let _prev_ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(prev_ct0is, prev_ct1is);
-    let ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(ct0is, ct1is);
-    let sum_ct_commitment = generate_commitment::<N, L, GRECO_BIT_CT>(sum_ct0is, sum_ct1is);
-
-    let ct_add: CiphertextAddition<N, L, GRECO_BIT_CT, GRECO_BIT_CT, GRECO_BIT_CT> = CiphertextAddition::new(
-        GRECO_CONFIGS,
-        ct0is,
-        ct1is,
-        ct_commitment,
-        prev_ct0is,
-        prev_ct1is,
-        _prev_ct_commitment,
-        sum_ct0is,
-        sum_ct1is,
-        sum_ct_commitment,
-        sum_r0is,
-        sum_r1is,
-    );
-
-    let is_ct_add_valid = ct_add.verify();
-
-    // ============================================================================
-    // STEP 4: Vote Type Detection and Return Logic
+    // STEP 3: Vote Type Detection and Return Logic
     // ============================================================================
     // The circuit branches into two cases based on the is_mask_vote flag:
     //
     // CASE 1: ACTUAL VOTE (is_mask_vote == false)
     //   - This is an eligible voter casting a vote
-    //   - Verify signature is valid (voter authenticates themselves)
-    //   - Verify address matches slot address
     //   - Verify vote amount <= balance
+    //   - Validate signature over the hashed message (voter authenticates themselves)
+    //   - Verify address matches slot address
     //   - Return new vote ciphertext commitment (ct_commitment)
     //
     // CASE 2: MASK VOTE (is_mask_vote == true)
     //   - This is anyone submitting a zero vote to mask slot activity
-    //   - Verify vote is actually zero (k1 must be zero)
+    //   - Verify vote is zero (k1 must be zero)
     //   - If first vote in slot: return zero ciphertext commitment (ct_commitment)
-    //   - If updating slot: verify addition and return sum ciphertext commitment (sum_ct_commitment)
+    //   - If updating slot:
+    //     * Verify that the sum ciphertext correctly represents the homomorphic addition
+    //       of a zero vote to the previous ciphertext without decrypting
+    //     * Mask votes add zero to the previous ciphertext, creating a different ciphertext
+    //       with the same plaintext as the previous ciphertext
+    //     * Generate commitments for prev_ct and sum_ct (ct_commitment is generated before)
+    //     * Verify prev_ct_commitment matches the actual polynomials to ensure the prover
+    //       hasn't tampered with the previous ciphertext
+    //     * Verify ciphertext addition using commitments and Fiat-Shamir transform with
+    //       Schwartz-Zippel lemma verification
+    //     * Return sum ciphertext commitment (sum_ct_commitment)
+
+    // Generate the vote ciphertext commitment.
+    let ct_commitment = generate_commitment::<512, 2, 36>(ct0is, ct1is);
+
     if is_mask_vote == false {
-        let is_signature_valid =
-            verify_signature(hashed_message, public_key_x, public_key_y, signature);
-        let voter_address = address_to_field(derive_address(public_key_x, public_key_y));
-
-        assert(is_signature_valid == true);
-        assert(slot_address == voter_address);
-
         check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
+        validate_signature(hashed_message, public_key_x, public_key_y, signature);
+
+        let voter_address = address_to_field(derive_address(public_key_x, public_key_y));
+        assert(slot_address == voter_address);
 
         ct_commitment
     } else {
@@ -220,6 +188,26 @@ fn main(
         if is_first_vote {
             ct_commitment
         } else {
+            let _prev_ct_commitment = generate_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
+            let sum_ct_commitment = generate_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
+
+            let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
+                GRECO_CONFIGS,
+                ct0is,
+                ct1is,
+                ct_commitment,
+                prev_ct0is,
+                prev_ct1is,
+                _prev_ct_commitment,
+                sum_ct0is,
+                sum_ct1is,
+                sum_ct_commitment,
+                sum_r0is,
+                sum_r1is,
+            );
+
+            let is_ct_add_valid = ct_add.verify();
+
             assert(prev_ct_commitment == _prev_ct_commitment);
             assert(is_ct_add_valid);
 
