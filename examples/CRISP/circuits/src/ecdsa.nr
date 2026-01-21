@@ -152,8 +152,11 @@ fn test_validate_signature_sdk_input() {
     validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
 }
 
-#[test]
+#[test(should_fail)]
 fn test_fail_validate_signature() {
+    // This test verifies that invalid signatures cause validation to fail.
+    // The test itself will fail (assertion failure) when validate_signature is called
+    // with an invalid signature, which demonstrates that invalid signatures are properly rejected.
     let hashed_message = [
         67, 126, 157, 164, 162, 165, 56, 242, 155, 214, 113, 196, 83, 198, 228, 36, 174, 104, 152,
         87, 167, 108, 64, 34, 234, 161, 122, 55, 44, 62, 151, 55,
@@ -173,9 +176,8 @@ fn test_fail_validate_signature() {
         171, 163, 213, 62, 223, 151,
     ];
 
-    // Note: This test expects validation to fail, but validate_signature asserts internally.
-    // This test would need to be restructured to test invalid signatures differently.
-    // validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
+    // This call should fail (assertion failure) because the signature is invalid
+    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
 }
 
 #[test]
