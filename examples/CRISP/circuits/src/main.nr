@@ -88,7 +88,7 @@ fn main(
     slot_address: pub Field,
     balance: Field,
     is_first_vote: pub bool,
-    is_mask_vote: pub bool,
+    is_mask_vote: bool,
 ) -> pub Field {
     // ============================================================================
     // STEP 1: Eligibility - Merkle Tree Proof
