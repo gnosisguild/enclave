@@ -35,10 +35,9 @@ contract MockE3Program is IE3Program {
 
     function publishInput(
         uint256,
-        address sender,
         bytes memory data
     ) external pure {
-        if (data.length == 3 || sender == address(0)) {
+        if (data.length == 3) {
             revert InvalidInput();
         }
     }

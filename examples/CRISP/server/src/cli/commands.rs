@@ -6,13 +6,14 @@
 
 use crisp_constants::get_default_paramset;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
+use evm_helpers::CRISPContract;
 use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::approve;
 use super::CLI_DB;
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
@@ -109,6 +110,7 @@ pub async fn initialize_crisp_round(
         U256::from(current_timestamp),
         U256::from(current_timestamp + CONFIG.e3_window_size as u64),
     ];
+    let input_deadline = U256::from(current_timestamp) + U256::from(CONFIG.e3_duration);
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
@@ -128,6 +130,7 @@ pub async fn initialize_crisp_round(
         .get_e3_quote(
             threshold,
             start_window,
+            input_deadline,
             duration,
             e3_program,
             e3_params.clone(),
@@ -169,6 +172,7 @@ pub async fn initialize_crisp_round(
         .request_e3(
             threshold,
             start_window,
+            input_deadline,
             duration,
             e3_program,
             e3_params,
@@ -249,7 +253,7 @@ pub async fn participate_in_existing_round(
     let vote_choice = get_user_vote()?;
     if let Some(vote) = vote_choice {
         let ct = encrypt_vote(vote, &pk_deserialized, &params)?;
-        let contract = EnclaveContract::new(
+        let contract = CRISPContract::new(
             &CONFIG.http_rpc_url,
             &CONFIG.private_key,
             &CONFIG.enclave_address,

@@ -189,6 +189,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Caller not authorized
     error Unauthorized();
 
+    /// @notice The Input deadline is invalid
+    error InvalidInputDeadline(uint256 deadline);
+
     /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
     /// @param e3Id The ID of the E3
     /// @param expiration The expiration timestamp of the E3
@@ -277,6 +280,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(
             requestParams.duration > 0 && requestParams.duration <= maxDuration,
             InvalidDuration(requestParams.duration)
+        );
+        require(
+            requestParams.inputDeadline >= block.timestamp,
+            InvalidInputDeadline(requestParams.inputDeadline)
         );
         require(
             e3Programs[requestParams.e3Program],

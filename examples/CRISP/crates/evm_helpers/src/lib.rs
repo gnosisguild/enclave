@@ -5,18 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
-    network::{Ethereum, EthereumWallet},
-    primitives::{Address, U256},
-    providers::{
-        fillers::{
+    contract, network::{Ethereum, EthereumWallet}, primitives::{Address, Bytes, U256}, providers::{
+        Identity, ProviderBuilder, RootProvider, fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
-        },
-        Identity, ProviderBuilder, RootProvider,
-    },
-    rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
-    sol,
+        }
+    }, rpc::types::TransactionReceipt, signers::local::PrivateKeySigner, sol
 };
 use eyre::Result;
 use std::sync::Arc;
@@ -28,6 +22,7 @@ sol! {
         function setMerkleRoot(uint256 e3_id, uint256 _root) external;
         function getSlotIndex(uint256 e3_id, address slot_address) external view returns (uint256);
         function isSlotEmptyByAddress(uint256 e3_id, address slot_address) external view returns (bool);
+        function publishInput(uint256 e3_id, bytes data) external;
     }
 }
 
@@ -95,6 +90,23 @@ impl CRISPContract<CRISPWriteProvider> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
         let receipt = contract
             .setMerkleRoot(e3_id, merkle_root)
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+
+    // publish an input to the CRISPProgram contract
+    pub async fn publish_input(
+        &self,
+        e3_id: U256,
+        data: Bytes,
+    ) -> Result<TransactionReceipt> {
+        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+        let receipt = contract
+            .publishInput(e3_id, data.into())
             .send()
             .await?
             .get_receipt()

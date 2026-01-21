@@ -30,6 +30,7 @@ contract MockEnclave {
         startWindow: [uint256(0), uint256(0)],
         duration: 0,
         expiration: 0,
+        inputDeadline: block.timestamp + 100,
         encryptionSchemeId: bytes32(0),
         e3Program: IE3Program(address(0)),
         e3ProgramParams: bytes(""),

@@ -1331,9 +1331,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-<<<<<<< HEAD
-  "buildInfoId": "solc-0_8_28-3db8a4d4e06448b0e2b45004faf38774a5464329"
-=======
-  "buildInfoId": "solc-0_8_28-96d34490499907f9f935346a5d1115c291fb61e7"
->>>>>>> 28347b01 (refactor: update contracts moving publishInput to e3program)
+  "buildInfoId": "solc-0_8_28-05c3634bb380442ccc1a4faaea1d199f996490c2"
 }

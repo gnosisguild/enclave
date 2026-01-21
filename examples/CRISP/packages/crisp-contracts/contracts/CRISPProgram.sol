@@ -54,6 +54,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidTallyLength();
   error SlotIsEmpty();
   error MerkleRootNotSet();
+  error InputDeadlinePassed(uint256 e3Id, uint256 deadline);
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -119,8 +120,12 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function publishInput(uint256 e3Id, address, bytes memory data) external {
+  function publishInput(uint256 e3Id, bytes memory data) external {
     E3 memory e3 = enclave.getE3(e3Id);
+
+    if (block.timestamp > e3.inputDeadline) {
+      revert InputDeadlinePassed(e3Id, e3.inputDeadline);
+    }
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
     if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();

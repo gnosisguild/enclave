@@ -15,7 +15,7 @@ use crate::server::{
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Bytes, U256};
-use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
+use evm_helpers::CRISPContract;
 use eyre::Error;
 use log::{error, info};
 
@@ -156,7 +156,7 @@ async fn broadcast_encrypted_vote(
     };
 
     // Broadcast vote to blockchain
-    let contract = match EnclaveContract::new(
+    let contract = match CRISPContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
         &CONFIG.enclave_address,

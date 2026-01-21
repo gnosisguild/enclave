@@ -213,6 +213,7 @@ pub async fn initialize_crisp_round(
         U256::from(Utc::now().timestamp()),
         U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
     ];
+    let input_deadline = U256::from(Utc::now().timestamp()) + U256::from(CONFIG.e3_duration);
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
@@ -225,6 +226,7 @@ pub async fn initialize_crisp_round(
         .request_e3(
             threshold,
             start_window,
+            input_deadline,
             duration,
             e3_program,
             e3_params,

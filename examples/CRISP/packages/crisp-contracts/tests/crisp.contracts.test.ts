@@ -103,7 +103,7 @@ describe('CRISP Contracts', function () {
       await crispProgram.validate(e3Id, 0n, '0x', '0x')
 
       // If it doesn't throw, the test is successful.
-      await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)
+      await crispProgram.publishInput(e3Id, zeroAddress, encodedProof)
     })
   })
 })

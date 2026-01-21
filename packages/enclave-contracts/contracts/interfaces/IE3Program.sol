@@ -41,11 +41,9 @@ interface IE3Program {
     /// @dev This function is called by data providers when they want to submit their 
     /// encrypted data 
     /// @param e3Id ID of the E3 computation
-    /// @param sender The account that is submitting the input
     /// @param data The input data to be validated
     function publishInput(
         uint256 e3Id,
-        address sender,
         bytes memory data
     ) external;
 }

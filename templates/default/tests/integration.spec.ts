@@ -18,10 +18,13 @@ import {
   RegistryEventType,
   FheProtocol,
 } from '@enclave-e3/sdk'
-import { hexToBytes } from 'viem'
+import { createWalletClient, hexToBytes, http } from 'viem'
 import assert from 'assert'
 
 import { describe, expect, it } from 'vitest'
+import { publishInput } from '../server/input'
+import { privateKeyToAccount } from 'viem/accounts'
+import { hardhat } from 'viem/chains'
 
 export function getContractAddresses() {
   return {
@@ -157,6 +160,8 @@ describe('Integration', () => {
 
   const contracts = getContractAddresses()
 
+  const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' 
+
   const store = new Map<bigint, E3State>()
   const sdk = EnclaveSDK.create({
     chainId: 31337,
@@ -166,8 +171,17 @@ describe('Integration', () => {
       feeToken: contracts.feeToken,
     },
     rpcUrl: 'ws://localhost:8545',
-    privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+    privateKey: testPrivateKey,
     protocol: FheProtocol.BFV,
+  })
+
+  
+  const account = privateKeyToAccount(testPrivateKey)
+
+  const walletClient = createWalletClient({
+        account,
+        chain: hardhat,
+        transport: http('http://localhost:8545'),
   })
 
   it('should run an integration test', async () => {
@@ -175,7 +189,8 @@ describe('Integration', () => {
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(130)
-    const duration = BigInt(30)
+    const duration = BigInt(300)
+    const inputDeadline = calculateStartWindow(250)[1]
     const e3ProgramParams = encodeBfvParams()
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
@@ -198,6 +213,7 @@ describe('Integration', () => {
       await sdk.requestE3({
         threshold,
         startWindow,
+        inputDeadline,
         duration,
         e3Program: contracts.e3Program,
         e3ProgramParams,
@@ -223,11 +239,13 @@ describe('Integration', () => {
 
     let { e3Id } = state
 
+    console.log("activated??")
     // ACTIVATION phase
     event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
       await sdk.activateE3(e3Id)
     })
 
+    console.log("activated!")
     state = store.get(0n)
     assert(state, 'store should have activated state but it was falsey')
     assert.strictEqual(state.type, 'activated')
@@ -241,8 +259,8 @@ describe('Integration', () => {
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes)
 
-    await sdk.publishInput(e3Id, `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
-    await sdk.publishInput(e3Id, `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
+    await publishInput(walletClient, e3Id, `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`, account.address)
+    await publishInput(walletClient, e3Id, `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`, account.address)
 
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 
