@@ -122,6 +122,7 @@ export interface E3 {
   threshold: readonly [number, number]
   requestBlock: bigint
   startWindow: readonly [bigint, bigint]
+  inputDeadline: bigint
   duration: bigint
   expiration: bigint
   encryptionSchemeId: string

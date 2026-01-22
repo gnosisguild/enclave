@@ -175,6 +175,8 @@ describe('Integration', () => {
     protocol: FheProtocol.BFV,
   })
 
+  const publicClient = sdk.getPublicClient()
+
   const account = privateKeyToAccount(testPrivateKey)
 
   const walletClient = createWalletClient({
@@ -188,8 +190,9 @@ describe('Integration', () => {
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(130)
-    const duration = BigInt(300)
-    const inputDeadline = calculateStartWindow(250)[1]
+    const duration = BigInt(30)
+    const inputDeadline = (await publicClient.getBlock()).timestamp + 30n
+
     const e3ProgramParams = encodeBfvParams()
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
@@ -238,13 +241,11 @@ describe('Integration', () => {
 
     let { e3Id } = state
 
-    console.log('activated??')
     // ACTIVATION phase
     event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
       await sdk.activateE3(e3Id)
     })
 
-    console.log('activated!')
     state = store.get(0n)
     assert(state, 'store should have activated state but it was falsey')
     assert.strictEqual(state.type, 'activated')
@@ -263,12 +264,14 @@ describe('Integration', () => {
       e3Id,
       `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
+      contracts.e3Program,
     )
     await publishInput(
       walletClient,
       e3Id,
       `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       account.address,
+      contracts.e3Program,
     )
 
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
