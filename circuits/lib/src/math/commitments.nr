@@ -120,7 +120,7 @@ pub fn compute_pk_bfv_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
     let mut payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
     payload = multiple_polynomial_payload::<N, L, BIT_PK>(payload, pk1);
 
-    compute_commitments(payload, DS_PK_BFV, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_PK_BFV, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_pk_trbfv_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
@@ -130,26 +130,26 @@ pub fn compute_pk_trbfv_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
     let mut payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
     payload = multiple_polynomial_payload::<N, L, BIT_PK>(payload, pk1);
 
-    compute_commitments(payload, DS_PK_TRBFV, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_PK_TRBFV, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_secret_sk_commitment<let N: u32, let BIT_SK: u32>(sk: Polynomial<N>) -> Field {
     let mut payload = single_polynomial_payload::<N, BIT_SK>(Vec::new(), sk);
-    compute_commitments(payload, DS_SECRET, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_SECRET, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_secret_e_sm_commitment<let N: u32, let L: u32, let BIT_E_SM: u32>(
     e_sm: [Polynomial<N>; L],
 ) -> Field {
     let mut payload = multiple_polynomial_payload::<N, L, BIT_E_SM>(Vec::new(), e_sm);
-    compute_commitments(payload, DS_SECRET, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_SECRET, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_spm_commitment_from_message<let N: u32, let BIT_MSG: u32>(
     message: Polynomial<N>,
 ) -> Field {
     let mut payload = single_polynomial_payload::<N, BIT_MSG>(Vec::new(), message);
-    compute_commitments(payload, DS_SPM, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_SPM, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_spm_commitment_from_shares<let N: u32, let L: u32, let N_PARTIES: u32>(
@@ -167,14 +167,14 @@ pub fn compute_spm_commitment_from_shares<let N: u32, let L: u32, let N_PARTIES:
     payload.push(party_idx as Field);
     payload.push(mod_idx as Field);
 
-    compute_commitments(payload, DS_SPM, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_SPM, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_aggregated_shares_commitment<let N: u32, let L: u32, let BIT_MSG: u32>(
     agg_shares: [Polynomial<N>; L],
 ) -> Field {
     let mut payload = multiple_polynomial_payload::<N, L, BIT_MSG>(Vec::new(), agg_shares);
-    compute_commitments(payload, DS_AGG_SHARES, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_AGG_SHARES, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_pk_agg_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
@@ -184,21 +184,25 @@ pub fn compute_pk_agg_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
     let mut payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
     payload = multiple_polynomial_payload::<N, L, BIT_PK>(payload, pk1);
 
-    compute_commitments(payload, DS_PK_AGG, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_PK_AGG, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 pub fn compute_aggregation_commitment(payload: Vec<Field>) -> Field {
-    compute_safe(DS_AGGREGATION, payload, [payload.len(), 1]).get(0)
+    compute_safe(DS_AGGREGATION, payload, [0x80000000 | payload.len(), 1]).get(0)
 }
 
 /// COMMITMENTS FOR CHALLENGES
 
 pub fn compute_pk_trbfv_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
-    compute_commitments(payload, DS_CLG_PK_TRBFV, [payload.len(), 2 * L])
+    compute_commitments(
+        payload,
+        DS_CLG_PK_TRBFV,
+        [0x80000000 | payload.len(), 2 * L],
+    )
 }
 
 pub fn compute_bfv_enc_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
-    compute_commitments(payload, DS_CLG_ENC_BFV, [payload.len(), 2 * L])
+    compute_commitments(payload, DS_CLG_ENC_BFV, [0x80000000 | payload.len(), 2 * L])
 }
 
 pub fn compute_greco_challenge_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
@@ -209,9 +213,13 @@ pub fn compute_greco_challenge_commitment<let N: u32, let L: u32, let BIT_PK: u3
 ) -> Vec<Field> {
     assert(compute_pk_agg_commitment::<N, L, BIT_PK>(pk0is, pk1is) == pk_commitment);
 
-    compute_commitments(gammas_payload, DS_CLG_GRECO, [gammas_payload.len(), 2 * L])
+    compute_commitments(
+        gammas_payload,
+        DS_CLG_GRECO,
+        [0x80000000 | gammas_payload.len(), 2 * L],
+    )
 }
 
 pub fn compute_dec_share_challenge<let L: u32>(payload: Vec<Field>) -> Field {
-    compute_commitments(payload, DS_CLG_DEC_SHARE, [payload.len(), 1]).get(0)
+    compute_commitments(payload, DS_CLG_DEC_SHARE, [0x80000000 | payload.len(), 1]).get(0)
 }
