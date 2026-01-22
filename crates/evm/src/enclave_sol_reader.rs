@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::event_reader::EvmEventReaderState;
+use crate::evm_interface::EvmInterfaceState;
 use crate::helpers::EthProvider;
-use crate::{EnclaveEvmEvent, EvmEventReader};
+use crate::{EnclaveEvmEvent, EvmInterface};
 use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
 use alloy::providers::Provider;
@@ -110,14 +110,14 @@ impl EnclaveSolReader {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
+        repository: &Repository<EvmInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
+    ) -> Result<Addr<EvmInterface<P>>>
     where
         P: Provider + Clone + 'static,
     {
-        let addr = EvmEventReader::attach(
+        let addr = EvmInterface::attach(
             provider,
             extractor,
             contract_address,

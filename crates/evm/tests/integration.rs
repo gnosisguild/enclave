@@ -20,7 +20,7 @@ use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     prelude::*, EnclaveEvent, EnclaveEventData, GetEvents, HistoryCollector, Shutdown, TestEvent,
 };
-use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmEventReader, HistoricalEventCoordinator};
+use e3_evm::{helpers::EthProvider, CoordinatorStart, EvmInterface, HistoricalEventCoordinator};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -89,7 +89,7 @@ async fn evm_reader() -> Result<()> {
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
     let processor = coordinator.clone().recipient();
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
@@ -172,7 +172,7 @@ async fn ensure_historical_events() -> Result<()> {
             .await?;
     }
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
@@ -249,7 +249,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
             .await?;
     }
 
-    let addr1 = EvmEventReader::attach(
+    let addr1 = EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
@@ -291,7 +291,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     let msgs = get_msgs(&history_collector).await?;
     assert_eq!(msgs, ["before", "online", "live", "events"]);
 
-    let _ = EvmEventReader::attach(
+    let _ = EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
@@ -358,7 +358,7 @@ async fn coordinator_single_reader() -> Result<()> {
             .await?;
     }
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
@@ -450,7 +450,7 @@ async fn coordinator_multiple_readers() -> Result<()> {
         .watch()
         .await?;
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract1.address().to_string(),
@@ -462,7 +462,7 @@ async fn coordinator_multiple_readers() -> Result<()> {
     )
     .await?;
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract2.address().to_string(),
@@ -509,7 +509,7 @@ async fn coordinator_no_historical_events() -> Result<()> {
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
     let processor = coordinator.clone().recipient();
 
-    EvmEventReader::attach(
+    EvmInterface::attach(
         provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),

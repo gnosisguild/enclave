@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
+    evm_interface::EvmInterfaceState, helpers::EthProvider, EnclaveEvmEvent, EvmInterface,
 };
 use actix::{Addr, Recipient};
 use alloy::{
@@ -148,14 +148,14 @@ impl BondingRegistrySolReader {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
+        repository: &Repository<EvmInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
+    ) -> Result<Addr<EvmInterface<P>>>
     where
         P: Provider + Clone + 'static,
     {
-        let addr = EvmEventReader::attach(
+        let addr = EvmInterface::attach(
             provider,
             extractor,
             contract_address,
@@ -182,7 +182,7 @@ impl BondingRegistrySol {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
+        repository: &Repository<EvmInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
     ) -> Result<()>

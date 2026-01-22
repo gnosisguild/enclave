@@ -5,9 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    event_reader::EvmEventReaderState,
+    evm_interface::EvmInterfaceState,
     helpers::{send_tx_with_retry, EthProvider},
-    EnclaveEvmEvent, EvmEventReader,
+    EnclaveEvmEvent, EvmInterface,
 };
 use actix::prelude::*;
 use alloy::{
@@ -223,14 +223,14 @@ impl CiphernodeRegistrySolReader {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
+        repository: &Repository<EvmInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
+    ) -> Result<Addr<EvmInterface<P>>>
     where
         P: Provider + Clone + 'static,
     {
-        let addr = EvmEventReader::attach(
+        let addr = EvmInterface::attach(
             provider,
             extractor,
             contract_address,
@@ -557,7 +557,7 @@ impl CiphernodeRegistrySol {
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
+        repository: &Repository<EvmInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
     ) -> Result<()>

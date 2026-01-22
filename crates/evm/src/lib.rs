@@ -9,7 +9,7 @@ mod ciphernode_registry_sol;
 mod enclave_sol;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
-mod event_reader;
+mod evm_interface;
 pub mod helpers;
 mod historical_event_coordinator;
 mod repo;
@@ -21,7 +21,7 @@ pub use ciphernode_registry_sol::{
 pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
-pub use event_reader::{EnclaveEvmEvent, EvmEventReader, EvmEventReaderState, ExtractorFn};
+pub use evm_interface::{EnclaveEvmEvent, EvmInterface, EvmInterfaceState, ExtractorFn};
 pub use helpers::send_tx_with_retry;
 pub use historical_event_coordinator::{CoordinatorStart, HistoricalEventCoordinator};
 pub use repo::*;
