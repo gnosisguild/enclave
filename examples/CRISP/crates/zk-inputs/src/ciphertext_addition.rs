@@ -14,7 +14,7 @@ use itertools::izip;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::Zero;
-use polynomial::*;
+use polynomial::{reduce_and_center_coefficients_mut, reduce_coefficients_2d};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
