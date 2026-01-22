@@ -15,7 +15,6 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
     otel: Option<String>,
-    experimental_trbfv: bool,
 ) -> Result<()> {
     up::execute(
         config,
@@ -24,7 +23,6 @@ pub async fn execute(
         verbose,
         config_string,
         otel,
-        experimental_trbfv,
     )
     .await
 }

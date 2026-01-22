@@ -53,7 +53,6 @@ impl LaunchCommand {
         verbose: u8,
         maybe_config_string: &Option<String>,
         maybe_otel: &Option<String>,
-        experimental_trbfv: bool,
     ) -> Result<CommandParams> {
         let enclave_bin = env::current_exe()?.display().to_string();
         let mut args = vec![];
@@ -81,10 +80,6 @@ impl LaunchCommand {
             args.push(peer.to_string());
         }
 
-        if experimental_trbfv {
-            args.push("--experimental-trbfv".to_string());
-        }
-
         Ok((enclave_bin, args))
     }
 }
@@ -96,7 +91,6 @@ fn extract_commands(
     verbose: u8,
     maybe_config_string: Option<String>,
     maybe_otel: Option<String>,
-    experimental_trbfv: bool,
 ) -> Result<CommandMap> {
     let mut exclude_list = exclude.clone();
 
@@ -121,7 +115,6 @@ fn extract_commands(
             verbose,
             &maybe_config_string,
             &maybe_otel,
-            experimental_trbfv,
         )?;
         cmds.insert(item.name.clone(), params);
     }
@@ -136,7 +129,6 @@ pub async fn execute(
     verbose: u8,
     maybe_config_string: Option<String>,
     maybe_otel: Option<String>,
-    experimental_trbfv: bool,
 ) -> Result<()> {
     let command_map = extract_commands(
         config.nodes(),
@@ -145,7 +137,6 @@ pub async fn execute(
         verbose,
         maybe_config_string,
         maybe_otel,
-        experimental_trbfv,
     )?;
 
     let process_manager = Arc::new(Mutex::new(ProcessManager::from(command_map)));

@@ -14,7 +14,6 @@ use tracing::{info, instrument};
 pub async fn execute(
     mut config: AppConfig,
     peers: Vec<String>,
-    experimental_trbfv: bool,
 ) -> Result<()> {
     owo();
 
@@ -36,14 +35,13 @@ pub async fn execute(
                 address,
                 pubkey_write_path,
                 plaintext_write_path,
-                experimental_trbfv,
             )
             .await?
         }
 
         // Launch in ciphernode configuration
         NodeRole::Ciphernode => {
-            e3_entrypoint::start::start::execute(&config, address, experimental_trbfv).await?
+            e3_entrypoint::start::start::execute(&config, address).await?
         }
     };
 

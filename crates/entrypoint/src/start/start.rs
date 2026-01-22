@@ -22,11 +22,10 @@ use tracing::instrument;
 pub async fn execute(
     config: &AppConfig,
     address: Address,
-    experimental_trbfv: bool,
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
-    let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
+    let builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
@@ -34,13 +33,8 @@ pub async fn execute(
         .with_contract_enclave_reader()
         .with_contract_bonding_registry()
         .with_max_threads()
-        .with_contract_ciphernode_registry();
-
-    if experimental_trbfv {
-        builder = builder.with_trbfv();
-    } else {
-        builder = builder.with_keyshare();
-    }
+        .with_contract_ciphernode_registry()
+        .with_trbfv();
 
     let node = builder.build().await?;
     let repositories = node.store().repositories();
@@ -51,7 +45,6 @@ pub async fn execute(
         &cipher,
         config.quic_port(),
         repositories.libp2p_keypair(),
-        experimental_trbfv,
     )
     .await?;
 

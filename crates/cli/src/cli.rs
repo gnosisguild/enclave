@@ -61,10 +61,6 @@ pub struct Cli {
     /// Set the Open Telemetry collector grpc endpoint. Eg. http://localhost:4317
     #[arg(long = "otel", global = true)]
     pub otel: Option<ValidUrl>,
-
-    /// Enable the experimental TrBFV threshold feature.
-    #[arg(long, global = true)]
-    pub experimental_trbfv: bool,
 }
 
 impl Cli {
@@ -160,7 +156,7 @@ impl Cli {
 
         match self.command {
             Commands::Start { peers } => {
-                start::execute(config, peers, self.experimental_trbfv).await?
+                start::execute(config, peers).await?
             }
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
@@ -183,7 +179,6 @@ impl Cli {
                     self.verbose,
                     self.config,
                     self.otel.clone().map(Into::into),
-                    self.experimental_trbfv,
                 )
                 .await?
             }

@@ -78,7 +78,6 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
     otel: Option<String>,
-    experimental_trbfv: bool,
 ) -> Result<()> {
     match command {
         NodeCommands::Up { detach, exclude } => {
@@ -89,7 +88,6 @@ pub async fn execute(
                 verbose,
                 config_string,
                 otel,
-                experimental_trbfv,
             )
             .await?
         }
@@ -102,7 +100,6 @@ pub async fn execute(
                 verbose,
                 config_string,
                 otel,
-                experimental_trbfv,
             )
             .await?
         }
