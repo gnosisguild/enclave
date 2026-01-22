@@ -1594,6 +1594,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bigint-poly"
+version = "0.1.7"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6712,7 +6722,7 @@ version = "0.1.0"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
+ "bigint-poly 0.1.7",
  "crisp-constants",
  "e3-sdk",
  "eyre",
@@ -6750,7 +6760,7 @@ dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
+ "bigint-poly 0.1.0",
  "blake3",
  "fhe",
  "fhe-math",
@@ -6775,7 +6785,7 @@ dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
+ "bigint-poly 0.1.0",
  "chrono",
  "fhe",
  "fhe-math",

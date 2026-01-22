@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::commitments::compute_commitment;
-use bigint_poly::*;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -15,6 +14,7 @@ use itertools::izip;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::Zero;
+use polynomial::*;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
