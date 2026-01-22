@@ -42,7 +42,11 @@ impl fmt::Display for Polynomial {
                 continue;
             }
 
-            if !first {
+            if first {
+                if coeff < &BigInt::zero() {
+                    write!(f, "-")?;
+                }
+            } else {
                 if coeff > &BigInt::zero() {
                     write!(f, " + ")?;
                 } else {
@@ -469,6 +473,12 @@ mod tests {
     fn test_polynomial_display() {
         let poly = Polynomial::new(vec![BigInt::from(2), BigInt::from(-3), BigInt::from(1)]);
         assert_eq!(poly.to_string(), "2x^2 - 3x + 1");
+    }
+
+    #[test]
+    fn test_polynomial_display_negative_leading() {
+        let poly = Polynomial::new(vec![BigInt::from(-3), BigInt::from(2), BigInt::from(-1)]);
+        assert_eq!(poly.to_string(), "-3x^2 + 2x - 1");
     }
 
     #[test]
