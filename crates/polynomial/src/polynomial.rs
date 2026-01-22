@@ -190,8 +190,10 @@ impl Polynomial {
     ///
     /// If all coefficients are zero, the result will be a polynomial with a single zero coefficient.
     pub fn trim_leading_zeros(mut self) -> Self {
-        while self.coefficients.len() > 1 && self.coefficients[0].is_zero() {
-            self.coefficients.remove(0);
+        if let Some(first_non_zero_idx) = self.coefficients.iter().position(|c| !c.is_zero()) {
+            self.coefficients.drain(..first_non_zero_idx);
+        } else {
+            self.coefficients = vec![BigInt::zero()];
         }
         self
     }
@@ -568,6 +570,27 @@ mod tests {
         ]);
         let trimmed = poly.trim_leading_zeros();
         assert_eq!(trimmed.coefficients(), &[BigInt::from(1), BigInt::from(2)]);
+    }
+
+    #[test]
+    fn test_trim_leading_zeros_all_zero() {
+        let poly = Polynomial::new(vec![BigInt::from(0), BigInt::from(0), BigInt::from(0)]);
+        let trimmed = poly.trim_leading_zeros();
+        assert_eq!(trimmed.coefficients(), &[BigInt::from(0)]);
+    }
+
+    #[test]
+    fn test_trim_leading_zeros_no_leading_zeros() {
+        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
+        let trimmed = poly.trim_leading_zeros();
+        assert_eq!(trimmed.coefficients(), &[BigInt::from(1), BigInt::from(2)]);
+    }
+
+    #[test]
+    fn test_trim_leading_zeros_single_zero() {
+        let poly = Polynomial::new(vec![BigInt::from(0)]);
+        let trimmed = poly.trim_leading_zeros();
+        assert_eq!(trimmed.coefficients(), &[BigInt::from(0)]);
     }
 
     #[test]
