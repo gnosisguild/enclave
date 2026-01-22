@@ -32,10 +32,15 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const polynomial_degree = ethers.toBigInt(512);
   const plaintext_modulus = ethers.toBigInt(10);
-  const moduli = [ethers.toBigInt("0xffffee001"), ethers.toBigInt("0xffffc4001")];
+  const moduli = [
+    ethers.toBigInt("0xffffee001"),
+    ethers.toBigInt("0xffffc4001"),
+  ];
   const error1_variance = "3";
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)"],
+    [
+      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
+    ],
     [[polynomial_degree, plaintext_modulus, moduli, error1_variance]],
   );
 
