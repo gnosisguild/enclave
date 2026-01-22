@@ -1,7 +1,7 @@
-use polynomial::Polynomial;
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
+use polynomial::Polynomial;
 
 fn create_test_polynomials(degree: usize) -> (Polynomial, Polynomial) {
     let mut coeffs1 = Vec::new();
