@@ -10,7 +10,6 @@ use crate::errors::PolynomialError;
 use crate::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::mem;
 
 /// Reduces a number modulo a prime modulus and centers it.
 ///
@@ -140,7 +139,7 @@ pub fn reduce_in_ring(
     cyclo: &[BigInt],
     modulus: &BigInt,
 ) -> Result<(), PolynomialError> {
-    let coeffs = mem::take(coefficients);
+    let coeffs = coefficients.clone();
     let poly = Polynomial::new(coeffs);
     let reduced = poly.reduce_by_cyclotomic(cyclo)?;
     *coefficients = reduced.coefficients;
