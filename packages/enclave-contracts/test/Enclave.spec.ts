@@ -1319,7 +1319,7 @@ describe("Enclave", function () {
       await mine(2, { interval: request.duration });
       await expect(
         enclave.publishCiphertextOutput(e3Id, data, proof),
-      ).to.be.revertedWithCustomError(enclave, "CommiteeDutiesCompleted");
+      ).to.be.revertedWithCustomError(enclave, "CommitteeDutiesCompleted");
     });
     it("reverts if output is not valid", async function () {
       const {

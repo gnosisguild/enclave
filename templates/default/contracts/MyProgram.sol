@@ -67,9 +67,9 @@ contract MyProgram is IE3Program, Ownable {
   }
 
   /// @notice Validates input
-  /// @param sender The account that is submitting the input.
+  /// @param e3Id The e3 id for which to publish input
   /// @param data The input to be verified.
-  function publishInput(uint256 e3Id, address sender, bytes memory data) external {
+  function publishInput(uint256 e3Id, bytes memory data) external {
     E3 memory e3 = enclave.getE3(e3Id);
 
     if (e3.inputDeadline >= block.timestamp) {

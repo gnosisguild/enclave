@@ -195,7 +195,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
     /// @param e3Id The ID of the E3
     /// @param expiration The expiration timestamp of the E3
-    error CommiteeDutiesCompleted(uint256 e3Id, uint256 expiration);
+    error CommitteeDutiesCompleted(uint256 e3Id, uint256 expiration);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -396,7 +396,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // You cannot post output after the commitee duties have completed
         require(
             e3.expiration >= block.timestamp,
-            CommiteeDutiesCompleted(e3Id, e3.expiration)
+            CommitteeDutiesCompleted(e3Id, e3.expiration)
         );
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?

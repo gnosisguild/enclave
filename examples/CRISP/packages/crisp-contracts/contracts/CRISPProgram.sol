@@ -127,6 +127,10 @@ contract CRISPProgram is IE3Program, Ownable {
       revert InputDeadlinePassed(e3Id, e3.inputDeadline);
     }
 
+    if (block.timestamp > e3.expiration) {
+      revert E3DoesNotExist();
+    }
+
     // We need to ensure that the CRISP admin set the merkle root of the census.
     if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
 
