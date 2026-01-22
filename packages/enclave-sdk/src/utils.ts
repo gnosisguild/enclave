@@ -88,14 +88,14 @@ export const DEFAULT_E3_CONFIG = {
  */
 export function encodeBfvParams(params: ProtocolParams): `0x${string}` {
   const { degree, plaintextModulus, moduli, error1Variance } = params
-  
+
   if (error1Variance === undefined) {
     throw new SDKError(
       'error1Variance is required in ProtocolParams. All BFV parameter sets must specify error1_variance.',
-      'MISSING_ERROR1_VARIANCE'
+      'MISSING_ERROR1_VARIANCE',
     )
   }
-  
+
   return encodeAbiParameters(
     [
       {

@@ -265,7 +265,7 @@ export interface VerifiableEncryptionResult {
 
 /**
  * BFV parameter set type for FHE operations.
- * 
+ *
  * The protocol is always FHE BFV, but different parameter sets are needed:
  * - DKG: Used during Distributed Key Generation (PVSS phase 0-1) where each
  *   ciphernode generates a standard BFV key-pair to encrypt secret shares.
@@ -310,11 +310,7 @@ export interface ProtocolParams {
   error1Variance: string | undefined
 }
 
-export type ProtocolParamsName =
-  | 'INSECURE_THRESHOLD_BFV_512'
-  | 'INSECURE_DKG_512'
-  | 'SECURE_THRESHOLD_BFV_8192'
-  | 'SECURE_DKG_8192'
+export type ProtocolParamsName = 'INSECURE_THRESHOLD_BFV_512' | 'INSECURE_DKG_512' | 'SECURE_THRESHOLD_BFV_8192' | 'SECURE_DKG_8192'
 
 /**
  * Preset identifiers for BFV/TRBFV parameter selection.
