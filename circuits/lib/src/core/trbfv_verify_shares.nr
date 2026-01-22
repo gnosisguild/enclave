@@ -64,7 +64,8 @@ pub struct VerifySharesSk<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32
 pub struct VerifySharesEsm<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> {
     configs: Configs<L>,
     /// Expected commitment to secret (from C1)
-    /// This is computed from the first modulus's RNS representation.
+    /// This is computed from all L RNS polynomials (matching
+    /// multiple_polynomial_payload's behavior which hashes all L modulus polynomials)
     expected_secret_commitment: Field,
     /// Smudging noise polynomial per modulus: [Polynomial<N>; L]
     /// For ESM: each modulus has its own polynomial (RNS representation)
@@ -169,8 +170,8 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
     }
 
     /// Verifies that secret hashes to expected_secret_commitment
-    /// For commitment verification, we use the first modulus's secret polynomial
-    /// (matches C1's computation which uses the first modulus's RNS representation)
+    /// The commitment is computed over all L RNS polynomials (matching
+    /// multiple_polynomial_payload's behavior which hashes all L modulus polynomials)
     fn verify_secret_commitment(self) {
         assert(
             compute_secret_e_sm_commitment::<N, L, BIT_SECRET>(self.secret_e_sm)
