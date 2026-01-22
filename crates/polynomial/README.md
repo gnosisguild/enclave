@@ -1,17 +1,20 @@
 # Polynomial Library
 
-A polynomial library with big integer coefficients designed for cryptographic applications, particularly lattice-based cryptography and homomorphic encryption schemes.
+A polynomial library with big integer coefficients designed for cryptographic applications,
+particularly lattice-based cryptography and homomorphic encryption schemes.
 
 ## Features
 
 - Uses `num-bigint` for coefficient representation.
-- Addition, subtraction, multiplication, division reduction modulo cyclotomic polynomials and prime moduli.
+- Addition, subtraction, multiplication, division reduction modulo cyclotomic polynomials and prime
+  moduli.
 - Utilities for coefficient range validation.
 - Optional serde support for polynomial serialization.
 
 ### Mathematical Background
 
-This library implements polynomial arithmetic over the ring of integers, with support for modular reduction operations commonly used in:
+This library implements polynomial arithmetic over the ring of integers, with support for modular
+reduction operations commonly used in:
 
 - **Lattice-based cryptography**: Polynomial rings over cyclotomic fields
 - **Homomorphic encryption**: BFV, BGV, and CKKS schemes
@@ -20,11 +23,14 @@ This library implements polynomial arithmetic over the ring of integers, with su
 ### Polynomial Representation
 
 Polynomials are represented as:
+
 ```
 a_n * x^n + a_{n-1} * x^{n-1} + ... + a_1 * x + a_0
 ```
 
-Where coefficients are stored in descending order (highest degree first) of degree using `BigInt` for arbitrary precision. You can rely on some methods to transform to ascending order (lowest degree first) and viceversa.
+Where coefficients are stored in descending order (highest degree first) of degree using `BigInt`
+for arbitrary precision. You can rely on some methods to transform to ascending order (lowest degree
+first) and viceversa.
 
 ### Performance
 
