@@ -16,13 +16,5 @@ pub async fn execute(
     config_string: Option<String>,
     otel: Option<String>,
 ) -> Result<()> {
-    up::execute(
-        config,
-        detach,
-        exclude,
-        verbose,
-        config_string,
-        otel,
-    )
-    .await
+    up::execute(config, detach, exclude, verbose, config_string, otel).await
 }

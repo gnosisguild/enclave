@@ -111,11 +111,7 @@ fn extract_commands(
 
     let mut cmds = HashMap::new();
     for item in filtered.iter() {
-        let params = item.to_params(
-            verbose,
-            &maybe_config_string,
-            &maybe_otel,
-        )?;
+        let params = item.to_params(verbose, &maybe_config_string, &maybe_otel)?;
         cmds.insert(item.name.clone(), params);
     }
 

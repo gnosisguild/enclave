@@ -155,9 +155,7 @@ impl Cli {
         }
 
         match self.command {
-            Commands::Start { peers } => {
-                start::execute(config, peers).await?
-            }
+            Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }

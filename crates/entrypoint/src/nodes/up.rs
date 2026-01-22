@@ -30,14 +30,7 @@ pub async fn execute(
     }
 
     //  run the swarm_daemon process locally forwarding args
-    daemon::execute(
-        config,
-        exclude,
-        verbose,
-        maybe_config_string,
-        maybe_otel,
-    )
-    .await?;
+    daemon::execute(config, exclude, verbose, maybe_config_string, maybe_otel).await?;
 
     Ok(())
 }
