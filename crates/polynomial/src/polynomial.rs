@@ -148,7 +148,10 @@ impl Polynomial {
 
     /// Returns the degree of the polynomial.
     ///
-    /// The degree of a zero polynomial is 0.
+    /// The degree is computed as `self.coefficients.len().saturating_sub(1)`,
+    /// which represents the highest exponent implied by the [`coefficients`](Self::coefficients)
+    /// vector. A coefficients vector of length `n` (including all-zero vectors
+    /// like those created by [`Polynomial::zero`]) yields degree `n - 1`.
     pub fn degree(&self) -> usize {
         if self.coefficients.is_empty() {
             0
