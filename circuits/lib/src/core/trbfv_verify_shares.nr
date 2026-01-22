@@ -1,4 +1,3 @@
-/// crates/generator/commitments
 // SPDX-License-Identifier: LGPL-3.0-only
 //
 // This file is provided WITHOUT ANY WARRANTY;
