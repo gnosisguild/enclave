@@ -6,8 +6,8 @@
 
 use crate::math::commitments::{
     compute_bfv_enc_challenge_commitment, compute_pk_bfv_commitment,
-    compute_shares_party_modulus_commitment, prepare_message_commitment_payload,
-    prepare_pk_commitment_payload,
+    compute_shares_party_modulus_commitment, prepare_pk_commitment_payload,
+    prepare_single_polynomial_commitment_payload,
 };
 use crate::math::helpers::flatten;
 use crate::math::modulo::U128::ModU128;
@@ -180,7 +180,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Verifies that the message polynomial hashes to the expected commitment
     fn verify_message_commitment(self) {
-        let payload = prepare_message_commitment_payload::<N>(self.message);
+        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_MSG>(self.message);
         let computed_commitment = compute_shares_party_modulus_commitment(payload);
         assert(
             computed_commitment == self.expected_message_commitment,

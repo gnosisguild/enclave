@@ -6,7 +6,7 @@
 
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_shares_party_modulus_commitment,
-    prepare_aggregated_shares_commitment_payload, prepare_single_polynomial_commitment_payload,
+    prepare_l_polynomial_commitment_payload, prepare_single_polynomial_commitment_payload,
 };
 use crate::math::polynomial::Polynomial;
 
@@ -80,7 +80,7 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
         let aggregated = self.compute_aggregated_shares();
 
         // Step 3: Return commitment to aggregated shares
-        let payload = prepare_aggregated_shares_commitment_payload::<N, L, BIT_MSG>(aggregated);
+        let payload = prepare_l_polynomial_commitment_payload::<N, L, BIT_MSG>(aggregated);
         compute_aggregated_shares_commitment(payload)
     }
 }

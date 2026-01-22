@@ -6,7 +6,7 @@
 
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_dec_share_challenge_commitment,
-    prepare_aggregated_shares_from_values_commitment_payload,
+    prepare_l_polynomial_commitment_payload,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
@@ -96,14 +96,14 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
 
     /// Verifies that s hashes to expected_s_commitment
     fn verify_s_commitment(self) {
-        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.s);
+        let payload = prepare_l_polynomial_commitment_payload::<N, L, BIT_S>(self.s);
         let computed_commitment = compute_aggregated_shares_commitment(payload);
         assert(computed_commitment == self.expected_s_commitment, "S commitment mismatch");
     }
 
     /// Verifies that e hashes to expected_e_commitment
     fn verify_e_commitment(self) {
-        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.e);
+        let payload = prepare_l_polynomial_commitment_payload::<N, L, BIT_E>(self.e);
         let computed_commitment = compute_aggregated_shares_commitment(payload);
         assert(computed_commitment == self.expected_e_commitment, "E commitment mismatch");
     }

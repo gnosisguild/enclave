@@ -46,20 +46,8 @@ pub fn prepare_shares_party_modulus_commitment_payload<let N: u32, let L: u32, l
     inputs
 }
 
-/// Prepares the payload for message commitment (must match C2).
-/// Used in C3.
-pub fn prepare_message_commitment_payload<let N: u32>(message: Polynomial<N>) -> Vec<Field> {
-    let mut inputs = Vec::new();
-
-    for i in 0..N {
-        inputs.push(message.coefficients[i]);
-    }
-
-    inputs
-}
-
 /// Prepares the payload for single polynomial commitment (must match C2).
-/// Used in C1, C2, C4.
+/// Used in C1, C2, C3, C4.
 pub fn prepare_single_polynomial_commitment_payload<let N: u32, let BIT_POLY: u32>(
     poly: Polynomial<N>,
 ) -> Vec<Field> {
@@ -67,27 +55,11 @@ pub fn prepare_single_polynomial_commitment_payload<let N: u32, let BIT_POLY: u3
 }
 
 /// Prepares the payload for aggregated shares commitment.
-/// Used in C4.
-pub fn prepare_aggregated_shares_commitment_payload<let N: u32, let L: u32, let BIT_MSG: u32>(
-    aggregated: [Polynomial<N>; L],
+/// Used in C1, C2, C4.
+pub fn prepare_l_polynomial_commitment_payload<let N: u32, let L: u32, let BIT_POLY: u32>(
+    polynomials: [Polynomial<N>; L],
 ) -> Vec<Field> {
-    flatten::<_, _, BIT_MSG>(Vec::new(), aggregated)
-}
-
-/// Prepares the payload for aggregated shares from values commitment.
-/// Used in C6.
-pub fn prepare_aggregated_shares_from_values_commitment_payload<let N: u32, let L: u32>(
-    values: [Polynomial<N>; L],
-) -> Vec<Field> {
-    let mut inputs = Vec::new();
-
-    for basis_idx in 0..L {
-        for coeff_idx in 0..N {
-            inputs.push(values[basis_idx].coefficients[coeff_idx]);
-        }
-    }
-
-    inputs
+    flatten::<_, _, BIT_POLY>(Vec::new(), polynomials)
 }
 
 /// Computes commitment to the BFV public key
