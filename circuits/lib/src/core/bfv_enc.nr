@@ -5,9 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_bfv_enc_challenge_commitment, compute_pk_bfv_commitment,
-    compute_shares_party_modulus_commitment, prepare_pk_commitment_payload,
-    prepare_single_polynomial_commitment_payload,
+    compute_bfv_enc_challenge, compute_pk_bfv_commitment, compute_spm_commitment_from_message,
 };
 use crate::math::helpers::flatten;
 use crate::math::modulo::U128::ModU128;
@@ -170,20 +168,18 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Verifies that the public key hashes to the expected commitment
     fn verify_pk_commitment(self) {
-        let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0is, self.pk1is);
-        let computed_commitment = compute_pk_bfv_commitment(payload);
         assert(
-            computed_commitment == self.expected_pk_commitment,
+            compute_pk_bfv_commitment::<N, L, BIT_PK>(self.pk0is, self.pk1is)
+                == self.expected_pk_commitment,
             "Public key commitment mismatch",
         );
     }
 
     /// Verifies that the message polynomial hashes to the expected commitment
     fn verify_message_commitment(self) {
-        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_MSG>(self.message);
-        let computed_commitment = compute_shares_party_modulus_commitment(payload);
         assert(
-            computed_commitment == self.expected_message_commitment,
+            compute_spm_commitment_from_message::<N, BIT_MSG>(self.message)
+                == self.expected_message_commitment,
             "Message commitment mismatch",
         );
     }
@@ -330,7 +326,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn generate_challenge(self, k1: Polynomial<N>) -> Vec<Field> {
         let inputs = self.payload(k1);
 
-        compute_bfv_enc_challenge_commitment::<L>(inputs)
+        compute_bfv_enc_challenge::<L>(inputs)
     }
 
     /// Verifies BFV encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma

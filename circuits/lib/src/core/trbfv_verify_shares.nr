@@ -6,10 +6,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_secret_commitment, compute_shares_party_modulus_commitment,
-    prepare_shares_party_modulus_commitment_payload, prepare_single_polynomial_commitment_payload,
+    compute_secret_e_sm_commitment, compute_secret_sk_commitment,
+    compute_spm_commitment_from_shares,
 };
-use crate::math::commitments::prepare_l_polynomial_commitment_payload;
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -111,9 +110,11 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
 
     /// Verifies that secret hashes to expected_secret_commitment
     fn verify_secret_commitment(self) {
-        let payload = prepare_single_polynomial_commitment_payload::<N, BIT_SECRET>(self.secret_sk);
-        let computed_commitment = compute_secret_commitment(payload);
-        assert(computed_commitment == self.expected_secret_commitment, "SK commitment mismatch");
+        assert(
+            compute_secret_sk_commitment::<N, BIT_SECRET>(self.secret_sk)
+                == self.expected_secret_commitment,
+            "SK commitment mismatch",
+        );
     }
 
     /// Verifies secret consistency: `y[i][j][0] == secret_sk[i]` for all i, j.
@@ -172,9 +173,11 @@ impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32
     /// For commitment verification, we use the first modulus's secret polynomial
     /// (matches C1's computation which uses the first modulus's RNS representation)
     fn verify_secret_commitment(self) {
-        let payload = prepare_l_polynomial_commitment_payload::<N, L, BIT_SECRET>(self.secret_e_sm);
-        let computed_commitment = compute_secret_commitment(payload);
-        assert(computed_commitment == self.expected_secret_commitment, "ESM commitment mismatch");
+        assert(
+            compute_secret_e_sm_commitment::<N, L, BIT_SECRET>(self.secret_e_sm)
+                == self.expected_secret_commitment,
+            "ESM commitment mismatch",
+        );
     }
 
     /// Verifies secret consistency: `y[i][j][0] == secret_e_sm[j][i]` for all i, j.
@@ -279,13 +282,8 @@ pub fn commit_to_party_shares<let N: u32, let L: u32, let N_PARTIES: u32>(
 
     for party_idx in 0..N_PARTIES {
         for mod_idx in 0..L {
-            let payload = prepare_shares_party_modulus_commitment_payload::<N, L, N_PARTIES>(
-                y,
-                party_idx,
-                mod_idx,
-            );
-
-            commitments[party_idx][mod_idx] = compute_shares_party_modulus_commitment(payload);
+            commitments[party_idx][mod_idx] =
+                compute_spm_commitment_from_shares::<N, L, N_PARTIES>(y, party_idx, mod_idx);
         }
     }
 
