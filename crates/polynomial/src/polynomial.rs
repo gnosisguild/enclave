@@ -297,7 +297,9 @@ impl Polynomial {
     /// # Errors
     ///
     /// Returns `PolynomialError::DivisionByZero` if the divisor is zero.
-    /// Returns `PolynomialError::InvalidPolynomial` if the divisor has zero leading coefficient.
+    /// Returns `PolynomialError::InvalidPolynomial` if the divisor has zero leading coefficient
+    /// or if exact divisibility is not satisfied (i.e., when a coefficient is not divisible
+    /// by the divisor's leading coefficient).
     pub fn div(&self, divisor: &Self) -> Result<(Self, Self), PolynomialError> {
         if divisor.is_zero() {
             return Err(PolynomialError::DivisionByZero);
@@ -318,6 +320,16 @@ impl Polynomial {
         let mut remainder = self.coefficients.clone();
 
         for i in 0..quotient.len() {
+            // Check for exact divisibility
+            if !(&remainder[i] % &divisor.coefficients[0]).is_zero() {
+                return Err(PolynomialError::InvalidPolynomial {
+                    message: format!(
+                        "Polynomial division requires exact divisibility: coefficient {} is not divisible by leading coefficient {}",
+                        &remainder[i], &divisor.coefficients[0]
+                    ),
+                });
+            }
+
             let coeff = &remainder[i] / &divisor.coefficients[0];
             quotient[i] = coeff.clone();
 
