@@ -12,17 +12,17 @@ use super::{EnclaveEvent, Unsequenced};
 
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct NetSyncEvents {
+pub struct EvmSyncEventsReceived {
     pub events: Vec<EnclaveEvent<Unsequenced>>,
 }
 
-impl NetSyncEvents {
+impl EvmSyncEventsReceived {
     pub fn new(events: Vec<EnclaveEvent<Unsequenced>>) -> Self {
         Self { events }
     }
 }
 
-impl Display for NetSyncEvents {
+impl Display for EvmSyncEventsReceived {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

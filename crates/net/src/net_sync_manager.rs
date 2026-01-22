@@ -8,8 +8,8 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, Event, GetAggregateEventsAfter, NetSyncEvents, ReceiveEvents, SyncRequest,
-    Unsequenced,
+    EnclaveEventData, Event, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
+    ReceiveEvents, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake};
 use futures::TryFutureExt;
@@ -90,16 +90,16 @@ impl Handler<EnclaveEvent> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::SyncRequest(data) => ctx.notify(data),
+            EnclaveEventData::OutgoingSyncRequested(data) => ctx.notify(data),
             _ => (),
         }
     }
 }
 
 /// SyncRequest is called on start up to fetch remote events
-impl Handler<SyncRequest> for NetSyncManager {
+impl Handler<OutgoingSyncRequested> for NetSyncManager {
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: SyncRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: OutgoingSyncRequested, _: &mut Self::Context) -> Self::Result {
         trap_fut(
             EType::Net,
             &self.bus.clone(),
@@ -113,7 +113,7 @@ impl Handler<OutgoingSyncRequestSucceeded> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: OutgoingSyncRequestSucceeded, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
-            self.bus.publish(NetSyncEvents {
+            self.bus.publish(NetSyncEventsReceived {
                 events: msg
                     .value
                     .events
@@ -200,7 +200,7 @@ async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     bus: BusHandle,
-    event: SyncRequest,
+    event: OutgoingSyncRequested,
 ) -> Result<()> {
     let value = retry_with_backoff(
         || {
@@ -216,7 +216,7 @@ async fn handle_sync_request_event(
     )
     .await?;
 
-    bus.publish(NetSyncEvents::new(
+    bus.publish(NetSyncEventsReceived::new(
         value
             .value
             .events

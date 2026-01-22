@@ -12,12 +12,12 @@ use crate::AggregateId;
 
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct SyncRequest {
+pub struct OutgoingSyncRequested {
     // TODO: this should be the event to trigger evm sync too
     pub since: Vec<(AggregateId, u128)>,
 }
 
-impl Display for SyncRequest {
+impl Display for OutgoingSyncRequested {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

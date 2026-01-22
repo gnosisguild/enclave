@@ -21,16 +21,16 @@ mod e3_requested;
 mod enclave_error;
 mod encryption_key_collection_failed;
 mod encryption_key_created;
-mod evm_sync_events;
+mod evm_sync_events_received;
 mod keyshare_created;
-mod net_sync_events;
+mod net_sync_events_received;
 mod operator_activation_changed;
+mod outgoing_sync_requested;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
-mod sync_request;
 mod test_event;
 mod threshold_share_collection_failed;
 mod threshold_share_created;
@@ -57,17 +57,17 @@ use e3_utils::{colorize, Color};
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
-pub use evm_sync_events::*;
+pub use evm_sync_events_received::*;
 pub use keyshare_created::*;
-pub use net_sync_events::*;
+pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
+pub use outgoing_sync_requested::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 use strum::IntoStaticStr;
-pub use sync_request::*;
 pub use test_event::*;
 pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
@@ -131,12 +131,12 @@ pub enum EnclaveEventData {
     EncryptionKeyCreated(EncryptionKeyCreated),
     EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
     ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
-    ComputeRequest(ComputeRequest),
-    ComputeResponse(ComputeResponse),
-    ComputeRequestError(ComputeRequestError),
-    SyncRequest(SyncRequest),
-    NetSyncEvents(NetSyncEvents),
-    EvmSyncEvents(EvmSyncEvents),
+    ComputeRequest(ComputeRequest),           // ComputeRequested
+    ComputeResponse(ComputeResponse),         // ComputeResponseReceived
+    ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
+    OutgoingSyncRequested(OutgoingSyncRequested),
+    NetSyncEventsReceived(NetSyncEventsReceived),
+    EvmSyncEventsReceived(EvmSyncEventsReceived),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -405,9 +405,9 @@ impl_into_event_data!(
     ComputeRequest,
     ComputeResponse,
     ComputeRequestError,
-    SyncRequest,
-    NetSyncEvents,
-    EvmSyncEvents
+    OutgoingSyncRequested,
+    NetSyncEventsReceived,
+    EvmSyncEventsReceived
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
