@@ -1,8 +1,10 @@
 //! Utility functions for polynomial operations.
 
+use crate::errors::PolynomialError;
 use crate::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
+use std::mem;
 
 /// Reduces a number modulo a prime modulus and centers it.
 ///
@@ -53,9 +55,10 @@ pub fn reduce_and_center(x: &BigInt, modulus: &BigInt, half_modulus: &BigInt) ->
 ///
 /// Panics if `modulus` is zero due to division by zero
 pub fn reduce_and_center_coefficients_mut(coefficients: &mut [BigInt], modulus: &BigInt) {
+    let half_modulus = modulus / 2;
     coefficients
         .iter_mut()
-        .for_each(|x| *x = reduce_and_center(x, modulus, &(modulus / 2)));
+        .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
 }
 
 /// Reduces and centers polynomial coefficients modulo a prime modulus.
@@ -71,9 +74,10 @@ pub fn reduce_and_center_coefficients_mut(coefficients: &mut [BigInt], modulus: 
 ///
 /// A new `Vec<BigInt>` with reduced and centered coefficients
 pub fn reduce_and_center_coefficients(coefficients: &[BigInt], modulus: &BigInt) -> Vec<BigInt> {
+    let half_modulus = modulus / 2;
     coefficients
         .iter()
-        .map(|x| reduce_and_center(x, modulus, &(modulus / 2)))
+        .map(|x| reduce_and_center(x, modulus, &half_modulus))
         .collect()
 }
 
@@ -88,7 +92,8 @@ pub fn reduce_and_center_coefficients(coefficients: &[BigInt], modulus: &BigInt)
 ///
 /// The reduced and centered scalar value
 pub fn reduce_and_center_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
-    reduce_and_center(x, modulus, &(modulus / 2))
+    let half_modulus = modulus / 2;
+    reduce_and_center(x, modulus, &half_modulus)
 }
 
 /// Reduces a scalar value modulo a modulus.
@@ -120,13 +125,21 @@ pub fn reduce_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
 /// * `cyclo` - A slice of `BigInt` representing the coefficients of the cyclotomic polynomial (typically x^N + 1).
 /// * `modulus` - A reference to a `BigInt` representing the modulus for the coefficient reduction. The coefficients
 ///   will be reduced and centered modulo this value.
-pub fn reduce_in_ring(coefficients: &mut Vec<BigInt>, cyclo: &[BigInt], modulus: &BigInt) {
-    let poly = Polynomial::new(coefficients.clone());
-    let reduced = poly
-        .reduce_by_cyclotomic(cyclo)
-        .expect("Failed to reduce by cyclotomic");
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success, or a `PolynomialError` if the cyclotomic reduction fails.
+pub fn reduce_in_ring(
+    coefficients: &mut Vec<BigInt>,
+    cyclo: &[BigInt],
+    modulus: &BigInt,
+) -> Result<(), PolynomialError> {
+    let coeffs = mem::take(coefficients);
+    let poly = Polynomial::new(coeffs);
+    let reduced = poly.reduce_by_cyclotomic(cyclo)?;
     *coefficients = reduced.coefficients;
     reduce_and_center_coefficients_mut(coefficients, modulus);
+    Ok(())
 }
 
 /// Reduces each element in the given slice of `BigInt` by the modulus `p`.
@@ -376,5 +389,73 @@ mod tests {
         let modulus = BigInt::from(7);
         let result = reduce_and_center_scalar(&x, &modulus);
         assert_eq!(result, BigInt::from(-1));
+    }
+
+    #[test]
+    fn test_reduce_in_ring() {
+        // Test successful reduction
+        // cyclo = [1, 0, 1] represents x^2 + 1, so n = cyclo.len() - 1 = 2
+        let cyclo = vec![BigInt::from(1), BigInt::from(0), BigInt::from(1)];
+        let modulus = BigInt::from(7);
+
+        // Create coefficients: [1, 2, 3] represents x^2 + 2x + 3
+        let mut coeffs = vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)];
+
+        // Reduce in ring: first reduce by cyclotomic, then reduce coefficients modulo
+        let result = reduce_in_ring(&mut coeffs, &cyclo, &modulus);
+        assert!(result.is_ok());
+
+        // Verify coefficients were modified in place
+        // The result should be the remainder after dividing by x^2 + 1, then reduced mod 7
+        // x^2 + 2x + 3 divided by x^2 + 1 gives remainder 2x + 2
+        // After right-aligning to n=2 (cyclo.len()-1 = 2): [2, 2]
+        // After mod 7 and centering: [2, 2]
+        assert_eq!(coeffs.len(), 2);
+        // The remainder 2x + 2 = [2, 2], when right-aligned to length 2, gives [2, 2]
+        assert_eq!(coeffs[0], BigInt::from(2));
+        assert_eq!(coeffs[1], BigInt::from(2));
+    }
+
+    #[test]
+    fn test_reduce_in_ring_error_cases() {
+        // Test with zero cyclotomic polynomial
+        let cyclo_zero = vec![BigInt::from(0), BigInt::from(0)];
+        let modulus = BigInt::from(7);
+        let mut coeffs = vec![BigInt::from(1), BigInt::from(2)];
+
+        let result = reduce_in_ring(&mut coeffs, &cyclo_zero, &modulus);
+        assert!(matches!(
+            result,
+            Err(crate::errors::PolynomialError::DivisionByZero)
+        ));
+
+        // Test with invalid cyclotomic (zero leading coefficient)
+        let cyclo_invalid = vec![BigInt::from(0), BigInt::from(1)];
+        let mut coeffs2 = vec![BigInt::from(1), BigInt::from(2)];
+
+        let result2 = reduce_in_ring(&mut coeffs2, &cyclo_invalid, &modulus);
+        assert!(matches!(
+            result2,
+            Err(crate::errors::PolynomialError::InvalidPolynomial { .. })
+        ));
+    }
+
+    #[test]
+    fn test_reduce_in_ring_modulus_reduction() {
+        // Test that coefficients are properly reduced and centered modulo
+        let cyclo = vec![BigInt::from(1), BigInt::from(0), BigInt::from(1)];
+        let modulus = BigInt::from(7);
+
+        // Create coefficients with large values
+        let mut coeffs = vec![BigInt::from(10), BigInt::from(15), BigInt::from(20)];
+
+        let result = reduce_in_ring(&mut coeffs, &cyclo, &modulus);
+        assert!(result.is_ok());
+
+        // Verify coefficients are reduced and centered (within [-3, 3] for modulus 7)
+        for coeff in &coeffs {
+            assert!(*coeff >= BigInt::from(-3));
+            assert!(*coeff <= BigInt::from(3));
+        }
     }
 }
