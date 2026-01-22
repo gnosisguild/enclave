@@ -54,25 +54,25 @@ impl EnclaveEvmEvent {
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
-pub struct EvmInterfaceParams<P> {
+pub struct EvmReadInterfaceParams<P> {
     provider: EthProvider<P>,
     extractor: ExtractorFn<EnclaveEventData>,
     contract_address: Address,
     start_block: Option<u64>,
     processor: Recipient<EnclaveEvmEvent>,
     bus: BusHandle,
-    state: Persistable<EvmInterfaceState>,
+    state: Persistable<EvmReadInterfaceState>,
     rpc_url: String,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
-pub struct EvmInterfaceState {
+pub struct EvmReadInterfaceState {
     pub ids: HashSet<EventId>,
     pub last_block: Option<u64>,
 }
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
-pub struct EvmInterface<P> {
+pub struct EvmReadInterface<P> {
     /// The alloy provider
     provider: Option<EthProvider<P>>,
     /// The contract address
@@ -91,13 +91,13 @@ pub struct EvmInterface<P> {
     /// Event bus for error propagation only
     bus: BusHandle,
     /// The auto persistable state of the event reader
-    state: Persistable<EvmInterfaceState>, // XXX: would be best to avoid persistable state outside of domain
+    state: Persistable<EvmReadInterfaceState>, // XXX: would be best to avoid persistable state outside of domain
     /// The RPC URL for the provider
     rpc_url: String,
 }
 
-impl<P: Provider + Clone + 'static> EvmInterface<P> {
-    pub fn new(params: EvmInterfaceParams<P>) -> Self {
+impl<P: Provider + Clone + 'static> EvmReadInterface<P> {
+    pub fn new(params: EvmReadInterfaceParams<P>) -> Self {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         Self {
             contract_address: params.contract_address,
@@ -120,15 +120,15 @@ impl<P: Provider + Clone + 'static> EvmInterface<P> {
         start_block: Option<u64>,
         processor: &Recipient<EnclaveEvmEvent>,
         bus: &BusHandle,
-        repository: &Repository<EvmInterfaceState>,
+        repository: &Repository<EvmReadInterfaceState>,
         rpc_url: String,
     ) -> Result<Addr<Self>> {
         let sync_state = repository
             .clone()
-            .load_or_default(EvmInterfaceState::default())
+            .load_or_default(EvmReadInterfaceState::default())
             .await?;
 
-        let params = EvmInterfaceParams {
+        let params = EvmReadInterfaceParams {
             provider,
             extractor,
             contract_address: contract_address.parse()?,
@@ -139,7 +139,7 @@ impl<P: Provider + Clone + 'static> EvmInterface<P> {
             rpc_url,
         };
 
-        let addr = EvmInterface::new(params).start();
+        let addr = EvmReadInterface::new(params).start();
 
         processor.do_send(EnclaveEvmEvent::RegisterReader);
 
@@ -148,7 +148,7 @@ impl<P: Provider + Clone + 'static> EvmInterface<P> {
     }
 }
 
-impl<P: Provider + Clone + 'static> Actor for EvmInterface<P> {
+impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -196,7 +196,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmInterface<P> {
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
     contract_address: &Address,
-    reader_addr: Addr<EvmInterface<P>>,
+    reader_addr: Addr<EvmReadInterface<P>>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEventData>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
@@ -297,7 +297,7 @@ fn is_local_node(rpc_url: &str) -> bool {
     rpc_url.contains("localhost") || rpc_url.contains("127.0.0.1")
 }
 
-impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmInterface<P> {
+impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P> {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
@@ -311,7 +311,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmInterface<P> {
 
 // XXX: Sync should handle the tracking of the last block based on what has been stored in the
 // eventlog
-impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmInterface<P> {
+impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmReadInterface<P> {
     type Result = ();
 
     #[instrument(name = "evm_interface", skip_all)]

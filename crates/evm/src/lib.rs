@@ -21,7 +21,7 @@ pub use ciphernode_registry_sol::{
 pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
-pub use evm_interface::{EnclaveEvmEvent, EvmInterface, EvmInterfaceState, ExtractorFn};
+pub use evm_interface::{EnclaveEvmEvent, EvmReadInterface, EvmReadInterfaceState, ExtractorFn};
 pub use helpers::send_tx_with_retry;
 pub use historical_event_coordinator::{CoordinatorStart, HistoricalEventCoordinator};
 pub use repo::*;

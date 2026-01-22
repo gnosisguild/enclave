@@ -6,7 +6,7 @@
 
 use crate::{
     enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
-    evm_interface::EvmInterfaceState, helpers::EthProvider, EnclaveEvmEvent,
+    evm_interface::EvmReadInterfaceState, helpers::EthProvider, EnclaveEvmEvent,
 };
 use actix::Recipient;
 use alloy::providers::{Provider, WalletProvider};
@@ -23,7 +23,7 @@ impl EnclaveSol {
         read_provider: EthProvider<R>,
         write_provider: EthProvider<W>,
         contract_address: &str,
-        repository: &Repository<EvmInterfaceState>,
+        repository: &Repository<EvmReadInterfaceState>,
         start_block: Option<u64>,
         rpc_url: String,
     ) -> Result<()>

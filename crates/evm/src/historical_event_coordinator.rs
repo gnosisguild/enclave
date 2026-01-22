@@ -20,7 +20,7 @@ struct BufferedEvent {
 #[rtype(result = "()")]
 pub struct CoordinatorStart;
 
-/// Coordinates historical replay across all EvmInterfaces.
+/// Coordinates historical replay across all EvmReadInterfaces.
 /// Buffers historical events, then sorts + publishes once all readers finish.
 pub struct HistoricalEventCoordinator {
     /// Count of readers that have registered
