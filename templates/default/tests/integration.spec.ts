@@ -173,7 +173,7 @@ describe('Integration', () => {
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(100)
-    const duration = BigInt(15)
+    const duration = BigInt(30)
     const e3ProgramParams = encodeBfvParams()
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
