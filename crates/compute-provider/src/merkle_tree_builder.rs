@@ -36,7 +36,7 @@ impl MerkleTreeBuilder {
     }
 
     pub fn compute_leaf_hashes(&mut self, data: &[(Vec<u8>, u64)], params_bytes: &[u8]) {
-        let params = decode_bfv_params(params_bytes);
+        let params = decode_bfv_params(params_bytes).expect("Failed to decode BFV params");
         let degree = params.degree();
         let plaintext_modulus = params.plaintext();
         let moduli = params.moduli().to_vec();

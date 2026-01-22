@@ -16,7 +16,7 @@ import {
   encodeBfvParams,
   encodeComputeProviderParams,
   RegistryEventType,
-  FheProtocol,
+  BfvParamSetType,
 } from '@enclave-e3/sdk'
 import { hexToBytes } from 'viem'
 import assert from 'assert'
@@ -167,7 +167,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-    protocol: FheProtocol.BFV,
+    protocol: BfvParamSetType.THRESHOLD,
   })
 
   it('should run an integration test', async () => {

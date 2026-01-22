@@ -12,7 +12,7 @@ import initializeWasm from '@enclave-e3/wasm/init'
 import { CiphernodeRegistryOwnable__factory, Enclave__factory } from '@enclave-e3/contracts/types'
 import { ContractClient } from './contract-client'
 import { EventListener } from './event-listener'
-import { FheProtocol, EnclaveEventType } from './types'
+import { BfvParamSetType, EnclaveEventType } from './types'
 import { SDKError, isValidAddress } from './utils'
 
 import type {
@@ -47,7 +47,7 @@ export class EnclaveSDK {
   private eventListener: EventListener
   private contractClient: ContractClient
   private initialized = false
-  private protocol: FheProtocol
+  private protocol: BfvParamSetType
   private protocolParams?: ProtocolParams
   private publicClient: PublicClient
 
@@ -72,8 +72,8 @@ export class EnclaveSDK {
     this.eventListener = new EventListener(config.publicClient)
     this.contractClient = new ContractClient(config.publicClient, config.walletClient, config.contracts)
 
-    if (!Object.values(FheProtocol).includes(config.protocol)) {
-      throw new SDKError(`Invalid protocol: ${config.protocol}`, 'INVALID_PROTOCOL')
+    if (!Object.values(BfvParamSetType).includes(config.protocol)) {
+      throw new SDKError(`Invalid BFV parameter set type: ${config.protocol}`, 'INVALID_PARAM_SET_TYPE')
     }
 
     this.protocol = config.protocol
@@ -126,10 +126,10 @@ export class EnclaveSDK {
     }
 
     switch (this.protocol) {
-      case FheProtocol.BFV:
-        return await this.getBfvParamsSet('INSECURE_SET_2048_1032193_1')
-      case FheProtocol.TRBFV:
-        return await this.getBfvParamsSet('INSECURE_SET_512_10_1')
+      case BfvParamSetType.DKG:
+        return await this.getBfvParamsSet('INSECURE_DKG_512')
+      case BfvParamSetType.THRESHOLD:
+        return await this.getBfvParamsSet('INSECURE_THRESHOLD_BFV_512')
     }
   }
 
@@ -513,7 +513,7 @@ export class EnclaveSDK {
     }
     privateKey?: `0x${string}`
     chainId: keyof typeof EnclaveSDK.chains
-    protocol: FheProtocol
+    protocol: BfvParamSetType
     protocolParams?: ProtocolParams
   }): EnclaveSDK {
     const chain = EnclaveSDK.chains[options.chainId]

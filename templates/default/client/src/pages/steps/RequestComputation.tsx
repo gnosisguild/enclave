@@ -106,7 +106,8 @@ const RequestComputation: React.FC = () => {
       const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
       const startWindow = calculateStartWindow(60) // 1 minute
       const duration = BigInt(60) // 1 minute
-      const e3ProgramParams = encodeBfvParams()
+      const protocolParams = await sdk.getProtocolParams()
+      const e3ProgramParams = encodeBfvParams(protocolParams)
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
 
       console.log('requestE3')

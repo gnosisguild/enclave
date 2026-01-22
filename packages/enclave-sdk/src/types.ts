@@ -50,9 +50,11 @@ export interface SDKConfig {
   chainId?: number
 
   /**
-   * The protocol to use for the Enclave requests
+   * The BFV parameter set type to use for FHE operations.
+   * DKG: Parameters for Distributed Key Generation (PVSS phase)
+   * THRESHOLD: Parameters for threshold encryption/decryption operations
    */
-  protocol: FheProtocol
+  protocol: BfvParamSetType
 
   /**
    * The protocol parameters to use for the Enclave requests
@@ -262,17 +264,24 @@ export interface VerifiableEncryptionResult {
 }
 
 /**
- * The protocol to use for the Enclave requests
+ * BFV parameter set type for FHE operations.
+ * 
+ * The protocol is always FHE BFV, but different parameter sets are needed:
+ * - DKG: Used during Distributed Key Generation (PVSS phase 0-1) where each
+ *   ciphernode generates a standard BFV key-pair to encrypt secret shares.
+ * - THRESHOLD: Used for threshold encryption/decryption operations (PVSS phase 2-4)
+ *   where the threshold public key is used for encryption and T+1 parties
+ *   collaborate for decryption.
  */
-export enum FheProtocol {
+export enum BfvParamSetType {
   /**
-   * The BFV protocol
+   * DKG parameter set - for Distributed Key Generation phase
    */
-  BFV = 'BFV',
+  DKG = 'DKG',
   /**
-   * The TrBFV protocol
+   * Threshold parameter set - for threshold encryption/decryption operations
    */
-  TRBFV = 'TRBFV',
+  THRESHOLD = 'THRESHOLD',
 }
 
 /**
@@ -302,42 +311,19 @@ export interface ProtocolParams {
 }
 
 export type ProtocolParamsName =
-  | 'INSECURE_SET_2048_1032193_1'
-  | 'INSECURE_SET_512_10_1'
-  | 'INSECURE_SET_512_0XFFFFEE001_1'
-  | 'SET_8192_1000_4'
-  | 'SET_8192_144115188075855872_2'
+  | 'INSECURE_THRESHOLD_BFV_512'
+  | 'INSECURE_DKG_512'
+  | 'SECURE_THRESHOLD_BFV_8192'
+  | 'SECURE_DKG_8192'
 
 /**
- * Parameters for the BFV protocol
+ * Preset identifiers for BFV/TRBFV parameter selection.
+ * Use these with `EnclaveSDK.getBfvParamsSet()` to fetch the actual parameters.
  */
 export const BfvProtocolParams = {
-  /**
-   * Recommended parameters for BFV protocol
-   * - Degree: 2048
-   * - Plaintext modulus: 1032193
-   * - Moduli:0x3FFFFFFF000001
-   */
-  BFV_NORMAL: {
-    degree: 2048,
-    plaintextModulus: 1032193n,
-    moduli: [0x3fffffff000001n],
-    error1Variance: '10',
-  } as const satisfies ProtocolParams,
-
-  /**
-   * Recommended parameters for TrBFV protocol
-   * - Degree: 8192
-   * - Plaintext modulus: 1000
-   * - Moduli: [0x00800000022a0001, 0x00800000021a0001, 0x0080000002120001, 0x0080000001f60001]
-   */
-  BFV_THRESHOLD: {
-    degree: 8192,
-    plaintextModulus: 1000n,
-    moduli: [0x00800000022a0001n, 0x00800000021a0001n, 0x0080000002120001n, 0x0080000001f60001n],
-    error1Variance: '10',
-  } as const satisfies ProtocolParams,
-}
+  DKG: 'INSECURE_DKG_512',
+  THRESHOLD: 'INSECURE_THRESHOLD_BFV_512',
+} as const satisfies Record<string, ProtocolParamsName>
 
 /**
  * The result of encrypting a value and generating a proof

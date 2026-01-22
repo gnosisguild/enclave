@@ -51,7 +51,7 @@ impl Fhe {
     }
 
     pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
-        let params = decode_bfv_params_arc(bytes);
+        let params = decode_bfv_params_arc(bytes).expect("Failed to decode BFV params");
         let crp = create_crp(
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),

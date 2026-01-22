@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import express, { Request, Response } from 'express'
-import { EnclaveSDK, EnclaveEventType, type E3ActivatedData, FheProtocol } from '@enclave-e3/sdk'
+import { EnclaveSDK, EnclaveEventType, type E3ActivatedData, BfvParamSetType } from '@enclave-e3/sdk'
 import { Log, PublicClient } from 'viem'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
@@ -40,7 +40,7 @@ async function createPrivateSDK() {
       feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
     chainId: CHAIN_ID,
-    protocol: FheProtocol.BFV,
+    protocol: BfvParamSetType.THRESHOLD,
   })
 
   await sdk.initialize()

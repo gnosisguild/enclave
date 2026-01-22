@@ -8,7 +8,7 @@ use e3_bfv_helpers::{
     client::{
         bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
     },
-    BfvParamSet, BfvParamSets,
+    BfvParamSet, BfvPreset,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -173,7 +173,7 @@ pub fn bfv_verifiable_encrypt_vector(
 /// Retrieves a BFV parameter set by name.
 ///
 /// # Parameters
-/// * `name` - Parameter set identifier (e.g., "SET_8192_1000_4")
+/// * `name` - Parameter set identifier (e.g., "SECURE_THRESHOLD_BFV_8192")
 ///
 /// # Returns
 /// A JavaScript object with the following structure:
@@ -189,8 +189,8 @@ pub fn bfv_verifiable_encrypt_vector(
 /// # Errors
 /// Returns error if the parameter set name is invalid or serialization fails.
 pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
-    let params =
-        BfvParamSets::get_params_by_str(name).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let preset = BfvPreset::from_name(name).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let params: BfvParamSet = preset.into();
     let js_params = BfvParamSetJs::from(&params);
     let serializer =
         serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
@@ -204,10 +204,13 @@ pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
 ///
 /// # Returns
 /// Array of parameter set names that can be passed to `get_bfv_params()`.
-/// Includes both production-ready sets (e.g., "SET_8192_1000_4") and
+/// Includes both production-ready sets (e.g., "SECURE_THRESHOLD_BFV_8192") and
 /// insecure sets for testing (prefixed with "INSECURE_").
 pub fn get_bfv_params_list() -> Vec<String> {
-    BfvParamSets::get_params_list()
+    BfvPreset::list()
+        .into_iter()
+        .map(|name| name.to_string())
+        .collect()
 }
 
 #[derive(Serialize, Deserialize)]

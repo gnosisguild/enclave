@@ -6,14 +6,12 @@
 
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use e3_sdk::bfv_helpers::build_bfv_params_from_set_arc;
-use e3_sdk::bfv_helpers::decode_bfv_params;
-use e3_sdk::bfv_helpers::BfvParamSets;
+use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, decode_bfv_params_arc, BfvPreset};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{fs, sync::Arc};
+use std::fs;
 
 #[derive(Debug, Clone)]
 struct HexBytes(pub Vec<u8>);
@@ -53,9 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Loading public key from {}", args.input);
     let bytes = fs::read(&args.input)?;
     let params = if let Some(params_bytes) = args.params {
-        Arc::new(decode_bfv_params(&params_bytes.0))
+        decode_bfv_params_arc(&params_bytes.0).expect("Failed to decode BFV params")
     } else {
-        build_bfv_params_from_set_arc(BfvParamSets::InsecureSet2048_1032193_1.into())
+        build_bfv_params_from_set_arc(BfvPreset::InsecureThresholdBfv512.into())
     };
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
     let raw_plaintext = args.plaintext;

@@ -32,7 +32,7 @@ impl TrBFVConfig {
     }
 
     pub fn params(&self) -> Arc<BfvParameters> {
-        decode_bfv_params_arc(&self.params)
+        decode_bfv_params_arc(&self.params).expect("Failed to decode BFV params")
     }
 
     pub fn num_parties(&self) -> u64 {

@@ -14,6 +14,7 @@ members = [
   "crates/evm", 
   "crates/evm-helpers",
   "crates/fhe",
+  "crates/fhe-params",
   "crates/fs", 
   "crates/indexer",
   "crates/init", 
@@ -78,6 +79,7 @@ e3-events = { version = "0.1.7", path = "./crates/events" }
 e3-evm = { version = "0.1.7", path = "./crates/evm" }
 e3-evm-helpers = { version = "0.1.7", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.1.7", path = "./crates/fhe" }
+e3-fhe-params = { version = "0.1.7", path = "./crates/fhe-params" }
 e3-fs = { version = "0.1.7", path = "./crates/fs" }
 e3-indexer = { version = "0.1.7", path = "./crates/indexer" }
 e3-multithread = { version = "0.1.7", path = "./crates/multithread" }

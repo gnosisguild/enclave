@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { FheProtocol } from '@enclave-e3/sdk'
+import { BfvParamSetType } from '@enclave-e3/sdk'
 import { getContractAddresses } from './env-config'
 
 /**
@@ -19,6 +19,6 @@ export function getEnclaveSDKConfig() {
       ciphernodeRegistry: contracts.ciphernodeRegistry,
       feeToken: contracts.feeToken,
     },
-    protocol: FheProtocol.BFV,
+    protocol: BfvParamSetType.DKG,
   }
 }

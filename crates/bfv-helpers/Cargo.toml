@@ -7,9 +7,8 @@ description = "E3 - Enclave BFV Helpers"
 repository = "https://github.com/gnosisguild/enclave/crates/bfv-helpers"
 
 [dependencies]
-alloy-dyn-abi = { workspace = true }
-alloy-primitives = { workspace = true }
 anyhow.workspace = true
+e3-fhe-params = { workspace = true, features = ["abi-encoding"] }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits.workspace = true
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
