@@ -81,7 +81,7 @@ Run benchmarks:
 cargo bench
 ```
 
-### Quick Start
+### Quick Start
 
 ```rust
 use polynomial::Polynomial;
