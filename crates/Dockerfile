@@ -64,6 +64,7 @@ COPY crates/logger/Cargo.toml ./logger/Cargo.toml
 COPY crates/multithread/Cargo.toml ./multithread/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
 COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
+COPY crates/polynomial/benches ./polynomial/benches
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
