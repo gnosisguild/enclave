@@ -837,8 +837,8 @@ mod tests {
         // n = cyclo.len() - 1 = 3 - 1 = 2, so output length is 2
         assert_eq!(reduced.coefficients().len(), 2);
         // The remainder is 2x = [2, 0], right-aligned to length 2 gives [2, 0]
-        assert_eq!(reduced.coefficients()[0], BigInt::from(2));
-        assert_eq!(reduced.coefficients()[1], BigInt::from(0));
+        assert_eq!(reduced.coefficients()[0].clone(), BigInt::from(2));
+        assert_eq!(reduced.coefficients()[1].clone(), BigInt::from(0));
     }
 
     #[test]
