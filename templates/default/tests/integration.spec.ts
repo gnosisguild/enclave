@@ -176,7 +176,8 @@ describe('Integration', () => {
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(130)
     const duration = BigInt(20)
-    const e3ProgramParams = encodeBfvParams()
+    const protocolParams = await sdk.getProtocolParams()
+    const e3ProgramParams = encodeBfvParams(protocolParams)
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
       true, // Mock the compute provider parameters, return 32 bytes of 0x00
