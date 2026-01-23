@@ -121,7 +121,7 @@ export type GrecoParams = {
 /**
  * The inputs required for the CRISP circuit.
  */
-export type CircuitInputs = {
+export type CRISPCircuitInputs = {
   // Ciphertext Addition Section.
   prev_ct0is: Polynomial[]
   prev_ct1is: Polynomial[]
@@ -131,22 +131,15 @@ export type CircuitInputs = {
   sum_r0is: Polynomial[]
   sum_r1is: Polynomial[]
   // Greco Section.
-  params: GrecoParams
-  pk_commitment: string
+  greco_verification_key: string[]
+  greco_key_hash: string
+  greco_proof: string[]
   ct0is: Polynomial[]
   ct1is: Polynomial[]
-  pk0is: Polynomial[]
-  pk1is: Polynomial[]
-  r1is: Polynomial[]
-  r2is: Polynomial[]
-  p1is: Polynomial[]
-  p2is: Polynomial[]
-  u: Polynomial
-  e0: Polynomial
-  e0is: Polynomial[]
-  e0_quotients: Polynomial[]
-  e1: Polynomial
   k1: Polynomial
+  pk_commitment: string
+  k1_commitment: string
+  ct_commitment: string
   // ECDSA Section.
   public_key_x: string[]
   public_key_y: string[]
@@ -165,6 +158,27 @@ export type CircuitInputs = {
   is_first_vote: boolean
   // Whether this is a mask vote.
   is_mask_vote: boolean
+}
+
+/*
+ * The inputs required for the GRECO circuit.
+ */
+export type GrecoCircuitInputs = {
+  pk_commitment: string
+  ct0is: Polynomial[]
+  ct1is: Polynomial[]
+  pk0is: Polynomial[]
+  pk1is: Polynomial[]
+  r1is: Polynomial[]
+  r2is: Polynomial[]
+  p1is: Polynomial[]
+  p2is: Polynomial[]
+  u: Polynomial
+  e0: Polynomial
+  e0is: Polynomial[]
+  e0_quotients: Polynomial[]
+  e1: Polynomial
+  k1: Polynomial
 }
 
 export type ProofData = {

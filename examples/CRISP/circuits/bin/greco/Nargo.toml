@@ -1,0 +1,10 @@
+[package]
+name = "crisp_greco"
+type = "bin"
+version = "0.1.0"
+authors = ["Gnosis Guild / Enclave"]
+license = "MIT"
+
+[dependencies]
+pvss_lib = { path = "../../../../../circuits/lib" }
+crisp_lib = { path = "../../lib" }

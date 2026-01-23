@@ -4,24 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use commitments::compute_ct_commitment;
-use lib::configs::insecure::trbfv::{
-    GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
-    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N, Q_MOD_T_MOD_P,
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
+use crisp_lib::ciphertext_addition::CiphertextAddition;
+use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
+use crisp_lib::ecdsa::{address_to_field, derive_address, validate_signature};
+use crisp_lib::merkle_tree::get_merkle_root;
+use crisp_lib::utils::{check_coefficient_values_with_balance, check_coefficient_zero};
+use pvss_lib::configs::insecure::trbfv::{
+    GRECO_BIT_CT, GRECO_BIT_K, GRECO_CONFIGS, L, N, Q_MOD_T_MOD_P,
 };
-use lib::core::greco::Greco;
-use lib::math::polynomial::Polynomial;
-
-mod commitments;
-mod constants;
-mod ciphertext_addition;
-use ciphertext_addition::CiphertextAddition;
-mod ecdsa;
-use ecdsa::{address_to_field, derive_address, validate_signature};
-mod merkle_tree;
-use merkle_tree::get_merkle_root;
-mod utils;
-use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
+use pvss_lib::math::polynomial::Polynomial;
 
 /// Main circuit function for CRISP vote verification.
 ///
@@ -59,21 +51,15 @@ fn main(
     sum_r0is: [Polynomial<N>; L],
     sum_r1is: [Polynomial<N>; L],
     // Greco Section.
-    pk_commitment: pub Field,
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
+    greco_verification_key: UltraHonkVerificationKey,
+    greco_key_hash: Field,
+    greco_proof: UltraHonkProof,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
-    u: Polynomial<N>,
-    e0: Polynomial<N>,
-    e0is: [Polynomial<N>; L],
-    e0_quotients: [Polynomial<N>; L],
-    e1: Polynomial<N>,
     k1: Polynomial<N>,
-    r1is: [Polynomial<(2 * N) - 1>; L],
-    r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<(2 * N) - 1>; L],
-    p2is: [Polynomial<N - 1>; L],
+    pk_commitment: pub Field,
+    k1_commitment: pub Field,
+    ct_commitment: pub Field,
     // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
@@ -115,33 +101,32 @@ fn main(
     // ============================================================================
     // STEP 2: BFV Encryption Verification (GRECO)
     // ============================================================================
-    // Verify that the ciphertext (ct0is, ct1is) is a valid encryption of the
-    // plaintext k1 under the public key (pk0is, pk1is). This ensures the ciphertext
-    // is correctly formed.
+    // Verify that the ciphertext (ct0is, ct1is) is a valid BFV encryption of the
+    // plaintext k1 under the public key represented by pk_commitment. This ensures
+    // the ciphertext is correctly formed and maintains the encryption relationship.
+    //
+    // The verification uses a recursive zero-knowledge proof (GRECO) to prove the encryption
+    // relationship without revealing the underlying values. The recursive proof demonstrates:
+    // - The ciphertext (ct0is, ct1is) correctly encrypts plaintext k1
+    // - The encryption uses the public key committed to in pk_commitment
+    // - The verification key hash matches the expected greco_key_hash
+    //
+    // After verifying the proof, we check that the provided commitments match the
+    // actual computed commitments to ensure consistency:
+    // - k1_commitment must match the commitment computed from k1
+    // - ct_commitment must match the commitment computed from (ct0is, ct1is)
     //
     // This check applies to BOTH cases:
     // - For actual votes: verifies the vote ciphertext is correctly formed
     // - For mask votes: verifies the zero vote ciphertext is correctly formed
-    let greco: Greco<N, L, GRECO_BIT_PK, GRECO_BIT_CT, GRECO_BIT_U, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_P1, GRECO_BIT_P2> = Greco::new(
-        GRECO_CONFIGS,
-        pk_commitment,
-        pk0is,
-        pk1is,
-        ct0is,
-        ct1is,
-        u,
-        e0,
-        e0is,
-        e0_quotients,
-        e1,
-        k1,
-        r1is,
-        r2is,
-        p1is,
-        p2is,
+    verify_ultrahonk_proof(
+        greco_verification_key,
+        greco_proof,
+        [pk_commitment, k1_commitment, ct_commitment],
+        greco_key_hash,
     );
-
-    assert(greco.verify());
+    assert(k1_commitment == compute_k1_commitment::<N, GRECO_BIT_K>(k1));
+    assert(ct_commitment == compute_ct_commitment::<N, L, GRECO_BIT_CT>(ct0is, ct1is));
 
     // ============================================================================
     // STEP 3: Vote Type Detection and Return Logic
