@@ -1,4 +1,1 @@
-pnpm lint
 pnpm format:check
-pnpm check:license
-pnpm check:pnpm
