@@ -25,10 +25,8 @@
 //! - Homomorphic encryption: BFV, BGV, and CKKS schemes.
 //! - Zero-knowledge proofs: Polynomial commitment schemes.
 
-pub mod errors;
 pub mod polynomial;
 pub mod utils;
 
-pub use errors::PolynomialError;
-pub use polynomial::Polynomial;
+pub use polynomial::{Polynomial, PolynomialError};
 pub use utils::*;

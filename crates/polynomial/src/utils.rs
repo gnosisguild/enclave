@@ -6,7 +6,7 @@
 
 //! Utility functions for polynomial operations.
 
-use crate::errors::PolynomialError;
+use crate::polynomial::PolynomialError;
 use crate::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -548,7 +548,7 @@ mod tests {
         let result = reduce_in_ring(&mut coeffs, &cyclo_zero, &modulus);
         assert!(matches!(
             result,
-            Err(crate::errors::PolynomialError::DivisionByZero)
+            Err(PolynomialError::DivisionByZero)
         ));
 
         // Test with invalid cyclotomic (zero leading coefficient)
@@ -558,7 +558,7 @@ mod tests {
         let result2 = reduce_in_ring(&mut coeffs2, &cyclo_invalid, &modulus);
         assert!(matches!(
             result2,
-            Err(crate::errors::PolynomialError::InvalidPolynomial { .. })
+            Err(PolynomialError::InvalidPolynomial { .. })
         ));
     }
 
