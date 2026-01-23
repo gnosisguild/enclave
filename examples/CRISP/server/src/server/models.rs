@@ -205,7 +205,7 @@ pub struct E3 {
     // Timing-related
     pub start_time: u64,
     pub block_start: u64,
-    pub input_deafline: u64,
+    pub input_deadline: u64,
     pub duration: u64,
     pub expiration: u64,
 
