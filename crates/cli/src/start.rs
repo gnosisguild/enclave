@@ -11,11 +11,7 @@ use e3_entrypoint::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
-pub async fn execute(
-    mut config: AppConfig,
-    peers: Vec<String>,
-    experimental_trbfv: bool,
-) -> Result<()> {
+pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
 
     let Some(address) = config.address() else {
@@ -36,15 +32,12 @@ pub async fn execute(
                 address,
                 pubkey_write_path,
                 plaintext_write_path,
-                experimental_trbfv,
             )
             .await?
         }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => {
-            e3_entrypoint::start::start::execute(&config, address, experimental_trbfv).await?
-        }
+        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config, address).await?,
     };
 
     info!(

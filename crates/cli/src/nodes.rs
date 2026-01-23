@@ -78,33 +78,15 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
     otel: Option<String>,
-    experimental_trbfv: bool,
 ) -> Result<()> {
     match command {
         NodeCommands::Up { detach, exclude } => {
-            nodes_up::execute(
-                config,
-                detach,
-                exclude,
-                verbose,
-                config_string,
-                otel,
-                experimental_trbfv,
-            )
-            .await?
+            nodes_up::execute(config, detach, exclude, verbose, config_string, otel).await?
         }
         NodeCommands::Down => nodes_down::execute().await?,
         NodeCommands::Ps => nodes_ps::execute().await?,
         NodeCommands::Daemon { exclude } => {
-            nodes_daemon::execute(
-                config,
-                exclude,
-                verbose,
-                config_string,
-                otel,
-                experimental_trbfv,
-            )
-            .await?
+            nodes_daemon::execute(config, exclude, verbose, config_string, otel).await?
         }
         NodeCommands::Start { id } => nodes_start::execute(&id).await?,
         NodeCommands::Status { id } => nodes_status::execute(&id).await?,

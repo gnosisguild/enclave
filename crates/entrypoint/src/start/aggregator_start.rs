@@ -26,11 +26,10 @@ pub async fn execute(
     address: Address,
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
-    experimental_trbfv: bool,
 ) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
-    let mut builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
+    let builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_chains(&config.chains())
@@ -39,13 +38,8 @@ pub async fn execute(
         .with_contract_bonding_registry()
         .with_contract_ciphernode_registry()
         .with_max_threads()
-        .with_pubkey_aggregation();
-
-    if experimental_trbfv {
-        builder = builder.with_threshold_plaintext_aggregation();
-    } else {
-        builder = builder.with_plaintext_aggregation()
-    }
+        .with_pubkey_aggregation()
+        .with_threshold_plaintext_aggregation();
 
     // TODO: put net package provisioning in the ciphernode-builder:
     let node = builder.build().await?;
@@ -58,7 +52,6 @@ pub async fn execute(
         &cipher,
         config.quic_port(),
         repositories.libp2p_keypair(),
-        experimental_trbfv,
     )
     .await?;
 

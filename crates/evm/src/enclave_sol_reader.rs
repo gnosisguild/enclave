@@ -12,11 +12,13 @@ use alloy::primitives::{LogData, B256};
 use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
+use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_data::Repository;
 use e3_events::{BusHandle, E3id, EnclaveEventData};
+use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::utility_types::ArcBytes;
 use num_bigint::BigUint;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 sol!(
     #[sol(rpc)]
@@ -28,17 +30,46 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
+        let params_bytes = value.0.e3.e3ProgramParams.to_vec();
+        let threshold_m = value.0.e3.threshold[0] as usize;
+        let threshold_n = value.0.e3.threshold[1] as usize;
+        let params_arc = decode_bfv_params_arc(&params_bytes);
+
+        // TODO: These should be delivered from the e3_program contract
+        // For now, using defaults that match the test configuration:
+        // - lambda = 2 (INSECURE, for testing only. Production should use lambda = 80)
+        // - esi_per_ct = 3 (number of ciphertexts per encryption slot)
+        let lambda = 2;
+        let esi_per_ct = 3;
+
+        let error_size = match calculate_error_size(params_arc, threshold_n, threshold_m, lambda) {
+            Ok(size) => {
+                let size_bytes = size.to_bytes_be();
+                info!(
+                    "Calculated error_size for E3 (threshold_n={}, threshold_m={}, lambda={}): {} bytes",
+                    threshold_n, threshold_m, lambda, size_bytes.len()
+                );
+                ArcBytes::from_bytes(&size_bytes)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to calculate error_size, using fallback: {}. \
+                    This may cause decryption failures!",
+                    e
+                );
+                ArcBytes::from_bytes(
+                    &BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
+                )
+            }
+        };
+
         e3_events::E3Requested {
-            params: ArcBytes::from_bytes(&value.0.e3.e3ProgramParams.to_vec()),
-            threshold_m: value.0.e3.threshold[0] as usize,
-            threshold_n: value.0.e3.threshold[1] as usize,
+            params: ArcBytes::from_bytes(&params_bytes),
+            threshold_m,
+            threshold_n,
             seed: value.0.e3.seed.into(),
-            // TODO: this should be delivered from the e3_program. Here we provide a sensible
-            // default that passes our tests
-            error_size: ArcBytes::from_bytes(
-                &BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
-            ),
-            esi_per_ct: 3, // TODO: this should be delivered from the e3_program
+            error_size,
+            esi_per_ct,
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
         }
     }
