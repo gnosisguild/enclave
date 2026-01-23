@@ -112,7 +112,11 @@ pub fn reduce_and_center_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
 ///
 /// The reduced scalar value in the range [0, modulus)
 pub fn reduce_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
-    (x + modulus) % modulus
+    let mut r = x % modulus;
+    if r < BigInt::zero() {
+        r += modulus;
+    }
+    r
 }
 
 /// Reduces a polynomial's coefficients within a polynomial ring defined by a cyclotomic polynomial and a modulus.
@@ -150,8 +154,8 @@ pub fn reduce_in_ring(
 /// Reduces each element in the given slice of `BigInt` by the modulus `p`.
 ///
 /// This function takes a slice of `BigInt` coefficients and applies the modulus operation
-/// on each element. It ensures the result is within the range `[0, p-1]` by adding `p`
-/// before applying the modulus operation. The result is collected into a new `Vec<BigInt>`.
+/// on each element. It ensures the result is within the range `[0, p-1]` by computing
+/// `r = coeff % p` and adding `p` if `r` is negative. The result is collected into a new `Vec<BigInt>`.
 ///
 /// # Arguments
 ///
@@ -162,7 +166,16 @@ pub fn reduce_in_ring(
 ///
 /// A `Vec<BigInt>` where each element is reduced modulo `p`.
 pub fn reduce_coefficients(coefficients: &[BigInt], p: &BigInt) -> Vec<BigInt> {
-    coefficients.iter().map(|coeff| (coeff + p) % p).collect()
+    coefficients
+        .iter()
+        .map(|coeff| {
+            let mut r = coeff % p;
+            if r < BigInt::zero() {
+                r += p;
+            }
+            r
+        })
+        .collect()
 }
 
 /// Reduces coefficients in a 2D matrix.
@@ -204,21 +217,21 @@ pub fn reduce_coefficients_3d(
 
 /// Mutably reduces each element in the given slice of `BigInt` by the modulus `p`.
 ///
-/// This function modifies the given mutable slice of `BigInt` coefficients in place. It adds `p`
-/// to each element before applying the modulus operation, ensuring the results are within the range `[0, p-1]`.
+/// This function modifies the given mutable slice of `BigInt` coefficients in place. It computes
+/// `r = coeff % p` for each element, then adds `p` if `r` is negative, ensuring the results are
+/// within the range `[0, p-1]`.
 ///
 /// # Arguments
 ///
 /// * `coefficients` - A mutable slice of `BigInt` representing the coefficients to be reduced.
 /// * `p` - A reference to a `BigInt` that represents the modulus value.
-///
-/// # Returns
-///
-/// A new `Vec<BigInt>` with reduced coefficients.
 pub fn reduce_coefficients_mut(coefficients: &mut [BigInt], p: &BigInt) {
     for coeff in coefficients.iter_mut() {
-        *coeff += p;
-        *coeff %= p;
+        let mut r = &*coeff % p;
+        if r < BigInt::zero() {
+            r += p;
+        }
+        *coeff = r;
     }
 }
 
@@ -351,6 +364,59 @@ mod tests {
     }
 
     #[test]
+    fn test_reduce_coefficients_less_than_neg_modulus() {
+        let modulus = BigInt::from(7);
+
+        // Test with values < -p (the bug fix case)
+        let coeffs = vec![
+            BigInt::from(-10), // -10 % 7 = -3, -3 + 7 = 4
+            BigInt::from(-14), // -14 % 7 = 0
+            BigInt::from(-15), // -15 % 7 = -1, -1 + 7 = 6
+            BigInt::from(-21), // -21 % 7 = 0
+        ];
+        let result = reduce_coefficients(&coeffs, &modulus);
+        assert_eq!(
+            result,
+            vec![
+                BigInt::from(4),
+                BigInt::from(0),
+                BigInt::from(6),
+                BigInt::from(0)
+            ]
+        );
+
+        // Test mixed positive and negative values
+        let coeffs2 = vec![
+            BigInt::from(-50),
+            BigInt::from(-7),
+            BigInt::from(-1),
+            BigInt::from(0),
+            BigInt::from(1),
+            BigInt::from(7),
+            BigInt::from(50),
+        ];
+        let result2 = reduce_coefficients(&coeffs2, &modulus);
+        assert_eq!(
+            result2,
+            vec![
+                BigInt::from(6), // -50 % 7 = -1, -1 + 7 = 6
+                BigInt::from(0), // -7 % 7 = 0
+                BigInt::from(6), // -1 % 7 = -1, -1 + 7 = 6
+                BigInt::from(0),
+                BigInt::from(1),
+                BigInt::from(0), // 7 % 7 = 0
+                BigInt::from(1), // 50 % 7 = 1
+            ]
+        );
+
+        // Verify all results are in [0, modulus)
+        for r in &result2 {
+            assert!(*r >= BigInt::from(0), "Result {} should be >= 0", r);
+            assert!(*r < modulus, "Result {} should be < {}", r, modulus);
+        }
+    }
+
+    #[test]
     fn test_range_check_centered() {
         let vec = vec![BigInt::from(-2), BigInt::from(0), BigInt::from(2)];
         let lower = BigInt::from(-3);
@@ -386,6 +452,57 @@ mod tests {
         let modulus = BigInt::from(7);
         let result = reduce_scalar(&x, &modulus);
         assert_eq!(result, BigInt::from(4));
+    }
+
+    #[test]
+    fn test_reduce_scalar_less_than_neg_modulus() {
+        let modulus = BigInt::from(7);
+
+        // Test value < -p (the bug fix case)
+        assert_eq!(reduce_scalar(&BigInt::from(-10), &modulus), BigInt::from(4)); // -10 % 7 = -3, -3 + 7 = 4
+        assert_eq!(reduce_scalar(&BigInt::from(-14), &modulus), BigInt::from(0)); // -14 % 7 = 0
+        assert_eq!(reduce_scalar(&BigInt::from(-15), &modulus), BigInt::from(6)); // -15 % 7 = -1, -1 + 7 = 6
+        assert_eq!(reduce_scalar(&BigInt::from(-21), &modulus), BigInt::from(0)); // -21 % 7 = 0
+
+        // Test exactly -p
+        assert_eq!(reduce_scalar(&BigInt::from(-7), &modulus), BigInt::from(0));
+
+        // Test values in [-p, 0)
+        assert_eq!(reduce_scalar(&BigInt::from(-6), &modulus), BigInt::from(1)); // -6 % 7 = -6, -6 + 7 = 1
+        assert_eq!(reduce_scalar(&BigInt::from(-1), &modulus), BigInt::from(6)); // -1 % 7 = -1, -1 + 7 = 6
+
+        // Test positive values
+        assert_eq!(reduce_scalar(&BigInt::from(0), &modulus), BigInt::from(0));
+        assert_eq!(reduce_scalar(&BigInt::from(3), &modulus), BigInt::from(3));
+        assert_eq!(reduce_scalar(&BigInt::from(7), &modulus), BigInt::from(0));
+        assert_eq!(reduce_scalar(&BigInt::from(10), &modulus), BigInt::from(3));
+
+        // Verify all results are in [0, modulus)
+        let test_values = vec![
+            BigInt::from(-100),
+            BigInt::from(-50),
+            BigInt::from(-7),
+            BigInt::from(-1),
+            BigInt::from(0),
+            BigInt::from(1),
+            BigInt::from(7),
+            BigInt::from(50),
+            BigInt::from(100),
+        ];
+        for val in test_values {
+            let result = reduce_scalar(&val, &modulus);
+            assert!(
+                result >= BigInt::from(0),
+                "Result {} should be >= 0",
+                result
+            );
+            assert!(
+                result < modulus,
+                "Result {} should be < {}",
+                result,
+                modulus
+            );
+        }
     }
 
     #[test]
@@ -462,5 +579,65 @@ mod tests {
             assert!(*coeff >= BigInt::from(-3));
             assert!(*coeff <= BigInt::from(3));
         }
+    }
+
+    #[test]
+    fn test_reduce_coefficients_mut() {
+        let modulus = BigInt::from(7);
+
+        // Test with values < -p (the bug fix case)
+        let mut coeffs = vec![
+            BigInt::from(-10), // -10 % 7 = -3, -3 + 7 = 4
+            BigInt::from(-14), // -14 % 7 = 0
+            BigInt::from(-15), // -15 % 7 = -1, -1 + 7 = 6
+            BigInt::from(-21), // -21 % 7 = 0
+        ];
+        reduce_coefficients_mut(&mut coeffs, &modulus);
+        assert_eq!(
+            coeffs,
+            vec![
+                BigInt::from(4),
+                BigInt::from(0),
+                BigInt::from(6),
+                BigInt::from(0)
+            ]
+        );
+
+        // Test mixed positive and negative values
+        let mut coeffs2 = vec![
+            BigInt::from(-50),
+            BigInt::from(-7),
+            BigInt::from(-1),
+            BigInt::from(0),
+            BigInt::from(1),
+            BigInt::from(7),
+            BigInt::from(50),
+        ];
+        reduce_coefficients_mut(&mut coeffs2, &modulus);
+        assert_eq!(
+            coeffs2,
+            vec![
+                BigInt::from(6), // -50 % 7 = -1, -1 + 7 = 6
+                BigInt::from(0), // -7 % 7 = 0
+                BigInt::from(6), // -1 % 7 = -1, -1 + 7 = 6
+                BigInt::from(0),
+                BigInt::from(1),
+                BigInt::from(0), // 7 % 7 = 0
+                BigInt::from(1), // 50 % 7 = 1
+            ]
+        );
+
+        // Verify all results are in [0, modulus)
+        for r in &coeffs2 {
+            assert!(*r >= BigInt::from(0), "Result {} should be >= 0", r);
+            assert!(*r < modulus, "Result {} should be < {}", r, modulus);
+        }
+
+        // Test that it modifies in place
+        let mut coeffs3 = vec![BigInt::from(-3)];
+        let original_ptr = coeffs3.as_ptr();
+        reduce_coefficients_mut(&mut coeffs3, &modulus);
+        assert_eq!(coeffs3[0], BigInt::from(4));
+        assert_eq!(coeffs3.as_ptr(), original_ptr); // Same memory location
     }
 }
