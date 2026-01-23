@@ -73,6 +73,7 @@
     "eslint": "^9.39.1",
     "glob": "^11.0.3",
     "husky": "^9.1.7",
+    "lint-staged": "^15.2.0",
     "prettier": "^3.1.1",
     "prettier-plugin-solidity": "^1.2.0",
     "prettier-plugin-tailwindcss": "^0.6.9",
@@ -88,5 +89,10 @@
       "undici-types": "6.19.8",
       "viem": "2.38.6"
     }
+  },
+  "lint-staged": {
+    "*.{js,jsx,mjs,cjs,json,md,mdx,ts,tsx,yml,yaml,css,sol}": [
+      "prettier --write"
+    ]
   }
 }

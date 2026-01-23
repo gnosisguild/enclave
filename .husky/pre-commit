@@ -1,1 +1,1 @@
-pnpm format:check
+pnpm lint-staged
