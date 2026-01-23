@@ -13,9 +13,9 @@ import {
   verifyProof,
   encodeVote,
   generateCircuitInputs,
-  executeCircuit,
   computeCiphertextCommitment,
   encryptVote,
+  executeCrispCircuit,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
@@ -162,7 +162,7 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, address, leaves)
 
-      const { crispInputs } = await generateCircuitInputs({
+      const { circuitInputs: crispInputs } = await generateCircuitInputs({
         vote,
         publicKey,
         signature,
@@ -173,7 +173,7 @@ describe('Vote', () => {
         isMaskVote: false,
       })
 
-      const { returnValue } = await executeCircuit(crispInputs)
+      const { returnValue } = await executeCrispCircuit(crispInputs)
       const commitment = computeCiphertextCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
       expect(returnValue).toEqual(commitment)
@@ -185,7 +185,7 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, SLOT_ADDRESS, leaves)
 
-      const { crispInputs } = await generateCircuitInputs({
+      const { circuitInputs: crispInputs } = await generateCircuitInputs({
         publicKey,
         balance,
         slotAddress: SLOT_ADDRESS,
@@ -197,7 +197,7 @@ describe('Vote', () => {
         isMaskVote: true,
       })
 
-      const { returnValue } = await executeCircuit(crispInputs)
+      const { returnValue } = await executeCrispCircuit(crispInputs)
       const commitment = computeCiphertextCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
 
       expect(returnValue).toEqual(commitment)
@@ -209,7 +209,7 @@ describe('Vote', () => {
       // Using generateCircuitInputs directly to check the output of the circuit.
       const merkleProof = generateMerkleProof(balance, SLOT_ADDRESS, leaves)
 
-      const { crispInputs } = await generateCircuitInputs({
+      const { circuitInputs: crispInputs } = await generateCircuitInputs({
         vote: zeroVote,
         publicKey,
         signature: MASK_SIGNATURE,
@@ -220,7 +220,7 @@ describe('Vote', () => {
         isMaskVote: true,
       })
 
-      const { returnValue } = await executeCircuit(crispInputs)
+      const { returnValue } = await executeCrispCircuit(crispInputs)
       const commitment = computeCiphertextCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
       expect(returnValue).toEqual(commitment)
