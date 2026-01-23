@@ -8,6 +8,7 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
+use crate::commitments::compute_commitment;
 use crisp_constants::get_default_paramset;
 use e3_sdk::bfv_helpers::build_bfv_params_arc;
 use e3_sdk::bfv_helpers::BfvParamSet;
@@ -23,13 +24,12 @@ use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use rand::thread_rng;
-use shared::commitments::compute_poly_commitment;
 use std::sync::Arc;
 mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
-
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
+mod commitments;
 
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
@@ -123,15 +123,9 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
-            &pt,
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            &self.bfv_params,
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let ciphertext_addition_inputs =
+            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, self.bfv_params.clone())
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
@@ -205,15 +199,9 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
-            &pt,
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            &self.bfv_params,
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let mut ciphertext_addition_inputs =
+            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, self.bfv_params.clone())
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // For first votes, set prev_ct_commitment to 0 since there's no previous ciphertext
         ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
@@ -267,6 +255,11 @@ impl ZKInputsGenerator {
         Ok(pk.to_bytes())
     }
 
+    /// Returns a clone of the BFV parameters used by this generator.
+    pub fn get_bfv_params(&self) -> Arc<BfvParameters> {
+        self.bfv_params.clone()
+    }
+
     /// Computes the commitment to a set of ciphertext polynomials.
     ///
     /// # Arguments
@@ -280,15 +273,7 @@ impl ZKInputsGenerator {
         ct0is: &[Vec<BigInt>],
         ct1is: &[Vec<BigInt>],
     ) -> Result<BigInt> {
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-        let bit = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        Ok(compute_poly_commitment(ct0is, ct1is, bit))
-    }
-
-    /// Returns a clone of the BFV parameters used by this generator.
-    pub fn get_bfv_params(&self) -> Arc<BfvParameters> {
-        self.bfv_params.clone()
+        compute_commitment(self.bfv_params.clone(), ct0is, ct1is)
     }
 }
 
