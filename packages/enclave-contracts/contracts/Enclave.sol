@@ -197,6 +197,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param expiration The expiration timestamp of the E3
     error CommitteeDutiesCompleted(uint256 e3Id, uint256 expiration);
 
+    /// @notice The input deadline has not yet been reached
+    /// @param e3Id The ID of the E3
+    /// @param inputDeadline The input deadline timestamp of the E3
+    error InputDeadlineNotReached(uint256 e3Id, uint256 inputDeadline);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                       Modifiers                        //
@@ -398,6 +403,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.expiration >= block.timestamp,
             CommitteeDutiesCompleted(e3Id, e3.expiration)
         );
+        // The program need to have stopped accepting inputs
+        require(block.timestamp >= e3.inputDeadline, InputDeadlineNotReached(e3Id, e3.inputDeadline));
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
         require(

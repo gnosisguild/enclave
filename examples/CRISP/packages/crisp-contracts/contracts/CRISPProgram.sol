@@ -43,7 +43,7 @@ contract CRISPProgram is IE3Program, Ownable {
   // Errors
   error CallerNotAuthorized();
   error E3AlreadyInitialized();
-  error E3DoesNotExist();
+  error E3Expired();
   error EnclaveAddressZero();
   error Risc0VerifierAddressZero();
   error InvalidHonkVerifier();
@@ -55,6 +55,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error SlotIsEmpty();
   error MerkleRootNotSet();
   error InputDeadlinePassed(uint256 e3Id, uint256 deadline);
+  error E3DoesNotExist();
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -128,7 +129,7 @@ contract CRISPProgram is IE3Program, Ownable {
     }
 
     if (block.timestamp > e3.expiration) {
-      revert E3DoesNotExist();
+      revert E3Expired();
     }
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
