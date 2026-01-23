@@ -11,6 +11,7 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
+import E3RefundManagerModule from "../ignition/modules/e3RefundManager";
 import EnclaveModule from "../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../ignition/modules/enclaveToken";
@@ -206,12 +207,39 @@ describe("Enclave", function () {
           registry: addressOne,
           bondingRegistry:
             await bondingRegistryContract.bondingRegistry.getAddress(),
+          e3RefundManager: addressOne, // placeholder, will be updated
           feeToken: await usdcToken.getAddress(),
+          timeoutConfig: {
+            committeeFormationWindow: 3600, // 1 hour
+            dkgWindow: 3600, // 1 hour
+            computeWindow: 3600, // 1 hour
+            decryptionWindow: 3600, // 1 hour
+            gracePeriod: 300, // 5 minutes
+          },
         },
       },
     });
 
     const enclaveAddress = await enclaveContract.enclave.getAddress();
+
+    const e3RefundManagerContract = await ignition.deploy(
+      E3RefundManagerModule,
+      {
+        parameters: {
+          E3RefundManager: {
+            owner: ownerAddress,
+            enclave: enclaveAddress,
+            treasury: ownerAddress,
+          },
+        },
+      },
+    );
+
+    const e3RefundManagerAddress =
+      await e3RefundManagerContract.e3RefundManager.getAddress();
+
+    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+    await enclave.setE3RefundManager(e3RefundManagerAddress);
 
     const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
       parameters: {
@@ -226,7 +254,6 @@ describe("Enclave", function () {
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
 
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
       ciphernodeRegistryAddress,
       owner,
@@ -389,11 +416,6 @@ describe("Enclave", function () {
       await enclave.setMaxDuration(1);
       expect(await enclave.maxDuration()).to.equal(1);
     });
-    it("returns true if max duration is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.setMaxDuration.staticCall(1);
-      expect(result).to.be.true;
-    });
     it("emits MaxDurationSet event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setMaxDuration(1))
@@ -439,13 +461,6 @@ describe("Enclave", function () {
       expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
 
-    it("returns true if ciphernodeRegistry is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
-
     it("emits CiphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -476,15 +491,6 @@ describe("Enclave", function () {
       await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
       expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0]!)).to.be
         .true;
-    });
-
-    it("returns true if parameters are set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setE3ProgramsParams.staticCall(
-        encodedE3ProgramsParams,
-      );
-      expect(result).to.be.true;
     });
 
     it("emits AllowedE3ProgramsParamsSet event", async function () {
@@ -605,16 +611,6 @@ describe("Enclave", function () {
       ).to.equal(await mocks.decryptionVerifier.getAddress());
     });
 
-    it("returns true if decryption verifier is enabled successfully", async function () {
-      const { enclave, mocks } = await loadFixture(setup);
-
-      const result = await enclave.setDecryptionVerifier.staticCall(
-        newEncryptionSchemeId,
-        await mocks.decryptionVerifier.getAddress(),
-      );
-      expect(result).to.be.true;
-    });
-
     it("emits EncryptionSchemeEnabled", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -656,13 +652,6 @@ describe("Enclave", function () {
         ethers.ZeroAddress,
       );
     });
-    it("returns true if encryption scheme is disabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result =
-        await enclave.disableEncryptionScheme.staticCall(encryptionSchemeId);
-      expect(result).to.be.true;
-    });
     it("emits EncryptionSchemeDisabled", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -702,11 +691,6 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
-    it("returns true if E3 Program is enabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.enableE3Program.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
     it("emits E3ProgramEnabled event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.enableE3Program(AddressTwo))
@@ -741,15 +725,6 @@ describe("Enclave", function () {
 
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
-    });
-    it("returns true if E3 Program is disabled successfully", async function () {
-      const {
-        enclave,
-        mocks: { e3Program },
-      } = await loadFixture(setup);
-      const result = await enclave.disableE3Program.staticCall(e3Program);
-
-      expect(result).to.be.true;
     });
     it("emits E3ProgramDisabled event", async function () {
       const {
@@ -973,12 +948,20 @@ describe("Enclave", function () {
 
       await expect(enclave.getE3(0)).to.not.be.revert(ethers);
       await expect(enclave.activate(0)).to.not.be.revert(ethers);
+
       await expect(enclave.activate(0))
-        .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
-        .withArgs(0);
+        .to.be.revertedWithCustomError(enclave, "InvalidStage")
+        .withArgs(0, 3, 4);
     });
     it("reverts if E3 is not yet ready to start", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1000,
         (await time.latest()) + 2000,
@@ -993,6 +976,15 @@ describe("Enclave", function () {
         computeProviderParams: request.computeProviderParams,
         customParams: request.customParams,
       });
+
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        0,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -1036,28 +1028,6 @@ describe("Enclave", function () {
         "E3Expired",
       );
     });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const startTime = [
-        (await time.latest()) + 1000,
-        (await time.latest()) + 2000,
-      ] as [number, number];
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: startTime,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
-        enclave,
-        "E3NotReady",
-      );
-    });
     it("reverts if E3 start has expired", async function () {
       const {
         enclave,
@@ -1093,12 +1063,27 @@ describe("Enclave", function () {
       );
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, request);
 
-      const prevRegistry = await enclave.ciphernodeRegistry();
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        0,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
 
+      const prevRegistry = await enclave.ciphernodeRegistry();
       const reg = await ignition.deploy(MockCiphernodeRegistryEmptyKeyModule);
       const nextRegistry =
         await reg.mockCiphernodeRegistryEmptyKey.getAddress();

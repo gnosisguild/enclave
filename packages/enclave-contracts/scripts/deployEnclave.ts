@@ -8,6 +8,7 @@ import hre from "hardhat";
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
@@ -15,6 +16,17 @@ import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
 import { deployMocks } from "./deployMocks";
+
+/**
+ * Default timeout configuration (in seconds)
+ */
+const DEFAULT_TIMEOUT_CONFIG = {
+  committeeFormationWindow: 3600,
+  dkgWindow: 7200,
+  computeWindow: 86400,
+  decryptionWindow: 3600,
+  gracePeriod: 600,
+};
 
 /**
  * Deploys the Enclave contracts
@@ -128,11 +140,26 @@ export const deployEnclave = async (withMocks?: boolean) => {
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
+    e3RefundManager: addressOne, // placeholder, will be updated
     feeToken: feeTokenAddress,
+    timeoutConfig: DEFAULT_TIMEOUT_CONFIG,
     hre,
   });
   const enclaveAddress = await enclave.getAddress();
   console.log("Enclave deployed to:", enclaveAddress);
+
+  console.log("Deploying E3RefundManager...");
+  const { e3RefundManager } = await deployAndSaveE3RefundManager({
+    owner: ownerAddress,
+    enclave: enclaveAddress,
+    treasury: ownerAddress, // Protocol treasury
+    hre,
+  });
+  const e3RefundManagerAddress = await e3RefundManager.getAddress();
+  console.log("E3RefundManager deployed to:", e3RefundManagerAddress);
+
+  console.log("Setting E3RefundManager in Enclave...");
+  await enclave.setE3RefundManager(e3RefundManagerAddress);
 
   ///////////////////////////////////////////
   // Configure cross-contract dependencies
@@ -166,6 +193,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
+
+  // E3RefundManager already has correct enclave from deployment
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
@@ -206,6 +235,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
+    E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}
     ============================================
   `);

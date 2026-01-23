@@ -11,7 +11,15 @@ export default buildModule("Enclave", (m) => {
   const maxDuration = m.getParameter("maxDuration");
   const registry = m.getParameter("registry");
   const bondingRegistry = m.getParameter("bondingRegistry");
+  const e3RefundManager = m.getParameter("e3RefundManager");
   const feeToken = m.getParameter("feeToken");
+  const timeoutConfig = m.getParameter("timeoutConfig", {
+    committeeFormationWindow: 3600,
+    dkgWindow: 7200,
+    computeWindow: 86400,
+    decryptionWindow: 3600,
+    gracePeriod: 600,
+  });
 
   const enclaveImpl = m.contract("Enclave", []);
 
@@ -19,8 +27,10 @@ export default buildModule("Enclave", (m) => {
     owner,
     registry,
     bondingRegistry,
+    e3RefundManager,
     feeToken,
     maxDuration,
+    timeoutConfig,
     [params],
   ]);
 

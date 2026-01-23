@@ -84,6 +84,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @dev Default 8000 = 80%. Allows operators to unbond up to 20% while remaining active
     uint256 public licenseActiveBps;
 
+    /// @notice Number of currently active operators
+    uint256 public numActiveOperators;
+
     /// @notice Operator state data structure
     /// @param licenseBond Amount of license tokens currently bonded
     /// @param exitUnlocksAt Timestamp when pending exit can be claimed
@@ -725,6 +728,12 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
         if (op.active != newActiveStatus) {
             op.active = newActiveStatus;
+            if (newActiveStatus) {
+                numActiveOperators++;
+            } else {
+                numActiveOperators--;
+            }
+
             emit OperatorActivationChanged(operator, newActiveStatus);
         }
     }
