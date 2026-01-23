@@ -9,6 +9,7 @@ use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::*;
 use e3_bfv_client::client::compute_pk_commitment;
+use e3_bfv_client::{decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64};
 use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_ciphernode_builder::EventSystem;
@@ -25,10 +26,9 @@ use e3_events::{
     OperatorActivationChanged, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
     Shutdown, TakeEvents, TicketBalanceUpdated,
 };
+use e3_fhe_params::encode_bfv_params;
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
-use e3_bfv_client::{decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64};
-use e3_fhe_params::encode_bfv_params;
 use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,

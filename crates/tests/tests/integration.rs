@@ -7,6 +7,7 @@
 use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Result};
+use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_crypto::Cipher;
 use e3_events::{
@@ -14,9 +15,8 @@ use e3_events::{
     E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
     TicketBalanceUpdated,
 };
-use e3_multithread::{Multithread, MultithreadReport, ToReport};
-use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_fhe_params::{build_bfv_params_arc, encode_bfv_params};
+use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
