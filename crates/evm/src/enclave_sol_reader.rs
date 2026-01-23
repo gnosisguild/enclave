@@ -33,7 +33,7 @@ impl From<E3RequestedWithChainId> for e3_events::E3Requested {
         let params_bytes = value.0.e3.e3ProgramParams.to_vec();
         let threshold_m = value.0.e3.threshold[0] as usize;
         let threshold_n = value.0.e3.threshold[1] as usize;
-        let params_arc = decode_bfv_params_arc(&params_bytes);
+        let params_arc = decode_bfv_params_arc(&params_bytes).expect("Failed to decode BFV params");
 
         // TODO: These should be delivered from the e3_program contract
         // For now, using defaults that match the test configuration:
@@ -42,7 +42,12 @@ impl From<E3RequestedWithChainId> for e3_events::E3Requested {
         let lambda = 2;
         let esi_per_ct = 3;
 
-        let error_size = match calculate_error_size(params_arc, threshold_n, threshold_m, lambda) {
+        let error_size = match calculate_error_size(
+            params_arc.clone(),
+            threshold_n,
+            threshold_m,
+            lambda,
+        ) {
             Ok(size) => {
                 let size_bytes = size.to_bytes_be();
                 info!(

@@ -170,15 +170,16 @@ pub fn bfv_public_key_to_greco(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use e3_fhe_params::{BfvParamSet, BfvPreset};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use greco::bounds::GrecoBounds;
     use greco::vectors::GrecoVectors;
     use rand::thread_rng;
+    use shared::template::calculate_bit_width;
 
     #[test]
     fn test_bfv_public_key_to_greco() {
-        use crate::{BfvParamSet, BfvPreset};
         let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
 
         let mut rng = thread_rng();
@@ -187,8 +188,7 @@ mod tests {
 
         // Get expected pk0is and pk1is from GrecoVectors
         let (_, bounds) = GrecoBounds::compute(&params, 0).unwrap();
-        let bit_pk =
-            shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
+        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
 
         let vote = vec![1u64, 0u64, 0u64];
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();
@@ -267,7 +267,6 @@ mod tests {
 
     #[test]
     fn test_bfv_ciphertext_to_greco() {
-        use crate::{BfvParamSet, BfvPreset};
         let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
 
         let mut rng = thread_rng();
@@ -276,8 +275,7 @@ mod tests {
 
         // Get expected ct0is and ct1is from GrecoVectors
         let (_, bounds) = GrecoBounds::compute(&params, 0).unwrap();
-        let bit_pk =
-            shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
+        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap();
 
         let vote = vec![1u64, 0u64, 0u64];
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &params).unwrap();

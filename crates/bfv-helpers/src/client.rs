@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::build_bfv_params_arc;
-use crate::utils::greco::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
 use anyhow::{anyhow, Result};
+use e3_greco_helpers::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};

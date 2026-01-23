@@ -2762,6 +2762,7 @@ version = "0.1.7"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
+ "e3-greco-helpers",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -3078,6 +3079,20 @@ dependencies = [
  "regex",
  "tokio",
  "vfs",
+]
+
+[[package]]
+name = "e3-greco-helpers"
+version = "0.1.7"
+dependencies = [
+ "e3-fhe-params",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "num-bigint",
+ "rand 0.8.5",
+ "zkfhe-greco",
+ "zkfhe-shared",
 ]
 
 [[package]]

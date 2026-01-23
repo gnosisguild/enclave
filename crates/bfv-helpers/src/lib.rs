@@ -5,8 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod client;
-pub mod utils;
-
 use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::FheDecoder;
 use thiserror::Error as ThisError;
