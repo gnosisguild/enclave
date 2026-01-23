@@ -5,8 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_aggregated_shares_commitment, compute_shares_party_modulus_commitment,
-    prepare_aggregated_shares_commitment_payload, prepare_single_polynomial_commitment_payload,
+    compute_aggregated_shares_commitment, compute_spm_commitment_from_message,
 };
 use crate::math::polynomial::Polynomial;
 
@@ -38,12 +37,11 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
     fn verify_commitments(self) {
         for party_idx in 0..H {
             for mod_idx in 0..L {
-                let payload = prepare_single_polynomial_commitment_payload::<N, BIT_MSG>(
-                    self.decrypted_shares[party_idx][mod_idx],
-                );
-                let computed = compute_shares_party_modulus_commitment(payload);
                 assert(
-                    computed == self.expected_commitments[party_idx][mod_idx],
+                    compute_spm_commitment_from_message::<N, BIT_MSG>(
+                        self.decrypted_shares[party_idx][mod_idx],
+                    )
+                        == self.expected_commitments[party_idx][mod_idx],
                     "Commitment mismatch",
                 );
             }
@@ -80,7 +78,6 @@ impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32> BfvDecCommitVerify<N,
         let aggregated = self.compute_aggregated_shares();
 
         // Step 3: Return commitment to aggregated shares
-        let payload = prepare_aggregated_shares_commitment_payload::<N, L, BIT_MSG>(aggregated);
-        compute_aggregated_shares_commitment(payload)
+        compute_aggregated_shares_commitment::<N, L, BIT_MSG>(aggregated)
     }
 }

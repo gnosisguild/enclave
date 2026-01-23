@@ -3547,7 +3547,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7125,7 +7125,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7222,7 +7222,7 @@ dependencies = [
 [[package]]
 name = "safe"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#5f3b221938efc52ad48cee3db8fcbda795b08e9e"
+source = "git+https://github.com/gnosisguild/enclave#dd9095cb560ff1b8c3c8e36cfd6ed2edf86ed2c2"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -7902,7 +7902,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9337,7 +9337,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#fec2bc0ceb372e8ea03fce1ea1c90f561acfebfc"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#d8c501e3eace1f9c5038b24caa654991a4d6f978"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -9362,7 +9362,7 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#fec2bc0ceb372e8ea03fce1ea1c90f561acfebfc"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#d8c501e3eace1f9c5038b24caa654991a4d6f978"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",

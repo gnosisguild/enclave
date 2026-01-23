@@ -4,8 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::compute_greco_pk_agg_commitment;
-use crate::math::commitments::{compute_pk_trbfv_commitment, prepare_pk_commitment_payload};
+use crate::math::commitments::{compute_pk_agg_commitment, compute_pk_trbfv_commitment};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -74,10 +73,9 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
     /// Verifies that pk trbfv hashes to each expected_pk_trbfv_commitment
     fn verify_pk_commitments(self) {
         for i in 0..H {
-            let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0[i], self.pk1[i]);
-            let computed_commitment = compute_pk_trbfv_commitment(payload);
             assert(
-                computed_commitment == self.expected_pk_trbfv_commitments[i],
+                compute_pk_trbfv_commitment::<N, L, BIT_PK>(self.pk0[i], self.pk1[i])
+                    == self.expected_pk_trbfv_commitments[i],
                 "PK commitment mismatch",
             );
         }
@@ -123,7 +121,6 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> TrbfvPublicKeyAggregat
         }
 
         // 2. Commit to aggregated public key
-        let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg);
-        compute_greco_pk_agg_commitment(payload)
+        compute_pk_agg_commitment::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg)
     }
 }

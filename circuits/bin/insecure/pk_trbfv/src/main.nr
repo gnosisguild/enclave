@@ -15,7 +15,7 @@ fn main(
     a: pub [Polynomial<N>; L],
     eek: Polynomial<N>,
     sk: Polynomial<N>,
-    e_sm: Polynomial<N>,
+    e_sm: [Polynomial<N>; L],
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
     pk0is: [Polynomial<N>; L],
