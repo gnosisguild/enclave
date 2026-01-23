@@ -546,10 +546,7 @@ mod tests {
         let mut coeffs = vec![BigInt::from(1), BigInt::from(2)];
 
         let result = reduce_in_ring(&mut coeffs, &cyclo_zero, &modulus);
-        assert!(matches!(
-            result,
-            Err(PolynomialError::DivisionByZero)
-        ));
+        assert!(matches!(result, Err(PolynomialError::DivisionByZero)));
 
         // Test with invalid cyclotomic (zero leading coefficient)
         let cyclo_invalid = vec![BigInt::from(0), BigInt::from(1)];
