@@ -404,7 +404,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CommitteeDutiesCompleted(e3Id, e3.expiration)
         );
         // The program need to have stopped accepting inputs
-        require(block.timestamp >= e3.inputDeadline, InputDeadlineNotReached(e3Id, e3.inputDeadline));
+        require(
+            block.timestamp >= e3.inputDeadline,
+            InputDeadlineNotReached(e3Id, e3.inputDeadline)
+        );
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
         require(
