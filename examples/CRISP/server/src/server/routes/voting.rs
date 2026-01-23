@@ -159,7 +159,7 @@ async fn broadcast_encrypted_vote(
     let contract = match CRISPContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
-        &CONFIG.enclave_address,
+        &CONFIG.e3_program_address,
     )
     .await
     {

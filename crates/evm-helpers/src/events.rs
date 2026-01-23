@@ -31,6 +31,7 @@ sol! {
         uint32[2] threshold;
         uint256 requestBlock;
         uint256[2] startWindow;
+        uint256 inputDeadline;
         uint256 duration;
         uint256 expiration;
         bytes32 encryptionSchemeId;
