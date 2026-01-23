@@ -197,8 +197,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         seed: seed.clone(),
-        threshold_m: 3,
-        threshold_n: 3, // Need to use n now to suggest committee size
+        threshold_m: 2,
+        threshold_n: 5, // Need to use n now to suggest committee size
         ..E3Requested::default()
     };
 
@@ -255,7 +255,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     println!("Aggregating decryption...");
     // Aggregate decryption
 
-    let raw_plaintext = vec![vec![1234, 567890]];
+    let raw_plaintext = vec![vec![4, 5]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, test_pubkey, raw_plaintext)?;
 
     // Setup Ciphertext Published Event
@@ -318,7 +318,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         bus.publish(E3Requested {
             e3_id: e3_id.clone(),
             threshold_m: 2,
-            threshold_n: 2,
+            threshold_n: 5,
             seed: seed.clone(),
             params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
             ..E3Requested::default()
@@ -408,7 +408,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .aggregate()?;
 
     // Publish the ciphertext
-    let raw_plaintext = vec![vec![1234, 567890]];
+    let raw_plaintext = vec![vec![4, 5]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.publish(CiphertextOutputPublished {
         ciphertext_output: ciphertext
@@ -501,8 +501,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     let local_evt_3 = CiphernodeSelected {
         e3_id: E3id::new("1235", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         ..CiphernodeSelected::default()
     };
 
@@ -550,8 +550,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Send the computation requested event
     bus.publish(E3Requested {
         e3_id: E3id::new("1234", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
@@ -594,8 +594,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Send the computation requested event
     bus.publish(E3Requested {
         e3_id: E3id::new("1234", 2),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
@@ -652,8 +652,8 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Capture messages from output on msgs vec
     let event = E3Requested {
         e3_id: E3id::new("1235", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&[1, 2, 3, 4]),
         ..E3Requested::default()
