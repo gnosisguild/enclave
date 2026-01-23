@@ -72,6 +72,7 @@ COPY crates/events/Cargo.toml crates/events/Cargo.toml
 COPY crates/evm/Cargo.toml crates/evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml crates/evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml crates/fhe/Cargo.toml
+COPY crates/fhe-params/Cargo.toml crates/fhe-params/Cargo.toml
 COPY crates/fs/Cargo.toml crates/fs/Cargo.toml
 COPY crates/indexer/Cargo.toml crates/indexer/Cargo.toml
 COPY crates/init/Cargo.toml crates/init/Cargo.toml
