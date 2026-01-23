@@ -40,9 +40,8 @@
 //! 4. Checks range constraints on all coefficients
 
 use lib::core::greco::Configs as GrecoConfigs;
+use lib::math::commitments::compute_commitments;
 use lib::math::polynomial::Polynomial;
-
-use crate::hash::generate_hash;
 
 /// Parameters for ciphertext addition verification.
 ///
@@ -196,24 +195,22 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        inputs.push(self.ct_commitment);
-        inputs.push(self.prev_ct_commitment);
-        inputs.push(self.sum_ct_commitment);
-
-        // Domain separator for ciphertext addition circuit - "CiphertextAddition" in hex
-        let domain_separator = [
-            0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x74, 0x65, 0x78, 0x74, 0x41, 0x64, 0x64, 0x69,
-            0x74, 0x69, 0x6f, 0x6e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // Domain separator - "CLG_CT_ADD"
+        let DS_CLG_CT_ADD: [u8; 64] = [
+            0x43, 0x4c, 0x47, 0x5f, 0x43, 0x54, 0x5f, 0x41, 0x44, 0x44, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let gammas = generate_hash::<L>(inputs, domain_separator, 2 * L);
+        let mut payload = Vec::new();
 
-        gammas
+        payload.push(self.ct_commitment);
+        payload.push(self.prev_ct_commitment);
+        payload.push(self.sum_ct_commitment);
+
+        compute_commitments(payload, DS_CLG_CT_ADD, [0x80000000 | payload.len(), 2 * L])
     }
 
     /// Verifies ciphertext addition constraints using Fiat-Shamir challenges.

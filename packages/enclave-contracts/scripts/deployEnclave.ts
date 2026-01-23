@@ -42,13 +42,18 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ownerAddress = await owner.getAddress();
 
-  const polynomial_degree = ethers.toBigInt(2048);
-  const plaintext_modulus = ethers.toBigInt(1032193);
-  const moduli = [ethers.toBigInt("18014398492704769")];
-
+  const polynomial_degree = ethers.toBigInt(512);
+  const plaintext_modulus = ethers.toBigInt(10);
+  const moduli = [
+    ethers.toBigInt("0xffffee001"),
+    ethers.toBigInt("0xffffc4001"),
+  ];
+  const error1_variance = "3";
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256", "uint256", "uint256[]"],
-    [polynomial_degree, plaintext_modulus, moduli],
+    [
+      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
+    ],
+    [[polynomial_degree, plaintext_modulus, moduli, error1_variance]],
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;

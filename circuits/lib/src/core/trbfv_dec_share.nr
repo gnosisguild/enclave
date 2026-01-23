@@ -4,10 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::{
-    compute_aggregated_shares_commitment, compute_dec_share_challenge_commitment,
-    prepare_aggregated_shares_from_values_commitment_payload,
-};
+use crate::math::commitments::{compute_aggregated_shares_commitment, compute_dec_share_challenge};
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
@@ -96,16 +93,20 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
 
     /// Verifies that s hashes to expected_s_commitment
     fn verify_s_commitment(self) {
-        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.s);
-        let computed_commitment = compute_aggregated_shares_commitment(payload);
-        assert(computed_commitment == self.expected_s_commitment, "S commitment mismatch");
+        assert(
+            compute_aggregated_shares_commitment::<N, L, BIT_S>(self.s)
+                == self.expected_s_commitment,
+            "S commitment mismatch",
+        );
     }
 
     /// Verifies that e hashes to expected_e_commitment
     fn verify_e_commitment(self) {
-        let payload = prepare_aggregated_shares_from_values_commitment_payload::<N, L>(self.e);
-        let computed_commitment = compute_aggregated_shares_commitment(payload);
-        assert(computed_commitment == self.expected_e_commitment, "E commitment mismatch");
+        assert(
+            compute_aggregated_shares_commitment::<N, L, BIT_E>(self.e)
+                == self.expected_e_commitment,
+            "E commitment mismatch",
+        );
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation.
@@ -231,7 +232,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_S: u32, let BIT_E: u32, le
     fn generate_challenge(self) -> Field {
         let inputs = self.payload();
 
-        compute_dec_share_challenge_commitment(inputs)
+        compute_dec_share_challenge::<L>(inputs)
     }
 
     /// Verifies the lifted decryption share computation formula for a specific CRT basis using the Schwartz-Zippel lemma.

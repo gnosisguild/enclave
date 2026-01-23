@@ -218,6 +218,10 @@ else
     else
         echo -e "${BLUE}Run with --fix to automatically add missing headers${NC}"
         echo -e "${BLUE}Run with --check-only for CI/CD usage (exits with code 1 if issues found)${NC}"
-        exit 0
+        if [[ ${#MISSING_FILES[@]} -gt 0 ]]; then
+            exit 1
+        else
+            exit 0
+        fi
     fi
 fi

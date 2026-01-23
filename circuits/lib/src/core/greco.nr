@@ -143,22 +143,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    /// Flattens public key polynomials into a single array for commitment generation.
-    ///
-    /// This function serializes all public key polynomial coefficients into a 1D array to enable
-    /// the generation of a public key commitment using a cryptographic sponge.
-    ///
-    /// # Returns
-    /// An array containing all public key polynomial coefficients in flattened form
-    fn commitment_payload(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
-
-        inputs
-    }
-
     /// Flattens all polynomials coefficients into a single array for challenge generation.
     ///
     /// This function serializes all polynomial coefficients into a 1D array to enable
@@ -318,12 +302,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// - gamma_1, ..., gamma_{L-1} are used for linear combination of ct0 constraints
     /// - gamma_L, ..., gamma_{2L-1} are used for linear combination of ct1 constraints
     fn generate_challenge(self) -> Vec<Field> {
-        let commitment_payload = self.commitment_payload();
-        let gammas_payload = self.gammas_payload();
-
-        compute_greco_challenge_commitment::<L>(
-            commitment_payload,
-            gammas_payload,
+        compute_greco_challenge_commitment::<N, L, BIT_PK>(
+            self.pk0is,
+            self.pk1is,
+            self.gammas_payload(),
             self.pk_commitment,
         )
     }

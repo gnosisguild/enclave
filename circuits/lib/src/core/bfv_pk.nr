@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::{compute_pk_bfv_commitment, prepare_pk_commitment_payload};
+use crate::math::commitments::compute_pk_bfv_commitment;
 use crate::math::polynomial::Polynomial;
 
 /// BFV Public Key Commitment Circuit (Circuit 0).
@@ -27,8 +27,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32> BfvPkCommit<N, L, BIT_PK> {
     /// Main verification function
     /// Returns commitment to BFV public key
     pub fn verify(self) -> Field {
-        // Compute and return the pk bfv commitment
-        let payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0, self.pk1);
-        compute_pk_bfv_commitment(payload)
+        compute_pk_bfv_commitment::<N, L, BIT_PK>(self.pk0, self.pk1)
     }
 }

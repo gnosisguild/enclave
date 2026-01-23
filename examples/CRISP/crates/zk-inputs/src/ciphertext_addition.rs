@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bigint_poly::*;
+use crate::commitments::compute_commitment;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -14,11 +14,10 @@ use itertools::izip;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::Zero;
+use polynomial::{reduce_and_center_coefficients_mut, reduce_coefficients_2d};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
-
-use shared::commitments::compute_poly_commitment;
 
 /// Set of inputs for validation of a ciphertext addition.
 ///
@@ -70,8 +69,7 @@ impl CiphertextAdditionInputs {
         prev_ct: &Ciphertext,
         ct: &Ciphertext,
         sum_ct: &Ciphertext,
-        params: &BfvParameters,
-        bit_ct: u32,
+        params: Arc<BfvParameters>,
     ) -> Result<CiphertextAdditionInputs> {
         let ctx: &Arc<fhe_math::rq::Context> = params
             .ctx_at_level(pt.level())
@@ -232,7 +230,7 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
-        res.prev_ct_commitment = compute_poly_commitment(&res.prev_ct0is, &res.prev_ct1is, bit_ct);
+        res.prev_ct_commitment = compute_commitment(params, &res.prev_ct0is, &res.prev_ct1is)?;
 
         Ok(res)
     }
@@ -283,13 +281,6 @@ mod tests {
         Plaintext::try_encode(&message_data, Encoding::poly(), params).unwrap()
     }
 
-    fn calculate_bit_ct(params: &Arc<BfvParameters>) -> u32 {
-        use greco::bounds::GrecoBounds;
-        use shared::template::calculate_bit_width;
-        let (_, bounds) = GrecoBounds::compute(params, 0).unwrap();
-        calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap()
-    }
-
     #[test]
     fn test_new_initialization() {
         let inputs = CiphertextAdditionInputs::new(2, 1024);
@@ -319,9 +310,8 @@ mod tests {
         let sum_ct = &ct1 + &ct2;
 
         // Compute ciphertext addition inputs.
-        let bit_ct = calculate_bit_ct(&bfv_params);
         let result =
-            CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, &bfv_params, bit_ct);
+            CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, bfv_params.clone());
 
         assert!(result.is_ok());
         let inputs = result.unwrap();
@@ -345,9 +335,8 @@ mod tests {
         let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
         let sum_ct = &ct1 + &ct2;
 
-        let bit_ct = calculate_bit_ct(&bfv_params);
         let inputs =
-            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, &bfv_params, bit_ct)
+            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, bfv_params.clone())
                 .unwrap();
         let standard_form = inputs.standard_form();
 

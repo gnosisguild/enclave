@@ -14,7 +14,7 @@ fhe-math.workspace = true
 fhe-traits.workspace = true
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
-bigint-poly = { git = "https://github.com/gnosisguild/bigint-poly", features = ["serde"] }
+polynomial = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 num-bigint = "0.4.6"

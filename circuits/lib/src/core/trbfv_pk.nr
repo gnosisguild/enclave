@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::commitments::{
-    compute_pk_trbfv_commitment, compute_secret_commitment, compute_trbfv_pk_challenge_commitment,
-    prepare_pk_commitment_payload, prepare_single_polynomial_commitment_payload,
+    compute_pk_trbfv_challenge, compute_pk_trbfv_commitment, compute_secret_e_sm_commitment,
+    compute_secret_sk_commitment,
 };
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
@@ -69,7 +69,7 @@ pub struct TrbfvPublicKey<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: 
 
     /// Smudging noise polynomial (secret witness)
     /// Used for threshold decryption security
-    e_sm: Polynomial<N>,
+    e_sm: [Polynomial<N>; L],
 
     /// Quotients from polynomial operations (secret witnesses)
     /// r1[i] are quotients from modulus switching for modulus i (can be negative, degree 2*N-1)
@@ -90,7 +90,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         a: [Polynomial<N>; L],
         eek: Polynomial<N>,
         sk: Polynomial<N>,
-        e_sm: Polynomial<N>,
+        e_sm: [Polynomial<N>; L],
         r1: [Polynomial<2 * N - 1>; L],
         r2: [Polynomial<N - 1>; L],
         pk0: [Polynomial<N>; L],
@@ -133,13 +133,9 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         self.perform_range_checks();
 
         // Step 2: Compute commitments
-        let sk_payload = prepare_single_polynomial_commitment_payload::<N, BIT_SK>(self.sk);
-        let e_sm_payload = prepare_single_polynomial_commitment_payload::<N, BIT_E_SM>(self.e_sm);
-        let pk_payload = prepare_pk_commitment_payload::<N, L, BIT_PK>(self.pk0, self.pk1);
-
-        let sk_commitment = compute_secret_commitment(sk_payload);
-        let e_sm_commitment = compute_secret_commitment(e_sm_payload);
-        let pk_commitment = compute_pk_trbfv_commitment(pk_payload);
+        let sk_commitment = compute_secret_sk_commitment::<N, BIT_SK>(self.sk);
+        let e_sm_commitment = compute_secret_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
+        let pk_commitment = compute_pk_trbfv_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
         // Step 3: Generate Fiat-Shamir challenges using commitments
         let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);
@@ -163,7 +159,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     ) -> Vec<Field> {
         let inputs = self.payload(sk_commitment, pk_commitment, e_sm_commitment);
 
-        compute_trbfv_pk_challenge_commitment::<L>(inputs)
+        compute_pk_trbfv_challenge::<L>(inputs)
     }
 
     /// Performs range checks on all secret witness values
@@ -174,11 +170,13 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         // Check that secret key polynomial has small coefficients
         self.sk.range_check_2bounds::<BIT_SK>(self.configs.sk_bound, self.configs.sk_bound);
 
-        // Check that smudging noise polynomial has small coefficients
-        self.e_sm.range_check_2bounds::<BIT_E_SM>(self.configs.e_sm_bound, self.configs.e_sm_bound);
-
         // Check quotient terms are within expected bounds (per modulus)
         for i in 0..L {
+            self.e_sm[i].range_check_2bounds::<BIT_E_SM>(
+                self.configs.e_sm_bound,
+                self.configs.e_sm_bound,
+            );
+
             self.r1[i].range_check_2bounds::<BIT_R1>(
                 self.configs.r1_bounds[i],
                 self.configs.r1_bounds[i],
