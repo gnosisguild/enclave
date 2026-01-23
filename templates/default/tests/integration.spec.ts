@@ -235,8 +235,8 @@ describe('Integration', () => {
 
     // INPUT PUBLISHING phase
     console.log('PUBLISHING PRIVATE INPUT')
-    const num1 = 12n
-    const num2 = 21n
+    const num1 = 1n
+    const num2 = 2n
 
     console.log('ENCRYPTING NUMBERS')
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
