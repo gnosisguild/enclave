@@ -4,25 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use lib::configs::default::threshold::{
-    L, N, Q_MOD_T_CENTERED, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_E0,
-    USER_DATA_ENCRYPTION_BIT_E1, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_P1,
-    USER_DATA_ENCRYPTION_BIT_P2, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_R1,
-    USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_CONFIGS,
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
+use crisp_lib::ciphertext_addition::CiphertextAddition;
+use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
+use crisp_lib::ecdsa::{address_to_field, derive_address, validate_signature};
+use crisp_lib::merkle_tree::get_merkle_root;
+use crisp_lib::utils::{check_coefficient_values_with_balance, check_coefficient_zero};
+use pvss_lib::configs::default::threshold::{
+    L, N, Q_MOD_T_CENTERED, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_K,
+    USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_CONFIGS,
 };
-use lib::core::threshold::user_data_encryption::UserDataEncryption;
-use lib::math::commitments::compute_ciphertext_commitment;
-use lib::math::polynomial::Polynomial;
-
-mod constants;
-mod ciphertext_addition;
-use ciphertext_addition::CiphertextAddition;
-mod ecdsa;
-use ecdsa::{address_to_field, derive_address, validate_signature};
-mod merkle_tree;
-use merkle_tree::get_merkle_root;
-mod utils;
-use utils::{check_coefficient_values_with_balance, check_coefficient_zero};
+use pvss_lib::math::commitments::compute_ciphertext_commitment;
+use pvss_lib::math::polynomial::Polynomial;
 
 /// Main circuit function for CRISP vote verification.
 ///
@@ -60,21 +53,15 @@ fn main(
     sum_r0is: [Polynomial<N>; L],
     sum_r1is: [Polynomial<N>; L],
     // Greco Section.
-    pk_commitment: pub Field,
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
+    greco_verification_key: UltraHonkVerificationKey,
+    greco_key_hash: Field,
+    greco_proof: UltraHonkProof,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
-    u: Polynomial<N>,
-    e0: Polynomial<N>,
-    e0is: [Polynomial<N>; L],
-    e0_quotients: [Polynomial<N>; L],
-    e1: Polynomial<N>,
     k1: Polynomial<N>,
-    r1is: [Polynomial<(2 * N) - 1>; L],
-    r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<(2 * N) - 1>; L],
-    p2is: [Polynomial<N - 1>; L],
+    pk_commitment: pub Field,
+    k1_commitment: pub Field,
+    ct_commitment: pub Field,
     // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
@@ -117,33 +104,34 @@ fn main(
     // ============================================================================
     // STEP 2: BFV Encryption Verification (GRECO)
     // ============================================================================
-    // Verify that the ciphertext (ct0is, ct1is) is a valid encryption of the
-    // plaintext k1 under the public key (pk0is, pk1is). This ensures the ciphertext
-    // is correctly formed.
+    // Verify that the ciphertext (ct0is, ct1is) is a valid BFV encryption of the
+    // plaintext k1 under the public key represented by pk_commitment. This ensures
+    // the ciphertext is correctly formed and maintains the encryption relationship.
+    //
+    // The verification uses a recursive zero-knowledge proof (GRECO) to prove the encryption
+    // relationship without revealing the underlying values. The recursive proof demonstrates:
+    // - The ciphertext (ct0is, ct1is) correctly encrypts plaintext k1
+    // - The encryption uses the public key committed to in pk_commitment
+    // - The verification key hash matches the expected greco_key_hash
+    //
+    // After verifying the proof, we check that the provided commitments match the
+    // actual computed commitments to ensure consistency:
+    // - k1_commitment must match the commitment computed from k1
+    // - ct_commitment must match the commitment computed from (ct0is, ct1is)
     //
     // This check applies to BOTH cases:
     // - For actual votes: verifies the vote ciphertext is correctly formed
     // - For mask votes: verifies the zero vote ciphertext is correctly formed
-    let user_data_encryption: UserDataEncryption<N, L, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_E1, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_BIT_P1, USER_DATA_ENCRYPTION_BIT_P2> = UserDataEncryption::new(
-        USER_DATA_ENCRYPTION_CONFIGS,
-        pk_commitment,
-        pk0is,
-        pk1is,
-        ct0is,
-        ct1is,
-        u,
-        e0,
-        e0is,
-        e0_quotients,
-        e1,
-        k1,
-        r1is,
-        r2is,
-        p1is,
-        p2is,
+    verify_ultrahonk_proof(
+        greco_verification_key,
+        greco_proof,
+        [pk_commitment, k1_commitment, ct_commitment],
+        greco_key_hash,
     );
-
-    assert(user_data_encryption.execute());
+    assert(k1_commitment == compute_k1_commitment::<N, USER_DATA_ENCRYPTION_BIT_K>(k1));
+    assert(
+        ct_commitment == compute_ct_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is),
+    );
 
     // ============================================================================
     // STEP 3: Vote Type Detection and Return Logic
@@ -174,7 +162,8 @@ fn main(
     //     * Return sum ciphertext commitment (sum_ct_commitment)
 
     // Generate the vote ciphertext commitment.
-    let ct_commitment = compute_ciphertext_commitment::<512, 2, 36>(ct0is, ct1is);
+    let ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
 
     if is_mask_vote == false {
         check_coefficient_values_with_balance(k1, Q_MOD_T_CENTERED, balance, num_options);
@@ -190,12 +179,16 @@ fn main(
         if is_first_vote {
             ct_commitment
         } else {
-            let _prev_ct_commitment =
-                compute_ciphertext_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
-            let sum_ct_commitment =
-                compute_ciphertext_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
+            let _prev_ct_commitment = compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(
+                prev_ct0is,
+                prev_ct1is,
+            );
+            let sum_ct_commitment = compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(
+                sum_ct0is,
+                sum_ct1is,
+            );
 
-            let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
+            let ct_add: CiphertextAddition<N, L, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT> = CiphertextAddition::new(
                 USER_DATA_ENCRYPTION_CONFIGS,
                 ct0is,
                 ct1is,
