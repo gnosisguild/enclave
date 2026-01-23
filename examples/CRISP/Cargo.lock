@@ -4332,6 +4332,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
+name = "polynomial"
+version = "0.1.7"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6723,7 +6733,6 @@ version = "0.1.0"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
  "crisp-constants",
  "e3-sdk",
  "eyre",
@@ -6735,6 +6744,7 @@ dependencies = [
  "num-bigint",
  "num-integer",
  "num-traits",
+ "polynomial",
  "rand 0.8.5",
  "rayon",
  "serde",
