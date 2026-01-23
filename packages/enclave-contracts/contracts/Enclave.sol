@@ -440,8 +440,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
-        // Note: if we make 0 a no expiration, this has to be refactored
-        require(e3.expiration > 0, E3NotActivated(e3Id));
+        // There must be a ciphertext to decrypt first
         require(
             e3.ciphertextOutput != bytes32(0),
             CiphertextOutputNotPublished(e3Id)
