@@ -5,17 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod client;
+
 use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::FheDecoder;
 use thiserror::Error as ThisError;
 
-pub use e3_fhe_params::{
-    build_bfv_params, build_bfv_params_arc, build_bfv_params_from_set,
-    build_bfv_params_from_set_arc, BfvParamSet, BfvPreset, PresetError, PresetMetadata,
-    PresetSearchDefaults,
-};
-pub use e3_fhe_params::{
-    decode_bfv_params, decode_bfv_params_arc, encode_bfv_params, EncodingError,
+pub use client::VerifiableEncryptionResult;
+pub use client::{
+    bfv_encrypt, bfv_verifiable_encrypt, compute_ct_commitment, compute_pk_commitment,
 };
 
 #[derive(ThisError, Debug)]
@@ -26,7 +23,7 @@ pub enum Error {
     BadEncoding,
 }
 
-/// Result that returns a type T or a BfvHelpersError
+/// Result that returns a type T or a BfvClientError
 type Result<T> = std::result::Result<T, Error>;
 
 /// Decode Plaintext to a Vec<u64>

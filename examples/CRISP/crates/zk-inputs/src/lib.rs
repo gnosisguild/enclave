@@ -10,8 +10,8 @@
 
 use crate::commitments::compute_commitment;
 use crisp_constants::get_default_paramset;
-use e3_sdk::bfv_helpers::build_bfv_params_arc;
-use e3_sdk::bfv_helpers::BfvParamSet;
+use e3_fhe_params::build_bfv_params_arc;
+use e3_fhe_params::BfvParamSet;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;

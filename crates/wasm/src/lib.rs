@@ -4,12 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_bfv_helpers::{
-    client::{
-        bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
-    },
-    BfvParamSet, BfvPreset,
+use e3_bfv_client::client::{
+    bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
 };
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use clap::{command, Parser};
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
+use e3_fhe_params::{build_bfv_params_arc, encode_bfv_params};
 use std::{error::Error, num::ParseIntError, process};
 
 fn parse_hex(arg: &str) -> Result<u64, ParseIntError> {

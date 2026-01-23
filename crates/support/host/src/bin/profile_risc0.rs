@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params, BfvPreset};
+use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params, BfvPreset};
 use e3_compute_provider::FHEInputs;
 use e3_support_host::run_risc0_compute;
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};

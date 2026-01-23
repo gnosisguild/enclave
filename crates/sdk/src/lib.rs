@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 #[cfg(feature = "bfv")]
-pub use e3_bfv_helpers as bfv_helpers;
+pub use e3_bfv_client as bfv_client;
+#[cfg(feature = "bfv")]
+pub use e3_fhe_params as bfv_params;
 
 #[cfg(feature = "evm")]
 pub use e3_evm_helpers as evm_helpers;

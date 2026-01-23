@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
+use e3_fhe_params::decode_bfv_params_arc;
 use fhe::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Implementation of the CiphertextProcessor function
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
-    let params = decode_bfv_params_arc(&fhe_inputs.params);
+    let params = decode_bfv_params_arc(&fhe_inputs.params).unwrap();
 
     let mut sum = Ciphertext::zero(&params);
     for ciphertext_bytes in &fhe_inputs.ciphertexts {
@@ -26,7 +26,7 @@ pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params, BfvParamSet, BfvPreset};
+    use e3_fhe_params::{BfvParamSet, BfvPreset, build_bfv_params_arc, encode_bfv_params};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use fhe_traits::FheEncrypter;

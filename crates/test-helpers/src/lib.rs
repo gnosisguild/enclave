@@ -20,7 +20,7 @@ use e3_events::{
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
-use e3_sdk::bfv_helpers::{BfvParamSet, BfvPreset};
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;

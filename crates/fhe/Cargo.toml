@@ -23,5 +23,6 @@ rand_chacha = { workspace = true }
 e3-request = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-e3-bfv-helpers = { workspace = true }
+e3-bfv-client = { workspace = true }
+e3-fhe-params = { workspace = true }
 e3-trbfv = { workspace = true }

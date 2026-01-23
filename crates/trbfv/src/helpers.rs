@@ -6,7 +6,7 @@
 
 use crate::shares::ShamirShare;
 use anyhow::Result;
-use e3_bfv_helpers::{BfvParamSet, BfvPreset};
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::mbfv::PublicKeyShare;
 use fhe::{
@@ -45,7 +45,7 @@ pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Resu
 
 /// TODO: Make this modular
 pub fn get_share_encryption_params() -> Arc<BfvParameters> {
-    let param_set: BfvParamSet = BfvPreset::SecureThresholdBfv8192.into();
+    let param_set: BfvParamSet = BfvPreset::SecureDkg8192.into();
     param_set.build_arc()
 }
 

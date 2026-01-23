@@ -7,10 +7,8 @@
 use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use e3_bfv_helpers::{
-    build_bfv_params_arc, decode_bfv_params_arc, decode_plaintext_to_vec_u64,
-    encode_vec_u64_to_bytes,
-};
+use e3_bfv_client::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
+use e3_fhe_params::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
 use e3_utils::{ArcBytes, SharedRng};

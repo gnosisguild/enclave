@@ -18,7 +18,8 @@ tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-e3-bfv-helpers.workspace = true
+e3-bfv-client.workspace = true
+e3-fhe-params.workspace = true
 fhe.workspace = true
 fhe-traits.workspace = true
 rand.workspace = true

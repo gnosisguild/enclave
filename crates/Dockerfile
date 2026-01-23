@@ -43,7 +43,8 @@ COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.jso
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
-COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
+COPY crates/bfv-client/Cargo.toml ./bfv-client/Cargo.toml
+COPY crates/greco-helpers/Cargo.toml ./greco-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml

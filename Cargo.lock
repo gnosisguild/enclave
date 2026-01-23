@@ -1825,17 +1825,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
-name = "bigint-poly"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/bigint-poly#9eca04d2aa473c5ead1e5a13adc8ad11bf250e4a"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2817,7 +2806,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-config",
  "e3-data",
  "e3-events",
@@ -2833,23 +2822,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-bfv-helpers"
+name = "e3-bfv-client"
 version = "0.1.7"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
  "fhe",
- "fhe-math",
  "fhe-traits",
- "fhe-util",
- "hex",
- "itertools 0.14.0",
- "ndarray",
- "num-bigint",
- "num-traits",
  "rand 0.8.5",
- "strum",
  "thiserror 1.0.69",
  "zkfhe-greco",
  "zkfhe-shared",
@@ -2923,7 +2904,8 @@ version = "0.1.7"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
- "e3-bfv-helpers",
+ "e3-bfv-client",
+ "e3-fhe-params",
  "hex",
  "lean-imt",
  "light-poseidon",
@@ -3073,13 +3055,13 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "e3-bfv-helpers",
  "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",
  "e3-data",
  "e3-entrypoint",
  "e3-events",
+ "e3-fhe-params",
  "e3-sortition",
  "e3-trbfv",
  "e3-utils",
@@ -3116,10 +3098,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-config",
  "e3-data",
  "e3-events",
+ "e3-fhe-params",
  "e3-request",
  "e3-trbfv",
  "e3-utils",
@@ -3178,8 +3161,9 @@ dependencies = [
  "alloy",
  "async-trait",
  "bincode",
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-evm-helpers",
+ "e3-fhe-params",
  "eyre",
  "fhe",
  "fhe-traits",
@@ -3326,8 +3310,9 @@ dependencies = [
 name = "e3-sdk"
 version = "0.1.7"
 dependencies = [
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-evm-helpers",
+ "e3-fhe-params",
  "e3-indexer",
 ]
 
@@ -3373,11 +3358,13 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-bfv-client",
  "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
  "e3-events",
  "e3-fhe",
+ "e3-fhe-params",
  "e3-keyshare",
  "e3-multithread",
  "e3-net",
@@ -3408,13 +3395,14 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
  "e3-events",
  "e3-evm",
  "e3-fhe",
+ "e3-fhe-params",
  "e3-keyshare",
  "e3-logger",
  "e3-multithread",
@@ -3445,10 +3433,11 @@ dependencies = [
  "anyhow",
  "bincode",
  "derivative",
- "e3-bfv-helpers",
+ "e3-bfv-client",
  "e3-crypto",
  "e3-events",
  "e3-fhe",
+ "e3-fhe-params",
  "e3-test-helpers",
  "e3-utils",
  "fhe",
@@ -3485,7 +3474,8 @@ dependencies = [
 name = "e3-wasm"
 version = "0.1.7"
 dependencies = [
- "e3-bfv-helpers",
+ "e3-bfv-client",
+ "e3-fhe-params",
  "getrandom 0.2.17",
  "serde",
  "serde-wasm-bindgen",
@@ -6515,6 +6505,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "polynomial"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#54db685297b55d517aa86a6005e77e9a0354af02"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "polyval"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7400,7 +7401,7 @@ dependencies = [
 [[package]]
 name = "safe"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#a3ef19d64142e5dd6916864c6d3dbc82f55f2bf8"
+source = "git+https://github.com/gnosisguild/enclave#54db685297b55d517aa86a6005e77e9a0354af02"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -9555,12 +9556,11 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#d8c501e3eace1f9c5038b24caa654991a4d6f978"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#02131ceea13a9ff154a4d8cdd534261dacbfc724"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
  "blake3",
  "fhe",
  "fhe-math",
@@ -9568,6 +9568,7 @@ dependencies = [
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
+ "polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
  "rand 0.8.5",
  "rayon",
  "serde",
@@ -9580,18 +9581,18 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#d8c501e3eace1f9c5038b24caa654991a4d6f978"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#02131ceea13a9ff154a4d8cdd534261dacbfc724"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "bigint-poly",
  "chrono",
  "fhe",
  "fhe-math",
  "fhe-traits",
  "num-bigint",
  "num-traits",
+ "polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
  "rand 0.8.5",
  "safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
  "serde",

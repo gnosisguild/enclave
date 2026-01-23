@@ -6,7 +6,8 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
-use e3_bfv_helpers::{client::compute_ct_commitment, decode_bfv_params};
+use e3_bfv_client::client::compute_ct_commitment;
+use e3_fhe_params::decode_bfv_params;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use num_traits::Num;
