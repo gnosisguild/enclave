@@ -7,7 +7,7 @@
 use crate::{Get, Insert, InsertBatch, InsertSync, Remove, SledDb};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
-use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, EventType};
 use std::path::PathBuf;
 use tracing::{error, info};
 
@@ -31,7 +31,7 @@ impl SledStore {
         }
         .start();
 
-        bus.subscribe("Shutdown", store.clone().into());
+        bus.subscribe(EventType::Shutdown, store.clone().into());
 
         Ok(store)
     }

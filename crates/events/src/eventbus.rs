@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
+use crate::EventType;
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
@@ -65,18 +66,21 @@ impl<E: Event> EventBus<E> {
 
     pub fn history(source: &Addr<EventBus<E>>) -> Addr<HistoryCollector<E>> {
         let addr = HistoryCollector::<E>::new().start();
-        source.do_send(Subscribe::new("*", addr.clone().recipient()));
+        source.do_send(Subscribe::new(EventType::All, addr.clone().recipient()));
         addr
     }
 
     pub fn error<EE: Event>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
-        source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
+        source.do_send(Subscribe::new(
+            EventType::EnclaveError,
+            addr.clone().recipient(),
+        ));
         addr
     }
 
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
-        source.do_send(Subscribe::new("*", dest.clone().recipient()))
+        source.do_send(Subscribe::new(EventType::All, dest.clone().recipient()))
     }
 
     pub fn pipe_filter<F>(source: &Addr<EventBus<E>>, predicate: F, dest: &Addr<EventBus<E>>)
@@ -85,7 +89,7 @@ impl<E: Event> EventBus<E> {
     {
         let filter = EventFilter::new(dest.clone().recipient(), predicate).start();
 
-        source.do_send(Subscribe::new("*", filter.recipient()));
+        source.do_send(Subscribe::new(EventType::All, filter.recipient()));
     }
 
     fn track(&mut self, event: E) {

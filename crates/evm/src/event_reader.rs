@@ -14,7 +14,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use e3_events::{prelude::*, EType, EnclaveEvent, EnclaveEventData, EventId};
+use e3_events::{prelude::*, EType, EnclaveEvent, EnclaveEventData, EventId, EventType};
 use e3_events::{BusHandle, Event};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
@@ -137,7 +137,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
 
         processor.do_send(EnclaveEvmEvent::RegisterReader);
 
-        bus.subscribe("Shutdown", addr.clone().into());
+        bus.subscribe(EventType::All, addr.clone().into());
         Ok(addr)
     }
 }

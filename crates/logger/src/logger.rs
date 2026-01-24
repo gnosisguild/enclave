@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::Event, EnclaveEvent, EnclaveEventData, EventBus, SeqState, Subscribe};
+use e3_events::{
+    prelude::Event, EnclaveEvent, EnclaveEventData, EventBus, EventType, SeqState, Subscribe,
+};
 use std::marker::PhantomData;
 use tracing::{error, info};
 
@@ -26,7 +28,7 @@ impl<E: EventLogging> SimpleLogger<E> {
         }
         .start();
         bus.do_send(Subscribe::<E>::new(
-            "*".to_string(),
+            EventType::All,
             addr.clone().recipient(),
         ));
         info!(node=%name, "READY!");

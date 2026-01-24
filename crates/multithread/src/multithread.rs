@@ -26,7 +26,7 @@ use e3_events::ErrorDispatcher;
 use e3_events::Event;
 use e3_events::EventPublisher;
 use e3_events::EventSubscriber;
-use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse};
+use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
@@ -81,7 +81,7 @@ impl Multithread {
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
-        bus.subscribe("ComputeRequest", addr.clone().recipient());
+        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
         addr
     }
 
