@@ -137,7 +137,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
 
         processor.do_send(EnclaveEvmEvent::RegisterReader);
 
-        bus.subscribe(EventType::All, addr.clone().into());
+        bus.subscribe(EventType::Shutdown, addr.clone().into());
         Ok(addr)
     }
 }
