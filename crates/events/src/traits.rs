@@ -105,6 +105,8 @@ pub trait EventSubscriber<E: Event> {
     fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
     /// Subscribe the recipient to events matching any of the given event types
     fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>);
+    /// Subscribe the recipient to events matching the given event type
+    fn unsubscribe(&self, event_type: &str, recipient: Recipient<E>);
 }
 
 /// Trait to create an event with a timestamp from its associated type data

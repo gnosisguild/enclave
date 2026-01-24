@@ -23,11 +23,11 @@ use e3_evm::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
         ProviderConfig,
     },
-    BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
-    EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
-    HistoricalEventCoordinator,
+    BondingRegistryReaderRepositoryFactory, CiphernodeRegistryReaderRepositoryFactory,
+    CiphernodeRegistrySol, CoordinatorStart, EnclaveSol, EnclaveSolReader,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, HistoricalEventCoordinator,
 };
+use e3_evm::{BondingRegistrySolReader, EvmLaunchCoordinator};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
@@ -406,65 +406,38 @@ impl CiphernodeBuilder {
             .iter()
             .filter(|chain| chain.enabled.unwrap_or(true))
         {
+            let read_provider = provider_cache.ensure_read_provider(chain).await?;
+            let mut launcher = EvmLaunchCoordinator::builder(&bus, read_provider);
             if self.contract_components.enclave {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
                 let write_provider = provider_cache
                     .ensure_write_provider(&repositories, chain, cipher)
                     .await?;
-                EnclaveSol::attach(
+                let addr = EnclaveSol::attach(
                     &processor,
                     &bus,
-                    read_provider.clone(),
                     write_provider.clone(),
                     &chain.contracts.enclave.address(),
-                    &repositories.enclave_sol_reader(read_provider.chain_id()),
-                    chain.contracts.enclave.deploy_block(),
-                    chain.rpc_url.clone(),
                 )
                 .await?;
+                launcher = launcher.with_contract(chain.contracts.enclave.address(), addr)?;
+                // TODO: add to launch coordinator
             }
 
             if self.contract_components.enclave_reader {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                EnclaveSolReader::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.enclave.address(),
-                    &repositories.enclave_sol_reader(read_provider.chain_id()),
-                    chain.contracts.enclave.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
+                EnclaveSolReader::setup(&processor);
             }
 
             if self.contract_components.bonding_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                BondingRegistrySol::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.bonding_registry.address(),
-                    &repositories.bonding_registry_reader(read_provider.chain_id()),
-                    chain.contracts.bonding_registry.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
+                let addr = BondingRegistrySolReader::setup(&processor);
+                // TODO: add to launch coordinator
             }
 
             if self.contract_components.ciphernode_registry {
                 let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                CiphernodeRegistrySol::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.ciphernode_registry.address(),
-                    &repositories.ciphernode_registry_reader(read_provider.chain_id()),
-                    chain.contracts.ciphernode_registry.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
-
+                let addr = CiphernodeRegistrySol::attach(&processor);
+                // TODO: add to launch coordinator
                 match provider_cache
                     .ensure_write_provider(&repositories, chain, cipher)
                     .await
@@ -490,6 +463,7 @@ impl CiphernodeBuilder {
                     ),
                 }
             }
+            launcher.build();
         }
 
         // We start after all readers have registered

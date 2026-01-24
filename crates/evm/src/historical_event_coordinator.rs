@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::EnclaveEvmEvent;
 use actix::prelude::*;
 use e3_events::{prelude::*, trap, BusHandle, EType, EnclaveEventData};
 use tracing::info;
+
+use crate::events::{EnclaveEvmEvent, EvmEvent};
 
 #[derive(Clone)]
 struct BufferedEvent {
@@ -108,13 +109,15 @@ impl Handler<EnclaveEvmEvent> for HistoricalEventCoordinator {
                 Ok(())
             }
 
-            EnclaveEvmEvent::Event { event, block } => {
+            EnclaveEvmEvent::Event(event) => {
                 if !self.started || !self.all_readers_complete() {
-                    if let Some(block) = block {
-                        self.buffered_events.push(BufferedEvent { block, event });
-                    }
+                    let block = event.block;
+                    self.buffered_events.push(BufferedEvent {
+                        block,
+                        event: event.payload,
+                    });
                 } else {
-                    self.target.publish(event)?;
+                    self.target.publish(event.payload)?;
                 }
                 Ok(())
             }

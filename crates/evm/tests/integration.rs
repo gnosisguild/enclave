@@ -90,7 +90,6 @@ async fn evm_reader() -> Result<()> {
 
     let coordinator = HistoricalEventCoordinator::setup(bus.clone());
     let processor = coordinator.clone().recipient();
-
     EvmReadInterface::attach(
         provider.clone(),
         test_event_extractor,

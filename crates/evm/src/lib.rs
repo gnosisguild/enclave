@@ -9,19 +9,26 @@ mod ciphernode_registry_sol;
 mod enclave_sol;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
-mod evm_interface;
+mod events;
+mod evm_launch_coordinator;
+mod evm_read_interface;
+mod evm_reader;
+mod evm_router;
+mod evm_sync_processor;
 pub mod helpers;
 mod historical_event_coordinator;
 mod repo;
 
-pub use bonding_registry_sol::{BondingRegistrySol, BondingRegistrySolReader};
+pub use bonding_registry_sol::BondingRegistrySolReader;
 pub use ciphernode_registry_sol::{
     CiphernodeRegistrySol, CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
 };
 pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
-pub use evm_interface::{EnclaveEvmEvent, EvmReadInterface, EvmReadInterfaceState, ExtractorFn};
+pub use evm_launch_coordinator::*;
+pub use evm_read_interface::{EvmReadInterface, EvmReadInterfaceState, ExtractorFn};
+pub use evm_sync_processor::*;
 pub use helpers::send_tx_with_retry;
 pub use historical_event_coordinator::{CoordinatorStart, HistoricalEventCoordinator};
 pub use repo::*;

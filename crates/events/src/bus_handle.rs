@@ -20,7 +20,7 @@ use crate::{
         EventSubscriber,
     },
     EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager,
-    HistoryCollector, Sequenced, Subscribe, Unsequenced,
+    HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
 #[derive(Clone, Derivative)]
@@ -162,6 +162,11 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
             self.event_bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
+    }
+
+    fn unsubscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Sequenced>>) {
+        self.event_bus
+            .do_send(Unsubscribe::new(event_type, recipient));
     }
 }
 
