@@ -21,6 +21,7 @@ e3-data = { workspace = true }
 e3-events = { workspace = true }
 e3-trbfv = { workspace = true }
 e3-utils = { workspace = true }
+hex = { workspace = true }
 futures-util = { workspace = true }
 e3-sortition = { workspace = true }
 serde = { workspace = true }

@@ -36,6 +36,8 @@ use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, sync::Arc};
 use tracing::info;
 
+use crate::error_decoder::extract_and_decode_from_string;
+
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
     fn to_ws_auth(&self) -> Option<Authorization>;
@@ -258,14 +260,29 @@ where
                 match fut.await {
                     Ok(receipt) => Ok(receipt),
                     Err(e) => {
-                        let error_str = format!("{}", e);
                         let retry_refs: Vec<&str> =
                             retry_codes.iter().map(|s| s.as_str()).collect();
-                        if should_retry_error(&error_str, &retry_refs) {
-                            info!("{}: error, will retry: {}", op_name, e);
-                            Err(RetryError::Retry(e))
-                        } else {
-                            Err(RetryError::Failure(e))
+
+                        let error_str = format!("{}", e);
+
+                        // try to decode the error to get a clear error name
+                        match extract_and_decode_from_string(error_str.as_str()) {
+                            Some(decoded) => {
+                                // we were able to decode it, now let's check if it's one of the ones
+                                // we want to retry 
+                                if should_retry_error(&decoded.selector, &retry_refs) {
+                                    info!("{}: error, will retry: {}", op_name, decoded.name);
+                                    Err(RetryError::Retry(e))
+                                } else {
+                                    // it's not an error we want to retry
+                                    Err(RetryError::Failure(e))
+                                }
+                            }
+                            // if it's not an error we have stored then we should assume 
+                            // we are not looking to retry 
+                            None => {
+                                Err(RetryError::Failure(e))
+                            }
                         }
                     }
                 }

@@ -14,5 +14,11 @@ fn main() {
         .unwrap()
         .success());
 
+    assert!(Command::new("bash")
+        .arg("./scripts/generate_error_selectors.sh")
+        .status()
+        .unwrap()
+        .success());
+
     println!("cargo:rerun-if-changed=./scripts/build_fixtures.sh");
 }
