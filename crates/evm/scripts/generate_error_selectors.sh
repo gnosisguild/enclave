@@ -11,10 +11,10 @@ fi
 
 # Default ABI files
 DEFAULT_ABIS=(
-    "packages/enclave-contracts/artifacts/contracts/Enclave.sol/Enclave.json"
-    "packages/enclave-contracts/artifacts/contracts/registry/CiphernodeRegistryOwnable.sol/CiphernodeRegistryOwnable.json"
-    "packages/enclave-contracts/artifacts/contracts/registry/BondingRegistry.sol/BondingRegistry.json"
-    "packages/enclave-contracts/artifacts/contracts/slashing/SlashingManager.sol/SlashingManager.json"
+    "../../packages/enclave-contracts/artifacts/contracts/Enclave.sol/Enclave.json"
+    "../../packages/enclave-contracts/artifacts/contracts/registry/CiphernodeRegistryOwnable.sol/CiphernodeRegistryOwnable.json"
+    "../../packages/enclave-contracts/artifacts/contracts/registry/BondingRegistry.sol/BondingRegistry.json"
+    "../../packages/enclave-contracts/artifacts/contracts/slashing/SlashingManager.sol/SlashingManager.json"
 )
 
 OUTPUT_FILE="src/error_selectors.rs"
@@ -32,7 +32,7 @@ ERRORS=$(for file in "${ABI_FILES[@]}"; do
         echo "Warning: File not found: $file" >&2
         continue
     fi
-    jq -c '.[] | select(.type == "error")' "$file" 2>/dev/null || true
+    jq -c '(if type == "object" then .abi else . end) | .[] | select(.type == "error")' "$file" 2>/dev/null || true
 done | sort -u)
 
 if [ -z "$ERRORS" ]; then
