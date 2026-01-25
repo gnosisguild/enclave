@@ -19,6 +19,7 @@ mod ordered_set;
 pub mod prelude;
 mod seed;
 mod sequencer;
+mod sync;
 mod traits;
 
 pub use bus_handle::*;
@@ -34,4 +35,5 @@ pub use eventstore_router::*;
 pub use ordered_set::*;
 pub use seed::*;
 pub use sequencer::*;
+pub use sync::*;
 pub use traits::*;

@@ -49,6 +49,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         Ok(())
     }
 }
+
 impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     pub fn new(index: I, log: L) -> Self {
         Self { index, log }

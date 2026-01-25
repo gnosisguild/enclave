@@ -5,9 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::event_system::AggregateConfig;
-use crate::{CiphernodeHandle, EventSystem};
+use crate::{CiphernodeHandle, EventSystem, ProviderCache};
 use actix::{Actor, Addr};
-use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
 use derivative::Derivative;
 use e3_aggregator::ext::{
@@ -16,18 +15,10 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{InMemStore, Repositories, RepositoriesFactory};
+use e3_data::{InMemStore, RepositoriesFactory};
 use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig};
-use e3_evm::{
-    helpers::{
-        load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
-        ProviderConfig,
-    },
-    BondingRegistryReaderRepositoryFactory, CiphernodeRegistryReaderRepositoryFactory,
-    CiphernodeRegistrySol, CoordinatorStart, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, HistoricalEventCoordinator,
-};
-use e3_evm::{BondingRegistrySolReader, EvmLaunchCoordinator};
+use e3_evm::{BondingRegistrySolReader, EnclaveSolWriter, EvmChainGateway};
+use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
@@ -297,7 +288,7 @@ impl CiphernodeBuilder {
     /// Create aggregate configuration from configured chains
     async fn create_aggregate_config(
         &self,
-        provider_cache: &mut ProviderCaches,
+        provider_cache: &mut ProviderCache,
     ) -> Result<AggregateConfig> {
         let mut chain_providers = Vec::new();
         for chain in &self.chains {
@@ -352,8 +343,7 @@ impl CiphernodeBuilder {
         };
 
         // Create provider cache early to use for chain validation
-        let mut provider_cache = ProviderCaches::new();
-
+        let mut provider_cache = ProviderCache::new();
         let aggregate_config = self.create_aggregate_config(&mut provider_cache).await?;
 
         // Get an event system instance.
@@ -376,8 +366,12 @@ impl CiphernodeBuilder {
 
         let bus = event_system.handle()?;
         let store = event_system.store()?;
+        let cipher = &self.cipher;
+        let repositories = Arc::new(store.repositories());
 
-        let repositories = store.repositories();
+        // Now we add write support as store depends on event system
+        let mut provider_cache =
+            provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
 
         // Use the configured backend directly
         let default_backend = self.sortition_backend.clone();
@@ -394,80 +388,80 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
             .await?;
 
-        let cipher = &self.cipher;
-
-        let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-        let processor = coordinator.clone().recipient();
-
-        // TODO: gather an async handle from the event readers that closes when they shutdown and
-        // join it with the network manager joinhandle below
-        for chain in self
-            .chains
-            .iter()
-            .filter(|chain| chain.enabled.unwrap_or(true))
-        {
-            let read_provider = provider_cache.ensure_read_provider(chain).await?;
-            let mut launcher = EvmLaunchCoordinator::builder(&bus, read_provider);
-            if self.contract_components.enclave {
-                let write_provider = provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await?;
-                let addr = EnclaveSol::attach(
-                    &processor,
-                    &bus,
-                    write_provider.clone(),
-                    &chain.contracts.enclave.address(),
-                )
-                .await?;
-                launcher = launcher.with_contract(chain.contracts.enclave.address(), addr)?;
-                // TODO: add to launch coordinator
-            }
-
-            if self.contract_components.enclave_reader {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                EnclaveSolReader::setup(&processor);
-            }
-
-            if self.contract_components.bonding_registry {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                let addr = BondingRegistrySolReader::setup(&processor);
-                // TODO: add to launch coordinator
-            }
-
-            if self.contract_components.ciphernode_registry {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                let addr = CiphernodeRegistrySol::attach(&processor);
-                // TODO: add to launch coordinator
-                match provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await
-                {
-                    Ok(write_provider) => {
-                        let _writer = CiphernodeRegistrySol::attach_writer(
-                            &bus,
-                            write_provider.clone(),
-                            &chain.contracts.ciphernode_registry.address(),
-                            self.pubkey_agg,
-                        )
-                        .await?;
-                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
-
-                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
-                            info!("Attaching CommitteeFinalizer for score sortition");
-                            e3_aggregator::CommitteeFinalizer::attach(&bus);
-                        }
-                    }
-                    Err(e) => error!(
-                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
-                        e
-                    ),
-                }
-            }
-            launcher.build();
-        }
-
-        // We start after all readers have registered
-        coordinator.do_send(CoordinatorStart);
+        // Sync processor
+        // All contract event processors will forward their parsed events here.
+        // let next = EvmChainGateway::setup(&bus).into();
+        //
+        // // TODO: gather an async handle from the event readers that closes when they shutdown and
+        // // join it with the network manager joinhandle below
+        // for chain in self
+        //     .chains
+        //     .iter()
+        //     .filter(|chain| chain.enabled.unwrap_or(true))
+        // {
+        //     // We create a launch coordinator for each chain
+        //     // This waits for the SyncStart message before creating the EvmInterface which inturn
+        //     // will begin the historical stream events followed by the live stream of events.
+        //     // We need to do this so that the interface knows when to stream from.
+        //     // Once it has created the EvmInterface it will kill itself
+        //     let mut read_launcher = EvmLaunchCoordinator::builder(
+        //         &bus,
+        //         &provider_cache.ensure_read_provider(chain).await?,
+        //     );
+        //
+        //     if self.contract_components.enclave {
+        //         let contract_address = chain.contracts.enclave.address();
+        //         let write_provider = provider_cache.ensure_write_provider(chain).await?;
+        //
+        //         EnclaveSolWriter::attach(&bus, write_provider.clone(), &contract_address).await?;
+        //
+        //         read_launcher.with_contract(contract_address, EnclaveSolReader::setup(&next))?;
+        //     }
+        //
+        //     if self.contract_components.enclave_reader {
+        //         let contract_address = chain.contracts.enclave.address();
+        //
+        //         read_launcher.with_contract(contract_address, EnclaveSolReader::setup(&next))?;
+        //     }
+        //
+        //     if self.contract_components.bonding_registry {
+        //         let contract_address = chain.contracts.bonding_registry.address();
+        //         read_launcher
+        //             .with_contract(contract_address, BondingRegistrySolReader::setup(&next))?;
+        //     }
+        //
+        //     if self.contract_components.ciphernode_registry {
+        //         let contract_address = chain.contracts.ciphernode_registry.address();
+        //         read_launcher
+        //             .with_contract(contract_address, CiphernodeRegistrySol::attach(&next))?;
+        //
+        //         match provider_cache
+        //             .ensure_write_provider(chain)
+        //             .await
+        //         {
+        //             Ok(write_provider) => {
+        //                 let _writer = CiphernodeRegistrySol::attach_writer(
+        //                     &bus,
+        //                     write_provider.clone(),
+        //                     &contract_address,
+        //                     self.pubkey_agg,
+        //                 )
+        //                 .await?;
+        //                 info!("CiphernodeRegistrySolWriter attached for publishing committees");
+        //
+        //                 if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
+        //                     info!("Attaching CommitteeFinalizer for score sortition");
+        //                     e3_aggregator::CommitteeFinalizer::attach(&bus);
+        //                 }
+        //             }
+        //             Err(e) => error!(
+        //                 "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+        //                 e
+        //             ),
+        //         }
+        //     }
+        //     let _ = read_launcher.build();
+        // }
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());
@@ -559,14 +553,6 @@ impl CiphernodeBuilder {
     }
 }
 
-/// Struct to cache modules required during the ciphernode construction so that providers are only
-/// constructed once.
-struct ProviderCaches {
-    signer_cache: Option<LocalSigner<SigningKey>>,
-    read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
-    write_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteWriteProvider>>,
-}
-
 /// Validate chain ID matches expected configuration
 fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
     if let Some(expected_chain_id) = chain.chain_id {
@@ -604,62 +590,4 @@ fn create_aggregate_delays(
     }
 
     Ok(delays)
-}
-
-impl ProviderCaches {
-    pub fn new() -> Self {
-        ProviderCaches {
-            signer_cache: None,
-            read_provider_cache: HashMap::new(),
-            write_provider_cache: HashMap::new(),
-        }
-    }
-
-    pub async fn ensure_signer(
-        &mut self,
-        cipher: &Cipher,
-        repositories: &Repositories,
-    ) -> Result<LocalSigner<SigningKey>> {
-        if let Some(ref cache) = self.signer_cache {
-            return Ok(cache.clone());
-        }
-
-        let signer = load_signer_from_repository(repositories.eth_private_key(), cipher).await?;
-        self.signer_cache = Some(signer.clone());
-        Ok(signer)
-    }
-
-    pub async fn ensure_read_provider(
-        &mut self,
-        chain: &ChainConfig,
-    ) -> Result<EthProvider<ConcreteReadProvider>> {
-        if let Some(cache) = self.read_provider_cache.get(chain) {
-            return Ok(cache.clone());
-        }
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let read_provider = provider_config.create_readonly_provider().await?;
-        self.read_provider_cache
-            .insert(chain.clone(), read_provider.clone());
-        Ok(read_provider)
-    }
-
-    pub async fn ensure_write_provider(
-        &mut self,
-        repositories: &Repositories,
-        chain: &ChainConfig,
-        cipher: &Cipher,
-    ) -> Result<EthProvider<ConcreteWriteProvider>> {
-        if let Some(cache) = self.write_provider_cache.get(chain) {
-            return Ok(cache.clone());
-        }
-
-        let signer = self.ensure_signer(cipher, repositories).await?;
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let write_provider = provider_config.create_signer_provider(&signer).await?;
-        self.write_provider_cache
-            .insert(chain.clone(), write_provider.clone());
-        Ok(write_provider)
-    }
 }

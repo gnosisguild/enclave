@@ -29,6 +29,8 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
+e3-evm = { workspace = true }
 e3-entrypoint = { workspace = true }
 e3-ciphernode-builder = { workspace = true }
 e3-events = { workspace = true, features = ["test-helpers"] }
+tracing-subscriber = { workspace = true }

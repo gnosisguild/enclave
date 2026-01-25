@@ -41,6 +41,7 @@ pub enum EType {
     PlaintextAggregation,
     Decryption,
     Sortition,
+    Sync,
     Data,
     Event,
     Computation,

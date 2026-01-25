@@ -2,21 +2,35 @@ use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
 use actix::{Actor, Addr, Handler};
 use alloy_primitives::Address;
 use std::collections::HashMap;
+use tracing::error;
 
 /// Directs EnclaveEvmEvent::Log events to the correct upstream processors. Drops all other event
 /// types
 pub struct EvmRouter {
     routing_table: HashMap<Address, EvmEventProcessor>,
+    fallback: Option<EvmEventProcessor>,
 }
 
 impl EvmRouter {
-    pub fn new(routing_table: HashMap<Address, EvmEventProcessor>) -> Self {
-        Self { routing_table }
+    pub fn new() -> Self {
+        Self {
+            routing_table: HashMap::new(),
+            fallback: None,
+        }
     }
 
-    pub fn setup(routing_table: HashMap<Address, EvmEventProcessor>) -> Addr<Self> {
-        let addr = Self::new(routing_table).start();
-        addr
+    pub fn add_route(mut self, address: Address, dest: &EvmEventProcessor) -> Self {
+        self.routing_table.insert(address, dest.clone());
+        self
+    }
+
+    pub fn add_fallback(mut self, fallback: &EvmEventProcessor) -> Self {
+        self.fallback = Some(fallback.clone());
+        self
+    }
+
+    pub fn get_routing_table(&self) -> &HashMap<Address, EvmEventProcessor> {
+        &self.routing_table
     }
 }
 
@@ -27,45 +41,91 @@ impl Actor for EvmRouter {
 impl Handler<EnclaveEvmEvent> for EvmRouter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
-        let EnclaveEvmEvent::Log(EvmLog { log, .. }) = msg.clone() else {
-            return;
-        };
-        let Some(dest) = self.routing_table.get(&log.address()) else {
-            return;
-        };
-
-        dest.do_send(msg);
-    }
-}
-
-pub struct EvmHub {
-    nexts: Vec<EvmEventProcessor>,
-}
-
-impl EvmHub {
-    pub fn new(nexts: Vec<EvmEventProcessor>) -> Self {
-        Self { nexts }
-    }
-
-    pub fn setup(nexts: Vec<EvmEventProcessor>) -> Addr<Self> {
-        let addr = Self::new(nexts).start();
-        addr
-    }
-}
-
-impl Actor for EvmHub {
-    type Context = actix::Context<Self>;
-}
-
-impl Handler<EnclaveEvmEvent> for EvmHub {
-    type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
-        let EnclaveEvmEvent::Log { .. } = msg.clone() else {
-            return;
-        };
-
-        for next in self.nexts.clone() {
-            next.do_send(msg.clone());
+        match msg.clone() {
+            // Take all log events and route them
+            EnclaveEvmEvent::Log(EvmLog { log, .. }) => {
+                if let Some(dest) = self.routing_table.get(&log.address()) {
+                    dest.do_send(msg);
+                } else {
+                    error!(
+                        "Could not find a route for log with address = {:?}",
+                        log.address()
+                    )
+                }
+            }
+            _ => {
+                if let Some(fallback) = self.fallback.clone() {
+                    fallback.do_send(msg)
+                }
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix::prelude::*;
+    use alloy_primitives::address;
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
+    use tokio::time::sleep;
+
+    struct TestProcessor(Arc<AtomicUsize>);
+
+    impl Actor for TestProcessor {
+        type Context = Context<Self>;
+    }
+
+    impl Handler<EnclaveEvmEvent> for TestProcessor {
+        type Result = ();
+        fn handle(&mut self, _msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[actix::test]
+    async fn test_evm_router_routes_log_to_correct_processor() {
+        let received_count = Arc::new(AtomicUsize::new(0));
+        let processor_addr = TestProcessor(received_count.clone()).start();
+        let addr = address!("0x1111111111111111111111111111111111111111");
+        let test_log = EvmLog::test_log(addr, 1);
+        let test_address = test_log.log.address();
+
+        let router = EvmRouter::new()
+            .add_route(test_address, &processor_addr.recipient())
+            .start();
+
+        router.do_send(EnclaveEvmEvent::Log(test_log));
+
+        sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(received_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[actix::test]
+    async fn test_evm_router_ignores_log_with_unknown_address() {
+        let received_count = Arc::new(AtomicUsize::new(0));
+        let processor_addr = TestProcessor(received_count.clone()).start();
+
+        let router_addr = address!("0x1111111111111111111111111111111111111111");
+        let log_addr = address!("0x2222222222222222222222222222222222222222");
+
+        let test_log = EvmLog::test_log(log_addr, 1);
+
+        let router = EvmRouter::new()
+            .add_route(router_addr, &processor_addr.recipient())
+            .start();
+
+        router.do_send(EnclaveEvmEvent::Log(test_log));
+
+        sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(received_count.load(Ordering::SeqCst), 0);
     }
 }

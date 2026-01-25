@@ -1,15 +1,14 @@
 use actix::{Message, Recipient};
 use alloy::rpc::types::Log;
-use e3_events::{EnclaveEventData, EventId};
+use alloy_primitives::Address;
+use e3_events::{EventId, EvmEvent};
 use serde::{Deserialize, Serialize};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub enum EnclaveEvmEvent {
-    /// Register a reader with the coordinator before it starts processing
-    RegisterReader,
     /// Signal that this reader has completed historical sync
-    HistoricalSyncComplete,
+    HistoricalSyncComplete(u64),
     /// An actual event from the blockchain
     Event(EvmEvent),
     /// Raw log data from the provider
@@ -17,16 +16,25 @@ pub enum EnclaveEvmEvent {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EvmEvent {
-    pub payload: EnclaveEventData,
-    pub block: u64,
-    pub ts: u128,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EvmLog {
     pub log: Log,
     pub chain_id: u64,
+}
+
+#[cfg(test)]
+impl EvmLog {
+    pub fn test_log(address: Address, chain_id: u64) -> EvmLog {
+        EvmLog {
+            log: Log {
+                inner: alloy_primitives::Log {
+                    address,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            chain_id,
+        }
+    }
 }
 
 impl EnclaveEvmEvent {

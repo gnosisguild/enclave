@@ -14,10 +14,10 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
 use anyhow::anyhow;
-use e3_events::{prelude::*, EType, EnclaveEvent, EnclaveEventData, EventId};
-use e3_events::{BusHandle, Event};
+use e3_events::{BusHandle, ErrorDispatcher, Event, EventSubscriber};
+use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
 use futures_util::stream::StreamExt;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{error, info, instrument};
@@ -42,6 +42,7 @@ pub struct Filters {
     historical: Filter,
     current: Filter,
 }
+
 impl Filters {
     pub fn new(addresses: Vec<Address>, start_block: Option<u64>) -> Self {
         let historical = Filter::new()
@@ -55,6 +56,11 @@ impl Filters {
             historical,
             current,
         }
+    }
+
+    pub fn from_routing_table<T>(table: &HashMap<Address, T>, start_block: Option<u64>) -> Self {
+        let addresses: Vec<Address> = table.keys().cloned().collect();
+        Self::new(addresses, start_block)
     }
 }
 
@@ -88,22 +94,20 @@ impl<P: Provider + Clone + 'static> EvmReadInterface<P> {
         }
     }
 
-    pub fn attach(
-        provider: EthProvider<P>,
-        processor: &Recipient<EnclaveEvmEvent>,
+    pub fn setup(
+        provider: &EthProvider<P>,
+        next: &Recipient<EnclaveEvmEvent>,
         bus: &BusHandle,
         filters: Filters,
     ) -> Addr<Self> {
         let params = EvmReadInterfaceParams {
-            provider,
-            processor: processor.clone(),
+            provider: provider.clone(),
+            processor: next.clone(),
             bus: bus.clone(),
             filters,
         };
 
         let addr = EvmReadInterface::new(params).start();
-
-        processor.do_send(EnclaveEvmEvent::RegisterReader);
 
         bus.subscribe("Shutdown", addr.clone().into());
         addr
@@ -158,8 +162,6 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             for log in historical_logs {
                 processor.do_send(EnclaveEvmEvent::Log(EvmLog { log, chain_id }))
             }
-
-            processor.do_send(EnclaveEvmEvent::HistoricalSyncComplete);
         }
         Err(e) => {
             error!("Failed to fetch historical events: {}", e);
@@ -167,6 +169,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             return;
         }
     }
+    processor.do_send(EnclaveEvmEvent::HistoricalSyncComplete(chain_id));
 
     info!("Subscribing to live events");
     match provider_ref.subscribe_logs(&filters.current).await {

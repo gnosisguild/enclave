@@ -3012,6 +3012,7 @@ dependencies = [
  "e3-data",
  "e3-entrypoint",
  "e3-events",
+ "e3-evm",
  "e3-sortition",
  "e3-utils",
  "futures-util",
@@ -3019,6 +3020,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "url",
  "zeroize",
 ]
