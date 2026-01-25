@@ -133,10 +133,10 @@ async fn evm_reader() -> Result<()> {
     let bus = system.handle()?;
     let history_collector = bus.history();
     let contract_address = contract.address().to_string();
+    let sync = FakeSyncActor::setup(&bus);
 
     // Simulates the setup for a single chain
     let gateway = EvmChainGateway::setup(&bus);
-    let sync = FakeSyncActor::setup(&bus);
     let runner = SyncStartExtractor::setup(OneShotRunner::setup({
         let bus = bus.clone();
         let provider = provider.clone();
@@ -158,7 +158,6 @@ async fn evm_reader() -> Result<()> {
             Ok(())
         }
     }));
-
     bus.subscribe("SyncStart", runner.recipient());
 
     // SyncStart holds initialization information such as start block and earliest event
