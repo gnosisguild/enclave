@@ -16,7 +16,6 @@ import {
   encodeBfvParams,
   encodeComputeProviderParams,
   RegistryEventType,
-  BfvParamSetType,
 } from '@enclave-e3/sdk'
 import { hexToBytes } from 'viem'
 import assert from 'assert'
@@ -167,7 +166,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-    protocol: BfvParamSetType.THRESHOLD,
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
   })
 
   it('should run an integration test', async () => {
@@ -176,8 +175,8 @@ describe('Integration', () => {
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(130)
     const duration = BigInt(20)
-    const protocolParams = await sdk.getProtocolParams()
-    const e3ProgramParams = encodeBfvParams(protocolParams)
+    const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
+    const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
       true, // Mock the compute provider parameters, return 32 bytes of 0x00
