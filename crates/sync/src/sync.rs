@@ -4,20 +4,37 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Handler, Message};
+use std::collections::HashMap;
 
-struct Sync;
+use actix::{Actor, AsyncContext, Handler, Message};
+use e3_events::{trap, BusHandle, EventPublisher, SyncEvmEvent, SyncStart};
+
+struct Sync {
+    bus: BusHandle,
+}
 
 impl Sync {}
 
 impl Actor for Sync {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.notify(Bootstrap);
+    }
+}
+
+impl Handler<SyncEvmEvent> for Sync {
+    type Result = ();
+    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {}
 }
 
 impl Handler<Bootstrap> for Sync {
     type Result = ();
     fn handle(&mut self, msg: Bootstrap, ctx: &mut Self::Context) -> Self::Result {
-        // Publish SyncStart
+        trap(e3_events::EType::Sync, &self.bus.clone(), || {
+            // Fetch snapshot state
+            self.bus
+                .publish(SyncStart::new(ctx.address(), HashMap::new()))
+        })
     }
 }
 

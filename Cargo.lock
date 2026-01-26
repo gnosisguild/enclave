@@ -3355,6 +3355,7 @@ name = "e3-sync"
 version = "0.1.7"
 dependencies = [
  "actix",
+ "e3-events",
 ]
 
 [[package]]
