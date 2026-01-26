@@ -3006,6 +3006,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
+ "bloom",
  "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use super::EnclaveEventData;
-use crate::SyncEvmEvent;
+use crate::{CorrelationId, SyncEvmEvent};
 use actix::{Message, Recipient};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,11 +21,19 @@ pub struct EvmEvent {
     block: u64,
     chain_id: u64,
     ts: u128,
+    id: CorrelationId,
 }
 
 impl EvmEvent {
-    pub fn new(data: EnclaveEventData, block: u64, ts: u128, chain_id: u64) -> Self {
+    pub fn new(
+        id: CorrelationId,
+        data: EnclaveEventData,
+        block: u64,
+        ts: u128,
+        chain_id: u64,
+    ) -> Self {
         Self {
+            id,
             data,
             block,
             ts,
@@ -35,6 +43,10 @@ impl EvmEvent {
 
     pub fn split(self) -> (EnclaveEventData, u128, u64) {
         (self.data, self.ts, self.block)
+    }
+
+    pub fn get_id(&self) -> CorrelationId {
+        self.id
     }
 }
 

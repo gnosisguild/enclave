@@ -1,14 +1,16 @@
 use crate::events::EnclaveEvmEvent;
+use crate::HistoricalSyncComplete;
 use actix::{Actor, Handler};
 use actix::{Addr, Recipient};
 use anyhow::Result;
 use anyhow::{bail, Context};
 use e3_events::{
-    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, SyncEnd, SyncEvmEvent,
-    SyncStart,
+    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventId, EventSubscriber, SyncEnd,
+    SyncEvmEvent, SyncStart,
 };
 use e3_events::{EType, EvmEvent};
 use e3_events::{Event, EventPublisher};
+use tracing::info;
 
 /// The chain gateway
 pub struct EvmChainGateway {
@@ -45,6 +47,7 @@ impl SyncStatus {
         };
 
         *self = SyncStatus::ForwardToSyncActor(Some(sender));
+        info!("Changed to ForwardToSyncActor");
         Ok(())
     }
 
@@ -57,6 +60,7 @@ impl SyncStatus {
         };
         let sender = std::mem::take(sender).context("Cannot call buffer_until_live twice")?;
         *self = SyncStatus::BufferUntilLive(vec![]);
+        info!("Changed to BufferUntilLive");
         Ok(sender)
     }
 
@@ -66,6 +70,7 @@ impl SyncStatus {
         };
         let buffer = std::mem::take(buffer);
         *self = SyncStatus::Live;
+        info!("Changed to Live");
         Ok(buffer)
     }
 }
@@ -108,8 +113,8 @@ impl EvmChainGateway {
 
     fn handle_evm_event(&mut self, msg: EnclaveEvmEvent) -> Result<()> {
         match msg {
-            EnclaveEvmEvent::HistoricalSyncComplete(chain_id) => {
-                self.handle_historical_sync_complete(chain_id)?;
+            EnclaveEvmEvent::HistoricalSyncComplete(e) => {
+                self.handle_historical_sync_complete(e)?;
                 Ok(())
             }
             EnclaveEvmEvent::Event(event) => {
@@ -120,9 +125,9 @@ impl EvmChainGateway {
         }
     }
 
-    fn handle_historical_sync_complete(&mut self, chain_id: u64) -> Result<()> {
+    fn handle_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
         let sender = self.status.buffer_until_live()?;
-        sender.do_send(SyncEvmEvent::HistoricalSyncComplete(chain_id));
+        sender.do_send(SyncEvmEvent::HistoricalSyncComplete(event.chain_id));
         Ok(())
     }
 

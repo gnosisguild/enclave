@@ -29,7 +29,7 @@ impl Handler<EnclaveEvmEvent> for EvmReader {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.clone() {
-            EnclaveEvmEvent::Log(EvmLog { log, chain_id }) => {
+            EnclaveEvmEvent::Log(EvmLog { log, chain_id, id }) => {
                 let extractor = self.extractor;
 
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
@@ -39,13 +39,12 @@ impl Handler<EnclaveEvmEvent> for EvmReader {
                     let log_index = log.log_index.expect(err);
                     let ts = from_log_chain_id_to_ts(block_timestamp, log_index, chain_id);
                     self.next.do_send(EnclaveEvmEvent::Event(EvmEvent::new(
-                        event, block, ts, chain_id,
+                        // note we use the id from the log event above!
+                        id, event, block, ts, chain_id,
                     )))
                 }
             }
-            EnclaveEvmEvent::HistoricalSyncComplete(chain_id) => self
-                .next
-                .do_send(EnclaveEvmEvent::HistoricalSyncComplete(chain_id)),
+            hist @ EnclaveEvmEvent::HistoricalSyncComplete(..) => self.next.do_send(hist),
             _ => (),
         }
     }

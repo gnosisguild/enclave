@@ -19,12 +19,10 @@ use e3_events::{
     prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, GetEvents,
     HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
 };
-use e3_evm::{
-    helpers::EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmReader,
-    EvmRouter, Filters, OneShotRunner, SyncStartExtractor,
-};
+use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmReader};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::sleep;
+use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::{fmt, EnvFilter};
 
 sol!(
@@ -80,6 +78,7 @@ async fn get_msgs(history_collector: &Addr<HistoryCollector<EnclaveEvent>>) -> R
 
 struct FakeSyncActor {
     bus: BusHandle,
+    buffer: Vec<EvmEvent>,
 }
 
 impl Actor for FakeSyncActor {
@@ -88,7 +87,11 @@ impl Actor for FakeSyncActor {
 
 impl FakeSyncActor {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
-        Self { bus: bus.clone() }.start()
+        Self {
+            bus: bus.clone(),
+            buffer: Vec::new(),
+        }
+        .start()
     }
 }
 
@@ -97,22 +100,34 @@ impl Handler<SyncEvmEvent> for FakeSyncActor {
     fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
-                SyncEvmEvent::Event(evt) => (), // self.buffer.push(evt) - sort historical event
-                SyncEvmEvent::HistoricalSyncComplete(evt) => self.bus.publish(SyncEnd::new())?,
+                // Buffer events as the sync actor receives them
+                SyncEvmEvent::Event(event) => self.buffer.push(event),
+                // When we hear that sync is complete send all events on chain then publish SyncEnd
+                SyncEvmEvent::HistoricalSyncComplete(_) => {
+                    for evt in self.buffer.drain(..) {
+                        let (data, ts, _) = evt.split();
+                        self.bus.publish_from_remote(data, ts)?;
+                    }
+                    self.bus.publish(SyncEnd::new())?;
+                }
             };
             Ok(())
         })
     }
 }
 
-#[actix::test]
-async fn evm_reader() -> Result<()> {
-    let _guard = tracing::subscriber::set_default(
+fn add_tracing() -> DefaultGuard {
+    tracing::subscriber::set_default(
         fmt()
             .with_env_filter(EnvFilter::new("info"))
             .with_test_writer()
             .finish(),
-    );
+    )
+}
+
+#[actix::test]
+async fn evm_reader() -> Result<()> {
+    let _guard = add_tracing();
 
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
@@ -128,14 +143,13 @@ async fn evm_reader() -> Result<()> {
         .await?,
     );
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let chain_id = provider.chain_id();
     let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
-    let contract_address = contract.address().to_string();
-    let sync = FakeSyncActor::setup(&bus);
 
-    let contract_address = contract_address.parse()?;
+    let chain_id = provider.chain_id();
+    let contract_address = contract.address().clone();
+    let sync = FakeSyncActor::setup(&bus);
     EvmSystemChainBuilder::new(&bus, &provider, chain_id)
         .with_route(move |upstream| {
             (
@@ -184,9 +198,10 @@ async fn evm_reader() -> Result<()> {
 
     Ok(())
 }
-/*
 #[actix::test]
 async fn ensure_historical_events() -> Result<()> {
+    let _guard = add_tracing();
+
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
@@ -199,16 +214,13 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.provider()).await?;
+    let contract_address = contract.address().clone();
+    let chain_id = provider.chain_id();
     let system = EventSystem::new("test").with_fresh_bus();
     let bus = system.handle()?;
     let history_collector = bus.history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];
-
-    let repository = Repository::new(get_in_mem_store());
-
-    let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-    let processor = coordinator.clone().recipient();
 
     for msg in historical_msgs.clone() {
         contract
@@ -219,19 +231,20 @@ async fn ensure_historical_events() -> Result<()> {
             .await?;
     }
 
-    EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository,
-        rpc_url.clone(),
-    )
-    .await?;
+    sleep(Duration::from_millis(1)).await;
 
-    coordinator.do_send(CoordinatorStart);
+    let sync = FakeSyncActor::setup(&bus);
+    EvmSystemChainBuilder::new(&bus, &provider, chain_id)
+        .with_route(move |upstream| {
+            (
+                contract_address,
+                TestEventParser::setup(&upstream).recipient(),
+            )
+        })
+        .build();
+    let mut evm_info = HashMap::new();
+    evm_info.insert(chain_id, None);
+    bus.publish(SyncStart::new(sync, evm_info))?;
 
     for msg in live_events.clone() {
         contract
@@ -250,8 +263,6 @@ async fn ensure_historical_events() -> Result<()> {
         .send(GetEvents::<EnclaveEvent>::new())
         .await?;
 
-    assert_eq!(history.len(), 8);
-
     let msgs: Vec<_> = history
         .into_iter()
         .filter_map(|evt| match evt.into_data() {
@@ -264,328 +275,3 @@ async fn ensure_historical_events() -> Result<()> {
 
     Ok(())
 }
-
-#[actix::test]
-async fn ensure_resume_after_shutdown() -> Result<()> {
-    // Create a WS provider
-    // NOTE: Anvil must be available on $PATH
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let rpc_url = anvil.ws_endpoint(); // Get RPC URL
-    let provider = EthProvider::new(
-        ProviderBuilder::new()
-            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
-            .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
-            .await?,
-    )
-    .await?;
-    let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
-    let history_collector = bus.history();
-    let repository = Repository::new(get_in_mem_store());
-
-    let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-    let processor = coordinator.clone().recipient();
-
-    for msg in ["before", "online"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    let addr1 = EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    coordinator.do_send(CoordinatorStart);
-
-    for msg in ["live", "events"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    // Ensure shutdown doesn't cause event to be lost.
-    sleep(Duration::from_millis(10)).await;
-    addr1
-        .send(EnclaveEvent::new_stored_event(Shutdown.into(), 4321, 42))
-        .await?;
-
-    for msg in ["these", "are", "not", "lost"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    sleep(Duration::from_millis(10)).await;
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(msgs, ["before", "online", "live", "events"]);
-
-    let _ = EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    sleep(Duration::from_millis(10)).await;
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(
-        msgs,
-        ["before", "online", "live", "events", "these", "are", "not", "lost"]
-    );
-
-    for msg in ["resumed", "data"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    sleep(Duration::from_millis(10)).await;
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(
-        msgs,
-        ["before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"]
-    );
-
-    Ok(())
-}
-
-#[actix::test]
-async fn coordinator_single_reader() -> Result<()> {
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let rpc_url = anvil.ws_endpoint();
-    let provider = EthProvider::new(
-        ProviderBuilder::new()
-            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
-            .connect_ws(WsConnect::new(rpc_url.clone()))
-            .await?,
-    )
-    .await?;
-    let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
-    let history_collector = bus.history();
-    let repository = Repository::new(get_in_mem_store());
-
-    let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-    let processor = coordinator.clone().recipient();
-
-    for msg in ["historical1", "historical2", "historical3"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    coordinator.do_send(CoordinatorStart);
-    sleep(Duration::from_millis(100)).await;
-
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(msgs, ["historical1", "historical2", "historical3"]);
-
-    for msg in ["live1", "live2"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    sleep(Duration::from_millis(100)).await;
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(
-        msgs,
-        [
-            "historical1",
-            "historical2",
-            "historical3",
-            "live1",
-            "live2"
-        ]
-    );
-
-    Ok(())
-}
-
-#[actix::test]
-async fn coordinator_multiple_readers() -> Result<()> {
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let rpc_url = anvil.ws_endpoint();
-    let provider = EthProvider::new(
-        ProviderBuilder::new()
-            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
-            .connect_ws(WsConnect::new(rpc_url.clone()))
-            .await?,
-    )
-    .await?;
-
-    let contract1 = EmitLogs::deploy(provider.provider()).await?;
-    let contract2 = EmitLogs::deploy(provider.provider()).await?;
-
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
-    let history_collector = bus.history();
-    let repository1 = Repository::new(get_in_mem_store());
-    let repository2 = Repository::new(get_in_mem_store());
-
-    let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-    let processor = coordinator.clone().recipient();
-
-    contract1
-        .setValue("contract1_msg1".to_string())
-        .send()
-        .await?
-        .watch()
-        .await?;
-    contract2
-        .setValue("contract2_msg1".to_string())
-        .send()
-        .await?
-        .watch()
-        .await?;
-    contract1
-        .setValue("contract1_msg2".to_string())
-        .send()
-        .await?
-        .watch()
-        .await?;
-    contract2
-        .setValue("contract2_msg2".to_string())
-        .send()
-        .await?
-        .watch()
-        .await?;
-
-    EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract1.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository1,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract2.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository2,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    coordinator.do_send(CoordinatorStart);
-
-    // Wait for historical events to be processed
-    sleep(Duration::from_millis(200)).await;
-
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(msgs.len(), 4);
-    assert!(msgs.contains(&"contract1_msg1".to_string()));
-    assert!(msgs.contains(&"contract2_msg1".to_string()));
-    assert!(msgs.contains(&"contract1_msg2".to_string()));
-    assert!(msgs.contains(&"contract2_msg2".to_string()));
-
-    Ok(())
-}
-
-#[actix::test]
-async fn coordinator_no_historical_events() -> Result<()> {
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let rpc_url = anvil.ws_endpoint();
-    let provider = EthProvider::new(
-        ProviderBuilder::new()
-            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
-            .connect_ws(WsConnect::new(rpc_url.clone()))
-            .await?,
-    )
-    .await?;
-    let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
-    let history_collector = bus.history();
-    let repository = Repository::new(get_in_mem_store());
-
-    let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-    let processor = coordinator.clone().recipient();
-
-    EvmReadInterface::attach(
-        provider.clone(),
-        test_event_extractor,
-        &contract.address().to_string(),
-        None,
-        &processor,
-        &bus,
-        &repository,
-        rpc_url.clone(),
-    )
-    .await?;
-
-    coordinator.do_send(CoordinatorStart);
-    sleep(Duration::from_millis(50)).await;
-
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(msgs.len(), 0);
-
-    for msg in ["live1", "live2"] {
-        contract
-            .setValue(msg.to_string())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    sleep(Duration::from_millis(100)).await;
-    let msgs = get_msgs(&history_collector).await?;
-    assert_eq!(msgs, ["live1", "live2"]);
-
-    Ok(())
-}*/

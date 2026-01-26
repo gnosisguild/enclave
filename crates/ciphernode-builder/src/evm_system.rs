@@ -1,10 +1,9 @@
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
-use anyhow::Result;
 use e3_events::{BusHandle, EventSubscriber, SyncStart};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
-    OneShotRunner, SyncStartExtractor,
+    FixHistoricalOrder, OneShotRunner, SyncStartExtractor,
 };
 
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> (Address, EvmEventProcessor) + Send {}
@@ -36,7 +35,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
     }
 
     pub fn build(self) {
-        let gateway = EvmChainGateway::setup(&self.bus);
+        let gateway = FixHistoricalOrder::setup(EvmChainGateway::setup(&self.bus));
         let runner = SyncStartExtractor::setup(OneShotRunner::setup({
             let bus = self.bus.clone();
             let provider = self.provider.clone();
