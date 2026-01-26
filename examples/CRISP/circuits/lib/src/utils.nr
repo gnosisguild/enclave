@@ -19,11 +19,14 @@ use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
 /// * `k1` - The plaintext polynomial encoding the vote
 /// * `q_mod_t` - The field representation of 1 (Q_MOD_T_MOD_P for binary encoding)
 /// * `balance` - The voter's balance/voting power
+///
+/// # Returns
+/// Returns `true` if the vote is valid, `false` otherwise.
 pub fn check_coefficient_values_with_balance<let D: u32>(
     k1: Polynomial<D>,
     q_mod_t: Field,
     balance: Field,
-) {
+) -> bool {
     let HALF_D = D / 2;
 
     // Define the boundaries for YES and NO vote regions in the polynomial
@@ -34,6 +37,7 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 
     let mut sum_yes: u64 = 0;
     let mut sum_no: u64 = 0;
+    let mut res = true;
 
     // YES votes are encoded in reverse order (LSB at highest index, MSB at lowest index)
     // We read from END_INDEX_Y-1 down to HALF_D to reconstruct the binary value
@@ -42,7 +46,9 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
         let idx = END_INDEX_Y - 1 - i;
         let coeff = k1.coefficients[idx];
 
-        assert(0 == coeff * (q_mod_t - coeff));
+        if 0 != coeff * (q_mod_t - coeff) {
+            res = false;
+        }
 
         // Convert coefficient to bit: 0 -> 0, q_mod_t -> 1
         let bit: u64 = if coeff == 0 { 0 } else { 1 };
@@ -60,7 +66,9 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
         let coeff = k1.coefficients[idx];
 
         // Binary constraint check (same as YES votes)
-        assert(0 == coeff * (q_mod_t - coeff));
+        if 0 != coeff * (q_mod_t - coeff) {
+            res = false;
+        }
 
         // Convert coefficient to bit
         let bit: u64 = if coeff == 0 { 0 } else { 1 };
@@ -71,17 +79,27 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 
     if (sum_yes != 0) {
         // If YES vote is cast, NO vote must be zero
-        assert(sum_no == 0);
+        if sum_no != 0 {
+            res = false;
+        }
         // Vote amount must not exceed balance
-        assert(sum_yes <= (balance as u64));
+        if sum_yes > (balance as u64) {
+            res = false;
+        }
     }
 
     if (sum_no != 0) {
         // If NO vote is cast, YES vote must be zero
-        assert(sum_yes == 0);
+        if sum_yes != 0 {
+            res = false;
+        }
         // Vote amount must not exceed balance
-        assert(sum_no <= (balance as u64));
+        if sum_no > (balance as u64) {
+            res = false;
+        }
     }
+
+    res
 }
 
 /// Checks if all vote coefficients are zero.
@@ -93,10 +111,13 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
 ///
+/// # Returns
+/// Returns `true` if all vote coefficients are zero, `false` otherwise.
+///
 /// # Vote Regions Checked
 /// - NO votes: coefficients [0, HALF_LARGEST_MINIMUM_DEGREE)
 /// - YES votes: coefficients [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) -> bool {
     let HALF_D = D / 2;
 
     // Define vote region boundaries
@@ -106,15 +127,24 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
     let START_INDEX_N = 0;
     let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
 
+    let mut res = true;
+
     // Check YES vote region: all coefficients must be zero
     for i in START_INDEX_Y..END_INDEX_Y {
-        assert(k1.coefficients[i] == 0);
+        if k1.coefficients[i] != 0 {
+            res = false;
+        }
     }
 
     // Check NO vote region: all coefficients must be zero
     for i in START_INDEX_N..END_INDEX_N {
-        assert(k1.coefficients[i] == 0);
+        if k1.coefficients[i] != 0 {
+            res = false;
+        }
     }
+
+    // Return true only if both regions are completely zero
+    res
 }
 
 #[test]
@@ -129,7 +159,7 @@ fn test_check_vote_is_within_balance_pass() {
         ],
     };
 
-    check_coefficient_values_with_balance(pol, 1, 1000);
+    assert(check_coefficient_values_with_balance(pol, 1, 1000));
 }
 
 #[test(should_fail)]
@@ -145,7 +175,7 @@ fn test_check_vote_is_within_balance_yes_and_no_not_zero() {
         ],
     };
 
-    check_coefficient_values_with_balance(pol, 1, 100);
+    assert(check_coefficient_values_with_balance(pol, 1, 100));
 }
 
 #[test(should_fail)]
@@ -160,7 +190,7 @@ fn test_check_vote_is_within_balance_fail() {
         ],
     };
 
-    check_coefficient_values_with_balance(pol, 1, 1);
+    assert(check_coefficient_values_with_balance(pol, 1, 1));
 }
 
 #[test]
@@ -175,7 +205,7 @@ fn test_check_coefficient_values_pass() {
         ],
     };
 
-    check_coefficient_values_with_balance(pol, 1, 100000000000);
+    assert(check_coefficient_values_with_balance(pol, 1, 100000000000));
 }
 
 #[test(should_fail)]
@@ -190,7 +220,7 @@ fn test_check_coefficient_values_fail() {
         ],
     };
 
-    check_coefficient_values_with_balance(pol, 1, 100);
+    assert(check_coefficient_values_with_balance(pol, 1, 100));
 }
 
 #[test(should_fail)]
@@ -205,7 +235,7 @@ fn test_check_coefficient_zero_fail() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol));
 }
 
 #[test]
@@ -219,5 +249,5 @@ fn test_check_coefficient_zero() {
         ],
     };
 
-    check_coefficient_zero(pol);
+    assert(check_coefficient_zero(pol));
 }
