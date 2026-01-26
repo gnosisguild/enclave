@@ -11,7 +11,6 @@ import { CompiledCircuit } from '@noir-lang/noir_js'
 
 import { EnclaveSDK } from '../src/enclave-sdk'
 import { zeroAddress } from 'viem'
-import { FheProtocol } from '../src/types'
 import demoCircuit from './fixtures/demo_circuit.json'
 
 describe('encryptNumber', () => {
@@ -26,7 +25,7 @@ describe('encryptNumber', () => {
       },
       rpcUrl: '',
       privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-      protocol: FheProtocol.TRBFV,
+      thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
     })
 
     it('should encrypt a number without crashing in a node environent', async () => {

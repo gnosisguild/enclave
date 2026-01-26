@@ -59,7 +59,8 @@ COPY Cargo.toml ./Cargo.toml
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n"
 COPY crates/aggregator/Cargo.toml crates/aggregator/Cargo.toml
-COPY crates/bfv-helpers/Cargo.toml crates/bfv-helpers/Cargo.toml
+COPY crates/bfv-client/Cargo.toml crates/bfv-client/Cargo.toml
+COPY crates/greco-helpers/Cargo.toml crates/greco-helpers/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml crates/ciphernode-builder/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
@@ -71,6 +72,7 @@ COPY crates/events/Cargo.toml crates/events/Cargo.toml
 COPY crates/evm/Cargo.toml crates/evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml crates/evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml crates/fhe/Cargo.toml
+COPY crates/fhe-params/Cargo.toml crates/fhe-params/Cargo.toml
 COPY crates/fs/Cargo.toml crates/fs/Cargo.toml
 COPY crates/indexer/Cargo.toml crates/indexer/Cargo.toml
 COPY crates/init/Cargo.toml crates/init/Cargo.toml

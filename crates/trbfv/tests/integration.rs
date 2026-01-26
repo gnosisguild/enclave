@@ -9,9 +9,10 @@ use std::{
 };
 
 use anyhow::Result;
-use e3_bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
+use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
+use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
 use e3_trbfv::{
     calculate_decryption_share::{
@@ -43,18 +44,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     let _guard = tracing::subscriber::set_default(subscriber);
     let rng = create_shared_rng_from_u64(42);
 
-    let (degree, plaintext_modulus, moduli) = (
-        8192usize,
-        16384u64,
-        &[
-            0x1FFFFFFEA0001u64, // 562949951979521
-            0x1FFFFFFE88001u64, // 562949951881217
-            0x1FFFFFFE48001u64, // 562949951619073
-            0xfffffebc001u64,   //
-        ] as &[u64],
-    );
-
-    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+    let params_raw = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // E3Parameters
@@ -111,8 +101,11 @@ async fn test_trbfv_isolation() -> Result<()> {
         num_votes_per_voter,
     );
 
-    let outputs =
-        e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
+    let outputs = e3_test_helpers::application::run_application(
+        &inputs,
+        params_raw.clone(),
+        num_votes_per_voter,
+    );
 
     // Encrypt the plaintext
     let ciphertexts = outputs
@@ -162,10 +155,12 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect();
 
     // Show summation result
+    let plaintext_modulus = params_raw.clone().plaintext();
+
     let mut expected_result = vec![0u64; 3];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
-            expected_result[j] += vals[j];
+            expected_result[j] = (expected_result[j] + vals[j]) % plaintext_modulus;
         }
     }
 

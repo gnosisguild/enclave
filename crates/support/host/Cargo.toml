@@ -26,4 +26,4 @@ tracing-subscriber = { workspace = true }
 boundless-market = { workspace = true }
 url = { workspace = true }
 dotenvy = { workspace = true }
-e3-bfv-helpers = { path = "../../bfv-helpers" }
+e3-fhe-params = { workspace = true }

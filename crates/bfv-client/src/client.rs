@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::build_bfv_params_arc;
-use crate::utils::greco::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
 use anyhow::{anyhow, Result};
+use e3_fhe_params::build_bfv_params_arc;
+use e3_greco_helpers::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
@@ -31,7 +31,7 @@ use shared::template::calculate_bit_width;
 /// # Errors
 /// Returns error string if:
 /// - Public key deserialization fails
-/// - Plaintext encoding fails  
+/// - Plaintext encoding fails
 /// - Encryption fails
 /// - Input validation vector computation fails
 pub fn bfv_encrypt<T>(
@@ -82,7 +82,7 @@ pub struct VerifiableEncryptionResult {
 /// # Errors
 /// Returns error string if:
 /// - Public key deserialization fails
-/// - Plaintext encoding fails  
+/// - Plaintext encoding fails
 /// - Encryption fails
 /// - Input validation vector computation fails
 pub fn bfv_verifiable_encrypt<T>(
@@ -209,21 +209,20 @@ pub fn compute_ct_commitment(
 
 #[cfg(test)]
 mod tests {
-    use crate::BfvParamSets;
+    use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet, BfvPreset};
 
     use super::*;
 
     #[test]
     fn test_bfv_encrypt_a64() {
-        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
-        let moduli = [param_set.moduli[0]];
+        let moduli = param_set.moduli;
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -240,15 +239,14 @@ mod tests {
 
     #[test]
     fn test_bfv_encrypt_v64() {
-        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
-        let moduli = [param_set.moduli[0]];
+        let moduli = param_set.moduli;
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -272,15 +270,14 @@ mod tests {
 
     #[test]
     fn test_bfv_verifiable_encrypt_a64() {
-        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
-        let moduli = [param_set.moduli[0]];
+        let moduli = param_set.moduli;
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -303,15 +300,14 @@ mod tests {
 
     #[test]
     fn test_bfv_verifiable_encrypt_v64() {
-        use crate::build_bfv_params_from_set_arc;
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set = BfvParamSets::InsecureSet2048_1032193_1.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
-        let moduli = [param_set.moduli[0]];
+        let moduli = param_set.moduli;
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);

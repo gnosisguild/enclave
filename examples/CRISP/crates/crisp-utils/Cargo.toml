@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 e3-sdk = { workspace = true, default-features = false, features=["bfv"] }
+e3-bfv-client = { workspace = true }
 eyre = { workspace = true }
 hex = { workspace = true }
 num-bigint = "=0.4.6"

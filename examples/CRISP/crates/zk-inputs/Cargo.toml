@@ -12,6 +12,8 @@ crisp-constants.workspace = true
 fhe.workspace = true
 fhe-math.workspace = true
 fhe-traits.workspace = true
+e3-bfv-client = { workspace = true }
+e3-fhe-params = { workspace = true }
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
 polynomial = { workspace = true, features = ["serde"] }

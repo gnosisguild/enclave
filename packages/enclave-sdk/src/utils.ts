@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { type Address, type Hash, type Log, encodeAbiParameters } from 'viem'
+import type { BfvParams } from './types'
 
 export class SDKError extends Error {
   constructor(
@@ -58,25 +59,6 @@ export function getCurrentTimestamp(): number {
   return Math.floor(Date.now() / 1000)
 }
 
-// BFV parameter set matching the Rust INSECURE_SET_2048_1032193_1 configuration
-export const INSECURE_SET_2048_1032193_1 = {
-  degree: 2048,
-  plaintext_modulus: 1032193,
-  moduli: [0x3fffffff000001n], // BigInt for the modulus
-  error1_variance: '10',
-} as const
-
-// BFV parameter set matching the Rust SET_8192_1000_4 configuration
-export const SET_8192_1000_4 = {
-  degree: 8192,
-  plaintext_modulus: 1000,
-  moduli: [0x00800000022a0001n, 0x00800000021a0001n, 0x0080000002120001n, 0x0080000001f60001n],
-  error1_variance: '52309181128222339698631578526730685514457152477762943514050560000',
-}
-
-// Set default parameter set
-export const BFV_PARAMS_SET = INSECURE_SET_2048_1032193_1
-
 // Compute provider parameters structure
 export interface ComputeProviderParams {
   name: string
@@ -104,12 +86,16 @@ export const DEFAULT_E3_CONFIG = {
  * Encode BFV parameters for the smart contract
  * BFV (Brakerski-Fan-Vercauteren) is a type of fully homomorphic encryption
  */
-export function encodeBfvParams(
-  degree: number = BFV_PARAMS_SET.degree,
-  plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
-  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli,
-  error1_variance: string = BFV_PARAMS_SET.error1_variance,
-): `0x${string}` {
+export function encodeBfvParams(params: BfvParams): `0x${string}` {
+  const { degree, plaintextModulus, moduli, error1Variance } = params
+
+  if (error1Variance === undefined) {
+    throw new SDKError(
+      'error1Variance is required in ProtocolParams. All BFV parameter sets must specify error1_variance.',
+      'MISSING_ERROR1_VARIANCE',
+    )
+  }
+
   return encodeAbiParameters(
     [
       {
@@ -126,9 +112,9 @@ export function encodeBfvParams(
     [
       {
         degree: BigInt(degree),
-        plaintext_modulus: BigInt(plaintext_modulus),
+        plaintext_modulus: BigInt(plaintextModulus),
         moduli: [...moduli],
-        error1_variance,
+        error1_variance: error1Variance,
       },
     ],
   )

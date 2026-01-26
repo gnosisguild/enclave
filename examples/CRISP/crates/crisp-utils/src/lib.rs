@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
+use e3_bfv_client::decode_bytes_to_vec_u64;
 use eyre::Result;
 use num_bigint::BigUint;
 

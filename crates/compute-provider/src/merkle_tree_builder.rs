@@ -6,7 +6,8 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
-use e3_bfv_helpers::{client::compute_ct_commitment, decode_bfv_params};
+use e3_bfv_client::client::compute_ct_commitment;
+use e3_fhe_params::decode_bfv_params;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -36,7 +37,7 @@ impl MerkleTreeBuilder {
     }
 
     pub fn compute_leaf_hashes(&mut self, data: &[(Vec<u8>, u64)], params_bytes: &[u8]) {
-        let params = decode_bfv_params(params_bytes);
+        let params = decode_bfv_params(params_bytes).expect("Failed to decode BFV params");
         let degree = params.degree();
         let plaintext_modulus = params.plaintext();
         let moduli = params.moduli().to_vec();

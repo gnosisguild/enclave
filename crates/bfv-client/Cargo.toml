@@ -1,0 +1,18 @@
+[package]
+name = "e3-bfv-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "E3 - BFV client helpers"
+repository = "https://github.com/gnosisguild/enclave/crates/bfv-client"
+
+[dependencies]
+anyhow.workspace = true
+e3-fhe-params = { workspace = true }
+e3-greco-helpers = { workspace = true }
+fhe.workspace = true
+fhe-traits.workspace = true
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
+rand.workspace = true
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+thiserror = { workspace = true }

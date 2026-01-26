@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_bfv_helpers::decode_bfv_params_arc;
+use e3_fhe_params::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
 use fhe::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
