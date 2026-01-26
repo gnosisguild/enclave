@@ -546,8 +546,8 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use std::sync::Arc;
-    use tokio::sync::mpsc;
     use tokio::sync::broadcast;
+    use tokio::sync::mpsc;
 
     let seed = e3_events::Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
 
@@ -604,7 +604,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     use e3_data::{GetDump, InMemStore};
     use e3_events::{EventBus, EventBusConfig, GetEvents, Seed, Shutdown, TakeEvents};
     use e3_sdk::bfv_helpers::{decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64};
-    use e3_test_helpers::{create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net};
+    use e3_test_helpers::{
+        create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
+    };
     use fhe::{
         bfv::{BfvParameters, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
@@ -724,7 +726,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     };
 
     let bus = EventSystem::in_mem("cn2")
-        .with_event_bus(EventBus::<e3_events::EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start())
+        .with_event_bus(
+            EventBus::<e3_events::EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start(),
+        )
         .handle()?;
     let cn1 = setup_local_ciphernode(
         &bus,
@@ -809,7 +813,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     use e3_bfv_helpers::client::compute_pk_commitment;
     use e3_events::{OrderedSet, PublicKeyAggregated, TakeEvents};
-    use e3_test_helpers::{create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net};
+    use e3_test_helpers::{
+        create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
+    };
     use fhe::{
         bfv::{BfvParameters, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
