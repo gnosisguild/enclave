@@ -6713,6 +6713,7 @@ dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "bigint-poly",
+ "bincode",
  "crisp-constants",
  "e3-sdk",
  "eyre",

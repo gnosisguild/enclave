@@ -5,20 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { Vote } from '../src/types'
-import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
-import { generateMerkleProof } from '../src/utils'
-import {
-  decodeTally,
-  generatePublicKey,
-  verifyProof,
-  encodeVote,
-  generateCircuitInputs,
-  executeCrispCircuit,
-  computeCommitment,
-  encryptVote,
-} from '../src/vote'
-import { publicKeyToAddress, signMessage } from 'viem/accounts'
-import { Hex, recoverPublicKey } from 'viem'
+import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE } from '../src/constants'
+import { decodeTally, generateBFVKeys, verifyProof, encodeVote, encryptVote, decryptVote } from '../src/vote'
+import { signMessage } from 'viem/accounts'
+import { Hex } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
 import { CrispSDK } from '../src/sdk'
 
@@ -26,9 +16,9 @@ describe('Vote', () => {
   let vote: Vote
   let signature: Hex
   let balance: bigint
-  let address: string
   let slotAddress: string
   let publicKey: Uint8Array
+  let secretKey: Uint8Array
   let previousCiphertext: Uint8Array
   let e3Id: number
   let sdk: CrispSDK
@@ -58,10 +48,11 @@ describe('Vote', () => {
     vote = { yes: 10n, no: 0n }
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
     balance = 100n
-    address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
-    publicKey = generatePublicKey()
+    const keys = generateBFVKeys()
+    publicKey = keys.publicKey
+    secretKey = keys.secretKey
     previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
     e3Id = 0
     sdk = new CrispSDK(CRISP_SERVER_URL)
@@ -77,12 +68,20 @@ describe('Vote', () => {
       expect(decoded.yes).toBe(10000000000n)
       expect(decoded.no).toBe(30000000000n)
     })
+
+    it('Should decode an encoded tally into its decimal representation from a number array', () => {
+      const encoded = encodeVote({ yes: 10000000000n, no: 30000000000n })
+      const decoded = decodeTally(encoded)
+
+      expect(decoded.yes).toBe(10000000000n)
+      expect(decoded.no).toBe(30000000000n)
+    })
   })
 
   describe('encodeVote', () => {
-    const decodeHalf = (encoded: BigInt64Array, isFirstHalf: boolean): number => {
+    const decodeHalf = (encoded: number[], isFirstHalf: boolean): number => {
       const halfLength = encoded.length / 2
-      const half = Array.from(isFirstHalf ? encoded.slice(0, halfLength) : encoded.slice(halfLength))
+      const half = isFirstHalf ? encoded.slice(0, halfLength) : encoded.slice(halfLength)
       const binaryString = half.map((b) => b.toString()).join('')
       const trimmedBinary = binaryString.replace(/^0+/, '') || '0'
       return parseInt(trimmedBinary, 2)
@@ -104,79 +103,7 @@ describe('Vote', () => {
     it('Should only contain binary digits (0 or 1)', () => {
       const encoded = encodeVote({ yes: 255n, no: 128n })
 
-      expect(Array.from(encoded).every((b) => b >= 0n && b <= 1n)).toBe(true)
-    })
-  })
-
-  describe('generateProof', () => {
-    it('Should generate a proof where the output is the new ciphertext', async () => {
-      // This test simulates a real vote (i.e. generateVoteProof).
-
-      // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, address, LEAVES)
-
-      const { circuitInputs: crispInputs } = await generateCircuitInputs({
-        vote,
-        publicKey,
-        signature,
-        messageHash: SIGNATURE_MESSAGE_HASH,
-        balance,
-        slotAddress: address,
-        merkleProof,
-        isMaskVote: false,
-      })
-
-      const { returnValue } = await executeCrispCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
-
-      expect(returnValue).toEqual(commitment)
-    })
-
-    it('Should generate a proof where the output is the ciphertext addition if there is a previous ciphertext and 0 vote', async () => {
-      // This test simulates a mask vote (i.e. generateMaskVoteProof).
-
-      // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-
-      const { circuitInputs: crispInputs } = await generateCircuitInputs({
-        publicKey,
-        balance,
-        slotAddress,
-        merkleProof,
-        vote: ZERO_VOTE,
-        signature: MASK_SIGNATURE,
-        messageHash: SIGNATURE_MESSAGE_HASH,
-        previousCiphertext,
-        isMaskVote: true,
-      })
-
-      const { returnValue } = await executeCrispCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
-
-      expect(returnValue).toEqual(commitment)
-    })
-
-    it('Should generate a proof where the output is the ciphertext of a 0 vote if there is no previous ciphertext', async () => {
-      // This test simulates a mask vote (i.e. generateMaskVoteProof).
-
-      // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
-
-      const { circuitInputs: crispInputs } = await generateCircuitInputs({
-        vote: ZERO_VOTE,
-        publicKey,
-        signature: MASK_SIGNATURE,
-        messageHash: SIGNATURE_MESSAGE_HASH,
-        merkleProof,
-        balance,
-        slotAddress,
-        isMaskVote: true,
-      })
-
-      const { returnValue } = await executeCrispCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
-
-      expect(returnValue).toEqual(commitment)
+      expect(encoded.every((b) => b >= 0 && b <= 1)).toBe(true)
     })
   })
 
@@ -198,6 +125,11 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+      expect(proof.encryptedVote).toBeDefined()
+
+      const decryptedVote = decryptVote(proof.encryptedVote, secretKey)
+
+      expect(decryptedVote).toEqual(vote)
 
       const isValid = await verifyProof(proof)
 
@@ -220,6 +152,11 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+      expect(proof.encryptedVote).toBeDefined()
+
+      const decryptedVote = decryptVote(proof.encryptedVote, secretKey)
+
+      expect(decryptedVote).toEqual(ZERO_VOTE)
 
       const isValid = await verifyProof(proof)
 
@@ -242,6 +179,10 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+
+      const decryptedVote = decryptVote(previousCiphertext, secretKey)
+
+      expect(decryptedVote).toEqual(ZERO_VOTE)
 
       const isValid = await verifyProof(proof)
 

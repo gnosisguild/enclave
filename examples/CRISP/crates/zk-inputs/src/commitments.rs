@@ -23,7 +23,7 @@ use std::sync::Arc;
 ///
 /// # Returns
 /// The commitment as a BigInt.
-pub fn compute_commitment(
+pub fn compute_ct_commitment(
     bfv_params: Arc<BfvParameters>,
     ct0is: &[Vec<BigInt>],
     ct1is: &[Vec<BigInt>],

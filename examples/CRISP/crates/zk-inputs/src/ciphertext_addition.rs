@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::commitments::compute_commitment;
+use crate::commitments::compute_ct_commitment;
 use bigint_poly::*;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
@@ -230,7 +230,7 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
-        res.prev_ct_commitment = compute_commitment(params, &res.prev_ct0is, &res.prev_ct1is)?;
+        res.prev_ct_commitment = compute_ct_commitment(params, &res.prev_ct0is, &res.prev_ct1is)?;
 
         Ok(res)
     }

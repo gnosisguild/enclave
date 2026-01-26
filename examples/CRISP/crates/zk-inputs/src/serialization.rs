@@ -10,8 +10,6 @@
 
 use crate::ciphertext_addition::CiphertextAdditionInputs;
 use eyre::{Context, Result};
-use greco::bounds::GrecoBounds;
-use greco::bounds::GrecoCryptographicParameters;
 use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use serde::Serialize;
@@ -25,7 +23,6 @@ pub struct ZKInputs {
     sum_ct1is: Vec<serde_json::Value>,
     sum_r0is: Vec<serde_json::Value>,
     sum_r1is: Vec<serde_json::Value>,
-    params: serde_json::Value,
     ct0is: Vec<serde_json::Value>,
     ct1is: Vec<serde_json::Value>,
     pk0is: Vec<serde_json::Value>,
@@ -48,48 +45,18 @@ fn to_string_1d_vec(vec: &[BigInt]) -> Vec<String> {
     vec.iter().map(|x| x.to_string()).collect()
 }
 
-/// Constructs a ZKInputs from GRECO bounds and vectors.
+/// Constructs a ZKInputs from GRECO vectors.
 ///
 /// # Arguments
-/// * `crypto_params` - Cryptographic parameters from GRECO
-/// * `bounds` - Bounds from GRECO
 /// * `vectors_standard` - Standard form vectors from GRECO
 /// * `ciphertext_addition_inputs_standard` - Standard form ciphertext addition inputs
 ///
 /// # Returns
 /// A ZKInputs struct ready for JSON serialization
 pub fn construct_inputs(
-    crypto_params: &GrecoCryptographicParameters,
-    bounds: &GrecoBounds,
     vectors_standard: &GrecoVectors,
     ciphertext_addition_inputs_standard: &CiphertextAdditionInputs,
 ) -> ZKInputs {
-    let mut params_json = serde_json::Map::new();
-
-    // Add crypto params.
-    let crypto_json = serde_json::json!({
-        "q_mod_t": crypto_params.q_mod_t.to_string(),
-        "qis": crypto_params.moduli.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "k0is": crypto_params.k0is.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-    });
-    params_json.insert("crypto".to_string(), crypto_json);
-
-    // Add bounds.
-    let bounds_json = serde_json::json!({
-        "e0_bound": bounds.e0_bound.to_string(),
-        "e1_bound": bounds.e1_bound.to_string(),
-        "u_bound": bounds.u_bound.to_string(),
-        "k1_low_bound": bounds.k1_low_bound.to_string(),
-        "k1_up_bound": bounds.k1_up_bound.to_string(),
-        "p1_bounds": bounds.p1_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "p2_bounds": bounds.p2_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "pk_bounds": bounds.pk_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "r1_low_bounds": bounds.r1_low_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "r1_up_bounds": bounds.r1_up_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "r2_bounds": bounds.r2_bounds.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-    });
-    params_json.insert("bounds".to_string(), bounds_json);
-
     ZKInputs {
         prev_ct0is: ciphertext_addition_inputs_standard
             .prev_ct0is
@@ -148,7 +115,6 @@ pub fn construct_inputs(
                 })
             })
             .collect(),
-        params: serde_json::Value::Object(params_json),
         ct0is: vectors_standard
             .ct0is
             .iter()
@@ -270,32 +236,7 @@ pub fn serialize_inputs_to_json(inputs: &ZKInputs) -> Result<String> {
 mod tests {
     use super::*;
     use num_bigint::BigInt;
-    use num_bigint::BigUint;
     use serde_json::Value;
-
-    fn create_mock_crypto_params() -> GrecoCryptographicParameters {
-        GrecoCryptographicParameters {
-            q_mod_t: BigInt::from(12345),
-            moduli: vec![1000007u64, 1000009u64],
-            k0is: vec![1u64, 2u64],
-        }
-    }
-
-    fn create_mock_bounds() -> GrecoBounds {
-        GrecoBounds {
-            e0_bound: BigUint::from(100u64),
-            e1_bound: BigUint::from(100u64),
-            u_bound: BigUint::from(200u64),
-            k1_low_bound: BigUint::from(10u64),
-            k1_up_bound: BigUint::from(20u64),
-            p1_bounds: vec![BigUint::from(30u64), BigUint::from(40u64)],
-            p2_bounds: vec![BigUint::from(50u64), BigUint::from(60u64)],
-            pk_bounds: vec![BigUint::from(70u64), BigUint::from(80u64)],
-            r1_low_bounds: vec![BigUint::from(90u64), BigUint::from(100u64)],
-            r1_up_bounds: vec![BigUint::from(110u64), BigUint::from(120u64)],
-            r2_bounds: vec![BigUint::from(130u64), BigUint::from(140u64)],
-        }
-    }
 
     fn create_mock_vectors() -> GrecoVectors {
         GrecoVectors {
@@ -362,20 +303,12 @@ mod tests {
 
     #[test]
     fn test_construct_inputs_basic() {
-        let crypto_params = create_mock_crypto_params();
-        let bounds = create_mock_bounds();
         let vectors = create_mock_vectors();
         let ciphertext_addition_inputs = create_mock_ciphertext_addition_inputs();
 
-        let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &vectors,
-            &ciphertext_addition_inputs,
-        );
+        let inputs = construct_inputs(&vectors, &ciphertext_addition_inputs);
 
         // Verify basic structure.
-        assert!(inputs.params.is_object());
         assert_eq!(inputs.prev_ct0is.len(), 1);
         assert_eq!(inputs.prev_ct1is.len(), 1);
         assert_eq!(inputs.sum_ct0is.len(), 1);
@@ -395,17 +328,10 @@ mod tests {
 
     #[test]
     fn test_serialize_inputs_to_json() {
-        let crypto_params = create_mock_crypto_params();
-        let bounds = create_mock_bounds();
         let vectors = create_mock_vectors();
         let ciphertext_addition_inputs = create_mock_ciphertext_addition_inputs();
 
-        let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &vectors,
-            &ciphertext_addition_inputs,
-        );
+        let inputs = construct_inputs(&vectors, &ciphertext_addition_inputs);
 
         let json_result = serialize_inputs_to_json(&inputs);
         assert!(json_result.is_ok());
@@ -418,7 +344,6 @@ mod tests {
         assert!(parsed.is_object());
 
         // Verify required fields exist.
-        assert!(parsed.get("params").is_some());
         assert!(parsed.get("prev_ct0is").is_some());
         assert!(parsed.get("prev_ct1is").is_some());
         assert!(parsed.get("sum_ct0is").is_some());
