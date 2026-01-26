@@ -50,16 +50,9 @@ export interface SDKConfig {
   chainId?: number
 
   /**
-   * The BFV parameter set type to use for FHE operations.
-   * DKG: Parameters for Distributed Key Generation (PVSS phase)
-   * THRESHOLD: Parameters for threshold encryption/decryption operations
+   * The threshold BFV parameters preset name to use for the Enclave requests
    */
-  protocol: BfvParamSetType
-
-  /**
-   * The protocol parameters to use for the Enclave requests
-   */
-  protocolParams?: ProtocolParams
+  thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
 }
 
 export interface EventListenerConfig {
@@ -264,34 +257,13 @@ export interface VerifiableEncryptionResult {
 }
 
 /**
- * BFV parameter set type for FHE operations.
- *
- * The protocol is always FHE BFV, but different parameter sets are needed:
- * - DKG: Used during Distributed Key Generation (PVSS phase 0-1) where each
- *   ciphernode generates a standard BFV key-pair to encrypt secret shares.
- * - THRESHOLD: Used for threshold encryption/decryption operations (PVSS phase 2-4)
- *   where the threshold public key is used for encryption and T+1 parties
- *   collaborate for decryption.
- */
-export enum BfvParamSetType {
-  /**
-   * DKG parameter set - for Distributed Key Generation phase
-   */
-  DKG = 'DKG',
-  /**
-   * Threshold parameter set - for threshold encryption/decryption operations
-   */
-  THRESHOLD = 'THRESHOLD',
-}
-
-/**
- * Protocol parameters for an Enclave program request
+ * BFV parameters for an Enclave program request
  * Example for BFV
  *   2048,               // degree
  *   1032193,            // plaintext_modulus
  *   0x3FFFFFFF000001,   // moduli
  */
-export interface ProtocolParams {
+export interface BfvParams {
   /**
    * The degree of the polynomial
    */
@@ -310,16 +282,12 @@ export interface ProtocolParams {
   error1Variance: string | undefined
 }
 
-export type ProtocolParamsName = 'INSECURE_THRESHOLD_BFV_512' | 'INSECURE_DKG_512' | 'SECURE_THRESHOLD_BFV_8192' | 'SECURE_DKG_8192'
+export type ThresholdBfvParamsPresetName = 'INSECURE_THRESHOLD_BFV_512' | 'SECURE_THRESHOLD_BFV_8192'
 
-/**
- * Preset identifiers for BFV/TRBFV parameter selection.
- * Use these with `EnclaveSDK.getBfvParamsSet()` to fetch the actual parameters.
- */
-export const BfvProtocolParams = {
-  DKG: 'INSECURE_DKG_512',
-  THRESHOLD: 'INSECURE_THRESHOLD_BFV_512',
-} as const satisfies Record<string, ProtocolParamsName>
+export const ThresholdBfvParamsPresetNames = [
+  'INSECURE_THRESHOLD_BFV_512',
+  'SECURE_THRESHOLD_BFV_8192',
+] as const satisfies ReadonlyArray<ThresholdBfvParamsPresetName>
 
 /**
  * The result of encrypting a value and generating a proof

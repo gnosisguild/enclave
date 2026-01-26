@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { type Address, type Hash, type Log, encodeAbiParameters } from 'viem'
-import type { ProtocolParams } from './types'
+import type { BfvParams } from './types'
 
 export class SDKError extends Error {
   constructor(
@@ -86,7 +86,7 @@ export const DEFAULT_E3_CONFIG = {
  * Encode BFV parameters for the smart contract
  * BFV (Brakerski-Fan-Vercauteren) is a type of fully homomorphic encryption
  */
-export function encodeBfvParams(params: ProtocolParams): `0x${string}` {
+export function encodeBfvParams(params: BfvParams): `0x${string}` {
   const { degree, plaintextModulus, moduli, error1Variance } = params
 
   if (error1Variance === undefined) {

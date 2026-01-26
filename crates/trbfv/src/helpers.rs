@@ -45,7 +45,7 @@ pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Resu
 
 /// TODO: Make this modular
 pub fn get_share_encryption_params() -> Arc<BfvParameters> {
-    let param_set: BfvParamSet = BfvPreset::SecureDkg8192.into();
+    let param_set: BfvParamSet = BfvPreset::InsecureDkg512.into();
     param_set.build_arc()
 }
 

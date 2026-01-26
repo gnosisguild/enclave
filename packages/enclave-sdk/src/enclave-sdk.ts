@@ -12,7 +12,7 @@ import initializeWasm from '@enclave-e3/wasm/init'
 import { CiphernodeRegistryOwnable__factory, Enclave__factory } from '@enclave-e3/contracts/types'
 import { ContractClient } from './contract-client'
 import { EventListener } from './event-listener'
-import { BfvParamSetType, EnclaveEventType } from './types'
+import { EnclaveEventType, ThresholdBfvParamsPresetNames } from './types'
 import { SDKError, isValidAddress } from './utils'
 
 import type {
@@ -20,10 +20,10 @@ import type {
   E3,
   EventCallback,
   SDKConfig,
-  ProtocolParams,
+  BfvParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
-  ProtocolParamsName,
+  ThresholdBfvParamsPresetName,
 } from './types'
 import {
   bfv_encrypt_number,
@@ -47,8 +47,7 @@ export class EnclaveSDK {
   private eventListener: EventListener
   private contractClient: ContractClient
   private initialized = false
-  private protocol: BfvParamSetType
-  private protocolParams?: ProtocolParams
+  private thresholdBfvParamsPresetName?: ThresholdBfvParamsPresetName
   private publicClient: PublicClient
 
   // TODO: use zod for config validation
@@ -69,19 +68,20 @@ export class EnclaveSDK {
       throw new SDKError('Invalid FeeToken contract address', 'INVALID_ADDRESS')
     }
 
+    if (!config.thresholdBfvParamsPresetName) {
+      throw new SDKError('Threshold BFV parameters preset name is required', 'MISSING_THRESHOLD_BFV_PARAMS_PRESET_NAME')
+    }
+
+    if (!Object.values(ThresholdBfvParamsPresetNames).includes(config.thresholdBfvParamsPresetName)) {
+      throw new SDKError(
+        `Invalid threshold BFV parameters preset name: ${config.thresholdBfvParamsPresetName}`,
+        'INVALID_THRESHOLD_BFV_PARAMS_PRESET_NAME',
+      )
+    }
+
+    this.thresholdBfvParamsPresetName = config.thresholdBfvParamsPresetName
     this.eventListener = new EventListener(config.publicClient)
     this.contractClient = new ContractClient(config.publicClient, config.walletClient, config.contracts)
-
-    if (!Object.values(BfvParamSetType).includes(config.protocol)) {
-      throw new SDKError(`Invalid BFV parameter set type: ${config.protocol}`, 'INVALID_PARAM_SET_TYPE')
-    }
-
-    this.protocol = config.protocol
-
-    if (config.protocolParams) {
-      this.protocolParams = config.protocolParams
-    }
-
     this.publicClient = config.publicClient
   }
 
@@ -108,9 +108,9 @@ export class EnclaveSDK {
     return this.publicClient
   }
 
-  public async getBfvParamsSet(name: ProtocolParamsName): Promise<ProtocolParams> {
+  public async getThresholdBfvParamsSet(): Promise<BfvParams> {
     await initializeWasm()
-    let params = get_bfv_params(name as string)
+    let params = get_bfv_params(this.thresholdBfvParamsPresetName as ThresholdBfvParamsPresetName)
     return {
       degree: Number(params.degree), // degree is returned as a bigint from wasm
       plaintextModulus: params.plaintext_modulus as bigint,
@@ -119,23 +119,9 @@ export class EnclaveSDK {
     }
   }
 
-  public async getProtocolParams(): Promise<ProtocolParams> {
-    await initializeWasm()
-    if (this.protocolParams) {
-      return this.protocolParams
-    }
-
-    switch (this.protocol) {
-      case BfvParamSetType.DKG:
-        return await this.getBfvParamsSet('INSECURE_DKG_512')
-      case BfvParamSetType.THRESHOLD:
-        return await this.getBfvParamsSet('INSECURE_THRESHOLD_BFV_512')
-    }
-  }
-
   public async computePublicKeyCommitment(publicKey: Uint8Array): Promise<Uint8Array> {
     await initializeWasm()
-    const protocolParams = await this.getProtocolParams()
+    const protocolParams = await this.getThresholdBfvParamsSet()
 
     return compute_pk_commitment(
       publicKey,
@@ -153,7 +139,7 @@ export class EnclaveSDK {
    */
   public async encryptNumber(data: bigint, publicKey: Uint8Array): Promise<Uint8Array> {
     await initializeWasm()
-    const protocolParams = await this.getProtocolParams()
+    const protocolParams = await this.getThresholdBfvParamsSet()
 
     return bfv_encrypt_number(
       data,
@@ -172,7 +158,7 @@ export class EnclaveSDK {
    */
   public async encryptVector(data: BigUint64Array, publicKey: Uint8Array): Promise<Uint8Array> {
     await initializeWasm()
-    const protocolParams = await this.getProtocolParams()
+    const protocolParams = await this.getThresholdBfvParamsSet()
 
     return bfv_encrypt_vector(
       data,
@@ -192,7 +178,7 @@ export class EnclaveSDK {
    */
   public async encryptNumberAndGenInputs(data: bigint, publicKey: Uint8Array): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm()
-    const protocolParams = await this.getProtocolParams()
+    const protocolParams = await this.getThresholdBfvParamsSet()
 
     const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
       data,
@@ -238,7 +224,7 @@ export class EnclaveSDK {
    */
   public async encryptVectorAndGenInputs(data: BigUint64Array, publicKey: Uint8Array): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm()
-    const protocolParams = await this.getProtocolParams()
+    const protocolParams = await this.getThresholdBfvParamsSet()
 
     const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_vector(
       data,
@@ -513,8 +499,7 @@ export class EnclaveSDK {
     }
     privateKey?: `0x${string}`
     chainId: keyof typeof EnclaveSDK.chains
-    protocol: BfvParamSetType
-    protocolParams?: ProtocolParams
+    thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
   }): EnclaveSDK {
     const chain = EnclaveSDK.chains[options.chainId]
 
@@ -544,8 +529,7 @@ export class EnclaveSDK {
       walletClient,
       contracts: options.contracts,
       chainId: options.chainId,
-      protocol: options.protocol,
-      protocolParams: options.protocolParams,
+      thresholdBfvParamsPresetName: options.thresholdBfvParamsPresetName,
     })
   }
 }

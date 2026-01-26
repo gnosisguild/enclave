@@ -11,7 +11,6 @@ import {
   type SDKConfig,
   type AllEventTypes,
   type EventCallback,
-  BfvParamSetType,
   type ProtocolParams,
   EnclaveEventType,
   RegistryEventType,
@@ -26,7 +25,6 @@ export interface UseEnclaveSDKConfig {
   }
   chainId?: number
   autoConnect?: boolean
-  protocol: BfvParamSetType
   protocolParams?: ProtocolParams
 }
 
@@ -69,7 +67,6 @@ export interface UseEnclaveSDKReturn {
  *       enclave: '0x...',
  *       ciphernodeRegistry: '0x...'
  *     },
- *     protocol: BfvParamSetType.DKG,
  *     protocolParams: {
  *       degree: 2048,
  *       plaintextModulus: 1032193n,

@@ -34,13 +34,13 @@ export type {
   CommitteeFinalizedData,
   EnclaveEventData,
   RegistryEventData,
-  ProtocolParams,
+  BfvParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
 } from './types'
 
 // enums and constants
-export { EnclaveEventType, RegistryEventType, BfvParamSetType, BfvProtocolParams } from './types'
+export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetName, ThresholdBfvParamsPresetNames } from './types'
 
 // Export utilities
 export {

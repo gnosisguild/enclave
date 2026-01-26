@@ -9,7 +9,7 @@ use alloy::{
     primitives::{Bytes, FixedBytes, Uint},
     sol,
 };
-use e3_bfv_client::client::compute_pk_commitment;
+use e3_bfv_client::compute_pk_commitment;
 use e3_evm_helpers::contracts::ReadOnly;
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
