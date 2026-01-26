@@ -26,7 +26,8 @@ pub struct EvmSystemChainBuilder<P> {
 }
 
 impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
-    pub fn new(bus: &BusHandle, provider: &EthProvider<P>, chain_id: u64) -> Self {
+    pub fn new(bus: &BusHandle, provider: &EthProvider<P>) -> Self {
+        let chain_id = provider.chain_id();
         Self {
             bus: bus.clone(),
             provider: provider.clone(),
@@ -35,7 +36,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         }
     }
 
-    pub fn with_route<F: RouteFn + 'static>(mut self, route_fn: F) -> Self {
+    pub fn with_contract<F: RouteFn + 'static>(mut self, route_fn: F) -> Self {
         self.route_factories.push(Box::new(route_fn));
         self
     }

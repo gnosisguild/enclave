@@ -150,8 +150,8 @@ async fn evm_reader() -> Result<()> {
     let chain_id = provider.chain_id();
     let contract_address = contract.address().clone();
     let sync = FakeSyncActor::setup(&bus);
-    EvmSystemChainBuilder::new(&bus, &provider, chain_id)
-        .with_route(move |upstream| {
+    EvmSystemChainBuilder::new(&bus, &provider)
+        .with_contract(move |upstream| {
             (
                 contract_address,
                 TestEventParser::setup(&upstream).recipient(),
@@ -234,8 +234,8 @@ async fn ensure_historical_events() -> Result<()> {
     sleep(Duration::from_millis(1)).await;
 
     let sync = FakeSyncActor::setup(&bus);
-    EvmSystemChainBuilder::new(&bus, &provider, chain_id)
-        .with_route(move |upstream| {
+    EvmSystemChainBuilder::new(&bus, &provider)
+        .with_contract(move |upstream| {
             (
                 contract_address,
                 TestEventParser::setup(&upstream).recipient(),
