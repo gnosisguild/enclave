@@ -20,3 +20,4 @@ num-bigint = "0.4.6"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
+e3-fhe-params = { workspace = true }

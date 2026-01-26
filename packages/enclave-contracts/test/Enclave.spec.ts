@@ -45,9 +45,12 @@ describe("Enclave", function () {
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-  const polynomial_degree = ethers.toBigInt(2048);
-  const plaintext_modulus = ethers.toBigInt(1032193);
-  const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
+  const polynomial_degree = ethers.toBigInt(512);
+  const plaintext_modulus = ethers.toBigInt(10);
+  const moduli = [
+    ethers.toBigInt("0xffffee001"),
+    ethers.toBigInt("0xffffc4001"),
+  ];
 
   const encodedE3ProgramParams = abiCoder.encode(
     ["uint256", "uint256", "uint256[]"],

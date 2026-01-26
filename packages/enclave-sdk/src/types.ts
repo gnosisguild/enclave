@@ -259,9 +259,10 @@ export interface VerifiableEncryptionResult {
 /**
  * BFV parameters for an Enclave program request
  * Example for BFV
- *   2048,               // degree
- *   1032193,            // plaintext_modulus
- *   0x3FFFFFFF000001,   // moduli
+ *   512,           // degree
+ *   10,            // plaintext_modulus
+ *   0xffffee001,   // moduli
+ *   0xffffc4001,   // moduli
  */
 export interface BfvParams {
   /**
