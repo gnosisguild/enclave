@@ -173,3 +173,40 @@ export const getMaxVoteValue = (numChoices: number): bigint => {
 export const getZeroVote = (numChoices: number): bigint[] => {
   return Array(numChoices).fill(0n)
 }
+
+/**
+ * Decode bytes to numbers array (little-endian, 8 bytes per value).
+ * @param data The bytes to decode (must be multiple of 8).
+ * @returns Array of numbers.
+ */
+export const decodeBytesToNumbers = (data: Uint8Array): number[] => {
+  if (data.length % 8 !== 0) {
+    throw new Error('Data length must be multiple of 8')
+  }
+
+  const arrayLength = data.length / 8
+  const result: number[] = []
+
+  for (let i = 0; i < arrayLength; i++) {
+    const offset = i * 8
+    let value = 0
+
+    // Read 8 bytes in little-endian order
+    for (let j = 0; j < 8; j++) {
+      const byteValue = data[offset + j]
+      value |= byteValue << (j * 8)
+    }
+
+    result.push(value)
+  }
+
+  return result
+}
+
+export const bigInt64ArrayToNumberArray = (bigInt64Array: BigInt64Array): number[] => {
+  return Array.from(bigInt64Array).map(Number)
+}
+
+export const numberArrayToBigInt64Array = (numberArray: number[]): BigInt64Array => {
+  return BigInt64Array.from(numberArray.map(BigInt))
+}

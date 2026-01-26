@@ -21,9 +21,11 @@
   "types": "./dist/index.d.ts",
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
-    "compile:circuit": "cd ../../circuits/bin/crisp && nargo compile",
+    "compile:crisp": "cd ../../circuits/bin/crisp && nargo compile",
+    "compile:greco": "cd ../../circuits/bin/greco && nargo compile",
+    "compile:circuits": "pnpm compile:crisp && pnpm compile:greco",
     "build:wasm": "pnpm -C ../crisp-zk-inputs build",
-    "build": "pnpm build:wasm && pnpm compile:circuit && tsup",
+    "build": "pnpm build:wasm && pnpm compile:circuits && tsup",
     "test": "vitest --run"
   },
   "publishConfig": {

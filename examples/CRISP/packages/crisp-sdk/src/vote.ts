@@ -24,10 +24,12 @@ import {
   getOptimalThreadCount,
   getZeroVote,
   getMaxVoteValue,
+  decodeBytesToNumbers,
+  numberArrayToBigInt64Array,
 } from './utils'
 import { MASK_SIGNATURE, MAX_VOTE_BITS, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import { UltraHonkBackend } from '@aztec/bb.js'
+import { deflattenFields, UltraHonkBackend } from '@aztec/bb.js'
 import crispCircuit from '../../../circuits/bin/crisp/target/crisp.json'
 import grecoCircuit from '../../../circuits/bin/greco/target/crisp_greco.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
@@ -42,7 +44,7 @@ const optimalThreadCount = await getOptimalThreadCount()
  * @param vote Array of vote values, one per choice.
  * @returns The encoded vote as a BigInt64Array.
  */
-export const encodeVote = (vote: Vote): BigInt64Array => {
+export const encodeVote = (vote: Vote): number[] => {
   if (vote.length < 2) {
     throw new Error('Vote must have at least two choices')
   }
@@ -55,7 +57,7 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
   const segmentSize = Math.floor(degree / n)
   const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
   const maxValue = (1n << BigInt(maxBits)) - 1n
-  const voteArray: string[] = []
+  const voteArray: number[] = []
 
   for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
     const value = choiceIdx < vote.length ? vote[choiceIdx] : 0n
@@ -68,38 +70,16 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
 
     for (let i = 0; i < segmentSize; i += 1) {
       const offset = segmentSize - binary.length
-      voteArray.push(i < offset ? '0' : binary[i - offset])
+      voteArray.push(i < offset ? 0 : parseInt(binary[i - offset]))
     }
   }
 
   const remainder = degree - segmentSize * n
   for (let i = 0; i < remainder; i++) {
-    voteArray.push('0')
+    voteArray.push(0)
   }
 
-  return BigInt64Array.from(voteArray.map(BigInt))
-}
-
-/**
- * Decode bytes to bigint array (little-endian, 8 bytes per value).
- * Uses BigInt to prevent precision loss for u64 values exceeding 2^53-1.
- * @param data The bytes to decode (must be multiple of 8).
- * @returns Array of bigints.
- */
-const decodeBytesToBigInts = (data: Uint8Array): bigint[] => {
-  if (data.length % 8 !== 0) {
-    throw new Error('Data length must be multiple of 8')
-  }
-
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
-  const arrayLength = data.length / 8
-  const result: bigint[] = []
-
-  for (let i = 0; i < arrayLength; i++) {
-    result.push(view.getBigUint64(i * 8, true)) // true = little-endian
-  }
-
-  return result
+  return voteArray
 }
 
 /**
@@ -108,27 +88,30 @@ const decodeBytesToBigInts = (data: Uint8Array): bigint[] => {
  * @param numChoices Number of choices.
  * @returns Array of vote counts per choice.
  */
-export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
-  const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
-  const bytes = hexToBytes(hexString as Hex)
-  const values = decodeBytesToBigInts(bytes)
+export const decodeTally = (tallyBytes: string | number[], numChoices: number): Vote => {
+  if (typeof tallyBytes === 'string') {
+    // Convert hex string to bytes, handling both with and without 0x prefix
+    // and decode to numbers.
+    const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
+    tallyBytes = decodeBytesToNumbers(hexToBytes(hexString as Hex))
+  }
 
   if (numChoices <= 0) {
     throw new Error('Number of choices must be positive')
   }
 
-  const segmentSize = Math.floor(values.length / numChoices)
+  const segmentSize = Math.floor(tallyBytes.length / numChoices)
   const effectiveSize = Math.min(segmentSize, MAX_VOTE_BITS)
   const results: Vote = []
 
   for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
     const segmentStart = choiceIdx * segmentSize
     const readStart = segmentStart + segmentSize - effectiveSize
-    const segment = values.slice(readStart, readStart + effectiveSize)
+    const segment = tallyBytes.slice(readStart, readStart + effectiveSize)
 
-    let value = 0n
+    let value = 0
     for (let i = 0; i < segment.length; i++) {
-      const weight = 1n << BigInt(segment.length - 1 - i)
+      const weight = 1 << (segment.length - 1 - i)
       value += segment[i] * weight
     }
 
@@ -147,15 +130,27 @@ export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
 export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
   const encodedVote = encodeVote(vote)
 
-  return zkInputsGenerator.encryptVote(publicKey, encodedVote)
+  return zkInputsGenerator.encryptVote(publicKey, numberArrayToBigInt64Array(encodedVote))
 }
 
 /**
- * Generate a random public key.
- * @returns The generated public key as a Uint8Array.
+ * Decrypt the vote using the secret key.
+ * @param vote - The vote to decrypt.
+ * @param secretKey - The secret key to use for decryption.
+ * @returns The decrypted vote as a Vote.
  */
-export const generatePublicKey = (): Uint8Array => {
-  return zkInputsGenerator.generatePublicKey()
+export const decryptVote = (ciphertext: Uint8Array, secretKey: Uint8Array): Vote => {
+  const decryptedVote = zkInputsGenerator.decryptVote(secretKey, ciphertext)
+
+  return decodeTally(Array.from(decryptedVote).map((v) => Number(v)))
+}
+
+/**
+ * Generate a random BFV public/secret key pair.
+ * @returns The generated public/secret key pair as a JavaScript object.
+ */
+export const generateBFVKeys = (): { secretKey: Uint8Array; publicKey: Uint8Array } => {
+  return zkInputsGenerator.generateKeys()
 }
 
 /**
@@ -195,13 +190,17 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<{
       // the previous ciphertext is not provided (is_first_vote is true).
       encryptVote(zeroVote, proofInputs.publicKey),
       proofInputs.publicKey,
-      encodedVote,
+      numberArrayToBigInt64Array(encodedVote),
     )
 
     circuitInputs = result.inputs
     encryptedVote = result.encryptedVote
   } else {
-    const result = await zkInputsGenerator.generateInputsForUpdate(proofInputs.previousCiphertext, proofInputs.publicKey, encodedVote)
+    const result = await zkInputsGenerator.generateInputsForUpdate(
+      proofInputs.previousCiphertext,
+      proofInputs.publicKey,
+      numberArrayToBigInt64Array(encodedVote),
+    )
 
     circuitInputs = result.inputs
     encryptedVote = result.encryptedVote
@@ -231,7 +230,7 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<{
  * @param crispInputs - The circuit inputs.
  * @returns The execute circuit result.
  */
-export const executeCrispCircuit = async (crispInputs: CRISPCircuitInputs): Promise<ExecuteCircuitResult> => {
+export const executeCrispCircuit = async (crispInputs: CRISPCircuitInputs): Promise<ExecuteCircuitResult<bigint>> => {
   const noir = new Noir(crispCircuit as CompiledCircuit)
 
   const { witness, returnValue } = await noir.execute(crispInputs)
@@ -239,12 +238,12 @@ export const executeCrispCircuit = async (crispInputs: CRISPCircuitInputs): Prom
   return { witness, returnValue: BigInt(returnValue as `0x${string}`) }
 }
 
-export const executeGrecoCircuit = async (grecoInputs: GrecoCircuitInputs): Promise<ExecuteCircuitResult> => {
+export const executeGrecoCircuit = async (grecoInputs: GrecoCircuitInputs): Promise<ExecuteCircuitResult<bigint[]>> => {
   const noir = new Noir(grecoCircuit as CompiledCircuit)
 
   const { witness, returnValue } = await noir.execute(grecoInputs)
 
-  return { witness, returnValue: BigInt(returnValue as `0x${string}`) }
+  return { witness, returnValue: (returnValue as any[]).map((v) => BigInt(v as `0x${string}`)) }
 }
 
 /**
@@ -253,22 +252,73 @@ export const executeGrecoCircuit = async (grecoInputs: GrecoCircuitInputs): Prom
  * @returns The proof.
  */
 export const generateProof = async (circuitInputs: any) => {
-  const { witness: grecoWitness } = await executeGrecoCircuit(circuitInputs)
+  const { witness: grecoWitness, returnValue: grecoReturnValue } = await executeGrecoCircuit({
+    pk_commitment: circuitInputs.pk_commitment,
+    ct0is: circuitInputs.ct0is,
+    ct1is: circuitInputs.ct1is,
+    pk0is: circuitInputs.pk0is,
+    pk1is: circuitInputs.pk1is,
+    r1is: circuitInputs.r1is,
+    r2is: circuitInputs.r2is,
+    p1is: circuitInputs.p1is,
+    p2is: circuitInputs.p2is,
+    u: circuitInputs.u,
+    e0: circuitInputs.e0,
+    e0is: circuitInputs.e0is,
+    e0_quotients: circuitInputs.e0_quotients,
+    e1: circuitInputs.e1,
+    k1: circuitInputs.k1,
+  })
   const grecoBackend = new UltraHonkBackend(
     (grecoCircuit as CompiledCircuit).bytecode,
     { threads: optimalThreadCount },
     { recursive: true },
   )
-  const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness)
-  const { proofAsFields, vkAsFields, vkHash } = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length)
 
-  const { witness: crispWitness } = await executeCrispCircuit(circuitInputs)
+  const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness)
+
+  const vk = await grecoBackend.getVerificationKey()
+  const vkAsFields = deflattenFields(vk)
+  const grecoProofAsFields = deflattenFields(grecoProof)
+  const { vkHash } = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length)
+
+  const { witness: crispWitness } = await executeCrispCircuit({
+    prev_ct0is: circuitInputs.prev_ct0is,
+    prev_ct1is: circuitInputs.prev_ct1is,
+    prev_ct_commitment: circuitInputs.prev_ct_commitment,
+    sum_ct0is: circuitInputs.sum_ct0is,
+    sum_ct1is: circuitInputs.sum_ct1is,
+    sum_r0is: circuitInputs.sum_r0is,
+    sum_r1is: circuitInputs.sum_r1is,
+    greco_verification_key: vkAsFields,
+    greco_key_hash: vkHash,
+    greco_proof: grecoProofAsFields,
+    ct0is: circuitInputs.ct0is,
+    ct1is: circuitInputs.ct1is,
+    k1: circuitInputs.k1,
+    pk_commitment: circuitInputs.pk_commitment,
+    k1_commitment: grecoReturnValue[0].toString(),
+    ct_commitment: grecoReturnValue[1].toString(),
+    public_key_x: circuitInputs.public_key_x,
+    public_key_y: circuitInputs.public_key_y,
+    signature: circuitInputs.signature,
+    hashed_message: circuitInputs.hashed_message,
+    merkle_root: circuitInputs.merkle_root,
+    merkle_proof_length: circuitInputs.merkle_proof_length,
+    merkle_proof_indices: circuitInputs.merkle_proof_indices,
+    merkle_proof_siblings: circuitInputs.merkle_proof_siblings,
+    slot_address: circuitInputs.slot_address,
+    balance: circuitInputs.balance,
+    is_first_vote: circuitInputs.is_first_vote,
+    is_mask_vote: circuitInputs.is_mask_vote,
+  } as CRISPCircuitInputs)
 
   const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
 
   const proof = await crispBackend.generateProof(crispWitness, { keccakZK: true })
 
-  await backend.destroy()
+  await crispBackend.destroy()
+  await grecoBackend.destroy()
 
   return proof
 }

@@ -180,9 +180,9 @@ export type ProofData = {
   encryptedVote: Uint8Array
 }
 
-export type ExecuteCircuitResult = {
+export type ExecuteCircuitResult<T> = {
   witness: Uint8Array
-  returnValue: bigint
+  returnValue: T
 }
 
 export type ProofInputs = {

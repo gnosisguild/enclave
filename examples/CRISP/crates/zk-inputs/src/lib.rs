@@ -26,6 +26,8 @@ use fhe::bfv::Ciphertext;
 use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::bfv::{Encoding, Plaintext};
+use fhe_traits::FheDecoder;
+use fhe_traits::FheDecrypter;
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -222,17 +224,47 @@ impl ZKInputsGenerator {
         Ok(ct.to_bytes())
     }
 
-    /// Generates a new public/secret key pair and returns the public key.
+    /// Decrypts a vote using the provided secret key.
+    ///
+    /// # Arguments
+    /// * `secret_key` - Secret key bytes for decryption
+    /// * `ciphertext` - Ciphertext bytes to decrypt
     ///
     /// # Returns
-    /// Raw bytes of the public key
-    pub fn generate_public_key(&self) -> Result<Vec<u8>> {
+    /// Vote value as a vector of coefficients
+    pub fn decrypt_vote(&self, secret_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u64>> {
+        let ct = Ciphertext::from_bytes(ciphertext, &self.bfv_params)
+            .with_context(|| "Failed to deserialize ciphertext")?;
+
+        // Deserialize secret key from bytes (coefficients serialized with bincode)
+        let coeffs: Vec<i64> = bincode::deserialize(secret_key)
+            .with_context(|| "Failed to deserialize secret key coefficients")?;
+        let sk = SecretKey::new(coeffs, &self.bfv_params);
+
+        let pt = sk
+            .try_decrypt(&ct)
+            .with_context(|| "Failed to decrypt ciphertext")?;
+        let vote = Vec::<u64>::try_decode(&pt, Encoding::poly())
+            .with_context(|| "Failed to decode plaintext")?;
+
+        Ok(vote)
+    }
+
+    /// Generates a new public/secret key pair and returns the secret key and public key bytes.
+    ///
+    /// # Returns
+    /// Tuple containing the secret key bytes and public key bytes
+    pub fn generate_keys(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         // Generate keys.
         let mut rng = thread_rng();
         let sk = SecretKey::random(&self.bfv_params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
 
-        Ok(pk.to_bytes())
+        // Serialize secret key coefficients with bincode
+        let sk_bytes =
+            bincode::serialize(&sk.coeffs).with_context(|| "Failed to serialize secret key")?;
+
+        Ok((sk_bytes, pk.to_bytes()))
     }
 
     /// Returns a clone of the BFV parameters used by this generator.
@@ -273,9 +305,7 @@ mod tests {
     #[test]
     fn test_inputs_generation_with_defaults() {
         let generator = ZKInputsGenerator::with_defaults();
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         let vote = create_vote_vector();
         let prev_ciphertext = generator
             .encrypt_vote(&public_key, vote.clone())
@@ -318,9 +348,7 @@ mod tests {
     #[test]
     fn test_inputs_generation_with_vote_0() {
         let generator = ZKInputsGenerator::with_defaults();
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         let vote = create_vote_vector();
         let prev_ciphertext = generator
             .encrypt_vote(&public_key, vote.clone())
@@ -353,10 +381,9 @@ mod tests {
         let generator = ZKInputsGenerator::with_defaults();
 
         // Test that functions use secure randomness (no deterministic seed).
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         assert!(!public_key.is_empty());
+        assert!(!secret_key.is_empty());
         let vote = create_vote_vector();
 
         let ciphertext = generator
@@ -396,9 +423,7 @@ mod tests {
     #[test]
     fn test_vote_values() {
         let generator = ZKInputsGenerator::with_defaults();
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         let vote = create_vote_vector();
         let prev_ciphertext = generator
             .encrypt_vote(&public_key, vote.clone())
@@ -418,9 +443,7 @@ mod tests {
     #[test]
     fn test_json_output_structure() {
         let generator = ZKInputsGenerator::with_defaults();
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         let vote = create_vote_vector();
         let prev_ciphertext = generator
             .encrypt_vote(&public_key, vote.clone())
@@ -451,9 +474,7 @@ mod tests {
     #[test]
     fn test_cryptographic_properties() {
         let generator = ZKInputsGenerator::with_defaults();
-        let public_key = generator
-            .generate_public_key()
-            .expect("Failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("Failed to generate keys");
         let vote = create_vote_vector();
 
         // Test that different votes produce different ciphertexts.
@@ -476,5 +497,101 @@ mod tests {
         assert!(!ct0.is_empty());
         assert!(!ct1.is_empty());
         assert!(!ct0_2.is_empty());
+    }
+
+    #[test]
+    fn test_decrypt_vote() {
+        let generator = ZKInputsGenerator::with_defaults();
+        let (secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
+        let vote = create_vote_vector();
+
+        // Encrypt the vote
+        let ciphertext = generator
+            .encrypt_vote(&public_key, vote.clone())
+            .expect("failed to encrypt vote");
+        assert!(!ciphertext.is_empty());
+
+        // Decrypt the vote
+        let decrypted_vote = generator
+            .decrypt_vote(&secret_key, &ciphertext)
+            .expect("failed to decrypt vote");
+
+        // Verify the decrypted vote matches the original
+        assert_eq!(decrypted_vote, vote);
+    }
+
+    #[test]
+    fn test_decrypt_vote_roundtrip() {
+        let generator = ZKInputsGenerator::with_defaults();
+        let (secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
+
+        // Test with different vote patterns
+        let test_votes = vec![
+            vec![0u64; DEFAULT_DEGREE], // All zeros
+            vec![1u64; DEFAULT_DEGREE], // All ones
+            create_vote_vector(),       // Alternating pattern
+        ];
+
+        for vote in test_votes {
+            // Encrypt
+            let ciphertext = generator
+                .encrypt_vote(&public_key, vote.clone())
+                .expect("failed to encrypt vote");
+
+            // Decrypt
+            let decrypted = generator
+                .decrypt_vote(&secret_key, &ciphertext)
+                .expect("failed to decrypt vote");
+
+            // Verify roundtrip
+            assert_eq!(decrypted, vote, "Decrypted vote should match original");
+        }
+    }
+
+    #[test]
+    fn test_decrypt_vote_wrong_key() {
+        let generator = ZKInputsGenerator::with_defaults();
+        let (_secret_key1, public_key1) =
+            generator.generate_keys().expect("failed to generate keys");
+        let (_secret_key2, _public_key2) =
+            generator.generate_keys().expect("failed to generate keys");
+        let vote = create_vote_vector();
+
+        // Encrypt with first key pair
+        let ciphertext = generator
+            .encrypt_vote(&public_key1, vote.clone())
+            .expect("failed to encrypt vote");
+
+        // Try to decrypt with wrong secret key (should fail or produce garbage)
+        let result = generator.decrypt_vote(&_secret_key2, &ciphertext);
+        // Decryption might succeed but produce incorrect results, or it might fail
+        // This test verifies the function doesn't panic
+        if let Ok(decrypted) = result {
+            // If decryption succeeds, the result should be different from original
+            assert_ne!(
+                decrypted, vote,
+                "Decryption with wrong key should produce different result"
+            );
+        }
+    }
+
+    #[test]
+    fn test_decrypt_vote_invalid_inputs() {
+        let generator = ZKInputsGenerator::with_defaults();
+        let (_secret_key, _public_key) =
+            generator.generate_keys().expect("failed to generate keys");
+
+        // Test invalid secret key bytes
+        let result = generator.decrypt_vote(&[1, 2, 3], &[4, 5, 6]);
+        assert!(result.is_err(), "Should fail with invalid secret key");
+
+        // Test invalid ciphertext bytes
+        let valid_sk_bytes = bincode::serialize(&vec![0i64; DEFAULT_DEGREE]).unwrap();
+        let result = generator.decrypt_vote(&valid_sk_bytes, &[1, 2, 3]);
+        assert!(result.is_err(), "Should fail with invalid ciphertext");
+
+        // Test empty inputs
+        let result = generator.decrypt_vote(&[], &[]);
+        assert!(result.is_err(), "Should fail with empty inputs");
     }
 }
