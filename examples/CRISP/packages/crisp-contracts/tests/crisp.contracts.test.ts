@@ -6,7 +6,7 @@
 
 import {
   hashLeaf,
-  generatePublicKey,
+  generateBFVKeys,
   SIGNATURE_MESSAGE,
   generateVoteProof,
   getAddressFromSignature,
@@ -18,7 +18,8 @@ import {
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
 
-let publicKey = generatePublicKey()
+let keys = generateBFVKeys()
+let publicKey = keys.publicKey
 
 describe('CRISP Contracts', function () {
   describe('decode tally', () => {

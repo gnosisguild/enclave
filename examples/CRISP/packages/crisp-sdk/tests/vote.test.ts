@@ -9,9 +9,9 @@ import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, MASK_SIGNATURE } from '../sr
 import { generateMerkleProof, getZeroVote } from '../src/utils'
 import {
   decodeTally,
-  generatePublicKey,
   verifyProof,
   encodeVote,
+  generateBFVKeys,
   generateCircuitInputs,
   computeCiphertextCommitment,
   encryptVote,
@@ -30,6 +30,7 @@ describe('Vote', () => {
   let address: string
   let leaves: bigint[]
   let publicKey: Uint8Array
+  let secretKey: Uint8Array
   let previousCiphertext: Uint8Array
   let e3Id: number
   let sdk: CrispSDK
@@ -65,7 +66,9 @@ describe('Vote', () => {
       { address, balance },
       { address: SLOT_ADDRESS, balance },
     ])
-    publicKey = generatePublicKey()
+    const keys = generateBFVKeys()
+    publicKey = keys.publicKey
+    secretKey = keys.secretKey
     previousCiphertext = encryptVote(zeroVote, publicKey)
     e3Id = 0
     sdk = new CrispSDK(CRISP_SERVER_URL)
@@ -81,16 +84,27 @@ describe('Vote', () => {
       expect(decoded[0]).toBe(10000000000n)
       expect(decoded[1]).toBe(30000000000n)
     })
+
+    it('Should decode an encoded tally into its decimal representation from a number array', () => {
+      const encoded = encodeVote({ yes: 10000000000n, no: 30000000000n })
+      const decoded = decodeTally(encoded)
+
+      expect(decoded.yes).toBe(10000000000n)
+      expect(decoded.no).toBe(30000000000n)
+    })
   })
 
   describe('encodeVote', () => {
-    const decodeSegment = (encoded: BigInt64Array, segmentIndex: number, numChoices: number): bigint => {
+    const decodeSegment = (encoded: number[], segmentIndex: number, numChoices: number): number => {
       const segmentSize = Math.floor(encoded.length / numChoices)
       const start = segmentIndex * segmentSize
-      const segment = Array.from(encoded.slice(start, start + segmentSize))
-      const binaryString = segment.map((b) => b.toString()).join('')
-      const trimmedBinary = binaryString.replace(/^0+/, '') || '0'
-      return BigInt('0b' + trimmedBinary)
+      const segment = encoded.slice(start, start + segmentSize)
+      let value = 0
+      for (let i = 0; i < segment.length; i++) {
+        const weight = 1 << (segment.length - 1 - i)
+        value += segment[i] * weight
+      }
+      return value
     }
 
     it('Should fail when the number of choices is less than 2', () => {
@@ -245,6 +259,11 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+      expect(proof.encryptedVote).toBeDefined()
+
+      const decryptedVote = decryptVote(proof.encryptedVote, secretKey)
+
+      expect(decryptedVote).toEqual(vote)
 
       const isValid = await verifyProof(proof)
 
@@ -268,6 +287,11 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+      expect(proof.encryptedVote).toBeDefined()
+
+      const decryptedVote = decryptVote(proof.encryptedVote, secretKey)
+
+      expect(decryptedVote).toEqual(ZERO_VOTE)
 
       const isValid = await verifyProof(proof)
 
@@ -291,6 +315,10 @@ describe('Vote', () => {
       expect(proof).toBeDefined()
       expect(proof.proof).toBeDefined()
       expect(proof.publicInputs).toBeDefined()
+
+      const decryptedVote = decryptVote(previousCiphertext, secretKey)
+
+      expect(decryptedVote).toEqual(ZERO_VOTE)
 
       const isValid = await verifyProof(proof)
 

@@ -6918,6 +6918,7 @@ dependencies = [
  "e3-bfv-client",
  "e3-fhe-params",
  "e3-polynomial",
+ "bincode",
  "e3-sdk",
  "e3-zk-helpers",
  "eyre",
