@@ -44,7 +44,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "crates/parity_matrix" }
+parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "crates/parity-matrix" }
 ```
 
 ## Usage
