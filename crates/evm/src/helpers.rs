@@ -34,7 +34,7 @@ use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, sync::Arc};
-use tracing::{info, error};
+use tracing::{error, info};
 
 use e3_utils::evm_error_decoder::extract_and_decode_from_string;
 
@@ -269,7 +269,7 @@ where
                         match extract_and_decode_from_string(error_str.as_str()) {
                             Some(decoded) => {
                                 // we were able to decode it, now let's check if it's one of the ones
-                                // we want to retry 
+                                // we want to retry
                                 if should_retry_error(&decoded.selector, &retry_refs) {
                                     info!("{}: error, will retry: {}", op_name, decoded.name);
                                     Err(RetryError::Retry(e))
@@ -279,11 +279,9 @@ where
                                     Err(RetryError::Failure(e))
                                 }
                             }
-                            // if it's not an error we have stored then we should assume 
-                            // we are not looking to retry 
-                            None => {
-                                Err(RetryError::Failure(e))
-                            }
+                            // if it's not an error we have stored then we should assume
+                            // we are not looking to retry
+                            None => Err(RetryError::Failure(e)),
                         }
                     }
                 }

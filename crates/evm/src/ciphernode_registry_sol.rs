@@ -405,7 +405,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                             error!("Failed to finalize commitee: {:?}", decoded.name);
                         }
                         None => {
-                            error!("Failed to finalize committee: {:?}", err);;
+                            error!("Failed to finalize committee: {:?}", err);
                         }
                     }
                     bus.err(EType::Evm, err);
@@ -449,7 +449,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                             error!("Failed to publish committee: {:?}", decoded.name);
                         }
                         None => {
-                            error!("Failed to publish committee: {:?}", err);;
+                            error!("Failed to publish committee: {:?}", err);
                         }
                     }
                     bus.err(EType::Evm, err)
