@@ -167,6 +167,7 @@ fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
 }
 
 #[actix::test]
+#[ignore = "Needs to be deleted after #1999 is merged"]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     use tracing_subscriber::{fmt, EnvFilter};
 
@@ -300,6 +301,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 }
 
 #[actix::test]
+#[ignore = "Needs to be ported to trBFV system after Sync is completed"]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let e3_id = E3id::new("1234", 1);
     let (rng, cn1_address, cn1_data, cn2_address, cn2_data, cipher, history, params, crpoly) = {
@@ -535,6 +537,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 }
 
 #[actix::test]
+#[ignore = "Needs to be ported to trBFV system"]
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, _) = get_common_setup(None)?;
