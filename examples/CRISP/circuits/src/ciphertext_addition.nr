@@ -39,10 +39,9 @@
 //! 3. Verifies the addition equations hold at these points
 //! 4. Checks range constraints on all coefficients
 
-use greco::CryptographicParams;
-use polynomial::Polynomial;
-
-use crate::hash::generate_hash;
+use lib::core::greco::Configs as GrecoConfigs;
+use lib::math::commitments::compute_commitments;
+use lib::math::polynomial::Polynomial;
 
 /// Parameters for ciphertext addition verification.
 ///
@@ -53,7 +52,7 @@ use crate::hash::generate_hash;
 /// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
 /// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
-    crypto_params: CryptographicParams<L>,
+    configs: GrecoConfigs<N, L>,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     ct_commitment: Field,
@@ -71,13 +70,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// Creates a new CiphertextAddition instance.
     ///
     /// # Arguments
-    /// * `crypto_params` - Cryptographic parameters for the ciphertext addition circuit.
+    /// * `configs` - Cryptographic configuration for the ciphertext addition circuit.
     /// * `ct0is`, `ct1is` - Ciphertext polynomials.
     /// * `prev_ct0is`, `prev_ct1is` - Previous ciphertext polynomials.
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
-        crypto_params: CryptographicParams<L>,
+        configs: GrecoConfigs<N, L>,
         ct0is: [Polynomial<N>; L],
         ct1is: [Polynomial<N>; L],
         ct_commitment: Field,
@@ -91,7 +90,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         r1is: [Polynomial<N>; L],
     ) -> Self {
         Self {
-            crypto_params,
+            configs,
             ct0is,
             ct1is,
             ct_commitment,
@@ -196,24 +195,22 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-
-        inputs.push(self.ct_commitment);
-        inputs.push(self.prev_ct_commitment);
-        inputs.push(self.sum_ct_commitment);
-
-        // Domain separator for ciphertext addition circuit - "CiphertextAddition" in hex
-        let domain_separator = [
-            0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x74, 0x65, 0x78, 0x74, 0x41, 0x64, 0x64, 0x69,
-            0x74, 0x69, 0x6f, 0x6e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // Domain separator - "CLG_CT_ADD"
+        let DS_CLG_CT_ADD: [u8; 64] = [
+            0x43, 0x4c, 0x47, 0x5f, 0x43, 0x54, 0x5f, 0x41, 0x44, 0x44, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let gammas = generate_hash::<L>(inputs, domain_separator, 2 * L);
+        let mut payload = Vec::new();
 
-        gammas
+        payload.push(self.ct_commitment);
+        payload.push(self.prev_ct_commitment);
+        payload.push(self.sum_ct_commitment);
+
+        compute_commitments(payload, DS_CLG_CT_ADD, [0x80000000 | payload.len(), 2 * L])
     }
 
     /// Verifies ciphertext addition constraints using Fiat-Shamir challenges.
@@ -253,7 +250,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct0i + prev_ct0i + r0i * q_i
             let mut p = self.ct0is[i];
-            let r0i_scaled = self.r0is[i].mul_scalar(self.crypto_params.qis[i]);
+            let r0i_scaled = self.r0is[i].mul_scalar(self.configs.qis[i]);
 
             p = p.add(self.prev_ct0is[i]);
             p = p.add(r0i_scaled);
@@ -271,7 +268,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct1i + prev_ct1i + r1i * q_i
             let mut p = self.ct1is[i];
-            let r1i_scaled = self.r1is[i].mul_scalar(self.crypto_params.qis[i]);
+            let r1i_scaled = self.r1is[i].mul_scalar(self.configs.qis[i]);
 
             p = p.add(self.prev_ct1is[i]);
             p = p.add(r1i_scaled);

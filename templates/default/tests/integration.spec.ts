@@ -69,9 +69,11 @@ type E3State = E3StateRequested | E3StatePublished | E3StateActivated | E3StateO
 
 async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>) {
   async function waitForEvent<T extends AllEventTypes>(type: T, trigger?: () => Promise<void>): Promise<EnclaveEvent<T>> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       sdk.once(type, resolve)
-      trigger && trigger()
+      if (trigger) {
+        trigger().catch(reject)
+      }
     })
   }
 
@@ -172,8 +174,8 @@ describe('Integration', () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const startWindow = calculateStartWindow(100)
-    const duration = BigInt(15)
+    const startWindow = calculateStartWindow(130)
+    const duration = BigInt(20)
     const e3ProgramParams = encodeBfvParams()
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,

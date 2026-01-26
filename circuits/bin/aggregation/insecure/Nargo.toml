@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "pk_trbfv_wrapper",
+    "verify_shares_trbfv_wrapper",
+    "enc_bfv_wrapper",
+    "dec_bfv_wrapper",
+    "pk_agg_trbfv_wrapper",
+    "dec_share_trbfv_wrapper",
+    "dec_shares_agg_trbfv_wrapper",
+]

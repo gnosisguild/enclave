@@ -117,7 +117,6 @@ impl NetEventTranslator {
         cipher: &Arc<Cipher>,
         quic_port: u16,
         repository: Repository<Vec<u8>>,
-        experimental_trbfv: bool,
     ) -> Result<(
         Addr<Self>,
         Option<Addr<DocumentPublisher>>,
@@ -143,11 +142,7 @@ impl NetEventTranslator {
         // Setup and start net event translator
         let rx = &Arc::new(interface.rx());
         let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
-        let maybe_publisher = if experimental_trbfv {
-            Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic))
-        } else {
-            None
-        };
+        let maybe_publisher = Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic));
 
         let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
