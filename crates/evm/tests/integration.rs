@@ -14,7 +14,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use e3_ciphernode_builder::EventSystem;
+use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
     prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, GetEvents,
     HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
@@ -135,30 +135,15 @@ async fn evm_reader() -> Result<()> {
     let contract_address = contract.address().to_string();
     let sync = FakeSyncActor::setup(&bus);
 
-    // Simulates the setup for a single chain
-    let gateway = EvmChainGateway::setup(&bus);
-    let runner = SyncStartExtractor::setup(OneShotRunner::setup({
-        let bus = bus.clone();
-        let provider = provider.clone();
-        let gateway = gateway.clone();
-        move |msg: SyncStart| {
-            let info = msg.get_evm_init_for(chain_id);
-            let gateway = gateway.recipient();
-            let router = EvmRouter::new()
-                // add new route per contract
-                .add_route(
-                    contract_address.parse()?,
-                    &TestEventParser::setup(&gateway).recipient(),
-                )
-                .add_fallback(&gateway);
-
-            let filters = Filters::from_routing_table(router.get_routing_table(), info);
-            let router = router.start();
-            EvmReadInterface::setup(&provider, &router.recipient(), &bus, filters);
-            Ok(())
-        }
-    }));
-    bus.subscribe("SyncStart", runner.recipient());
+    let contract_address = contract_address.parse()?;
+    EvmSystemChainBuilder::new(&bus, &provider, chain_id)
+        .with_route(move |upstream| {
+            (
+                contract_address,
+                TestEventParser::setup(&upstream).recipient(),
+            )
+        })
+        .build();
 
     // SyncStart holds initialization information such as start block and earliest event
     // This should trigger all chains to start to sync
