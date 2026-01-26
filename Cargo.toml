@@ -34,6 +34,7 @@ members = [
   "crates/trbfv",
   "crates/utils",
   "crates/wasm",
+  "crates/parity_matrix",
   "crates/polynomial"
 ]
 exclude = [

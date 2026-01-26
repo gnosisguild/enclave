@@ -9579,6 +9579,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "zkfhe-parity-matrix"
+version = "0.1.7"
+dependencies = [
+ "clap",
+ "num-bigint",
+ "num-traits",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
 source = "git+https://github.com/gnosisguild/zkfhe-generator#02131ceea13a9ff154a4d8cdd534261dacbfc724"
