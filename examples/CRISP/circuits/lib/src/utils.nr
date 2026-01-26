@@ -83,6 +83,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
         // Multi-option vote: can split, but total must not exceed balance
         assert(total_votes <= (balance as u64));
     }
+
+    res
 }
 
 /// Checks if all vote coefficients are zero.
@@ -93,6 +95,9 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 ///
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
+///
+/// # Returns
+/// Returns `true` if all vote coefficients are zero, `false` otherwise.
 ///
 pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
     assert(num_options > 1);
@@ -114,6 +119,9 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
             }
         }
     }
+
+    // Return true only if both regions are completely zero
+    res
 }
 
 #[test]
