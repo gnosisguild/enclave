@@ -12,7 +12,6 @@ mod enclave_sol_writer;
 mod events;
 mod evm_chain_gateway;
 mod evm_hub;
-mod evm_launch_coordinator;
 mod evm_read_interface;
 mod evm_reader;
 mod evm_router;
