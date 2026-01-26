@@ -1,8 +1,14 @@
-use std::marker::PhantomData;
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
 use anyhow::Result;
+use std::marker::PhantomData;
 use tracing::error;
+
 pub struct OneShotRunner<F, M>
 where
     F: FnOnce(M) -> Result<()> + 'static,

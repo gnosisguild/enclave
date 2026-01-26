@@ -1,6 +1,11 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use actix::{Actor, Handler};
 use e3_events::{hlc::HlcTimestamp, EnclaveEventData, EvmEvent};
-use tracing::info;
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},
