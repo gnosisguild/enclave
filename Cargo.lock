@@ -6185,6 +6185,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "parity-matrix"
+version = "0.1.7"
+dependencies = [
+ "clap",
+ "num-bigint",
+ "num-traits",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "parity-scale-codec"
 version = "3.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9576,16 +9586,6 @@ dependencies = [
  "tempfile",
  "toml",
  "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-parity-matrix"
-version = "0.1.7"
-dependencies = [
- "clap",
- "num-bigint",
- "num-traits",
- "thiserror 1.0.69",
 ]
 
 [[package]]

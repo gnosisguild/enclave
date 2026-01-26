@@ -44,7 +44,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-zkfhe-parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "crates/parity_matrix" }
+parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "crates/parity_matrix" }
 ```
 
 ## Usage
@@ -52,7 +52,7 @@ zkfhe-parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "
 ### Library Usage
 
 ```rust
-use zkfhe_parity_matrix::matrix::{ParityMatrixConfig, build_generator_matrix, null_space, verify_parity_matrix};
+use parity_matrix::matrix::{ParityMatrixConfig, build_generator_matrix, null_space, verify_parity_matrix};
 use num_bigint::BigUint;
 
 // Configure parameters

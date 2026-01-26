@@ -5,11 +5,11 @@
 use clap::Parser;
 use num_bigint::BigUint;
 use num_traits::Zero;
-use zkfhe_parity_matrix::math::mod_pow;
-use zkfhe_parity_matrix::matrix::{
+use parity_matrix::math::mod_pow;
+use parity_matrix::matrix::{
     build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
 };
-use zkfhe_parity_matrix::utils::print_matrix;
+use parity_matrix::utils::print_matrix;
 
 #[derive(Parser, Debug, Clone)]
 #[command(
