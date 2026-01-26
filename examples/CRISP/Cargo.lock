@@ -2106,6 +2106,7 @@ dependencies = [
 name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
+ "e3-fhe-params",
  "getrandom 0.2.16",
  "js-sys",
  "num-bigint",
