@@ -10,6 +10,8 @@ pub mod formatters;
 pub mod helpers;
 pub mod retry;
 pub mod utility_types;
+pub mod evm_error_selectors;
+pub mod evm_error_decoder;
 pub use actix::*;
 pub use alloy::*;
 pub use formatters::*;

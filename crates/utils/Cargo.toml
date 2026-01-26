@@ -11,6 +11,7 @@ actix.workspace = true
 alloy.workspace = true
 anyhow.workspace = true
 derivative.workspace = true
+hex.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
 serde.workspace = true

@@ -24,6 +24,7 @@ use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::Shutdown;
 use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_utils::evm_error_decoder::extract_and_decode_from_string;
 use tracing::info;
 
 sol!(
@@ -115,6 +116,19 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                         info!(tx=%receipt.transaction_hash, "Published plaintext output");
                     }
                     Err(err) => {
+                        match extract_and_decode_from_string(&err.to_string()) {
+                            Some(decoded) => {
+                                bus.err(
+                                    EType::Evm,
+                                    anyhow::anyhow!(
+                                        "Error publishing plaintext output: {}",
+                                        decoded.name
+                                    ),
+                                );
+                                return;
+                            }
+                            None => {}
+                        }
                         bus.err(
                             EType::Evm,
                             anyhow::anyhow!("Error publishing plaintext output: {:?}", err),

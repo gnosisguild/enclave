@@ -24,6 +24,7 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EventSubscriber, OrderedSet, PublicKeyAggregated, Seed,
     Shutdown, TicketGenerated, TicketId,
 };
+use e3_utils::evm_error_decoder::extract_and_decode_from_string;
 use tracing::{error, info, trace};
 
 sol!(
@@ -362,7 +363,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
                             info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
                         }
                         Err(err) => {
-                            error!("Failed to submit ticket: {:?}", err);
+                            match extract_and_decode_from_string(&err.to_string()) {
+                                Some(decoded) => {
+                                    error!("Failed to submit ticket: {:?}", decoded.name);
+                                }
+                                None => {
+                                    error!("Failed to submit ticket: {:?}", err);
+                                }
+                            }
                             bus.err(EType::Evm, err);
                         }
                     }
@@ -392,7 +400,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalizeRe
                     info!(tx=%receipt.transaction_hash, "Committee finalized on registry");
                 }
                 Err(err) => {
-                    error!("Failed to finalize committee: {:?}", err);
+                    match extract_and_decode_from_string(&err.to_string()) {
+                        Some(decoded) => {
+                            error!("Failed to finalize commitee: {:?}", decoded.name);
+                        }
+                        None => {
+                            error!("Failed to finalize committee: {:?}", err);;
+                        }
+                    }
                     bus.err(EType::Evm, err);
                 }
             }
@@ -428,7 +443,17 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                 Ok(receipt) => {
                     info!(tx=%receipt.transaction_hash, "Committee published to registry");
                 }
-                Err(err) => bus.err(EType::Evm, err),
+                Err(err) => {
+                    match extract_and_decode_from_string(&err.to_string()) {
+                        Some(decoded) => {
+                            error!("Failed to publish committee: {:?}", decoded.name);
+                        }
+                        None => {
+                            error!("Failed to publish committee: {:?}", err);;
+                        }
+                    }
+                    bus.err(EType::Evm, err)
+                }
             }
         })
     }

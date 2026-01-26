@@ -34,9 +34,9 @@ use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, sync::Arc};
-use tracing::info;
+use tracing::{info, error};
 
-use crate::error_decoder::extract_and_decode_from_string;
+use e3_utils::evm_error_decoder::extract_and_decode_from_string;
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -274,7 +274,8 @@ where
                                     info!("{}: error, will retry: {}", op_name, decoded.name);
                                     Err(RetryError::Retry(e))
                                 } else {
-                                    // it's not an error we want to retry
+                                    // it's not an error we want to retry but maybe it's still a known error
+                                    error!("{}: error, will NOT retry: {}", op_name, decoded.name);
                                     Err(RetryError::Failure(e))
                                 }
                             }

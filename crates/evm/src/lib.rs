@@ -9,8 +9,6 @@ mod ciphernode_registry_sol;
 mod enclave_sol;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
-pub mod error_decoder;
-mod error_selectors;
 mod event_reader;
 pub mod helpers;
 mod historical_event_coordinator;

@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::error_selectors::ERROR_SELECTORS;
+use crate::evm_error_selectors::ERROR_SELECTORS;
 
 /// Decoded EVM error information
 #[derive(Debug, Clone, PartialEq, Eq)]
