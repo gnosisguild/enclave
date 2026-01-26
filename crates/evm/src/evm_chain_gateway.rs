@@ -11,12 +11,14 @@ use e3_events::{
 use e3_events::{EType, EvmEvent};
 use e3_events::{Event, EventPublisher};
 
-/// The chain gateway
+/// This component sits between the Evm ingestion for a chain and the Sync actor and the Bus.
+/// It coordinates event flow between these components.
 pub struct EvmChainGateway {
     bus: BusHandle,
     status: SyncStatus,
 }
 
+/// This state machine coordinates the function of the EvmChainGateway
 #[derive(Clone, Debug)]
 enum SyncStatus {
     /// Intial State
