@@ -4,7 +4,7 @@ set -euo pipefail  # Stricter error handling
 # Get the script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-PLAINTEXT="1234,567890"
+PLAINTEXT="4,0"
 ID=$(date +%s)
 
 if [[ "$SCRIPT_DIR" != "$(pwd)" ]]; then 
