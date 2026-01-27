@@ -28,7 +28,6 @@ pub mod errors;
 pub mod math;
 pub mod matrix;
 pub mod matrix_type;
-pub mod utils;
 
 // Re-export commonly used types for convenience
 pub use errors::{ParityMatrixError, ParityMatrixResult};
