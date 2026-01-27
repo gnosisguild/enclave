@@ -5,11 +5,15 @@
 //! and parameter validation.
 use std::collections::BTreeMap;
 
-use crate::search::constants::{D_POW2_MAX, D_POW2_START, K_MAX, PlaintextMode};
+use crate::search::constants::{PlaintextMode, D_POW2_MAX, D_POW2_START, K_MAX};
 use crate::search::errors::{BfvParamsResult, SearchError, ValidationError};
 use crate::search::prime::PrimeItem;
-use crate::search::prime::{build_prime_items, build_prime_items_for_second, select_max_q_under_cap};
-use crate::search::utils::{approx_bits_from_log2, big_shift_pow2, fmt_big_summary, log2_big, product};
+use crate::search::prime::{
+    build_prime_items, build_prime_items_for_second, select_max_q_under_cap,
+};
+use crate::search::utils::{
+    approx_bits_from_log2, big_shift_pow2, fmt_big_summary, log2_big, product,
+};
 use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use num_traits::{One, Zero};
