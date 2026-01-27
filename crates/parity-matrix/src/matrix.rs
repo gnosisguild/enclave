@@ -175,7 +175,7 @@ pub fn verify_parity_matrix(
 #[cfg(test)]
 mod tests {
     use crate::errors::ParityMatrixError;
-    use crate::math::mod_pow;
+    use crate::math::evaluate_polynomial;
     use crate::matrix::{
         build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
     };
@@ -183,15 +183,6 @@ mod tests {
     use num_traits::One;
     use num_traits::Zero;
     use std::str::FromStr;
-
-    /// Helper: evaluate a polynomial with given coefficients at point x mod q
-    fn eval_poly(coeffs: &[BigUint], x: &BigUint, q: &BigUint) -> BigUint {
-        let mut val = BigUint::zero();
-        for (i, coeff) in coeffs.iter().enumerate() {
-            val = (val + coeff * mod_pow(x, i, q)) % q;
-        }
-        val
-    }
 
     /// Helper: compute H * v mod q
     fn matrix_vector_mult(h: &[Vec<BigUint>], v: &[BigUint], q: &BigUint) -> Vec<BigUint> {
@@ -264,9 +255,7 @@ mod tests {
 
         for coeffs in test_polys.iter().filter(|c| c.len() == num_coeffs) {
             // Evaluate polynomial at all points
-            let eval_vec: Vec<BigUint> = (0..=n)
-                .map(|j| eval_poly(coeffs, &BigUint::from(j), &q))
-                .collect();
+            let eval_vec = evaluate_polynomial(coeffs, n, &q);
 
             // Check H * eval_vec = 0
             if !h.is_empty() {
@@ -283,178 +272,25 @@ mod tests {
         }
     }
 
-    // ==================== Tests with constraint t ≤ (n-1)/2 ====================
-    // For t to be valid: t ≤ (n-1)/2, i.e., 2t+1 ≤ n
-    // n=3: t ≤ 1, n=5: t ≤ 2, n=7: t ≤ 3, n=9: t ≤ 4, n=11: t ≤ 5, etc.
-
-    // ==================== Small prime q = 2 ====================
+    // ==================== Representative tests ====================
+    // Most parameter combinations are covered by test_many_combinations below.
+    // These tests cover specific edge cases and representative examples.
 
     #[test]
-    fn test_q2_n3_t0() {
-        // n=3, max t = (3-1)/2 = 1, testing t=0 (constants)
-        test_parity_matrix_for_params(BigUint::from(2u32), 3, 0);
-    }
-
-    #[test]
-    fn test_q2_n3_t1() {
-        // n=3, max t = 1 (linear polynomials)
-        test_parity_matrix_for_params(BigUint::from(2u32), 3, 1);
-    }
-
-    #[test]
-    fn test_q2_n5_t2() {
-        // n=5, max t = 2 (quadratic)
-        test_parity_matrix_for_params(BigUint::from(2u32), 5, 2);
-    }
-
-    // ==================== Small prime q = 3 ====================
-
-    #[test]
-    fn test_q3_n3_t1() {
-        test_parity_matrix_for_params(BigUint::from(3u32), 3, 1);
-    }
-
-    #[test]
-    fn test_q3_n5_t2() {
-        test_parity_matrix_for_params(BigUint::from(3u32), 5, 2);
-    }
-
-    #[test]
-    fn test_q3_n7_t3() {
-        test_parity_matrix_for_params(BigUint::from(3u32), 7, 3);
-    }
-
-    // ==================== Prime q = 5 ====================
-
-    #[test]
-    fn test_q5_n5_t2() {
-        // n=5, max t = 2
-        test_parity_matrix_for_params(BigUint::from(5u32), 5, 2);
-    }
-
-    #[test]
-    fn test_q5_n7_t3() {
-        // n=7, max t = 3
-        test_parity_matrix_for_params(BigUint::from(5u32), 7, 3);
-    }
-
-    #[test]
-    fn test_q5_n9_t4() {
-        // n=9, max t = 4
-        test_parity_matrix_for_params(BigUint::from(5u32), 9, 4);
-    }
-
-    // ==================== Prime q = 7 (default) ====================
-
-    #[test]
-    fn test_q7_n5_t2_default() {
-        // Default parameters: n=5, t=2
+    fn test_default_params() {
+        // Default parameters: q=7, n=5, t=2
         test_parity_matrix_for_params(BigUint::from(7u32), 5, 2);
     }
 
     #[test]
-    fn test_q7_n7_t3() {
-        test_parity_matrix_for_params(BigUint::from(7u32), 7, 3);
+    fn test_small_prime_q2() {
+        // Smallest prime modulus
+        test_parity_matrix_for_params(BigUint::from(2u32), 3, 1);
     }
 
     #[test]
-    fn test_q7_n9_t4() {
-        test_parity_matrix_for_params(BigUint::from(7u32), 9, 4);
-    }
-
-    #[test]
-    fn test_q7_n11_t5() {
-        test_parity_matrix_for_params(BigUint::from(7u32), 11, 5);
-    }
-
-    // ==================== Prime q = 11 ====================
-
-    #[test]
-    fn test_q11_n5_t2() {
-        test_parity_matrix_for_params(BigUint::from(11u32), 5, 2);
-    }
-
-    #[test]
-    fn test_q11_n9_t4() {
-        test_parity_matrix_for_params(BigUint::from(11u32), 9, 4);
-    }
-
-    #[test]
-    fn test_q11_n11_t5() {
-        test_parity_matrix_for_params(BigUint::from(11u32), 11, 5);
-    }
-
-    #[test]
-    fn test_q11_n15_t7() {
-        test_parity_matrix_for_params(BigUint::from(11u32), 15, 7);
-    }
-
-    // ==================== Prime q = 13 ====================
-
-    #[test]
-    fn test_q13_n7_t3() {
-        test_parity_matrix_for_params(BigUint::from(13u32), 7, 3);
-    }
-
-    #[test]
-    fn test_q13_n11_t5() {
-        test_parity_matrix_for_params(BigUint::from(13u32), 11, 5);
-    }
-
-    #[test]
-    fn test_q13_n13_t6() {
-        test_parity_matrix_for_params(BigUint::from(13u32), 13, 6);
-    }
-
-    // ==================== Larger prime q = 17 ====================
-
-    #[test]
-    fn test_q17_n9_t4() {
-        test_parity_matrix_for_params(BigUint::from(17u32), 9, 4);
-    }
-
-    #[test]
-    fn test_q17_n13_t6() {
-        test_parity_matrix_for_params(BigUint::from(17u32), 13, 6);
-    }
-
-    #[test]
-    fn test_q17_n17_t8() {
-        test_parity_matrix_for_params(BigUint::from(17u32), 17, 8);
-    }
-
-    // ==================== Larger prime q = 23 ====================
-
-    #[test]
-    fn test_q23_n11_t5() {
-        test_parity_matrix_for_params(BigUint::from(23u32), 11, 5);
-    }
-
-    #[test]
-    fn test_q23_n17_t8() {
-        test_parity_matrix_for_params(BigUint::from(23u32), 17, 8);
-    }
-
-    #[test]
-    fn test_q23_n21_t10() {
-        test_parity_matrix_for_params(BigUint::from(23u32), 21, 10);
-    }
-
-    // ==================== Large prime q = 101 ====================
-
-    #[test]
-    fn test_q101_n11_t5() {
-        test_parity_matrix_for_params(BigUint::from(101u32), 11, 5);
-    }
-
-    #[test]
-    fn test_q101_n21_t10() {
-        test_parity_matrix_for_params(BigUint::from(101u32), 21, 10);
-    }
-
-    #[test]
-    fn test_q101_n51_t25() {
-        // n=51, max t = 25
+    fn test_large_prime_101() {
+        // Large prime with high degree
         test_parity_matrix_for_params(BigUint::from(101u32), 51, 25);
     }
 
@@ -488,24 +324,12 @@ mod tests {
 
     #[test]
     fn test_t_equals_0() {
-        // Degree 0 polynomials (constants), n=3
+        // Degree 0 polynomials (constants)
         test_parity_matrix_for_params(BigUint::from(7u32), 3, 0);
     }
 
     #[test]
-    fn test_t_max_for_n5() {
-        // n=5, max t = (5-1)/2 = 2
-        test_parity_matrix_for_params(BigUint::from(11u32), 5, 2);
-    }
-
-    #[test]
-    fn test_t_max_for_n7() {
-        // n=7, max t = (7-1)/2 = 3
-        test_parity_matrix_for_params(BigUint::from(11u32), 7, 3);
-    }
-
-    #[test]
-    fn test_small_n3_t1() {
+    fn test_minimal_case() {
         // Minimal meaningful case: n=3, t=1 (linear)
         test_parity_matrix_for_params(BigUint::from(5u32), 3, 1);
     }
@@ -559,9 +383,7 @@ mod tests {
         );
 
         // Evaluate polynomial at all points
-        let eval_vec: Vec<BigUint> = (0..=n)
-            .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
-            .collect();
+        let eval_vec = evaluate_polynomial(&coeffs, n, &q);
 
         // Check H * eval_vec ≠ 0
         let result = matrix_vector_mult(&h, &eval_vec, &q);
@@ -676,9 +498,7 @@ mod tests {
                 "Leading coefficient must be non-zero"
             );
 
-            let eval_vec: Vec<BigUint> = (0..=n)
-                .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
-                .collect();
+            let eval_vec = evaluate_polynomial(&coeffs, n, &q);
 
             let result = matrix_vector_mult(&h, &eval_vec, &q);
             assert!(
@@ -847,38 +667,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_mod_inverse_non_invertible_zero() {
-        // Zero has no modular inverse
-        let q = BigUint::from(7u32);
-        let a = BigUint::zero();
-        let result = crate::math::mod_inverse(&a, &q);
-        assert!(result.is_err());
-        match result {
-            Err(ParityMatrixError::Math { message }) => {
-                assert!(message.contains("Modular inverse does not exist"));
-            }
-            _ => panic!("Expected Math error for zero"),
-        }
-    }
-
-    #[test]
-    fn test_mod_inverse_non_invertible_composite() {
-        // If q is composite and gcd(a, q) != 1, no inverse exists
-        let q = BigUint::from(6u32); // composite: 2 * 3
-        let a = BigUint::from(2u32); // gcd(2, 6) = 2 != 1
-        let result = crate::math::mod_inverse(&a, &q);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_mod_inverse_non_invertible_multiple_of_modulus() {
-        // a is a multiple of q
-        let q = BigUint::from(7u32);
-        let a = BigUint::from(14u32); // 14 = 2 * 7
-        let result = crate::math::mod_inverse(&a, &q);
-        assert!(result.is_err());
-    }
 
     #[test]
     fn test_dimension_mismatch_verify() {
@@ -1009,9 +797,7 @@ mod tests {
                     .collect();
 
                 // Evaluate polynomial at all points
-                let eval_vec: Vec<BigUint> = (0..=n)
-                    .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
-                    .collect();
+                let eval_vec = evaluate_polynomial(&coeffs, n, &q);
 
                 // Property: H * eval_vec = 0 for degree-t polynomials
                 let result = matrix_vector_mult(&h, &eval_vec, &q);
@@ -1059,9 +845,7 @@ mod tests {
                 }
 
                 // Evaluate polynomial at all points
-                let eval_vec: Vec<BigUint> = (0..=n)
-                    .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
-                    .collect();
+                let eval_vec = evaluate_polynomial(&coeffs, n, &q);
 
                 // Property: H * eval_vec ≠ 0 for degree-(t+1) polynomials
                 let result = matrix_vector_mult(&h, &eval_vec, &q);
