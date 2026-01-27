@@ -12,10 +12,132 @@
 use crate::errors::{ConstraintError, MathError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
-use crate::matrix_type::DynamicMatrix;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
+
+/// A matrix with runtime-determined dimensions.
+///
+/// Use this when dimensions are not known at compile time (e.g., null space results).
+/// Dimensions are validated at construction and runtime operations check consistency.
+///
+/// # Example
+///
+/// ```
+/// use e3_parity_matrix::ParityMatrix;
+/// use num_bigint::BigUint;
+///
+/// let data = vec![
+///     vec![BigUint::from(1u32), BigUint::from(2u32)],
+///     vec![BigUint::from(3u32), BigUint::from(4u32)],
+/// ];
+/// let matrix = ParityMatrix::new(data).unwrap();
+/// assert_eq!(matrix.rows(), 2);
+/// assert_eq!(matrix.cols(), 2);
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParityMatrix {
+    data: Vec<Vec<BigUint>>,
+    rows: usize,
+    cols: usize,
+}
+
+impl ParityMatrix {
+    /// Creates a new dynamic matrix from data, validating dimensions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if rows have inconsistent lengths.
+    pub fn new(data: Vec<Vec<BigUint>>) -> ParityMatrixResult<Self> {
+        if data.is_empty() {
+            return Ok(Self {
+                data,
+                rows: 0,
+                cols: 0,
+            });
+        }
+
+        let rows = data.len();
+        let cols = data[0].len();
+
+        for (i, row) in data.iter().enumerate() {
+            if row.len() != cols {
+                return Err(ParityMatrixError::dimension_mismatch(
+                    cols,
+                    row.len(),
+                    &format!("columns in row {}", i),
+                ));
+            }
+        }
+
+        Ok(Self { data, rows, cols })
+    }
+
+    /// Creates a zero matrix of the specified dimensions.
+    pub fn zeros(rows: usize, cols: usize) -> Self {
+        Self {
+            data: vec![vec![BigUint::zero(); cols]; rows],
+            rows,
+            cols,
+        }
+    }
+
+    /// Returns the number of rows.
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Returns the number of columns.
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    /// Returns a reference to the underlying data.
+    pub fn data(&self) -> &[Vec<BigUint>] {
+        &self.data
+    }
+
+    /// Gets a reference to a specific element.
+    ///
+    /// # Panics
+    ///
+    /// Panics if indices are out of bounds.
+    pub fn get(&self, row: usize, col: usize) -> &BigUint {
+        &self.data[row][col]
+    }
+}
+
+impl From<ParityMatrix> for Vec<Vec<BigUint>> {
+    fn from(matrix: ParityMatrix) -> Self {
+        matrix.data
+    }
+}
+
+/// Trait for matrices that can be used in matrix operations.
+pub trait MatrixLike {
+    /// Returns the number of rows.
+    fn rows(&self) -> usize;
+
+    /// Returns the number of columns.
+    fn cols(&self) -> usize;
+
+    /// Returns a reference to the underlying data.
+    fn data(&self) -> &[Vec<BigUint>];
+}
+
+impl MatrixLike for ParityMatrix {
+    fn rows(&self) -> usize {
+        self.rows
+    }
+
+    fn cols(&self) -> usize {
+        self.cols
+    }
+
+    fn data(&self) -> &[Vec<BigUint>] {
+        &self.data
+    }
+}
 
 /// Configuration for parity matrix generation.
 ///
@@ -49,7 +171,7 @@ pub struct ParityMatrixConfig {
 /// # Example
 ///
 /// ```
-/// use parity_matrix::{build_generator_matrix, ParityMatrixConfig};
+/// use e3_parity_matrix::{build_generator_matrix, ParityMatrixConfig, ParityMatrixError};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -61,9 +183,9 @@ pub struct ParityMatrixConfig {
 /// // G is a 3×6 matrix where G[i][j] = j^i mod 7
 /// assert_eq!(g.rows(), 3);
 /// assert_eq!(g.cols(), 6);
-/// # Ok::<(), parity_matrix::ParityMatrixError>(())
+/// # Ok::<(), ParityMatrixError>(())
 /// ```
-pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<DynamicMatrix> {
+pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<ParityMatrix> {
     // Validate modulus: q must be >= 2 for valid field arithmetic
     if config.q.is_zero() || config.q.is_one() {
         return Err(ParityMatrixError::from(MathError::InvalidModulus {
@@ -92,7 +214,7 @@ pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult
         }
     }
 
-    DynamicMatrix::new(g)
+    ParityMatrix::new(g)
 }
 
 /// Compute the null space of a matrix over `Z_q` using Gaussian elimination.
@@ -107,7 +229,7 @@ pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult
 /// # Example
 ///
 /// ```
-/// use parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
+/// use e3_parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig, ParityMatrixError};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -119,11 +241,11 @@ pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult
 /// let h = null_space(&g, &config.q)?;
 /// // H is a basis for vectors orthogonal to all rows of G
 /// assert_eq!(h.cols(), g.cols());
-/// # Ok::<(), parity_matrix::ParityMatrixError>(())
+/// # Ok::<(), ParityMatrixError>(())
 /// ```
-pub fn null_space(matrix: &DynamicMatrix, q: &BigUint) -> ParityMatrixResult<DynamicMatrix> {
+pub fn null_space(matrix: &ParityMatrix, q: &BigUint) -> ParityMatrixResult<ParityMatrix> {
     if matrix.rows() == 0 {
-        return Ok(DynamicMatrix::zeros(0, 0));
+        return Ok(ParityMatrix::zeros(0, 0));
     }
 
     let rows = matrix.rows();
@@ -206,7 +328,7 @@ pub fn null_space(matrix: &DynamicMatrix, q: &BigUint) -> ParityMatrixResult<Dyn
         })
         .collect();
 
-    DynamicMatrix::new(null_basis)
+    ParityMatrix::new(null_basis)
 }
 
 /// Verify that `H · G^T = 0 (mod q)`.
@@ -221,7 +343,7 @@ pub fn null_space(matrix: &DynamicMatrix, q: &BigUint) -> ParityMatrixResult<Dyn
 /// # Example
 ///
 /// ```
-/// use parity_matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig};
+/// use e3_parity_matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig, ParityMatrixError};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -232,11 +354,11 @@ pub fn null_space(matrix: &DynamicMatrix, q: &BigUint) -> ParityMatrixResult<Dyn
 /// let g = build_generator_matrix(&config)?;
 /// let h = null_space(&g, &config.q)?;
 /// assert!(verify_parity_matrix(&g, &h, &config.q)?);
-/// # Ok::<(), parity_matrix::ParityMatrixError>(())
+/// # Ok::<(), ParityMatrixError>(())
 /// ```
 pub fn verify_parity_matrix(
-    matrix: &DynamicMatrix,
-    h: &DynamicMatrix,
+    matrix: &ParityMatrix,
+    h: &ParityMatrix,
     q: &BigUint,
 ) -> ParityMatrixResult<bool> {
     if h.rows() == 0 || matrix.rows() == 0 {
@@ -258,12 +380,7 @@ pub fn verify_parity_matrix(
     // Compute H * G^T
     for (i, h_row) in h_data.iter().enumerate() {
         for (j, matrix_row) in matrix_data.iter().enumerate() {
-            let sum = h_row
-                .iter()
-                .zip(matrix_row.iter())
-                .fold(BigUint::zero(), |acc, (h_val, g_val)| {
-                    (acc + h_val * g_val) % q
-                });
+            let sum = crate::math::dot_product_mod(h_row, matrix_row, q);
             if !sum.is_zero() {
                 return Err(ParityMatrixError::verification(format!(
                     "H · G^T ≠ 0 (mod q): entry at position ({}, {}) is {}",
@@ -281,26 +398,16 @@ mod tests {
     use crate::errors::ParityMatrixError;
     use crate::math::evaluate_polynomial;
     use crate::matrix::{
-        build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
+        build_generator_matrix, null_space, verify_parity_matrix, ParityMatrix, ParityMatrixConfig,
     };
-    use crate::matrix_type::DynamicMatrix;
     use num_bigint::BigUint;
     use num_traits::One;
     use num_traits::Zero;
     use std::str::FromStr;
 
     /// Helper: compute H * v mod q
-    fn matrix_vector_mult(h: &DynamicMatrix, v: &[BigUint], q: &BigUint) -> Vec<BigUint> {
-        h.data()
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .zip(v.iter())
-                    .fold(BigUint::zero(), |acc, (h_val, v_val)| {
-                        (acc + h_val * v_val) % q
-                    })
-            })
-            .collect()
+    fn matrix_vector_mult(h: &ParityMatrix, v: &[BigUint], q: &BigUint) -> Vec<BigUint> {
+        crate::math::matrix_vector_mult_mod(h.data(), v, q)
     }
 
     /// Test that H * G^T = 0 and that polynomial evaluations are in the null space of H
@@ -739,7 +846,7 @@ mod tests {
     #[test]
     fn test_empty_matrix_null_space() {
         // Empty matrix should return empty null space
-        let empty = DynamicMatrix::zeros(0, 0);
+        let empty = ParityMatrix::zeros(0, 0);
         let q = BigUint::from(7u32);
         let result = null_space(&empty, &q).unwrap();
         assert_eq!(result.rows(), 0);
@@ -748,7 +855,7 @@ mod tests {
     #[test]
     fn test_empty_matrix_verify() {
         // Empty matrices should verify as true
-        let empty = DynamicMatrix::zeros(0, 0);
+        let empty = ParityMatrix::zeros(0, 0);
         let q = BigUint::from(7u32);
         assert!(verify_parity_matrix(&empty, &empty, &q).unwrap());
     }
@@ -791,8 +898,8 @@ mod tests {
     fn test_dimension_mismatch_verify() {
         // Test verify_parity_matrix with mismatched dimensions
         let q = BigUint::from(7u32);
-        let g = DynamicMatrix::new(vec![vec![BigUint::one(); 3]]).unwrap(); // 1x3
-        let h = DynamicMatrix::new(vec![vec![BigUint::one(); 4]]).unwrap(); // 1x4 (mismatch)
+        let g = ParityMatrix::new(vec![vec![BigUint::one(); 3]]).unwrap(); // 1x3
+        let h = ParityMatrix::new(vec![vec![BigUint::one(); 4]]).unwrap(); // 1x4 (mismatch)
 
         // This should error due to dimension mismatch
         let result = verify_parity_matrix(&g, &h, &q);
@@ -804,7 +911,7 @@ mod tests {
         // Create a matrix that might cause issues during Gaussian elimination
         // when pivot element is not invertible mod q
         let q = BigUint::from(6u32); // composite modulus
-        let matrix = DynamicMatrix::new(vec![
+        let matrix = ParityMatrix::new(vec![
             vec![BigUint::from(2u32), BigUint::from(4u32)], // gcd(2, 6) = 2
             vec![BigUint::from(3u32), BigUint::from(3u32)], // gcd(3, 6) = 3
         ])

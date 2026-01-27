@@ -11,7 +11,6 @@ error-correcting codes.
 - Parity matrix verification
 - **Type-safe matrix types** with dimension validation at construction
 - Support for arbitrary modulus q using `num-bigint`
-- Command-line tool for interactive matrix generation
 
 ## Mathematical Background
 
@@ -63,7 +62,7 @@ let config = ParityMatrixConfig {
     n: 10,                       // Number of points
 };
 
-// Build generator matrix (returns DynamicMatrix with validated dimensions)
+// Build generator matrix (returns ParityMatrix with validated dimensions)
 let g = build_generator_matrix(&config)?;
 assert_eq!(g.rows(), 5);  // t+1 = 5
 assert_eq!(g.cols(), 11); // n+1 = 11
@@ -78,10 +77,10 @@ assert!(is_valid);
 
 ### Type-Safe Matrix Types
 
-The library provides `DynamicMatrix` for type-safe matrix operations with dimension validation:
+The library provides `ParityMatrix` for type-safe matrix operations with dimension validation:
 
 ```rust
-use parity_matrix::DynamicMatrix;
+use parity_matrix::ParityMatrix;
 use num_bigint::BigUint;
 
 // Create a matrix with dimension validation
@@ -89,7 +88,7 @@ let data = vec![
     vec![BigUint::from(1u32), BigUint::from(2u32)],
     vec![BigUint::from(3u32), BigUint::from(4u32)],
 ];
-let matrix = DynamicMatrix::new(data)?;
+let matrix = ParityMatrix::new(data)?;
 
 // Access dimensions safely
 assert_eq!(matrix.rows(), 2);
@@ -100,26 +99,12 @@ let invalid = vec![
     vec![BigUint::from(1u32), BigUint::from(2u32)],
     vec![BigUint::from(3u32)],  // Wrong length!
 ];
-assert!(DynamicMatrix::new(invalid).is_err()); // Dimension mismatch error
-```
-
-### Command-Line Tool
-
-The crate includes a binary for interactive matrix generation:
-
-```bash
-cargo run --bin parity-matrix -- --q 101 --n 10 --t 4
-```
-
-With verbose output:
-
-```bash
-cargo run --bin parity-matrix -- --q 101 --n 10 --t 4 --verbose
+assert!(ParityMatrix::new(invalid).is_err()); // Dimension mismatch error
 ```
 
 ## Type Safety
 
-The library uses type-safe matrix wrappers (`DynamicMatrix`) that:
+The library uses type-safe matrix wrappers (`ParityMatrix`) that:
 
 - **Validate dimensions at construction** - prevents malformed matrices
 - **Check dimension compatibility** - operations verify dimensions match
@@ -156,7 +141,7 @@ cargo test -- --nocapture
 
 ### Matrix Types
 
-- `DynamicMatrix` - Type-safe matrix wrapper with runtime dimension validation
+- `ParityMatrix` - Type-safe matrix wrapper with runtime dimension validation
 - `MatrixLike` - Trait for generic matrix operations
 
-All functions return `DynamicMatrix` instances with validated dimensions.
+All functions return `ParityMatrix` instances with validated dimensions.

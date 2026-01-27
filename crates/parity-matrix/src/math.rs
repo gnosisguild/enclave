@@ -18,7 +18,7 @@ use num_traits::{One, Zero};
 /// # Example
 ///
 /// ```
-/// use parity_matrix::math::mod_pow;
+/// use e3_parity_matrix::math::mod_pow;
 /// use num_bigint::BigUint;
 ///
 /// let result = mod_pow(&BigUint::from(3u32), 4, &BigUint::from(11u32));
@@ -39,7 +39,7 @@ pub fn mod_pow(base: &BigUint, exp: usize, modulus: &BigUint) -> BigUint {
 /// # Example
 ///
 /// ```
-/// use parity_matrix::math::evaluate_polynomial;
+/// use e3_parity_matrix::math::evaluate_polynomial;
 /// use num_bigint::BigUint;
 ///
 /// // Evaluate f(x) = 2x + 1 at points 0, 1, 2, 3
@@ -75,12 +75,13 @@ pub fn evaluate_polynomial(coeffs: &[BigUint], n: usize, q: &BigUint) -> Vec<Big
 /// # Example
 ///
 /// ```
-/// use parity_matrix::math::mod_inverse;
+/// use e3_parity_matrix::math::mod_inverse;
+/// use e3_parity_matrix::ParityMatrixError;
 /// use num_bigint::BigUint;
 ///
 /// let inv = mod_inverse(&BigUint::from(3u32), &BigUint::from(11u32))?;
 /// assert_eq!((BigUint::from(3u32) * &inv) % BigUint::from(11u32), BigUint::from(1u32));
-/// # Ok::<(), parity_matrix::ParityMatrixError>(())
+/// # Ok::<(), ParityMatrixError>(())
 /// ```
 pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint> {
     if modulus.is_zero() {
@@ -165,6 +166,70 @@ pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint
             Ok(&m - abs_mod)
         }
     }
+}
+
+/// Compute the dot product of two vectors modulo `modulus`.
+///
+/// Returns `(a[0] * b[0] + a[1] * b[1] + ... + a[n-1] * b[n-1]) mod modulus`.
+///
+/// # Panics
+///
+/// Panics if the vectors have different lengths.
+///
+/// # Example
+///
+/// ```
+/// use e3_parity_matrix::math::dot_product_mod;
+/// use num_bigint::BigUint;
+///
+/// let a = vec![BigUint::from(2u32), BigUint::from(3u32)];
+/// let b = vec![BigUint::from(4u32), BigUint::from(5u32)];
+/// let result = dot_product_mod(&a, &b, &BigUint::from(7u32));
+/// // (2*4 + 3*5) mod 7 = (8 + 15) mod 7 = 23 mod 7 = 2
+/// assert_eq!(result, BigUint::from(2u32));
+/// ```
+pub fn dot_product_mod(a: &[BigUint], b: &[BigUint], modulus: &BigUint) -> BigUint {
+    a.iter()
+        .zip(b.iter())
+        .fold(BigUint::zero(), |acc, (a_val, b_val)| {
+            (acc + a_val * b_val) % modulus
+        })
+}
+
+/// Compute matrix-vector multiplication modulo `modulus`.
+///
+/// Multiplies a matrix (as rows of vectors) by a vector, returning a new vector.
+/// Each element of the result is the dot product of a matrix row with the input vector, modulo `modulus`.
+///
+/// # Panics
+///
+/// Panics if the matrix rows and input vector have incompatible dimensions.
+///
+/// # Example
+///
+/// ```
+/// use e3_parity_matrix::math::matrix_vector_mult_mod;
+/// use num_bigint::BigUint;
+///
+/// let matrix = vec![
+///     vec![BigUint::from(1u32), BigUint::from(2u32)],
+///     vec![BigUint::from(3u32), BigUint::from(4u32)],
+/// ];
+/// let vector = vec![BigUint::from(5u32), BigUint::from(6u32)];
+/// let result = matrix_vector_mult_mod(&matrix, &vector, &BigUint::from(7u32));
+/// // [1*5 + 2*6, 3*5 + 4*6] mod 7 = [17, 39] mod 7 = [3, 4]
+/// assert_eq!(result[0], BigUint::from(3u32));
+/// assert_eq!(result[1], BigUint::from(4u32));
+/// ```
+pub fn matrix_vector_mult_mod(
+    matrix: &[Vec<BigUint>],
+    vector: &[BigUint],
+    modulus: &BigUint,
+) -> Vec<BigUint> {
+    matrix
+        .iter()
+        .map(|row| dot_product_mod(row, vector, modulus))
+        .collect()
 }
 
 #[cfg(test)]
@@ -384,5 +449,57 @@ mod tests {
         assert_eq!(result[0], BigUint::from(5u32));
         // Verify f(1) = 5 + 3 + 2 = 10
         assert_eq!(result[1], BigUint::from(10u32));
+    }
+
+    #[test]
+    fn test_dot_product_mod() {
+        let q = BigUint::from(7u32);
+        let a = vec![BigUint::from(2u32), BigUint::from(3u32)];
+        let b = vec![BigUint::from(4u32), BigUint::from(5u32)];
+        // (2*4 + 3*5) mod 7 = (8 + 15) mod 7 = 23 mod 7 = 2
+        let result = dot_product_mod(&a, &b, &q);
+        assert_eq!(result, BigUint::from(2u32));
+
+        // Test with zero vector
+        let zero = vec![BigUint::zero(); 3];
+        let v = vec![BigUint::from(1u32), BigUint::from(2u32), BigUint::from(3u32)];
+        assert_eq!(dot_product_mod(&zero, &v, &q), BigUint::zero());
+
+        // Test with larger modulus
+        let q_large = BigUint::from(101u32);
+        let a2 = vec![BigUint::from(10u32), BigUint::from(20u32)];
+        let b2 = vec![BigUint::from(5u32), BigUint::from(6u32)];
+        // (10*5 + 20*6) mod 101 = (50 + 120) mod 101 = 170 mod 101 = 69
+        let result2 = dot_product_mod(&a2, &b2, &q_large);
+        assert_eq!(result2, BigUint::from(69u32));
+    }
+
+    #[test]
+    fn test_matrix_vector_mult_mod() {
+        let q = BigUint::from(7u32);
+        let matrix = vec![
+            vec![BigUint::from(1u32), BigUint::from(2u32)],
+            vec![BigUint::from(3u32), BigUint::from(4u32)],
+        ];
+        let vector = vec![BigUint::from(5u32), BigUint::from(6u32)];
+        // [1*5 + 2*6, 3*5 + 4*6] mod 7 = [17, 39] mod 7 = [3, 4]
+        let result = matrix_vector_mult_mod(&matrix, &vector, &q);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], BigUint::from(3u32));
+        assert_eq!(result[1], BigUint::from(4u32));
+
+        // Test with zero vector
+        let zero_vec = vec![BigUint::zero(); 2];
+        let result_zero = matrix_vector_mult_mod(&matrix, &zero_vec, &q);
+        assert_eq!(result_zero, vec![BigUint::zero(), BigUint::zero()]);
+
+        // Test with identity-like matrix
+        let identity = vec![
+            vec![BigUint::from(1u32), BigUint::zero()],
+            vec![BigUint::zero(), BigUint::from(1u32)],
+        ];
+        let v = vec![BigUint::from(3u32), BigUint::from(4u32)];
+        let result_id = matrix_vector_mult_mod(&identity, &v, &q);
+        assert_eq!(result_id, v);
     }
 }
