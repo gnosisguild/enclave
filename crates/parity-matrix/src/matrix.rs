@@ -25,7 +25,7 @@ pub struct ParityMatrixConfig {
 /// G[i][j] = j^i mod q
 /// Each row corresponds to evaluations of x^i at points 0, 1, ..., n
 /// For polynomials of degree t, we have t+1 coefficients (a_0, ..., a_t)
-pub fn build_generator_matrix(config: ParityMatrixConfig) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
+pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
     if config.t > max_t {
@@ -40,8 +40,9 @@ pub fn build_generator_matrix(config: ParityMatrixConfig) -> ParityMatrixResult<
     let mut g = vec![vec![BigUint::zero(); config.n + 1]; num_coeffs];
 
     for (i, row) in g.iter_mut().enumerate().take(num_coeffs) {
-        for (j, cell) in row.iter_mut().enumerate().take(config.n + 1) {
-            *cell = mod_pow(&BigUint::from(j), i, &config.q);
+        for j in 0..=config.n {
+            let j_big = BigUint::from(j);
+            row[j] = mod_pow(&j_big, i, &config.q);
         }
     }
 
@@ -216,7 +217,7 @@ mod tests {
         );
 
         let num_coeffs = t + 1; // degree t polynomial has t+1 coefficients
-        let g = build_generator_matrix(ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
+        let g = build_generator_matrix(&ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
         let h = null_space(&g, &q).unwrap();
 
         // Check dimensions
@@ -537,7 +538,7 @@ mod tests {
             "higher_degree must be <= n for meaningful test"
         );
 
-        let g = build_generator_matrix(ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
+        let g = build_generator_matrix(&ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
         let h = null_space(&g, &q).unwrap();
 
         if h.is_empty() {
@@ -636,7 +637,7 @@ mod tests {
         let t = 4;
         let higher_degree = 6;
 
-        let g = build_generator_matrix(ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
+        let g = build_generator_matrix(&ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
         let h = null_space(&g, &q).unwrap();
 
         // Test with different coefficient patterns for degree-6 polynomial

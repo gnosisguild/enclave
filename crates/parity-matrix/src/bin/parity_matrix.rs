@@ -83,7 +83,7 @@ fn run() -> Result<(), ParityMatrixError> {
     };
 
     // Build the generator matrix (this will validate the config and constraints)
-    let g = build_generator_matrix(config)?;
+    let g = build_generator_matrix(&config)?;
     print_matrix("Generator Matrix G", &g, &args.q);
 
     // Compute the parity (null space) matrix
