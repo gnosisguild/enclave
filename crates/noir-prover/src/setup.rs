@@ -39,18 +39,18 @@ pub struct NoirSetup {
 }
 
 impl NoirSetup {
-    pub fn new(enclave_dir: &Path) -> Self {
+    pub fn new(enclave_dir: &Path, config: NoirConfig) -> Self {
         let noir_dir = enclave_dir.join("noir");
         Self {
             bb_binary: noir_dir.join("bin").join("bb"),
             circuits_dir: noir_dir.join("circuits"),
             work_dir: noir_dir.join("work"),
             noir_dir,
-            config: NoirConfig::default(),
+            config,
         }
     }
 
-    pub fn with_default_dir() -> Result<Self, NoirProverError> {
+    pub async fn with_default_dir() -> Result<Self, NoirProverError> {
         let base_dirs = directories::BaseDirs::new().ok_or_else(|| {
             NoirProverError::IoError(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -59,7 +59,8 @@ impl NoirSetup {
         })?;
 
         let enclave_dir = base_dirs.home_dir().join(".enclave");
-        Ok(Self::new(&enclave_dir))
+        let config = NoirConfig::fetch_or_default().await;
+        Ok(Self::new(&enclave_dir, config))
     }
 
     fn version_file(&self) -> PathBuf {
@@ -393,7 +394,7 @@ mod tests {
     #[tokio::test]
     async fn test_setup_creates_directories() {
         let temp = tempdir().unwrap();
-        let setup = NoirSetup::new(temp.path());
+        let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
         fs::create_dir_all(&setup.noir_dir).await.unwrap();
         fs::create_dir_all(&setup.circuits_dir).await.unwrap();
