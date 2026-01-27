@@ -132,7 +132,7 @@ pub fn calculate_bit_width(bound_str: &str) -> Result<u32> {
         return Ok(1); // Minimum 1 bit
     }
 
-    Ok((bound - BigInt::from(1)).bits() as u32 + 1)
+    Ok(bound.bits() as u32)
 }
 
 /// Get the ZKP modulus as a BigInt.
@@ -150,4 +150,63 @@ pub fn get_zkp_modulus() -> BigInt {
         "21888242871839275222246405745257275088548364400416034343698204186575808495617",
     )
     .expect("Invalid ZKP modulus")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_bit_width_handles_zero_and_positive_bounds() {
+        assert_eq!(calculate_bit_width("0").unwrap(), 1);
+        assert_eq!(calculate_bit_width("1").unwrap(), 1);
+        assert_eq!(calculate_bit_width("2").unwrap(), 2);
+        assert_eq!(calculate_bit_width("3").unwrap(), 2);
+        assert_eq!(calculate_bit_width("4").unwrap(), 3);
+        assert_eq!(calculate_bit_width("7").unwrap(), 3);
+        assert_eq!(calculate_bit_width("8").unwrap(), 4);
+    }
+
+    #[test]
+    fn calculate_bit_width_rejects_invalid_input() {
+        let err = calculate_bit_width("nope").unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("Failed to parse bound"));
+    }
+
+    #[test]
+    fn bigint_to_field_reduces_modulus() {
+        let modulus = get_zkp_modulus();
+        let value = modulus.clone() + BigInt::from(5);
+        let reduced = bigint_to_field(&value);
+        assert_eq!(reduced, bigint_to_field(&BigInt::from(5)));
+    }
+
+    #[test]
+    fn bigint_to_field_handles_negative() {
+        let modulus = get_zkp_modulus();
+        let value = BigInt::from(-1);
+        let expected = bigint_to_field(&(modulus - BigInt::from(1)));
+        assert_eq!(bigint_to_field(&value), expected);
+    }
+
+    #[test]
+    fn to_string_helpers_round_trip() {
+        let one = BigInt::from(1);
+        let two = BigInt::from(2);
+        let three = BigInt::from(3);
+
+        assert_eq!(
+            to_string_1d_vec(&[one.clone(), two.clone()]),
+            vec!["1", "2"]
+        );
+        assert_eq!(
+            to_string_2d_vec(&[vec![one.clone(), two.clone()], vec![three.clone()]]),
+            vec![vec!["1", "2"], vec!["3"]]
+        );
+        assert_eq!(
+            to_string_3d_vec(&[vec![vec![one, two, three]]]),
+            vec![vec![vec!["1", "2", "3"]]]
+        );
+    }
 }

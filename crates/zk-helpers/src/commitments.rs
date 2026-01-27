@@ -518,3 +518,79 @@ pub fn compute_dec_share_challenge(payload: Vec<Field>) -> BigInt {
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils::bigint_to_field;
+
+    fn field_to_bigint(value: Field) -> BigInt {
+        let bytes = value.into_bigint().to_bytes_le();
+        BigInt::from_bytes_le(num_bigint::Sign::Plus, &bytes)
+    }
+
+    #[test]
+    fn compute_ciphertext_commitment_matches_manual_payload() {
+        let ct0 = vec![vec![BigInt::from(1), BigInt::from(2)]];
+        let ct1 = vec![vec![BigInt::from(3), BigInt::from(4)]];
+        let bit_ct = 4;
+
+        let mut payload = Vec::new();
+        payload = flatten(payload, &ct0, bit_ct);
+        payload = flatten(payload, &ct1, bit_ct);
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = field_to_bigint(compute_commitments(payload, DS_CIPHERTEXT, io_pattern)[0]);
+
+        let actual = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn compute_spm_commitment_from_shares_matches_manual_payload() {
+        let y = vec![
+            vec![
+                vec![BigInt::from(0), BigInt::from(11), BigInt::from(12)],
+                vec![BigInt::from(0), BigInt::from(21), BigInt::from(22)],
+            ],
+            vec![
+                vec![BigInt::from(0), BigInt::from(13), BigInt::from(14)],
+                vec![BigInt::from(0), BigInt::from(23), BigInt::from(24)],
+            ],
+            vec![
+                vec![BigInt::from(0), BigInt::from(15), BigInt::from(16)],
+                vec![BigInt::from(0), BigInt::from(25), BigInt::from(26)],
+            ],
+        ];
+        let party_idx = 0;
+        let mod_idx = 1;
+
+        let mut payload = Vec::new();
+        for coeff_y in &y {
+            let share_value = &coeff_y[mod_idx][party_idx + 1];
+            payload.push(bigint_to_field(share_value));
+        }
+        payload.push(Field::from(party_idx as u64));
+        payload.push(Field::from(mod_idx as u64));
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = field_to_bigint(compute_commitments(payload, DS_SPM, io_pattern)[0]);
+
+        let actual = compute_spm_commitment_from_shares(&y, party_idx, mod_idx);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn challenge_lengths_match_expected_output() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+        let l = 3;
+
+        let pk_trbfv = compute_pk_trbfv_challenge(payload.clone(), l);
+        let bfv_enc = compute_bfv_enc_challenge(payload, l);
+
+        assert_eq!(pk_trbfv.len(), 2 * l);
+        assert_eq!(bfv_enc.len(), 2 * l);
+    }
+}
