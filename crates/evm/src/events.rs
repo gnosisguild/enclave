@@ -56,13 +56,19 @@ impl EnclaveEvmEvent {
 pub struct EvmLog {
     pub id: CorrelationId,
     pub log: Log,
+    pub timestamp: u64,
     pub chain_id: u64,
 }
 
 impl EvmLog {
-    pub fn new(log: Log, chain_id: u64) -> Self {
+    pub fn new(log: Log, chain_id: u64, timestamp: u64) -> Self {
         let id = CorrelationId::new();
-        Self { log, chain_id, id }
+        Self {
+            log,
+            chain_id,
+            id,
+            timestamp,
+        }
     }
 
     pub fn get_id(&self) -> CorrelationId {

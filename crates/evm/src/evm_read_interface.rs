@@ -156,12 +156,14 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     let chain_id = provider.chain_id();
     let provider_ref = provider.provider();
     let mut last_id: Option<CorrelationId> = None;
+    let mut timestamp_tracker = TimestampTracker::new();
     // Historical events
     match provider_ref.get_logs(&filters.historical).await {
         Ok(historical_logs) => {
             info!("Fetched {} historical events", historical_logs.len());
             for log in historical_logs {
-                let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id));
+                let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
+                let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
                 last_id = Some(evt.get_id());
                 processor.do_send(evt)
             }
@@ -188,7 +190,8 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                     maybe_log = stream.next() => {
                         match maybe_log {
                             Some(log) => {
-                                processor.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id)))
+                                let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
+                                processor.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp)))
                             }
                             None => break, // Stream ended
                         }
@@ -212,10 +215,6 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     info!("Exiting stream loop");
 }
 
-fn is_local_node(rpc_url: &str) -> bool {
-    rpc_url.contains("localhost") || rpc_url.contains("127.0.0.1")
-}
-
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P> {
     type Result = ();
 
@@ -225,5 +224,40 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P
                 let _ = shutdown.send(());
             }
         }
+    }
+}
+
+/// Cache utility to keep track of timestamps
+struct TimestampTracker {
+    current: Option<(u64, u64)>, // (block_number, timestamp)
+}
+
+impl TimestampTracker {
+    fn new() -> Self {
+        Self { current: None }
+    }
+
+    async fn get<P: Provider>(&mut self, provider: &P, block_number: Option<u64>) -> u64 {
+        let Some(bn) = block_number else {
+            error!("BLOCK NUMBER NOT FOUND ON LOG!");
+            return 0;
+        };
+
+        if let Some((cached_bn, ts)) = self.current {
+            if bn == cached_bn {
+                return ts;
+            }
+        }
+
+        let ts = provider
+            .get_block_by_number(bn.into())
+            .await
+            .ok()
+            .flatten()
+            .map(|b| b.header.timestamp)
+            .unwrap_or(0);
+
+        self.current = Some((bn, ts));
+        ts
     }
 }

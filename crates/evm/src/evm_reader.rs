@@ -6,6 +6,7 @@
 
 use actix::{Actor, Handler};
 use e3_events::{hlc::HlcTimestamp, EnclaveEventData, EvmEvent};
+use tracing::info;
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},
@@ -34,15 +35,19 @@ impl Handler<EnclaveEvmEvent> for EvmReader {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.clone() {
-            EnclaveEvmEvent::Log(EvmLog { log, chain_id, id }) => {
+            EnclaveEvmEvent::Log(EvmLog {
+                log,
+                chain_id,
+                id,
+                timestamp,
+            }) => {
                 let extractor = self.extractor;
 
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     let err = "Log should always have metadata because we listen to non-pending blocks. If you are seeing this it is likely because there is an issue with how we are subscribing to blocks";
                     let block = log.block_number.expect(err);
-                    let block_timestamp = log.block_timestamp.expect(err);
                     let log_index = log.log_index.expect(err);
-                    let ts = from_log_chain_id_to_ts(block_timestamp, log_index, chain_id);
+                    let ts = from_log_chain_id_to_ts(timestamp, log_index, chain_id);
                     self.next.do_send(EnclaveEvmEvent::Event(EvmEvent::new(
                         // note we use the id from the log event above!
                         id, event, block, ts, chain_id,
