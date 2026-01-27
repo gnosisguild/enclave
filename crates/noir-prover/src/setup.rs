@@ -278,17 +278,23 @@ impl NoirSetup {
         fs::create_dir_all(&self.circuits_dir).await?;
 
         let placeholder = serde_json::json!({
-            "noir_version": "1.0.0-beta.11",
-            "hash": 0,
-            "abi": {
-                "parameters": [],
-                "return_type": null
+            "noir_version":"1.0.0-beta.15+83245db91dcf63420ef4bcbbd85b98f397fee663",
+            "hash":"15412581843239610929",
+            "abi":{
+                "parameters":[
+                    {"name":"x","type":{"kind":"field"},"visibility":"private"},
+                    {"name":"y","type":{"kind":"field"},"visibility":"private"},
+                    {"name":"_sum","type":{"kind":"field"},"visibility":"public"}
+                ],
+                "return_type":null,
+                "error_types":{}
             },
-            "bytecode": "",
-            "debug_symbols": "",
-            "file_map": {},
-            "names": ["placeholder"],
-            "_note": "This is a placeholder circuit for testing. Replace with real compiled circuits."
+            "bytecode":"H4sIAAAAAAAA/5WOMQ5AMBRA/y8HMbIRRxCJSYwWg8RiIGIz9gjiAk4hHKeb0WLX0KHRDu1bXvL/y89H+HCFu7rtCTeCiiPsgRFo06LUhk0+smgN9iLdKC0rPz6z6RjmhN3LxffE/O7byg+hZv7nAb2HRPkUAQAA",
+            "debug_symbols":"jZDRCoMwDEX/Jc996MbG1F8ZQ2qNUghtie1giP++KLrpw2BPaXJ7bsgdocUm97XzXRiguo/QsCNyfU3BmuSCl+k4KdjaOjGijGCnCxUNo09Q+Uyk4GkoL5+GaPxSk2FRtQL0rVQx7Bzh/JrUl9a/0Vu5ssXlA1//psvbSp90ccAf0hnr+HAuaKjO0+zGzjSEawRd9naXSHrFTdkyixwstplxtls0WfAG",
+            "file_map":{
+                "50":{"source":"pub fn main(\n    x: Field,\n    y: Field,\n    _sum: pub Field\n) {\n    let sum = x + y;\n    assert(sum == _sum);\n}\n",
+                "path":"./enclave/circuits/bin/dummy/src/main.nr"}
+            },"expression_width":{"Bounded":{"width":4}}
         });
 
         let circuit_path = self.circuits_dir.join("pk_bfv.json");
