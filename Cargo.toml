@@ -23,6 +23,7 @@ members = [
   "crates/logger",
   "crates/multithread",
   "crates/net", 
+  "crates/noir-prover",
   "crates/program-server", 
   "crates/request",
   "crates/safe",
@@ -89,6 +90,7 @@ e3-evm = { version = "0.1.8", path = "./crates/evm" }
 e3-evm-helpers = { version = "0.1.8", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.1.8", path = "./crates/fhe" }
 e3-fhe-params = { version = "0.1.8", path = "./crates/fhe-params" }
+e3-noir-prover = { version = "0.1.7", path = "./crates/noir-prover" }
 e3-fs = { version = "0.1.8", path = "./crates/fs" }
 e3-greco-helpers = { version = "0.1.8", path = "./crates/greco-helpers" }
 e3-indexer = { version = "0.1.8", path = "./crates/indexer" }
@@ -183,6 +185,7 @@ strum = { version = "=0.27.2", features = ["derive"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
+toml = "=0.8.23"
 tracing = "=0.1.41"
 tracing-opentelemetry = "=0.30.0"
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }

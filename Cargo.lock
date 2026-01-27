@@ -971,9 +971,15 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-type-parser"
+<<<<<<< HEAD
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94b91b13181d3bcd23680fd29d7bc861d1f33fbe90fdd0af67162434aeba902d"
+=======
+version = "1.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6dbdf239d997b705e1c23cc8bb43f301db615b187379fa923d87723d47fcd31"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "serde",
  "winnow",
@@ -2705,6 +2711,15 @@ dependencies = [
 
 [[package]]
 name = "directories"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "directories"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
@@ -2893,6 +2908,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-noir-prover",
  "e3-support-scripts",
  "hex",
  "opentelemetry",
@@ -2903,6 +2919,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "tokio",
+ "toml",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -3295,6 +3312,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-noir-prover"
+version = "0.1.7"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "directories 5.0.1",
+ "flate2",
+ "futures-util",
+ "hex",
+ "indicatif 0.17.11",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "e3-parity-matrix"
 version = "0.1.8"
 dependencies = [
@@ -3323,6 +3364,17 @@ dependencies = [
 name = "e3-polynomial"
 version = "0.1.8"
 source = "git+https://github.com/gnosisguild/enclave?branch=main#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-polynomial"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3408,6 +3460,18 @@ dependencies = [
 name = "e3-safe"
 version = "0.1.8"
 source = "git+https://github.com/gnosisguild/enclave#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "sha3",
+ "taceo-poseidon2",
+]
+
+[[package]]
+name = "e3-safe"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3610,8 +3674,13 @@ version = "0.1.8"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
+<<<<<<< HEAD
  "e3-polynomial 0.1.8",
  "e3-safe 0.1.8",
+=======
+ "e3-polynomial 0.1.7",
+ "e3-safe 0.1.7",
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
  "fhe",
  "num-bigint",
  "num-traits",
@@ -3704,7 +3773,7 @@ version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
- "directories",
+ "directories 6.0.0",
  "flate2",
  "futures-util",
  "indicatif 0.17.11",
@@ -7268,12 +7337,14 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
+ "tokio-util",
  "tower 0.5.3",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.5",
 ]
@@ -8113,9 +8184,15 @@ dependencies = [
 
 [[package]]
 name = "syn-solidity"
+<<<<<<< HEAD
 version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2379beea9476b89d0237078be761cf8e012d92d5ae4ae0c9a329f974838870fc"
+=======
+version = "1.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e629391be459480417646f7ca78894442249262a6e095dbd6e4ab6988cfafce0"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "paste",
  "proc-macro2",
@@ -9005,6 +9082,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "wasmtimer"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9564,18 +9654,30 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
+<<<<<<< HEAD
 version = "0.8.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7456cf00f0685ad319c5b1693f291a650eaf345e941d082fc4e03df8a03996ac"
+=======
+version = "0.8.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdea86ddd5568519879b8187e1cf04e24fce28f7fe046ceecbce472ff19a2572"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
+<<<<<<< HEAD
 version = "0.8.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1328722bbf2115db7e19d69ebcc15e795719e2d66b60827c6a69a117365e37a0"
+=======
+version = "0.8.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c15e1b46eff7c6c91195752e0eeed8ef040e391cdece7c25376957d5f15df22"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9669,13 +9771,21 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
+=======
+source = "git+https://github.com/gnosisguild/zkfhe-generator#f3fd30fc4e969f674536c2616639021c15915d71"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "blake3",
+<<<<<<< HEAD
  "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
+=======
+ "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -9694,14 +9804,23 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
+<<<<<<< HEAD
 source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
+=======
+source = "git+https://github.com/gnosisguild/zkfhe-generator#f3fd30fc4e969f674536c2616639021c15915d71"
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "chrono",
+<<<<<<< HEAD
  "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
  "e3-safe 0.1.8 (git+https://github.com/gnosisguild/enclave)",
+=======
+ "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
+ "e3-safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
+>>>>>>> 7f4654d1 (feat: add e3-noir-prover crate for Noir proof generation)
  "fhe",
  "fhe-math",
  "fhe-traits",
