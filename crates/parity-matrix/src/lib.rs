@@ -30,4 +30,7 @@ pub mod matrix;
 
 // Re-export commonly used types for convenience
 pub use errors::{ParityMatrixError, ParityMatrixResult};
-pub use matrix::{build_generator_matrix, null_space, verify_parity_matrix, MatrixLike, ParityMatrix, ParityMatrixConfig};
+pub use matrix::{
+    build_generator_matrix, null_space, verify_parity_matrix, MatrixLike, ParityMatrix,
+    ParityMatrixConfig,
+};

@@ -462,7 +462,11 @@ mod tests {
 
         // Test with zero vector
         let zero = vec![BigUint::zero(); 3];
-        let v = vec![BigUint::from(1u32), BigUint::from(2u32), BigUint::from(3u32)];
+        let v = vec![
+            BigUint::from(1u32),
+            BigUint::from(2u32),
+            BigUint::from(3u32),
+        ];
         assert_eq!(dot_product_mod(&zero, &v, &q), BigUint::zero());
 
         // Test with larger modulus
