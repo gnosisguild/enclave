@@ -1,0 +1,6 @@
+{
+  "required_bb_version": "0.86.0",
+  "required_circuits_version": "0.1.0",
+  "bb_download_url": "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz",
+  "circuits_download_url": "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits.tar.gz"
+}
