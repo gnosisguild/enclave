@@ -10,7 +10,7 @@
 
 use clap::Parser;
 use num_bigint::BigUint;
-use num_traits::Zero;
+use parity_matrix::errors::ParityMatrixError;
 use parity_matrix::math::evaluate_polynomial;
 use parity_matrix::matrix::{
     build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
@@ -41,6 +41,13 @@ struct Args {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), ParityMatrixError> {
     let args = Args::parse();
 
     if args.verbose {
@@ -76,23 +83,11 @@ fn main() {
     };
 
     // Build the generator matrix (this will validate the config and constraints)
-    let g = match build_generator_matrix(config) {
-        Ok(pm) => pm,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let g = build_generator_matrix(config)?;
     print_matrix("Generator Matrix G", &g, &args.q);
 
     // Compute the parity (null space) matrix
-    let h = match null_space(&g, &args.q) {
-        Ok(h) => h,
-        Err(e) => {
-            eprintln!("Error computing null space: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let h = null_space(&g, &args.q)?;
 
     if h.is_empty() {
         println!("Parity Matrix H: (empty - the subspace spans the entire space)");
@@ -101,17 +96,11 @@ fn main() {
     }
 
     // Verify correctness
-    match verify_parity_matrix(&g, &h, &args.q) {
-        Ok(true) => {
-            println!("✓ Verification passed: H · G^T = 0 (mod q)");
-        }
-        Ok(false) => {
-            println!("✗ Verification FAILED: H · G^T ≠ 0 (mod q)");
-        }
-        Err(e) => {
-            eprintln!("Error during verification: {}", e);
-            std::process::exit(1);
-        }
+    let verified = verify_parity_matrix(&g, &h, &args.q)?;
+    if verified {
+        println!("✓ Verification passed: H · G^T = 0 (mod q)");
+    } else {
+        println!("✗ Verification FAILED: H · G^T ≠ 0 (mod q)");
     }
 
     if args.verbose {
@@ -226,4 +215,6 @@ fn main() {
             "Random polynomial evaluation is also in the null space of H",
         );
     }
+
+    Ok(())
 }
