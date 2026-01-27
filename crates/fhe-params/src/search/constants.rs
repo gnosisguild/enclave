@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 /// NTT-friendly primes by bit-length (40..63), 6 per size
 pub const NTT_PRIMES_BY_BITS: &[(u8, [&str; 6])] = &[
     (
