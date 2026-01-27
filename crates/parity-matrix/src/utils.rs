@@ -15,23 +15,27 @@ pub fn print_matrix(name: &str, matrix: &[Vec<BigUint>], q: &BigUint) {
     };
     println!("{} ({}x{}):", name, matrix.len(), cols);
 
-    // Determine max width for formatting
-    let max_width = matrix
-        .iter()
-        .flat_map(|row| row.iter())
-        .map(|v| v.to_string().len())
-        .max()
-        .unwrap_or(1)
-        .max(q.to_string().len().min(6)); // Cap at 6 for very large q
+    // Calculate max width and print in a single pass
+    let mut max_width = q.to_string().len().min(6);
+    let mut string_cache = Vec::new();
 
     for row in matrix {
+        let mut row_strings = Vec::new();
+        for val in row {
+            let s = val.to_string();
+            let display_len = if s.len() > 12 { 12 } else { s.len() };
+            max_width = max_width.max(display_len);
+            row_strings.push(s);
+        }
+        string_cache.push(row_strings);
+    }
+
+    for row_strings in string_cache {
         print!("  [");
-        for (i, val) in row.iter().enumerate() {
+        for (i, s) in row_strings.iter().enumerate() {
             if i > 0 {
                 print!(", ");
             }
-            let s = val.to_string();
-            // Truncate very large numbers for display
             if s.len() > 12 {
                 print!("{}...", &s[..9]);
             } else {
