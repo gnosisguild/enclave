@@ -6,10 +6,18 @@
 
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::Context;
-use e3_events::{trap, BusHandle, EType, EventPublisher, EvmEventConfig, SyncEvmEvent, SyncStart};
+use e3_events::{
+    trap, BusHandle, EType, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd, SyncEvmEvent,
+    SyncStart,
+};
+
+// NOTE: This is a WIP. We need to synchronize events from EVM as well as libp2p
+
+/// Manage the synchronization of events across.
 pub struct Synchronizer {
     bus: BusHandle,
     evm_config: Option<EvmEventConfig>,
+    evm_buffer: Vec<EvmEvent>,
     // net_config: NetEventConfig,
 }
 
@@ -18,6 +26,7 @@ impl Synchronizer {
         Self {
             evm_config: Some(evm_config),
             bus: bus.clone(),
+            evm_buffer: Vec::new(),
         }
     }
 
@@ -36,8 +45,21 @@ impl Actor for Synchronizer {
 impl Handler<SyncEvmEvent> for Synchronizer {
     type Result = ();
     fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
-
-        // What do we do with these for now?
+        trap(EType::Sync, &self.bus.clone(), || {
+            match msg {
+                // Buffer events as the sync actor receives them
+                SyncEvmEvent::Event(event) => self.evm_buffer.push(event),
+                // When we hear that sync is complete send all events on chain then publish SyncEnd
+                SyncEvmEvent::HistoricalSyncComplete(_) => {
+                    for evt in self.evm_buffer.drain(..) {
+                        let (data, ts, _) = evt.split();
+                        self.bus.publish_from_remote(data, ts)?;
+                    }
+                    self.bus.publish(SyncEnd::new())?;
+                }
+            };
+            Ok(())
+        })
     }
 }
 
