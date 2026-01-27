@@ -147,11 +147,6 @@ pub fn verify_parity_matrix(
         return Ok(true);
     }
 
-    // Validate dimensions
-    if matrix.is_empty() {
-        return Err(ParityMatrixError::from(MatrixError::EmptyMatrix));
-    }
-
     let h_rows = h.len();
     let g_rows = matrix.len();
     let n_plus_1 = h[0].len();
