@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::circuits::pk_bfv::{PK_BFV_CIRCUIT_NAME, PK_BFV_N_PROOFS, PK_BFV_N_PUBLIC_INPUTS};
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
