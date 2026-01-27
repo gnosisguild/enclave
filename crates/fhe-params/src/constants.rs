@@ -84,4 +84,9 @@ pub mod defaults {
     /// when variance is not specified. Both variance() and error1_variance default to this value.
     pub const VARIANCE: usize = 10;
     pub const ERROR1_VARIANCE: u32 = 10;
+
+    /// Default insecure security parameter (λ).
+    pub const DEFAULT_INSECURE_LAMBDA: usize = 2;
+    /// Default secure security parameter (λ).
+    pub const DEFAULT_SECURE_LAMBDA: usize = 80;
 }

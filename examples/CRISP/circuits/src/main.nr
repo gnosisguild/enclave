@@ -4,15 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use commitments::compute_ct_commitment;
 use lib::configs::insecure::trbfv::{
     GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
     GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N, Q_MOD_T_MOD_P,
 };
 use lib::core::greco::Greco;
+use lib::math::commitments::compute_ciphertext_commitment;
 use lib::math::polynomial::Polynomial;
 
-mod commitments;
 mod constants;
 mod ciphertext_addition;
 use ciphertext_addition::CiphertextAddition;
@@ -172,7 +171,7 @@ fn main(
     //     * Return sum ciphertext commitment (sum_ct_commitment)
 
     // Generate the vote ciphertext commitment.
-    let ct_commitment = compute_ct_commitment::<512, 2, 36>(ct0is, ct1is);
+    let ct_commitment = compute_ciphertext_commitment::<512, 2, 36>(ct0is, ct1is);
 
     if is_mask_vote == false {
         check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
@@ -188,8 +187,10 @@ fn main(
         if is_first_vote {
             ct_commitment
         } else {
-            let _prev_ct_commitment = compute_ct_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
-            let sum_ct_commitment = compute_ct_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
+            let _prev_ct_commitment =
+                compute_ciphertext_commitment::<512, 2, 36>(prev_ct0is, prev_ct1is);
+            let sum_ct_commitment =
+                compute_ciphertext_commitment::<512, 2, 36>(sum_ct0is, sum_ct1is);
 
             let ct_add: CiphertextAddition<512, 2, 36, 36, 36> = CiphertextAddition::new(
                 GRECO_CONFIGS,

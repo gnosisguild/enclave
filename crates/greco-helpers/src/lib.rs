@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_zk_helpers::utils::get_zkp_modulus;
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 use fhe_math::rq::Representation;
 use num_bigint::BigInt;
-use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
 
 /// Converts a BFV coefficient (in [0, qi)) to centered format [-(qi-1)/2, (qi-1)/2].
@@ -171,12 +171,12 @@ pub fn bfv_public_key_to_greco(
 mod tests {
     use super::*;
     use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_zk_helpers::utils::calculate_bit_width;
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use greco::bounds::GrecoBounds;
     use greco::vectors::GrecoVectors;
     use rand::thread_rng;
-    use shared::template::calculate_bit_width;
 
     #[test]
     fn test_bfv_public_key_to_greco() {

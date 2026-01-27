@@ -5,9 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use e3_polynomial::Polynomial;
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use polynomial::Polynomial;
 
 fn create_test_polynomials(degree: usize) -> (Polynomial, Polynomial) {
     let mut coeffs1 = Vec::new();
@@ -123,7 +123,7 @@ fn benchmark_utility_functions(c: &mut Criterion) {
 
     group.bench_function("reduce_and_center", |b| {
         b.iter(|| {
-            black_box(polynomial::utils::reduce_and_center(
+            black_box(e3_polynomial::utils::reduce_and_center(
                 &x,
                 &modulus,
                 &half_modulus,
@@ -137,7 +137,7 @@ fn benchmark_utility_functions(c: &mut Criterion) {
 
     group.bench_function("range_check_standard", |b| {
         b.iter(|| {
-            black_box(polynomial::utils::range_check_standard(
+            black_box(e3_polynomial::utils::range_check_standard(
                 &coeffs, &bound, &modulus,
             ))
         })
