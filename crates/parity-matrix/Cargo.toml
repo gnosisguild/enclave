@@ -12,6 +12,9 @@ num-traits = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [[bin]]
 name = "parity-matrix"
 path = "src/bin/parity_matrix.rs"

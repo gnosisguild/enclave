@@ -196,4 +196,98 @@ mod tests {
             _ => panic!("Expected Math error for modulus = 1"),
         }
     }
+
+    #[test]
+    fn test_mod_inverse_zero_element() {
+        // Zero has no modular inverse
+        let q = BigUint::from(7u32);
+        let a = BigUint::zero();
+        let result = mod_inverse(&a, &q);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("Modular inverse does not exist"));
+            }
+            _ => panic!("Expected Math error for zero"),
+        }
+    }
+
+    #[test]
+    fn test_mod_inverse_non_invertible_composite_modulus() {
+        // Test with composite modulus where gcd(a, q) != 1
+        let q = BigUint::from(6u32); // composite: 2 * 3
+        let a = BigUint::from(2u32); // gcd(2, 6) = 2 != 1
+        let result = mod_inverse(&a, &q);
+        assert!(result.is_err());
+
+        let a2 = BigUint::from(3u32); // gcd(3, 6) = 3 != 1
+        let result2 = mod_inverse(&a2, &q);
+        assert!(result2.is_err());
+
+        // But gcd(5, 6) = 1, so inverse should exist
+        let a3 = BigUint::from(5u32);
+        let result3 = mod_inverse(&a3, &q);
+        assert!(result3.is_ok());
+        let inv3 = result3.unwrap();
+        assert_eq!((&a3 * &inv3) % &q, BigUint::one());
+    }
+
+    #[test]
+    fn test_mod_inverse_multiple_of_modulus() {
+        // a is a multiple of q, so gcd(a, q) = q != 1
+        let q = BigUint::from(7u32);
+        let a = BigUint::from(14u32); // 14 = 2 * 7
+        let result = mod_inverse(&a, &q);
+        assert!(result.is_err());
+
+        let a2 = BigUint::from(21u32); // 21 = 3 * 7
+        let result2 = mod_inverse(&a2, &q);
+        assert!(result2.is_err());
+    }
+
+    #[test]
+    fn test_mod_inverse_large_composite_modulus() {
+        // Test with larger composite modulus
+        let q = BigUint::from(15u32); // composite: 3 * 5
+        // Elements that share factors with q should fail
+        let non_invertible = vec![3u32, 5, 6, 9, 10, 12];
+        for val in non_invertible {
+            let a = BigUint::from(val);
+            let result = mod_inverse(&a, &q);
+            assert!(result.is_err(), "{} should not have inverse mod {}", val, q);
+        }
+
+        // Elements coprime with q should succeed
+        let invertible = vec![1u32, 2, 4, 7, 8, 11, 13, 14];
+        for val in invertible {
+            let a = BigUint::from(val);
+            let result = mod_inverse(&a, &q);
+            assert!(result.is_ok(), "{} should have inverse mod {}", val, q);
+            let inv = result.unwrap();
+            assert_eq!((&a * &inv) % &q, BigUint::one());
+        }
+    }
+
+    #[test]
+    fn test_mod_inverse_reduced_mod_q() {
+        // Test that a mod q is used (not the full value of a)
+        let q = BigUint::from(7u32);
+        let a = BigUint::from(9u32); // 9 mod 7 = 2
+        let inv = mod_inverse(&a, &q).unwrap();
+        // Should be same as inverse of 2
+        let inv2 = mod_inverse(&BigUint::from(2u32), &q).unwrap();
+        assert_eq!(inv, inv2);
+        assert_eq!((&a * &inv) % &q, BigUint::one());
+    }
+
+    #[test]
+    fn test_mod_inverse_all_elements_prime_modulus() {
+        // For prime modulus, all non-zero elements should have inverses
+        let q = BigUint::from(11u32);
+        for a_val in 1u32..11 {
+            let a = BigUint::from(a_val);
+            let inv = mod_inverse(&a, &q).unwrap();
+            assert_eq!((&a * &inv) % &q, BigUint::one());
+        }
+    }
 }

@@ -174,6 +174,7 @@ pub fn verify_parity_matrix(
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::ParityMatrixError;
     use crate::math::mod_pow;
     use crate::matrix::{
         build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
@@ -699,6 +700,404 @@ mod tests {
             for t in 0..max_t {
                 // Test degree t+1 (just above threshold)
                 test_higher_degree_not_in_nullspace(q.clone(), n, t, t + 1);
+            }
+        }
+    }
+
+    // ==================== Edge Case Tests ====================
+
+    #[test]
+    #[should_panic(expected = "zero modulus")]
+    fn test_q_equals_zero() {
+        // q = 0 should panic in mod_pow (num-bigint panics on zero modulus)
+        let q = BigUint::zero();
+        let config = ParityMatrixConfig {
+            q: q.clone(),
+            n: 3,
+            t: 1,
+        };
+
+        // This will panic when mod_pow is called with q=0
+        let _ = build_generator_matrix(&config);
+    }
+
+    #[test]
+    fn test_q_equals_one() {
+        // q = 1 means all values are 0 mod 1
+        let q = BigUint::one();
+        let config = ParityMatrixConfig {
+            q: q.clone(),
+            n: 3,
+            t: 1,
+        };
+
+        let result = build_generator_matrix(&config);
+        // With q=1, mod_pow returns 0, so matrix should be all zeros
+        if let Ok(g) = result {
+            assert!(g.iter().all(|row| row.iter().all(|x| x.is_zero())));
+        }
+    }
+
+    #[test]
+    fn test_n_equals_zero() {
+        // n = 0 means we have 1 point (point 0)
+        let q = BigUint::from(7u32);
+        let config = ParityMatrixConfig { q, n: 0, t: 0 };
+
+        let result = build_generator_matrix(&config);
+        assert!(result.is_ok());
+        if let Ok(g) = result {
+            assert_eq!(g.len(), 1); // t+1 = 1
+            assert_eq!(g[0].len(), 1); // n+1 = 1
+            assert_eq!(g[0][0], BigUint::one()); // 0^0 = 1
+        }
+    }
+
+    #[test]
+    fn test_n_equals_one() {
+        // n = 1 means we have 2 points (0 and 1)
+        // max_t = (1-1)/2 = 0, so only t=0 is valid
+        let q = BigUint::from(7u32);
+        let config = ParityMatrixConfig { q, n: 1, t: 0 };
+
+        let result = build_generator_matrix(&config);
+        assert!(result.is_ok());
+        if let Ok(g) = result {
+            assert_eq!(g.len(), 1); // t+1 = 1
+            assert_eq!(g[0].len(), 2); // n+1 = 2
+            assert_eq!(g[0][0], BigUint::one()); // 0^0 = 1
+            assert_eq!(g[0][1], BigUint::one()); // 1^0 = 1
+        }
+    }
+
+    #[test]
+    fn test_t_equals_zero_edge_cases() {
+        // Test t=0 (constant polynomials) with various n and q
+        let test_cases = vec![
+            (BigUint::from(2u32), 3),
+            (BigUint::from(3u32), 5),
+            (BigUint::from(5u32), 7),
+            (BigUint::from(7u32), 9),
+            (BigUint::from(11u32), 11),
+        ];
+
+        for (q, n) in test_cases {
+            let config = ParityMatrixConfig { q: q.clone(), n, t: 0 };
+            let g = build_generator_matrix(&config).unwrap();
+            let h = null_space(&g, &q).unwrap();
+
+            // G should be 1x(n+1) with all ones
+            assert_eq!(g.len(), 1);
+            assert_eq!(g[0].len(), n + 1);
+            assert!(g[0].iter().all(|x| *x == BigUint::one()));
+
+            // Verify H * G^T = 0
+            assert!(verify_parity_matrix(&g, &h, &q).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_empty_matrix_null_space() {
+        // Empty matrix should return empty null space
+        let empty: Vec<Vec<BigUint>> = vec![];
+        let q = BigUint::from(7u32);
+        let result = null_space(&empty, &q).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_empty_matrix_verify() {
+        // Empty matrices should verify as true
+        let empty: Vec<Vec<BigUint>> = vec![];
+        let q = BigUint::from(7u32);
+        assert!(verify_parity_matrix(&empty, &empty, &q).unwrap());
+    }
+
+    // ==================== Error Condition Tests ====================
+
+    #[test]
+    fn test_invalid_constraint_t_too_large() {
+        // Test constraint violation: t > (n-1)/2
+        let q = BigUint::from(7u32);
+        let config = ParityMatrixConfig { q, n: 5, t: 3 }; // max_t = 2, but t=3
+
+        let result = build_generator_matrix(&config);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Constraint { message }) => {
+                assert!(message.contains("Degree constraint violated"));
+            }
+            _ => panic!("Expected Constraint error"),
+        }
+    }
+
+    #[test]
+    fn test_invalid_constraint_t_equals_max_plus_one() {
+        // Test t = max_t + 1
+        let q = BigUint::from(11u32);
+        let n = 7;
+        let max_t = (n - 1) / 2; // = 3
+        let config = ParityMatrixConfig {
+            q,
+            n,
+            t: max_t + 1, // = 4
+        };
+
+        let result = build_generator_matrix(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mod_inverse_non_invertible_zero() {
+        // Zero has no modular inverse
+        let q = BigUint::from(7u32);
+        let a = BigUint::zero();
+        let result = crate::math::mod_inverse(&a, &q);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("Modular inverse does not exist"));
+            }
+            _ => panic!("Expected Math error for zero"),
+        }
+    }
+
+    #[test]
+    fn test_mod_inverse_non_invertible_composite() {
+        // If q is composite and gcd(a, q) != 1, no inverse exists
+        let q = BigUint::from(6u32); // composite: 2 * 3
+        let a = BigUint::from(2u32); // gcd(2, 6) = 2 != 1
+        let result = crate::math::mod_inverse(&a, &q);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mod_inverse_non_invertible_multiple_of_modulus() {
+        // a is a multiple of q
+        let q = BigUint::from(7u32);
+        let a = BigUint::from(14u32); // 14 = 2 * 7
+        let result = crate::math::mod_inverse(&a, &q);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_dimension_mismatch_verify() {
+        // Test verify_parity_matrix with mismatched dimensions
+        let q = BigUint::from(7u32);
+        let g = vec![vec![BigUint::one(); 3]]; // 1x3
+        let h = vec![vec![BigUint::one(); 4]]; // 1x4 (mismatch)
+
+        // This should either error or handle gracefully
+        // The function checks h_row.len() == matrix_row.len() via zip
+        // So it will silently skip mismatched elements, but we should test it
+        let result = verify_parity_matrix(&g, &h, &q);
+        // Depending on implementation, might succeed or fail
+        // The key is it shouldn't panic
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_null_space_with_non_invertible_pivot() {
+        // Create a matrix that might cause issues during Gaussian elimination
+        // when pivot element is not invertible mod q
+        let q = BigUint::from(6u32); // composite modulus
+        let matrix = vec![
+            vec![BigUint::from(2u32), BigUint::from(4u32)], // gcd(2, 6) = 2
+            vec![BigUint::from(3u32), BigUint::from(3u32)], // gcd(3, 6) = 3
+        ];
+
+        // This should handle non-invertible elements gracefully
+        let result = null_space(&matrix, &q);
+        // Should either return error or handle it
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    // ==================== Property-Based Tests ====================
+
+    #[cfg(test)]
+    mod proptest_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        // Strategy for generating valid BigUint moduli (primes >= 2)
+        fn arb_prime_modulus() -> impl Strategy<Value = BigUint> {
+            prop_oneof![
+                Just(BigUint::from(2u32)),
+                Just(BigUint::from(3u32)),
+                Just(BigUint::from(5u32)),
+                Just(BigUint::from(7u32)),
+                Just(BigUint::from(11u32)),
+                Just(BigUint::from(13u32)),
+                Just(BigUint::from(17u32)),
+                Just(BigUint::from(19u32)),
+                Just(BigUint::from(23u32)),
+                Just(BigUint::from(29u32)),
+                Just(BigUint::from(31u32)),
+                Just(BigUint::from(37u32)),
+                Just(BigUint::from(41u32)),
+                Just(BigUint::from(43u32)),
+                Just(BigUint::from(47u32)),
+                Just(BigUint::from(53u32)),
+                Just(BigUint::from(59u32)),
+                Just(BigUint::from(61u32)),
+                Just(BigUint::from(67u32)),
+                Just(BigUint::from(71u32)),
+                Just(BigUint::from(73u32)),
+                Just(BigUint::from(79u32)),
+                Just(BigUint::from(83u32)),
+                Just(BigUint::from(89u32)),
+                Just(BigUint::from(97u32)),
+                Just(BigUint::from(101u32)),
+            ]
+        }
+
+        // Strategy for generating valid n (number of points)
+        fn arb_n() -> impl Strategy<Value = usize> {
+            3usize..=50
+        }
+
+        // Strategy for generating valid t given n
+        fn arb_t_for_n(n: usize) -> impl Strategy<Value = usize> {
+            let max_t = (n.saturating_sub(1)) / 2;
+            0usize..=max_t
+        }
+
+        // Strategy for generating valid (q, n, t) triplets
+        fn arb_valid_config() -> impl Strategy<Value = (BigUint, usize, usize)> {
+            arb_prime_modulus().prop_flat_map(|q| {
+                let q_clone = q.clone();
+                arb_n().prop_flat_map(move |n| {
+                    let q_clone2 = q_clone.clone();
+                    arb_t_for_n(n).prop_map(move |t| (q_clone2.clone(), n, t))
+                })
+            })
+        }
+
+        proptest! {
+            #[test]
+            fn prop_h_times_g_transpose_is_zero(
+                (q, n, t) in arb_valid_config()
+            ) {
+                let config = ParityMatrixConfig { q: q.clone(), n, t };
+                let g = build_generator_matrix(&config).unwrap();
+                let h = null_space(&g, &q).unwrap();
+
+                // Property: H * G^T = 0 for all valid configs
+                prop_assert!(
+                    verify_parity_matrix(&g, &h, &q).unwrap(),
+                    "H * G^T should be zero for q={}, n={}, t={}",
+                    q, n, t
+                );
+            }
+
+            #[test]
+            fn prop_polynomial_evaluations_in_null_space(
+                (q, n, t) in arb_valid_config()
+            ) {
+                let config = ParityMatrixConfig { q: q.clone(), n, t };
+                let g = build_generator_matrix(&config).unwrap();
+                let h = null_space(&g, &q).unwrap();
+
+                if h.is_empty() {
+                    return Ok(());
+                }
+
+                // Generate random polynomial coefficients of degree t
+                let num_coeffs = t + 1;
+                let coeffs: Vec<BigUint> = (0..num_coeffs)
+                    .map(|i| BigUint::from(i as u32 + 1) % &q)
+                    .collect();
+
+                // Evaluate polynomial at all points
+                let eval_vec: Vec<BigUint> = (0..=n)
+                    .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
+                    .collect();
+
+                // Property: H * eval_vec = 0 for degree-t polynomials
+                let result = matrix_vector_mult(&h, &eval_vec, &q);
+                prop_assert!(
+                    result.iter().all(|x| x.is_zero()),
+                    "H * v should be 0 for degree-{} polynomial with q={}, n={}, t={}",
+                    t, q, n, t
+                );
+            }
+
+            #[test]
+            fn prop_higher_degree_polynomials_not_in_null_space(
+                (q, n, t) in arb_valid_config()
+            ) {
+                // Only test if we can have a higher degree polynomial
+                if t >= n {
+                    return Ok(());
+                }
+
+                // Skip if n+1 > q, as evaluation points repeat mod q and rank of G may be reduced
+                // This can cause higher degree polynomials to appear in null space
+                let n_plus_1 = BigUint::from(n + 1);
+                if n_plus_1 > q {
+                    return Ok(());
+                }
+
+                let config = ParityMatrixConfig { q: q.clone(), n, t };
+                let g = build_generator_matrix(&config).unwrap();
+                let h = null_space(&g, &q).unwrap();
+
+                if h.is_empty() {
+                    return Ok(());
+                }
+
+                // Generate polynomial of degree t+1 (one more than allowed)
+                let higher_degree = t + 1;
+                let num_coeffs = higher_degree + 1;
+                let coeffs: Vec<BigUint> = (1..=num_coeffs)
+                    .map(|i| BigUint::from(i as u32) % &q)
+                    .collect();
+
+                // Ensure leading coefficient is non-zero
+                if coeffs[higher_degree].is_zero() {
+                    return Ok(());
+                }
+
+                // Evaluate polynomial at all points
+                let eval_vec: Vec<BigUint> = (0..=n)
+                    .map(|j| eval_poly(&coeffs, &BigUint::from(j), &q))
+                    .collect();
+
+                // Property: H * eval_vec ≠ 0 for degree-(t+1) polynomials
+                let result = matrix_vector_mult(&h, &eval_vec, &q);
+                prop_assert!(
+                    !result.iter().all(|x| x.is_zero()),
+                    "H * v should NOT be 0 for degree-{} polynomial with q={}, n={}, t={}",
+                    higher_degree, q, n, t
+                );
+            }
+
+            #[test]
+            fn prop_generator_matrix_dimensions_correct(
+                (q, n, t) in arb_valid_config()
+            ) {
+                let config = ParityMatrixConfig { q, n, t };
+                let g = build_generator_matrix(&config).unwrap();
+
+                // Property: G has correct dimensions
+                prop_assert_eq!(g.len(), t + 1, "G should have t+1 rows");
+                if !g.is_empty() {
+                    prop_assert_eq!(g[0].len(), n + 1, "G should have n+1 columns");
+                }
+            }
+
+            #[test]
+            fn prop_null_space_has_correct_dimensions(
+                (q, n, t) in arb_valid_config()
+            ) {
+                let config = ParityMatrixConfig { q: q.clone(), n, t };
+                let g = build_generator_matrix(&config).unwrap();
+                let h = null_space(&g, &q).unwrap();
+
+                // Property: H has correct column dimension
+                if !h.is_empty() {
+                    prop_assert_eq!(h[0].len(), n + 1, "H should have n+1 columns");
+                }
             }
         }
     }

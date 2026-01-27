@@ -6191,6 +6191,7 @@ dependencies = [
  "clap",
  "num-bigint",
  "num-traits",
+ "proptest",
  "thiserror 1.0.69",
 ]
 
