@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_noir_prover::{NoirSetup, SetupStatus};
+use e3_noir_prover::{NoirConfig, NoirSetup, SetupStatus};
 use tempfile::tempdir;
 use tokio::fs;
 
 #[tokio::test]
 async fn test_check_status_on_empty_dir() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path());
+    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
     let status = setup.check_status().await;
     assert!(matches!(status, SetupStatus::FullSetupNeeded));
@@ -20,7 +20,7 @@ async fn test_check_status_on_empty_dir() {
 #[tokio::test]
 async fn test_placeholder_circuits_creation() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path());
+    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
     fs::create_dir_all(&setup.circuits_dir).await.unwrap();
 
@@ -36,7 +36,7 @@ async fn test_placeholder_circuits_creation() {
 #[tokio::test]
 async fn test_work_dir_creation_and_cleanup() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path());
+    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
     let e3_id = "test-e3-123";
     let work_dir = setup.work_dir_for(e3_id);
@@ -53,14 +53,12 @@ async fn test_work_dir_creation_and_cleanup() {
 #[tokio::test]
 async fn test_version_info_persistence() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path());
+    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
     fs::create_dir_all(&setup.noir_dir).await.unwrap();
 
-    // Load (should be empty defaults)
     let info = setup.load_version_info().await;
     assert!(info.bb_version.is_none());
 
-    // Modify and save
     let mut info = info;
     info.bb_version = Some("0.87.0".to_string());
     info.circuits_version = Some("0.1.0".to_string());
@@ -68,7 +66,6 @@ async fn test_version_info_persistence() {
         .await
         .unwrap();
 
-    // Reload
     let reloaded = setup.load_version_info().await;
     assert_eq!(reloaded.bb_version, Some("0.87.0".to_string()));
     assert_eq!(reloaded.circuits_version, Some("0.1.0".to_string()));
