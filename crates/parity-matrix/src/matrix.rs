@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::errors::{ConstraintError, MatrixError, ParityMatrixError, ParityMatrixResult};
+use crate::errors::{ConstraintError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
 use num_bigint::BigUint;
@@ -65,9 +65,12 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
 
     // Initialize: transpose of original matrix in left part, identity in right part
     for (i, aug_row) in aug.iter_mut().enumerate().take(cols) {
-        for (j, aug_cell) in aug_row.iter_mut().enumerate().take(rows) {
-            *aug_cell = matrix[j][i].clone();
-        }
+        aug_row[..rows]
+            .iter_mut()
+            .enumerate()
+            .for_each(|(j, aug_cell)| {
+                *aug_cell = matrix[j][i].clone();
+            });
         aug_row[rows + i] = BigUint::one();
     }
 
@@ -114,26 +117,23 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
     }
 
     // The null space basis vectors come from rows that are zero in the left part
-    let mut null_basis = Vec::new();
-
-    for row in aug.iter().take(cols) {
-        let mut is_zero_left = true;
-        for col_val in row.iter().take(rows) {
-            if !col_val.is_zero() {
-                is_zero_left = false;
-                break;
+    let null_basis: Vec<Vec<BigUint>> = aug
+        .iter()
+        .take(cols)
+        .filter_map(|row| {
+            let is_zero_left = row[..rows].iter().all(|x| x.is_zero());
+            if is_zero_left {
+                let null_vec = row[rows..].to_vec();
+                if null_vec.iter().any(|x| !x.is_zero()) {
+                    Some(null_vec)
+                } else {
+                    None
+                }
+            } else {
+                None
             }
-        }
-
-        if is_zero_left {
-            // Extract the right part (identity portion) as a null space vector
-            let null_vec: Vec<BigUint> = row[rows..].to_vec();
-            // Check it's not all zeros
-            if null_vec.iter().any(|x| !x.is_zero()) {
-                null_basis.push(null_vec);
-            }
-        }
-    }
+        })
+        .collect();
 
     Ok(null_basis)
 }
@@ -150,15 +150,16 @@ pub fn verify_parity_matrix(
 
     let h_rows = h.len();
     let g_rows = matrix.len();
-    let n_plus_1 = h[0].len();
 
     // Compute H * G^T
     for (i, h_row) in h.iter().enumerate().take(h_rows) {
         for (j, matrix_row) in matrix.iter().enumerate().take(g_rows) {
-            let mut sum = BigUint::zero();
-            for k in 0..n_plus_1 {
-                sum = (sum + &h_row[k] * &matrix_row[k]) % q;
-            }
+            let sum = h_row
+                .iter()
+                .zip(matrix_row.iter())
+                .fold(BigUint::zero(), |acc, (h_val, g_val)| {
+                    (acc + h_val * g_val) % q
+                });
             if !sum.is_zero() {
                 return Err(ParityMatrixError::verification(format!(
                     "H · G^T ≠ 0 (mod q): entry at position ({}, {}) is {}",
