@@ -4,11 +4,26 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Modular arithmetic operations for finite field computations.
+//!
+//! This module provides efficient implementations of modular exponentiation,
+//! polynomial evaluation, and modular inverses over `Z_q`.
+
 use crate::errors::{MathError, ParityMatrixError, ParityMatrixResult};
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 
-/// Compute modular exponentiation: base^exp mod modulus
+/// Compute modular exponentiation: `base^exp mod modulus`.
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::math::mod_pow;
+/// use num_bigint::BigUint;
+///
+/// let result = mod_pow(&BigUint::from(3u32), 4, &BigUint::from(11u32));
+/// assert_eq!(result, BigUint::from(4u32)); // 3^4 = 81 ≡ 4 (mod 11)
+/// ```
 pub fn mod_pow(base: &BigUint, exp: usize, modulus: &BigUint) -> BigUint {
     if modulus.is_one() {
         return BigUint::zero();
@@ -16,7 +31,23 @@ pub fn mod_pow(base: &BigUint, exp: usize, modulus: &BigUint) -> BigUint {
     base.modpow(&BigUint::from(exp), modulus)
 }
 
-/// Evaluate a polynomial with given coefficients at points 0, 1, ..., n.
+/// Evaluate a polynomial with given coefficients at points `0, 1, ..., n`.
+///
+/// For a polynomial `f(x) = a₀ + a₁x + ... + aₖxᵏ` with coefficients `coeffs = [a₀, ..., aₖ]`,
+/// returns the vector `[f(0), f(1), ..., f(n)]` where all arithmetic is performed modulo `q`.
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::math::evaluate_polynomial;
+/// use num_bigint::BigUint;
+///
+/// // Evaluate f(x) = 2x + 1 at points 0, 1, 2, 3
+/// let coeffs = vec![BigUint::from(1u32), BigUint::from(2u32)];
+/// let result = evaluate_polynomial(&coeffs, 3, &BigUint::from(7u32));
+/// assert_eq!(result[0], BigUint::from(1u32)); // f(0) = 1
+/// assert_eq!(result[1], BigUint::from(3u32)); // f(1) = 3
+/// ```
 pub fn evaluate_polynomial(coeffs: &[BigUint], n: usize, q: &BigUint) -> Vec<BigUint> {
     let mut eval_vec = vec![BigUint::zero(); n + 1];
     #[allow(clippy::needless_range_loop)]
@@ -31,8 +62,26 @@ pub fn evaluate_polynomial(coeffs: &[BigUint], n: usize, q: &BigUint) -> Vec<Big
     eval_vec
 }
 
-/// Compute modular inverse using extended Euclidean algorithm
-/// Returns an error if inverse doesn't exist (gcd(a, modulus) != 1)
+/// Compute modular inverse using extended Euclidean algorithm.
+///
+/// Returns `a^{-1} mod modulus` such that `a · a^{-1} ≡ 1 (mod modulus)`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - `modulus = 0` or `modulus = 1`
+/// - `gcd(a, modulus) ≠ 1` (inverse doesn't exist)
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::math::mod_inverse;
+/// use num_bigint::BigUint;
+///
+/// let inv = mod_inverse(&BigUint::from(3u32), &BigUint::from(11u32))?;
+/// assert_eq!((BigUint::from(3u32) * &inv) % BigUint::from(11u32), BigUint::from(1u32));
+/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// ```
 pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint> {
     if modulus.is_zero() {
         return Err(ParityMatrixError::from(MathError::InvalidModulus {

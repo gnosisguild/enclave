@@ -4,13 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Generator matrix construction and null space computation.
+//!
+//! This module builds generator matrices for polynomial evaluations and computes
+//! their null spaces to create parity check matrices.
+
 use crate::errors::{ConstraintError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 
-/// Configuration for parity matrix generation
+/// Configuration for parity matrix generation.
+///
+/// Defines the parameters for constructing a generator matrix over `Z_q`:
+/// - `q`: modulus for arithmetic operations
+/// - `t`: maximum degree of polynomials (must satisfy `t ≤ (n-1)/2`)
+/// - `n`: number of evaluation points (polynomials are evaluated at 0, 1, ..., n)
 #[derive(Debug, Clone)]
 pub struct ParityMatrixConfig {
     /// Modulus q
@@ -21,10 +31,34 @@ pub struct ParityMatrixConfig {
     pub n: usize,
 }
 
-/// Build the generator matrix G of size (t+1) × (n+1)
-/// G[i][j] = j^i mod q
-/// Each row corresponds to evaluations of x^i at points 0, 1, ..., n
-/// For polynomials of degree t, we have t+1 coefficients (a_0, ..., a_t)
+/// Build the generator matrix G of size (t+1) × (n+1).
+///
+/// The generator matrix `G` is defined as `G[i][j] = j^i mod q`, where:
+/// - Row `i` corresponds to the monomial `x^i` evaluated at points `0, 1, ..., n`
+/// - Column `j` corresponds to evaluation point `j`
+///
+/// For a polynomial `f(x) = a₀ + a₁x + ... + aₜxᵗ`, the evaluation vector
+/// `[f(0), f(1), ..., f(n)]` equals `G^T · [a₀, ..., aₜ]`.
+///
+/// # Errors
+///
+/// Returns an error if `t > (n-1)/2`, violating the degree constraint.
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::matrix::{build_generator_matrix, ParityMatrixConfig};
+/// use num_bigint::BigUint;
+///
+/// let config = ParityMatrixConfig {
+///     q: BigUint::from(7u32),
+///     t: 2,
+///     n: 5,
+/// };
+/// let g = build_generator_matrix(&config)?;
+/// // G is a 3×6 matrix where G[i][j] = j^i mod 7
+/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// ```
 pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
@@ -49,8 +83,31 @@ pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult
     Ok(g)
 }
 
-/// Compute the null space of a matrix over Z_q using Gaussian elimination
-/// Returns a basis for the null space (each vector is a row)
+/// Compute the null space of a matrix over `Z_q` using Gaussian elimination.
+///
+/// Returns a basis for the null space where each basis vector is a row.
+/// The null space consists of all vectors `v` such that `matrix · v = 0 (mod q)`.
+///
+/// # Errors
+///
+/// Returns an error if a pivot element is not invertible modulo `q`.
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
+/// use num_bigint::BigUint;
+///
+/// let config = ParityMatrixConfig {
+///     q: BigUint::from(7u32),
+///     t: 2,
+///     n: 5,
+/// };
+/// let g = build_generator_matrix(&config)?;
+/// let h = null_space(&g, &config.q)?;
+/// // H is a basis for vectors orthogonal to all rows of G
+/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// ```
 pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
     if matrix.is_empty() {
         return Ok(vec![]);
@@ -138,7 +195,31 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
     Ok(null_basis)
 }
 
-/// Verify that H * G^T = 0 (mod q)
+/// Verify that `H · G^T = 0 (mod q)`.
+///
+/// Checks that the parity check matrix `H` is orthogonal to the generator matrix `G`,
+/// which is a necessary condition for `H` to be a valid null space of `G`.
+///
+/// # Errors
+///
+/// Returns an error if verification fails (i.e., `H · G^T ≠ 0`).
+///
+/// # Example
+///
+/// ```
+/// use parity_matrix::matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig};
+/// use num_bigint::BigUint;
+///
+/// let config = ParityMatrixConfig {
+///     q: BigUint::from(7u32),
+///     t: 2,
+///     n: 5,
+/// };
+/// let g = build_generator_matrix(&config)?;
+/// let h = null_space(&g, &config.q)?;
+/// assert!(verify_parity_matrix(&g, &h, &config.q)?);
+/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// ```
 pub fn verify_parity_matrix(
     matrix: &[Vec<BigUint>],
     h: &[Vec<BigUint>],
