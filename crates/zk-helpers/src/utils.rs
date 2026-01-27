@@ -132,11 +132,7 @@ pub fn calculate_bit_width(bound_str: &str) -> Result<u32> {
         return Ok(1); // Minimum 1 bit
     }
 
-    // Calculate log2 and add 1
-    let log2 = bound.bits() as f64;
-    let bit_width = (log2.ceil() as u32) + 1;
-
-    Ok(bit_width)
+    Ok((bound - BigInt::from(1)).bits() as u32 + 1)
 }
 
 /// Get the ZKP modulus as a BigInt.

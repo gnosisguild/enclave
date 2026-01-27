@@ -48,8 +48,8 @@ mod tests {
         let secret_key = SecretKey::random(&params, &mut OsRng);
         let public_key = PublicKey::new(&secret_key, &mut rng);
 
-        // 10
-        let ten = public_key.try_encrypt(
+        // 3
+        let three = public_key.try_encrypt(
             &Plaintext::try_encode(&[3u64], Encoding::poly(), &params)?,
             &mut rng,
         )?;
@@ -63,7 +63,7 @@ mod tests {
         // Prepare inputs
         let fhe_inputs = FHEInputs {
             params: encode_bfv_params(&params),
-            ciphertexts: vec![(ten.to_bytes(), 0), (two.to_bytes(), 1)],
+            ciphertexts: vec![(three.to_bytes(), 0), (two.to_bytes(), 1)],
         };
 
         // Run the processor

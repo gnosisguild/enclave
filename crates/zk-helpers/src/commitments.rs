@@ -295,7 +295,10 @@ pub fn compute_spm_commitment_from_shares(
 
     // Add shares y[coeff_idx][mod_idx][party_idx + 1] for each coefficient
     for coeff_y in y {
-        let share_value = &coeff_y[mod_idx][party_idx + 1];
+        let share_value = coeff_y.get(mod_idx).expect("Modulus index out of bounds");
+        let share_value = share_value
+            .get(party_idx + 1)
+            .expect("Party index out of bounds");
         payload.push(crate::utils::bigint_to_field(share_value));
     }
 
