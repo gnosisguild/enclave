@@ -59,7 +59,9 @@ pub struct ParityMatrixConfig {
 /// // G is a 3×6 matrix where G[i][j] = j^i mod 7
 /// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
 /// ```
-pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
+pub fn build_generator_matrix(
+    config: &ParityMatrixConfig,
+) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
     if config.t > max_t {
@@ -683,7 +685,11 @@ mod tests {
         ];
 
         for (q, n) in test_cases {
-            let config = ParityMatrixConfig { q: q.clone(), n, t: 0 };
+            let config = ParityMatrixConfig {
+                q: q.clone(),
+                n,
+                t: 0,
+            };
             let g = build_generator_matrix(&config).unwrap();
             let h = null_space(&g, &q).unwrap();
 
@@ -747,7 +753,6 @@ mod tests {
         let result = build_generator_matrix(&config);
         assert!(result.is_err());
     }
-
 
     #[test]
     fn test_dimension_mismatch_verify() {

@@ -298,7 +298,7 @@ mod tests {
     fn test_mod_inverse_large_composite_modulus() {
         // Test with larger composite modulus
         let q = BigUint::from(15u32); // composite: 3 * 5
-        // Elements that share factors with q should fail
+                                      // Elements that share factors with q should fail
         let non_invertible = vec![3u32, 5, 6, 9, 10, 12];
         for val in non_invertible {
             let a = BigUint::from(val);
@@ -343,13 +343,13 @@ mod tests {
     #[test]
     fn test_evaluate_polynomial() {
         let q = BigUint::from(7u32);
-        
+
         // Test constant polynomial: f(x) = 3
         let coeffs = vec![BigUint::from(3u32)];
         let result = evaluate_polynomial(&coeffs, 5, &q);
         assert_eq!(result.len(), 6); // n+1 = 6
         assert!(result.iter().all(|x| *x == BigUint::from(3u32)));
-        
+
         // Test linear polynomial: f(x) = 2x + 1
         let coeffs = vec![BigUint::from(1u32), BigUint::from(2u32)];
         let result = evaluate_polynomial(&coeffs, 3, &q);
@@ -358,18 +358,26 @@ mod tests {
         assert_eq!(result[1], BigUint::from(3u32)); // f(1) = 2*1 + 1 = 3
         assert_eq!(result[2], BigUint::from(5u32)); // f(2) = 2*2 + 1 = 5
         assert_eq!(result[3], BigUint::from(0u32)); // f(3) = 2*3 + 1 = 7 mod 7 = 0
-        
+
         // Test quadratic polynomial: f(x) = x^2 + x + 1
-        let coeffs = vec![BigUint::from(1u32), BigUint::from(1u32), BigUint::from(1u32)];
+        let coeffs = vec![
+            BigUint::from(1u32),
+            BigUint::from(1u32),
+            BigUint::from(1u32),
+        ];
         let result = evaluate_polynomial(&coeffs, 2, &q);
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], BigUint::from(1u32)); // f(0) = 1
         assert_eq!(result[1], BigUint::from(3u32)); // f(1) = 1 + 1 + 1 = 3
         assert_eq!(result[2], BigUint::from(7u32) % &q); // f(2) = 4 + 2 + 1 = 7 mod 7 = 0
-        
+
         // Test with larger modulus
         let q = BigUint::from(101u32);
-        let coeffs = vec![BigUint::from(5u32), BigUint::from(3u32), BigUint::from(2u32)];
+        let coeffs = vec![
+            BigUint::from(5u32),
+            BigUint::from(3u32),
+            BigUint::from(2u32),
+        ];
         let result = evaluate_polynomial(&coeffs, 10, &q);
         assert_eq!(result.len(), 11);
         // Verify f(0) = 5
