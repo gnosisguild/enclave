@@ -32,6 +32,17 @@ impl NoirProver {
         }
     }
 
+    /// Get the circuits directory
+       pub fn circuits_dir(&self) -> &PathBuf {
+        &self.circuits_dir
+    }
+
+    /// Get the work directory
+    pub fn work_dir(&self) -> &PathBuf {
+        &self.work_dir
+    }
+
+
     /// Generate proof using bb
     pub async fn generate_proof(
         &self,
