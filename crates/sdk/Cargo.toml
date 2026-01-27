@@ -8,7 +8,8 @@ repository = "https://github.com/gnosisguild/enclave/crates/sdk"
 
 [dependencies]
 e3-evm-helpers = { workspace = true, optional = true }
-e3-bfv-helpers = { workspace = true, optional = true }
+e3-bfv-client = { workspace = true, optional = true }
+e3-fhe-params = { workspace = true, optional = true }
 e3-indexer = { workspace = true, optional = true }
 
 [features]
@@ -16,4 +17,4 @@ default = ["full"]
 full = ["evm", "bfv", "indexer"]
 indexer = ["dep:e3-indexer"]
 evm = ["dep:e3-evm-helpers"]
-bfv = ["dep:e3-bfv-helpers"]
+bfv = ["dep:e3-bfv-client", "dep:e3-fhe-params"]

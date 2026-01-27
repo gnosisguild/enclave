@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params, BfvParamSets};
+use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params, BfvPreset};
 use e3_compute_provider::FHEInputs;
 use e3_support_host::run_risc0_compute;
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
@@ -14,8 +14,8 @@ use rand::thread_rng;
 fn main() {
     println!("Starting RISC0 profiling with mock ciphertexts...");
 
-    // Use InsecureSet512_10_1 parameter set
-    let param_set = BfvParamSets::InsecureSet512_10_1.into();
+    // Use InsecureThresholdBfv512 parameter set
+    let param_set = BfvPreset::InsecureThresholdBfv512.into();
     let params = build_bfv_params_from_set_arc(param_set);
 
     println!(

@@ -16,7 +16,7 @@ use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
 use chrono::Utc;
 use crisp_constants::get_default_paramset;
-use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
+use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
 

@@ -16,7 +16,6 @@ import {
   encodeBfvParams,
   encodeComputeProviderParams,
   RegistryEventType,
-  FheProtocol,
 } from '@enclave-e3/sdk'
 import { hexToBytes } from 'viem'
 import assert from 'assert'
@@ -167,7 +166,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-    protocol: FheProtocol.BFV,
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
   })
 
   it('should run an integration test', async () => {
@@ -176,7 +175,8 @@ describe('Integration', () => {
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
     const startWindow = calculateStartWindow(130)
     const duration = BigInt(20)
-    const e3ProgramParams = encodeBfvParams()
+    const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
+    const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
       true, // Mock the compute provider parameters, return 32 bytes of 0x00
@@ -234,8 +234,8 @@ describe('Integration', () => {
 
     // INPUT PUBLISHING phase
     console.log('PUBLISHING PRIVATE INPUT')
-    const num1 = 12n
-    const num2 = 21n
+    const num1 = 1n
+    const num2 = 2n
 
     console.log('ENCRYPTING NUMBERS')
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)

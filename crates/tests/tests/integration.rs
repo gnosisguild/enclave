@@ -7,6 +7,7 @@
 use actix::Actor;
 use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Result};
+use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_crypto::Cipher;
 use e3_events::{
@@ -14,8 +15,8 @@ use e3_events::{
     E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
     TicketBalanceUpdated,
 };
+use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
-use e3_sdk::bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
@@ -123,20 +124,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let bus = system.handle()?;
 
     // Parameters (128bits of security)
-    let (degree, plaintext_modulus, moduli) = (
-        8192,
-        1000,
-        &[
-            36028797055270913,
-            36028797054222337,
-            36028797053698049,
-            36028797051863041,
-        ],
-    );
-
-    // Params for BFV
-    // TODO: use params set with secure params in test
-    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+    let params_raw = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
 
     // Encoded Params
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
@@ -364,8 +352,11 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let running_app_timer = Instant::now();
     println!("Running application to generate outputs...");
-    let outputs =
-        e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
+    let outputs = e3_test_helpers::application::run_application(
+        &inputs,
+        params_raw.clone(),
+        num_votes_per_voter,
+    );
     report.push(("Running FHE Application", running_app_timer.elapsed()));
 
     let publishing_ct_timer = Instant::now();
@@ -427,11 +418,12 @@ async fn test_trbfv_actor() -> Result<()> {
         .map(|r| r.first().unwrap().clone())
         .collect();
 
-    // Show summation result
+    // Show summation result (mod plaintext modulus)
+    let plaintext_modulus = params_raw.clone().plaintext();
     let mut expected_result = vec![0u64; 3];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
-            expected_result[j] += vals[j];
+            expected_result[j] = (expected_result[j] + vals[j]) % plaintext_modulus;
         }
     }
 

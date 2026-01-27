@@ -1,0 +1,19 @@
+[package]
+name = "e3-fhe-params"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave FHE Params"
+repository = "https://github.com/gnosisguild/enclave/crates/fhe-params"
+
+[dependencies]
+fhe = { workspace = true }
+num-bigint = { workspace = true }
+thiserror = { workspace = true }
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+alloy-dyn-abi = { workspace = true, optional = true }
+alloy-primitives = { workspace = true, optional = true }
+
+[features]
+default = []
+abi-encoding = ["dep:alloy-dyn-abi", "dep:alloy-primitives"]

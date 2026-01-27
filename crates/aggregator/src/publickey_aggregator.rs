@@ -6,7 +6,7 @@
 
 use actix::prelude::*;
 use anyhow::Result;
-use e3_bfv_helpers::client::compute_pk_commitment;
+use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,

@@ -7,4 +7,4 @@ edition = { workspace = true }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 e3-compute-provider = { workspace = true }
-e3-bfv-helpers = { workspace = true }
+e3-fhe-params = { workspace = true }

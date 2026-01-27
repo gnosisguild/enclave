@@ -50,12 +50,10 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_5 --network localho
 heading "Request Committee"
 
 ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh \
-  --moduli 0x800000022a0001 \
-  --moduli 0x800000021a0001 \
-  --moduli 0x80000002120001 \
-  --moduli 0x80000001f60001 \
-  --degree 8192 \
-  --plaintext-modulus 1032193)
+  --moduli 0xffffee001 \
+  --moduli 0xffffc4001 \
+  --degree 512 \
+  --plaintext-modulus 10)
 
 pnpm committee:new \
   --network localhost \

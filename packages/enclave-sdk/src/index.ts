@@ -34,13 +34,13 @@ export type {
   CommitteeFinalizedData,
   EnclaveEventData,
   RegistryEventData,
-  ProtocolParams,
+  BfvParams,
   VerifiableEncryptionResult,
   EncryptedValueAndPublicInputs,
 } from './types'
 
 // enums and constants
-export { EnclaveEventType, RegistryEventType, FheProtocol, BfvProtocolParams } from './types'
+export { EnclaveEventType, RegistryEventType, ThresholdBfvParamsPresetName, ThresholdBfvParamsPresetNames } from './types'
 
 // Export utilities
 export {
@@ -55,7 +55,6 @@ export {
   sleep,
   getCurrentTimestamp,
   // BFV and E3 utilities
-  BFV_PARAMS_SET,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
   encodeBfvParams,
