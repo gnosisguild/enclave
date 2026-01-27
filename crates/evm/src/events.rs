@@ -40,6 +40,9 @@ pub enum EnclaveEvmEvent {
     Event(EvmEvent),
     /// Raw log data from the provider
     Log(EvmLog),
+    /// Dummy event to report that an event was processed. This is required to ensure that the
+    /// appropriate events are ordered correctly
+    Processed(CorrelationId),
 }
 
 impl EnclaveEvmEvent {
@@ -48,6 +51,7 @@ impl EnclaveEvmEvent {
             EnclaveEvmEvent::HistoricalSyncComplete(e) => e.get_id(),
             EnclaveEvmEvent::Log(e) => e.get_id(),
             EnclaveEvmEvent::Event(e) => e.get_id(),
+            EnclaveEvmEvent::Processed(id) => id.to_owned(),
         }
     }
 }

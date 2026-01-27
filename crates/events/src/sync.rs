@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::EvmEvent;
 use actix::Message;
 use serde::{Deserialize, Serialize};
-
+type Chainid = u64;
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub enum SyncEvmEvent {
     /// Signal that this reader has completed historical sync
-    HistoricalSyncComplete(u64),
+    HistoricalSyncComplete(ChainId),
     /// An actual event from the blockchain
     Event(EvmEvent),
 }
@@ -61,5 +61,9 @@ impl EvmEventConfig {
 
     pub fn insert(&mut self, key: ChainId, value: EvmEventConfigChain) {
         self.config.insert(key, value);
+    }
+
+    pub fn chains(&self) -> HashSet<u64> {
+        self.config.keys().cloned().collect()
     }
 }

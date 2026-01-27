@@ -41,6 +41,7 @@ impl Handler<EnclaveEvmEvent> for EvmReader {
                 id,
                 timestamp,
             }) => {
+                info!("processing event({})", msg.get_id());
                 let extractor = self.extractor;
 
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
@@ -52,6 +53,8 @@ impl Handler<EnclaveEvmEvent> for EvmReader {
                         // note we use the id from the log event above!
                         id, event, block, ts, chain_id,
                     )))
+                } else {
+                    self.next.do_send(EnclaveEvmEvent::Processed(id))
                 }
             }
             hist @ EnclaveEvmEvent::HistoricalSyncComplete(..) => self.next.do_send(hist),

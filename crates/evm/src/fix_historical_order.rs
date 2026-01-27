@@ -7,6 +7,8 @@
 use crate::{EnclaveEvmEvent, EvmEventProcessor, HistoricalSyncComplete};
 use actix::{Actor, Addr, Handler};
 use bloom::{BloomFilter, ASMS};
+use e3_events::CorrelationId;
+use tracing::{info, warn};
 
 pub struct FixHistoricalOrder {
     dest: EvmEventProcessor,
@@ -34,10 +36,15 @@ impl FixHistoricalOrder {
         })) = self.pending_sync_complete
         {
             if self.seen_ids.contains(id) {
+                info!("Forwarding historical send complete event");
                 self.dest
                     .do_send(self.pending_sync_complete.take().unwrap());
             }
         }
+    }
+
+    fn track_id(&mut self, id: CorrelationId) {
+        self.seen_ids.insert(&id);
     }
 }
 
@@ -49,18 +56,34 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
+        let id = msg.get_id();
+        info!("Receiving EnclaveEvmEvent event({})", msg.get_id());
         match msg {
             none_hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
                 prev_event: None,
                 ..
             }) => {
+                info!(
+                    "Historical order event({}) has no previous event. Forwarding...",
+                    id
+                );
                 self.dest.do_send(none_hist);
             }
-            hist @ EnclaveEvmEvent::HistoricalSyncComplete(..) => {
+            hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
+                prev_event: Some(prev),
+                ..
+            }) => {
+                info!(
+                    "Historical order event({}) has previous event({}). Buffering...",
+                    id, prev
+                );
+
                 self.pending_sync_complete = Some(hist);
             }
+            EnclaveEvmEvent::Processed(id) => self.track_id(id),
             other => {
-                self.seen_ids.insert(&other.get_id());
+                info!("Forwarding event({})", other.get_id());
+                self.track_id(other.get_id());
                 self.dest.do_send(other);
             }
         }

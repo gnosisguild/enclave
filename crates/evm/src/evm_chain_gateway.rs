@@ -16,6 +16,7 @@ use e3_events::{
 };
 use e3_events::{EType, EvmEvent};
 use e3_events::{Event, EventPublisher};
+use tracing::info;
 
 /// This component sits between the Evm ingestion for a chain and the Sync actor and the Bus.
 /// It coordinates event flow between these components.
@@ -98,6 +99,7 @@ impl EvmChainGateway {
     }
 
     fn handle_sync_start(&mut self, msg: SyncStart) -> Result<()> {
+        info!("Processing SyncStart message");
         // Received a SyncStart event from the event bus. Get the sender within that event and forward
         // all events to that actor
         let sender = msg.sender.context("No sender on SyncStart Message")?;
@@ -110,6 +112,7 @@ impl EvmChainGateway {
     }
 
     fn handle_sync_end(&mut self, _: SyncEnd) -> Result<()> {
+        info!("Processing SyncEnd message");
         let buffer = self.status.live()?;
         for evt in buffer {
             self.publish_evm_event(evt)?;
@@ -138,19 +141,34 @@ impl EvmChainGateway {
     }
 
     fn handle_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
+        info!(
+            "handling historical sync complete for chain_id({})",
+            event.chain_id
+        );
         let sender = self.status.buffer_until_live()?;
+        info!("Sending historical sync complete event to sender.");
         sender.do_send(SyncEvmEvent::HistoricalSyncComplete(event.chain_id));
         Ok(())
     }
 
     fn handle_receive_evm_event(&mut self, msg: EvmEvent) -> Result<()> {
         match &mut self.status {
-            SyncStatus::BufferUntilLive(buffer) => buffer.push(msg),
+            SyncStatus::BufferUntilLive(buffer) => {
+                info!("saving evm event({}) to pre-live buffer", msg.get_id());
+                buffer.push(msg)
+            }
             SyncStatus::ForwardToSyncActor(Some(sync_actor)) => {
+                info!("forwarding evm event({}) to SyncActor", msg.get_id());
                 sync_actor.do_send(msg.into());
             }
-            SyncStatus::Live => self.publish_evm_event(msg)?,
-            SyncStatus::Init(buffer) => buffer.push(msg),
+            SyncStatus::Live => {
+                info!("publishing evm event({})", msg.get_id());
+                self.publish_evm_event(msg)?
+            }
+            SyncStatus::Init(buffer) => {
+                info!("saving evm event({}) to pre-sync buffer", msg.get_id());
+                buffer.push(msg)
+            }
             _ => (),
         };
         Ok(())
@@ -188,7 +206,6 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
 
     use e3_events::{CorrelationId, EvmEventConfig, EvmEventConfigChain, TestEvent};
-    use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     struct SyncEventCollector {

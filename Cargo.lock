@@ -3403,6 +3403,7 @@ dependencies = [
  "actix",
  "anyhow",
  "e3-events",
+ "tracing",
 ]
 
 [[package]]

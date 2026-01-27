@@ -165,6 +165,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                 let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
                 let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
                 last_id = Some(evt.get_id());
+                info!("Sending event({})", evt.get_id());
                 processor.do_send(evt)
             }
         }
@@ -174,9 +175,13 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             return;
         }
     }
-
+    let historical_sync_event = HistoricalSyncComplete::new(chain_id, last_id);
+    info!(
+        "Historical Sync Complete event({})",
+        historical_sync_event.get_id()
+    );
     processor.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
-        HistoricalSyncComplete::new(chain_id, last_id),
+        historical_sync_event,
     ));
 
     info!("Subscribing to live events");

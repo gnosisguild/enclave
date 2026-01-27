@@ -8,7 +8,7 @@ use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
 use actix::{Actor, Addr, Handler};
 use alloy_primitives::Address;
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{debug, error, info};
 
 /// Directs EnclaveEvmEvent::Log events to the correct upstream processors. Drops all other event
 /// types
@@ -50,7 +50,9 @@ impl Handler<EnclaveEvmEvent> for EvmRouter {
         match msg.clone() {
             // Take all log events and route them
             EnclaveEvmEvent::Log(EvmLog { log, .. }) => {
-                if let Some(dest) = self.routing_table.get(&log.address()) {
+                let address = log.address();
+                if let Some(dest) = self.routing_table.get(&address) {
+                    debug!("Found address {address} in routing table forwarding to destination.");
                     dest.do_send(msg);
                 } else {
                     error!(
@@ -61,6 +63,7 @@ impl Handler<EnclaveEvmEvent> for EvmRouter {
             }
             _ => {
                 if let Some(fallback) = self.fallback.clone() {
+                    info!("Sending event({}) to fallback", msg.get_id());
                     fallback.do_send(msg)
                 }
             }

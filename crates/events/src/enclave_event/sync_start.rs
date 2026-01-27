@@ -11,10 +11,7 @@ use actix::{Message, Recipient};
 use anyhow::Context;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fmt::{self, Display},
-};
+use std::fmt::{self, Display};
 
 /// This is a processed EvmEvent specifically typed for the Sync actor
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -50,6 +47,10 @@ impl EvmEvent {
 
     pub fn get_id(&self) -> CorrelationId {
         self.id
+    }
+
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
     }
 }
 
