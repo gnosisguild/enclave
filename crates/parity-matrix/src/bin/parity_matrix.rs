@@ -11,11 +11,11 @@
 use clap::Parser;
 use num_bigint::BigUint;
 use num_traits::Zero;
-use parity_matrix::math::mod_pow;
+use parity_matrix::math::evaluate_polynomial;
 use parity_matrix::matrix::{
     build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
 };
-use parity_matrix::utils::print_matrix;
+use parity_matrix::utils::{print_matrix, verify_null_space};
 
 #[derive(Parser, Debug, Clone)]
 #[command(
@@ -151,41 +151,19 @@ fn main() {
         );
         println!("F(x) = {}", poly_str);
 
-        // Evaluate at all points
-        let mut eval_vec = vec![BigUint::zero(); args.n + 1];
-        #[allow(clippy::needless_range_loop)]
-        for j in 0..=args.n {
-            let x = BigUint::from(j);
-            let mut val = BigUint::zero();
-            for (i, coeff) in coeffs.iter().enumerate() {
-                val = (val + coeff * mod_pow(&x, i, &args.q)) % &args.q;
-            }
-            eval_vec[j] = val;
-        }
+        let eval_vec = evaluate_polynomial(&coeffs, args.n, &args.q);
         println!(
             "Evaluation vector v = [F(0), F(1), ..., F({})]: {:?}",
             args.n,
             eval_vec.iter().map(|v| v.to_string()).collect::<Vec<_>>()
         );
 
-        // Check H * v = 0
-        if !h.is_empty() {
-            let mut result = vec![BigUint::zero(); h.len()];
-            for (i, row) in h.iter().enumerate() {
-                for (j, h_val) in row.iter().enumerate() {
-                    result[i] = (&result[i] + h_val * &eval_vec[j]) % &args.q;
-                }
-            }
-            println!(
-                "H · v = {:?}",
-                result.iter().map(|v| v.to_string()).collect::<Vec<_>>()
-            );
-            if result.iter().all(|x| x.is_zero()) {
-                println!("✓ Evaluation vector is in the null space of H (as expected)");
-            } else {
-                println!("✗ Something went wrong - vector should be in null space");
-            }
-        }
+        verify_null_space(
+            &h,
+            &eval_vec,
+            &args.q,
+            "Evaluation vector is in the null space of H (as expected)",
+        );
 
         // Second verification with random coefficients
         println!("=== Second Verification (Random Coefficients) ===");
@@ -231,17 +209,7 @@ fn main() {
         );
         println!("G(x) = {}", random_poly_str);
 
-        // Evaluate random polynomial at all points
-        let mut random_eval_vec = vec![BigUint::zero(); args.n + 1];
-        #[allow(clippy::needless_range_loop)]
-        for j in 0..=args.n {
-            let x = BigUint::from(j);
-            let mut val = BigUint::zero();
-            for (i, coeff) in random_coeffs.iter().enumerate() {
-                val = (val + coeff * mod_pow(&x, i, &args.q)) % &args.q;
-            }
-            random_eval_vec[j] = val;
-        }
+        let random_eval_vec = evaluate_polynomial(&random_coeffs, args.n, &args.q);
         println!(
             "Evaluation vector v = [G(0), G(1), ..., G({})]: {:?}",
             args.n,
@@ -251,23 +219,11 @@ fn main() {
                 .collect::<Vec<_>>()
         );
 
-        // Check H * v = 0 for random polynomial
-        if !h.is_empty() {
-            let mut result = vec![BigUint::zero(); h.len()];
-            for (i, row) in h.iter().enumerate() {
-                for (j, h_val) in row.iter().enumerate() {
-                    result[i] = (&result[i] + h_val * &random_eval_vec[j]) % &args.q;
-                }
-            }
-            println!(
-                "H · v = {:?}",
-                result.iter().map(|v| v.to_string()).collect::<Vec<_>>()
-            );
-            if result.iter().all(|x| x.is_zero()) {
-                println!("✓ Random polynomial evaluation is also in the null space of H");
-            } else {
-                println!("✗ Something went wrong - vector should be in null space");
-            }
-        }
+        verify_null_space(
+            &h,
+            &random_eval_vec,
+            &args.q,
+            "Random polynomial evaluation is also in the null space of H",
+        );
     }
 }

@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use num_bigint::BigUint;
+use num_traits::Zero;
 
 pub fn print_matrix(name: &str, matrix: &[Vec<BigUint>], q: &BigUint) {
     let cols = if matrix.is_empty() {
@@ -40,4 +41,25 @@ pub fn print_matrix(name: &str, matrix: &[Vec<BigUint>], q: &BigUint) {
         println!("]");
     }
     println!();
+}
+
+pub fn verify_null_space(h: &[Vec<BigUint>], eval_vec: &[BigUint], q: &BigUint, success_msg: &str) {
+    if h.is_empty() {
+        return;
+    }
+    let mut result = vec![BigUint::zero(); h.len()];
+    for (i, row) in h.iter().enumerate() {
+        for (j, h_val) in row.iter().enumerate() {
+            result[i] = (&result[i] + h_val * &eval_vec[j]) % q;
+        }
+    }
+    println!(
+        "H · v = {:?}",
+        result.iter().map(|v| v.to_string()).collect::<Vec<_>>()
+    );
+    if result.iter().all(|x| x.is_zero()) {
+        println!("✓ {}", success_msg);
+    } else {
+        println!("✗ Something went wrong - vector should be in null space");
+    }
 }

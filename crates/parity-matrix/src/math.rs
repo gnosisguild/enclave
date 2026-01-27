@@ -16,6 +16,21 @@ pub fn mod_pow(base: &BigUint, exp: usize, modulus: &BigUint) -> BigUint {
     base.modpow(&BigUint::from(exp), modulus)
 }
 
+/// Evaluate a polynomial with given coefficients at points 0, 1, ..., n.
+pub fn evaluate_polynomial(coeffs: &[BigUint], n: usize, q: &BigUint) -> Vec<BigUint> {
+    let mut eval_vec = vec![BigUint::zero(); n + 1];
+    #[allow(clippy::needless_range_loop)]
+    for j in 0..=n {
+        let x = BigUint::from(j);
+        let mut val = BigUint::zero();
+        for (i, coeff) in coeffs.iter().enumerate() {
+            val = (val + coeff * mod_pow(&x, i, q)) % q;
+        }
+        eval_vec[j] = val;
+    }
+    eval_vec
+}
+
 /// Compute modular inverse using extended Euclidean algorithm
 /// Returns an error if inverse doesn't exist (gcd(a, modulus) != 1)
 pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint> {
