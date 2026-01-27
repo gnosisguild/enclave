@@ -11,7 +11,5 @@ mod setup;
 
 pub use config::{NoirConfig, VersionInfo};
 pub use error::NoirProverError;
-pub use prover::{Circuit, NoirProver, Proof};
+pub use prover::NoirProver;
 pub use setup::{NoirSetup, SetupStatus};
-
-pub type Result<T> = std::result::Result<T, NoirProverError>;

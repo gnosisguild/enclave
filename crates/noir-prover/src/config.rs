@@ -4,13 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::error::NoirProverError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::Duration;
 use tokio::fs;
+use tracing::{debug, warn};
 
-pub const REQUIRED_BB_VERSION: &str = "0.86.0";
-pub const REQUIRED_CIRCUITS_VERSION: &str = "0.1.0";
+const NOIR_VERSIONS_MANIFEST_URL: &str =
+    "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/noir-prover/noir-versions.json";
+
+const NOIR_BB_VERSION: &str = "0.86.0";
+const NOIR_CIRCUITS_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoirConfig {
@@ -25,8 +31,54 @@ impl Default for NoirConfig {
         Self {
             bb_download_url: "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz".to_string(),
             circuits_download_url: "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits.tar.gz".to_string(),
-            required_bb_version: REQUIRED_BB_VERSION.to_string(),
-            required_circuits_version: REQUIRED_CIRCUITS_VERSION.to_string(),
+            required_bb_version: NOIR_BB_VERSION.to_string(),
+            required_circuits_version: NOIR_CIRCUITS_VERSION.to_string(),
+        }
+    }
+}
+
+impl NoirConfig {
+    pub async fn fetch_latest() -> Result<Self, NoirProverError> {
+        let client = reqwest::Client::new();
+        let response = client
+            .get(NOIR_VERSIONS_MANIFEST_URL)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .map_err(|e| {
+                NoirProverError::DownloadFailed(
+                    NOIR_VERSIONS_MANIFEST_URL.to_string(),
+                    e.to_string(),
+                )
+            })?;
+
+        if !response.status().is_success() {
+            return Err(NoirProverError::DownloadFailed(
+                NOIR_VERSIONS_MANIFEST_URL.to_string(),
+                format!("HTTP {}", response.status()),
+            ));
+        }
+
+        let config: NoirConfig = response.json().await.map_err(|e| {
+            NoirProverError::DownloadFailed(NOIR_VERSIONS_MANIFEST_URL.to_string(), e.to_string())
+        })?;
+
+        Ok(config)
+    }
+
+    pub async fn fetch_or_default() -> Self {
+        match Self::fetch_latest().await {
+            Ok(config) => {
+                debug!(
+                    "Fetched versions manifest: bb={}, circuits={}",
+                    config.required_bb_version, config.required_circuits_version
+                );
+                config
+            }
+            Err(e) => {
+                warn!("Could not fetch versions manifest ({}), using defaults", e);
+                Self::default()
+            }
         }
     }
 }
