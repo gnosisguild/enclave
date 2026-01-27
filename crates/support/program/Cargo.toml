@@ -7,4 +7,4 @@ edition = "2024"
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "7a361de36d7ccd8f421b874008895cc07f246b80" }
-e3-fhe-params = { git = "https://github.com/gnosisguild/enclave", rev = "a358cb0417c657b2397c43e1687e1a9b92e42101" }
+e3-fhe-params = { git = "https://github.com/gnosisguild/enclave", rev = "dbdaaee1db9d868adacc03f75bb2ac85024359ae" }

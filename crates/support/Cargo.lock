@@ -3056,12 +3056,11 @@ dependencies = [
 [[package]]
 name = "e3-fhe-params"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101#a358cb0417c657b2397c43e1687e1a9b92e42101"
+source = "git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae#dbdaaee1db9d868adacc03f75bb2ac85024359ae"
 dependencies = [
  "fhe",
  "num-bigint",
  "thiserror 1.0.69",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3105,7 +3104,7 @@ dependencies = [
  "bytemuck",
  "dotenvy",
  "e3-compute-provider 0.1.5",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101)",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae)",
  "e3-user-program",
  "fhe",
  "fhe-traits",
@@ -3136,7 +3135,7 @@ name = "e3-user-program"
 version = "0.1.0"
 dependencies = [
  "e3-compute-provider 0.1.7",
- "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101)",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae)",
  "fhe",
  "fhe-traits",
 ]

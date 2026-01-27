@@ -13,7 +13,7 @@ e3-support-app = { path = "./app" }
 e3-support-host = { path = "./host" }
 e3-user-program = { path = "./program" }
 e3-support-types = { path = "./types" }
-e3-fhe-params = { git = "https://github.com/gnosisguild/enclave", rev = "a358cb0417c657b2397c43e1687e1a9b92e42101" }
+e3-fhe-params = { git = "https://github.com/gnosisguild/enclave", rev = "dbdaaee1db9d868adacc03f75bb2ac85024359ae" }
 
 methods = { path = "./methods" }
 alloy-primitives = { version = "1.3", default-features = false, features = [
