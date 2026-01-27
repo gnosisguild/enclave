@@ -1,0 +1,22 @@
+{
+  "noir_version": "1.0.0-beta.15+83245db91dcf63420ef4bcbbd85b98f397fee663",
+  "hash": "13330399022024109035",
+  "abi": {
+    "parameters": [
+      { "name": "x", "type": { "kind": "field" }, "visibility": "private" },
+      { "name": "y", "type": { "kind": "field" }, "visibility": "private" },
+      { "name": "_sum", "type": { "kind": "field" }, "visibility": "private" }
+    ],
+    "return_type": null,
+    "error_types": {}
+  },
+  "bytecode": "H4sIAAAAAAAA/5WOMQ5AQBBFZ4aDKOmII4hEJUqNQqJRENEp9wjiAk4hHGc7pUZvE0skmtnXvGL+/HyEG1u7KeuWlBH+WNoOsECTLH6yfpX2Mpi9NYsXIfLCDfdk2Loxkud0qDvxe9/NzyBi/Fx0+gP3FAEAAA==",
+  "debug_symbols": "jZDdCoMwDIXfJde9kA1/8FXGkFqjFEJbYjsY4rsvim56MfAqTU6/E3Im6LBNQ2Nd70eoHxO0bIns0JA3OlrvZDrNCva2iYwoIzjoQgXN6CLULhEpeGlK66cxaLfWqFnUTAG6TqoY9pZwec3qR2f/0bza2OL+hfPLdFlsdFWe6Kd02lg+XQsZ1Ld5MWOrW8ItgT45cwgkvsOu7JEF9ga7xLjYrZos+AA=",
+  "file_map": {
+    "50": {
+      "source": "fn main (x: Field, y: Field, _sum: Field) {\n    let sum = x + y;\n    assert(sum == _sum);\n}",
+      "path": "/Users/ctrlc03/Documents/zk/enclave/circuits/bin/dummy/src/main.nr"
+    }
+  },
+  "expression_width": { "Bounded": { "width": 4 } }
+}

@@ -56,4 +56,7 @@ pub enum NoirProverError {
 
     #[error("Unsupported platform: {os}-{arch}")]
     UnsupportedPlatform { os: String, arch: String },
+
+    #[error("Witness generation failed: {0}")]
+    WitnessGenerationFailed(String),
 }

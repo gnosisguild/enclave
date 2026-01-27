@@ -8,8 +8,10 @@ mod config;
 mod error;
 mod prover;
 mod setup;
+mod witness;
 
 pub use config::{NoirConfig, VersionInfo};
 pub use error::NoirProverError;
 pub use prover::NoirProver;
 pub use setup::{NoirSetup, SetupStatus};
+pub use witness::{input_map, CompiledCircuit, WitnessGenerator};
