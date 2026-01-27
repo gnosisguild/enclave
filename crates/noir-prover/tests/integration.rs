@@ -231,7 +231,7 @@ async fn test_pk_bfv_proof() {
     let prover = NoirProver::new(&setup);
 
     // 8. Generate proof
-    let e3_id = "pk-bfv-test-001";
+    let e3_id = "1";
 
     let proof_result = prove_pk_bfv(&prover, &encryption_data.public_key, &params, e3_id)
         .await
