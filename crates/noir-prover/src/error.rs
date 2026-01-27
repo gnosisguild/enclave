@@ -11,6 +11,9 @@ pub enum NoirProverError {
     #[error("Barretenberg binary not found. Run 'enclave setup' first.")]
     BbNotInstalled,
 
+    #[error("Nargo binary not found. Run 'enclave setup' first.")]
+    NargoNotInstalled,
+
     #[error("Circuit '{0}' not found. Run 'enclave setup' first.")]
     CircuitNotFound(String),
 
