@@ -31,6 +31,6 @@ pub mod matrix_type;
 pub mod utils;
 
 // Re-export commonly used types for convenience
-pub use matrix_type::{DynamicMatrix, MatrixLike};
 pub use errors::{ParityMatrixError, ParityMatrixResult};
-pub use matrix::{ParityMatrixConfig, build_generator_matrix, null_space, verify_parity_matrix};
+pub use matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig};
+pub use matrix_type::{DynamicMatrix, MatrixLike};

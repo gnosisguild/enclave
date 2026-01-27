@@ -63,9 +63,7 @@ pub struct ParityMatrixConfig {
 /// assert_eq!(g.cols(), 6);
 /// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
-pub fn build_generator_matrix(
-    config: &ParityMatrixConfig,
-) -> ParityMatrixResult<DynamicMatrix> {
+pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<DynamicMatrix> {
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
     if config.t > max_t {

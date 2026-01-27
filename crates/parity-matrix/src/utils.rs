@@ -45,12 +45,7 @@ pub fn print_matrix(name: &str, matrix: &dyn MatrixLike, q: &BigUint) {
     println!();
 }
 
-pub fn verify_null_space(
-    h: &dyn MatrixLike,
-    eval_vec: &[BigUint],
-    q: &BigUint,
-    success_msg: &str,
-) {
+pub fn verify_null_space(h: &dyn MatrixLike, eval_vec: &[BigUint], q: &BigUint, success_msg: &str) {
     if h.rows() == 0 {
         return;
     }

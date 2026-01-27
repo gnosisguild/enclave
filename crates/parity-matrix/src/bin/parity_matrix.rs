@@ -10,12 +10,12 @@
 
 use clap::Parser;
 use num_bigint::BigUint;
-use parity_matrix::{
-    ParityMatrixError, ParityMatrixConfig, build_generator_matrix, null_space,
-    verify_parity_matrix, MatrixLike,
-};
 use parity_matrix::math::evaluate_polynomial;
 use parity_matrix::utils::{print_matrix, verify_null_space};
+use parity_matrix::{
+    build_generator_matrix, null_space, verify_parity_matrix, MatrixLike, ParityMatrixConfig,
+    ParityMatrixError,
+};
 
 #[derive(Parser, Debug, Clone)]
 #[command(
