@@ -14,5 +14,5 @@ fhe.workspace = true
 fhe-traits.workspace = true
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 rand.workspace = true
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
 thiserror = { workspace = true }
+e3-zk-helpers = { workspace = true }

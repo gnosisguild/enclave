@@ -10,7 +10,6 @@ repository = "https://github.com/gnosisguild/enclave/crates/fhe-params"
 fhe = { workspace = true }
 num-bigint = { workspace = true }
 thiserror = { workspace = true }
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
 alloy-dyn-abi = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, optional = true }
 

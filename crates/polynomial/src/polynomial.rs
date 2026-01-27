@@ -209,7 +209,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```
-    /// use polynomial::Polynomial;
+    /// use e3_polynomial::Polynomial;
     /// use num_bigint::BigInt;
     ///
     /// let poly = Polynomial::new(vec![
@@ -422,7 +422,7 @@ impl Polynomial {
     /// # Examples
     ///
     /// ```
-    /// use polynomial::Polynomial;
+    /// use e3_polynomial::Polynomial;
     /// use num_bigint::BigInt;
     ///
     /// // Reduce modulo x^4 + 1 (cyclotomic polynomial for N=4)

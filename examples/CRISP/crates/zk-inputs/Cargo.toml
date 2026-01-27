@@ -15,8 +15,8 @@ fhe-traits.workspace = true
 e3-bfv-client = { workspace = true }
 e3-fhe-params = { workspace = true }
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
-polynomial = { workspace = true, features = ["serde"] }
+e3-zk-helpers = { workspace = true }
+e3-polynomial = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 num-bigint = "0.4.6"

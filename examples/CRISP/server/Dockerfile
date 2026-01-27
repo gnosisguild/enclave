@@ -90,6 +90,7 @@ COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml crates/trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml crates/utils/Cargo.toml
 COPY crates/wasm/Cargo.toml crates/wasm/Cargo.toml
+COPY crates/zk-helpers/Cargo.toml crates/zk-helpers/Cargo.toml
 
 RUN set -eux; \
     find \
