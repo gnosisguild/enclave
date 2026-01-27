@@ -3276,6 +3276,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-parity-matrix"
+version = "0.1.7"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "proptest",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "e3-program-server"
 version = "0.1.7"
 dependencies = [
@@ -6182,17 +6193,6 @@ checksum = "eebde548fbbf1ea81a99b128872779c437752fb99f217c45245e1a61dcd9edcd"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "parity-matrix"
-version = "0.1.7"
-dependencies = [
- "num-bigint",
- "num-traits",
- "proptest",
- "serde",
- "thiserror 1.0.69",
 ]
 
 [[package]]

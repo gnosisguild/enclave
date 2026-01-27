@@ -1,5 +1,5 @@
 [package]
-name = "parity-matrix"
+name = "e3-parity-matrix"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
