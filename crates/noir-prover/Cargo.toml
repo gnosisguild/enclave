@@ -1,0 +1,30 @@
+[package]
+name = "e3-noir-prover"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Noir proof generation for Enclave ciphernodes"
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio = { workspace = true, features = ["process", "fs"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+reqwest = { workspace = true, features = ["json", "stream"] }
+tempfile.workspace = true
+tracing.workspace = true
+directories = "5"
+flate2 = "1"
+tar = "0.4"
+toml.workspace = true
+sha2.workspace = true
+hex.workspace = true
+futures-util.workspace = true
+indicatif = "0.17"
+thiserror.workspace = true
+walkdir = "2.5"
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
