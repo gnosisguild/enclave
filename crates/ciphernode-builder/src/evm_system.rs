@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::mem::replace;
+
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
 use e3_events::{BusHandle, EventSubscriber, SyncStart};
@@ -12,8 +14,8 @@ use e3_evm::{
     FixHistoricalOrder, OneShotRunner, SyncStartExtractor,
 };
 
-pub trait RouteFn: FnOnce(EvmEventProcessor) -> (Address, EvmEventProcessor) + Send {}
-impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> (Address, EvmEventProcessor) + Send {}
+pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
+impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 
 type RouteFactory = Box<dyn RouteFn>;
 
@@ -22,7 +24,7 @@ pub struct EvmSystemChainBuilder<P> {
     provider: EthProvider<P>,
     bus: BusHandle,
     chain_id: u64,
-    route_factories: Vec<RouteFactory>,
+    route_factories: Vec<(Address, RouteFactory)>,
 }
 
 impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
@@ -36,26 +38,31 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         }
     }
 
-    pub fn with_contract<F: RouteFn + 'static>(mut self, route_fn: F) -> Self {
-        self.route_factories.push(Box::new(route_fn));
+    pub fn with_contract<F: RouteFn + 'static>(
+        &mut self,
+        address: Address,
+        route_fn: F,
+    ) -> &mut Self {
+        self.route_factories.push((address, Box::new(route_fn)));
         self
     }
 
-    pub fn build(self) {
+    pub fn build(&mut self) {
         let gateway = FixHistoricalOrder::setup(EvmChainGateway::setup(&self.bus));
         let runner = SyncStartExtractor::setup(OneShotRunner::setup({
             let bus = self.bus.clone();
             let provider = self.provider.clone();
             let gateway = gateway.clone();
             let chain_id = self.chain_id;
-            let route_factories = self.route_factories;
+            // Only gets consumed once so fine to do this
+            let route_factories = replace(&mut self.route_factories, Vec::new());
             move |msg: SyncStart| {
                 let config = msg.get_evm_config(chain_id)?;
                 let gateway = gateway.recipient();
                 let mut router = EvmRouter::new();
 
-                for route_fn in route_factories {
-                    let (address, processor) = route_fn(gateway.clone());
+                for (address, route_fn) in route_factories {
+                    let processor = route_fn(gateway.clone());
                     router = router.add_route(address, &processor);
                 }
 

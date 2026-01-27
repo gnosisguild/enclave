@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy_primitives::Address;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Hash, Eq, Deserialize, Serialize, PartialEq)]
@@ -17,12 +19,17 @@ pub enum Contract {
 }
 
 impl Contract {
-    pub fn address(&self) -> &String {
+    pub fn address_str(&self) -> &str {
         use Contract::*;
         match self {
             Full { address, .. } => address,
             AddressOnly(v) => v,
         }
+    }
+
+    pub fn address(&self) -> Result<Address> {
+        let addr = self.address_str().parse()?;
+        Ok(addr)
     }
 
     pub fn deploy_block(&self) -> Option<u64> {

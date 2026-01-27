@@ -44,7 +44,7 @@ impl TryFrom<ChainConfig> for EvmEventConfigChain {
             let deploy_block = contract.deploy_block();
             if deploy_block.unwrap_or(0) == 0 && !rpc.is_local() {
                 let rpc_url = rpc.url().to_string();
-                let contract_address = contract.address();
+                let contract_address = contract.address_str();
                 error!(
                    "Querying from block 0 on a non-local node ({}) without a specific deploy_block is not allowed.",
                    rpc_url

@@ -10,6 +10,7 @@ use crate::{
 };
 use actix::Addr;
 use alloy::providers::{Provider, WalletProvider};
+use alloy_primitives::Address;
 use anyhow::Result;
 use e3_events::BusHandle;
 
@@ -20,7 +21,7 @@ impl EnclaveSol {
         processor: &EvmEventProcessor,
         bus: &BusHandle,
         write_provider: EthProvider<W>,
-        contract_address: &str,
+        contract_address: Address,
     ) -> Result<Addr<EvmReader>>
     where
         W: Provider + WalletProvider + Clone + 'static,

@@ -151,11 +151,8 @@ async fn evm_reader() -> Result<()> {
     let contract_address = contract.address().clone();
     let sync = FakeSyncActor::setup(&bus);
     EvmSystemChainBuilder::new(&bus, &provider)
-        .with_contract(move |upstream| {
-            (
-                contract_address,
-                TestEventParser::setup(&upstream).recipient(),
-            )
+        .with_contract(contract_address, move |upstream| {
+            TestEventParser::setup(&upstream).recipient()
         })
         .build();
 
@@ -235,11 +232,8 @@ async fn ensure_historical_events() -> Result<()> {
 
     let sync = FakeSyncActor::setup(&bus);
     EvmSystemChainBuilder::new(&bus, &provider)
-        .with_contract(move |upstream| {
-            (
-                contract_address,
-                TestEventParser::setup(&upstream).recipient(),
-            )
+        .with_contract(contract_address, move |upstream| {
+            TestEventParser::setup(&upstream).recipient()
         })
         .build();
     let mut evm_info = EvmEventConfig::new();

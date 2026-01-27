@@ -577,7 +577,7 @@ nodes:
             let chain = config.chains().first().unwrap();
             assert_eq!(config.quic_port(), 1235);
             assert_eq!(
-                chain.contracts.ciphernode_registry.address(),
+                chain.contracts.ciphernode_registry.address_str(),
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
             assert_eq!(config.peers(), vec!["one", "two"]);
@@ -688,11 +688,11 @@ chains:
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
             assert_eq!(
-                chain.contracts.enclave.address(),
+                chain.contracts.enclave.address_str(),
                 "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
             );
             assert_eq!(
-                chain.contracts.ciphernode_registry.address(),
+                chain.contracts.ciphernode_registry.address_str(),
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
             assert_eq!(
@@ -803,7 +803,7 @@ chains:
                 }
             );
             assert_eq!(
-                chain.contracts.enclave.address(),
+                chain.contracts.enclave.address_str(),
                 "0x1234567890123456789012345678901234567890"
             );
 

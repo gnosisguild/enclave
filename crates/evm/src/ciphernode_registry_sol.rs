@@ -245,10 +245,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
     pub async fn attach(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
-        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address.parse()?)
+        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address)
             .await?
             .start();
 
@@ -533,7 +533,7 @@ impl CiphernodeRegistrySol {
     pub async fn attach_writer<P>(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>
     where

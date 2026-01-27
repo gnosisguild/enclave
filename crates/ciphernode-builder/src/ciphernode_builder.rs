@@ -17,7 +17,9 @@ use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
 use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig};
-use e3_evm::{BondingRegistrySolReader, EnclaveSolWriter, EvmChainGateway};
+use e3_evm::{
+    BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter, EvmChainGateway,
+};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -400,69 +402,62 @@ impl CiphernodeBuilder {
             let mut system = EvmSystemChainBuilder::new(&bus, &provider);
 
             if self.contract_components.enclave {
-                let contract_address = chain.contracts.enclave.address();
                 let write_provider = provider_cache.ensure_write_provider(chain).await?;
-
-                EnclaveSolWriter::attach(&bus, write_provider.clone(), &contract_address).await?;
-                let contract_address = contract_address.parse()?;
-                system = system.with_contract(move |next| {
-                    (contract_address, EnclaveSolReader::setup(&next).recipient())
+                let contract = &chain.contracts.enclave;
+                EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?).await?;
+                system.with_contract(contract.address()?, move |next| {
+                    EnclaveSolReader::setup(&next).recipient()
                 });
             }
 
             if self.contract_components.enclave_reader {
-                let contract_address = chain.contracts.enclave.address().parse()?;
+                let contract = &chain.contracts.enclave;
 
-                system = system.with_contract(move |next| {
-                    (contract_address, EnclaveSolReader::setup(&next).recipient())
+                system.with_contract(contract.address()?, move |next| {
+                    EnclaveSolReader::setup(&next).recipient()
                 });
             }
 
             if self.contract_components.bonding_registry {
-                let contract_address = chain.contracts.bonding_registry.address().parse()?;
-                system = system.with_contract(move |next| {
-                    (
-                        contract_address,
-                        BondingRegistrySolReader::setup(&next).recipient(),
-                    )
+                let contract = &chain.contracts.bonding_registry;
+                system.with_contract(contract.address()?, move |next| {
+                    BondingRegistrySolReader::setup(&next).recipient()
                 });
             }
 
             if self.contract_components.ciphernode_registry {
-                let contract_address_str = chain.contracts.ciphernode_registry.address();
-                let contract_address = contract_address_str.parse()?;
+                let contract = &chain.contracts.ciphernode_registry;
 
-                system = system.with_contract(move |next| {
-                    (
-                        contract_address,
-                        CiphernodeRegistrySol::attach(&next).recipient(),
-                    )
+                system.with_contract(contract.address()?, move |next| {
+                    CiphernodeRegistrySolReader::setup(&next).recipient()
                 });
 
+                // TODO: Should we not let this pass and just use '?'?
+                // Above if we include enclave in the config and we don't have a wallet it will fail
                 match provider_cache
-                        .ensure_write_provider(chain)
-                        .await
-                    {
-                        Ok(write_provider) => {
-                            let _writer = CiphernodeRegistrySol::attach_writer(
-                                &bus,
-                                write_provider.clone(),
-                                &contract_address_str,
-                                self.pubkey_agg,
-                            )
-                            .await?;
-                            info!("CiphernodeRegistrySolWriter attached for publishing committees");
+                    .ensure_write_provider(&chain)
+                    .await
+                {
+                    Ok(write_provider) => {
+                        let _writer = CiphernodeRegistrySol::attach_writer(
+                            &bus,
+                            write_provider.clone(),
+                            contract.address()?,
+                            self.pubkey_agg,
+                        )
+                        .await?;
+                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
-                            if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
-                                info!("Attaching CommitteeFinalizer for score sortition");
-                                e3_aggregator::CommitteeFinalizer::attach(&bus);
-                            }
+                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
+                            info!("Attaching CommitteeFinalizer for score sortition");
+                            e3_aggregator::CommitteeFinalizer::attach(&bus);
                         }
-                        Err(e) => error!(
-                            "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
-                            e
-                        ),
                     }
+                    Err(e) => error!(
+                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+                        e
+                    ),
+                }
             }
             system.build();
         }

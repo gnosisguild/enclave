@@ -55,9 +55,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub async fn attach(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
-        let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
+        let addr = EnclaveSolWriter::new(bus, provider, contract_address)?.start();
         bus.subscribe_all(&["PlaintextAggregated", "Shutdown"], addr.clone().into());
         Ok(addr)
     }
