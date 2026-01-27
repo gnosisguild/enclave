@@ -19,6 +19,18 @@ pub fn mod_pow(base: &BigUint, exp: usize, modulus: &BigUint) -> BigUint {
 /// Compute modular inverse using extended Euclidean algorithm
 /// Returns an error if inverse doesn't exist (gcd(a, modulus) != 1)
 pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint> {
+    if modulus.is_zero() {
+        return Err(ParityMatrixError::from(MathError::InvalidModulus {
+            modulus: modulus.to_string(),
+            reason: "modulus cannot be zero".to_string(),
+        }));
+    }
+    if modulus.is_one() {
+        return Err(ParityMatrixError::from(MathError::InvalidModulus {
+            modulus: modulus.to_string(),
+            reason: "modular inverse is undefined for modulus = 1".to_string(),
+        }));
+    }
     let a_reduced = a % modulus;
     if a_reduced.is_zero() {
         return Err(ParityMatrixError::from(MathError::NoModularInverse {
@@ -138,5 +150,35 @@ mod tests {
         let a = BigUint::from(12345678901234567890u64);
         let inv = mod_inverse(&a, &q).expect("Inverse should exist");
         assert_eq!((&a * &inv) % &q, BigUint::one());
+    }
+
+    #[test]
+    fn test_mod_inverse_zero_modulus() {
+        // Test that modulus = 0 returns an error
+        let a = BigUint::from(5u32);
+        let q = BigUint::zero();
+        let result = mod_inverse(&a, &q);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("modulus cannot be zero"));
+            }
+            _ => panic!("Expected Math error for zero modulus"),
+        }
+    }
+
+    #[test]
+    fn test_mod_inverse_one_modulus() {
+        // Test that modulus = 1 returns an error
+        let a = BigUint::from(5u32);
+        let q = BigUint::one();
+        let result = mod_inverse(&a, &q);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("modular inverse is undefined for modulus = 1"));
+            }
+            _ => panic!("Expected Math error for modulus = 1"),
+        }
     }
 }
