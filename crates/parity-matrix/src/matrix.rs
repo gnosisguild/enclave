@@ -15,6 +15,7 @@ use crate::math::mod_pow;
 use crate::matrix_type::DynamicMatrix;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for parity matrix generation.
 ///
@@ -22,7 +23,7 @@ use num_traits::{One, Zero};
 /// - `q`: modulus for arithmetic operations
 /// - `t`: maximum degree of polynomials (must satisfy `t ≤ (n-1)/2`)
 /// - `n`: number of evaluation points (polynomials are evaluated at 0, 1, ..., n)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParityMatrixConfig {
     /// Modulus q
     pub q: BigUint,

@@ -7,10 +7,11 @@ description = "Parity Matrix for the linear subspace of Z_q^{n+1}"
 repository = "https://github.com/gnosisguild/enclave/crates/parity-matrix"
 
 [dependencies]
-num-bigint = { workspace = true }
+num-bigint = { workspace = true, features = ["serde"] }
 num-traits = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
