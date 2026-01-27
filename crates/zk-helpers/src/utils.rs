@@ -114,8 +114,6 @@ pub fn bigint_to_field(value: &BigInt) -> FieldElement {
 
 /// Calculate bit width from a bound string.
 ///
-/// The formula is: BIT = ceil(log₂(bound)) + 1
-///
 /// # Arguments
 /// * `bound_str` - String representation of the bound value
 ///
