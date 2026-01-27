@@ -71,7 +71,7 @@ impl Handler<Bootstrap> for Synchronizer {
                 "EvmEventConfig was not set likely Bootstrap was called more than once.",
             )?;
 
-            // Fetch snapshot state
+            // TODO: Get information about what has and has not been synced then fire SyncStart
             self.bus.publish(SyncStart::new(ctx.address(), evm_config))
         })
     }
