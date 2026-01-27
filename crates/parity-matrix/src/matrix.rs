@@ -917,10 +917,15 @@ mod tests {
         ])
         .unwrap();
 
-        // This should handle non-invertible elements gracefully
+        // null_space should return an error when encountering a non-invertible pivot
         let result = null_space(&matrix, &q);
-        // Should either return error or handle it
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("Modular inverse does not exist"));
+            }
+            _ => panic!("Expected Math error for non-invertible pivot"),
+        }
     }
 
     // ==================== Property-Based Tests ====================
