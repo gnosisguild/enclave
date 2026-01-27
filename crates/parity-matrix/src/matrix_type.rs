@@ -9,6 +9,7 @@
 use crate::errors::{ParityMatrixError, ParityMatrixResult};
 use num_bigint::BigUint;
 use num_traits::Zero;
+use serde::{Deserialize, Serialize};
 
 /// A matrix with runtime-determined dimensions.
 ///
@@ -29,7 +30,7 @@ use num_traits::Zero;
 /// assert_eq!(matrix.rows(), 2);
 /// assert_eq!(matrix.cols(), 2);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DynamicMatrix {
     data: Vec<Vec<BigUint>>,
     rows: usize,
