@@ -1,11 +1,14 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2022 Aztec
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.21;
 
 uint256 constant N = 524288;
 uint256 constant LOG_N = 19;
 uint256 constant NUMBER_OF_PUBLIC_INPUTS = 22;
-uint256 constant VK_HASH = 0x2db23f945f10f8251c7fae6d42923485512fb4ae365cae7afb2088bf1f8fcba4;
+uint256 constant VK_HASH = 0x0c6685a709c1e3e2ac9908ae9073d528d7e6b90e86815647aaa10b6723faa033;
 library HonkVerificationKey {
   function loadVerificationKey() internal pure returns (Honk.VerificationKey memory) {
     Honk.VerificationKey memory vk = Honk.VerificationKey({
@@ -33,8 +36,8 @@ library HonkVerificationKey {
         y: uint256(0x0a9c42dc2ec320da7f3be004c85731dfc8de9f97d78e6cdd25e3e0c5aa26e366)
       }),
       qc: Honk.G1Point({
-        x: uint256(0x2cea75256a79391fa13e40b434288ce68ab5c8707c2fff771405c11682141696),
-        y: uint256(0x0a32621fc716daa418f975b8cb711449937aec57aff134bca7f8b13bd4bc14d1)
+        x: uint256(0x2f2c14f160c2f0d03805454993190d7599b56da9bb5441ffe0339461f3e7fc67),
+        y: uint256(0x0c4cb1acd00497c98fb86e0df53008a50d7588bcf40d01a094c164f1f612a85f)
       }),
       qLookup: Honk.G1Point({
         x: uint256(0x111ada27d4243c5df982e1cd77f2d9aff394ba4f2ba2faf8ec1a8e5b6d78d1e7),

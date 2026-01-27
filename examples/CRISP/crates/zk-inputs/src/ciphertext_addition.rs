@@ -4,19 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::commitments::compute_commitment;
+use e3_polynomial::{reduce_and_center_coefficients_mut, reduce_coefficients_2d};
+use e3_zk_helpers::commitments::compute_ciphertext_commitment;
+use e3_zk_helpers::utils::{calculate_bit_width, get_zkp_modulus};
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
 use fhe::bfv::Plaintext;
 use fhe_math::rq::Representation;
+use greco::bounds::GrecoBounds;
 use itertools::izip;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::Zero;
-use polynomial::{reduce_and_center_coefficients_mut, reduce_coefficients_2d};
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use shared::constants::get_zkp_modulus;
 use std::sync::Arc;
 
 /// Set of inputs for validation of a ciphertext addition.
@@ -230,7 +231,10 @@ impl CiphertextAdditionInputs {
             res.r1is[i] = r1i;
         }
 
-        res.prev_ct_commitment = compute_commitment(params, &res.prev_ct0is, &res.prev_ct1is)?;
+        let (_, bounds) = GrecoBounds::compute(&params, 0)?;
+        let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+        res.prev_ct_commitment =
+            compute_ciphertext_commitment(&res.prev_ct0is, &res.prev_ct1is, bit);
 
         Ok(res)
     }

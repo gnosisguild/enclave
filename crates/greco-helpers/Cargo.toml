@@ -10,7 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/greco-helpers"
 fhe = { workspace = true }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs" }
 num-bigint = { workspace = true }
-shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+e3-zk-helpers = { workspace = true }
 
 [dev-dependencies]
 e3-fhe-params = { workspace = true }

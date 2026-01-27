@@ -7,11 +7,12 @@
 use crate::builder::build_pair_for_preset;
 use crate::builder::{build_bfv_params_from_set, build_bfv_params_from_set_arc};
 use crate::constants::{
+    defaults::DEFAULT_INSECURE_LAMBDA,
+    defaults::DEFAULT_SECURE_LAMBDA,
     insecure_512,
     search_defaults::{B, B_CHI},
     secure_8192,
 };
-use shared::{SecurityLevel, DEFAULT_INSECURE_LAMBDA, DEFAULT_SECURE_LAMBDA};
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -64,8 +65,6 @@ pub enum BfvPreset {
 pub struct PresetMetadata {
     /// The canonical name of the preset (e.g., "INSECURE_THRESHOLD_BFV_512")
     pub name: &'static str,
-    /// Security level classification (Secure if λ ≥ 80, Insecure otherwise)
-    pub security_level: SecurityLevel,
     /// LWE dimension (d) - the degree of the polynomial ring, must be a power of 2
     ///
     /// This determines the size of the polynomial ring R_q = Z_q[X]/(X^d + 1).
@@ -221,14 +220,12 @@ impl BfvPreset {
         match self {
             BfvPreset::InsecureThresholdBfv512 | BfvPreset::InsecureDkg512 => PresetMetadata {
                 name: self.name(),
-                security_level: SecurityLevel::from_lambda(DEFAULT_INSECURE_LAMBDA),
                 degree: insecure_512::DEGREE,
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
             },
             BfvPreset::SecureThresholdBfv8192 | BfvPreset::SecureDkg8192 => PresetMetadata {
                 name: self.name(),
-                security_level: SecurityLevel::from_lambda(DEFAULT_SECURE_LAMBDA),
                 degree: secure_8192::DEGREE,
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
@@ -364,13 +361,13 @@ mod tests {
         let metadata = insecure.metadata();
         assert_eq!(metadata.degree, insecure_512::DEGREE);
         assert_eq!(metadata.num_parties, insecure_512::NUM_PARTIES);
-        assert_eq!(metadata.lambda, shared::DEFAULT_INSECURE_LAMBDA);
+        assert_eq!(metadata.lambda, DEFAULT_INSECURE_LAMBDA);
 
         let secure = BfvPreset::SecureThresholdBfv8192;
         let metadata = secure.metadata();
         assert_eq!(metadata.degree, secure_8192::DEGREE);
         assert_eq!(metadata.num_parties, secure_8192::NUM_PARTIES);
-        assert_eq!(metadata.lambda, shared::DEFAULT_SECURE_LAMBDA);
+        assert_eq!(metadata.lambda, DEFAULT_SECURE_LAMBDA);
     }
 
     #[test]
@@ -380,14 +377,14 @@ mod tests {
         assert_eq!(defaults.n, insecure_512::threshold::SEARCH_N);
         assert_eq!(defaults.k, insecure_512::threshold::SEARCH_K);
         assert_eq!(defaults.z, insecure_512::threshold::SEARCH_Z);
-        assert_eq!(defaults.lambda, shared::DEFAULT_INSECURE_LAMBDA as u32);
+        assert_eq!(defaults.lambda, DEFAULT_INSECURE_LAMBDA as u32);
 
         let preset = BfvPreset::SecureThresholdBfv8192;
         let defaults = preset.search_defaults().unwrap();
         assert_eq!(defaults.n, secure_8192::threshold::SEARCH_N);
         assert_eq!(defaults.k, secure_8192::threshold::SEARCH_K);
         assert_eq!(defaults.z, secure_8192::threshold::SEARCH_Z);
-        assert_eq!(defaults.lambda, shared::DEFAULT_SECURE_LAMBDA as u32);
+        assert_eq!(defaults.lambda, DEFAULT_SECURE_LAMBDA as u32);
 
         // DKG presets don't have search defaults
         assert!(BfvPreset::InsecureDkg512.search_defaults().is_none());

@@ -26,7 +26,7 @@ pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use e3_fhe_params::{BfvParamSet, BfvPreset, build_bfv_params_arc, encode_bfv_params};
+    use e3_fhe_params::{build_bfv_params_arc, encode_bfv_params, BfvParamSet, BfvPreset};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use fhe_traits::FheEncrypter;
@@ -50,7 +50,7 @@ mod tests {
 
         // 10
         let ten = public_key.try_encrypt(
-            &Plaintext::try_encode(&[10u64], Encoding::poly(), &params)?,
+            &Plaintext::try_encode(&[3u64], Encoding::poly(), &params)?,
             &mut rng,
         )?;
 
@@ -72,7 +72,7 @@ mod tests {
         // Decrypt result
         let decrypted = secret_key.try_decrypt(&Ciphertext::from_bytes(&result, &params)?)?;
 
-        assert_eq!(decrypted.value[0], 12);
+        assert_eq!(decrypted.value[0], 5);
         Ok(())
     }
 }

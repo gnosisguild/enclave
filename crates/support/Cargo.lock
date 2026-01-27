@@ -2987,44 +2987,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "e3-bfv-helpers"
-version = "0.1.5"
+name = "e3-bfv-client"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
 dependencies = [
- "alloy-dyn-abi",
- "alloy-primitives",
  "anyhow",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
+ "e3-greco-helpers",
  "fhe",
- "fhe-math",
  "fhe-traits",
- "fhe-util",
- "itertools 0.14.0",
- "ndarray",
- "num-bigint",
- "num-traits",
  "rand 0.8.5",
- "strum",
  "thiserror 1.0.69",
  "zkfhe-greco",
  "zkfhe-shared",
-]
-
-[[package]]
-name = "e3-bfv-helpers"
-version = "0.1.5"
-source = "git+https://github.com/gnosisguild/enclave?rev=632766e4ed1ceeccdeb023a56f16413a33be6f46#632766e4ed1ceeccdeb023a56f16413a33be6f46"
-dependencies = [
- "alloy-dyn-abi",
- "alloy-primitives",
- "anyhow",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
- "num-bigint",
- "rand 0.8.5",
- "strum",
- "thiserror 1.0.69",
- "zkfhe-greco",
 ]
 
 [[package]]
@@ -3046,12 +3021,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-compute-provider"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "ark-bn254 0.4.0",
+ "ark-ff 0.4.2",
+ "e3-bfv-client",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
+ "hex",
+ "lean-imt",
+ "light-poseidon",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "serde",
+ "sha3",
+ "zk-kit-imt",
+]
+
+[[package]]
+name = "e3-fhe-params"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "alloy-dyn-abi",
+ "alloy-primitives",
+ "fhe",
+ "num-bigint",
+ "thiserror 1.0.69",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "e3-fhe-params"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101#a358cb0417c657b2397c43e1687e1a9b92e42101"
+dependencies = [
+ "fhe",
+ "num-bigint",
+ "thiserror 1.0.69",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "e3-greco-helpers"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "fhe",
+ "fhe-math",
+ "num-bigint",
+ "zkfhe-shared",
+]
+
+[[package]]
 name = "e3-support-app"
 version = "0.1.0"
 dependencies = [
  "actix-web",
  "anyhow",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.5",
  "e3-support-host",
  "e3-support-types",
  "env_logger",
@@ -3074,8 +3104,8 @@ dependencies = [
  "boundless-market",
  "bytemuck",
  "dotenvy",
- "e3-bfv-helpers 0.1.5",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.5",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101)",
  "e3-user-program",
  "fhe",
  "fhe-traits",
@@ -3105,8 +3135,8 @@ dependencies = [
 name = "e3-user-program"
 version = "0.1.0"
 dependencies = [
- "e3-bfv-helpers 0.1.5 (git+https://github.com/gnosisguild/enclave?rev=632766e4ed1ceeccdeb023a56f16413a33be6f46)",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.7",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=a358cb0417c657b2397c43e1687e1a9b92e42101)",
  "fhe",
  "fhe-traits",
 ]

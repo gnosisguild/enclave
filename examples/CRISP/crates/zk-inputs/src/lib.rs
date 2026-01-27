@@ -8,10 +8,11 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
-use crate::commitments::compute_commitment;
 use crisp_constants::get_default_paramset;
 use e3_fhe_params::build_bfv_params_arc;
-use e3_fhe_params::{constants::insecure_512, BfvParamSet, BfvPreset};
+use e3_fhe_params::BfvParamSet;
+use e3_zk_helpers::commitments::compute_ciphertext_commitment;
+use e3_zk_helpers::utils::calculate_bit_width;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -29,7 +30,6 @@ mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
-mod commitments;
 
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
@@ -96,7 +96,7 @@ impl ZKInputsGenerator {
 
         let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
 
-        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
         // Compute the vectors of the GRECO inputs.
         let greco_vectors = GrecoVectors::compute(
@@ -172,7 +172,7 @@ impl ZKInputsGenerator {
 
         let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
 
-        let bit_pk = shared::template::calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
         // Compute the vectors of the GRECO inputs.
         let greco_vectors = GrecoVectors::compute(
@@ -273,19 +273,22 @@ impl ZKInputsGenerator {
         ct0is: &[Vec<BigInt>],
         ct1is: &[Vec<BigInt>],
     ) -> Result<BigInt> {
-        compute_commitment(self.bfv_params.clone(), ct0is, ct1is)
+        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+        let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
+        Ok(compute_ciphertext_commitment(ct0is, ct1is, bit))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const DEFAULT_DEGREE: usize = 512;
+    use e3_fhe_params::constants::insecure_512;
+    use e3_fhe_params::BfvPreset;
 
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
-        (0..DEFAULT_DEGREE).map(|i| (i % 2) as u64).collect()
+        (0..insecure_512::DEGREE).map(|i| (i % 2) as u64).collect()
     }
 
     #[test]

@@ -2828,12 +2828,12 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
+ "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "thiserror 1.0.69",
  "zkfhe-greco",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3124,7 +3124,6 @@ dependencies = [
  "fhe",
  "num-bigint",
  "thiserror 1.0.69",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3145,13 +3144,13 @@ name = "e3-greco-helpers"
 version = "0.1.7"
 dependencies = [
  "e3-fhe-params",
+ "e3-zk-helpers",
  "fhe",
  "fhe-math",
  "fhe-traits",
  "num-bigint",
  "rand 0.8.5",
  "zkfhe-greco",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3276,6 +3275,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-polynomial"
+version = "0.1.7"
+dependencies = [
+ "bincode",
+ "criterion",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "e3-program-server"
 version = "0.1.7"
 dependencies = [
@@ -3304,6 +3315,17 @@ dependencies = [
  "e3-utils",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "e3-safe"
+version = "0.1.7"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "sha3",
+ "taceo-poseidon2",
 ]
 
 [[package]]
@@ -3480,6 +3502,20 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "e3-zk-helpers"
+version = "0.1.7"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "e3-polynomial",
+ "e3-safe",
+ "fhe",
+ "num-bigint",
+ "num-traits",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -6495,18 +6531,6 @@ dependencies = [
 [[package]]
 name = "polynomial"
 version = "0.1.7"
-dependencies = [
- "bincode",
- "criterion",
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "polynomial"
-version = "0.1.7"
 source = "git+https://github.com/gnosisguild/enclave?branch=main#54db685297b55d517aa86a6005e77e9a0354af02"
 dependencies = [
  "num-bigint",
@@ -7386,17 +7410,6 @@ name = "ryu"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a50f4cf475b65d88e057964e0e9bb1f0aa9bbb2036dc65c64596b42932536984"
-
-[[package]]
-name = "safe"
-version = "0.1.7"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
 
 [[package]]
 name = "safe"
@@ -9568,7 +9581,7 @@ dependencies = [
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
- "polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
+ "polynomial",
  "rand 0.8.5",
  "rayon",
  "serde",
@@ -9592,9 +9605,9 @@ dependencies = [
  "fhe-traits",
  "num-bigint",
  "num-traits",
- "polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
+ "polynomial",
  "rand 0.8.5",
- "safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
+ "safe",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
