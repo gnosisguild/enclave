@@ -4,22 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::matrix_type::MatrixLike;
 use num_bigint::BigUint;
 use num_traits::Zero;
 
-pub fn print_matrix(name: &str, matrix: &[Vec<BigUint>], q: &BigUint) {
-    let cols = if matrix.is_empty() {
-        0
-    } else {
-        matrix[0].len()
-    };
-    println!("{} ({}x{}):", name, matrix.len(), cols);
+pub fn print_matrix(name: &str, matrix: &dyn MatrixLike, q: &BigUint) {
+    let rows = matrix.rows();
+    let cols = matrix.cols();
+    println!("{} ({}x{}):", name, rows, cols);
 
     // Calculate max width and print in a single pass
     let mut max_width = q.to_string().len().min(6);
     let mut string_cache = Vec::new();
 
-    for row in matrix {
+    for row in matrix.data() {
         let mut row_strings = Vec::new();
         for val in row {
             let s = val.to_string();
@@ -47,12 +45,17 @@ pub fn print_matrix(name: &str, matrix: &[Vec<BigUint>], q: &BigUint) {
     println!();
 }
 
-pub fn verify_null_space(h: &[Vec<BigUint>], eval_vec: &[BigUint], q: &BigUint, success_msg: &str) {
-    if h.is_empty() {
+pub fn verify_null_space(
+    h: &dyn MatrixLike,
+    eval_vec: &[BigUint],
+    q: &BigUint,
+    success_msg: &str,
+) {
+    if h.rows() == 0 {
         return;
     }
-    let mut result = vec![BigUint::zero(); h.len()];
-    for (i, row) in h.iter().enumerate() {
+    let mut result = vec![BigUint::zero(); h.rows()];
+    for (i, row) in h.data().iter().enumerate() {
         for (j, h_val) in row.iter().enumerate() {
             result[i] = (&result[i] + h_val * &eval_vec[j]) % q;
         }

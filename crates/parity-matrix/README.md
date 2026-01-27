@@ -9,6 +9,7 @@ error-correcting codes.
 - Generator matrix construction for polynomial evaluation subspaces
 - Null space computation using Gaussian elimination over finite fields
 - Parity matrix verification
+- **Type-safe matrix types** with dimension validation at construction
 - Support for arbitrary modulus q using `num-bigint`
 - Command-line tool for interactive matrix generation
 
@@ -52,7 +53,7 @@ parity-matrix = { git = "https://github.com/gnosisguild/enclave", path = "crates
 ### Library Usage
 
 ```rust
-use parity_matrix::matrix::{ParityMatrixConfig, build_generator_matrix, null_space, verify_parity_matrix};
+use parity_matrix::{ParityMatrixConfig, build_generator_matrix, null_space, verify_parity_matrix};
 use num_bigint::BigUint;
 
 // Configure parameters
@@ -62,15 +63,44 @@ let config = ParityMatrixConfig {
     n: 10,                       // Number of points
 };
 
-// Build generator matrix
-let g = build_generator_matrix(config.clone())?;
+// Build generator matrix (returns DynamicMatrix with validated dimensions)
+let g = build_generator_matrix(&config)?;
+assert_eq!(g.rows(), 5);  // t+1 = 5
+assert_eq!(g.cols(), 11); // n+1 = 11
 
 // Compute parity matrix (null space)
 let h = null_space(&g, &config.q)?;
 
-// Verify correctness
+// Verify correctness (dimension compatibility checked automatically)
 let is_valid = verify_parity_matrix(&g, &h, &config.q)?;
 assert!(is_valid);
+```
+
+### Type-Safe Matrix Types
+
+The library provides `DynamicMatrix` for type-safe matrix operations with dimension validation:
+
+```rust
+use parity_matrix::DynamicMatrix;
+use num_bigint::BigUint;
+
+// Create a matrix with dimension validation
+let data = vec![
+    vec![BigUint::from(1u32), BigUint::from(2u32)],
+    vec![BigUint::from(3u32), BigUint::from(4u32)],
+];
+let matrix = DynamicMatrix::new(data)?;
+
+// Access dimensions safely
+assert_eq!(matrix.rows(), 2);
+assert_eq!(matrix.cols(), 2);
+
+// Invalid dimensions are caught at construction
+let invalid = vec![
+    vec![BigUint::from(1u32), BigUint::from(2u32)],
+    vec![BigUint::from(3u32)],  // Wrong length!
+];
+assert!(DynamicMatrix::new(invalid).is_err()); // Dimension mismatch error
 ```
 
 ### Command-Line Tool
@@ -87,6 +117,21 @@ With verbose output:
 cargo run --bin parity-matrix -- --q 101 --n 10 --t 4 --verbose
 ```
 
+## Type Safety
+
+The library uses type-safe matrix wrappers (`DynamicMatrix`) that:
+
+- **Validate dimensions at construction** - prevents malformed matrices
+- **Check dimension compatibility** - operations verify dimensions match
+- **Provide clear error messages** - dimension mismatches are caught early with helpful context
+- **Enable safe access** - explicit `rows()` and `cols()` methods instead of ambiguous indexing
+
+All matrix operations automatically validate dimension compatibility, preventing common errors like:
+
+- Mismatched matrix dimensions in operations
+- Inconsistent row lengths
+- Out-of-bounds access patterns
+
 ## Testing
 
 Run the test suite:
@@ -100,3 +145,18 @@ Run tests with verbose output:
 ```bash
 cargo test -- --nocapture
 ```
+
+## API Reference
+
+### Matrix Operations
+
+- `build_generator_matrix(config)` - Builds generator matrix G with dimensions (t+1) × (n+1)
+- `null_space(matrix, q)` - Computes null space (parity matrix) of a matrix
+- `verify_parity_matrix(g, h, q)` - Verifies that H · G^T = 0 (mod q)
+
+### Matrix Types
+
+- `DynamicMatrix` - Type-safe matrix wrapper with runtime dimension validation
+- `MatrixLike` - Trait for generic matrix operations
+
+All functions return `DynamicMatrix` instances with validated dimensions.

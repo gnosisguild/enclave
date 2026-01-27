@@ -10,11 +10,11 @@
 
 use clap::Parser;
 use num_bigint::BigUint;
-use parity_matrix::errors::ParityMatrixError;
-use parity_matrix::math::evaluate_polynomial;
-use parity_matrix::matrix::{
-    build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
+use parity_matrix::{
+    ParityMatrixError, ParityMatrixConfig, build_generator_matrix, null_space,
+    verify_parity_matrix, MatrixLike,
 };
+use parity_matrix::math::evaluate_polynomial;
 use parity_matrix::utils::{print_matrix, verify_null_space};
 
 #[derive(Parser, Debug, Clone)]
@@ -84,15 +84,15 @@ fn run() -> Result<(), ParityMatrixError> {
 
     // Build the generator matrix (this will validate the config and constraints)
     let g = build_generator_matrix(&config)?;
-    print_matrix("Generator Matrix G", &g, &args.q);
+    print_matrix("Generator Matrix G", &g as &dyn MatrixLike, &args.q);
 
     // Compute the parity (null space) matrix
     let h = null_space(&g, &args.q)?;
 
-    if h.is_empty() {
+    if h.rows() == 0 {
         println!("Parity Matrix H: (empty - the subspace spans the entire space)");
     } else {
-        print_matrix("Parity Matrix H", &h, &args.q);
+        print_matrix("Parity Matrix H", &h as &dyn MatrixLike, &args.q);
     }
 
     // Verify correctness
@@ -148,7 +148,7 @@ fn run() -> Result<(), ParityMatrixError> {
         );
 
         verify_null_space(
-            &h,
+            &h as &dyn MatrixLike,
             &eval_vec,
             &args.q,
             "Evaluation vector is in the null space of H (as expected)",
@@ -209,7 +209,7 @@ fn run() -> Result<(), ParityMatrixError> {
         );
 
         verify_null_space(
-            &h,
+            &h as &dyn MatrixLike,
             &random_eval_vec,
             &args.q,
             "Random polynomial evaluation is also in the null space of H",

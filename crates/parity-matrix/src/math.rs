@@ -80,7 +80,7 @@ pub fn evaluate_polynomial(coeffs: &[BigUint], n: usize, q: &BigUint) -> Vec<Big
 ///
 /// let inv = mod_inverse(&BigUint::from(3u32), &BigUint::from(11u32))?;
 /// assert_eq!((BigUint::from(3u32) * &inv) % BigUint::from(11u32), BigUint::from(1u32));
-/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
 pub fn mod_inverse(a: &BigUint, modulus: &BigUint) -> ParityMatrixResult<BigUint> {
     if modulus.is_zero() {

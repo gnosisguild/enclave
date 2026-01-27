@@ -12,6 +12,7 @@
 use crate::errors::{ConstraintError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
+use crate::matrix_type::DynamicMatrix;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 
@@ -47,7 +48,7 @@ pub struct ParityMatrixConfig {
 /// # Example
 ///
 /// ```
-/// use parity_matrix::matrix::{build_generator_matrix, ParityMatrixConfig};
+/// use parity_matrix::{build_generator_matrix, ParityMatrixConfig};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -57,11 +58,13 @@ pub struct ParityMatrixConfig {
 /// };
 /// let g = build_generator_matrix(&config)?;
 /// // G is a 3×6 matrix where G[i][j] = j^i mod 7
-/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// assert_eq!(g.rows(), 3);
+/// assert_eq!(g.cols(), 6);
+/// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
 pub fn build_generator_matrix(
     config: &ParityMatrixConfig,
-) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
+) -> ParityMatrixResult<DynamicMatrix> {
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
     if config.t > max_t {
@@ -82,7 +85,7 @@ pub fn build_generator_matrix(
         }
     }
 
-    Ok(g)
+    DynamicMatrix::new(g)
 }
 
 /// Compute the null space of a matrix over `Z_q` using Gaussian elimination.
@@ -97,7 +100,7 @@ pub fn build_generator_matrix(
 /// # Example
 ///
 /// ```
-/// use parity_matrix::matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
+/// use parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -108,15 +111,17 @@ pub fn build_generator_matrix(
 /// let g = build_generator_matrix(&config)?;
 /// let h = null_space(&g, &config.q)?;
 /// // H is a basis for vectors orthogonal to all rows of G
-/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// assert_eq!(h.cols(), g.cols());
+/// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
-pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Vec<Vec<BigUint>>> {
-    if matrix.is_empty() {
-        return Ok(vec![]);
+pub fn null_space(matrix: &DynamicMatrix, q: &BigUint) -> ParityMatrixResult<DynamicMatrix> {
+    if matrix.rows() == 0 {
+        return Ok(DynamicMatrix::zeros(0, 0));
     }
 
-    let rows = matrix.len();
-    let cols = matrix[0].len();
+    let rows = matrix.rows();
+    let cols = matrix.cols();
+    let matrix_data = matrix.data();
 
     // Create augmented matrix [A | I] to track column operations
     // We'll do row reduction on A^T to find the null space
@@ -128,7 +133,7 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
             .iter_mut()
             .enumerate()
             .for_each(|(j, aug_cell)| {
-                *aug_cell = matrix[j][i].clone();
+                *aug_cell = matrix_data[j][i].clone();
             });
         aug_row[rows + i] = BigUint::one();
     }
@@ -194,7 +199,7 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
         })
         .collect();
 
-    Ok(null_basis)
+    DynamicMatrix::new(null_basis)
 }
 
 /// Verify that `H · G^T = 0 (mod q)`.
@@ -209,7 +214,7 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
 /// # Example
 ///
 /// ```
-/// use parity_matrix::matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig};
+/// use parity_matrix::{build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig};
 /// use num_bigint::BigUint;
 ///
 /// let config = ParityMatrixConfig {
@@ -220,23 +225,32 @@ pub fn null_space(matrix: &[Vec<BigUint>], q: &BigUint) -> ParityMatrixResult<Ve
 /// let g = build_generator_matrix(&config)?;
 /// let h = null_space(&g, &config.q)?;
 /// assert!(verify_parity_matrix(&g, &h, &config.q)?);
-/// # Ok::<(), parity_matrix::errors::ParityMatrixError>(())
+/// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
 pub fn verify_parity_matrix(
-    matrix: &[Vec<BigUint>],
-    h: &[Vec<BigUint>],
+    matrix: &DynamicMatrix,
+    h: &DynamicMatrix,
     q: &BigUint,
 ) -> ParityMatrixResult<bool> {
-    if h.is_empty() || matrix.is_empty() {
+    if h.rows() == 0 || matrix.rows() == 0 {
         return Ok(true);
     }
 
-    let h_rows = h.len();
-    let g_rows = matrix.len();
+    // Validate dimension compatibility: H must have same number of columns as G has rows
+    if h.cols() != matrix.cols() {
+        return Err(ParityMatrixError::dimension_mismatch(
+            matrix.cols(),
+            h.cols(),
+            "H columns vs G columns",
+        ));
+    }
+
+    let h_data = h.data();
+    let matrix_data = matrix.data();
 
     // Compute H * G^T
-    for (i, h_row) in h.iter().enumerate().take(h_rows) {
-        for (j, matrix_row) in matrix.iter().enumerate().take(g_rows) {
+    for (i, h_row) in h_data.iter().enumerate() {
+        for (j, matrix_row) in matrix_data.iter().enumerate() {
             let sum = h_row
                 .iter()
                 .zip(matrix_row.iter())
@@ -262,14 +276,16 @@ mod tests {
     use crate::matrix::{
         build_generator_matrix, null_space, verify_parity_matrix, ParityMatrixConfig,
     };
+    use crate::matrix_type::DynamicMatrix;
     use num_bigint::BigUint;
     use num_traits::One;
     use num_traits::Zero;
     use std::str::FromStr;
 
     /// Helper: compute H * v mod q
-    fn matrix_vector_mult(h: &[Vec<BigUint>], v: &[BigUint], q: &BigUint) -> Vec<BigUint> {
-        h.iter()
+    fn matrix_vector_mult(h: &DynamicMatrix, v: &[BigUint], q: &BigUint) -> Vec<BigUint> {
+        h.data()
+            .iter()
             .map(|row| {
                 row.iter()
                     .zip(v.iter())
@@ -297,24 +313,24 @@ mod tests {
         let h = null_space(&g, &q).unwrap();
 
         // Check dimensions
-        assert_eq!(g.len(), num_coeffs, "G should have t+1 rows");
-        assert_eq!(g[0].len(), n + 1, "G should have n+1 columns");
+        assert_eq!(g.rows(), num_coeffs, "G should have t+1 rows");
+        assert_eq!(g.cols(), n + 1, "G should have n+1 columns");
 
         // Note: When n+1 > q, evaluation points repeat mod q, so the rank of G
         // may be less than t+1. We only check exact dimensions when n+1 <= q.
         let n_plus_1 = BigUint::from(n + 1);
         if num_coeffs < n + 1 && n_plus_1 <= q {
             assert_eq!(
-                h.len(),
+                h.rows(),
                 n + 1 - num_coeffs,
                 "H should have n-t rows for q={}, n={}, t={}",
                 q,
                 n,
                 t
             );
-            assert_eq!(h[0].len(), n + 1, "H should have n+1 columns");
-        } else if !h.is_empty() {
-            assert_eq!(h[0].len(), n + 1, "H should have n+1 columns");
+            assert_eq!(h.cols(), n + 1, "H should have n+1 columns");
+        } else if h.rows() > 0 {
+            assert_eq!(h.cols(), n + 1, "H should have n+1 columns");
         }
 
         // Verify H * G^T = 0
@@ -341,7 +357,7 @@ mod tests {
             let eval_vec = evaluate_polynomial(coeffs, n, &q);
 
             // Check H * eval_vec = 0
-            if !h.is_empty() {
+            if h.rows() > 0 {
                 let result = matrix_vector_mult(&h, &eval_vec, &q);
                 assert!(
                     result.iter().all(|x| x.is_zero()),
@@ -450,7 +466,7 @@ mod tests {
         let g = build_generator_matrix(&ParityMatrixConfig { q: q.clone(), n, t }).unwrap();
         let h = null_space(&g, &q).unwrap();
 
-        if h.is_empty() {
+        if h.rows() == 0 {
             return; // No parity checks, skip
         }
 
@@ -637,7 +653,7 @@ mod tests {
         let result = build_generator_matrix(&config);
         // With q=1, mod_pow returns 0, so matrix should be all zeros
         if let Ok(g) = result {
-            assert!(g.iter().all(|row| row.iter().all(|x| x.is_zero())));
+            assert!(g.data().iter().all(|row| row.iter().all(|x| x.is_zero())));
         }
     }
 
@@ -650,9 +666,9 @@ mod tests {
         let result = build_generator_matrix(&config);
         assert!(result.is_ok());
         if let Ok(g) = result {
-            assert_eq!(g.len(), 1); // t+1 = 1
-            assert_eq!(g[0].len(), 1); // n+1 = 1
-            assert_eq!(g[0][0], BigUint::one()); // 0^0 = 1
+            assert_eq!(g.rows(), 1); // t+1 = 1
+            assert_eq!(g.cols(), 1); // n+1 = 1
+            assert_eq!(g.get(0, 0), &BigUint::one()); // 0^0 = 1
         }
     }
 
@@ -666,10 +682,10 @@ mod tests {
         let result = build_generator_matrix(&config);
         assert!(result.is_ok());
         if let Ok(g) = result {
-            assert_eq!(g.len(), 1); // t+1 = 1
-            assert_eq!(g[0].len(), 2); // n+1 = 2
-            assert_eq!(g[0][0], BigUint::one()); // 0^0 = 1
-            assert_eq!(g[0][1], BigUint::one()); // 1^0 = 1
+            assert_eq!(g.rows(), 1); // t+1 = 1
+            assert_eq!(g.cols(), 2); // n+1 = 2
+            assert_eq!(g.get(0, 0), &BigUint::one()); // 0^0 = 1
+            assert_eq!(g.get(0, 1), &BigUint::one()); // 1^0 = 1
         }
     }
 
@@ -694,9 +710,9 @@ mod tests {
             let h = null_space(&g, &q).unwrap();
 
             // G should be 1x(n+1) with all ones
-            assert_eq!(g.len(), 1);
-            assert_eq!(g[0].len(), n + 1);
-            assert!(g[0].iter().all(|x| *x == BigUint::one()));
+            assert_eq!(g.rows(), 1);
+            assert_eq!(g.cols(), n + 1);
+            assert!(g.data()[0].iter().all(|x| *x == BigUint::one()));
 
             // Verify H * G^T = 0
             assert!(verify_parity_matrix(&g, &h, &q).unwrap());
@@ -706,16 +722,16 @@ mod tests {
     #[test]
     fn test_empty_matrix_null_space() {
         // Empty matrix should return empty null space
-        let empty: Vec<Vec<BigUint>> = vec![];
+        let empty = DynamicMatrix::zeros(0, 0);
         let q = BigUint::from(7u32);
         let result = null_space(&empty, &q).unwrap();
-        assert!(result.is_empty());
+        assert_eq!(result.rows(), 0);
     }
 
     #[test]
     fn test_empty_matrix_verify() {
         // Empty matrices should verify as true
-        let empty: Vec<Vec<BigUint>> = vec![];
+        let empty = DynamicMatrix::zeros(0, 0);
         let q = BigUint::from(7u32);
         assert!(verify_parity_matrix(&empty, &empty, &q).unwrap());
     }
@@ -758,16 +774,12 @@ mod tests {
     fn test_dimension_mismatch_verify() {
         // Test verify_parity_matrix with mismatched dimensions
         let q = BigUint::from(7u32);
-        let g = vec![vec![BigUint::one(); 3]]; // 1x3
-        let h = vec![vec![BigUint::one(); 4]]; // 1x4 (mismatch)
+        let g = DynamicMatrix::new(vec![vec![BigUint::one(); 3]]).unwrap(); // 1x3
+        let h = DynamicMatrix::new(vec![vec![BigUint::one(); 4]]).unwrap(); // 1x4 (mismatch)
 
-        // This should either error or handle gracefully
-        // The function checks h_row.len() == matrix_row.len() via zip
-        // So it will silently skip mismatched elements, but we should test it
+        // This should error due to dimension mismatch
         let result = verify_parity_matrix(&g, &h, &q);
-        // Depending on implementation, might succeed or fail
-        // The key is it shouldn't panic
-        assert!(result.is_ok() || result.is_err());
+        assert!(result.is_err());
     }
 
     #[test]
@@ -775,10 +787,11 @@ mod tests {
         // Create a matrix that might cause issues during Gaussian elimination
         // when pivot element is not invertible mod q
         let q = BigUint::from(6u32); // composite modulus
-        let matrix = vec![
+        let matrix = DynamicMatrix::new(vec![
             vec![BigUint::from(2u32), BigUint::from(4u32)], // gcd(2, 6) = 2
             vec![BigUint::from(3u32), BigUint::from(3u32)], // gcd(3, 6) = 3
-        ];
+        ])
+        .unwrap();
 
         // This should handle non-invertible elements gracefully
         let result = null_space(&matrix, &q);
@@ -872,7 +885,7 @@ mod tests {
                 let g = build_generator_matrix(&config).unwrap();
                 let h = null_space(&g, &q).unwrap();
 
-                if h.is_empty() {
+                if h.rows() == 0 {
                     return Ok(());
                 }
 
@@ -914,7 +927,7 @@ mod tests {
                 let g = build_generator_matrix(&config).unwrap();
                 let h = null_space(&g, &q).unwrap();
 
-                if h.is_empty() {
+                if h.rows() == 0 {
                     return Ok(());
                 }
 
@@ -950,9 +963,9 @@ mod tests {
                 let g = build_generator_matrix(&config).unwrap();
 
                 // Property: G has correct dimensions
-                prop_assert_eq!(g.len(), t + 1, "G should have t+1 rows");
-                if !g.is_empty() {
-                    prop_assert_eq!(g[0].len(), n + 1, "G should have n+1 columns");
+                prop_assert_eq!(g.rows(), t + 1, "G should have t+1 rows");
+                if g.rows() > 0 {
+                    prop_assert_eq!(g.cols(), n + 1, "G should have n+1 columns");
                 }
             }
 
@@ -965,8 +978,8 @@ mod tests {
                 let h = null_space(&g, &q).unwrap();
 
                 // Property: H has correct column dimension
-                if !h.is_empty() {
-                    prop_assert_eq!(h[0].len(), n + 1, "H should have n+1 columns");
+                if h.rows() > 0 {
+                    prop_assert_eq!(h.cols(), n + 1, "H should have n+1 columns");
                 }
             }
         }

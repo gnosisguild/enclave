@@ -100,4 +100,16 @@ impl ParityMatrixError {
             message: message.into(),
         }
     }
+
+    /// Create a dimension mismatch error
+    pub fn dimension_mismatch(expected: usize, actual: usize, context: impl Into<String>) -> Self {
+        ParityMatrixError::Matrix {
+            message: format!(
+                "Dimension mismatch in {}: expected {}, got {}",
+                context.into(),
+                expected,
+                actual
+            ),
+        }
+    }
 }
