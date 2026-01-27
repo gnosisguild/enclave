@@ -75,16 +75,6 @@ fn main() {
         n: args.n,
     };
 
-    // Check constraint: t ≤ (n-1)/2
-    let max_t = (args.n.saturating_sub(1)) / 2;
-    if args.t > max_t {
-        eprintln!(
-            "Error: t ({}) must be ≤ (n-1)/2 = {} for n = {}",
-            args.t, max_t, args.n
-        );
-        std::process::exit(1);
-    }
-
     // Build the generator matrix (this will validate the config and constraints)
     let g = match build_generator_matrix(config) {
         Ok(pm) => pm,
