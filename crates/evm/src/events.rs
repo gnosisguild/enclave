@@ -81,7 +81,7 @@ use alloy_primitives::Address;
 
 #[cfg(test)]
 impl EvmLog {
-    pub fn test_log(address: Address, chain_id: u64) -> EvmLog {
+    pub fn test_log(address: Address, chain_id: u64, timestamp: u64) -> EvmLog {
         let id = CorrelationId::new();
         EvmLog {
             log: Log {
@@ -93,6 +93,7 @@ impl EvmLog {
             },
             chain_id,
             id,
+            timestamp,
         }
     }
 }

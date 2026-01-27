@@ -100,7 +100,7 @@ mod tests {
         let received_count = Arc::new(AtomicUsize::new(0));
         let processor_addr = TestProcessor(received_count.clone()).start();
         let addr = address!("0x1111111111111111111111111111111111111111");
-        let test_log = EvmLog::test_log(addr, 1);
+        let test_log = EvmLog::test_log(addr, 1, 0);
         let test_address = test_log.log.address();
 
         let router = EvmRouter::new()
@@ -122,7 +122,7 @@ mod tests {
         let router_addr = address!("0x1111111111111111111111111111111111111111");
         let log_addr = address!("0x2222222222222222222222222222222222222222");
 
-        let test_log = EvmLog::test_log(log_addr, 1);
+        let test_log = EvmLog::test_log(log_addr, 1, 0);
 
         let router = EvmRouter::new()
             .add_route(router_addr, &processor_addr.recipient())

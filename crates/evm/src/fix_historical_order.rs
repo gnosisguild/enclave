@@ -97,9 +97,9 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let fix = FixHistoricalOrder::setup(Collector(tx).start());
 
-        let log_1 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1));
-        let log_2 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2));
-        let log_3 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3));
+        let log_1 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 1, 1));
+        let log_2 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 2, 2));
+        let log_3 = EnclaveEvmEvent::Log(EvmLog::test_log(Address::ZERO, 3, 3));
 
         let sync_complete = EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete::new(
             1,

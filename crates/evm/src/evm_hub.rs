@@ -74,6 +74,7 @@ mod tests {
         let log_event = EnclaveEvmEvent::Log(EvmLog::test_log(
             address!("0x1111111111111111111111111111111111111111"),
             1,
+            0,
         ));
 
         hub.send(log_event).await.unwrap();
