@@ -11,7 +11,7 @@ use crate::{
     rpc::{RpcAuth, RPC},
 };
 use anyhow::*;
-use e3_events::EvmEventConfigChain;
+use e3_events::{EvmEventConfig, EvmEventConfigChain};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -34,9 +34,9 @@ impl ChainConfig {
     }
 }
 
-impl TryFrom<ChainConfig> for EvmEventConfigChain {
+impl TryFrom<&ChainConfig> for EvmEventConfigChain {
     type Error = anyhow::Error;
-    fn try_from(value: ChainConfig) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: &ChainConfig) -> std::result::Result<Self, Self::Error> {
         let rpc = value.rpc_url()?;
         let contracts = value.contracts.contracts();
         let mut lowest_block: Option<u64> = None;
@@ -58,5 +58,13 @@ impl TryFrom<ChainConfig> for EvmEventConfigChain {
         }
         let start_block = lowest_block.unwrap_or(0);
         Ok(EvmEventConfigChain::new(start_block))
+    }
+}
+
+impl TryFrom<ChainConfig> for EvmEventConfigChain {
+    type Error = anyhow::Error;
+    fn try_from(value: ChainConfig) -> std::result::Result<Self, Self::Error> {
+        let r = &value;
+        r.try_into()
     }
 }

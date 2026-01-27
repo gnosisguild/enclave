@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::event_system::AggregateConfig;
-use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache};
+use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
 use anyhow::Result;
 use derivative::Derivative;
@@ -13,22 +13,23 @@ use e3_aggregator::ext::{
     PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
     ThresholdPlaintextAggregatorExtension,
 };
+use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
-use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig};
-use e3_evm::{
-    BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter, EvmChainGateway,
-};
+use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig};
+use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
+use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
+use e3_sync::Synchronizer;
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -69,6 +70,20 @@ pub struct CiphernodeBuilder {
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
+    net_config: Option<NetConfig>,
+}
+
+// Simple Net Configuration
+#[derive(Debug)]
+struct NetConfig {
+    pub peers: Vec<String>,
+    pub quic_port: u16,
+}
+
+impl NetConfig {
+    pub fn new(peers: Vec<String>, quic_port: u16) -> Self {
+        Self { peers, quic_port }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -121,6 +136,7 @@ impl CiphernodeBuilder {
             task_pool: None,
             threads: None,
             threshold_plaintext_agg: false,
+            net_config: None,
         }
     }
 
@@ -283,6 +299,12 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Setup net package components.
+    pub fn with_net(mut self, peers: Vec<String>, quic_port: u16) -> Self {
+        self.net_config = Some(NetConfig::new(peers, quic_port));
+        self
+    }
+
     fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
@@ -390,77 +412,17 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
             .await?;
 
-        // TODO: gather an async handle from the event readers that closes when they shutdown and
-        // join it with the network manager joinhandle below
-        for chain in self
-            .chains
-            .iter()
-            .filter(|chain| chain.enabled.unwrap_or(true))
-        {
-            let provider = provider_cache.ensure_read_provider(chain).await?;
-
-            let mut system = EvmSystemChainBuilder::new(&bus, &provider);
-
-            if self.contract_components.enclave {
-                let write_provider = provider_cache.ensure_write_provider(chain).await?;
-                let contract = &chain.contracts.enclave;
-                EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?).await?;
-                system.with_contract(contract.address()?, move |next| {
-                    EnclaveSolReader::setup(&next).recipient()
-                });
-            }
-
-            if self.contract_components.enclave_reader {
-                let contract = &chain.contracts.enclave;
-
-                system.with_contract(contract.address()?, move |next| {
-                    EnclaveSolReader::setup(&next).recipient()
-                });
-            }
-
-            if self.contract_components.bonding_registry {
-                let contract = &chain.contracts.bonding_registry;
-                system.with_contract(contract.address()?, move |next| {
-                    BondingRegistrySolReader::setup(&next).recipient()
-                });
-            }
-
-            if self.contract_components.ciphernode_registry {
-                let contract = &chain.contracts.ciphernode_registry;
-
-                system.with_contract(contract.address()?, move |next| {
-                    CiphernodeRegistrySolReader::setup(&next).recipient()
-                });
-
-                // TODO: Should we not let this pass and just use '?'?
-                // Above if we include enclave in the config and we don't have a wallet it will fail
-                match provider_cache
-                    .ensure_write_provider(&chain)
-                    .await
-                {
-                    Ok(write_provider) => {
-                        let _writer = CiphernodeRegistrySol::attach_writer(
-                            &bus,
-                            write_provider.clone(),
-                            contract.address()?,
-                            self.pubkey_agg,
-                        )
-                        .await?;
-                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
-
-                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
-                            info!("Attaching CommitteeFinalizer for score sortition");
-                            e3_aggregator::CommitteeFinalizer::attach(&bus);
-                        }
-                    }
-                    Err(e) => error!(
-                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
-                        e
-                    ),
-                }
-            }
-            system.build();
-        }
+        // Setup evm system
+        // TODO: gather an async handle from the event readers in thre following function
+        // that closes when they shutdown and join it with the network manager joinhandle externally
+        let evm_config = setup_evm_system(
+            &self.chains,
+            &mut provider_cache,
+            &bus,
+            &self.contract_components,
+            self.pubkey_agg,
+        )
+        .await?;
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());
@@ -507,8 +469,30 @@ impl CiphernodeBuilder {
             info!("Setting up KeyshareExtension (legacy)!");
             e3_builder = e3_builder.with(KeyshareExtension::create(&bus, &addr, &self.cipher))
         }
+
         info!("building...");
+
         e3_builder.build().await?;
+
+        let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
+            let repositories = store.repositories();
+            let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
+                bus.clone(),
+                net_config.peers,
+                &self.cipher,
+                net_config.quic_port,
+                repositories.libp2p_keypair(),
+            )
+            .await?;
+            (join_handle, peer_id)
+        } else {
+            (
+                tokio::spawn(std::future::ready(Ok(()))),
+                "-not set-".to_string(),
+            )
+        };
+
+        Synchronizer::setup(&bus, evm_config); // TODO: add net config if required
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
@@ -516,6 +500,8 @@ impl CiphernodeBuilder {
             bus,
             history,
             errors,
+            peer_id,
+            join_handle,
         ))
     }
 
@@ -589,4 +575,82 @@ fn create_aggregate_delays(
     }
 
     Ok(delays)
+}
+
+async fn setup_evm_system(
+    chains: &Vec<ChainConfig>,
+    provider_cache: &mut ProviderCache<WriteEnabled>,
+    bus: &BusHandle,
+    contract_components: &ContractComponents,
+    pubkey_agg: bool,
+) -> Result<EvmEventConfig> {
+    let mut evm_config = EvmEventConfig::new();
+    for chain in chains.iter().filter(|chain| chain.enabled.unwrap_or(true)) {
+        let provider = provider_cache.ensure_read_provider(chain).await?;
+        let chain_id = provider.chain_id();
+        evm_config.insert(chain_id, chain.try_into()?);
+        let mut system = EvmSystemChainBuilder::new(&bus, &provider);
+
+        if contract_components.enclave {
+            let write_provider = provider_cache.ensure_write_provider(chain).await?;
+            let contract = &chain.contracts.enclave;
+            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?).await?;
+            system.with_contract(contract.address()?, move |next| {
+                EnclaveSolReader::setup(&next).recipient()
+            });
+        }
+
+        if contract_components.enclave_reader {
+            let contract = &chain.contracts.enclave;
+
+            system.with_contract(contract.address()?, move |next| {
+                EnclaveSolReader::setup(&next).recipient()
+            });
+        }
+
+        if contract_components.bonding_registry {
+            let contract = &chain.contracts.bonding_registry;
+            system.with_contract(contract.address()?, move |next| {
+                BondingRegistrySolReader::setup(&next).recipient()
+            });
+        }
+
+        if contract_components.ciphernode_registry {
+            let contract = &chain.contracts.ciphernode_registry;
+
+            system.with_contract(contract.address()?, move |next| {
+                CiphernodeRegistrySolReader::setup(&next).recipient()
+            });
+
+            // TODO: Should we not let this pass and just use '?'?
+            // Above if we include enclave in the config and we don't have a wallet it will fail
+            match provider_cache
+                    .ensure_write_provider(&chain)
+                    .await
+                {
+                    Ok(write_provider) => {
+                        CiphernodeRegistrySol::attach_writer(
+                            &bus,
+                            write_provider.clone(),
+                            contract.address()?,
+                            pubkey_agg,
+                        )
+                        .await?;
+                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
+
+                        if pubkey_agg {
+                            info!("Attaching CommitteeFinalizer for score sortition");
+                            CommitteeFinalizer::attach(&bus);
+                        }
+                    }
+                    Err(e) => error!(
+                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+                        e
+                    )
+                }
+        }
+        system.build();
+    }
+
+    Ok(evm_config)
 }
