@@ -3572,7 +3572,7 @@ dependencies = [
 [[package]]
 name = "e3-polynomial"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#ffceb25b8eb6bc752530bda33d0c6f6d88b1e33f"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3601,7 +3601,7 @@ version = "0.1.7"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-polynomial",
+ "e3-polynomial 0.1.7",
  "e3-zk-helpers",
  "fhe",
  "fhe-math",
@@ -3614,7 +3614,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
- "toml",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -3657,7 +3657,7 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
+source = "git+https://github.com/gnosisguild/enclave#ffceb25b8eb6bc752530bda33d0c6f6d88b1e33f"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
