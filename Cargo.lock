@@ -6188,7 +6188,6 @@ dependencies = [
 name = "parity-matrix"
 version = "0.1.7"
 dependencies = [
- "clap",
  "num-bigint",
  "num-traits",
  "proptest",

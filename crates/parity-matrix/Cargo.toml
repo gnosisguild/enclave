@@ -10,12 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/parity-matrix"
 num-bigint = { workspace = true, features = ["serde"] }
 num-traits = { workspace = true }
 thiserror = { workspace = true }
-clap = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
-
-[[bin]]
-name = "parity-matrix"
-path = "src/bin/parity_matrix.rs"
