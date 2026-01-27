@@ -4,9 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_noir_prover::{NoirConfig, NoirSetup, SetupStatus};
+use std::path::PathBuf;
+
+use e3_noir_prover::{
+    input_map, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus, WitnessGenerator,
+};
 use tempfile::tempdir;
-use tokio::fs;
+use tokio::{fs, process::Command};
 
 #[tokio::test]
 async fn test_check_status_on_empty_dir() {
@@ -69,4 +73,109 @@ async fn test_version_info_persistence() {
     let reloaded = setup.load_version_info().await;
     assert_eq!(reloaded.bb_version, Some("0.87.0".to_string()));
     assert_eq!(reloaded.circuits_version, Some("0.1.0".to_string()));
+}
+
+async fn find_bb() -> Option<PathBuf> {
+    if let Ok(output) = Command::new("which").arg("bb").output().await {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        for path in [
+            format!("{}/.bb/bb", home),
+            format!("{}/.nargo/bin/bb", home),
+            format!("{}/.enclave/noir/bin/bb", home),
+        ] {
+            if std::path::Path::new(&path).exists() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    None
+}
+
+fn fixtures_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+}
+
+#[tokio::test]
+async fn test_dummy_circuit() {
+    const CIRCUIT_NAME: &str = "dummy";
+
+    // 1. Find bb
+    let bb = match find_bb().await {
+        Some(p) => p,
+        None => {
+            println!("⚠ Skipping: bb not found");
+            return;
+        }
+    };
+
+    // 2. Create NoirSetup
+    let temp = tempdir().unwrap();
+    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+
+    // 3. Init directories
+    fs::create_dir_all(&setup.circuits_dir).await.unwrap();
+    fs::create_dir_all(setup.circuits_dir.join("vk"))
+        .await
+        .unwrap();
+    fs::create_dir_all(&setup.work_dir).await.unwrap();
+    fs::create_dir_all(setup.noir_dir.join("bin"))
+        .await
+        .unwrap();
+
+    // 4. Symlink bb
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&bb, &setup.bb_binary).unwrap();
+
+    // 5. Copy circuit and VK from fixtures
+    let fixtures = fixtures_dir();
+    let circuit_src = fixtures.join(format!("{}.json", CIRCUIT_NAME));
+    let vk_src = fixtures.join(format!("{}.vk", CIRCUIT_NAME));
+
+    let circuit_dst = setup.circuits_dir.join(format!("{}.json", CIRCUIT_NAME));
+    let vk_dst = setup
+        .circuits_dir
+        .join("vk")
+        .join(format!("{}.vk", CIRCUIT_NAME));
+
+    fs::copy(&circuit_src, &circuit_dst).await.unwrap();
+    fs::copy(&vk_src, &vk_dst).await.unwrap();
+
+    // 6. Load circuit
+    let circuit = CompiledCircuit::from_file(&circuit_src).unwrap();
+
+    // 7. Generate witness (NATIVE!)
+    let witness_gen = WitnessGenerator::new();
+    let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
+    let witness = witness_gen.generate_witness(&circuit, inputs).unwrap();
+    println!("✓ Witness: {} bytes", witness.len());
+
+    // 8. Create prover and generate proof
+    let prover = NoirProver::new(&setup);
+    let e3_id = "test-e3-001";
+    let proof = prover
+        .generate_proof(CIRCUIT_NAME, &witness, e3_id)
+        .await
+        .unwrap();
+    println!("✓ Proof: {} bytes", proof.len());
+
+    // 9. Verify
+    let valid = prover
+        .verify_proof(CIRCUIT_NAME, &proof, e3_id)
+        .await
+        .unwrap();
+
+    assert!(valid);
+    println!("✓ Verified!");
+
+    // 10. Cleanup
+    prover.cleanup(e3_id).await.unwrap();
 }
