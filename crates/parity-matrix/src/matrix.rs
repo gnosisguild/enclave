@@ -9,7 +9,7 @@
 //! This module builds generator matrices for polynomial evaluations and computes
 //! their null spaces to create parity check matrices.
 
-use crate::errors::{ConstraintError, ParityMatrixError, ParityMatrixResult};
+use crate::errors::{ConstraintError, MathError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
 use crate::matrix_type::DynamicMatrix;
@@ -64,6 +64,14 @@ pub struct ParityMatrixConfig {
 /// # Ok::<(), parity_matrix::ParityMatrixError>(())
 /// ```
 pub fn build_generator_matrix(config: &ParityMatrixConfig) -> ParityMatrixResult<DynamicMatrix> {
+    // Validate modulus: q must be >= 2 for valid field arithmetic
+    if config.q.is_zero() || config.q.is_one() {
+        return Err(ParityMatrixError::from(MathError::InvalidModulus {
+            modulus: config.q.to_string(),
+            reason: "modulus must be >= 2 for valid field arithmetic".to_string(),
+        }));
+    }
+
     // Check constraint: t ≤ (n-1)/2
     let max_t = config.n.saturating_sub(1) / 2;
     if config.t > max_t {
@@ -625,9 +633,8 @@ mod tests {
     // ==================== Edge Case Tests ====================
 
     #[test]
-    #[should_panic(expected = "zero modulus")]
     fn test_q_equals_zero() {
-        // q = 0 should panic in mod_pow (num-bigint panics on zero modulus)
+        // q = 0 should return InvalidModulus error
         let q = BigUint::zero();
         let config = ParityMatrixConfig {
             q: q.clone(),
@@ -635,13 +642,20 @@ mod tests {
             t: 1,
         };
 
-        // This will panic when mod_pow is called with q=0
-        let _ = build_generator_matrix(&config);
+        let result = build_generator_matrix(&config);
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("Invalid modulus"));
+                assert!(message.contains("modulus must be >= 2"));
+            }
+            _ => panic!("Expected Math error for q=0"),
+        }
     }
 
     #[test]
     fn test_q_equals_one() {
-        // q = 1 means all values are 0 mod 1
+        // q = 1 should return InvalidModulus error
         let q = BigUint::one();
         let config = ParityMatrixConfig {
             q: q.clone(),
@@ -650,9 +664,13 @@ mod tests {
         };
 
         let result = build_generator_matrix(&config);
-        // With q=1, mod_pow returns 0, so matrix should be all zeros
-        if let Ok(g) = result {
-            assert!(g.data().iter().all(|row| row.iter().all(|x| x.is_zero())));
+        assert!(result.is_err());
+        match result {
+            Err(ParityMatrixError::Math { message }) => {
+                assert!(message.contains("Invalid modulus"));
+                assert!(message.contains("modulus must be >= 2"));
+            }
+            _ => panic!("Expected Math error for q=1"),
         }
     }
 
