@@ -22,8 +22,8 @@ evaluations of degree at most t at points 0, 1, ..., n.
 
 The generator matrix G has dimensions (t+1) × (n+1), where:
 
-- Each row i corresponds to evaluations of x^i at points 0, 1, ..., n
-- G[i][j] = j^i mod q
+- Each row i corresponds to evaluations of `x^i` at points 0, 1, ..., n
+- `G[i][j] = j^i mod q`
 - For polynomials of degree t, we have t+1 coefficients (a_0, ..., a_t)
 
 ### Parity Matrix
