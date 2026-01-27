@@ -6192,6 +6192,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "proptest",
+ "serde",
  "thiserror 1.0.69",
 ]
 
