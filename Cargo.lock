@@ -342,9 +342,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-chains"
-version = "0.2.29"
+version = "0.2.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef3a72a2247c34a8545ee99e562b1b9b69168e5000567257ae51e91b4e6b1193"
+checksum = "90f374d3c6d729268bbe2d0e0ff992bb97898b2df756691a62ee1d5f0506bc39"
 dependencies = [
  "alloy-primitives",
  "num_enum",
@@ -971,9 +971,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-sol-type-parser"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af67a0b0dcebe14244fc92002cd8d96ecbf65db4639d479f5fcd5805755a4c27"
+checksum = "d6dbdf239d997b705e1c23cc8bb43f301db615b187379fa923d87723d47fcd31"
 dependencies = [
  "serde",
  "winnow",
@@ -2705,6 +2705,15 @@ dependencies = [
 
 [[package]]
 name = "directories"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "directories"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
@@ -2892,6 +2901,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-noir-prover",
  "e3-support-scripts",
  "hex",
  "opentelemetry",
@@ -2902,6 +2912,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "tokio",
+ "toml",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -3293,6 +3304,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-noir-prover"
+version = "0.1.7"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "directories 5.0.1",
+ "flate2",
+ "futures-util",
+ "hex",
+ "indicatif 0.17.11",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "e3-parity-matrix"
 version = "0.1.7"
 dependencies = [
@@ -3309,6 +3344,17 @@ version = "0.1.7"
 dependencies = [
  "bincode",
  "criterion",
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-polynomial"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
+dependencies = [
  "num-bigint",
  "num-traits",
  "serde",
@@ -3381,6 +3427,18 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.7"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "hex",
+ "sha3",
+ "taceo-poseidon2",
+]
+
+[[package]]
+name = "e3-safe"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3583,8 +3641,8 @@ version = "0.1.7"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "e3-polynomial",
- "e3-safe",
+ "e3-polynomial 0.1.7",
+ "e3-safe 0.1.7",
  "fhe",
  "num-bigint",
  "num-traits",
@@ -3677,7 +3735,7 @@ version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
- "directories",
+ "directories 6.0.0",
  "flate2",
  "futures-util",
  "indicatif 0.17.11",
@@ -4647,9 +4705,9 @@ dependencies = [
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.64"
+version = "0.1.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33e57f83510bb73707521ebaffa789ec8caf86f9657cad665b092b581d40e9fb"
+checksum = "e31bc9ad994ba00e440a8aa5c9ef0ec67d5cb5e5cb0cc7f8b744a35b389cc470"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
@@ -5086,9 +5144,9 @@ dependencies = [
 
 [[package]]
 name = "keccak-asm"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505d1856a39b200489082f90d897c3f07c455563880bc5952e38eabf731c83b6"
+checksum = "b646a74e746cd25045aa0fd42f4f7f78aa6d119380182c7e63a5593c4ab8df6f"
 dependencies = [
  "digest 0.10.7",
  "sha3-asm",
@@ -5149,9 +5207,9 @@ dependencies = [
 
 [[package]]
 name = "libm"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libp2p"
@@ -6625,17 +6683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "polynomial"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#54db685297b55d517aa86a6005e77e9a0354af02"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "polyval"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7252,12 +7299,14 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
+ "tokio-util",
  "tower 0.5.3",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.5",
 ]
@@ -7506,18 +7555,6 @@ name = "ryu"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a50f4cf475b65d88e057964e0e9bb1f0aa9bbb2036dc65c64596b42932536984"
-
-[[package]]
-name = "safe"
-version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#54db685297b55d517aa86a6005e77e9a0354af02"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
 
 [[package]]
 name = "same-file"
@@ -7859,9 +7896,9 @@ dependencies = [
 
 [[package]]
 name = "sha3-asm"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c28efc5e327c837aa837c59eae585fc250715ef939ac32881bcc11677cd02d46"
+checksum = "b31139435f327c93c6038ed350ae4588e2c70a13d50599509fee6349967ba35a"
 dependencies = [
  "cc",
  "cfg-if",
@@ -7963,9 +8000,9 @@ checksum = "e320a6c5ad31d271ad523dcf3ad13e2767ad8b1cb8f047f75a8aeaf8da139da2"
 
 [[package]]
 name = "siphasher"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
+checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
 
 [[package]]
 name = "slab"
@@ -8109,9 +8146,9 @@ dependencies = [
 
 [[package]]
 name = "syn-solidity"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f92d01b5de07eaf324f7fca61cc6bd3d82bbc1de5b6c963e6fe79e86f36580d"
+checksum = "e629391be459480417646f7ca78894442249262a6e095dbd6e4ab6988cfafce0"
 dependencies = [
  "paste",
  "proc-macro2",
@@ -9001,6 +9038,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "wasmtimer"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9560,18 +9610,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.33"
+version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "668f5168d10b9ee831de31933dc111a459c97ec93225beb307aed970d1372dfd"
+checksum = "fdea86ddd5568519879b8187e1cf04e24fce28f7fe046ceecbce472ff19a2572"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.33"
+version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c7962b26b0a8685668b671ee4b54d007a67d4eaf05fda79ac0ecf41e32270f1"
+checksum = "0c15e1b46eff7c6c91195752e0eeed8ef040e391cdece7c25376957d5f15df22"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9665,19 +9715,19 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#02131ceea13a9ff154a4d8cdd534261dacbfc724"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#f3fd30fc4e969f674536c2616639021c15915d71"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "blake3",
+ "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
  "fhe",
  "fhe-math",
  "fhe-traits",
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
- "polynomial",
  "rand 0.8.5",
  "rayon",
  "serde",
@@ -9690,20 +9740,20 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#02131ceea13a9ff154a4d8cdd534261dacbfc724"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#f3fd30fc4e969f674536c2616639021c15915d71"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "chrono",
+ "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
+ "e3-safe 0.1.7 (git+https://github.com/gnosisguild/enclave)",
  "fhe",
  "fhe-math",
  "fhe-traits",
  "num-bigint",
  "num-traits",
- "polynomial",
  "rand 0.8.5",
- "safe",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
