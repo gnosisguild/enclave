@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::events::EvmEventProcessor;
-use crate::evm_reader::EvmReader;
+use crate::evm_parser::EvmParser;
 use actix::{Actor, Addr};
 use alloy::primitives::{LogData, B256};
 use alloy::{sol, sol_types::SolEvent};
@@ -138,7 +138,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmReader> {
-        EvmReader::new(next, extractor).start()
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }

@@ -19,8 +19,8 @@ use e3_events::{
     prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, EvmEventConfig,
     EvmEventConfigChain, GetEvents, HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
 };
-use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmReader};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
+use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::{fmt, EnvFilter};
@@ -56,8 +56,8 @@ fn test_event_extractor(
 struct TestEventParser;
 
 impl TestEventParser {
-    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmReader> {
-        EvmReader::new(next, test_event_extractor).start()
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, test_event_extractor).start()
     }
 }
 

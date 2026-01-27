@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{events::EvmEventProcessor, evm_reader::EvmReader};
+use crate::{events::EvmEventProcessor, evm_parser::EvmParser};
 use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
@@ -137,7 +137,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 /// Connects to BondingRegistry.sol converting EVM events to EnclaveEvents
 pub struct BondingRegistrySolReader;
 impl BondingRegistrySolReader {
-    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmReader> {
-        EvmReader::new(next, extractor).start()
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }

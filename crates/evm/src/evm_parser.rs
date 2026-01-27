@@ -13,16 +13,16 @@ use crate::{
     ExtractorFn,
 };
 
-pub struct EvmReader {
+pub struct EvmParser {
     next: EvmEventProcessor,
     extractor: ExtractorFn<EnclaveEventData>,
 }
 
-impl Actor for EvmReader {
+impl Actor for EvmParser {
     type Context = actix::Context<Self>;
 }
 
-impl EvmReader {
+impl EvmParser {
     pub fn new(next: &EvmEventProcessor, extractor: ExtractorFn<EnclaveEventData>) -> Self {
         Self {
             next: next.clone(),
@@ -31,7 +31,7 @@ impl EvmReader {
     }
 }
 
-impl Handler<EnclaveEvmEvent> for EvmReader {
+impl Handler<EnclaveEvmEvent> for EvmParser {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         match msg.clone() {

@@ -6,7 +6,7 @@
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor},
-    evm_reader::EvmReader,
+    evm_parser::EvmParser,
     helpers::{send_tx_with_retry, EthProvider},
 };
 use actix::prelude::*;
@@ -217,8 +217,8 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
-    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmReader> {
-        EvmReader::new(next, extractor).start()
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }
 
@@ -526,7 +526,7 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
 pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
-    pub fn attach(processor: &Recipient<EnclaveEvmEvent>) -> Addr<EvmReader> {
+    pub fn attach(processor: &Recipient<EnclaveEvmEvent>) -> Addr<EvmParser> {
         CiphernodeRegistrySolReader::setup(processor)
     }
 
