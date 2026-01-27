@@ -11,6 +11,7 @@ pub mod constants;
 #[cfg(feature = "abi-encoding")]
 pub mod encoding;
 pub mod presets;
+pub mod search;
 
 pub use builder::{
     build_bfv_params, build_bfv_params_arc, build_bfv_params_from_set,
