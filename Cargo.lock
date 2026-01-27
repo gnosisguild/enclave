@@ -2696,6 +2696,15 @@ dependencies = [
 
 [[package]]
 name = "directories"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "directories"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
@@ -2881,6 +2890,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-init",
+ "e3-noir-prover",
  "e3-support-scripts",
  "hex",
  "opentelemetry",
@@ -2891,6 +2901,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "tokio",
+ "toml",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
@@ -3276,6 +3287,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-noir-prover"
+version = "0.1.7"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "directories 5.0.1",
+ "flate2",
+ "futures-util",
+ "hex",
+ "indicatif 0.17.11",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "e3-program-server"
 version = "0.1.7"
 dependencies = [
@@ -3568,7 +3603,7 @@ version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
- "directories",
+ "directories 6.0.0",
  "flate2",
  "futures-util",
  "indicatif 0.17.11",
@@ -7132,12 +7167,14 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
+ "tokio-util",
  "tower 0.5.3",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.5",
 ]
@@ -8889,6 +8926,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f01b580c9ac74c8d8f0c0e4afb04eeef2acf145458e52c03845ee9cd23e3d12"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

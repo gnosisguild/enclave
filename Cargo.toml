@@ -23,6 +23,7 @@ members = [
   "crates/logger",
   "crates/multithread",
   "crates/net", 
+  "crates/noir-prover",
   "crates/program-server", 
   "crates/request",
   "crates/safe",
@@ -89,6 +90,7 @@ e3-multithread = { version = "0.1.7", path = "./crates/multithread" }
 e3-keyshare = { version = "0.1.7", path = "./crates/keyshare" }
 e3-logger = { version = "0.1.7", path = "./crates/logger" }
 e3-net = { version = "0.1.7", path = "./crates/net" }
+e3-noir-prover = { version = "0.1.7", path = "./crates/noir-prover" }
 e3-compute-provider = { version = "0.1.7", path = "./crates/compute-provider" }
 e3-sortition = { version = "0.1.7", path = "./crates/sortition" }
 e3-program-server = { version = "0.1.7", path = "./crates/program-server" }
@@ -169,6 +171,7 @@ strum = { version = "=0.27.2", features = ["derive"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
+toml = "=0.8.23"
 tracing = "=0.1.41"
 tracing-opentelemetry = "=0.30.0"
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }
