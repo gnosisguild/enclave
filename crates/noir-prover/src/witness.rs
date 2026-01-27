@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 //
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 // Native witness generation using nargo (following mopro/noir-rs pattern)
 
 use crate::error::NoirProverError;
@@ -154,20 +158,6 @@ where
             (k.into(), InputValue::Field(field))
         })
         .collect()
-}
-
-/// Convert a vector of strings to a witness map (like mopro/noir-rs)
-pub fn from_vec_str_to_witness_map(
-    witness_vec: Vec<&str>,
-) -> Result<WitnessMap<FieldElement>, NoirProverError> {
-    let mut witness_map = WitnessMap::new();
-    for (i, witness) in witness_vec.iter().enumerate() {
-        witness_map.insert(
-            Witness(i as u32),
-            FieldElement::try_from_str(witness).unwrap_or_default(),
-        );
-    }
-    Ok(witness_map)
 }
 
 #[cfg(test)]

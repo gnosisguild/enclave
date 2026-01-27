@@ -11,9 +11,6 @@ pub enum NoirProverError {
     #[error("Barretenberg binary not found. Run 'enclave setup' first.")]
     BbNotInstalled,
 
-    #[error("Nargo binary not found. Run 'enclave setup' first.")]
-    NargoNotInstalled,
-
     #[error("Circuit '{0}' not found. Run 'enclave setup' first.")]
     CircuitNotFound(String),
 
@@ -59,9 +56,6 @@ pub enum NoirProverError {
 
     #[error("Unsupported platform: {os}-{arch}")]
     UnsupportedPlatform { os: String, arch: String },
-
-    #[error("Prover.toml not found in: {0}")]
-    ProverTomlNotFound(String),
 
     #[error("Witness generation failed: {0}")]
     WitnessGenerationFailed(String),
