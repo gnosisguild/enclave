@@ -22,6 +22,7 @@ members = [
   "crates/logger",
   "crates/multithread",
   "crates/net", 
+  "crates/noir-prover",
   "crates/program-server", 
   "crates/request",
   "crates/safe",
@@ -178,6 +179,7 @@ strum = { version = "=0.27.2", features = ["derive"] }
 tempfile = "=3.20.0"
 thiserror =  { version = "=1.0.69" }
 tokio = { version = "=1.46.1", features = ["full"] }
+toml = "=0.8.23"
 tracing = "=0.1.41"
 tracing-opentelemetry = "=0.30.0"
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }
