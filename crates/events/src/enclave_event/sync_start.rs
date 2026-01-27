@@ -6,10 +6,13 @@
 
 use super::EnclaveEventData;
 use crate::{CorrelationId, SyncEvmEvent};
+use crate::{EvmEventConfig, EvmEventConfigChain};
 use actix::{Message, Recipient};
+use anyhow::Context;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{self, Display},
 };
 
@@ -54,36 +57,32 @@ impl EvmEvent {
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct SyncStart {
-    /// The start block information for chains
-    pub evm_init_info: Vec<(u64, Option<u64>)>, // HashMap cannot derive Hash
+    /// The initial information for reading historical events from chains. This is generated from
+    /// from persisted information
+    pub evm_config: EvmEventConfig,
+
     #[serde(skip)]
+    /// We include the sender here so that the evm can communicate directly with the sync actor
     pub sender: Option<Recipient<SyncEvmEvent>>, // Must be Option to allow serde deserialize on
                                                  // EnclaveEvent as Default is required to be
-                                                 // implemented
+                                                 // implemented this is fine as this event is never
+                                                 // shared
 }
 
 impl SyncStart {
-    pub fn new(
-        sender: impl Into<Recipient<SyncEvmEvent>>,
-        evm_init_info: HashMap<u64, Option<u64>>,
-    ) -> Self {
+    pub fn new(sender: impl Into<Recipient<SyncEvmEvent>>, evm_config: EvmEventConfig) -> Self {
         Self {
             sender: Some(sender.into()),
-            evm_init_info: evm_init_info.into_iter().collect(),
+            evm_config,
         }
     }
 
-    pub fn get_evm_init_for(&self, chain_id: u64) -> Option<u64> {
-        self.evm_init_info
-            .iter()
-            .find_map(|(ch_id, value)| {
-                if ch_id == &chain_id {
-                    Some(value.clone())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(None)
+    pub fn get_evm_config(&self, chain_id: u64) -> Result<EvmEventConfigChain> {
+        Ok(self
+            .evm_config
+            .get(&chain_id)
+            .context("No config found for chain")?
+            .clone())
     }
 }
 

@@ -16,8 +16,8 @@ use alloy::{
 use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
-    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, GetEvents,
-    HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
+    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, EvmEventConfig,
+    EvmEventConfigChain, GetEvents, HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmReader};
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -161,8 +161,8 @@ async fn evm_reader() -> Result<()> {
 
     // SyncStart holds initialization information such as start block and earliest event
     // This should trigger all chains to start to sync
-    let mut evm_info = HashMap::new();
-    evm_info.insert(chain_id, None);
+    let mut evm_info = EvmEventConfig::new();
+    evm_info.insert(chain_id, EvmEventConfigChain::new(0));
     bus.publish(SyncStart::new(sync, evm_info))?;
 
     sleep(Duration::from_secs(1)).await;
@@ -242,8 +242,8 @@ async fn ensure_historical_events() -> Result<()> {
             )
         })
         .build();
-    let mut evm_info = HashMap::new();
-    evm_info.insert(chain_id, None);
+    let mut evm_info = EvmEventConfig::new();
+    evm_info.insert(chain_id, EvmEventConfigChain::new(0));
     bus.publish(SyncStart::new(sync, evm_info))?;
 
     for msg in live_events.clone() {

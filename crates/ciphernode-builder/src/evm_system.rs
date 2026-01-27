@@ -50,7 +50,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             let chain_id = self.chain_id;
             let route_factories = self.route_factories;
             move |msg: SyncStart| {
-                let info = msg.get_evm_init_for(chain_id);
+                let config = msg.get_evm_config(chain_id)?;
                 let gateway = gateway.recipient();
                 let mut router = EvmRouter::new();
 
@@ -60,7 +60,8 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
                 }
 
                 router = router.add_fallback(&gateway);
-                let filters = Filters::from_routing_table(router.get_routing_table(), info);
+                let filters =
+                    Filters::from_routing_table(router.get_routing_table(), config.deploy_block());
                 let router = router.start();
                 EvmReadInterface::setup(&provider, &router.recipient(), &bus, filters);
                 Ok(())

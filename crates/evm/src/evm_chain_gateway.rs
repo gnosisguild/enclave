@@ -187,7 +187,7 @@ mod tests {
     use super::*;
     use e3_ciphernode_builder::EventSystem;
 
-    use e3_events::{CorrelationId, TestEvent};
+    use e3_events::{CorrelationId, EvmEventConfig, EvmEventConfigChain, TestEvent};
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -219,7 +219,9 @@ mod tests {
         let chain_id = 1u64;
 
         // SyncStart: Init -> ForwardToSyncActor
-        bus.publish(SyncStart::new(collector.clone(), HashMap::new()))
+        let mut evm_config = EvmEventConfig::new();
+        evm_config.insert(chain_id, EvmEventConfigChain::new(0));
+        bus.publish(SyncStart::new(collector.clone(), evm_config))
             .unwrap();
 
         // Send EVM event while forwarding - should reach collector

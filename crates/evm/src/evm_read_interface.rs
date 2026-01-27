@@ -45,10 +45,10 @@ pub struct Filters {
 }
 
 impl Filters {
-    pub fn new(addresses: Vec<Address>, start_block: Option<u64>) -> Self {
+    pub fn new(addresses: Vec<Address>, start_block: u64) -> Self {
         let historical = Filter::new()
             .address(addresses.clone())
-            .from_block(start_block.unwrap_or(0));
+            .from_block(start_block);
         let current = Filter::new()
             .address(addresses)
             .from_block(BlockNumberOrTag::Latest);
@@ -59,7 +59,7 @@ impl Filters {
         }
     }
 
-    pub fn from_routing_table<T>(table: &HashMap<Address, T>, start_block: Option<u64>) -> Self {
+    pub fn from_routing_table<T>(table: &HashMap<Address, T>, start_block: u64) -> Self {
         let addresses: Vec<Address> = table.keys().cloned().collect();
         Self::new(addresses, start_block)
     }

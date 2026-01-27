@@ -388,9 +388,6 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
             .await?;
 
-        // Sync processor
-        // All contract event processors will forward their parsed events here.
-
         // TODO: gather an async handle from the event readers that closes when they shutdown and
         // join it with the network manager joinhandle below
         for chain in self

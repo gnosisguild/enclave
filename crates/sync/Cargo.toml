@@ -8,4 +8,5 @@ repository = "https://github.com/gnosisguild/enclave/crates/sync"
 
 [dependencies]
 actix.workspace = true
+anyhow.workspace = true
 e3-events.workspace = true
