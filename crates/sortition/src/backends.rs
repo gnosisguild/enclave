@@ -9,7 +9,7 @@ use crate::ticket::{RegisteredNode, Ticket};
 use crate::ticket_sortition::ScoreSortition;
 use alloy::primitives::Address;
 use anyhow::Result;
-use e3_events::Seed;
+use e3_events::{E3id, Seed};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -24,6 +24,7 @@ pub trait SortitionList<T> {
     /// or if `size == 0`.
     fn contains(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: T,
@@ -37,6 +38,7 @@ pub trait SortitionList<T> {
     /// or if `size == 0`.
     fn get_index(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: String,
@@ -144,6 +146,7 @@ impl SortitionList<String> for ScoreBackend {
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
     fn contains(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: String,
@@ -159,7 +162,7 @@ impl SortitionList<String> for ScoreBackend {
             return Ok(false);
         }
 
-        let winners = ScoreSortition::new(size).get_committee(seed.into(), &nodes)?;
+        let winners = ScoreSortition::new(size).get_committee(e3_id, seed, &nodes)?;
         let want: Address = address.parse()?;
         Ok(winners.iter().any(|w| w.address == want))
     }
@@ -169,6 +172,7 @@ impl SortitionList<String> for ScoreBackend {
     /// Returns `Ok(None)` if there are no nodes or `size == 0`.
     fn get_index(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: String,
@@ -185,7 +189,7 @@ impl SortitionList<String> for ScoreBackend {
             return Ok(None);
         }
 
-        let winners = ScoreSortition::new(size).get_committee(seed.into(), &nodes)?;
+        let winners = ScoreSortition::new(size).get_committee(e3_id, seed, &nodes)?;
         let want: alloy::primitives::Address = address.parse()?;
 
         let maybe = winners
@@ -257,6 +261,7 @@ impl SortitionBackend {
 impl SortitionList<String> for SortitionBackend {
     fn contains(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: String,
@@ -264,12 +269,15 @@ impl SortitionList<String> for SortitionBackend {
         node_state: &NodeStateStore,
     ) -> anyhow::Result<bool> {
         match self {
-            SortitionBackend::Score(b) => b.contains(seed, size, address, chain_id, node_state),
+            SortitionBackend::Score(b) => {
+                b.contains(e3_id, seed, size, address, chain_id, node_state)
+            }
         }
     }
 
     fn get_index(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         address: String,
@@ -277,7 +285,9 @@ impl SortitionList<String> for SortitionBackend {
         node_state: &NodeStateStore,
     ) -> anyhow::Result<Option<(u64, Option<u64>)>> {
         match self {
-            SortitionBackend::Score(b) => b.get_index(seed, size, address, chain_id, node_state),
+            SortitionBackend::Score(b) => {
+                b.get_index(e3_id, seed, size, address, chain_id, node_state)
+            }
         }
     }
 

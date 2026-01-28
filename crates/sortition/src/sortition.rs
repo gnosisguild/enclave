@@ -14,12 +14,10 @@ use e3_events::{
     ConfigurationUpdated, EType, EnclaveEvent, EventType, OperatorActivationChanged,
     PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
-use e3_events::{BusHandle, EnclaveEventData};
+use e3_events::{BusHandle, E3id, EnclaveEventData};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::info;
-use tracing::instrument;
-use tracing::warn;
+use tracing::{info, instrument, warn};
 
 /// State for a single ciphernode
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,6 +97,8 @@ impl NodeStateStore {
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "Option<(u64, Option<u64>)>")]
 pub struct GetNodeIndex {
+    /// The E3 computation ID.
+    pub e3_id: E3id,
     /// Round seed / randomness used by the sortition algorithm.
     pub seed: Seed,
     /// Hex-encoded node address (e.g., `"0x..."`).
@@ -512,7 +512,14 @@ impl Handler<GetNodeIndex> for Sortition {
                     (map.get(&msg.chain_id), state_map.get(&msg.chain_id))
                 {
                     backend
-                        .get_index(msg.seed, msg.size, msg.address.clone(), msg.chain_id, state)
+                        .get_index(
+                            msg.e3_id,
+                            msg.seed,
+                            msg.size,
+                            msg.address.clone(),
+                            msg.chain_id,
+                            state,
+                        )
                         .unwrap_or_else(|err| {
                             bus.err(EType::Sortition, err);
                             None
