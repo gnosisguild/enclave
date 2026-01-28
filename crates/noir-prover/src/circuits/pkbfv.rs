@@ -60,22 +60,23 @@ impl CircuitProver for PkBfvCircuit {
 }
 
 fn to_polynomial_array(vecs: &[Vec<BigInt>]) -> Result<InputValue, NoirProverError> {
-    let polynomials: Vec<InputValue> = vecs
-        .iter()
-        .map(|coeffs| {
-            let field_coeffs: Vec<InputValue> = coeffs
-                .iter()
-                .map(|b| {
-                    let field = FieldElement::try_from_str(&b.to_string()).unwrap_or_default();
-                    InputValue::Field(field)
-                })
-                .collect();
+    let mut polynomials = Vec::with_capacity(vecs.len());
 
-            let mut fields = BTreeMap::new();
-            fields.insert("coefficients".to_string(), InputValue::Vec(field_coeffs));
-            InputValue::Struct(fields)
-        })
-        .collect();
+    for coeffs in vecs {
+        let mut field_coeffs = Vec::with_capacity(coeffs.len());
+
+        for b in coeffs {
+            let s = b.to_string();
+            let field = FieldElement::try_from_str(&s).ok_or_else(|| {
+                NoirProverError::SerializationError(format!("invalid field element: {}", s))
+            })?;
+            field_coeffs.push(InputValue::Field(field));
+        }
+
+        let mut fields = BTreeMap::new();
+        fields.insert("coefficients".to_string(), InputValue::Vec(field_coeffs));
+        polynomials.push(InputValue::Struct(fields));
+    }
 
     Ok(InputValue::Vec(polynomials))
 }
