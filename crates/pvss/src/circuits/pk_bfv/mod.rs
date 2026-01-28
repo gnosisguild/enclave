@@ -7,5 +7,3 @@
 pub mod circuit;
 pub mod codegen;
 pub mod computation;
-
-pub use circuit::PkBfvCircuit;

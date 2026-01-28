@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::types::{SecurityLevel, Wrapper};
+use crate::errors::CodegenError;
+use crate::types::{Configs, SecurityLevel, Template, Toml, Wrapper};
 use e3_zk_helpers::utils::to_string_1d_vec;
 use num_bigint::BigInt;
 use serde_json;
+use std::path::Path;
 
 pub fn map_witness_2d_vector_to_json(values: &Vec<Vec<BigInt>>) -> Vec<serde_json::Value> {
     values
@@ -28,7 +30,7 @@ pub fn get_security_level(lambda: usize) -> SecurityLevel {
     }
 }
 
-pub fn generate_wrapper(n_proofs: usize, n_public_inputs: usize) -> Wrapper {
+pub fn generate_wrapper(n_recursive_proofs: usize, n_public_inputs: usize) -> Wrapper {
     format!(
         r#"use bb_proof_verification::{{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof}};
 use lib::math::commitments::compute_aggregation_commitment;
@@ -59,6 +61,30 @@ fn main(
     compute_aggregation_commitment(aggregated_public_inputs)
 }}
 "#,
-        n_proofs, n_public_inputs
+        n_recursive_proofs, n_public_inputs
     )
+}
+
+pub fn write_toml(toml: &Toml, path: Option<&Path>) -> Result<(), CodegenError> {
+    let toml_path = path.unwrap_or_else(|| Path::new("."));
+    let toml_path = toml_path.join("Prover.toml");
+    Ok(std::fs::write(toml_path, toml)?)
+}
+
+pub fn write_template(template: &Template, path: Option<&Path>) -> Result<(), CodegenError> {
+    let template_path = path.unwrap_or_else(|| Path::new("."));
+    let template_path = template_path.join("main.nr");
+    Ok(std::fs::write(template_path, template)?)
+}
+
+pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), CodegenError> {
+    let configs_path = path.unwrap_or_else(|| Path::new("."));
+    let configs_path = configs_path.join("configs.nr");
+    Ok(std::fs::write(configs_path, configs)?)
+}
+
+pub fn write_wrapper(wrapper: &Wrapper, path: Option<&Path>) -> Result<(), CodegenError> {
+    let wrapper_path = path.unwrap_or_else(|| Path::new("."));
+    let wrapper_path = wrapper_path.join("wrapper.nr");
+    Ok(std::fs::write(wrapper_path, wrapper)?)
 }

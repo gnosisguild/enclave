@@ -7,8 +7,8 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
-use e3_pvss::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
-use e3_pvss::pk_bfv::codegen::write_artifacts;
+use e3_pvss::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
+use e3_pvss::circuits::pk_bfv::codegen::write_artifacts;
 use e3_pvss::registry::CircuitRegistry;
 use e3_pvss::sample;
 use e3_pvss::traits::Circuit;
@@ -56,10 +56,10 @@ fn main() -> Result<()> {
         for circuit_name in circuits {
             if let Ok(circuit_meta) = registry.get(&circuit_name) {
                 println!(
-                    "  {} - params_type: {:?}, n_proofs: {}, pub_inputs: {}",
+                    "  {} - params_type: {:?}, n_recursive_proofs: {}, pub_inputs: {}",
                     circuit_name,
                     circuit_meta.supported_parameter(),
-                    circuit_meta.n_proofs(),
+                    circuit_meta.n_recursive_proofs(),
                     circuit_meta.n_public_inputs()
                 );
             }

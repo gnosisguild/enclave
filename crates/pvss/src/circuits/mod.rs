@@ -4,10 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod circuits;
-pub mod errors;
-pub mod registry;
-pub mod sample;
-pub mod traits;
-pub mod types;
-pub mod utils;
+pub mod pk_bfv;

@@ -50,7 +50,7 @@ pub trait Circuit: Send + Sync {
         Self::DKG_INPUT_TYPE
     }
 
-    fn n_proofs(&self) -> usize {
+    fn n_recursive_proofs(&self) -> usize {
         Self::N_PROOFS
     }
 
@@ -63,7 +63,7 @@ pub trait CircuitMetadata: Send + Sync {
     fn name(&self) -> &'static str;
     fn supported_parameter(&self) -> ParameterType;
     fn dkg_input_type(&self) -> Option<DkgInputType>;
-    fn n_proofs(&self) -> usize;
+    fn n_recursive_proofs(&self) -> usize;
     fn n_public_inputs(&self) -> usize;
 }
 
@@ -80,7 +80,7 @@ impl<T: Circuit> CircuitMetadata for T {
         T::DKG_INPUT_TYPE
     }
 
-    fn n_proofs(&self) -> usize {
+    fn n_recursive_proofs(&self) -> usize {
         T::N_PROOFS
     }
 

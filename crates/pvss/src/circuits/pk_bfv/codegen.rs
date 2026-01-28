@@ -4,20 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
+use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
 use crate::errors::CodegenError;
-use crate::pk_bfv::computation::*;
-use crate::pk_bfv::PkBfvCircuit;
 use crate::traits::Circuit;
 use crate::traits::Computation;
 use crate::traits::ReduceToZkpModulus;
 use crate::types::Artifacts;
-use crate::types::Configs;
-use crate::types::Template;
-use crate::types::Toml;
-use crate::types::Wrapper;
+use crate::types::{Configs, Template, Toml, Wrapper};
 use crate::utils::generate_wrapper;
 use crate::utils::get_security_level;
 use crate::utils::map_witness_2d_vector_to_json;
+use crate::utils::write_configs;
+use crate::utils::write_template;
+use crate::utils::write_toml;
+use crate::utils::write_wrapper;
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::BfvPreset;
 use fhe::bfv::BfvParameters;
@@ -102,30 +103,6 @@ pub global {}_BIT_PK: u32 = {};
         <PkBfvCircuit as Circuit>::PREFIX,
         bits.pk_bit,
     )
-}
-
-pub fn write_toml(toml: &Toml, path: Option<&Path>) -> Result<(), CodegenError> {
-    let toml_path = path.unwrap_or_else(|| Path::new("."));
-    let toml_path = toml_path.join("Prover.toml");
-    Ok(std::fs::write(toml_path, toml)?)
-}
-
-pub fn write_template(template: &Template, path: Option<&Path>) -> Result<(), CodegenError> {
-    let template_path = path.unwrap_or_else(|| Path::new("."));
-    let template_path = template_path.join("main.nr");
-    Ok(std::fs::write(template_path, template)?)
-}
-
-pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), CodegenError> {
-    let configs_path = path.unwrap_or_else(|| Path::new("."));
-    let configs_path = configs_path.join("configs.nr");
-    Ok(std::fs::write(configs_path, configs)?)
-}
-
-pub fn write_wrapper(wrapper: &Wrapper, path: Option<&Path>) -> Result<(), CodegenError> {
-    let wrapper_path = path.unwrap_or_else(|| Path::new("."));
-    let wrapper_path = wrapper_path.join("wrapper.nr");
-    Ok(std::fs::write(wrapper_path, wrapper)?)
 }
 
 pub fn write_artifacts(

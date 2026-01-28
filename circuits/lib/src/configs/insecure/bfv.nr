@@ -24,7 +24,7 @@ pk_bfv (CIRCUIT 0 - PUBLIC KEY BFV)
 ************************************/
 
 // pk_bfv - bit parameters
-pub global PK_BFV_BIT_PK: u32 = 51;
+pub global PK_BFV_BIT_PK: u32 = 50;
 
 /************************************
 -------------------------------------

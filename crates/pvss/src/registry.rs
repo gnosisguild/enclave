@@ -16,11 +16,6 @@ use thiserror::Error;
 pub enum RegistryError {
     #[error("Unknown circuit: {name}")]
     UnknownCircuit { name: String },
-    #[error("Invalid input for circuit {name}: expected {expected}")]
-    InvalidInput {
-        name: String,
-        expected: &'static str,
-    },
 }
 
 /// Registry for PVSS circuits.
@@ -61,10 +56,10 @@ impl CircuitRegistry {
         Ok(self.get(name)?.dkg_input_type())
     }
 
-    /// Get number of proofs for a circuit.
+    /// Get number of recursive proofs for a circuit.
     /// This is used for determine the number of proofs required for aggregation.
-    pub fn n_proofs(&self, name: &str) -> Result<usize, RegistryError> {
-        Ok(self.get(name)?.n_proofs())
+    pub fn n_recursive_proofs(&self, name: &str) -> Result<usize, RegistryError> {
+        Ok(self.get(name)?.n_recursive_proofs())
     }
 
     /// Get number of public inputs for a circuit.
@@ -82,7 +77,7 @@ impl CircuitRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pk_bfv::PkBfvCircuit;
+    use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
     use crate::traits::Circuit;
 
     #[test]
@@ -105,7 +100,10 @@ mod tests {
         assert_eq!(circuit.name(), <PkBfvCircuit as Circuit>::NAME);
         assert_eq!(circuit.supported_parameter(), ParameterType::DKG);
         assert!(circuit.dkg_input_type().is_none());
-        assert_eq!(circuit.n_proofs(), <PkBfvCircuit as Circuit>::N_PROOFS);
+        assert_eq!(
+            circuit.n_recursive_proofs(),
+            <PkBfvCircuit as Circuit>::N_PROOFS
+        );
         assert_eq!(
             circuit.n_public_inputs(),
             <PkBfvCircuit as Circuit>::N_PUBLIC_INPUTS

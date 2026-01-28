@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::circuits::pk_bfv::codegen;
+use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
 use crate::errors::CodegenError;
-use crate::pk_bfv;
-use crate::pk_bfv::computation::{Bits, Bounds, Witness};
 use crate::traits::{Circuit, CircuitCodegen, CircuitComputation, Computation};
 use crate::types::{Artifacts, DkgInputType};
 use e3_fhe_params::{BfvPreset, ParameterType};
@@ -15,17 +15,17 @@ use fhe::bfv::{BfvParameters, PublicKey};
 #[derive(Debug)]
 pub struct PkBfvCircuit;
 
-#[derive(Debug, Clone)]
-pub struct PkBfvCodegenInput {
-    pub preset: BfvPreset,
-    pub public_key: PublicKey,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PkBfvComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
     pub witness: Witness,
+}
+
+#[derive(Debug, Clone)]
+pub struct PkBfvCodegenInput {
+    pub preset: BfvPreset,
+    pub public_key: PublicKey,
 }
 
 impl Circuit for PkBfvCircuit {
@@ -42,7 +42,7 @@ impl CircuitCodegen for PkBfvCircuit {
     type Error = CodegenError;
 
     fn codegen(&self, input: Self::Input) -> Result<Artifacts, Self::Error> {
-        pk_bfv::codegen::codegen(input.preset, input.public_key)
+        codegen::codegen(input.preset, input.public_key)
     }
 }
 
