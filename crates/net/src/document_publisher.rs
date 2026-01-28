@@ -16,7 +16,8 @@ use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
     DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, Event, Filter, PartyId, PublishDocumentRequested, ThresholdShareCreated,
+    EncryptionKeyCreated, Event, EventType, Filter, PartyId, PublishDocumentRequested,
+    ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -91,7 +92,7 @@ impl DocumentPublisher {
         let addr = Self::new(bus, tx, rx, topic).start();
         EventConverter::setup(bus);
         // Listen on all events
-        bus.subscribe("*", addr.clone().recipient());
+        bus.subscribe(EventType::All, addr.clone().recipient());
 
         // Forward gossip data from NetEvent
         tokio::spawn({
@@ -407,9 +408,9 @@ impl EventConverter {
 
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
-        bus.subscribe("ThresholdShareCreated", addr.clone().into());
-        bus.subscribe("EncryptionKeyCreated", addr.clone().into());
-        bus.subscribe("DocumentReceived", addr.clone().into());
+        bus.subscribe(EventType::ThresholdShareCreated, addr.clone().into());
+        bus.subscribe(EventType::EncryptionKeyCreated, addr.clone().into());
+        bus.subscribe(EventType::DocumentReceived, addr.clone().into());
         addr
     }
 
@@ -592,8 +593,8 @@ mod tests {
         let net_evt_rx = Arc::new(net_evt_rx);
         let history = HistoryCollector::<EnclaveEvent>::new().start();
         let error = HistoryCollector::<EnclaveEvent>::new().start();
-        bus.subscribe("*", history.clone().recipient());
-        bus.subscribe("EnclaveError", error.clone().recipient());
+        bus.subscribe(EventType::All, history.clone().recipient());
+        bus.subscribe(EventType::EnclaveError, error.clone().recipient());
         let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
         Ok((

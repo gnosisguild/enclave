@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
-    EnclaveEvent, EnclaveEventData, Shutdown,
+    EnclaveEvent, EnclaveEventData, EventType, Shutdown,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -32,7 +32,7 @@ impl CommitteeFinalizer {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.subscribe_all(
-            &["CommitteeRequested", "Shutdown"],
+            &[EventType::CommitteeRequested, EventType::Shutdown],
             addr.clone().recipient(),
         );
 
