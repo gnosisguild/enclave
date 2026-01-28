@@ -11,7 +11,7 @@
 //! and parameter validation.
 use std::collections::BTreeMap;
 
-use crate::search::constants::{PlaintextMode, D_POW2_MAX, D_POW2_START, K_MAX};
+use crate::search::constants::{D_POW2_MAX, D_POW2_START, K_MAX};
 use crate::search::errors::{BfvParamsResult, SearchError, ValidationError};
 use crate::search::prime::PrimeItem;
 use crate::search::prime::{
@@ -156,11 +156,8 @@ pub fn finalize_bfv_candidate(
 ) -> Option<BfvSearchResult> {
     let q_bfv = product(chosen.iter().map(|pi| pi.value.clone()));
 
-    // Compute plaintext space per mode
-    let k_plain_eff: u128 = match PlaintextMode::FromQi {
-        PlaintextMode::MaxUserAndQi => bfv_search_config.k.max(bfv_search_config.z),
-        PlaintextMode::FromQi => bfv_search_config.k.max(bfv_search_config.z),
-    };
+    // Compute plaintext space: max of user-defined k and z
+    let k_plain_eff: u128 = bfv_search_config.k.max(bfv_search_config.z);
 
     // r_k(q) = q mod k
     let k_big = BigUint::from(k_plain_eff);

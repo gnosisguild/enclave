@@ -277,12 +277,3 @@ pub const D_POW2_START: u64 = 256;
 pub const D_POW2_MAX: u64 = 32768;
 /// Max number of ciphertext
 pub const K_MAX: u128 = 1u128 << 25; // 33,554,432
-
-/// Plaintext mode
-/// - MaxUserAndQi: use the user-defined plaintext modulus k and the largest prime found in the search
-/// - FromQi: use the largest prime found in the search
-#[derive(Copy, Clone, Debug)]
-pub enum PlaintextMode {
-    MaxUserAndQi,
-    FromQi,
-}
