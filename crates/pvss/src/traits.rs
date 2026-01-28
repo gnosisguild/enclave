@@ -16,7 +16,10 @@ pub trait Computation: Sized {
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error>;
 }
 
-pub trait Transform: Sized {
-    fn reduce_to_zkp_modulus(&self) -> Self;
+pub trait ConvertToJson {
     fn convert_to_json(&self) -> serde_json::Result<Value>;
+}
+
+pub trait ReduceToZkpModulus: Sized {
+    fn reduce_to_zkp_modulus(&self) -> Self;
 }
