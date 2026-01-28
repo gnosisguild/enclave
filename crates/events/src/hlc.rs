@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::rpc::types::Log;
 use rand::Rng;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex};
@@ -205,7 +204,7 @@ impl PartialEq for Hlc {
 }
 
 impl Hlc {
-    const DEFAULT_MAX_DRIFT: u64 = 60_000_000; // 60 sec
+    const DEFAULT_MAX_DRIFT: u64 = 5 * 60 * 1_000_000; // 5 min
 
     pub fn new(node: u32) -> Self {
         Self {

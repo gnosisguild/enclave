@@ -19,9 +19,10 @@ use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscribe
 use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
 use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
@@ -176,7 +177,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         }
     }
     let historical_sync_event = HistoricalSyncComplete::new(chain_id, last_id);
-    info!(
+    warn!(
         "Historical Sync Complete event({})",
         historical_sync_event.get_id()
     );

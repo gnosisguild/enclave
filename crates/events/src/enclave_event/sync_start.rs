@@ -52,6 +52,10 @@ impl EvmEvent {
     pub fn chain_id(&self) -> u64 {
         self.chain_id
     }
+
+    pub fn ts(&self) -> u128 {
+        self.ts
+    }
 }
 
 /// Dispatched by the Sync actor when initial data is read and the sync process needs to be started

@@ -9,8 +9,8 @@ use std::collections::{HashMap, HashSet};
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
 use e3_events::{
-    trap, BusHandle, EType, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd, SyncEvmEvent,
-    SyncStart,
+    trap, BusHandle, EType, EnclaveEvent, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd,
+    SyncEvmEvent, SyncStart,
 };
 use tracing::info;
 
@@ -58,9 +58,14 @@ impl Synchronizer {
 
     fn handle_sync_end(&mut self) -> Result<()> {
         info!("all chains synced draining to bus and running sync end");
+        // Order all events (theoretically)
+        self.evm_buffer.sort_by_key(|i| i.ts());
+
+        // publish them in order
         for evt in self.evm_buffer.drain(..) {
-            let (data, ts, _) = evt.split();
-            self.bus.publish_from_remote(data, ts)?;
+            let (data, _, _) = evt.split();
+            self.bus.publish(data)?; // Use publish here as historical events will be correctly
+                                     // ordered as part of the preparatory process
         }
         self.bus.publish(SyncEnd::new())?;
         Ok(())
