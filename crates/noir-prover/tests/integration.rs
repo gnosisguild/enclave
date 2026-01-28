@@ -4,21 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
 use e3_noir_prover::{
-    input_map, prove_pk_bfv, verify_pk_bfv, CompiledCircuit, NoirConfig, NoirProver, NoirSetup,
-    SetupStatus, WitnessGenerator,
+    input_map, CircuitProver, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus,
+    WitnessGenerator,
 };
+use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
+use e3_pvss::sample::generate_sample;
+use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
+use e3_zk_helpers::commitments::compute_pk_bfv_commitment;
 use num_bigint::BigInt;
-use shared::calculate_bit_width;
-use shared::commitments::compute_pk_bfv_commitment;
+use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::{fs, process::Command};
-use zkfhe_pkbfv::bounds::PkBfvBounds;
-use zkfhe_pkbfv::sample::generate_sample_encryption;
-use zkfhe_pkbfv::vectors::PkBfvVectors;
 
 #[tokio::test]
 async fn test_check_status_on_empty_dir() {
@@ -158,12 +156,15 @@ async fn test_dummy_circuit() {
     fs::copy(&vk_src, &vk_dst).await.unwrap();
 
     // 6. Load circuit
-    let circuit = CompiledCircuit::from_file(&circuit_src).unwrap();
+    let circuit = CompiledCircuit::from_file(&circuit_src).await.unwrap();
 
     // 7. Generate witness (NATIVE!)
     let witness_gen = WitnessGenerator::new();
     let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
-    let witness = witness_gen.generate_witness(&circuit, inputs).unwrap();
+    let witness = witness_gen
+        .generate_witness(&circuit, inputs)
+        .await
+        .unwrap();
 
     // 8. Create prover and generate proof
     let prover = NoirProver::new(&setup);
@@ -230,44 +231,43 @@ async fn test_pk_bfv_proof() {
     let param_set = preset.into();
     let params = build_bfv_params_from_set_arc(param_set);
 
-    let encryption_data = generate_sample_encryption(&params).unwrap();
+    let sample = generate_sample(&params);
 
-    // 7. Create prover from setup
+    // 7. Create prover and circuit instance
     let prover = NoirProver::new(&setup);
+    let circuit = PkBfvCircuit;
 
     // 8. Generate proof
     let e3_id = "1";
-
-    let proof_result = prove_pk_bfv(&prover, &encryption_data.public_key, &params, e3_id)
+    let proof_result = circuit
+        .prove(&prover, &params, &sample.public_key, e3_id)
         .await
         .unwrap();
 
-    // confirm that the commitment matches
-    let vectors = PkBfvVectors::compute(&encryption_data.public_key, &params).unwrap();
-    let bounds = PkBfvBounds::compute(&params, 0).unwrap();
-    let bit_width = calculate_bit_width(bounds.1.pk_bound.to_string().as_str()).unwrap();
-    let std_vectors = vectors.standard_form();
-    let commitment_calculated =
-        compute_pk_bfv_commitment(&std_vectors.pk0is, &std_vectors.pk1is, bit_width);
+    // 9. Confirm that the commitment matches
+    let computation_output = circuit.compute(&params, &sample.public_key).unwrap();
+    let reduced_witness = computation_output.witness.reduce_to_zkp_modulus();
+    let commitment_calculated = compute_pk_bfv_commitment(
+        &reduced_witness.pk0is,
+        &reduced_witness.pk1is,
+        computation_output.bits.pk_bit,
+    );
     let commitment_from_proof =
-        BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof_result.commitment);
-    assert!(
-        commitment_calculated == commitment_from_proof,
+        BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof_result.output.as_ref());
+
+    assert_eq!(
+        commitment_calculated, commitment_from_proof,
         "Commitment should match!"
     );
 
-    // 9. Verify proof
-    let valid = verify_pk_bfv(
-        &prover,
-        &proof_result.proof,
-        &proof_result.commitment,
-        &format!("{}-verify", e3_id),
-    )
-    .await
-    .unwrap();
+    // 10. Verify proof using the trait-based API
+    let valid = circuit
+        .verify(&prover, &proof_result.proof, &proof_result.output, e3_id)
+        .await
+        .unwrap();
 
     assert!(valid, "Proof should be valid!");
 
-    // 10. Cleanup
+    // 11. Cleanup
     prover.cleanup(e3_id).await.unwrap();
 }
