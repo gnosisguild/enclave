@@ -174,6 +174,7 @@ pub struct E3StateLite {
     pub vote_count: u64,
 
     pub start_time: u64,
+    pub input_deadline: u64,
     pub duration: u64,
     pub expiration: u64,
     pub start_block: u64,
@@ -204,6 +205,7 @@ pub struct E3 {
     // Timing-related
     pub start_time: u64,
     pub block_start: u64,
+    pub input_deadline: u64,
     pub duration: u64,
     pub expiration: u64,
 
@@ -239,6 +241,7 @@ pub struct E3Crisp {
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub requester: String,
+    pub input_deadline: u64,
 }
 
 impl From<E3> for WebResultRequest {

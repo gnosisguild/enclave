@@ -17,7 +17,8 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @param threshold M/N threshold for the committee (M required out of N total members)
  * @param requestBlock Block number when the E3 computation was requested
  * @param startWindow Start window for the computation: index 0 is minimum block, index 1 is the maximum block
- * @param duration Duration of the E3 computation in blocks or time units
+ * @param inputDeadline When to stop accepting inputs from data providers
+ * @param duration Duration of commitee duties
  * @param expiration Timestamp when committee duties expire and computation is considered failed
  * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
  * @param e3Program Address of the E3 Program contract that validates and verifies the computation
@@ -34,6 +35,7 @@ struct E3 {
     uint32[2] threshold;
     uint256 requestBlock;
     uint256[2] startWindow;
+    uint256 inputDeadline;
     uint256 duration;
     uint256 expiration;
     bytes32 encryptionSchemeId;

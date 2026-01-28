@@ -38,13 +38,9 @@ interface IE3Program {
     ) external returns (bool success);
 
     /// @notice Validate and process input data for a computation
-    /// @dev This function is called by the Enclave contract when input is published
+    /// @dev This function is called by data providers when they want to submit their
+    /// encrypted data
     /// @param e3Id ID of the E3 computation
-    /// @param sender The account that is submitting the input
     /// @param data The input data to be validated
-    function validateInput(
-        uint256 e3Id,
-        address sender,
-        bytes memory data
-    ) external;
+    function publishInput(uint256 e3Id, bytes memory data) external;
 }

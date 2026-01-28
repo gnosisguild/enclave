@@ -11,7 +11,7 @@ contract FakeEnclave {
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
   event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
   event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
-  event CommitteePublished(uint256 indexed e3Id, bytes publicKey);
+  event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
 
   // Emit E3Activated event with passed test data
   function emitE3Activated(uint256 e3Id, uint256 expiration, bytes32 committeePublicKey) public {
@@ -35,7 +35,8 @@ contract FakeEnclave {
 
   // Emit CommitteePublished event with passed test data
   function emitCommitteePublished(uint256 e3Id, bytes memory publicKey) public {
-    emit CommitteePublished(e3Id, publicKey);
+    address[] memory nodes = new address[](1);
+    emit CommitteePublished(e3Id, nodes, publicKey);
   }
 
   function getE3(uint256 _e3Id) external view returns (E3 memory e3) {
@@ -44,6 +45,7 @@ contract FakeEnclave {
       threshold: [uint32(2), uint32(3)],
       requestBlock: 18750000,
       startWindow: [uint256(18750100), uint256(18750200)],
+      inputDeadline: 18750300,
       duration: 100,
       expiration: block.timestamp + 1 days,
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
@@ -63,6 +65,7 @@ struct E3 {
   uint32[2] threshold;
   uint256 requestBlock;
   uint256[2] startWindow;
+  uint256 inputDeadline;
   uint256 duration;
   uint256 expiration;
   bytes32 encryptionSchemeId;

@@ -25,7 +25,6 @@ import {
   enableE3,
   publishCiphertext,
   publishCommittee,
-  publishInput,
   publishPlaintext,
   requestCommittee,
 } from "./tasks/enclave";
@@ -97,7 +96,6 @@ const config: HardhatUserConfig = {
     requestCommittee,
     publishPlaintext,
     publishCiphertext,
-    publishInput,
     activateE3,
     publishCommittee,
     enableE3,
