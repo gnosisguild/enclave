@@ -245,17 +245,17 @@ async fn test_trbfv_actor() -> Result<()> {
     // we need to manually construct the committee that sortition would select
 
     // For seed=123, these 5 nodes get selected by sortition:
-    // 0x8f32E487328F04927f20c4B14399e4F3123763df (ticket 6)
-    // 0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba (ticket 68)
-    // 0x8966a013047aef67Cac52Bc96eB77bC11B5D2572 (ticket 95)
-    // 0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479 (ticket 15)
-    // 0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB (ticket 12)
+    // P0: Node 3 - 0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba (ticket 29)
+    // P1: Node 0 - 0x781199F9d55d18E855a7AA84C5e4B40dA2C96fc8 (ticket 14)
+    // P2: Node 6 - 0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB (ticket 18)
+    // P3: Node 5 - 0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479 (ticket 17)
+    // P4: Node 4 - 0x8966a013047aef67Cac52Bc96eB77bC11B5D2572 (ticket 92)
     let committee: Vec<String> = vec![
-        "0x8f32E487328F04927f20c4B14399e4F3123763df".to_string(),
         "0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba".to_string(),
-        "0x8966a013047aef67Cac52Bc96eB77bC11B5D2572".to_string(),
-        "0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479".to_string(),
+        "0x781199F9d55d18E855a7AA84C5e4B40dA2C96fc8".to_string(),
         "0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB".to_string(),
+        "0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479".to_string(),
+        "0x8966a013047aef67Cac52Bc96eB77bC11B5D2572".to_string(),
     ];
 
     println!("Emitting CommitteeFinalized with {} nodes", committee.len());
