@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod circuits;
 mod config;
 mod error;
-mod pkbfv;
 mod prover;
 mod setup;
 mod traits;
 mod witness;
 
+pub use circuits::*;
 pub use config::{NoirConfig, VersionInfo};
 pub use error::NoirProverError;
-pub use pkbfv::*;
 pub use prover::NoirProver;
 pub use setup::{NoirSetup, SetupStatus};
 pub use traits::*;
