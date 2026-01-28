@@ -12,17 +12,17 @@ use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
 /// Cryptographic parameters for BFV encryption circuit.
-pub struct Configs<let L: u32> {
+pub struct Configs<let L_PRIME: u32> {
     /// Plaintext modulus t
     pub t: Field,
     /// Q mod t (for scaling message)
     pub q_mod_t: Field,
     /// CRT moduli for each basis: [q_0, q_1, ..., q_{L-1}]
-    pub qis: [Field; L],
+    pub qis: [Field; L_PRIME],
     /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
-    pub k0is: [Field; L],
+    pub k0is: [Field; L_PRIME],
     /// Bounds for public key polynomials for each CRT basis
-    pub pk_bounds: [Field; L],
+    pub pk_bounds: [Field; L_PRIME],
     /// Bounds for error polynomials (e0)
     pub e0_bound: Field,
     /// Bounds for error polynomials (e1)
@@ -30,34 +30,34 @@ pub struct Configs<let L: u32> {
     /// Bound for secret polynomial u (ternary distribution)
     pub u_bound: Field,
     /// Lower bounds for r1 polynomials (modulus switching quotients)
-    pub r1_low_bounds: [Field; L],
+    pub r1_low_bounds: [Field; L_PRIME],
     /// Upper bounds for r1 polynomials (modulus switching quotients)
-    pub r1_up_bounds: [Field; L],
+    pub r1_up_bounds: [Field; L_PRIME],
     /// Bounds for r2 polynomials (cyclotomic reduction quotients)
-    pub r2_bounds: [Field; L],
+    pub r2_bounds: [Field; L_PRIME],
     /// Bounds for p1 polynomials (modulus switching quotients)
-    pub p1_bounds: [Field; L],
+    pub p1_bounds: [Field; L_PRIME],
     /// Bounds for p2 polynomials (cyclotomic reduction quotients)
-    pub p2_bounds: [Field; L],
+    pub p2_bounds: [Field; L_PRIME],
     /// Bound for message polynomial (m)
     pub msg_bound: Field,
 }
 
-impl<let L: u32> Configs<L> {
+impl<let L_PRIME: u32> Configs<L_PRIME> {
     pub fn new(
         t: Field,
         q_mod_t: Field,
-        qis: [Field; L],
-        k0is: [Field; L],
-        pk_bounds: [Field; L],
+        qis: [Field; L_PRIME],
+        k0is: [Field; L_PRIME],
+        pk_bounds: [Field; L_PRIME],
         e0_bound: Field,
         e1_bound: Field,
         u_bound: Field,
-        r1_low_bounds: [Field; L],
-        r1_up_bounds: [Field; L],
-        r2_bounds: [Field; L],
-        p1_bounds: [Field; L],
-        p2_bounds: [Field; L],
+        r1_low_bounds: [Field; L_PRIME],
+        r1_up_bounds: [Field; L_PRIME],
+        r2_bounds: [Field; L_PRIME],
+        p1_bounds: [Field; L_PRIME],
+        p2_bounds: [Field; L_PRIME],
         msg_bound: Field,
     ) -> Self {
         Configs {
@@ -86,9 +86,9 @@ impl<let L: u32> Configs<L> {
 /// 2. Message commitment matches expected (from SK shares circuit)
 /// 3. Correct BFV encryption: ct0[l] = pk0[l] * u + e0[l] + k1 * k0[l] + r1[l] * q[l] + r2[l] * (X^N + 1)
 ///    and ct1[l] = pk1[l] * u + e1 + p2[l] * (X^N + 1) + p1[l] * q[l]
-pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
+pub struct EncryptionBfv<let N: u32, let L_PRIME: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Circuit parameters
-    configs: Configs<L>,
+    configs: Configs<L_PRIME>,
     /// Expected commitment to public key (from Circuit 0)
     /// (public witness)
     expected_pk_commitment: Field,
@@ -96,54 +96,54 @@ pub struct EncryptionBfv<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u3
     /// (public witness)
     expected_message_commitment: Field,
     /// Public key component 0 for each CRT basis (committed witnesses)
-    pk0is: [Polynomial<N>; L],
+    pk0is: [Polynomial<N>; L_PRIME],
     /// Public key component 1 for each CRT basis (committed witnesses)
-    pk1is: [Polynomial<N>; L],
+    pk1is: [Polynomial<N>; L_PRIME],
     /// Ciphertext component 0 for each CRT basis (public witnesses)
-    ct0is: [Polynomial<N>; L],
+    ct0is: [Polynomial<N>; L_PRIME],
     /// Ciphertext component 1 for each CRT basis (public witnesses)
-    ct1is: [Polynomial<N>; L],
+    ct1is: [Polynomial<N>; L_PRIME],
     /// Random ternary polynomial u (secret witness)
     u: Polynomial<N>,
     /// Error polynomial e0 (secret witness)
     e0: Polynomial<N>,
     /// Per-basis error polynomials e0[l] (secret witnesses)
-    e0is: [Polynomial<N>; L],
+    e0is: [Polynomial<N>; L_PRIME],
     /// CRT quotients for e0 (secret witnesses)
-    e0_quotients: [Polynomial<N>; L],
+    e0_quotients: [Polynomial<N>; L_PRIME],
     /// Error polynomial e1 (secret witness)
     e1: Polynomial<N>,
     /// Raw message polynomial (secret witness)
     message: Polynomial<N>,
     /// Modulus switching quotient polynomials r1 (secret witnesses, degree 2N-1)
-    r1is: [Polynomial<(2 * N) - 1>; L],
+    r1is: [Polynomial<(2 * N) - 1>; L_PRIME],
     /// Cyclotomic reduction quotient polynomials r2 (secret witnesses, degree N-1)
-    r2is: [Polynomial<N - 1>; L],
+    r2is: [Polynomial<N - 1>; L_PRIME],
     /// Modulus switching quotient polynomials p1 (secret witnesses, degree 2N-1)
-    p1is: [Polynomial<(2 * N) - 1>; L],
+    p1is: [Polynomial<(2 * N) - 1>; L_PRIME],
     /// Cyclotomic reduction quotient polynomials p2 (secret witnesses, degree N-1)
-    p2is: [Polynomial<N - 1>; L],
+    p2is: [Polynomial<N - 1>; L_PRIME],
 }
 
-impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> EncryptionBfv<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_MSG, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+impl<let N: u32, let L_PRIME: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_E1: u32, let BIT_MSG: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> EncryptionBfv<N, L_PRIME, BIT_PK, BIT_CT, BIT_U, BIT_E0, BIT_E1, BIT_MSG, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     pub fn new(
-        configs: Configs<L>,
+        configs: Configs<L_PRIME>,
         expected_pk_commitment: Field,
         expected_message_commitment: Field,
-        pk0is: [Polynomial<N>; L],
-        pk1is: [Polynomial<N>; L],
-        ct0is: [Polynomial<N>; L],
-        ct1is: [Polynomial<N>; L],
+        pk0is: [Polynomial<N>; L_PRIME],
+        pk1is: [Polynomial<N>; L_PRIME],
+        ct0is: [Polynomial<N>; L_PRIME],
+        ct1is: [Polynomial<N>; L_PRIME],
         u: Polynomial<N>,
         e0: Polynomial<N>,
-        e0is: [Polynomial<N>; L],
-        e0_quotients: [Polynomial<N>; L],
+        e0is: [Polynomial<N>; L_PRIME],
+        e0_quotients: [Polynomial<N>; L_PRIME],
         e1: Polynomial<N>,
         message: Polynomial<N>,
-        r1is: [Polynomial<2 * N - 1>; L],
-        r2is: [Polynomial<N - 1>; L],
-        p1is: [Polynomial<2 * N - 1>; L],
-        p2is: [Polynomial<N - 1>; L],
+        r1is: [Polynomial<2 * N - 1>; L_PRIME],
+        r2is: [Polynomial<N - 1>; L_PRIME],
+        p1is: [Polynomial<2 * N - 1>; L_PRIME],
+        p2is: [Polynomial<N - 1>; L_PRIME],
     ) -> Self {
         EncryptionBfv {
             configs,
@@ -169,7 +169,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// Verifies that the public key hashes to the expected commitment
     fn verify_pk_commitment(self) {
         assert(
-            compute_pk_bfv_commitment::<N, L, BIT_PK>(self.pk0is, self.pk1is)
+            compute_pk_bfv_commitment::<N, L_PRIME, BIT_PK>(self.pk0is, self.pk1is)
                 == self.expected_pk_commitment,
             "Public key commitment mismatch",
         );
@@ -248,7 +248,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     /// Performs coefficient-wise CRT consistency check for the e0 error polynomial
     fn check_e0_crt_consistency(self) {
-        for i in 0..L {
+        for i in 0..L_PRIME {
             for j in 0..N {
                 assert(
                     self.e0.coefficients[j]
@@ -292,7 +292,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Message should be in [0, t)
         self.message.range_check_standard::<BIT_MSG>(self.configs.msg_bound);
 
-        for i in 0..L {
+        for i in 0..L_PRIME {
             self.pk0is[i].range_check_2bounds::<BIT_PK>(
                 self.configs.pk_bounds[i],
                 self.configs.pk_bounds[i],
@@ -326,7 +326,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     fn generate_challenge(self, k1: Polynomial<N>) -> Vec<Field> {
         let inputs = self.payload(k1);
 
-        compute_bfv_enc_challenge::<L>(inputs)
+        compute_bfv_enc_challenge::<L_PRIME>(inputs)
     }
 
     /// Verifies BFV encryption constraints using Fiat-Shamir challenges and the Schwartz-Zippel lemma
@@ -338,7 +338,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let k1_at_gamma = k1.eval(gamma);
 
         let mut sum = (0, 0);
-        for i in 0..L {
+        for i in 0..L_PRIME {
             let pk0is_at_gamma = self.pk0is[i].eval(gamma);
             let r1i_at_gamma = self.r1is[i].eval(gamma);
             let r2i_at_gamma = self.r2is[i].eval(gamma);
@@ -363,8 +363,8 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
             // Accumulate weighted sums for batch verification
             let gamma_i = if i == 0 { 1 } else { gammas.get(i) };
             sum = (
-                sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L),
-                sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L),
+                sum.0 + ct0_lhs * gamma_i + ct1_lhs * gammas.get(i + L_PRIME),
+                sum.1 + ct0_rhs * gamma_i + ct1_rhs * gammas.get(i + L_PRIME),
             );
         }
 
