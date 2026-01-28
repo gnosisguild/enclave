@@ -1,0 +1,13 @@
+[package]
+name = "e3-pvss-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "PVSS CLI for artifact generation"
+repository = "https://github.com/gnosisguild/enclave/crates/pvss-cli"
+
+[dependencies]
+e3-pvss = { workspace = true }
+e3-fhe-params = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
