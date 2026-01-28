@@ -67,19 +67,13 @@ pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> Result<Artifacts, Co
 
 pub fn generate_template(lambda: usize) -> Template {
     format!(
-        r#"use lib::configs::{}::bfv::{{
-L, N, {}_BIT_PK,
-}};
+        r#"use lib::configs::{}::bfv::{{L, N, {}_BIT_PK}};
 use lib::core::bfv_pk::BfvPkCommit;
 use lib::math::polynomial::Polynomial;
 
-fn main(
-pk0is: [Polynomial<N>; L],
-pk1is: [Polynomial<N>; L],
-) -> pub Field {{
-let pk_bfv: BfvPkCommit<N, L, {}_BIT_PK> =
-    BfvPkCommit::new(pk0is, pk1is);
-pk_bfv.verify()
+fn main(pk0is: [Polynomial<N>; L], pk1is: [Polynomial<N>; L]) -> pub Field {{
+    let pk_bfv: BfvPkCommit<N, L, {}_BIT_PK> = BfvPkCommit::new(pk0is, pk1is);
+    pk_bfv.verify()
 }}
 "#,
         get_security_level(lambda).as_str(),

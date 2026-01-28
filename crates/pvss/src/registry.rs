@@ -72,6 +72,11 @@ impl CircuitRegistry {
     pub fn n_public_inputs(&self, name: &str) -> Result<usize, RegistryError> {
         Ok(self.get(name)?.n_public_inputs())
     }
+
+    /// List all registered circuit names.
+    pub fn list_circuits(&self) -> Vec<String> {
+        self.circuits.keys().cloned().collect()
+    }
 }
 
 #[cfg(test)]
