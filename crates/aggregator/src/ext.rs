@@ -8,11 +8,9 @@ use std::sync::Arc;
 
 use crate::keyshare_created_filter_buffer::KeyshareCreatedFilterBuffer;
 use crate::{
-    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
-    PlaintextRepositoryFactory, PublicKeyAggregator, PublicKeyAggregatorParams,
-    PublicKeyAggregatorState, PublicKeyRepositoryFactory, ThresholdPlaintextAggregator,
-    ThresholdPlaintextAggregatorParams, ThresholdPlaintextAggregatorState,
-    TrBfvPlaintextRepositoryFactory,
+    PublicKeyAggregator, PublicKeyAggregatorParams, PublicKeyAggregatorState,
+    PublicKeyRepositoryFactory, ThresholdPlaintextAggregator, ThresholdPlaintextAggregatorParams,
+    ThresholdPlaintextAggregatorState, TrBfvPlaintextRepositoryFactory,
 };
 use actix::{Actor, Addr, Recipient};
 use anyhow::{anyhow, Result};
@@ -24,127 +22,6 @@ use e3_fhe::ext::FHE_KEY;
 use e3_fhe::Fhe;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
-
-#[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
-pub struct PlaintextAggregatorExtension {
-    bus: BusHandle,
-    sortition: Addr<Sortition>,
-}
-
-impl PlaintextAggregatorExtension {
-    pub fn create(bus: &BusHandle, sortition: &Addr<Sortition>) -> Box<Self> {
-        Box::new(Self {
-            bus: bus.clone(),
-            sortition: sortition.clone(),
-        })
-    }
-}
-
-const ERROR_PLAINTEXT_FHE_MISSING:&str = "Could not create PlaintextAggregator because the fhe instance it depends on was not set on the context.";
-const ERROR_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator because the meta instance it depends on was not set on the context.";
-
-#[async_trait]
-impl E3Extension for PlaintextAggregatorExtension {
-    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        // Save plaintext aggregator
-        let EnclaveEventData::CiphertextOutputPublished(data) = evt.get_data() else {
-            return;
-        };
-
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
-            );
-            return;
-        };
-
-        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_META_MISSING),
-            );
-            return;
-        };
-
-        let e3_id = data.e3_id.clone();
-        let repo = ctx.repositories().plaintext(&e3_id);
-
-        // This is a single ciphertext for the legacy PlaintextAggregator
-        let Some(single_ciphertext) = data.ciphertext_output.first() else {
-            self.bus.err(
-                EType::PlaintextAggregation,
-                anyhow!("Could not extract ciphertext from array"),
-            );
-            return;
-        };
-
-        let sync_state = repo.send(Some(PlaintextAggregatorState::init(
-            meta.threshold_m,
-            meta.threshold_n,
-            meta.seed,
-            single_ciphertext.clone(),
-        )));
-
-        ctx.set_event_recipient(
-            "plaintext",
-            Some(
-                PlaintextAggregator::new(
-                    PlaintextAggregatorParams {
-                        fhe: fhe.clone(),
-                        bus: self.bus.clone(),
-                        sortition: self.sortition.clone(),
-                        e3_id: e3_id.clone(),
-                    },
-                    sync_state,
-                )
-                .start()
-                .into(),
-            ),
-        );
-    }
-
-    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
-        // No ID on the snapshot -> bail
-        if !snapshot.contains("plaintext") {
-            return Ok(());
-        }
-
-        let repo = ctx.repositories().plaintext(&snapshot.e3_id);
-        let sync_state = repo.load().await?;
-
-        // No Snapshot returned from the store -> bail
-        if !sync_state.has() {
-            return Ok(());
-        };
-
-        // Get deps
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
-            );
-            return Ok(());
-        };
-
-        let value = PlaintextAggregator::new(
-            PlaintextAggregatorParams {
-                fhe: fhe.clone(),
-                bus: self.bus.clone(),
-                sortition: self.sortition.clone(),
-                e3_id: ctx.e3_id.clone(),
-            },
-            sync_state,
-        )
-        .start()
-        .into();
-
-        // send to context
-        ctx.set_event_recipient("plaintext", Some(value));
-
-        Ok(())
-    }
-}
 
 pub struct PublicKeyAggregatorExtension {
     bus: BusHandle,
