@@ -19,6 +19,7 @@ use num_bigint::BigInt;
 use num_bigint::BigUint;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Configs {
@@ -97,7 +98,7 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type Params = BfvParameters;
+    type Params = Arc<BfvParameters>;
     type Input = PublicKey;
     type Error = fhe::Error;
 

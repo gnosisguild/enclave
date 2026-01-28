@@ -8,6 +8,7 @@ pub mod pk_bfv;
 pub mod registry;
 pub mod sample;
 pub mod traits;
+pub mod utils;
 
 /// Variant for input types for DKG.
 ///
