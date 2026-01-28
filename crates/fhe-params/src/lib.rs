@@ -4,13 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Preset definitions and builders for zkFHE parameters.
+//! Preset definitions and builders for BFV FHE parameters.
 
 pub mod builder;
 pub mod constants;
 #[cfg(feature = "abi-encoding")]
 pub mod encoding;
 pub mod presets;
+pub mod search;
 
 pub use builder::{
     build_bfv_params, build_bfv_params_arc, build_bfv_params_from_set,
