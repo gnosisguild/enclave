@@ -33,7 +33,6 @@ async fn test_placeholder_circuits_creation() {
     let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
     fs::create_dir_all(&setup.circuits_dir).await.unwrap();
-
     setup.download_circuits().await.unwrap();
 
     let circuit_path = setup.circuits_dir.join("pk_bfv.json");
@@ -110,24 +109,10 @@ fn fixtures_dir() -> PathBuf {
         .join("fixtures")
 }
 
-#[tokio::test]
-async fn test_dummy_circuit() {
-    const CIRCUIT_NAME: &str = "dummy";
-
-    // 1. Find bb
-    let bb = match find_bb().await {
-        Some(p) => p,
-        None => {
-            println!("⚠ Skipping: bb not found");
-            return;
-        }
-    };
-
-    // 2. Create NoirSetup
+async fn setup_test_prover(bb: &PathBuf) -> (NoirSetup, tempfile::TempDir) {
     let temp = tempdir().unwrap();
     let setup = NoirSetup::new(temp.path(), NoirConfig::default());
 
-    // 3. Init directories
     fs::create_dir_all(&setup.circuits_dir).await.unwrap();
     fs::create_dir_all(setup.circuits_dir.join("vk"))
         .await
@@ -137,28 +122,41 @@ async fn test_dummy_circuit() {
         .await
         .unwrap();
 
-    // 4. Symlink bb
     #[cfg(unix)]
-    std::os::unix::fs::symlink(&bb, &setup.bb_binary).unwrap();
+    std::os::unix::fs::symlink(bb, &setup.bb_binary).unwrap();
 
-    // 5. Copy circuit and VK from fixtures
+    (setup, temp)
+}
+
+#[tokio::test]
+async fn test_dummy_circuit() {
+    let bb = match find_bb().await {
+        Some(p) => p,
+        None => {
+            println!("skipping: bb not found");
+            return;
+        }
+    };
+
+    let (setup, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
-    let circuit_src = fixtures.join(format!("{}.json", CIRCUIT_NAME));
-    let vk_src = fixtures.join(format!("{}.vk", CIRCUIT_NAME));
 
-    let circuit_dst = setup.circuits_dir.join(format!("{}.json", CIRCUIT_NAME));
-    let vk_dst = setup
-        .circuits_dir
-        .join("vk")
-        .join(format!("{}.vk", CIRCUIT_NAME));
+    fs::copy(
+        fixtures.join("dummy.json"),
+        setup.circuits_dir.join("dummy.json"),
+    )
+    .await
+    .unwrap();
+    fs::copy(
+        fixtures.join("dummy.vk"),
+        setup.circuits_dir.join("vk").join("dummy.vk"),
+    )
+    .await
+    .unwrap();
 
-    fs::copy(&circuit_src, &circuit_dst).await.unwrap();
-    fs::copy(&vk_src, &vk_dst).await.unwrap();
-
-    // 6. Load circuit
-    let circuit = CompiledCircuit::from_file(&circuit_src).await.unwrap();
-
-    // 7. Generate witness (NATIVE!)
+    let circuit = CompiledCircuit::from_file(&fixtures.join("dummy.json"))
+        .await
+        .unwrap();
     let witness_gen = WitnessGenerator::new();
     let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
     let witness = witness_gen
@@ -166,85 +164,58 @@ async fn test_dummy_circuit() {
         .await
         .unwrap();
 
-    // 8. Create prover and generate proof
     let prover = NoirProver::new(&setup);
     let e3_id = "test-e3-001";
-    let proof = prover
-        .generate_proof(CIRCUIT_NAME, &witness, e3_id)
-        .await
-        .unwrap();
 
-    // 9. Verify
-    let valid = prover
-        .verify_proof(CIRCUIT_NAME, &proof, e3_id)
+    let proof = prover
+        .generate_proof("dummy", &witness, e3_id)
         .await
         .unwrap();
+    let valid = prover.verify_proof("dummy", &proof, e3_id).await.unwrap();
 
     assert!(valid);
-
-    // 10. Cleanup
     prover.cleanup(e3_id).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_pk_bfv_proof() {
-    // 1. Find bb
     let bb = match find_bb().await {
         Some(p) => p,
         None => {
-            println!("⚠ Skipping: bb not found");
+            println!("skipping: bb not found");
             return;
         }
     };
 
-    // 2. Create NoirSetup
-    let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
-
-    // 3. Init directories
-    fs::create_dir_all(&setup.circuits_dir).await.unwrap();
-    fs::create_dir_all(setup.circuits_dir.join("vk"))
-        .await
-        .unwrap();
-    fs::create_dir_all(&setup.work_dir).await.unwrap();
-    fs::create_dir_all(setup.noir_dir.join("bin"))
-        .await
-        .unwrap();
-
-    // 4. Symlink bb
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(&bb, &setup.bb_binary).unwrap();
-
-    // 5. Copy circuit and VK from fixtures
+    let (setup, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
-    let circuit_src = fixtures.join("pk_bfv.json");
-    let vk_src = fixtures.join("pk_bfv.vk");
 
-    let circuit_dst = setup.circuits_dir.join("pk_bfv.json");
-    let vk_dst = setup.circuits_dir.join("vk").join("pk_bfv.vk");
+    fs::copy(
+        fixtures.join("pk_bfv.json"),
+        setup.circuits_dir.join("pk_bfv.json"),
+    )
+    .await
+    .unwrap();
+    fs::copy(
+        fixtures.join("pk_bfv.vk"),
+        setup.circuits_dir.join("vk").join("pk_bfv.vk"),
+    )
+    .await
+    .unwrap();
 
-    fs::copy(&circuit_src, &circuit_dst).await.unwrap();
-    fs::copy(&vk_src, &vk_dst).await.unwrap();
-
-    // 6. Setup BFV params and generate test data
     let preset = BfvPreset::InsecureDkg512;
-    let param_set = preset.into();
-    let params = build_bfv_params_from_set_arc(param_set);
-
+    let params = build_bfv_params_from_set_arc(preset.into());
     let sample = generate_sample(&params);
 
-    // 7. Create prover and circuit instance
     let prover = NoirProver::new(&setup);
     let circuit = PkBfvCircuit;
-
-    // 8. Generate proof
     let e3_id = "1";
+
     let proof_result = circuit
         .prove(&prover, &params, &sample.public_key, e3_id)
         .await
         .unwrap();
 
-    // 9. Confirm that the commitment matches
     let computation_output = circuit.compute(&params, &sample.public_key).unwrap();
     let reduced_witness = computation_output.witness.reduce_to_zkp_modulus();
     let commitment_calculated = compute_pk_bfv_commitment(
@@ -253,21 +224,15 @@ async fn test_pk_bfv_proof() {
         computation_output.bits.pk_bit,
     );
     let commitment_from_proof =
-        BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof_result.output.as_ref());
+        BigInt::from_bytes_be(num_bigint::Sign::Plus, proof_result.output.as_ref());
 
-    assert_eq!(
-        commitment_calculated, commitment_from_proof,
-        "Commitment should match!"
-    );
+    assert_eq!(commitment_calculated, commitment_from_proof);
 
-    // 10. Verify proof using the trait-based API
     let valid = circuit
         .verify(&prover, &proof_result.proof, &proof_result.output, e3_id)
         .await
         .unwrap();
 
-    assert!(valid, "Proof should be valid!");
-
-    // 11. Cleanup
+    assert!(valid);
     prover.cleanup(e3_id).await.unwrap();
 }

@@ -14,17 +14,17 @@ use acir::{
 };
 use base64::engine::{general_purpose, Engine};
 use bn254_blackbox_solver::Bn254BlackBoxSolver;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use nargo::foreign_calls::default::DefaultForeignCallBuilder;
 use nargo::ops::execute_program;
 use noirc_abi::{input_parser::InputValue, Abi, InputMap};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 
-/// Compiled Noir circuit artifact (the JSON from target/<circuit>.json)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledCircuit {
-    /// Base64-encoded, gzipped ACIR bytecode
     pub bytecode: String,
-    /// Circuit ABI - maps parameter names to witness indices
     pub abi: Abi,
 }
 
@@ -39,27 +39,23 @@ impl CompiledCircuit {
     }
 }
 
-/// Get the ACIR buffer (compressed) from base64-encoded bytecode
-fn get_acir_buffer(circuit_bytecode: &str) -> Result<Vec<u8>, NoirProverError> {
+fn get_acir_buffer(bytecode: &str) -> Result<Vec<u8>, NoirProverError> {
     general_purpose::STANDARD
-        .decode(circuit_bytecode)
-        .map_err(|e| NoirProverError::SerializationError(format!("Base64 decode: {}", e)))
+        .decode(bytecode)
+        .map_err(|e| NoirProverError::SerializationError(format!("base64 decode: {}", e)))
 }
 
-/// Get the Program from circuit bytecode
-/// Note: Program::deserialize_program handles gzip decompression internally
-fn get_program(circuit_bytecode: &str) -> Result<Program<FieldElement>, NoirProverError> {
-    let acir_buffer = get_acir_buffer(circuit_bytecode)?;
+fn get_program(bytecode: &str) -> Result<Program<FieldElement>, NoirProverError> {
+    let acir_buffer = get_acir_buffer(bytecode)?;
     Program::deserialize_program(&acir_buffer)
         .map_err(|e| NoirProverError::SerializationError(format!("ACIR decode: {:?}", e)))
 }
 
-/// Execute the circuit and return the solved witness stack
 fn execute(
-    circuit_bytecode: &str,
+    bytecode: &str,
     initial_witness: WitnessMap<FieldElement>,
 ) -> Result<WitnessStack<FieldElement>, NoirProverError> {
-    let program = get_program(circuit_bytecode)?;
+    let program = get_program(bytecode)?;
     let blackbox_solver = Bn254BlackBoxSolver::default();
     let mut foreign_call_executor = DefaultForeignCallBuilder::default().build();
 
@@ -72,27 +68,21 @@ fn execute(
     .map_err(|e| NoirProverError::WitnessGenerationFailed(e.to_string()))
 }
 
-/// Serialize witness stack using bincode + gzip (bb expects gzip)
 fn serialize_witness(
     witness_stack: &WitnessStack<FieldElement>,
 ) -> Result<Vec<u8>, NoirProverError> {
-    use flate2::write::GzEncoder;
-    use flate2::Compression;
-    use std::io::Write;
-
     let buf = bincode::serialize(witness_stack)
-        .map_err(|e| NoirProverError::SerializationError(format!("Bincode: {}", e)))?;
+        .map_err(|e| NoirProverError::SerializationError(format!("bincode: {}", e)))?;
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder
         .write_all(&buf)
-        .map_err(|e| NoirProverError::SerializationError(format!("Gzip: {}", e)))?;
+        .map_err(|e| NoirProverError::SerializationError(format!("gzip: {}", e)))?;
     encoder
         .finish()
-        .map_err(|e| NoirProverError::SerializationError(format!("Gzip finish: {}", e)))
+        .map_err(|e| NoirProverError::SerializationError(format!("gzip finish: {}", e)))
 }
 
-/// Native witness generator
 pub struct WitnessGenerator;
 
 impl WitnessGenerator {
@@ -100,9 +90,6 @@ impl WitnessGenerator {
         Self
     }
 
-    /// Generate witness from a compiled circuit and inputs
-    ///
-    /// Returns serialized witness data ready for `bb prove`
     pub async fn generate_witness(
         &self,
         circuit: &CompiledCircuit,
@@ -130,7 +117,6 @@ impl Default for WitnessGenerator {
     }
 }
 
-/// Helper to create InputMap from string key-value pairs
 pub fn input_map<I, K, V>(iter: I) -> InputMap
 where
     I: IntoIterator<Item = (K, V)>,
@@ -139,8 +125,7 @@ where
 {
     iter.into_iter()
         .map(|(k, v)| {
-            let v_str = v.as_ref();
-            let field = FieldElement::try_from_str(v_str).unwrap_or_default();
+            let field = FieldElement::try_from_str(v.as_ref()).unwrap_or_default();
             (k.into(), InputValue::Field(field))
         })
         .collect()
@@ -178,7 +163,6 @@ mod tests {
         let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]);
 
         let result = generator.generate_witness(&circuit, inputs).await;
-
         assert!(result.is_err());
     }
 }

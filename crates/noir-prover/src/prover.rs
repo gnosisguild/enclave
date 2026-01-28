@@ -13,7 +13,6 @@ use tokio::fs;
 use tokio::process::Command;
 use tracing::{debug, info};
 
-/// Noir prover with native witness generation
 pub struct NoirProver {
     bb_binary: PathBuf,
     circuits_dir: PathBuf,
@@ -21,7 +20,6 @@ pub struct NoirProver {
 }
 
 impl NoirProver {
-    /// Create a new prover from NoirSetup
     pub fn new(setup: &NoirSetup) -> Self {
         Self {
             bb_binary: setup.bb_binary.clone(),
@@ -30,17 +28,14 @@ impl NoirProver {
         }
     }
 
-    /// Get the circuits directory
     pub fn circuits_dir(&self) -> &PathBuf {
         &self.circuits_dir
     }
 
-    /// Get the work directory
     pub fn work_dir(&self) -> &PathBuf {
         &self.work_dir
     }
 
-    /// Generate proof using bb
     pub async fn generate_proof(
         &self,
         circuit_name: &str,
@@ -56,6 +51,17 @@ impl NoirProver {
             return Err(NoirProverError::CircuitNotFound(circuit_name.to_string()));
         }
 
+        let vk_path = self
+            .circuits_dir
+            .join("vk")
+            .join(format!("{}.vk", circuit_name));
+        if !vk_path.exists() {
+            return Err(NoirProverError::CircuitNotFound(format!(
+                "VK not found: {}",
+                vk_path.display()
+            )));
+        }
+
         let job_dir = self.work_dir.join(e3_id);
         fs::create_dir_all(&job_dir).await?;
 
@@ -63,23 +69,9 @@ impl NoirProver {
         let output_dir = job_dir.join("out");
         let proof_path = output_dir.join("proof");
 
-        // Write witness
         fs::write(&witness_path, witness_data).await?;
 
-        debug!("Generating proof for circuit: {}", circuit_name);
-
-        // Run bb prove
-        let vk_path = self
-            .circuits_dir
-            .join("vk")
-            .join(format!("{}.vk", circuit_name));
-
-        if !vk_path.exists() {
-            return Err(NoirProverError::CircuitNotFound(format!(
-                "VK not found: {}",
-                vk_path.display()
-            )));
-        }
+        debug!("generating proof for circuit: {}", circuit_name);
 
         let output = Command::new(&self.bb_binary)
             .args([
@@ -104,12 +96,11 @@ impl NoirProver {
         }
 
         let proof = fs::read(&proof_path).await?;
-        info!("Generated proof ({} bytes) for {}", proof.len(), e3_id);
+        info!("generated proof ({} bytes) for {}", proof.len(), e3_id);
 
         Ok(proof)
     }
 
-    /// Verify a proof using bb
     pub async fn verify_proof(
         &self,
         circuit_name: &str,
@@ -137,16 +128,14 @@ impl NoirProver {
         let proof_path = job_dir.join("proof_to_verify");
         fs::write(&proof_path, proof).await?;
 
-        // Read public inputs from the output directory (written by generate_proof)
         let public_inputs_path = job_dir.join("out").join("public_inputs");
         if !public_inputs_path.exists() {
             return Err(NoirProverError::ProveFailed(
-                "public_inputs not found - was generate_proof called with the same e3_id?"
-                    .to_string(),
+                "public_inputs not found".to_string(),
             ));
         }
 
-        debug!("Verifying proof for circuit: {}", circuit_name);
+        debug!("verifying proof for circuit: {}", circuit_name);
 
         let output = Command::new(&self.bb_binary)
             .args([
@@ -166,7 +155,6 @@ impl NoirProver {
         Ok(output.status.success())
     }
 
-    /// Cleanup job directory
     pub async fn cleanup(&self, e3_id: &str) -> Result<(), NoirProverError> {
         let job_dir = self.work_dir.join(e3_id);
         if job_dir.exists() {
