@@ -7,6 +7,7 @@
 use actix::Actor;
 use actix::Addr;
 use e3_config::AppConfig;
+use e3_events::EventType;
 use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
@@ -80,7 +81,10 @@ impl EventBusFactory {
         let error_collector = HistoryCollector::<E>::new().start();
         // Importantly subscribe to events
         let bus = self.get_event_bus::<E>();
-        bus.do_send(Subscribe::new("*", error_collector.clone().recipient()));
+        bus.do_send(Subscribe::new(
+            EventType::All,
+            error_collector.clone().recipient(),
+        ));
         // Store it in our HashMap
         error_collector_cache.insert(type_id, Box::new(error_collector.clone()));
 

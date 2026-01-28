@@ -12,7 +12,9 @@ use e3_data::{
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
+use e3_events::{
+    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventType, Sequencer,
+};
 use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
@@ -402,7 +404,7 @@ mod tests {
         .start();
 
         // Send all evts to the listener
-        handle.subscribe("*", listener.clone().into());
+        handle.subscribe(EventType::All, listener.clone().into());
 
         // Lets store some data
         datastore.scope("/foo/name").write("Fred".to_string());
