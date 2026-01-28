@@ -6,7 +6,7 @@
 
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
 use e3_noir_prover::{
-    input_map, CircuitProverExt, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus,
+    input_map, CircuitProver, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus,
     WitnessGenerator,
 };
 use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
@@ -156,12 +156,15 @@ async fn test_dummy_circuit() {
     fs::copy(&vk_src, &vk_dst).await.unwrap();
 
     // 6. Load circuit
-    let circuit = CompiledCircuit::from_file(&circuit_src).unwrap();
+    let circuit = CompiledCircuit::from_file(&circuit_src).await.unwrap();
 
     // 7. Generate witness (NATIVE!)
     let witness_gen = WitnessGenerator::new();
     let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
-    let witness = witness_gen.generate_witness(&circuit, inputs).unwrap();
+    let witness = witness_gen
+        .generate_witness(&circuit, inputs)
+        .await
+        .unwrap();
 
     // 8. Create prover and generate proof
     let prover = NoirProver::new(&setup);
