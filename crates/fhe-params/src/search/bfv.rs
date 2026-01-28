@@ -335,12 +335,15 @@ pub fn construct_qi_for_target_bits(
 
     let target_f = target_bits as f64;
 
-    // Fewest primes first: start from minimal s needed to reach target with 61-bit primes
-    let s = target_bits.div_ceil(61).max(2) as usize;
+    // Compute the actual maximum bit length available in the prime buckets
+    let max_bit = by_bits_small.keys().max().cloned().unwrap_or(61);
+
+    // Fewest primes first: start from minimal s needed to reach target with max_bit primes
+    let s = target_bits.div_ceil(max_bit as u64).max(2) as usize;
 
     let r_float = target_f / (s as f64);
-    let floor_r = r_float.floor().clamp(40.0, 61.0) as u8;
-    let ceil_r = r_float.ceil().clamp(40.0, 61.0) as u8;
+    let floor_r = r_float.floor().clamp(40.0, max_bit as f64) as u8;
+    let ceil_r = r_float.ceil().clamp(40.0, max_bit as f64) as u8;
 
     // Build candidate selections mixing floor/ceil buckets; choose best by closeness once
     let mut tried: Vec<Vec<PrimeItem>> = Vec::new();
@@ -665,6 +668,11 @@ pub fn finalize_second_param(
     let lhs_log2 = log2_big(&lhs);
     let rhs_log2 = log2_big(&delta);
 
+    let ok = lhs < delta;
+    if !ok {
+        return None;
+    }
+
     if bfv_search_config.verbose {
         println!("\n[BFV-2nd] d={d} candidate:");
         println!(
@@ -690,15 +698,11 @@ pub fn finalize_second_param(
         println!("  B_C = B_fresh = {}", b_c.to_str_radix(10));
         println!("  log2(2*B_C)≈{:.3}   log2(Δ)≈{:.3}", lhs_log2, rhs_log2);
 
-        let ok = lhs < delta;
         println!(
             "  2*B_C {} Δ   => {}",
             if ok { "<" } else { "≥" },
             if ok { "PASS ✅" } else { "fail ❌" }
         );
-        if !ok {
-            return None;
-        }
 
         println!("\n*** BFV-2nd FEASIBLE at d={} ***", d);
     }
@@ -818,6 +822,7 @@ mod tests {
         let primes = build_prime_items_for_second();
         assert!(!primes.is_empty());
 
+        // Test invalid case: primes too small for k_plain
         let small_primes = primes
             .iter()
             .filter(|p| p.bitlen <= 40)
@@ -826,10 +831,44 @@ mod tests {
             .collect::<Vec<_>>();
 
         if !small_primes.is_empty() {
-            let k_plain = 1u128 << 50;
+            let k_plain = 1u128 << 50; // 2^50, requires primes > 2^51
             let d = 512;
             let result = finalize_second_param(&config, d, small_primes, k_plain);
-            assert!(result.is_none() || result.is_some());
+            // Primes with bitlen <= 40 are < 2^40 < 2^51, so should be rejected
+            assert!(result.is_none());
+        }
+
+        // Test valid case: primes large enough for k_plain
+        let large_primes = primes
+            .iter()
+            .filter(|p| p.bitlen > 50) // Large primes that can satisfy various k_plain values
+            .take(2)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if !large_primes.is_empty() {
+            let k_plain = 1u128 << 30; // 2^30, requires primes > 2^31
+            let d = 512;
+            let result = finalize_second_param(&config, d, large_primes.clone(), k_plain);
+            assert!(result.is_some());
+            let res = result.unwrap();
+
+            // Validate returned properties
+            assert_eq!(res.d, d);
+            assert_eq!(res.k_plain_eff, k_plain);
+            assert_eq!(res.selected_primes.len(), large_primes.len());
+            // Compare primes by their values since PrimeItem doesn't implement PartialEq
+            for (returned, expected) in res.selected_primes.iter().zip(large_primes.iter()) {
+                assert_eq!(returned.value, expected.value);
+            }
+
+            // Validate q_bfv is product of selected primes
+            let expected_q = product(res.selected_primes.iter().map(|p| p.value.clone()));
+            assert_eq!(res.q_bfv, expected_q);
+
+            // Validate delta = q_bfv / k_plain
+            let expected_delta = &res.q_bfv / &BigUint::from(k_plain);
+            assert_eq!(res.delta, expected_delta);
         }
     }
 

@@ -126,14 +126,18 @@ This enables serialization for smart contracts and cross-platform parameter exch
 ### Using Presets
 
 ```rust
-use e3_fhe_params::{BfvPreset, build_bfv_params_arc};
+use e3_fhe_params::{BfvPreset, build_bfv_params_arc, builder::build_pair_for_preset};
 use std::sync::Arc;
 
-// Build threshold BFV parameters
-let params = build_bfv_params_arc(BfvPreset::SecureThresholdBfv8192)?;
+fn example() -> Result<(), e3_fhe_params::PresetError> {
+    // Build threshold BFV parameters
+    let params = build_bfv_params_arc(BfvPreset::SecureThresholdBfv8192)?;
 
-// Build both threshold and DKG parameter pairs
-let (threshold_params, dkg_params) = build_pair_for_preset(BfvPreset::SecureThresholdBfv8192)?;
+    // Build both threshold and DKG parameter pairs
+    let (threshold_params, dkg_params) = build_pair_for_preset(BfvPreset::SecureThresholdBfv8192)?;
+
+    Ok(())
+}
 ```
 
 ### Custom Parameter Sets
