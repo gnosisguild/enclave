@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Preset definitions and builders for zkFHE parameters.
+//! Preset definitions and builders for BFV FHE parameters.
 
 pub mod builder;
 pub mod constants;
