@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use noirc_abi::InputMap;
 
 #[derive(Debug, Clone)]
+#[must_use]
 pub struct ProofResult<O> {
     pub proof: Vec<u8>,
     pub output: O,
