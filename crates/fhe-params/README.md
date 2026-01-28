@@ -12,6 +12,7 @@ parameters that satisfy security constraints.
   sets
 - **Parameter Search**: Algorithm to find optimal BFV parameters using NTT-friendly primes with
   exact arithmetic
+- **CLI Tool**: Command-line interface for searching and validating BFV parameters interactively
 - **ABI Encoding**: Optional Solidity ABI encoding/decoding for smart contract integration
 
 ## Overview
@@ -157,6 +158,8 @@ let params = build_bfv_params_from_set_arc(&param_set)?;
 
 ### Parameter Search
 
+#### Using the Library
+
 ```rust
 use e3_fhe_params::search::bfv::{BfvSearchConfig, bfv_search};
 
@@ -181,6 +184,74 @@ match bfv_search(&config) {
     }
 }
 ```
+
+#### Using the CLI Tool
+
+The crate includes a command-line tool `search_params` for searching BFV parameters interactively:
+
+```bash
+# Build the binary
+cargo build --bin search_params --package e3-fhe-params
+
+# Run with default parameters
+cargo run --bin search_params --package e3-fhe-params
+
+# Run with custom parameters
+cargo run --bin search_params --package e3-fhe-params -- \
+    --n 100 \
+    --z 100 \
+    --k 100 \
+    --lambda 80 \
+    --b 20 \
+    --b-chi 1
+
+# Enable verbose output to see the search process
+cargo run --bin search_params --package e3-fhe-params -- \
+    --n 100 --z 100 --k 100 --lambda 80 --verbose
+```
+
+**CLI Options:**
+
+- `--n <N>`: Number of parties (ciphernodes). Default: `1000`
+- `--z <Z>`: Number of fresh ciphertext additions (number of votes). Also used as plaintext modulus
+  k. Default: `1000`
+- `--k <K>`: Plaintext modulus (plaintext space). Default: `1000`
+- `--lambda <LAMBDA>`: Statistical security parameter λ (negl(λ) = 2^{-λ}). Default: `80`
+- `--b <B>`: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2). Default: `20`
+- `--b-chi <B_CHI>`: Bound on distribution χ for secret key generation. Default: `1`
+- `--verbose`: Enable verbose output showing detailed search process
+- `--help`: Show help message
+- `--version`: Show version information
+
+**Example: Reproducing Production Preset**
+
+The production preset `SecureThresholdBfv8192` can be reproduced using:
+
+```bash
+cargo run --bin search_params --package e3-fhe-params -- \
+    --n 100 \
+    --z 100 \
+    --k 100 \
+    --lambda 80 \
+    --b 20 \
+    --b-chi 1
+```
+
+This will output the same parameter set as the preset, including:
+
+- Degree: 8192
+- 4 NTT-friendly primes (52-53 bits each)
+- All noise budgets and validation metrics
+- A second parameter set (if found)
+
+**Output Format:**
+
+The CLI displays:
+
+- **First BFV Parameter Set**: The main threshold encryption parameters with all noise budgets
+- **Second BFV Parameter Set**: Additional parameters for simpler conditions (if found)
+- Distribution types (CBD/Uniform) and variance values for error bounds
+- Complete parameter details including moduli, noise budgets, and validation metrics
 
 ### ABI Encoding/Decoding
 

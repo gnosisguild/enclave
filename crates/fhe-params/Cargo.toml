@@ -16,6 +16,10 @@ anyhow = { workspace = true }
 alloy-dyn-abi = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, optional = true }
 
+[[bin]]
+name = "search_params"
+path = "src/bin/search_params.rs"
+
 [features]
 default = []
 abi-encoding = ["dep:alloy-dyn-abi", "dep:alloy-primitives"]
