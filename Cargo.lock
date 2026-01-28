@@ -3402,7 +3402,9 @@ version = "0.1.7"
 dependencies = [
  "actix",
  "anyhow",
+ "e3-ciphernode-builder",
  "e3-events",
+ "tokio",
  "tracing",
 ]
 
