@@ -6,6 +6,8 @@
 
 // Noir prover using native witness generation + bb CLI
 
+// Noir prover using native witness generation + bb CLI
+
 use crate::error::NoirProverError;
 use crate::setup::NoirSetup;
 use std::path::PathBuf;
@@ -28,6 +30,16 @@ impl NoirProver {
             circuits_dir: setup.circuits_dir.clone(),
             work_dir: setup.work_dir.clone(),
         }
+    }
+
+    /// Get the circuits directory
+    pub fn circuits_dir(&self) -> &PathBuf {
+        &self.circuits_dir
+    }
+
+    /// Get the work directory
+    pub fn work_dir(&self) -> &PathBuf {
+        &self.work_dir
     }
 
     /// Generate proof using bb
