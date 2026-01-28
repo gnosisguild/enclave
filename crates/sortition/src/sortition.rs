@@ -11,8 +11,8 @@ use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, EType, EnclaveEvent, OperatorActivationChanged, PlaintextOutputPublished,
-    Seed, TicketBalanceUpdated,
+    ConfigurationUpdated, EType, EnclaveEvent, EventType, OperatorActivationChanged,
+    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use serde::{Deserialize, Serialize};
@@ -195,14 +195,14 @@ impl Sortition {
         // Subscribe to all relevant events
         bus.subscribe_all(
             &[
-                "CiphernodeAdded",
-                "CiphernodeRemoved",
-                "TicketBalanceUpdated",
-                "OperatorActivationChanged",
-                "ConfigurationUpdated",
-                "CommitteePublished",
-                "PlaintextOutputPublished",
-                "CommitteeFinalized",
+                EventType::CiphernodeAdded,
+                EventType::CiphernodeRemoved,
+                EventType::TicketBalanceUpdated,
+                EventType::OperatorActivationChanged,
+                EventType::ConfigurationUpdated,
+                EventType::CommitteePublished,
+                EventType::PlaintextOutputPublished,
+                EventType::CommitteeFinalized,
             ],
             addr.clone().into(),
         );

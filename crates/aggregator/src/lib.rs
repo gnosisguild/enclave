@@ -7,14 +7,10 @@
 mod committee_finalizer;
 pub mod ext;
 mod keyshare_created_filter_buffer;
-mod plaintext_aggregator;
 mod publickey_aggregator;
 mod repo;
 mod threshold_plaintext_aggregator;
 pub use committee_finalizer::CommitteeFinalizer;
-pub use plaintext_aggregator::{
-    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
-};
 pub use publickey_aggregator::{
     PublicKeyAggregator, PublicKeyAggregatorParams, PublicKeyAggregatorState,
 };

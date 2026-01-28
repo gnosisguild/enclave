@@ -25,6 +25,7 @@ use e3_events::BusHandle;
 use e3_events::E3RequestComplete;
 use e3_events::EType;
 use e3_events::EnclaveEventData;
+use e3_events::EventType;
 use e3_events::{E3id, EnclaveEvent, Event};
 use serde::Deserialize;
 use serde::Serialize;
@@ -301,7 +302,7 @@ impl E3RouterBuilder {
         };
 
         let addr = e3r.start();
-        self.bus.subscribe("*", addr.clone().recipient());
+        self.bus.subscribe(EventType::All, addr.clone().recipient());
         Ok(addr)
     }
 }

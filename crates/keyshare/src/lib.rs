@@ -6,11 +6,9 @@
 
 mod encryption_key_collector;
 pub mod ext;
-mod keyshare;
 mod repo;
 mod threshold_keyshare;
 mod threshold_share_collector;
 pub use encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
-pub use keyshare::*;
 pub use repo::*;
 pub use threshold_keyshare::*;
