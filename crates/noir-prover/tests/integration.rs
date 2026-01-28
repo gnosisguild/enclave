@@ -11,9 +11,14 @@ use e3_noir_prover::{
     input_map, prove_pk_bfv, verify_pk_bfv, CompiledCircuit, NoirConfig, NoirProver, NoirSetup,
     SetupStatus, WitnessGenerator,
 };
+use num_bigint::BigInt;
+use shared::calculate_bit_width;
+use shared::commitments::compute_pk_bfv_commitment;
 use tempfile::tempdir;
 use tokio::{fs, process::Command};
+use zkfhe_pkbfv::bounds::PkBfvBounds;
 use zkfhe_pkbfv::sample::generate_sample_encryption;
+use zkfhe_pkbfv::vectors::PkBfvVectors;
 
 #[tokio::test]
 async fn test_check_status_on_empty_dir() {
@@ -236,6 +241,20 @@ async fn test_pk_bfv_proof() {
     let proof_result = prove_pk_bfv(&prover, &encryption_data.public_key, &params, e3_id)
         .await
         .unwrap();
+
+    // confirm that the commitment matches
+    let vectors = PkBfvVectors::compute(&encryption_data.public_key, &params).unwrap();
+    let bounds = PkBfvBounds::compute(&params, 0).unwrap();
+    let bit_width = calculate_bit_width(bounds.1.pk_bound.to_string().as_str()).unwrap();
+    let std_vectors = vectors.standard_form();
+    let commitment_calculated =
+        compute_pk_bfv_commitment(&std_vectors.pk0is, &std_vectors.pk1is, bit_width);
+    let commitment_from_proof =
+        BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof_result.commitment);
+    assert!(
+        commitment_calculated == commitment_from_proof,
+        "Commitment should match!"
+    );
 
     // 9. Verify proof
     let valid = verify_pk_bfv(
