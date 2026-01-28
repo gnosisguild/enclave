@@ -26,7 +26,7 @@ thiserror.workspace = true
 walkdir = "2.5"
 chrono = { workspace = true }
 shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
-pkbfv = { package = "zkfhe-pk-bfv", git = "https://github.com/gnosisguild/zkfhe-generator" }
+zkfhe_pkbfv = { package = "zkfhe-pk-bfv", git = "https://github.com/gnosisguild/zkfhe-generator" }
 # Noir ACVM crates for native witness generation
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.15" }
 acvm = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.15" }
@@ -36,6 +36,8 @@ nargo = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.15" }
 # Base64 decoding
 base64 = "0.22"
 bincode = "1.3.3"
-
+fhe.workspace = true
+e3-fhe-params.workspace = true
+num-bigint.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

@@ -9,7 +9,7 @@
 use crate::error::NoirProverError;
 use acir::{
     circuit::Program,
-    native_types::{Witness, WitnessMap, WitnessStack},
+    native_types::{WitnessMap, WitnessStack},
     FieldElement,
 };
 use base64::engine::{general_purpose, Engine};
