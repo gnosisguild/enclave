@@ -9,11 +9,13 @@ mod error;
 mod pkbfv;
 mod prover;
 mod setup;
+mod traits;
 mod witness;
 
 pub use config::{NoirConfig, VersionInfo};
 pub use error::NoirProverError;
-pub use pkbfv::{prove_pk_bfv, verify_pk_bfv};
+pub use pkbfv::*;
 pub use prover::NoirProver;
 pub use setup::{NoirSetup, SetupStatus};
+pub use traits::*;
 pub use witness::{input_map, CompiledCircuit, WitnessGenerator};

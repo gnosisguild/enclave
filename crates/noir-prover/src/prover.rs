@@ -6,8 +6,6 @@
 
 // Noir prover using native witness generation + bb CLI
 
-// Noir prover using native witness generation + bb CLI
-
 use crate::error::NoirProverError;
 use crate::setup::NoirSetup;
 use std::path::PathBuf;
