@@ -4,11 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::errors::CodegenError;
 use crate::pk_bfv::computation::*;
 use crate::pk_bfv::PkBfvCircuit;
 use crate::traits::Circuit;
 use crate::traits::Computation;
 use crate::traits::ReduceToZkpModulus;
+use crate::types::Artifacts;
 use crate::types::Configs;
 use crate::types::Template;
 use crate::types::Toml;
@@ -31,23 +33,23 @@ pub struct TomlJson {
     pub pk1is: Vec<serde_json::Value>,
 }
 
-pub fn generate_toml(witness: Witness) -> Toml {
+pub fn generate_toml(witness: Witness) -> Result<Toml, CodegenError> {
     let pk0is = map_witness_2d_vector_to_json(&witness.pk0is);
     let pk1is = map_witness_2d_vector_to_json(&witness.pk1is);
 
     let toml_json = TomlJson { pk0is, pk1is };
-    toml::to_string(&toml_json).unwrap()
+    Ok(toml::to_string(&toml_json)?)
 }
 
-pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> (Toml, Configs, Template, Wrapper) {
+pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> Result<Artifacts, CodegenError> {
     let params = BfvParamSet::from(preset).build_arc();
     // Compute.
-    let bounds = Bounds::compute(&params, &()).unwrap();
-    let bits = Bits::compute(&params, &bounds).unwrap();
-    let witness = Witness::compute(&params, &public_key).unwrap();
+    let bounds = Bounds::compute(&params, &())?;
+    let bits = Bits::compute(&params, &bounds)?;
+    let witness = Witness::compute(&params, &public_key)?;
     let zkp_witness = witness.reduce_to_zkp_modulus();
 
-    let toml = generate_toml(zkp_witness);
+    let toml = generate_toml(zkp_witness)?;
     let configs = generate_configs(&params, &bits);
     let template = generate_template(preset.metadata().lambda);
     let wrapper = generate_wrapper(
@@ -55,7 +57,12 @@ pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> (Toml, Configs, Temp
         <PkBfvCircuit as Circuit>::N_PUBLIC_INPUTS,
     );
 
-    (toml, configs, template, wrapper)
+    Ok(Artifacts {
+        toml,
+        configs,
+        template,
+        wrapper,
+    })
 }
 
 pub fn generate_template(lambda: usize) -> Template {
@@ -95,7 +102,7 @@ pk_bfv (CIRCUIT 0 - PUBLIC KEY BFV COMMITMENT)
 
 // pk_bfv - bit parameters
 pub global {}_BIT_PK: u32 = {};
-å"#,
+"#,
         params.degree(),
         params.moduli().len(),
         <PkBfvCircuit as Circuit>::PREFIX,
@@ -103,28 +110,28 @@ pub global {}_BIT_PK: u32 = {};
     )
 }
 
-pub fn write_toml(toml: &Toml, path: Option<&Path>) {
+pub fn write_toml(toml: &Toml, path: Option<&Path>) -> Result<(), CodegenError> {
     let toml_path = path.unwrap_or_else(|| Path::new("."));
     let toml_path = toml_path.join("Prover.toml");
-    std::fs::write(toml_path, toml).unwrap();
+    Ok(std::fs::write(toml_path, toml)?)
 }
 
-pub fn write_template(template: &Template, path: Option<&Path>) {
+pub fn write_template(template: &Template, path: Option<&Path>) -> Result<(), CodegenError> {
     let template_path = path.unwrap_or_else(|| Path::new("."));
     let template_path = template_path.join("main.nr");
-    std::fs::write(template_path, template).unwrap();
+    Ok(std::fs::write(template_path, template)?)
 }
 
-pub fn write_configs(configs: &Configs, path: Option<&Path>) {
+pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), CodegenError> {
     let configs_path = path.unwrap_or_else(|| Path::new("."));
     let configs_path = configs_path.join("configs.nr");
-    std::fs::write(configs_path, configs).unwrap();
+    Ok(std::fs::write(configs_path, configs)?)
 }
 
-pub fn write_wrapper(wrapper: &Wrapper, path: Option<&Path>) {
+pub fn write_wrapper(wrapper: &Wrapper, path: Option<&Path>) -> Result<(), CodegenError> {
     let wrapper_path = path.unwrap_or_else(|| Path::new("."));
     let wrapper_path = wrapper_path.join("wrapper.nr");
-    std::fs::write(wrapper_path, wrapper).unwrap();
+    Ok(std::fs::write(wrapper_path, wrapper)?)
 }
 
 pub fn write_artifacts(
@@ -133,11 +140,12 @@ pub fn write_artifacts(
     configs: &Configs,
     wrapper: &Wrapper,
     path: Option<&Path>,
-) {
-    write_toml(&toml, path);
-    write_template(&template, path);
-    write_configs(&configs, path);
-    write_wrapper(&wrapper, path);
+) -> Result<(), CodegenError> {
+    write_toml(&toml, path)?;
+    write_template(&template, path)?;
+    write_configs(&configs, path)?;
+    write_wrapper(&wrapper, path)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -152,9 +160,9 @@ mod tests {
         let preset = BfvPreset::InsecureThresholdBfv512;
         let params = BfvParamSet::from(preset).build_arc();
         let sample = sample::generate_sample(&params);
-        let (toml, configs, template, wrapper) = codegen(preset, sample.public_key);
+        let artifacts = codegen(preset, sample.public_key).unwrap();
 
-        let parsed: toml::Value = toml.parse().unwrap();
+        let parsed: toml::Value = artifacts.toml.parse().unwrap();
         let pk0is = parsed
             .get("pk0is")
             .and_then(|value| value.as_array())
@@ -167,7 +175,14 @@ mod tests {
         assert!(!pk1is.is_empty());
 
         let temp_dir = TempDir::new().unwrap();
-        write_artifacts(&toml, &template, &configs, &wrapper, Some(temp_dir.path()));
+        write_artifacts(
+            &artifacts.toml,
+            &artifacts.template,
+            &artifacts.configs,
+            &artifacts.wrapper,
+            Some(temp_dir.path()),
+        )
+        .unwrap();
 
         let output_path = temp_dir.path().join("Prover.toml");
         assert!(output_path.exists());
@@ -176,8 +191,8 @@ mod tests {
         assert!(content.contains("pk0is"));
         assert!(content.contains("pk1is"));
 
-        assert!(toml.contains("[[pk0is]]"));
-        assert!(toml.contains("[[pk1is]]"));
+        assert!(artifacts.toml.contains("[[pk0is]]"));
+        assert!(artifacts.toml.contains("[[pk1is]]"));
 
         let template_path = temp_dir.path().join("main.nr");
         assert!(template_path.exists());

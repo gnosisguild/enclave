@@ -90,12 +90,10 @@ pub struct Sample {
     pub public_key: PublicKey,
 }
 
-#[derive(Debug)]
-pub enum CircuitArtifacts {
-    PkBfv {
-        toml: Toml,
-        configs: Configs,
-        template: Template,
-        wrapper: Wrapper,
-    },
+#[derive(Debug, Clone)]
+pub struct Artifacts {
+    pub toml: Toml,
+    pub configs: Configs,
+    pub template: Template,
+    pub wrapper: Wrapper,
 }

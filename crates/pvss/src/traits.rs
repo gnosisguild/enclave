@@ -59,7 +59,7 @@ pub trait Circuit: Send + Sync {
     }
 }
 
-pub trait CircuitMeta: Send + Sync {
+pub trait CircuitMetadata: Send + Sync {
     fn name(&self) -> &'static str;
     fn supported_parameter(&self) -> ParameterType;
     fn dkg_input_type(&self) -> Option<DkgInputType>;
@@ -67,7 +67,7 @@ pub trait CircuitMeta: Send + Sync {
     fn n_public_inputs(&self) -> usize;
 }
 
-impl<T: Circuit> CircuitMeta for T {
+impl<T: Circuit> CircuitMetadata for T {
     fn name(&self) -> &'static str {
         T::NAME
     }
@@ -87,4 +87,26 @@ impl<T: Circuit> CircuitMeta for T {
     fn n_public_inputs(&self) -> usize {
         T::N_PUBLIC_INPUTS
     }
+}
+
+pub trait CircuitCodegen: Circuit {
+    type Input;
+    type Error;
+
+    /// Generate artifacts for a circuit.
+    fn codegen(&self, input: Self::Input) -> Result<crate::types::Artifacts, Self::Error>;
+}
+
+pub trait CircuitComputation: Circuit {
+    type Params;
+    type Input;
+    type Output;
+    type Error;
+
+    /// Compute circuit-specific data.
+    fn compute(
+        &self,
+        params: &Self::Params,
+        input: &Self::Input,
+    ) -> Result<Self::Output, Self::Error>;
 }

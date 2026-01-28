@@ -21,7 +21,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Configs {
+pub struct Constants {
     pub n: usize,
     pub l: usize,
     pub moduli: Vec<u64>,
@@ -45,7 +45,7 @@ pub struct Witness {
     pub pk1is: Vec<Vec<BigInt>>,
 }
 
-impl Computation for Configs {
+impl Computation for Constants {
     type Params = BfvParameters;
     type Input = ();
     type Error = std::convert::Infallible;
@@ -53,7 +53,7 @@ impl Computation for Configs {
     fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
         let moduli = params.moduli().to_vec();
 
-        Ok(Configs {
+        Ok(Constants {
             n: params.degree(),
             l: moduli.len(),
             moduli,
@@ -76,7 +76,7 @@ impl Computation for Bits {
 impl Computation for Bounds {
     type Params = BfvParameters;
     type Input = ();
-    type Error = std::convert::Infallible;
+    type Error = crate::errors::CodegenError;
 
     fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
         let mut pk_bound_max = BigUint::from(0u32);
@@ -137,7 +137,7 @@ impl Computation for Witness {
     }
 }
 
-impl ConvertToJson for Configs {
+impl ConvertToJson for Constants {
     fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
         serde_json::to_value(self)
     }
@@ -197,15 +197,15 @@ mod tests {
     }
 
     #[test]
-    fn test_configs_json_roundtrip() {
+    fn test_constants_json_roundtrip() {
         let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
-        let configs = Configs::compute(&params, &()).unwrap();
+        let constants = Constants::compute(&params, &()).unwrap();
 
-        let json = configs.convert_to_json().unwrap();
-        let decoded: Configs = serde_json::from_value(json).unwrap();
+        let json = constants.convert_to_json().unwrap();
+        let decoded: Constants = serde_json::from_value(json).unwrap();
 
-        assert_eq!(decoded.n, configs.n);
-        assert_eq!(decoded.l, configs.l);
-        assert_eq!(decoded.moduli, configs.moduli);
+        assert_eq!(decoded.n, constants.n);
+        assert_eq!(decoded.l, constants.l);
+        assert_eq!(decoded.moduli, constants.moduli);
     }
 }

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::traits::CircuitMeta;
+use crate::traits::CircuitMetadata;
 use crate::types::DkgInputType;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
@@ -25,7 +25,7 @@ pub enum RegistryError {
 
 /// Registry for PVSS circuits.
 pub struct CircuitRegistry {
-    circuits: HashMap<String, Arc<dyn CircuitMeta>>,
+    circuits: HashMap<String, Arc<dyn CircuitMetadata>>,
 }
 
 impl CircuitRegistry {
@@ -37,13 +37,12 @@ impl CircuitRegistry {
     }
 
     /// Register a circuit descriptor under a name.
-    #[allow(dead_code)]
-    fn register(&mut self, circuit: Arc<dyn CircuitMeta>) {
+    pub fn register(&mut self, circuit: Arc<dyn CircuitMetadata>) {
         self.circuits.insert(circuit.name().to_lowercase(), circuit);
     }
 
     /// Get a circuit descriptor from the registry.
-    pub fn get(&self, name: &str) -> Result<Arc<dyn CircuitMeta>, RegistryError> {
+    pub fn get(&self, name: &str) -> Result<Arc<dyn CircuitMetadata>, RegistryError> {
         self.circuits
             .get(&name.to_lowercase())
             .cloned()
@@ -82,6 +81,7 @@ mod tests {
     use crate::traits::Circuit;
 
     #[test]
+    /// Unknown circuits should return an error.
     fn registry_rejects_unknown_circuit() {
         let registry = CircuitRegistry::new();
         assert!(matches!(
@@ -91,6 +91,7 @@ mod tests {
     }
 
     #[test]
+    /// Registry should expose metadata for registered circuits.
     fn registry_reports_expected_metadata() {
         let mut registry = CircuitRegistry::new();
         registry.register(Arc::new(PkBfvCircuit));

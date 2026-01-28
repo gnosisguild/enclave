@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod errors;
 pub mod pk_bfv;
 pub mod registry;
 pub mod sample;
