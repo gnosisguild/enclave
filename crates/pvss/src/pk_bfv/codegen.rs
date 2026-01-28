@@ -193,7 +193,7 @@ mod tests {
 
         let template_content = std::fs::read_to_string(&template_path).unwrap();
         assert!(template_content.contains("pk0is: [Polynomial<N>; L],"));
-        assert!(template_content.contains("pk1is: [Polynomial<N>; L],"));
+        assert!(template_content.contains("pk1is: [Polynomial<N>; L]"));
 
         let wrapper_path = temp_dir.path().join("wrapper.nr");
         assert!(wrapper_path.exists());
