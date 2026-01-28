@@ -75,6 +75,18 @@ impl BfvSearchResult {
     }
 }
 
+/// Search for optimal BFV parameters that satisfy all security constraints.
+///
+/// This function implements a search algorithm that:
+/// 1. Iterates through polynomial degrees d (powers of 2)
+/// 2. For each d, finds the maximum q under the Eq4 constraint
+/// 3. Validates the candidate against Eq1 (noise bound)
+/// 4. Refines the result by decreasing q to find the minimal valid parameters
+///
+/// Returns the first feasible parameter set found, or an error if none exist.
+///
+/// Note: Some resulting parameter sets from this search are hardcoded as presets
+/// in the `presets.rs` file for production use (e.g., `BfvPreset::SecureThresholdBfv8192`).
 pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSearchResult> {
     let prime_items = build_prime_items();
 
@@ -149,6 +161,12 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
     Err(SearchError::NoFeasibleParameters.into())
 }
 
+/// Validate a candidate parameter set and compute all noise bounds.
+///
+/// Computes noise budgets (B_Enc, B_fresh, B_C, B_sm) and checks if Eq1 is satisfied:
+/// 2*(B_C + n*B_sm) < Δ
+///
+/// Returns None if validation fails, otherwise returns the complete result.
 pub fn finalize_bfv_candidate(
     bfv_search_config: &BfvSearchConfig,
     d: u64,
@@ -253,6 +271,11 @@ pub fn finalize_bfv_candidate(
     })
 }
 
+/// Refine parameters by decreasing q in 2-bit steps from an initial feasible set.
+///
+/// Starting from a valid parameter set, this function decreases the bit size of q
+/// by 2 bits per iteration, keeping the last passing configuration before the first failure.
+/// This finds the minimal valid q for the given degree d.
 pub fn refine_from_initial(
     bfv_search_config: &BfvSearchConfig,
     d: u64,
@@ -285,6 +308,11 @@ pub fn refine_from_initial(
     Some(last_passing)
 }
 
+/// Construct a CRT prime selection targeting a specific bit size for q.
+///
+/// Uses a greedy packing strategy: divides target bits by number of primes needed,
+/// then tries combinations of floor/ceil bit-length buckets to get closest to target.
+/// Validates the selection and returns a result if it passes Eq1.
 pub fn construct_qi_for_target_bits(
     bfv_search_config: &BfvSearchConfig,
     d: u64,
@@ -378,6 +406,10 @@ pub fn construct_qi_for_target_bits(
     None
 }
 
+/// Search for a second BFV parameter set with plaintext space derived from the first set.
+///
+/// The plaintext modulus k is set to the next power of 2 above the maximum qi bit length
+/// from the first parameter set. Uses a separate prime pool that includes 62-bit primes.
 pub fn bfv_search_second_param(
     bfv_search_config: &BfvSearchConfig,
     first: &BfvSearchResult,
@@ -433,6 +465,10 @@ pub fn bfv_search_second_param(
     None
 }
 
+/// Refine second parameter set at a fixed degree d by decreasing q.
+///
+/// Collects all passing candidates as q decreases, then selects the one with
+/// the fewest primes (minimizing CRT overhead).
 pub fn refine_second_param_at_d(
     bfv_search_config: &BfvSearchConfig,
     d: u64,
@@ -481,6 +517,10 @@ pub fn refine_second_param_at_d(
     Some(all_passing.into_iter().next().unwrap())
 }
 
+/// Construct CRT prime selection for second parameter set targeting specific bit size.
+///
+/// Similar to `construct_qi_for_target_bits` but uses 62-bit primes and validates
+/// that all qi are more than one bit larger than k_plain.
 pub fn construct_qi_second_param(
     bfv_search_config: &BfvSearchConfig,
     d: u64,
@@ -566,6 +606,10 @@ pub fn construct_qi_second_param(
     None
 }
 
+/// Validate second parameter set with simplified noise bounds.
+///
+/// For the second set, uses B_Enc = B (simpler bound) and checks 2*B_C < Δ.
+/// Also validates that all qi are more than one bit larger than k_plain.
 pub fn finalize_second_param(
     bfv_search_config: &BfvSearchConfig,
     d: u64,

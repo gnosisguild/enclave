@@ -19,6 +19,10 @@ where
     xs.into_iter().fold(BigUint::one(), |acc, x| acc * x)
 }
 
+/// Compute approximate log2 of a BigUint efficiently.
+///
+/// Uses the bit length and top 8 bytes to compute a fractional approximation:
+/// log2(x) ≈ (total_bits - 64) + log2(top_8_bytes)
 pub fn log2_big(x: &BigUint) -> f64 {
     if x.is_zero() {
         return f64::NEG_INFINITY;

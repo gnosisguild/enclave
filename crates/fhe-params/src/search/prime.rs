@@ -10,11 +10,16 @@ use std::collections::BTreeMap;
 use crate::search::constants::NTT_PRIMES_BY_BITS;
 use crate::search::utils::{log2_big, parse_hex_big};
 
+/// Represents an NTT-friendly prime with precomputed metadata.
 #[derive(Debug, Clone)]
 pub struct PrimeItem {
+    /// Bit length of the prime
     pub bitlen: u8,
+    /// Prime value as BigUint
     pub value: BigUint,
+    /// Precomputed log2(value) for efficiency
     pub log2: f64,
+    /// Hexadecimal representation
     pub hex: String,
 }
 
@@ -53,9 +58,11 @@ pub fn build_prime_items_for_second() -> Vec<PrimeItem> {
     build_prime_items_with_filter(|bits| bits == 63 || bits == 61)
 }
 
+/// Greedily select the maximum q under a log2 cap by taking largest primes first.
+///
+/// Iterates through bit lengths from largest to smallest (60 down to 40),
+/// adding primes as long as the cumulative log2(q) stays under the limit.
 pub fn select_max_q_under_cap(limit_log2: f64, all: &[PrimeItem]) -> Vec<PrimeItem> {
-    // Greedy: take largest primes from larger bit-lengths first, mixing buckets,
-    // ensuring log2(q) stays under the cap as we add
     let mut by_bits: BTreeMap<u8, Vec<PrimeItem>> = BTreeMap::new();
     for p in all {
         by_bits.entry(p.bitlen).or_default().push(p.clone());

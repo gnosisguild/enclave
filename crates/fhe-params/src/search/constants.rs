@@ -272,8 +272,9 @@ pub const NTT_PRIMES_BY_BITS: &[(u8, [&str; 6])] = &[
     ),
 ];
 
-/// Bounds to search within for the LWE dimension
+/// Starting polynomial degree (power of 2) for parameter search
 pub const D_POW2_START: u64 = 256;
+/// Maximum polynomial degree (power of 2) to search up to
 pub const D_POW2_MAX: u64 = 32768;
-/// Max number of ciphertext
+/// Maximum number of votes/plaintext additions (k_plain_eff)
 pub const K_MAX: u128 = 1u128 << 25; // 33,554,432
