@@ -29,14 +29,12 @@ pub struct CompiledCircuit {
 }
 
 impl CompiledCircuit {
-    /// Load from JSON string
     pub fn from_json(json: &str) -> Result<Self, NoirProverError> {
         serde_json::from_str(json).map_err(NoirProverError::JsonError)
     }
 
-    /// Load from file
-    pub fn from_file(path: &std::path::Path) -> Result<Self, NoirProverError> {
-        let contents = std::fs::read_to_string(path)?;
+    pub async fn from_file(path: &std::path::Path) -> Result<Self, NoirProverError> {
+        let contents = tokio::fs::read_to_string(path).await?;
         Self::from_json(&contents)
     }
 }
@@ -105,36 +103,24 @@ impl WitnessGenerator {
     /// Generate witness from a compiled circuit and inputs
     ///
     /// Returns serialized witness data ready for `bb prove`
-    pub fn generate_witness(
+    pub async fn generate_witness(
         &self,
         circuit: &CompiledCircuit,
         inputs: InputMap,
     ) -> Result<Vec<u8>, NoirProverError> {
-        // Encode inputs to initial witness using ABI
-        let initial_witness = circuit.abi.encode(&inputs, None).map_err(|e| {
-            NoirProverError::WitnessGenerationFailed(format!("ABI encode: {:?}", e))
-        })?;
+        let bytecode = circuit.bytecode.clone();
+        let abi = circuit.abi.clone();
 
-        // Execute program to solve all witnesses
-        let witness_stack = execute(&circuit.bytecode, initial_witness)?;
+        tokio::task::spawn_blocking(move || {
+            let initial_witness = abi.encode(&inputs, None).map_err(|e| {
+                NoirProverError::WitnessGenerationFailed(format!("ABI encode: {:?}", e))
+            })?;
 
-        // Serialize using bincode + zstd (matches nargo format)
-        serialize_witness(&witness_stack)
-    }
-
-    /// Generate witness directly from bytecode string and inputs
-    pub fn generate_witness_from_bytecode(
-        &self,
-        bytecode: &str,
-        abi: &Abi,
-        inputs: InputMap,
-    ) -> Result<Vec<u8>, NoirProverError> {
-        let initial_witness = abi.encode(&inputs, None).map_err(|e| {
-            NoirProverError::WitnessGenerationFailed(format!("ABI encode: {:?}", e))
-        })?;
-
-        let witness_stack = execute(bytecode, initial_witness)?;
-        serialize_witness(&witness_stack)
+            let witness_stack = execute(&bytecode, initial_witness)?;
+            serialize_witness(&witness_stack)
+        })
+        .await
+        .map_err(|e| NoirProverError::WitnessGenerationFailed(e.to_string()))?
     }
 }
 
@@ -172,34 +158,27 @@ mod tests {
         assert_eq!(circuit.abi.parameters.len(), 3);
     }
 
-    #[test]
-    fn test_generate_witness() {
+    #[tokio::test]
+    async fn test_generate_witness() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
-
         let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
 
-        let witness = generator.generate_witness(&circuit, inputs).unwrap();
+        let witness = generator.generate_witness(&circuit, inputs).await.unwrap();
 
-        // Should be valid gzip (magic bytes: 0x1f 0x8b)
         assert!(witness.len() > 2);
         assert_eq!(witness[0], 0x1f);
         assert_eq!(witness[1], 0x8b);
-
-        println!("Generated witness: {} bytes", witness.len());
     }
 
-    #[test]
-    fn test_wrong_sum_fails() {
+    #[tokio::test]
+    async fn test_wrong_sum_fails() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
-
-        // Wrong sum: 5 + 3 != 10
         let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]);
 
-        let result = generator.generate_witness(&circuit, inputs);
+        let result = generator.generate_witness(&circuit, inputs).await;
 
-        // Should fail because constraint is not satisfied
         assert!(result.is_err());
     }
 }
