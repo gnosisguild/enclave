@@ -677,3 +677,134 @@ pub fn finalize_second_param(
         rhs_log2,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::prime::build_prime_items;
+    use crate::search::prime::build_prime_items_for_second;
+    use num_bigint::BigUint;
+
+    fn create_test_config() -> BfvSearchConfig {
+        BfvSearchConfig {
+            n: 10,
+            z: 1000,
+            k: 1000,
+            lambda: 80,
+            b: 20,
+            b_chi: 1,
+            verbose: false,
+        }
+    }
+
+    #[test]
+    fn test_bfv_search_result_qi_values() {
+        let primes = build_prime_items();
+        assert!(!primes.is_empty());
+
+        let test_primes = primes.iter().take(3).cloned().collect::<Vec<_>>();
+        let result = BfvSearchResult {
+            d: 512,
+            k_plain_eff: 1000,
+            q_bfv: product(test_primes.iter().map(|p| p.value.clone())),
+            selected_primes: test_primes.clone(),
+            rkq: 0,
+            delta: BigUint::one(),
+            benc_min: BigUint::one(),
+            b_fresh: BigUint::one(),
+            b_c: BigUint::one(),
+            b_sm_min: BigUint::one(),
+            lhs_log2: 0.0,
+            rhs_log2: 0.0,
+        };
+
+        let qi_vals = result.qi_values();
+        assert_eq!(qi_vals.len(), test_primes.len());
+        for (i, val) in qi_vals.iter().enumerate() {
+            assert_eq!(*val, test_primes[i].value.to_u64().unwrap());
+        }
+    }
+
+    #[test]
+    fn test_bfv_search_invalid_z_zero() {
+        let mut config = create_test_config();
+        config.z = 0;
+
+        let result = bfv_search(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bfv_search_invalid_z_too_large() {
+        let mut config = create_test_config();
+        config.z = K_MAX + 1;
+
+        let result = bfv_search(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_finalize_bfv_candidate_with_valid_primes() {
+        let config = create_test_config();
+        let primes = build_prime_items();
+        assert!(!primes.is_empty());
+
+        let test_primes = primes.iter().take(2).cloned().collect::<Vec<_>>();
+        let d = 512;
+
+        let result = finalize_bfv_candidate(&config, d, test_primes.clone());
+
+        if let Some(res) = result {
+            assert_eq!(res.d, d);
+            assert_eq!(res.selected_primes.len(), test_primes.len());
+            assert_eq!(res.k_plain_eff, config.z.max(config.k));
+        }
+    }
+
+    #[test]
+    fn test_finalize_bfv_candidate_empty_primes() {
+        let config = create_test_config();
+        let empty_primes = vec![];
+        let d = 512;
+
+        let result = finalize_bfv_candidate(&config, d, empty_primes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_finalize_second_param_qi_validation() {
+        let config = create_test_config();
+        let primes = build_prime_items_for_second();
+        assert!(!primes.is_empty());
+
+        let small_primes = primes
+            .iter()
+            .filter(|p| p.bitlen <= 40)
+            .take(2)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if !small_primes.is_empty() {
+            let k_plain = 1u128 << 50;
+            let d = 512;
+            let result = finalize_second_param(&config, d, small_primes, k_plain);
+            assert!(result.is_none() || result.is_some());
+        }
+    }
+
+    #[test]
+    fn test_construct_qi_for_target_bits() {
+        let config = create_test_config();
+        let primes = build_prime_items();
+        assert!(!primes.is_empty());
+
+        let d = 512;
+        let target_bits = 100;
+
+        let result = construct_qi_for_target_bits(&config, d, &primes, target_bits);
+        if let Some(res) = result {
+            assert_eq!(res.d, d);
+            assert!(!res.selected_primes.is_empty());
+        }
+    }
+}

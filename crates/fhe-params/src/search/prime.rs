@@ -90,3 +90,90 @@ pub fn select_max_q_under_cap(limit_log2: f64, all: &[PrimeItem]) -> Vec<PrimeIt
 
     sel
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::utils::parse_hex_big;
+
+    #[test]
+    fn test_build_prime_items() {
+        let items = build_prime_items();
+        assert!(!items.is_empty());
+
+        // Verify no 61, 62, or 63-bit primes are included
+        for item in &items {
+            assert_ne!(item.bitlen, 61);
+            assert_ne!(item.bitlen, 62);
+            assert_ne!(item.bitlen, 63);
+        }
+
+        // Verify items have correct structure
+        for item in &items {
+            assert_eq!(parse_hex_big(&item.hex), item.value);
+            assert!(item.log2 > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_build_prime_items_for_second() {
+        let items = build_prime_items_for_second();
+        assert!(!items.is_empty());
+
+        // Verify no 61 or 63-bit primes are included, but 62-bit should be included
+        assert!(items.iter().any(|item| item.bitlen == 62));
+        for item in &items {
+            assert_ne!(item.bitlen, 61);
+            assert_ne!(item.bitlen, 63);
+        }
+
+        // Verify items have correct structure
+        for item in &items {
+            assert_eq!(parse_hex_big(&item.hex), item.value);
+            assert!(item.log2 > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_select_max_q_under_cap() {
+        let all = build_prime_items();
+        assert!(!all.is_empty());
+
+        // Test with a reasonable cap
+        let limit_log2 = 100.0;
+        let selected = select_max_q_under_cap(limit_log2, &all);
+
+        // Verify selected items are under the cap
+        let mut total_log2 = 0.0;
+        for item in &selected {
+            total_log2 += item.log2;
+        }
+        assert!(total_log2 <= limit_log2 + 1e-12);
+
+        // Verify selected items are from the input
+        for sel_item in &selected {
+            assert!(all.iter().any(|item| item.hex == sel_item.hex));
+        }
+    }
+
+    #[test]
+    fn test_select_max_q_under_cap_small_limit() {
+        let all = build_prime_items();
+        let limit_log2 = 50.0;
+        let selected = select_max_q_under_cap(limit_log2, &all);
+
+        // With a small limit, we should get fewer items
+        let mut total_log2 = 0.0;
+        for item in &selected {
+            total_log2 += item.log2;
+        }
+        assert!(total_log2 <= limit_log2 + 1e-12);
+    }
+
+    #[test]
+    fn test_select_max_q_under_cap_empty_input() {
+        let empty: Vec<PrimeItem> = vec![];
+        let selected = select_max_q_under_cap(100.0, &empty);
+        assert!(selected.is_empty());
+    }
+}

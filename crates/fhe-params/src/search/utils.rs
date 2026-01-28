@@ -55,3 +55,64 @@ pub fn fmt_big_summary(x: &BigUint) -> String {
 pub fn big_shift_pow2(exp: u32) -> BigUint {
     BigUint::one() << exp
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_bigint::BigUint;
+
+    #[test]
+    fn test_parse_hex_big() {
+        assert_eq!(parse_hex_big("0xff"), BigUint::from(255u64));
+        assert_eq!(parse_hex_big("ff"), BigUint::from(255u64));
+        assert_eq!(parse_hex_big("0x100"), BigUint::from(256u64));
+        assert_eq!(parse_hex_big("0x1a2b3c"), BigUint::from(1715004u64));
+    }
+
+    #[test]
+    fn test_product() {
+        let nums = vec![
+            BigUint::from(2u64),
+            BigUint::from(3u64),
+            BigUint::from(4u64),
+        ];
+        assert_eq!(product(nums), BigUint::from(24u64));
+
+        let empty: Vec<BigUint> = vec![];
+        assert_eq!(product(empty), BigUint::one());
+    }
+
+    #[test]
+    fn test_log2_big() {
+        assert_eq!(log2_big(&BigUint::zero()), f64::NEG_INFINITY);
+
+        // Function returns approximation, just verify it's positive for non-zero values
+        assert!(log2_big(&BigUint::from(256u64)) > 0.0);
+        assert!(log2_big(&BigUint::from(1024u64)) > 0.0);
+        assert!(log2_big(&BigUint::from(1024u64)) > log2_big(&BigUint::from(256u64)));
+    }
+
+    #[test]
+    fn test_approx_bits_from_log2() {
+        assert_eq!(approx_bits_from_log2(0.0), 1);
+        assert_eq!(approx_bits_from_log2(1.0), 2);
+        assert_eq!(approx_bits_from_log2(8.0), 9);
+        assert_eq!(approx_bits_from_log2(-1.0), 1);
+    }
+
+    #[test]
+    fn test_fmt_big_summary() {
+        let x = BigUint::from(256u64);
+        let summary = fmt_big_summary(&x);
+        assert!(summary.contains("2^"));
+        assert!(summary.contains("bits"));
+    }
+
+    #[test]
+    fn test_big_shift_pow2() {
+        assert_eq!(big_shift_pow2(0), BigUint::one());
+        assert_eq!(big_shift_pow2(1), BigUint::from(2u64));
+        assert_eq!(big_shift_pow2(8), BigUint::from(256u64));
+        assert_eq!(big_shift_pow2(10), BigUint::from(1024u64));
+    }
+}
