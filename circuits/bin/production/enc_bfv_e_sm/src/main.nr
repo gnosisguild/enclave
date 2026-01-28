@@ -6,7 +6,7 @@
 
 use lib::configs::production::bfv::{
     ENC_BFV_BIT_CT, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2,
-    ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS_E_SM, L, N,
+    ENC_BFV_BIT_PK, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_U, ENC_BFV_CONFIGS_E_SM, L_PRIME, N,
 };
 use lib::core::bfv_enc::EncryptionBfv;
 use lib::math::polynomial::Polynomial;
@@ -14,22 +14,22 @@ use lib::math::polynomial::Polynomial;
 fn main(
     expected_pk_commitment: pub Field,
     expected_message_commitment: pub Field,
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
-    ct0is: pub [Polynomial<N>; L],
-    ct1is: pub [Polynomial<N>; L],
+    pk0is: [Polynomial<N>; L_PRIME],
+    pk1is: [Polynomial<N>; L_PRIME],
+    ct0is: pub [Polynomial<N>; L_PRIME],
+    ct1is: pub [Polynomial<N>; L_PRIME],
     u: Polynomial<N>,
     e0: Polynomial<N>,
-    e0is: [Polynomial<N>; L],
-    e0_quotients: [Polynomial<N>; L],
+    e0is: [Polynomial<N>; L_PRIME],
+    e0_quotients: [Polynomial<N>; L_PRIME],
     e1: Polynomial<N>,
     message: Polynomial<N>,
-    r1is: [Polynomial<(2 * N) - 1>; L],
-    r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<(2 * N) - 1>; L],
-    p2is: [Polynomial<N - 1>; L],
+    r1is: [Polynomial<(2 * N) - 1>; L_PRIME],
+    r2is: [Polynomial<N - 1>; L_PRIME],
+    p1is: [Polynomial<(2 * N) - 1>; L_PRIME],
+    p2is: [Polynomial<N - 1>; L_PRIME],
 ) {
-    let enc_bfv: EncryptionBfv<N, L, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
+    let enc_bfv: EncryptionBfv<N, L_PRIME, ENC_BFV_BIT_PK, ENC_BFV_BIT_CT, ENC_BFV_BIT_U, ENC_BFV_BIT_E0, ENC_BFV_BIT_E1, ENC_BFV_BIT_MSG, ENC_BFV_BIT_R1, ENC_BFV_BIT_R2, ENC_BFV_BIT_P1, ENC_BFV_BIT_P2> = EncryptionBfv::new(
         ENC_BFV_CONFIGS_E_SM,
         expected_pk_commitment,
         expected_message_commitment,
