@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
 use e3_noir_prover::{
     input_map, CircuitProverExt, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus,
@@ -16,6 +14,7 @@ use e3_pvss::sample::generate_sample;
 use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
 use e3_zk_helpers::commitments::compute_pk_bfv_commitment;
 use num_bigint::BigInt;
+use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::{fs, process::Command};
 
