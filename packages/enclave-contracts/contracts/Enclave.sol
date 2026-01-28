@@ -131,16 +131,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param encryptionSchemeId The ID of the invalid encryption scheme.
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
 
-    /// @notice Thrown when attempting to publish input after the computation deadline has passed.
-    /// @param e3Id The ID of the E3.
-    /// @param expiration The expiration timestamp that has passed.
-    error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
-
-    /// @notice Thrown when attempting to publish output before the input deadline has passed.
-    /// @param e3Id The ID of the E3.
-    /// @param expiration The expiration timestamp that has not yet passed.
-    error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-
     /// @notice Thrown when attempting to set an invalid ciphernode registry address.
     /// @param ciphernodeRegistry The invalid ciphernode registry address.
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
@@ -152,9 +142,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Thrown when output verification fails.
     /// @param output The invalid output data.
     error InvalidOutput(bytes output);
-
-    /// @notice Thrown when input data is invalid.
-    error InvalidInput();
 
     /// @notice Thrown when the start window parameters are invalid.
     error InvalidStartWindow();
@@ -201,6 +188,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Caller not authorized
     error Unauthorized();
+
+    /// @notice The Input deadline is invalid
+    error InvalidInputDeadline(uint256 deadline);
+
+    /// @notice The duties are completed, and ciphernodes are not required to act anymore for this E3
+    /// @param e3Id The ID of the E3
+    /// @param expiration The expiration timestamp of the E3
+    error CommitteeDutiesCompleted(uint256 e3Id, uint256 expiration);
+
+    /// @notice The input deadline has not yet been reached
+    /// @param e3Id The ID of the E3
+    /// @param inputDeadline The input deadline timestamp of the E3
+    error InputDeadlineNotReached(uint256 e3Id, uint256 inputDeadline);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -287,6 +287,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidDuration(requestParams.duration)
         );
         require(
+            requestParams.inputDeadline >= block.timestamp,
+            InvalidInputDeadline(requestParams.inputDeadline)
+        );
+        require(
             e3Programs[requestParams.e3Program],
             E3ProgramNotAllowed(requestParams.e3Program)
         );
@@ -300,6 +304,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.threshold = requestParams.threshold;
         e3.requestBlock = block.number;
         e3.startWindow = requestParams.startWindow;
+        e3.inputDeadline = requestParams.inputDeadline;
         e3.duration = requestParams.duration;
         e3.expiration = 0;
         e3.e3Program = requestParams.e3Program;
@@ -384,26 +389,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @inheritdoc IEnclave
-    function publishInput(
-        uint256 e3Id,
-        bytes calldata data
-    ) external returns (bool success) {
-        E3 memory e3 = getE3(e3Id);
-
-        // Note: if we make 0 a no expiration, this has to be refactored
-        require(e3.expiration > 0, E3NotActivated(e3Id));
-        // TODO: should we have an input window, including both a start and end timestamp?
-        require(
-            e3.expiration > block.timestamp,
-            InputDeadlinePassed(e3Id, e3.expiration)
-        );
-
-        e3.e3Program.validateInput(e3Id, msg.sender, data);
-
-        success = true;
-    }
-
-    /// @inheritdoc IEnclave
     function publishCiphertextOutput(
         uint256 e3Id,
         bytes calldata ciphertextOutput,
@@ -413,9 +398,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
+        // You cannot post output after the commitee duties have completed
         require(
-            e3.expiration <= block.timestamp,
-            InputDeadlineNotPassed(e3Id, e3.expiration)
+            e3.expiration >= block.timestamp,
+            CommitteeDutiesCompleted(e3Id, e3.expiration)
+        );
+        // The program need to have stopped accepting inputs
+        require(
+            block.timestamp >= e3.inputDeadline,
+            InputDeadlineNotReached(e3Id, e3.inputDeadline)
         );
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
@@ -452,8 +443,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
-        // Note: if we make 0 a no expiration, this has to be refactored
-        require(e3.expiration > 0, E3NotActivated(e3Id));
+        // There must be a ciphertext to decrypt first
         require(
             e3.ciphertextOutput != bytes32(0),
             CiphertextOutputNotPublished(e3Id)

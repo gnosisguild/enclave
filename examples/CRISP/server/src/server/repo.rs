@@ -170,6 +170,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         token_address: String,
         balance_threshold: String,
         requester: String,
+        input_deadline: u64,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
@@ -184,6 +185,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             balance_threshold,
             ciphertext_inputs: vec![],
             requester,
+            input_deadline,
         })
         .await
     }
@@ -267,6 +269,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             id: self.e3_id,
             status: e3_crisp.status,
             chain_id: e3.chain_id,
+            input_deadline: e3.input_deadline,
             duration: e3.duration,
             vote_count: u64::try_from(e3_crisp.has_voted.len())?,
             start_time: e3_crisp.start_time,
@@ -277,6 +280,12 @@ impl<S: DataStore> CrispE3Repository<S> {
             balance_threshold: e3_crisp.balance_threshold,
             requester: e3_crisp.requester,
         })
+    }
+
+    /// Get the input deadline for the current round
+    pub async fn get_input_deadline(&self) -> Result<u64> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.input_deadline)
     }
 
     pub async fn get_ciphertext_inputs(&self) -> Result<Vec<(Vec<u8>, u64)>> {

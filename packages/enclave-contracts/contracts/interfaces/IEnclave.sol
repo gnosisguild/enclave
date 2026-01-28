@@ -214,7 +214,8 @@ interface IEnclave {
     /// @notice This struct contains the parameters to submit a request to Enclave.
     /// @param threshold The M/N threshold for the committee.
     /// @param startWindow The start window for the computation.
-    /// @param duration The duration of the computation in seconds.
+    /// @param inputDeadline When the program will stop accepting inputs.
+    /// @param duration How long should ciphernodes be active for.
     /// @param e3Program The address of the E3 Program.
     /// @param e3ProgramParams The ABI encoded computation parameters.
     /// @param computeProviderParams The ABI encoded compute provider parameters.
@@ -222,6 +223,7 @@ interface IEnclave {
     struct E3RequestParams {
         uint32[2] threshold;
         uint256[2] startWindow;
+        uint256 inputDeadline;
         uint256 duration;
         IE3Program e3Program;
         bytes e3ProgramParams;
@@ -252,17 +254,6 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @return success True if the E3 was successfully activated.
     function activate(uint256 e3Id) external returns (bool success);
-
-    /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
-    /// @dev This function MUST revert if the E3 is not yet activated.
-    /// @dev This function MUST emit the InputPublished event.
-    /// @param e3Id ID of the E3.
-    /// @param data ABI encoded input data to publish.
-    /// @return success True if the input was successfully published.
-    function publishInput(
-        uint256 e3Id,
-        bytes calldata data
-    ) external returns (bool success);
 
     /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the CiphertextOutputPublished event.

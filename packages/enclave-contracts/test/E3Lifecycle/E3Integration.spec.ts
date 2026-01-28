@@ -275,6 +275,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         threshold: [2, 2] as [number, number],
         startWindow: [startTime, startTime + ONE_DAY] as [number, number],
         duration: ONE_DAY,
+        inputDeadline: startTime + ONE_DAY - 300,
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
         // computeProviderParams must be exactly 32 bytes for MockE3Program.validate
@@ -877,6 +878,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         threshold: [2, 2] as [number, number],
         startWindow: [startTime, activationDeadline] as [number, number],
         duration: ONE_DAY,
+        inputDeadline: startTime + ONE_DAY - 300,
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
         computeProviderParams: abiCoder.encode(
@@ -1077,7 +1079,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // 4. Publish ciphertext output
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) + 1);
+      await time.increaseTo(Number(e3.expiration) - 100);
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";
@@ -1144,6 +1146,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           threshold: [2, 2] as [number, number],
           startWindow: [startTime, startTime + ONE_DAY] as [number, number],
           duration: ONE_DAY,
+          inputDeadline: startTime + ONE_DAY - 300,
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
           computeProviderParams: abiCoder.encode(
@@ -1225,6 +1228,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           threshold: [2, 2] as [number, number],
           startWindow: [startTime, startTime + ONE_DAY] as [number, number],
           duration: ONE_DAY,
+          inputDeadline: startTime + ONE_DAY - 300,
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
           computeProviderParams: abiCoder.encode(
@@ -1317,7 +1321,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // 4. Publish ciphertext output (after input deadline)
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) + 1);
+      await time.increaseTo(Number(e3.expiration) - 100);
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";
@@ -1374,7 +1378,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // Publish outputs
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) + 1);
+      await time.increaseTo(Number(e3.expiration) - 100);
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";

@@ -14,6 +14,7 @@ pub struct E3 {
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub ciphertext_output: Vec<u8>,
     pub committee_public_key: Vec<u8>,
+    pub input_deadline: u64,
     pub duration: u64,
     pub e3_params: Vec<u8>,
     pub custom_params: Vec<u8>,

@@ -45,6 +45,7 @@ contract FakeEnclave {
       threshold: [uint32(2), uint32(3)],
       requestBlock: 18750000,
       startWindow: [uint256(18750100), uint256(18750200)],
+      inputDeadline: 18750300,
       duration: 100,
       expiration: block.timestamp + 1 days,
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
@@ -64,6 +65,7 @@ struct E3 {
   uint32[2] threshold;
   uint256 requestBlock;
   uint256[2] startWindow;
+  uint256 inputDeadline;
   uint256 duration;
   uint256 expiration;
   bytes32 encryptionSchemeId;

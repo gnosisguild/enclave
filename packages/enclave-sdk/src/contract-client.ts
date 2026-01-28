@@ -102,11 +102,12 @@ export class ContractClient {
 
   /**
    * Request a new E3 computation
-   * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
+   * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 inputDeadline, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
     threshold: [number, number],
     startWindow: [bigint, bigint],
+    inputDeadline: bigint,
     duration: bigint,
     e3Program: `0x${string}`,
     e3ProgramParams: `0x${string}`,
@@ -137,6 +138,7 @@ export class ContractClient {
           {
             threshold,
             startWindow,
+            inputDeadline,
             duration,
             e3Program,
             e3ProgramParams,
@@ -190,42 +192,6 @@ export class ContractClient {
       return hash
     } catch (error) {
       throw new SDKError(`Failed to activate E3: ${error}`, 'ACTIVATE_E3_FAILED')
-    }
-  }
-
-  /**
-   * Publish input for an E3 computation
-   * publishInput(uint256 e3Id, bytes memory data)
-   */
-  public async publishInput(e3Id: bigint, data: `0x${string}`, gasLimit?: bigint): Promise<Hash> {
-    if (!this.walletClient) {
-      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
-    }
-
-    if (!this.contractInfo) {
-      await this.initialize()
-    }
-
-    try {
-      const account = this.walletClient.account
-      if (!account) {
-        throw new SDKError('No account connected', 'NO_ACCOUNT')
-      }
-
-      const { request } = await this.publicClient.simulateContract({
-        address: this.addresses.enclave,
-        abi: Enclave__factory.abi,
-        functionName: 'publishInput',
-        args: [e3Id, data],
-        account,
-        gas: gasLimit,
-      })
-
-      const hash = await this.walletClient.writeContract(request)
-
-      return hash
-    } catch (error) {
-      throw new SDKError(`Failed to publish input: ${error}`, 'PUBLISH_INPUT_FAILED')
     }
   }
 

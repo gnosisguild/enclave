@@ -234,6 +234,11 @@
             },
             {
               "internalType": "uint256",
+              "name": "inputDeadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
               "name": "duration",
               "type": "uint256"
             },
@@ -702,6 +707,11 @@
             },
             {
               "internalType": "uint256",
+              "name": "inputDeadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
               "name": "duration",
               "type": "uint256"
             },
@@ -777,6 +787,11 @@
               "internalType": "uint256[2]",
               "name": "startWindow",
               "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "inputDeadline",
+              "type": "uint256"
             },
             {
               "internalType": "uint256",
@@ -1018,30 +1033,6 @@
         },
         {
           "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        }
-      ],
-      "name": "publishInput",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
           "name": "plaintextOutput",
           "type": "bytes"
         },
@@ -1075,6 +1066,11 @@
               "internalType": "uint256[2]",
               "name": "startWindow",
               "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "inputDeadline",
+              "type": "uint256"
             },
             {
               "internalType": "uint256",
@@ -1135,6 +1131,11 @@
               "internalType": "uint256[2]",
               "name": "startWindow",
               "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "inputDeadline",
+              "type": "uint256"
             },
             {
               "internalType": "uint256",
@@ -1330,5 +1331,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-3db8a4d4e06448b0e2b45004faf38774a5464329"
+  "buildInfoId": "solc-0_8_28-f60579663c6e7444d5163f3c20aab12b3e57c6df"
 }
