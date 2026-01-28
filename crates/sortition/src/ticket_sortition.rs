@@ -7,6 +7,7 @@
 use crate::ticket::{calculate_best_ticket_for_node, RegisteredNode, WinnerTicket};
 use alloy::primitives::Address;
 use anyhow::Result;
+use e3_events::{E3id, Seed};
 use std::collections::{hash_map::Entry, HashMap};
 
 /// Deterministic committee selection based on ticket scores.
@@ -30,13 +31,19 @@ impl ScoreSortition {
     /// Determine the top-N committee members from a list of registered nodes.
     ///
     /// # Parameters
+    /// - `e3_id`: The E3 computation ID.
     /// - `seed`: Round seed used for deterministic ticket scoring.
     /// - `nodes`: Snapshot of all registered nodes (each with its tickets).
     ///
     /// # Returns
     /// A sorted vector of `WinnerTicket`s representing the selected committee.
     /// Returns an empty vector if no nodes have tickets or if `size == 0`.
-    pub fn get_committee(&self, seed: u64, nodes: &[RegisteredNode]) -> Result<Vec<WinnerTicket>> {
+    pub fn get_committee(
+        &self,
+        e3_id: E3id,
+        seed: Seed,
+        nodes: &[RegisteredNode],
+    ) -> Result<Vec<WinnerTicket>> {
         if nodes.is_empty() || self.size == 0 {
             return Ok(Vec::new());
         }
@@ -48,7 +55,7 @@ impl ScoreSortition {
                 continue;
             }
 
-            let w = calculate_best_ticket_for_node(seed, n)?;
+            let w = calculate_best_ticket_for_node(e3_id.clone(), seed, n)?;
             match best_map.entry(w.address) {
                 Entry::Vacant(v) => {
                     v.insert(w);
@@ -83,7 +90,8 @@ impl ScoreSortition {
 mod tests {
     use crate::ticket::{RegisteredNode, Ticket, WinnerTicket};
     use crate::ticket_sortition::ScoreSortition;
-    use alloy::primitives::{keccak256, Address};
+    use alloy::primitives::{keccak256, Address, Uint};
+    use e3_events::{E3id, Seed};
     use std::collections::HashSet;
 
     fn ticket_count(i: u64) -> u64 {
@@ -118,8 +126,9 @@ mod tests {
 
     #[test]
     fn test_ticket_sortition() {
-        let seed: u64 = 0xA1B2_C3D4_E5F6_7789;
         let committee_size: usize = 3;
+        let e3_id = E3id::new("42", 42);
+        let seed = Seed::from(Uint::from(0xA1B2_C3D4_E5F6_7789u64));
 
         let nodes = build_nodes();
         assert_eq!(nodes.len(), 10);
@@ -135,14 +144,14 @@ mod tests {
         }
 
         let committee: Vec<WinnerTicket> = ScoreSortition::new(committee_size)
-            .get_committee(seed, &nodes)
+            .get_committee(e3_id, seed, &nodes)
             .expect("score sortition should succeed");
         assert_eq!(committee.len(), committee_size);
 
         // Check winners deterministically for the given seed
         assert_eq!(committee[0].address, nodes[9].address);
-        assert_eq!(committee[1].address, nodes[1].address);
-        assert_eq!(committee[2].address, nodes[0].address);
+        assert_eq!(committee[1].address, nodes[2].address);
+        assert_eq!(committee[2].address, nodes[1].address);
 
         println!("COMMITTEE {:#?}", committee);
     }

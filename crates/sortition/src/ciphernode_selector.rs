@@ -110,9 +110,11 @@ impl Handler<E3Requested> for CiphernodeSelector {
         Box::pin(async move {
             let seed = data.seed;
             let size = data.threshold_n;
+            let e3_id = data.e3_id.clone();
             info!(
-                "Calling GetNodeIndex address={} seed={} size={}",
+                "Calling GetNodeIndex address={} e3_id={} seed={} size={}",
                 address.clone(),
+                e3_id,
                 seed,
                 size
             );
@@ -120,6 +122,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
             // then decorate it with this information WithIndex<E3Requested>
             if let Ok(found_result) = sortition
                 .send(GetNodeIndex {
+                    e3_id: e3_id.clone(),
                     chain_id,
                     seed,
                     address: address.clone(),
