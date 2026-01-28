@@ -3319,6 +3319,7 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-zk-helpers",
  "fhe",
  "fhe-math",
  "itertools 0.14.0",

@@ -11,6 +11,7 @@ e3-polynomial = { workspace = true }
 fhe = { workspace = true }
 fhe-math = { workspace = true }
 e3-fhe-params = { workspace = true }
+e3-zk-helpers = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 rand = { workspace = true }

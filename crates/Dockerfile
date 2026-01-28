@@ -80,6 +80,7 @@ COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
+COPY crates/pvss/Cargo.toml ./pvss/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs

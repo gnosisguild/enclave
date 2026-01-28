@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::circuits::pk_bfv::{PK_BFV_CIRCUIT_NAME, PK_BFV_N_PROOFS, PK_BFV_N_PUBLIC_INPUTS};
+use crate::pk_bfv::{PK_BFV_CIRCUIT_NAME, PK_BFV_N_PROOFS, PK_BFV_N_PUBLIC_INPUTS};
+use crate::DkgInputType;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -22,6 +23,8 @@ pub struct ZKCircuit {
 #[derive(Clone)]
 pub struct CircuitComputeMetadata {
     supported_parameter: ParameterType,
+    #[allow(dead_code)]
+    dkg_input_type: Option<DkgInputType>,
 }
 
 #[derive(Clone)]
@@ -53,6 +56,7 @@ impl CircuitRegistry {
             PK_BFV_CIRCUIT_NAME,
             CircuitComputeMetadata {
                 supported_parameter: ParameterType::DKG,
+                dkg_input_type: None,
             },
             CircuitCodegenMetadata {
                 n_proofs: PK_BFV_N_PROOFS,
@@ -160,6 +164,7 @@ mod tests {
 
         assert_eq!(name, PK_BFV_CIRCUIT_NAME);
         assert_eq!(compute.supported_parameter, ParameterType::DKG);
+        assert_eq!(compute.dkg_input_type.is_none(), true);
         assert_eq!(codegen.n_proofs, PK_BFV_N_PROOFS);
         assert_eq!((codegen.n_public_inputs)(), PK_BFV_N_PUBLIC_INPUTS);
     }
