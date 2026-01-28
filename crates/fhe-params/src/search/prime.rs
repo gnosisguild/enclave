@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use num_bigint::BigUint;
-use num_traits::One;
 use std::collections::BTreeMap;
 
 use crate::search::constants::NTT_PRIMES_BY_BITS;
@@ -19,11 +18,15 @@ pub struct PrimeItem {
     pub hex: String,
 }
 
-/// Build a flat list of all primes with precomputed log2 and hex strings.
-pub fn build_prime_items() -> Vec<PrimeItem> {
+/// Filter function type for excluding specific bit lengths
+type BitFilter = fn(u8) -> bool;
+
+/// Build a flat list of primes with precomputed log2 and hex strings.
+/// Excludes primes whose bit length matches the filter predicate.
+fn build_prime_items_with_filter(filter: BitFilter) -> Vec<PrimeItem> {
     let mut vec = Vec::new();
     for (bits, arr) in NTT_PRIMES_BY_BITS.iter() {
-        if *bits == 63 || *bits == 62 || *bits == 61 {
+        if filter(*bits) {
             continue;
         }
         for &phex in arr {
@@ -39,24 +42,15 @@ pub fn build_prime_items() -> Vec<PrimeItem> {
     vec
 }
 
+/// Build a flat list of all primes with precomputed log2 and hex strings.
+/// Excludes 61, 62, and 63-bit primes.
+pub fn build_prime_items() -> Vec<PrimeItem> {
+    build_prime_items_with_filter(|bits| bits == 63 || bits == 62 || bits == 61)
+}
+
 /// Build prime items for second parameter set (includes 62-bit primes, excludes 61 and 63-bit)
 pub fn build_prime_items_for_second() -> Vec<PrimeItem> {
-    let mut vec = Vec::new();
-    for (bits, arr) in NTT_PRIMES_BY_BITS.iter() {
-        if *bits == 63 || *bits == 61 {
-            continue;
-        }
-        for &phex in arr {
-            let v = parse_hex_big(phex);
-            vec.push(PrimeItem {
-                bitlen: *bits,
-                log2: log2_big(&v),
-                hex: phex.to_string(),
-                value: v,
-            });
-        }
-    }
-    vec
+    build_prime_items_with_filter(|bits| bits == 63 || bits == 61)
 }
 
 pub fn select_max_q_under_cap(limit_log2: f64, all: &[PrimeItem]) -> Vec<PrimeItem> {
@@ -71,17 +65,14 @@ pub fn select_max_q_under_cap(limit_log2: f64, all: &[PrimeItem]) -> Vec<PrimeIt
     }
 
     let mut sel: Vec<PrimeItem> = Vec::new();
-    let mut q = BigUint::one();
     let mut qlog = 0.0f64;
 
     for bb in (40u8..=60u8).rev() {
         if let Some(bucket) = by_bits.get_mut(&bb) {
             for pi in bucket.iter() {
-                // tentative
                 let new_qlog = qlog + pi.log2;
                 if new_qlog <= limit_log2 + 1e-12 {
                     sel.push(pi.clone());
-                    q *= &pi.value;
                     qlog = new_qlog;
                 }
             }
