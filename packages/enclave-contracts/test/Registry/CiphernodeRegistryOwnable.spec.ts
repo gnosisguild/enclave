@@ -328,6 +328,7 @@ describe("CiphernodeRegistryOwnable", function () {
       duration: 60 * 60 * 24 * 30, // 30 days
       e3Program: await mockE3Program.mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
+      inputDeadline: currentTime + 500,
       computeProviderParams: abiCoder.encode(
         ["address"],
         [await mockDecryptionVerifier.mockDecryptionVerifier.getAddress()],

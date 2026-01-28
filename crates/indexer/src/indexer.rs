@@ -391,6 +391,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                 let _ = db_clone.modify::<Vec<u8>, _>(&temp_key, |_| None).await;
 
                 let e3 = contract.get_e3(e.e3Id).await?;
+                let input_deadline = u64_try_from(e3.inputDeadline)?;
                 let duration = u64_try_from(e3.duration)?;
                 let expiration = u64_try_from(e.expiration)?;
                 let seed = e3.seed.to_be_bytes();
@@ -407,6 +408,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
                     ciphertext_inputs: vec![],
                     ciphertext_output: vec![],
                     committee_public_key,
+                    input_deadline,
                     duration,
                     custom_params: e3.customParams.to_vec(),
                     e3_params: e3.e3ProgramParams.to_vec(),

@@ -45,8 +45,14 @@ export const requestCommittee = task(
     type: ArgumentType.INT,
   })
   .addOption({
+    name: "inputDeadline",
+    description: "deadline for input submission (default: now + 2 days)",
+    defaultValue: Math.floor(Date.now() / 1000) + 86400 * 2,
+    type: ArgumentType.INT,
+  })
+  .addOption({
     name: "duration",
-    description: "duration in seconds of the E3 (default: 1 day)",
+    description: "duration in seconds of the E3 (default: 3 days)",
     defaultValue: 86400,
     type: ArgumentType.INT,
   })
@@ -82,6 +88,7 @@ export const requestCommittee = task(
         windowStart,
         windowEnd,
         duration,
+        inputDeadline,
         e3Address,
         e3Params,
         computeParams,
@@ -164,12 +171,13 @@ export const requestCommittee = task(
       const requestParams = {
         threshold: [thresholdQuorum, thresholdTotal] as [number, number],
         startWindow: [windowStart, windowEnd] as [number, number],
-        duration: duration,
+        duration,
         e3Program:
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
         computeProviderParams,
         customParams,
+        inputDeadline,
       };
 
       console.log("Request parameters:", requestParams);
@@ -328,55 +336,6 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
       await tx.wait();
 
       console.log(`E3 program activated`);
-    },
-  }))
-  .build();
-
-export const publishInput = task(
-  "e3:publishInput",
-  "Publish input for an E3 program",
-)
-  .addOption({
-    name: "e3Id",
-    description: "Id of the E3 program",
-    defaultValue: 0,
-    type: ArgumentType.INT,
-  })
-  .addOption({
-    name: "data",
-    description: "data to publish",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "dataFile",
-    description: "file containing data to publish",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
-
-      const { enclave } = await deployAndSaveEnclave({
-        hre,
-      });
-
-      let dataToSend = data;
-
-      if (dataFile) {
-        const file = fs.readFileSync(dataFile);
-        dataToSend = file.toString();
-      }
-
-      const tx = await enclave.publishInput(e3Id, dataToSend);
-
-      console.log("Publishing input... ", tx.hash);
-      await tx.wait();
-
-      console.log(`Input published`);
     },
   }))
   .build();

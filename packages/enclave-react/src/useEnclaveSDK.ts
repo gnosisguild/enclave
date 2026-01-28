@@ -35,7 +35,6 @@ export interface UseEnclaveSDKReturn {
   // Contract interaction methods (only the ones commonly used)
   requestE3: typeof EnclaveSDK.prototype.requestE3
   activateE3: typeof EnclaveSDK.prototype.activateE3
-  publishInput: typeof EnclaveSDK.prototype.publishInput
   getThresholdBfvParamsSet: typeof EnclaveSDK.prototype.getThresholdBfvParamsSet
   // Event handling
   onEnclaveEvent: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
@@ -160,14 +159,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     [sdk],
   )
 
-  const publishInput = useCallback(
-    (...args: Parameters<typeof EnclaveSDK.prototype.publishInput>) => {
-      if (!sdk) throw new Error('SDK not initialized')
-      return sdk.publishInput(...args)
-    },
-    [sdk],
-  )
-
   const getThresholdBfvParamsSet = useCallback(async () => {
     if (!sdk) throw new Error('SDK not initialized')
     return sdk.getThresholdBfvParamsSet()
@@ -196,7 +187,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     error,
     requestE3,
     activateE3,
-    publishInput,
     getThresholdBfvParamsSet,
     onEnclaveEvent,
     off,

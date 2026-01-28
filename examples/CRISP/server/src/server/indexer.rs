@@ -104,6 +104,8 @@ pub async fn register_e3_requested(
                     .parse()
                     .with_context(|| "Invalid token address")?;
 
+                let input_deadline = e3.inputDeadline.to::<u64>();
+
                 // Get token holders from Etherscan API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
                     info!(
@@ -170,7 +172,7 @@ pub async fn register_e3_requested(
                 }
 
                 // save the e3 details
-                repo.initialize_round(custom_params, e3.requester.to_string())
+                repo.initialize_round(custom_params, e3.requester.to_string(), input_deadline)
                 .await?;
 
                 // Store eligible addresses in the repository.
@@ -244,7 +246,6 @@ pub async fn register_e3_activated(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             let mut current_round_repo = CurrentRoundRepository::new(store);
-            let expiration = event.expiration.to::<u64>();
 
             info!("[e3_id={}] Handling E3 request", e3_id);
             async move {
@@ -253,6 +254,8 @@ pub async fn register_e3_activated(
                 current_round_repo
                     .set_current_round(CurrentRound { id: e3_id })
                     .await?;
+
+                let expiration = repo.get_input_deadline().await?;
 
                 info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
                 ctx.do_later(expiration, move |_, ctx| {

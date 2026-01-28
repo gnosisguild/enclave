@@ -44,6 +44,7 @@ sol! {
         uint32[2] threshold;
         uint256 requestBlock;
         uint256[2] startWindow;
+        uint256 inputDeadline;
         uint256 duration;
         uint256 expiration;
         bytes32 encryptionSchemeId;
@@ -61,6 +62,7 @@ sol! {
     struct E3RequestParams {
         uint32[2] threshold;
         uint256[2] startWindow;
+        uint256 inputDeadline;
         uint256 duration;
         address e3Program;
         bytes e3ProgramParams;
@@ -78,7 +80,6 @@ sol! {
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
         function activate(uint256 e3Id) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
-        function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
         function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
@@ -116,6 +117,7 @@ pub trait EnclaveRead {
         &self,
         threshold: [u32; 2],
         start_window: [U256; 2],
+        input_deadline: U256,
         duration: U256,
         e3_program: Address,
         e3_params: Bytes,
@@ -131,6 +133,7 @@ pub trait EnclaveWrite {
         &self,
         threshold: [u32; 2],
         start_window: [U256; 2],
+        input_deadline: U256,
         duration: U256,
         e3_program: Address,
         e3_params: Bytes,
@@ -143,9 +146,6 @@ pub trait EnclaveWrite {
 
     /// Enable an E3 program
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt>;
-
-    /// Publish input data for an E3
-    async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt>;
 
     /// Publish ciphertext output with proof
     async fn publish_ciphertext_output(
@@ -342,6 +342,7 @@ where
         &self,
         threshold: [u32; 2],
         start_window: [U256; 2],
+        input_deadline: U256,
         duration: U256,
         e3_program: Address,
         e3_params: Bytes,
@@ -350,6 +351,7 @@ where
         let e3_request = E3RequestParams {
             threshold,
             startWindow: start_window,
+            inputDeadline: input_deadline,
             duration,
             e3Program: e3_program,
             e3ProgramParams: e3_params,
@@ -370,6 +372,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         &self,
         threshold: [u32; 2],
         start_window: [U256; 2],
+        input_deadline: U256,
         duration: U256,
         e3_program: Address,
         e3_params: Bytes,
@@ -388,6 +391,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let e3_request = E3RequestParams {
             threshold,
             startWindow: start_window,
+            inputDeadline: input_deadline,
             duration,
             e3Program: e3_program,
             e3ProgramParams: e3_params.clone(),
@@ -424,20 +428,6 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract.enableE3Program(e3_program).nonce(nonce);
-        let receipt = builder.send().await?.get_receipt().await?;
-
-        Ok(receipt)
-    }
-
-    async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt> {
-        let _guard = NONCE_LOCK.lock().await;
-        let wallet_addr = self
-            .wallet_address
-            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
-        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
-
-        let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishInput(e3_id, data).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok(receipt)

@@ -119,22 +119,25 @@ function getActivationDefer(e3Id: bigint): Defer {
 async function handleE3ActivatedEvent(event: any) {
   const data = event.data as E3ActivatedData
   const e3Id = data.e3Id
-  const expiration = data.expiration
 
   // This allows us to wait until the session has been activated avoiding race conditions
   const def = getActivationDefer(e3Id)
 
-  console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`)
-
   const sessionKey = e3Id.toString()
 
+  const sdk = await createPrivateSDK()
+  const publicClient = sdk.getPublicClient()
+
+  console.log('📡 Fetching E3 data from contract...')
+  const e3 = await sdk.getE3(e3Id)
+
+  console.log('✅ Received E3 data from contract.')
+
+  const expiration = e3.inputDeadline
+
+  console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`)
+
   if (!e3Sessions.has(sessionKey)) {
-    const sdk = await createPrivateSDK()
-    console.log('📡 Fetching E3 data from contract...')
-
-    const e3 = await sdk.getE3(e3Id)
-    console.log('✅ Received E3 data from contract.')
-
     e3Sessions.set(sessionKey, {
       e3Id,
       e3ProgramParams: e3.e3ProgramParams,
@@ -146,7 +149,7 @@ async function handleE3ActivatedEvent(event: any) {
     def.resolve()
   }
 
-  const currentTime = BigInt(Math.floor(Date.now() / 1000))
+  const currentTime = (await publicClient.getBlock()).timestamp
   const sleepSeconds = expiration > currentTime ? Number(expiration - currentTime) : 0
 
   if (sleepSeconds > 0) {

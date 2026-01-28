@@ -55,7 +55,7 @@ contract CRISPProgram is IE3Program, Ownable {
   // Errors
   error CallerNotAuthorized();
   error E3AlreadyInitialized();
-  error E3DoesNotExist();
+  error E3Expired(uint256 e3Id);
   error EnclaveAddressZero();
   error Risc0VerifierAddressZero();
   error InvalidHonkVerifier();
@@ -67,6 +67,8 @@ contract CRISPProgram is IE3Program, Ownable {
   error SlotIsEmpty();
   error MerkleRootNotSet();
   error InvalidNumOptions();
+  error InputDeadlinePassed(uint256 e3Id, uint256 deadline);
+  error E3DoesNotExist();
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -147,9 +149,16 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external {
-    // it should only be called via Enclave for now
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+  function publishInput(uint256 e3Id, bytes memory data) external {
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    if (block.timestamp > e3.inputDeadline) {
+      revert InputDeadlinePassed(e3Id, e3.inputDeadline);
+    }
+
+    if (block.timestamp > e3.expiration) {
+      revert E3Expired(e3Id);
+    }
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
     if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
@@ -162,9 +171,6 @@ contract CRISPProgram is IE3Program, Ownable {
     );
 
     (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
-
-    // Fetch E3 to get committee public key
-    E3 memory e3 = enclave.getE3(e3Id);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
     bytes32[] memory noirPublicInputs = new bytes32[](7);
