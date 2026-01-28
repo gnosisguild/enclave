@@ -184,6 +184,16 @@ describe('Integration', () => {
     transport: http('http://localhost:8545'),
   })
 
+  const publicClient = sdk.getPublicClient()
+
+  const account = privateKeyToAccount(testPrivateKey)
+
+  const walletClient = createWalletClient({
+    account,
+    chain: hardhat,
+    transport: http('http://localhost:8545'),
+  })
+
   it('should run an integration test', async () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
