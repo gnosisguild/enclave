@@ -3535,12 +3535,15 @@ dependencies = [
  "acir",
  "acvm",
  "anyhow",
+ "async-trait",
  "base64",
  "bincode 1.3.3",
  "bn254_blackbox_solver",
  "chrono",
  "directories 5.0.1",
  "e3-fhe-params",
+ "e3-pvss",
+ "e3-zk-helpers",
  "fhe",
  "flate2",
  "futures-util",
@@ -3560,8 +3563,6 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "walkdir",
- "zkfhe-pk-bfv",
- "zkfhe-shared",
 ]
 
 [[package]]
@@ -3590,7 +3591,7 @@ dependencies = [
 [[package]]
 name = "e3-polynomial"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#ffceb25b8eb6bc752530bda33d0c6f6d88b1e33f"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3619,7 +3620,7 @@ version = "0.1.7"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-polynomial",
+ "e3-polynomial 0.1.7",
  "e3-zk-helpers",
  "fhe",
  "fhe-math",
@@ -3632,7 +3633,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
- "toml",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -3675,7 +3676,7 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.7"
-source = "git+https://github.com/gnosisguild/enclave#65c7c61ade0b9d66ce846aa1be3cd4545571553c"
+source = "git+https://github.com/gnosisguild/enclave#ffceb25b8eb6bc752530bda33d0c6f6d88b1e33f"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -10708,29 +10709,6 @@ dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "blake3",
- "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml 0.8.23",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-pk-bfv"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#f3fd30fc4e969f674536c2616639021c15915d71"
-dependencies = [
- "anyhow",
  "blake3",
  "e3-polynomial 0.1.7 (git+https://github.com/gnosisguild/enclave?branch=main)",
  "fhe",
