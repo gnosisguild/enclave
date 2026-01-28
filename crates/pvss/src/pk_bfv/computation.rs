@@ -116,16 +116,18 @@ impl Computation for Witness {
         let pk1_rows = pk1_coeffs.rows();
 
         // Extract and convert public key polynomials per modulus
-        let results: Vec<(Vec<BigInt>, Vec<BigInt>)> = izip!(moduli, pk0_rows, pk1_rows)
-            .par_bridge()
+        // Collect into Vec first to preserve moduli ordering with par_iter
+        let zipped: Vec<_> = izip!(moduli, pk0_rows, pk1_rows).collect();
+        let results: Vec<(Vec<BigInt>, Vec<BigInt>)> = zipped
+            .par_iter()
             .map(|(qi, pk0_coeffs, pk1_coeffs)| {
                 let mut pk0i: Vec<BigInt> =
                     pk0_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
                 let mut pk1i: Vec<BigInt> =
                     pk1_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
 
-                reduce_and_center_coefficients_mut(&mut pk0i, &BigInt::from(*qi));
-                reduce_and_center_coefficients_mut(&mut pk1i, &BigInt::from(*qi));
+                reduce_and_center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
+                reduce_and_center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
 
                 (pk0i, pk1i)
             })

@@ -29,7 +29,7 @@ pub struct CircuitRegistry {
 }
 
 impl CircuitRegistry {
-    /// Build a registry with all known circuits registered.
+    /// Build an empty registry.
     pub fn new() -> Self {
         Self {
             circuits: HashMap::new(),
