@@ -152,7 +152,7 @@ fn main() {
 
     if args.verbose {
         println!(
-            "== BFV parameter search (NTT-friendly primes 40..61 bits; 62-bit and 63-bit are excluded) =="
+            "== BFV parameter search (NTT-friendly primes 40..60 bits; 61-, 62- and 63-bit primes are excluded) =="
         );
         println!(
             "Inputs: n={}  z={} k(user)={}  λ={}  B={} B_chi={}",
