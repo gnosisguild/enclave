@@ -505,8 +505,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     let local_evt_3 = CiphernodeSelected {
         e3_id: E3id::new("1235", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         ..CiphernodeSelected::default()
     };
 
@@ -563,8 +563,8 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Capture messages from output on msgs vec
     let event = E3Requested {
         e3_id: E3id::new("1235", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&[1, 2, 3, 4]),
         ..E3Requested::default()
@@ -600,16 +600,13 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 #[actix::test]
 #[ignore = "Needs to be ported to trBFV system after Sync is completed"]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
-    use e3_bfv_helpers::client::compute_pk_commitment;
+    use e3_bfv_client::{decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64};
     use e3_data::{GetDump, InMemStore};
-    use e3_events::{EventBus, EventBusConfig, GetEvents, Seed, Shutdown, TakeEvents};
-    use e3_sdk::bfv_helpers::{decode_bytes_to_vec_u64, decode_plaintext_to_vec_u64};
-    use e3_test_helpers::{
-        create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
-    };
+    use e3_events::{EventBus, EventBusConfig, GetEvents, Shutdown, TakeEvents};
+    use e3_test_helpers::{create_random_eth_addrs, get_common_setup, simulate_libp2p_net};
     use fhe::{
-        bfv::{BfvParameters, PublicKey, SecretKey},
-        mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
+        bfv::{PublicKey, SecretKey},
+        mbfv::{AggregateIter, PublicKeyShare},
     };
     use fhe_traits::Serialize;
     use std::time::Duration;
@@ -766,7 +763,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     // Publish the ciphertext
     use e3_test_helpers::encrypt_ciphertext;
-    let raw_plaintext = vec![vec![1234, 567890]];
+    let raw_plaintext = vec![vec![4, 5]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.publish(CiphertextOutputPublished {
         ciphertext_output: ciphertext
@@ -811,7 +808,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 #[actix::test]
 #[ignore = "Needs to be ported to trBFV system"]
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
-    use e3_bfv_helpers::client::compute_pk_commitment;
+    use e3_bfv_client::compute_pk_commitment;
     use e3_events::{OrderedSet, PublicKeyAggregated, TakeEvents};
     use e3_test_helpers::{
         create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
@@ -917,8 +914,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Send the computation requested event
     bus.publish(E3Requested {
         e3_id: E3id::new("1234", 1),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
@@ -961,8 +958,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Send the computation requested event
     bus.publish(E3Requested {
         e3_id: E3id::new("1234", 2),
-        threshold_m: 3,
-        threshold_n: 3,
+        threshold_m: 2,
+        threshold_n: 5,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&encode_bfv_params(&params)),
         ..E3Requested::default()
