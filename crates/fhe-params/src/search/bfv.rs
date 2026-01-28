@@ -154,7 +154,7 @@ pub fn finalize_bfv_candidate(
     d: u64,
     chosen: Vec<PrimeItem>,
 ) -> Option<BfvSearchResult> {
-    let q_bfv = product(&chosen.iter().map(|pi| pi.value.clone()).collect::<Vec<_>>());
+    let q_bfv = product(chosen.iter().map(|pi| pi.value.clone()));
 
     // Compute plaintext space per mode
     let k_plain_eff: u128 = match PlaintextMode::FromQi {
@@ -263,12 +263,7 @@ pub fn refine_from_initial(
     initial_sel: Vec<PrimeItem>,
 ) -> Option<BfvSearchResult> {
     // Determine initial bits and then decrease by 2 bits per step.
-    let initial_q = product(
-        &initial_sel
-            .iter()
-            .map(|pi| pi.value.clone())
-            .collect::<Vec<_>>(),
-    );
+    let initial_q = product(initial_sel.iter().map(|pi| pi.value.clone()));
     let mut current_bits = approx_bits_from_log2(log2_big(&initial_q));
 
     // Start with the initial feasible result
@@ -367,7 +362,7 @@ pub fn construct_qi_for_target_bits(
     // Pick selection closest to target bits and test exactly once
     let mut best: Option<(f64, Vec<PrimeItem>)> = None;
     for sel in tried {
-        let q = product(&sel.iter().map(|pi| pi.value.clone()).collect::<Vec<_>>());
+        let q = product(sel.iter().map(|pi| pi.value.clone()));
         let qbits = log2_big(&q);
         let diff = (qbits - target_f).abs();
         if let Some((best_diff, _)) = &best {
@@ -454,12 +449,7 @@ pub fn refine_second_param_at_d(
         return None;
     }
 
-    let initial_q = product(
-        &initial_sel
-            .iter()
-            .map(|pi| pi.value.clone())
-            .collect::<Vec<_>>(),
-    );
+    let initial_q = product(initial_sel.iter().map(|pi| pi.value.clone()));
     let mut current_bits = approx_bits_from_log2(log2_big(&initial_q));
     let mut all_passing: Vec<BfvSearchResult> = Vec::new();
 
@@ -562,7 +552,7 @@ pub fn construct_qi_second_param(
 
     let mut best: Option<(f64, Vec<PrimeItem>)> = None;
     for sel in tried {
-        let q = product(&sel.iter().map(|pi| pi.value.clone()).collect::<Vec<_>>());
+        let q = product(sel.iter().map(|pi| pi.value.clone()));
         let qbits = log2_big(&q);
         let diff = (qbits - target_f).abs();
         if let Some((best_diff, _)) = &best {
@@ -617,7 +607,7 @@ pub fn finalize_second_param(
         }
     }
 
-    let q_bfv = product(&chosen.iter().map(|pi| pi.value.clone()).collect::<Vec<_>>());
+    let q_bfv = product(chosen.iter().map(|pi| pi.value.clone()));
     let rkq_big = &q_bfv % &k_big;
     let rkq: u128 = rkq_big.to_u128().unwrap_or(0);
     let delta = &q_bfv / &k_big;

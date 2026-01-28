@@ -12,12 +12,11 @@ pub fn parse_hex_big(s: &str) -> BigUint {
     BigUint::parse_bytes(t.as_bytes(), 16).expect("invalid hex prime")
 }
 
-pub fn product(xs: &[BigUint]) -> BigUint {
-    let mut acc = BigUint::one();
-    for x in xs {
-        acc *= x;
-    }
-    acc
+pub fn product<I>(xs: I) -> BigUint
+where
+    I: IntoIterator<Item = BigUint>,
+{
+    xs.into_iter().fold(BigUint::one(), |acc, x| acc * x)
 }
 
 pub fn log2_big(x: &BigUint) -> f64 {
