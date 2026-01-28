@@ -4,19 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::types::Sample;
 use fhe::bfv::{BfvParameters, PublicKey, SecretKey};
 use rand::thread_rng;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct Sample {
-    pub public_key: PublicKey,
-}
-
-pub fn generate_sample(bfv_params: &Arc<BfvParameters>) -> Sample {
+pub fn generate_sample(params: &Arc<BfvParameters>) -> Sample {
     let mut rng = thread_rng();
 
-    let secret_key = SecretKey::random(bfv_params, &mut rng);
+    let secret_key = SecretKey::random(&params, &mut rng);
     let public_key = PublicKey::new(&secret_key, &mut rng);
 
     Sample { public_key }
@@ -29,8 +25,8 @@ mod tests {
 
     #[test]
     fn test_generate_sample() {
-        let bfv_params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
-        let sample = generate_sample(&bfv_params);
+        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let sample = generate_sample(&params);
 
         assert_eq!(sample.public_key.c.c.len(), 2);
     }

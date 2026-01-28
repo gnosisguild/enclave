@@ -19,7 +19,6 @@ use num_bigint::BigInt;
 use num_bigint::BigUint;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Configs {
@@ -67,8 +66,7 @@ impl Computation for Bits {
     type Input = Bounds;
     type Error = e3_zk_helpers::utils::ZkHelpersUtilsError;
 
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
-        let _ = params;
+    fn compute(_: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         Ok(Bits {
             pk_bit: calculate_bit_width(&input.pk_bound.to_string())?,
         })
@@ -98,7 +96,7 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type Params = Arc<BfvParameters>;
+    type Params = BfvParameters;
     type Input = PublicKey;
     type Error = fhe::Error;
 
@@ -176,9 +174,9 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let bfv_params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
-        let bounds = Bounds::compute(&bfv_params, &()).unwrap();
-        let bits = Bits::compute(&bfv_params, &bounds).unwrap();
+        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let bounds = Bounds::compute(&params, &()).unwrap();
+        let bits = Bits::compute(&params, &bounds).unwrap();
         let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
 
         assert_eq!(bounds.pk_bound, BigUint::from(34359701504u64));
@@ -187,9 +185,9 @@ mod tests {
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let bfv_params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
-        let encryption_data = generate_sample(&bfv_params);
-        let witness = Witness::compute(&bfv_params, &encryption_data.public_key).unwrap();
+        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let encryption_data = generate_sample(&params);
+        let witness = Witness::compute(&params, &encryption_data.public_key).unwrap();
         let zkp_reduced = witness.reduce_to_zkp_modulus();
         let json = zkp_reduced.convert_to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
@@ -200,8 +198,8 @@ mod tests {
 
     #[test]
     fn test_configs_json_roundtrip() {
-        let bfv_params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
-        let configs = Configs::compute(&bfv_params, &()).unwrap();
+        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let configs = Configs::compute(&params, &()).unwrap();
 
         let json = configs.convert_to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

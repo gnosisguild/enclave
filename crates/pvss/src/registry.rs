@@ -4,145 +4,82 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::pk_bfv::{PK_BFV_CIRCUIT_NAME, PK_BFV_N_PROOFS, PK_BFV_N_PUBLIC_INPUTS};
-use crate::DkgInputType;
+use crate::traits::CircuitMeta;
+use crate::types::DkgInputType;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
-
-type PublicInputsFn = Arc<dyn Fn() -> u32 + Send + Sync + 'static>;
-
-#[derive(Clone)]
-pub struct ZKCircuit {
-    name: &'static str,
-    compute: CircuitComputeMetadata,
-    codegen: CircuitCodegenMetadata,
-}
-
-#[derive(Clone)]
-pub struct CircuitComputeMetadata {
-    supported_parameter: ParameterType,
-    #[allow(dead_code)]
-    dkg_input_type: Option<DkgInputType>,
-}
-
-#[derive(Clone)]
-pub struct CircuitCodegenMetadata {
-    n_proofs: u32,
-    n_public_inputs: PublicInputsFn,
-}
 
 /// Errors produced by the circuit registry.
 #[derive(Error, Debug)]
 pub enum RegistryError {
     #[error("Unknown circuit: {name}")]
     UnknownCircuit { name: String },
+    #[error("Invalid input for circuit {name}: expected {expected}")]
+    InvalidInput {
+        name: String,
+        expected: &'static str,
+    },
 }
 
 /// Registry for PVSS circuits.
 pub struct CircuitRegistry {
-    circuits: HashMap<String, ZKCircuit>,
+    circuits: HashMap<String, Arc<dyn CircuitMeta>>,
 }
 
 impl CircuitRegistry {
     /// Build a registry with all known circuits registered.
     pub fn new() -> Self {
-        let mut registry = Self {
+        Self {
             circuits: HashMap::new(),
-        };
-
-        registry.register(
-            PK_BFV_CIRCUIT_NAME,
-            CircuitComputeMetadata {
-                supported_parameter: ParameterType::DKG,
-                dkg_input_type: None,
-            },
-            CircuitCodegenMetadata {
-                n_proofs: PK_BFV_N_PROOFS,
-                n_public_inputs: Arc::new(|| PK_BFV_N_PUBLIC_INPUTS),
-            },
-        );
-
-        registry
+        }
     }
 
     /// Register a circuit descriptor under a name.
-    fn register(
-        &mut self,
-        name: &'static str,
-        compute: CircuitComputeMetadata,
-        codegen: CircuitCodegenMetadata,
-    ) {
-        self.circuits.insert(
-            name.to_lowercase(),
-            ZKCircuit {
-                name,
-                compute,
-                codegen,
-            },
-        );
+    #[allow(dead_code)]
+    fn register(&mut self, circuit: Arc<dyn CircuitMeta>) {
+        self.circuits.insert(circuit.name().to_lowercase(), circuit);
     }
 
     /// Get a circuit descriptor from the registry.
-    pub fn get(&self, name: &str) -> Result<ZKCircuit, RegistryError> {
-        let key = name.to_lowercase();
-        let ZKCircuit {
-            name,
-            compute,
-            codegen,
-        } = self
-            .circuits
-            .get(&key)
+    pub fn get(&self, name: &str) -> Result<Arc<dyn CircuitMeta>, RegistryError> {
+        self.circuits
+            .get(&name.to_lowercase())
+            .cloned()
             .ok_or_else(|| RegistryError::UnknownCircuit {
                 name: name.to_string(),
-            })?;
-        Ok(ZKCircuit {
-            name,
-            compute: compute.clone(),
-            codegen: codegen.clone(),
-        })
+            })
     }
 
     /// Return supported parameter types for a circuit.
     pub fn supported_parameter_type(&self, name: &str) -> Result<ParameterType, RegistryError> {
-        let ZKCircuit { compute, .. } =
-            self.circuits.get(&name.to_lowercase()).ok_or_else(|| {
-                RegistryError::UnknownCircuit {
-                    name: name.to_string(),
-                }
-            })?;
-        Ok(compute.supported_parameter)
+        Ok(self.get(name)?.supported_parameter())
+    }
+
+    /// Return DKG input type for a circuit, if any.
+    pub fn dkg_input_type(&self, name: &str) -> Result<Option<DkgInputType>, RegistryError> {
+        Ok(self.get(name)?.dkg_input_type())
     }
 
     /// Get number of proofs for a circuit.
     /// This is used for determine the number of proofs required for aggregation.
-    pub fn n_proofs(&self, name: &str) -> Result<u32, RegistryError> {
-        let ZKCircuit { codegen, .. } =
-            self.circuits.get(&name.to_lowercase()).ok_or_else(|| {
-                RegistryError::UnknownCircuit {
-                    name: name.to_string(),
-                }
-            })?;
-        Ok(codegen.n_proofs)
+    pub fn n_proofs(&self, name: &str) -> Result<usize, RegistryError> {
+        Ok(self.get(name)?.n_proofs())
     }
 
     /// Get number of public inputs for a circuit.
     /// This is used for determine the number of public inputs required for aggregation.
-    pub fn n_public_inputs(&self, name: &str) -> Result<u32, RegistryError> {
-        let ZKCircuit { codegen, .. } =
-            self.circuits.get(&name.to_lowercase()).ok_or_else(|| {
-                RegistryError::UnknownCircuit {
-                    name: name.to_string(),
-                }
-            })?;
-        Ok((codegen.n_public_inputs)())
+    pub fn n_public_inputs(&self, name: &str) -> Result<usize, RegistryError> {
+        Ok(self.get(name)?.n_public_inputs())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pk_bfv::PkBfvCircuit;
+    use crate::traits::Circuit;
 
     #[test]
     fn registry_rejects_unknown_circuit() {
@@ -155,17 +92,17 @@ mod tests {
 
     #[test]
     fn registry_reports_expected_metadata() {
-        let registry = CircuitRegistry::new();
-        let ZKCircuit {
-            name,
-            compute,
-            codegen,
-        } = registry.get(PK_BFV_CIRCUIT_NAME).unwrap();
+        let mut registry = CircuitRegistry::new();
+        registry.register(Arc::new(PkBfvCircuit));
+        let circuit = registry.get(<PkBfvCircuit as Circuit>::NAME).unwrap();
 
-        assert_eq!(name, PK_BFV_CIRCUIT_NAME);
-        assert_eq!(compute.supported_parameter, ParameterType::DKG);
-        assert_eq!(compute.dkg_input_type.is_none(), true);
-        assert_eq!(codegen.n_proofs, PK_BFV_N_PROOFS);
-        assert_eq!((codegen.n_public_inputs)(), PK_BFV_N_PUBLIC_INPUTS);
+        assert_eq!(circuit.name(), <PkBfvCircuit as Circuit>::NAME);
+        assert_eq!(circuit.supported_parameter(), ParameterType::DKG);
+        assert!(circuit.dkg_input_type().is_none());
+        assert_eq!(circuit.n_proofs(), <PkBfvCircuit as Circuit>::N_PROOFS);
+        assert_eq!(
+            circuit.n_public_inputs(),
+            <PkBfvCircuit as Circuit>::N_PUBLIC_INPUTS
+        );
     }
 }

@@ -4,10 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-/// Circuit metadata
-pub const PK_BFV_CIRCUIT_NAME: &str = "pk-bfv";
-pub const PK_BFV_N_PROOFS: u32 = 1;
-pub const PK_BFV_N_PUBLIC_INPUTS: u32 = 1;
-
 pub mod codegen;
 pub mod computation;
+
+use crate::traits::Circuit;
+use crate::types::DkgInputType;
+use e3_fhe_params::ParameterType;
+
+pub struct PkBfvCircuit;
+
+impl Circuit for PkBfvCircuit {
+    const NAME: &'static str = "pk-bfv";
+    const PREFIX: &'static str = "PK_BFV";
+    const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
+    const DKG_INPUT_TYPE: Option<DkgInputType> = None;
+    const N_PROOFS: usize = 1;
+    const N_PUBLIC_INPUTS: usize = 1;
+}
