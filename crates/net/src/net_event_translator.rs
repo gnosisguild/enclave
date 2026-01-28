@@ -21,6 +21,7 @@ use e3_events::BusHandle;
 use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
+use e3_events::EventType;
 use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use libp2p::identity::ed25519;
@@ -73,7 +74,7 @@ impl NetEventTranslator {
         let addr = NetEventTranslator::new(&bus, tx, topic).start();
 
         // Listen on all events
-        bus.subscribe("*", addr.clone().recipient());
+        bus.subscribe(EventType::All, addr.clone().recipient());
 
         tokio::spawn({
             let addr = addr.clone();

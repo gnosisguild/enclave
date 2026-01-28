@@ -22,6 +22,7 @@ use e3_events::prelude::*;
 use e3_events::BusHandle;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
+use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{E3id, EType, PlaintextAggregated};
 use tracing::info;
@@ -58,7 +59,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-        bus.subscribe_all(&["PlaintextAggregated", "Shutdown"], addr.clone().into());
+        bus.subscribe_all(
+            &[EventType::PlaintextAggregated, EventType::Shutdown],
+            addr.clone().into(),
+        );
         Ok(addr)
     }
 }

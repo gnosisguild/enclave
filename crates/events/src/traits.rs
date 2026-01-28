@@ -9,7 +9,7 @@ use anyhow::Result;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::{EnclaveEvent, Unsequenced};
+use crate::{EnclaveEvent, EventType, Unsequenced};
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event:
@@ -83,9 +83,9 @@ pub trait ErrorDispatcher<E: ErrorEvent> {
 /// Trait to subscribe to events
 pub trait EventSubscriber<E: Event> {
     /// Subscribe the recipient to events matching the given event type
-    fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
+    fn subscribe(&self, event_type: EventType, recipient: Recipient<E>);
     /// Subscribe the recipient to events matching any of the given event types
-    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>);
+    fn subscribe_all(&self, event_types: &[EventType], recipient: Recipient<E>);
 }
 
 /// Trait to create an event with a timestamp from its associated type data

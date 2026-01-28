@@ -16,7 +16,7 @@ use anyhow::*;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventPublisher, HistoryCollector, Seed, Subscribe,
+    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -83,8 +83,11 @@ pub fn get_common_setup(
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
     let errors = HistoryCollector::<EnclaveEvent>::new().start();
     let history = HistoryCollector::<EnclaveEvent>::new().start();
-    bus.do_send(Subscribe::new("*", history.clone().recipient()));
-    bus.do_send(Subscribe::new("EnclaveError", errors.clone().recipient()));
+    bus.do_send(Subscribe::new(EventType::All, history.clone().recipient()));
+    bus.do_send(Subscribe::new(
+        EventType::EnclaveError,
+        errors.clone().recipient(),
+    ));
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
