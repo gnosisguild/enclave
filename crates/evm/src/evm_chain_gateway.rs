@@ -109,7 +109,7 @@ impl EvmChainGateway {
         let mut buffer = self.status.forward_to_sync_actor(sender)?;
         // Drain any events that were buffered early
         for evt in buffer.drain(..) {
-            self.handle_receive_evm_event(evt)?;
+            self.process_evm_event(evt)?;
         }
         Ok(())
     }
@@ -132,18 +132,18 @@ impl EvmChainGateway {
     fn handle_evm_event(&mut self, msg: EnclaveEvmEvent) -> Result<()> {
         match msg {
             EnclaveEvmEvent::HistoricalSyncComplete(e) => {
-                self.handle_historical_sync_complete(e)?;
+                self.forward_historical_sync_complete(e)?;
                 Ok(())
             }
             EnclaveEvmEvent::Event(event) => {
-                self.handle_receive_evm_event(event)?;
+                self.process_evm_event(event)?;
                 Ok(())
             }
             _ => panic!("EvmChainGateway is only designed to receive EnclaveEvmEvent::HistoricalSyncComplete or EnclaveEvmEvent::Event events"),
         }
     }
 
-    fn handle_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
+    fn forward_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
         info!(
             "handling historical sync complete for chain_id({})",
             event.chain_id
@@ -154,7 +154,7 @@ impl EvmChainGateway {
         Ok(())
     }
 
-    fn handle_receive_evm_event(&mut self, msg: EvmEvent) -> Result<()> {
+    fn process_evm_event(&mut self, msg: EvmEvent) -> Result<()> {
         match &mut self.status {
             SyncStatus::BufferUntilLive(buffer) => {
                 info!("saving evm event({}) to pre-live buffer", msg.get_id());
