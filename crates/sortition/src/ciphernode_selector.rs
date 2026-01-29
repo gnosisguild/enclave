@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::sortition::Sortition;
 use crate::WithSortitionPartyTicket;
 use actix::prelude::*;
 use anyhow::bail;

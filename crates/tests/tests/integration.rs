@@ -260,6 +260,11 @@ async fn test_trbfv_actor() -> Result<()> {
 
     println!("Emitting CommitteeFinalized with {} nodes", committee.len());
 
+    let expected = vec!["E3Requested"];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+
     bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee,
@@ -268,7 +273,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let committee_finalized_timer = Instant::now();
 
-    let expected = vec!["E3Requested", "CommitteeFinalized"];
+    let expected = vec!["CommitteeFinalized"];
     let _ = nodes
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
