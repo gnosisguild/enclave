@@ -150,7 +150,7 @@ impl EvmChainGateway {
         );
         let sender = self.status.buffer_until_live()?;
         info!("Sending historical sync complete event to sender.");
-        sender.do_send(SyncEvmEvent::HistoricalSyncComplete(event.chain_id));
+        sender.try_send(SyncEvmEvent::HistoricalSyncComplete(event.chain_id))?;
         Ok(())
     }
 

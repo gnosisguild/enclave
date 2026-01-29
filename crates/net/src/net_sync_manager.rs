@@ -11,7 +11,7 @@ use e3_events::{
     EnclaveEventData, Event, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
     ReceiveEvents, Unsequenced,
 };
-use e3_utils::{retry_with_backoff, to_retry, NotifySync, OnceTake};
+use e3_utils::{retry_with_backoff, to_retry, OnceTake};
 use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -99,11 +99,11 @@ impl Handler<EnclaveEvent> for NetSyncManager {
 /// SyncRequest is called on start up to fetch remote events
 impl Handler<OutgoingSyncRequested> for NetSyncManager {
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: OutgoingSyncRequested, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: OutgoingSyncRequested, ctx: &mut Self::Context) -> Self::Result {
         trap_fut(
             EType::Net,
             &self.bus.clone(),
-            handle_sync_request_event(self.tx.clone(), self.rx.clone(), self.bus.clone(), msg),
+            handle_sync_request_event(self.tx.clone(), self.rx.clone(), msg, ctx.address()),
         )
     }
 }
@@ -199,8 +199,8 @@ async fn sync_request(
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    bus: BusHandle,
     event: OutgoingSyncRequested,
+    address: impl Into<Recipient<OutgoingSyncRequestSucceeded>>,
 ) -> Result<()> {
     let value = retry_with_backoff(
         || {
@@ -216,13 +216,6 @@ async fn handle_sync_request_event(
     )
     .await?;
 
-    bus.publish(NetSyncEventsReceived::new(
-        value
-            .value
-            .events
-            .into_iter()
-            .map(|data| data.try_into())
-            .collect::<Result<Vec<EnclaveEvent<Unsequenced>>>>()?,
-    ))?;
+    address.into().try_send(value)?;
     Ok(())
 }
