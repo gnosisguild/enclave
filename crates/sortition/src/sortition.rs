@@ -5,19 +5,21 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::backends::{SortitionBackend, SortitionList};
+use crate::CiphernodeSelector;
 use actix::prelude::*;
 use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, EType, EnclaveEvent, EventType, OperatorActivationChanged,
+    ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
     PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use e3_utils::NotifySync;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ops::Deref;
 use tracing::info;
 use tracing::instrument;
 use tracing::warn;
@@ -95,27 +97,53 @@ impl NodeStateStore {
     }
 }
 
-/// Message: ask the `Sortition` whether `address` would be in the
-/// committee of size `size` for randomness `seed` on `chain_id`.
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Option<(u64, Option<u64>)>")]
-pub struct GetNodeIndex {
-    /// Round seed / randomness used by the sortition algorithm.
-    pub seed: Seed,
-    /// Hex-encoded node address (e.g., `"0x..."`).
-    pub address: String,
-    /// Committee size (top-N).
-    pub size: usize,
-    /// Target chain.
-    pub chain_id: u64,
-}
-
 /// Message: request the current set of registered node addresses for `chain_id`.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Vec<String>")]
 pub struct GetNodes {
     /// Target chain.
     pub chain_id: u64,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+pub struct WithSortitionPartyTicket<T> {
+    inner: T,
+    party_ticket_id: Option<(u64, Option<u64>)>,
+    address: String,
+}
+
+impl<T> WithSortitionPartyTicket<T> {
+    pub fn new(inner: T, party_ticket_id: Option<(u64, Option<u64>)>, address: &str) -> Self {
+        Self {
+            inner,
+            party_ticket_id,
+            address: address.to_owned(),
+        }
+    }
+
+    pub fn is_selected(&self) -> bool {
+        self.party_ticket_id.is_some()
+    }
+
+    pub fn address(&self) -> &str {
+        self.address.as_ref()
+    }
+
+    pub fn ticket_id(&self) -> Option<u64> {
+        self.party_ticket_id.and_then(|(_, ticket_id)| ticket_id)
+    }
+
+    pub fn party_id(&self) -> Option<u64> {
+        self.party_ticket_id.map(|(party_id, _)| party_id)
+    }
+}
+
+impl<T> Deref for WithSortitionPartyTicket<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 /// Message to get the finalized committee nodes for a specific E3.
@@ -143,6 +171,10 @@ pub struct Sortition {
     bus: BusHandle,
     /// Persistent map of finalized committees per E3
     finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
+    /// Address for the CiphernodeSelector
+    ciphernode_selector: Addr<CiphernodeSelector>,
+    /// Address for the current node
+    address: String,
 }
 
 /// Parameters for constructing a `Sortition` actor.
@@ -156,6 +188,10 @@ pub struct SortitionParams {
     pub node_state: Persistable<HashMap<u64, NodeStateStore>>,
     /// Persistent map of finalized committees per E3
     pub finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
+    /// Address for the CiphernodeSelector
+    pub ciphernode_selector: Addr<CiphernodeSelector>,
+    /// Address for the current node
+    pub address: String,
 }
 
 impl Sortition {
@@ -165,6 +201,8 @@ impl Sortition {
             node_state: params.node_state,
             bus: params.bus,
             finalized_committees: params.finalized_committees,
+            ciphernode_selector: params.ciphernode_selector,
+            address: params.address,
         }
     }
 
@@ -175,6 +213,8 @@ impl Sortition {
         node_state_store: Repository<HashMap<u64, NodeStateStore>>,
         committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
         default_backend: SortitionBackend,
+        ciphernode_selector: Addr<CiphernodeSelector>,
+        address: &str,
     ) -> Result<Addr<Self>> {
         let mut backends = backends_store.load_or_default(HashMap::new()).await?;
         let node_state = node_state_store.load_or_default(HashMap::new()).await?;
@@ -190,12 +230,15 @@ impl Sortition {
             backends,
             node_state,
             finalized_committees,
+            ciphernode_selector,
+            address: address.to_owned(),
         })
         .start();
 
         // Subscribe to all relevant events
         bus.subscribe_all(
             &[
+                EventType::E3Requested,
                 EventType::CiphernodeAdded,
                 EventType::CiphernodeRemoved,
                 EventType::TicketBalanceUpdated,
@@ -222,6 +265,26 @@ impl Sortition {
             .ok_or_else(|| anyhow::anyhow!("No backend for chain_id {}", chain_id))?;
         Ok(backend.nodes())
     }
+
+    pub fn get_node_index(
+        &self,
+        seed: Seed,
+        size: usize,
+        chain_id: u64,
+    ) -> Option<(u64, Option<u64>)> {
+        let bus = self.bus.clone();
+        let map = self.backends.get()?;
+        let state_map = self.node_state.get()?;
+        let backend = map.get(&chain_id)?;
+        let state = state_map.get(&chain_id)?;
+
+        backend
+            .get_index(seed, size, self.address.clone(), chain_id, state)
+            .unwrap_or_else(|err| {
+                bus.err(EType::Sortition, err);
+                None
+            })
+    }
 }
 
 impl Actor for Sortition {
@@ -233,6 +296,7 @@ impl Handler<EnclaveEvent> for Sortition {
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
+            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, data.clone()),
             EnclaveEventData::CiphernodeAdded(data) => self.notify_sync(ctx, data.clone()),
             EnclaveEventData::CiphernodeRemoved(data) => self.notify_sync(ctx, data.clone()),
             EnclaveEventData::TicketBalanceUpdated(data) => self.notify_sync(ctx, data.clone()),
@@ -245,6 +309,21 @@ impl Handler<EnclaveEvent> for Sortition {
             EnclaveEventData::CommitteeFinalized(data) => self.notify_sync(ctx, data.clone()),
             _ => (),
         }
+    }
+}
+
+impl Handler<E3Requested> for Sortition {
+    type Result = ();
+    fn handle(&mut self, msg: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+        let chain_id = msg.e3_id.chain_id();
+        let seed = msg.seed;
+        let threshold_n = msg.threshold_n;
+        self.ciphernode_selector
+            .do_send(WithSortitionPartyTicket::new(
+                msg,
+                self.get_node_index(seed, threshold_n, chain_id),
+                &self.address,
+            ))
     }
 }
 
@@ -498,35 +577,6 @@ impl Handler<CommitteeFinalized> for Sortition {
         }) {
             self.bus.err(EType::Sortition, err);
         }
-    }
-}
-
-impl Handler<GetNodeIndex> for Sortition {
-    type Result = ResponseFuture<Option<(u64, Option<u64>)>>;
-
-    fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
-        let backends_snapshot = self.backends.get();
-        let node_state_snapshot = self.node_state.get();
-        let bus = self.bus.clone();
-
-        Box::pin(async move {
-            if let (Some(map), Some(state_map)) = (backends_snapshot, node_state_snapshot) {
-                if let (Some(backend), Some(state)) =
-                    (map.get(&msg.chain_id), state_map.get(&msg.chain_id))
-                {
-                    backend
-                        .get_index(msg.seed, msg.size, msg.address.clone(), msg.chain_id, state)
-                        .unwrap_or_else(|err| {
-                            bus.err(EType::Sortition, err);
-                            None
-                        })
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
     }
 }
 

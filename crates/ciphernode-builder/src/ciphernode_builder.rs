@@ -381,17 +381,19 @@ impl CiphernodeBuilder {
         // Use the configured backend directly
         let default_backend = self.sortition_backend.clone();
 
+        let ciphernode_selector =
+            CiphernodeSelector::attach(&bus, repositories.ciphernode_selector(), &addr).await?;
+
         let sortition = Sortition::attach(
             &bus,
             repositories.sortition(),
             repositories.node_state(),
             repositories.finalized_committees(),
             default_backend,
+            ciphernode_selector,
+            &addr,
         )
         .await?;
-
-        CiphernodeSelector::attach(&bus, &sortition, repositories.ciphernode_selector(), &addr)
-            .await?;
 
         // Setup evm system
         // TODO: gather an async handle from the event readers in thre following function
