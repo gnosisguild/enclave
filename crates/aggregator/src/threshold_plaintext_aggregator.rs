@@ -10,9 +10,9 @@ use actix::prelude::*;
 use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, BusHandle, ComputeRequest, ComputeResponse, CorrelationId,
-    DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, PlaintextAggregated,
-    Seed,
+    prelude::*, trap, BusHandle, ComputeRequest, ComputeResponse, ComputeResponseKind,
+    CorrelationId, DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData,
+    PlaintextAggregated, Seed,
 };
 use e3_sortition::{GetNodesForE3, Sortition};
 use e3_trbfv::{
@@ -208,7 +208,7 @@ impl ThresholdPlaintextAggregator {
         let trbfv_config =
             TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
 
-        let event = ComputeRequest::new(
+        let event = ComputeRequest::trbfv(
             TrBFVRequest::CalculateThresholdDecryption(
                 CalculateThresholdDecryptionRequest {
                     ciphertexts: msg.ciphertext_output,
@@ -230,7 +230,9 @@ impl ThresholdPlaintextAggregator {
             "PlaintextAggregator should never receive incorrect e3_id msgs"
         );
 
-        let TrBFVResponse::CalculateThresholdDecryption(response) = msg.response else {
+        let ComputeResponseKind::TrBFV(TrBFVResponse::CalculateThresholdDecryption(response)) =
+            msg.response
+        else {
             // Must be another compute response so ignoring
             return Ok(());
         };

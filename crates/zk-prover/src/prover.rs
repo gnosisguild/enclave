@@ -6,32 +6,12 @@
 
 use crate::backend::ZkBackend;
 use crate::error::ZkError;
-use serde::{Deserialize, Serialize};
+use e3_events::{CircuitName, Proof};
+use e3_utils::utility_types::ArcBytes;
+use std::fs;
 use std::path::PathBuf;
-use tokio::fs;
-use tokio::process::Command;
+use std::process::Command as StdCommand;
 use tracing::{debug, info};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[must_use]
-pub struct Proof {
-    /// Circuit name (e.g., "pk_bfv", "pk_trbfv").
-    pub circuit: String,
-    /// The proof bytes.
-    pub data: Vec<u8>,
-    /// Public signals (inputs and outputs) from the circuit.
-    pub public_signals: Vec<u8>,
-}
-
-impl Proof {
-    pub fn new(circuit: impl Into<String>, data: Vec<u8>, public_signals: Vec<u8>) -> Self {
-        Self {
-            circuit: circuit.into(),
-            data,
-            public_signals,
-        }
-    }
-}
 
 pub struct ZkProver {
     bb_binary: PathBuf,
@@ -56,9 +36,9 @@ impl ZkProver {
         &self.work_dir
     }
 
-    pub async fn generate_proof(
+    pub fn generate_proof(
         &self,
-        circuit_name: &str,
+        circuit: CircuitName,
         witness_data: &[u8],
         e3_id: &str,
     ) -> Result<Proof, ZkError> {
@@ -66,6 +46,7 @@ impl ZkProver {
             return Err(ZkError::BbNotInstalled);
         }
 
+        let circuit_name = circuit.as_str();
         let circuit_path = self.circuits_dir.join(format!("{}.json", circuit_name));
         if !circuit_path.exists() {
             return Err(ZkError::CircuitNotFound(circuit_name.to_string()));
@@ -83,18 +64,18 @@ impl ZkProver {
         }
 
         let job_dir = self.work_dir.join(e3_id);
-        fs::create_dir_all(&job_dir).await?;
+        fs::create_dir_all(&job_dir)?;
 
         let witness_path = job_dir.join("witness.gz");
         let output_dir = job_dir.join("out");
         let proof_path = output_dir.join("proof");
         let public_inputs_path = output_dir.join("public_inputs");
 
-        fs::write(&witness_path, witness_data).await?;
+        fs::write(&witness_path, witness_data)?;
 
         debug!("generating proof for circuit: {}", circuit_name);
 
-        let output = Command::new(&self.bb_binary)
+        let output = StdCommand::new(&self.bb_binary)
             .args([
                 "prove",
                 "--scheme",
@@ -108,16 +89,15 @@ impl ZkProver {
                 "-o",
                 output_dir.to_str().unwrap(),
             ])
-            .output()
-            .await?;
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(ZkError::ProveFailed(stderr.to_string()));
         }
 
-        let proof_data = fs::read(&proof_path).await?;
-        let public_signals = fs::read(&public_inputs_path).await?;
+        let proof_data = fs::read(&proof_path)?;
+        let public_signals = fs::read(&public_inputs_path)?;
 
         info!(
             "generated proof ({} bytes) for {} / {}",
@@ -126,17 +106,20 @@ impl ZkProver {
             e3_id
         );
 
-        Ok(Proof::new(circuit_name, proof_data, public_signals))
+        Ok(Proof::new(
+            circuit,
+            ArcBytes::from_bytes(&proof_data),
+            ArcBytes::from_bytes(&public_signals),
+        ))
     }
 
-    pub async fn verify(&self, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
-        self.verify_proof(&proof.circuit, &proof.data, &proof.public_signals, e3_id)
-            .await
+    pub fn verify(&self, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
+        self.verify_proof(proof.circuit, &proof.data, &proof.public_signals, e3_id)
     }
 
-    pub async fn verify_proof(
+    pub fn verify_proof(
         &self,
-        circuit_name: &str,
+        circuit: CircuitName,
         proof_data: &[u8],
         public_signals: &[u8],
         e3_id: &str,
@@ -145,6 +128,7 @@ impl ZkProver {
             return Err(ZkError::BbNotInstalled);
         }
 
+        let circuit_name = circuit.as_str();
         let vk_path = self
             .circuits_dir
             .join("vk")
@@ -154,20 +138,20 @@ impl ZkProver {
         }
 
         let job_dir = self.work_dir.join(e3_id);
-        fs::create_dir_all(&job_dir).await?;
+        fs::create_dir_all(&job_dir)?;
 
         let out_dir = job_dir.join("out");
-        fs::create_dir_all(&out_dir).await?;
+        fs::create_dir_all(&out_dir)?;
 
         let proof_path = job_dir.join("proof_to_verify");
         let public_inputs_path = out_dir.join("public_inputs");
 
-        fs::write(&proof_path, proof_data).await?;
-        fs::write(&public_inputs_path, public_signals).await?;
+        fs::write(&proof_path, proof_data)?;
+        fs::write(&public_inputs_path, public_signals)?;
 
         debug!("verifying proof for circuit: {}", circuit_name);
 
-        let output = Command::new(&self.bb_binary)
+        let output = StdCommand::new(&self.bb_binary)
             .args([
                 "verify",
                 "--scheme",
@@ -179,16 +163,15 @@ impl ZkProver {
                 "-k",
                 vk_path.to_str().unwrap(),
             ])
-            .output()
-            .await?;
+            .output()?;
 
         Ok(output.status.success())
     }
 
-    pub async fn cleanup(&self, e3_id: &str) -> Result<(), ZkError> {
+    pub fn cleanup(&self, e3_id: &str) -> Result<(), ZkError> {
         let job_dir = self.work_dir.join(e3_id);
         if job_dir.exists() {
-            fs::remove_dir_all(&job_dir).await?;
+            fs::remove_dir_all(&job_dir)?;
         }
         Ok(())
     }
@@ -200,13 +183,13 @@ mod tests {
     use crate::config::ZkConfig;
     use tempfile::tempdir;
 
-    #[tokio::test]
-    async fn test_prover_requires_bb() {
+    #[test]
+    fn test_prover_requires_bb() {
         let temp = tempdir().unwrap();
         let backend = ZkBackend::new(temp.path(), ZkConfig::default());
         let prover = ZkProver::new(&backend);
 
-        let result = prover.generate_proof("test", b"witness", "e3-1").await;
+        let result = prover.generate_proof(CircuitName::PkBfv, b"witness", "e3-1");
         assert!(matches!(result, Err(ZkError::BbNotInstalled)));
     }
 }
