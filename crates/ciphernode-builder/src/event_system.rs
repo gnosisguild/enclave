@@ -13,15 +13,19 @@ use e3_data::{
 };
 use e3_events::hlc::Hlc;
 use e3_events::{
-    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventType, Sequencer,
+    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter, EventType,
+    Sequencer, StoreEventRequested,
 };
+use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
+use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
-/// Hold the InMem EventStore instance and InMemStore
+pub use e3_data::AggregateConfig;
+
 struct InMemBackend {
-    eventstore: OnceCell<Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
@@ -29,7 +33,7 @@ struct InMemBackend {
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
-    eventstore: OnceCell<Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
     store: OnceCell<Addr<SledStore>>,
 }
 
@@ -39,22 +43,10 @@ enum EventSystemBackend {
     Persisted(PersistedBackend),
 }
 
-pub enum EventStoreAddr {
-    InMem(Addr<EventStore<InMemSequenceIndex, InMemEventLog>>),
-    Persisted(Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>),
-}
-
-impl TryFrom<EventStoreAddr> for Addr<EventStore<InMemSequenceIndex, InMemEventLog>> {
-    type Error = anyhow::Error;
-    fn try_from(value: EventStoreAddr) -> std::result::Result<Self, Self::Error> {
-        if let EventStoreAddr::InMem(addr) = value {
-            Ok(addr)
-        } else {
-            Err(anyhow!(
-                "address was not EventStore<InMemSequenceIndex, InMemEventLog>"
-            ))
-        }
-    }
+#[derive(Clone)]
+pub enum EventStoreAddrs {
+    InMem(HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>),
+    Persisted(HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
 }
 
 /// EventSystem holds interconnected references to the components that manage events and
@@ -83,6 +75,10 @@ pub struct EventSystem {
     wired: OnceCell<()>,
     /// Hlc override
     hlc: OnceCell<Hlc>,
+    /// Central configuration for aggregates, including delays and other settings
+    aggregate_config: OnceCell<AggregateConfig>,
+    /// Cached EventStoreAddrs for idempotency
+    eventstore_addrs: OnceCell<EventStoreAddrs>,
 }
 
 impl EventSystem {
@@ -96,7 +92,7 @@ impl EventSystem {
         Self {
             node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::new(),
             }),
             buffer: OnceCell::new(),
@@ -105,6 +101,8 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -113,7 +111,7 @@ impl EventSystem {
         Self {
             node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::from(store.to_owned()),
             }),
             buffer: OnceCell::new(),
@@ -122,6 +120,8 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -132,7 +132,7 @@ impl EventSystem {
             backend: EventSystemBackend::Persisted(PersistedBackend {
                 log_path,
                 sled_path,
-                eventstore: OnceCell::new(),
+                eventstores: OnceCell::new(),
                 store: OnceCell::new(),
             }),
             buffer: OnceCell::new(),
@@ -141,6 +141,8 @@ impl EventSystem {
             handle: OnceCell::new(),
             wired: OnceCell::new(),
             hlc: OnceCell::new(),
+            aggregate_config: OnceCell::new(),
+            eventstore_addrs: OnceCell::new(),
         }
     }
 
@@ -164,16 +166,32 @@ impl EventSystem {
         self
     }
 
+    /// Add aggregate configuration including delays and other settings
+    pub fn with_aggregate_config(self, config: AggregateConfig) -> Self {
+        let _ = self.aggregate_config.set(config);
+        self
+    }
+
     /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
+    }
+
+    /// Get the aggregate configuration
+    pub fn aggregate_config(&self) -> AggregateConfig {
+        self.aggregate_config
+            .get_or_init(|| AggregateConfig::new(HashMap::new()))
+            .clone()
     }
 
     /// Get the buffer address
     pub fn buffer(&self) -> Addr<WriteBuffer> {
         let buffer = self
             .buffer
-            .get_or_init(|| WriteBuffer::new().start())
+            .get_or_init(|| {
+                let config = self.aggregate_config();
+                WriteBuffer::with_config(config).start()
+            })
             .clone();
         self.wire_if_ready();
         buffer
@@ -182,40 +200,101 @@ impl EventSystem {
     /// Get the sequencer address
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
-            .get_or_try_init(|| match self.eventstore()? {
-                EventStoreAddr::InMem(es) => {
-                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
-                }
-                EventStoreAddr::Persisted(es) => {
-                    Ok(Sequencer::new(&self.eventbus(), es, self.buffer()).start())
+            .get_or_try_init(|| {
+                let router = self.eventstore_router()?;
+                Ok(Sequencer::new(&self.eventbus(), router, self.buffer()).start())
+            })
+            .cloned()
+    }
+
+    /// Get the EventStore addresses
+    pub fn eventstore_addrs(&self) -> Result<EventStoreAddrs> {
+        self.eventstore_addrs
+            .get_or_try_init(|| {
+                match &self.backend {
+                    EventSystemBackend::InMem(b) => {
+                        let config = self.aggregate_config();
+                        let indexes = config.indexed_ids();
+
+                        let addrs = b
+                            .eventstores
+                            .get_or_init(|| {
+                                let mut eventstore_map = HashMap::new();
+                                for &index in &indexes {
+                                    eventstore_map.insert(
+                                        index,
+                                        EventStore::new(
+                                            InMemSequenceIndex::new(),
+                                            InMemEventLog::new(),
+                                        )
+                                        .start(),
+                                    );
+                                }
+                                eventstore_map
+                            })
+                            .clone();
+                        Ok(EventStoreAddrs::InMem(addrs))
+                    }
+                    EventSystemBackend::Persisted(b) => {
+                        let config = self.aggregate_config();
+                        let indexes = config.indexed_ids();
+
+                        let addrs = b
+                            .eventstores
+                            .get_or_try_init(|| -> Result<_> {
+                                let mut eventstore_map = HashMap::new();
+                                for &index in &indexes {
+                                    // Enumerate the log path for each eventstore
+                                    let enumerated_log_path = enumerate_path(&b.log_path, index);
+                                    let tree_name = format!("sequence_index.{}", index);
+                                    let index_store =
+                                        SledSequenceIndex::new(&b.sled_path, &tree_name)?;
+                                    let log = CommitLogEventLog::new(&enumerated_log_path)?;
+                                    eventstore_map
+                                        .insert(index, EventStore::new(index_store, log).start());
+                                }
+                                Ok(eventstore_map)
+                            })?
+                            .clone();
+                        Ok(EventStoreAddrs::Persisted(addrs))
+                    }
                 }
             })
             .cloned()
     }
 
-    /// Get the EventStore address
-    pub fn eventstore(&self) -> Result<EventStoreAddr> {
-        match &self.backend {
-            EventSystemBackend::InMem(b) => {
-                let addr = b
-                    .eventstore
-                    .get_or_init(|| {
-                        EventStore::new(InMemSequenceIndex::new(), InMemEventLog::new()).start()
-                    })
-                    .clone();
-                Ok(EventStoreAddr::InMem(addr))
-            }
-            EventSystemBackend::Persisted(b) => {
-                let addr = b
-                    .eventstore
-                    .get_or_try_init(|| -> Result<_> {
-                        let index = SledSequenceIndex::new(&b.sled_path, "sequence_index")?;
-                        let log = CommitLogEventLog::new(&b.log_path)?;
-                        Ok(EventStore::new(index, log).start())
-                    })?
-                    .clone();
-                Ok(EventStoreAddr::Persisted(addr))
-            }
+    /// Get an EventStoreRouter for InMem backend
+    pub fn in_mem_eventstore_router(
+        &self,
+    ) -> Result<Addr<EventStoreRouter<InMemSequenceIndex, InMemEventLog>>> {
+        let eventstores = self.eventstore_addrs()?;
+        if let EventStoreAddrs::InMem(addrs) = eventstores {
+            let router = EventStoreRouter::new(addrs);
+            Ok(router.start())
+        } else {
+            Err(anyhow!("Expected InMem backend but got Persisted"))
+        }
+    }
+
+    /// Get an EventStoreRouter for Persisted backend
+    pub fn persisted_eventstore_router(
+        &self,
+    ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
+        let eventstores = self.eventstore_addrs()?;
+        if let EventStoreAddrs::Persisted(addrs) = eventstores {
+            let router = EventStoreRouter::new(addrs);
+            Ok(router.start())
+        } else {
+            Err(anyhow!("Expected Persisted backend but got InMem"))
+        }
+    }
+
+    /// Get an EventStoreRouter Recipient
+    pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
+        let eventstores = self.eventstore_addrs()?;
+        match &eventstores {
+            EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
+            EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
         }
     }
 
@@ -304,8 +383,9 @@ mod tests {
     use actix::Message;
 
     use e3_events::prelude::*;
+    use e3_events::CorrelationId;
     use e3_events::EnclaveEventData;
-    use e3_events::GetEventsAfter;
+
     use e3_events::ReceiveEvents;
     use e3_events::TestEvent;
     use tempfile::TempDir;
@@ -396,7 +476,6 @@ mod tests {
         let system = EventSystem::in_mem("cn1").with_fresh_bus();
         let handle = system.handle()?;
         let datastore = system.store()?;
-        let eventstore = system.eventstore()?;
         let listener = Listener {
             logs: Vec::new(),
             events: Vec::new(),
@@ -415,12 +494,6 @@ mod tests {
 
         // NOTE: Eventual consistency
         // Store should not have data set on it until event has been published
-        // There is an argument we should instead delay reads until the event has been stored but
-        // this would:
-        //   a. Promote poor patterns of sharing data through persistence
-        //   b. Add a large amount of complexity to batching Get operations
-        // For now we allow this inconsistency under the assumption that data is written for
-        // snapshot storage exclusively.
 
         // Let's check the eventual consistency all data points should be none...
         assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);
@@ -458,16 +531,64 @@ mod tests {
         let logs = listener.send(GetLogs).await?;
         assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
 
-        // Get the in mem address for the event store
-        let es: Addr<EventStore<InMemSequenceIndex, InMemEventLog>> = eventstore.try_into()?;
+        // Get the in mem eventstore router
+        let router = system.in_mem_eventstore_router()?;
 
-        // Get all events after the given timestamp and send them to the listener
-        es.do_send(GetEventsAfter::new(ts, listener.clone()));
+        // Get all events after the given timestamp using the router
+        use e3_events::{AggregateId, GetAggregateEventsAfter};
+        let mut ts_map = HashMap::new();
+        ts_map.insert(AggregateId::new(0), ts);
+        let get_events_msg =
+            GetAggregateEventsAfter::new(CorrelationId::new(), ts_map, listener.clone().into());
+        router.do_send(get_events_msg);
         sleep(Duration::from_millis(100)).await;
 
         // Pull the events off the listsner since the timestamp
         let events = listener.send(GetEvents).await?;
         assert_eq!(events, vec!["yellow", "red", "white"]);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_multiple_eventstores() -> Result<()> {
+        use e3_events::AggregateId;
+
+        // Create an AggregateConfig with multiple AggregateIds
+        let mut delays = HashMap::new();
+        delays.insert(AggregateId::new(0), 1000); // 1ms delay
+        delays.insert(AggregateId::new(1), 2000); // 2ms delay
+        delays.insert(AggregateId::new(2), 3000); // 3ms delay
+        let aggregate_config = AggregateConfig::new(delays);
+
+        // Test in-memory eventstores
+        let system = EventSystem::in_mem("test_multi").with_aggregate_config(aggregate_config);
+        let Ok(EventStoreAddrs::InMem(addrs)) = system.eventstore_addrs() else {
+            panic!("Expected InMem event store addrs");
+        };
+
+        // Should create 3 eventstores for 3 AggregateIds
+        assert_eq!(addrs.len(), 3);
+        // Test that we can access the first eventstore (index 0)
+        assert!(addrs.contains_key(&0));
+        assert!(addrs.contains_key(&1));
+        assert!(addrs.contains_key(&2));
+
+        // Test persistent eventstores
+        let tmp = TempDir::new().unwrap();
+        let persisted_system = EventSystem::persisted(
+            "test_persisted",
+            tmp.path().join("log"),
+            tmp.path().join("sled"),
+        )
+        .with_aggregate_config(AggregateConfig::new(HashMap::new()));
+
+        let Ok(EventStoreAddrs::Persisted(addrs)) = persisted_system.eventstore_addrs() else {
+            panic!("Expected Persisted event store addrs");
+        };
+
+        assert_eq!(addrs.len(), 1);
+        assert!(addrs.contains_key(&0));
+
         Ok(())
     }
 }

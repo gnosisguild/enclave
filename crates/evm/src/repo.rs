@@ -7,7 +7,7 @@
 use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
 
-use crate::EvmEventReaderState;
+use crate::EvmReadInterfaceState;
 
 pub trait EthPrivateKeyRepositoryFactory {
     fn eth_private_key(&self) -> Repository<Vec<u8>>;
@@ -20,21 +20,21 @@ impl EthPrivateKeyRepositoryFactory for Repositories {
 }
 
 pub trait EnclaveSolReaderRepositoryFactory {
-    fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+    fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState>;
 }
 
 impl EnclaveSolReaderRepositoryFactory for Repositories {
-    fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+    fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState> {
         Repository::new(self.store.scope(StoreKeys::enclave_sol_reader(chain_id)))
     }
 }
 
 pub trait CiphernodeRegistryReaderRepositoryFactory {
-    fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+    fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState>;
 }
 
 impl CiphernodeRegistryReaderRepositoryFactory for Repositories {
-    fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+    fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState> {
         Repository::new(
             self.store
                 .scope(StoreKeys::ciphernode_registry_reader(chain_id)),
@@ -43,11 +43,11 @@ impl CiphernodeRegistryReaderRepositoryFactory for Repositories {
 }
 
 pub trait BondingRegistryReaderRepositoryFactory {
-    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState>;
 }
 
 impl BondingRegistryReaderRepositoryFactory for Repositories {
-    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmReadInterfaceState> {
         Repository::new(
             self.store
                 .scope(StoreKeys::bonding_registry_reader(chain_id)),

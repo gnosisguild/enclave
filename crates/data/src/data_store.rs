@@ -99,6 +99,31 @@ impl DataStore {
         &self.addr
     }
 
+    /// Get a reference to the Recipient<Get>
+    pub fn get_recipient(&self) -> &Recipient<Get> {
+        &self.get
+    }
+
+    /// Get a reference to the Recipient<Remove>
+    pub fn remove_recipient(&self) -> &Recipient<Remove> {
+        &self.remove
+    }
+
+    /// Get a reference to the Recipient<Insert>
+    pub fn insert_recipient(&self) -> &Recipient<Insert> {
+        &self.insert
+    }
+
+    /// Get a reference to the Recipient<InsertSync>
+    pub fn insert_sync_recipient(&self) -> &Recipient<InsertSync> {
+        &self.insert_sync
+    }
+
+    /// Get a clone of the scope bytes
+    pub fn scope_bytes(&self) -> &[u8] {
+        &self.scope
+    }
+
     /// Changes the scope for the data store.
     /// Note that if the scope does not start with a slash one is appended.
     /// ```

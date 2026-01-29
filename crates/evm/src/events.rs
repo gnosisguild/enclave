@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use actix::{Message, Recipient};
+use alloy::rpc::types::Log;
+use e3_events::{CorrelationId, EvmEvent};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct HistoricalSyncComplete {
+    pub chain_id: u64,
+    pub prev_event: Option<CorrelationId>,
+    pub id: CorrelationId,
+}
+
+impl HistoricalSyncComplete {
+    pub fn new(chain_id: u64, prev_event: Option<CorrelationId>) -> Self {
+        let id = CorrelationId::new();
+        Self {
+            id,
+            chain_id,
+            prev_event,
+        }
+    }
+
+    pub fn get_id(&self) -> CorrelationId {
+        self.id
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub enum EnclaveEvmEvent {
+    /// Signal that this reader has completed historical sync
+    HistoricalSyncComplete(HistoricalSyncComplete),
+    /// An actual event from the blockchain
+    Event(EvmEvent),
+    /// Raw log data from the provider
+    Log(EvmLog),
+    /// Dummy event to report that an event was processed. This is required to ensure that the
+    /// appropriate events are ordered correctly
+    Processed(CorrelationId),
+}
+
+impl EnclaveEvmEvent {
+    pub fn get_id(&self) -> CorrelationId {
+        match self {
+            EnclaveEvmEvent::HistoricalSyncComplete(e) => e.get_id(),
+            EnclaveEvmEvent::Log(e) => e.get_id(),
+            EnclaveEvmEvent::Event(e) => e.get_id(),
+            EnclaveEvmEvent::Processed(id) => id.to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EvmLog {
+    pub id: CorrelationId,
+    pub log: Log,
+    pub timestamp: u64,
+    pub chain_id: u64,
+}
+
+impl EvmLog {
+    pub fn new(log: Log, chain_id: u64, timestamp: u64) -> Self {
+        let id = CorrelationId::new();
+        Self {
+            log,
+            chain_id,
+            id,
+            timestamp,
+        }
+    }
+
+    pub fn get_id(&self) -> CorrelationId {
+        self.id
+    }
+}
+
+#[cfg(test)]
+use alloy_primitives::Address;
+
+#[cfg(test)]
+impl EvmLog {
+    pub fn test_log(address: Address, chain_id: u64, timestamp: u64) -> EvmLog {
+        let id = CorrelationId::new();
+        EvmLog {
+            log: Log {
+                inner: alloy_primitives::Log {
+                    address,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            chain_id,
+            id,
+            timestamp,
+        }
+    }
+}
+
+pub type EvmEventProcessor = Recipient<EnclaveEvmEvent>;

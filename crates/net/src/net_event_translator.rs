@@ -21,6 +21,7 @@ use e3_events::BusHandle;
 use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
+use e3_events::EventContextAccessors;
 use e3_events::EventType;
 use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
@@ -160,7 +161,7 @@ impl Handler<LibP2pEvent> for NetEventTranslator {
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
         let LibP2pEvent(data) = msg;
         let event: EnclaveEvent<Unsequenced> = data.try_into()?;
-        self.sent_events.insert(event.get_id());
+        self.sent_events.insert(event.id());
         let (data, ts) = event.split();
         self.bus.publish_from_remote(data, ts)?;
         Ok(())

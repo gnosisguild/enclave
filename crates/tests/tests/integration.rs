@@ -173,7 +173,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(bus.consumer())
+                .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
                 .await
@@ -188,7 +188,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
                 .with_sortition_score()
-                .testmode_with_forked_bus(bus.consumer())
+                .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
                 .await

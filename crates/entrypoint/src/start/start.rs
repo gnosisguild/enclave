@@ -6,7 +6,7 @@
 
 use alloy::primitives::Address;
 use anyhow::Result;
-use e3_ciphernode_builder::CiphernodeBuilder;
+use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
@@ -19,13 +19,10 @@ use tokio::task::JoinHandle;
 use tracing::instrument;
 
 #[instrument(name = "app", skip_all)]
-pub async fn execute(
-    config: &AppConfig,
-    address: Address,
-) -> Result<(BusHandle, JoinHandle<Result<()>>, String)> {
+pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
-    let builder = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
+    let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
@@ -34,19 +31,10 @@ pub async fn execute(
         .with_contract_bonding_registry()
         .with_max_threads()
         .with_contract_ciphernode_registry()
-        .with_trbfv();
+        .with_trbfv()
+        .with_net(config.peers(), config.quic_port())
+        .build()
+        .await?;
 
-    let node = builder.build().await?;
-    let repositories = node.store().repositories();
-    let bus = node.bus.clone();
-    let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
-        bus.clone(),
-        config.peers(),
-        &cipher,
-        config.quic_port(),
-        repositories.libp2p_keypair(),
-    )
-    .await?;
-
-    Ok((bus, join_handle, peer_id))
+    Ok(node)
 }
