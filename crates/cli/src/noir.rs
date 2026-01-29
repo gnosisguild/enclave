@@ -7,7 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
-use e3_noir_prover::{NoirSetup, SetupStatus};
+use e3_zk_prover::{SetupStatus, ZkBackend};
 
 #[derive(Subcommand, Debug)]
 pub enum NoirCommands {
@@ -23,63 +23,63 @@ pub async fn execute(command: NoirCommands, _config: &AppConfig) -> Result<()> {
 }
 
 pub async fn execute_without_config(command: NoirCommands) -> Result<()> {
-    let setup = NoirSetup::with_default_dir()
+    let backend = ZkBackend::with_default_dir()
         .await
-        .map_err(|e| anyhow!("Failed to initialize noir setup: {}", e))?;
+        .map_err(|e| anyhow!("Failed to initialize ZK backend: {}", e))?;
 
     match command {
         NoirCommands::Status => {
-            execute_status(&setup).await?;
+            execute_status(&backend).await?;
         }
         NoirCommands::Setup { force } => {
-            execute_setup(&setup, force).await?;
+            execute_setup(&backend, force).await?;
         }
     }
 
     Ok(())
 }
 
-async fn execute_status(setup: &NoirSetup) -> Result<()> {
-    let status = setup.check_status().await;
-    let version_info = setup.load_version_info().await;
+async fn execute_status(backend: &ZkBackend) -> Result<()> {
+    let status = backend.check_status().await;
+    let version_info = backend.load_version_info().await;
 
-    println!("=== Noir Prover Status ===\n");
+    println!("=== ZK Prover Status ===\n");
 
     println!("Barretenberg (bb):");
-    println!("  Path: {}", setup.bb_binary.display());
+    println!("  Path: {}", backend.bb_binary.display());
     if let Some(ref v) = version_info.bb_version {
         println!("  Version: {}", v);
     }
-    if setup.bb_binary.exists() {
-        println!("  ✓ Installed");
+    if backend.bb_binary.exists() {
+        println!("  Installed");
     } else {
-        println!("  ✗ Not installed");
+        println!("  Not installed");
     }
 
     println!();
 
     println!("Circuits:");
-    println!("  Path: {}", setup.circuits_dir.display());
+    println!("  Path: {}", backend.circuits_dir.display());
     if let Some(ref v) = version_info.circuits_version {
         println!("  Version: {}", v);
     }
-    if setup.circuits_dir.exists() {
-        println!("  ✓ Installed");
+    if backend.circuits_dir.exists() {
+        println!("  Installed");
     } else {
-        println!("  ✗ Not installed");
+        println!("  Not installed");
     }
 
     println!();
 
     match status {
         SetupStatus::Ready => {
-            println!("Status: ✓ Ready");
+            println!("Status: Ready");
         }
         SetupStatus::BbNeedsUpdate {
             installed,
             required,
         } => {
-            println!("Status: ⚠ Barretenberg needs update");
+            println!("Status: Barretenberg needs update");
             println!(
                 "  Installed: {}",
                 installed.as_deref().unwrap_or("not installed")
@@ -91,7 +91,7 @@ async fn execute_status(setup: &NoirSetup) -> Result<()> {
             installed,
             required,
         } => {
-            println!("Status: ⚠ Circuits need update");
+            println!("Status: Circuits need update");
             println!(
                 "  Installed: {}",
                 installed.as_deref().unwrap_or("not installed")
@@ -100,7 +100,7 @@ async fn execute_status(setup: &NoirSetup) -> Result<()> {
             println!("\nRun `enclave noir setup` to update");
         }
         SetupStatus::FullSetupNeeded => {
-            println!("Status: ✗ Setup required");
+            println!("Status: Setup required");
             println!("\nRun `enclave noir setup` to install");
         }
     }
@@ -108,28 +108,28 @@ async fn execute_status(setup: &NoirSetup) -> Result<()> {
     Ok(())
 }
 
-async fn execute_setup(setup: &NoirSetup, force: bool) -> Result<()> {
+async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
     if force {
-        println!("Force reinstalling Noir prover components...\n");
+        println!("Force reinstalling ZK prover components...\n");
     } else {
-        let status = setup.check_status().await;
+        let status = backend.check_status().await;
         if matches!(status, SetupStatus::Ready) {
-            println!("✓ Noir prover is already set up and up to date.");
+            println!("ZK prover is already set up and up to date.");
             println!("  Use --force to reinstall.");
             return Ok(());
         }
     }
 
-    println!("Setting up Noir prover...\n");
+    println!("Setting up ZK prover...\n");
 
-    setup
+    backend
         .ensure_installed()
         .await
         .map_err(|e| anyhow!("Setup failed: {}", e))?;
 
-    println!("\n✓ Noir prover setup complete!");
-    println!("  bb binary: {}", setup.bb_binary.display());
-    println!("  circuits: {}", setup.circuits_dir.display());
+    println!("\nZK prover setup complete!");
+    println!("  bb binary: {}", backend.bb_binary.display());
+    println!("  circuits: {}", backend.circuits_dir.display());
 
     Ok(())
 }

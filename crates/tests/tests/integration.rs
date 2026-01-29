@@ -614,8 +614,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     use std::time::Duration;
     use tokio::time::sleep;
 
-    type PkSkShareTuple = (PublicKeyShare, SecretKey, String);
-
     async fn setup_local_ciphernode(
         bus: &BusHandle,
         rng: &e3_utils::SharedRng,
