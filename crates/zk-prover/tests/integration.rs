@@ -222,7 +222,8 @@ async fn test_pk_bfv_proof() {
         &reduced_witness.pk1is,
         computation_output.bits.pk_bit,
     );
-    let commitment_from_proof = BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_output);
+    let commitment_from_proof =
+        BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_signals);
 
     assert_eq!(commitment_calculated, commitment_from_proof);
 

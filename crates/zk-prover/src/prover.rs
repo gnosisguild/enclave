@@ -15,20 +15,20 @@ use tracing::{debug, info};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[must_use]
 pub struct Proof {
-    /// "pk_bfv", "pk_trbfv", etc.
+    /// Circuit name (e.g., "pk_bfv", "pk_trbfv").
     pub circuit: String,
-    /// The actual proof bytes.
+    /// The proof bytes.
     pub data: Vec<u8>,
-    /// The public output/commitment from the circuit.
-    pub public_output: Vec<u8>,
+    /// Public signals (inputs and outputs) from the circuit.
+    pub public_signals: Vec<u8>,
 }
 
 impl Proof {
-    pub fn new(circuit: impl Into<String>, data: Vec<u8>, public_output: Vec<u8>) -> Self {
+    pub fn new(circuit: impl Into<String>, data: Vec<u8>, public_signals: Vec<u8>) -> Self {
         Self {
             circuit: circuit.into(),
             data,
-            public_output,
+            public_signals,
         }
     }
 }
@@ -117,7 +117,7 @@ impl ZkProver {
         }
 
         let proof_data = fs::read(&proof_path).await?;
-        let public_output = fs::read(&public_inputs_path).await?;
+        let public_signals = fs::read(&public_inputs_path).await?;
 
         info!(
             "generated proof ({} bytes) for {} / {}",
@@ -126,11 +126,11 @@ impl ZkProver {
             e3_id
         );
 
-        Ok(Proof::new(circuit_name, proof_data, public_output))
+        Ok(Proof::new(circuit_name, proof_data, public_signals))
     }
 
     pub async fn verify(&self, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
-        self.verify_proof(&proof.circuit, &proof.data, &proof.public_output, e3_id)
+        self.verify_proof(&proof.circuit, &proof.data, &proof.public_signals, e3_id)
             .await
     }
 
@@ -138,7 +138,7 @@ impl ZkProver {
         &self,
         circuit_name: &str,
         proof_data: &[u8],
-        public_output: &[u8],
+        public_signals: &[u8],
         e3_id: &str,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
@@ -163,7 +163,7 @@ impl ZkProver {
         let public_inputs_path = out_dir.join("public_inputs");
 
         fs::write(&proof_path, proof_data).await?;
-        fs::write(&public_inputs_path, public_output).await?;
+        fs::write(&public_inputs_path, public_signals).await?;
 
         debug!("verifying proof for circuit: {}", circuit_name);
 
