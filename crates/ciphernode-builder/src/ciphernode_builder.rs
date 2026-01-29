@@ -428,6 +428,7 @@ impl CiphernodeBuilder {
                 &self.cipher,
                 &addr,
                 share_encryption_params,
+                self.zk_backend.clone(),
             ))
         }
 
@@ -505,14 +506,26 @@ impl CiphernodeBuilder {
             )
         });
 
-        // Create it
-        let addr = Multithread::attach(
-            bus,
-            self.rng.clone(),
-            self.cipher.clone(),
-            task_pool,
-            self.multithread_report.clone(),
-        );
+        // Create it with or without ZK prover
+        let addr = if let Some(ref backend) = self.zk_backend {
+            info!("Multithread actor with ZK prover");
+            Multithread::attach_with_zk(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+                backend,
+            )
+        } else {
+            Multithread::attach(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+            )
+        };
 
         // Set the cache
         self.multithread_cache = Some(addr.clone());
