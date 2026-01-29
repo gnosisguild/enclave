@@ -14,7 +14,7 @@ mod traits;
 mod witness;
 
 pub use backend::{SetupStatus, ZkBackend};
-pub use config::{VersionInfo, ZkConfig};
+pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use error::ZkError;
 pub use ext::{ZkProofExtension, ZK_PROVER_KEY};
 pub use prover::ZkProver;
