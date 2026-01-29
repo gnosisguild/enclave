@@ -142,6 +142,8 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::KeyGeneration, &self.bus.clone(), || {
+            self.bus.set_ctx(&msg);
+            self.state.set_ctx(&msg);
             match msg.into_data() {
                 EnclaveEventData::KeyshareCreated(data) => self.notify_sync(ctx, data)?,
                 EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),

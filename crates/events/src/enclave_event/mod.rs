@@ -508,6 +508,16 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
         }
     }
 }
+impl From<EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: EnclaveEvent) -> Self {
+        (&value).into()
+    }
+}
+impl From<&EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: &EnclaveEvent) -> Self {
+        value.ctx.clone()
+    }
+}
 
 // Add convenience method to EnclaveEvent
 impl<S: SeqState> EnclaveEvent<S> {

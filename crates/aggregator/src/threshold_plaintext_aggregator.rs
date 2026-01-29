@@ -12,7 +12,7 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, ComputeRequest, ComputeResponse, CorrelationId,
     DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, PlaintextAggregated,
-    Seed,
+    Seed, TypedEvent,
 };
 use e3_sortition::{GetNodesForE3, Sortition};
 use e3_trbfv::{
@@ -262,19 +262,27 @@ impl Actor for ThresholdPlaintextAggregator {
 impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+        self.bus.set_ctx(&msg);
+        self.state.set_ctx(&msg);
+        match msg.get_data() {
+            EnclaveEventData::DecryptionshareCreated(data) => {
+                ctx.notify(TypedEvent::new(data.clone(), msg.clone()))
+            }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data.clone()),
             _ => (),
         }
     }
 }
 
-impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregator {
+    type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        event: TypedEvent<DecryptionshareCreated>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
             self.state.get()
         else {

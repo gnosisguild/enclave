@@ -48,6 +48,7 @@ impl Actor for CommitteeFinalizer {
 impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        self.bus.set_ctx(&msg);
         match msg.into_data() {
             EnclaveEventData::CommitteeRequested(data) => self.notify_sync(ctx, data),
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
