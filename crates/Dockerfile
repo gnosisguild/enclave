@@ -65,7 +65,7 @@ COPY crates/logger/Cargo.toml ./logger/Cargo.toml
 COPY crates/multithread/Cargo.toml ./multithread/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
 COPY crates/parity-matrix/Cargo.toml ./parity-matrix/Cargo.toml
-COPY crates/noir-prover/Cargo.toml ./noir-prover/Cargo.toml
+COPY crates/zk-prover/Cargo.toml ./zk-prover/Cargo.toml
 COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
 COPY crates/polynomial/benches ./polynomial/benches
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml

@@ -4,9 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Native witness generation using nargo (following mopro/noir-rs pattern)
-
-use crate::error::NoirProverError;
+use crate::error::ZkError;
 use acir::{
     circuit::Program,
     native_types::{WitnessMap, WitnessStack},
@@ -29,32 +27,32 @@ pub struct CompiledCircuit {
 }
 
 impl CompiledCircuit {
-    pub fn from_json(json: &str) -> Result<Self, NoirProverError> {
-        serde_json::from_str(json).map_err(NoirProverError::JsonError)
+    pub fn from_json(json: &str) -> Result<Self, ZkError> {
+        serde_json::from_str(json).map_err(ZkError::JsonError)
     }
 
-    pub async fn from_file(path: &std::path::Path) -> Result<Self, NoirProverError> {
+    pub async fn from_file(path: &std::path::Path) -> Result<Self, ZkError> {
         let contents = tokio::fs::read_to_string(path).await?;
         Self::from_json(&contents)
     }
 }
 
-fn get_acir_buffer(bytecode: &str) -> Result<Vec<u8>, NoirProverError> {
+fn get_acir_buffer(bytecode: &str) -> Result<Vec<u8>, ZkError> {
     general_purpose::STANDARD
         .decode(bytecode)
-        .map_err(|e| NoirProverError::SerializationError(format!("base64 decode: {}", e)))
+        .map_err(|e| ZkError::SerializationError(format!("base64 decode: {}", e)))
 }
 
-fn get_program(bytecode: &str) -> Result<Program<FieldElement>, NoirProverError> {
+fn get_program(bytecode: &str) -> Result<Program<FieldElement>, ZkError> {
     let acir_buffer = get_acir_buffer(bytecode)?;
     Program::deserialize_program(&acir_buffer)
-        .map_err(|e| NoirProverError::SerializationError(format!("ACIR decode: {:?}", e)))
+        .map_err(|e| ZkError::SerializationError(format!("ACIR decode: {:?}", e)))
 }
 
 fn execute(
     bytecode: &str,
     initial_witness: WitnessMap<FieldElement>,
-) -> Result<WitnessStack<FieldElement>, NoirProverError> {
+) -> Result<WitnessStack<FieldElement>, ZkError> {
     let program = get_program(bytecode)?;
     let blackbox_solver = Bn254BlackBoxSolver::default();
     let mut foreign_call_executor = DefaultForeignCallBuilder::default().build();
@@ -65,22 +63,20 @@ fn execute(
         &blackbox_solver,
         &mut foreign_call_executor,
     )
-    .map_err(|e| NoirProverError::WitnessGenerationFailed(e.to_string()))
+    .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))
 }
 
-fn serialize_witness(
-    witness_stack: &WitnessStack<FieldElement>,
-) -> Result<Vec<u8>, NoirProverError> {
+fn serialize_witness(witness_stack: &WitnessStack<FieldElement>) -> Result<Vec<u8>, ZkError> {
     let buf = bincode::serialize(witness_stack)
-        .map_err(|e| NoirProverError::SerializationError(format!("bincode: {}", e)))?;
+        .map_err(|e| ZkError::SerializationError(format!("bincode: {}", e)))?;
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder
         .write_all(&buf)
-        .map_err(|e| NoirProverError::SerializationError(format!("gzip: {}", e)))?;
+        .map_err(|e| ZkError::SerializationError(format!("gzip: {}", e)))?;
     encoder
         .finish()
-        .map_err(|e| NoirProverError::SerializationError(format!("gzip finish: {}", e)))
+        .map_err(|e| ZkError::SerializationError(format!("gzip finish: {}", e)))
 }
 
 pub struct WitnessGenerator;
@@ -94,20 +90,20 @@ impl WitnessGenerator {
         &self,
         circuit: &CompiledCircuit,
         inputs: InputMap,
-    ) -> Result<Vec<u8>, NoirProverError> {
+    ) -> Result<Vec<u8>, ZkError> {
         let bytecode = circuit.bytecode.clone();
         let abi = circuit.abi.clone();
 
         tokio::task::spawn_blocking(move || {
-            let initial_witness = abi.encode(&inputs, None).map_err(|e| {
-                NoirProverError::WitnessGenerationFailed(format!("ABI encode: {:?}", e))
-            })?;
+            let initial_witness = abi
+                .encode(&inputs, None)
+                .map_err(|e| ZkError::WitnessGenerationFailed(format!("ABI encode: {:?}", e)))?;
 
             let witness_stack = execute(&bytecode, initial_witness)?;
             serialize_witness(&witness_stack)
         })
         .await
-        .map_err(|e| NoirProverError::WitnessGenerationFailed(e.to_string()))?
+        .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?
     }
 }
 

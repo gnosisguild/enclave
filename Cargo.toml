@@ -22,7 +22,7 @@ members = [
   "crates/logger",
   "crates/multithread",
   "crates/net", 
-  "crates/noir-prover",
+  "crates/zk-prover",
   "crates/program-server", 
   "crates/request",
   "crates/safe",

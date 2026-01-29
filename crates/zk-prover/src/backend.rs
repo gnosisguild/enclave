@@ -2,10 +2,10 @@
 //
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
+// or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::config::{NoirConfig, VersionInfo};
-use crate::error::NoirProverError;
+use crate::config::{VersionInfo, ZkConfig};
+use crate::error::ZkError;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -30,41 +30,41 @@ pub enum SetupStatus {
 }
 
 #[derive(Debug, Clone)]
-pub struct NoirSetup {
-    pub noir_dir: PathBuf,
+pub struct ZkBackend {
+    pub base_dir: PathBuf,
     pub bb_binary: PathBuf,
     pub circuits_dir: PathBuf,
     pub work_dir: PathBuf,
-    pub config: NoirConfig,
+    pub config: ZkConfig,
 }
 
-impl NoirSetup {
-    pub fn new(enclave_dir: &Path, config: NoirConfig) -> Self {
-        let noir_dir = enclave_dir.join("noir");
+impl ZkBackend {
+    pub fn new(enclave_dir: &Path, config: ZkConfig) -> Self {
+        let base_dir = enclave_dir.join("noir");
         Self {
-            bb_binary: noir_dir.join("bin").join("bb"),
-            circuits_dir: noir_dir.join("circuits"),
-            work_dir: noir_dir.join("work"),
-            noir_dir,
+            bb_binary: base_dir.join("bin").join("bb"),
+            circuits_dir: base_dir.join("circuits"),
+            work_dir: base_dir.join("work"),
+            base_dir,
             config,
         }
     }
 
-    pub async fn with_default_dir() -> Result<Self, NoirProverError> {
+    pub async fn with_default_dir() -> Result<Self, ZkError> {
         let base_dirs = directories::BaseDirs::new().ok_or_else(|| {
-            NoirProverError::IoError(std::io::Error::new(
+            ZkError::IoError(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Could not determine home directory",
             ))
         })?;
 
         let enclave_dir = base_dirs.home_dir().join(".enclave");
-        let config = NoirConfig::fetch_or_default().await;
+        let config = ZkConfig::fetch_or_default().await;
         Ok(Self::new(&enclave_dir, config))
     }
 
     fn version_file(&self) -> PathBuf {
-        self.noir_dir.join("version.json")
+        self.base_dir.join("version.json")
     }
 
     pub async fn load_version_info(&self) -> VersionInfo {
@@ -96,9 +96,9 @@ impl NoirSetup {
         }
     }
 
-    pub async fn ensure_installed(&self) -> Result<(), NoirProverError> {
-        fs::create_dir_all(&self.noir_dir).await?;
-        fs::create_dir_all(self.noir_dir.join("bin")).await?;
+    pub async fn ensure_installed(&self) -> Result<(), ZkError> {
+        fs::create_dir_all(&self.base_dir).await?;
+        fs::create_dir_all(self.base_dir.join("bin")).await?;
         fs::create_dir_all(&self.circuits_dir).await?;
         fs::create_dir_all(&self.work_dir).await?;
 
@@ -106,7 +106,7 @@ impl NoirSetup {
 
         match status {
             SetupStatus::Ready => {
-                debug!("Noir setup is ready");
+                debug!("ZK backend is ready");
                 Ok(())
             }
             SetupStatus::BbNeedsUpdate {
@@ -114,7 +114,7 @@ impl NoirSetup {
                 required,
             } => {
                 info!(
-                    "Updating Barretenberg: {} -> {}",
+                    "updating Barretenberg: {} -> {}",
                     installed.as_deref().unwrap_or("not installed"),
                     required
                 );
@@ -125,26 +125,26 @@ impl NoirSetup {
                 required,
             } => {
                 info!(
-                    "Updating circuits: {} -> {}",
+                    "updating circuits: {} -> {}",
                     installed.as_deref().unwrap_or("not installed"),
                     required
                 );
                 self.download_circuits().await
             }
             SetupStatus::FullSetupNeeded => {
-                info!("Setting up Noir proving infrastructure...");
+                info!("setting up ZK proving infrastructure...");
                 self.download_bb().await?;
                 self.download_circuits().await
             }
         }
     }
 
-    fn detect_platform() -> Result<(String, String), NoirProverError> {
+    fn detect_platform() -> Result<(String, String), ZkError> {
         let os = match std::env::consts::OS {
             "linux" => "linux",
             "macos" => "darwin",
             os => {
-                return Err(NoirProverError::UnsupportedPlatform {
+                return Err(ZkError::UnsupportedPlatform {
                     os: os.to_string(),
                     arch: std::env::consts::ARCH.to_string(),
                 })
@@ -155,7 +155,7 @@ impl NoirSetup {
             "x86_64" => "amd64",
             "aarch64" => "arm64",
             arch => {
-                return Err(NoirProverError::UnsupportedPlatform {
+                return Err(ZkError::UnsupportedPlatform {
                     os: std::env::consts::OS.to_string(),
                     arch: arch.to_string(),
                 })
@@ -165,7 +165,7 @@ impl NoirSetup {
         Ok((os.to_string(), arch.to_string()))
     }
 
-    pub async fn download_bb(&self) -> Result<(), NoirProverError> {
+    pub async fn download_bb(&self) -> Result<(), ZkError> {
         let (os, arch) = Self::detect_platform()?;
         let version = &self.config.required_bb_version;
 
@@ -176,7 +176,7 @@ impl NoirSetup {
             .replace("{os}", &os)
             .replace("{arch}", &arch);
 
-        info!("Downloading Barretenberg from: {}", url);
+        info!("downloading Barretenberg from: {}", url);
 
         let bytes = self.download_with_progress(&url, "Downloading bb").await?;
         let checksum = self.compute_checksum(&bytes);
@@ -184,7 +184,7 @@ impl NoirSetup {
         let decoder = GzDecoder::new(&bytes[..]);
         let mut archive = Archive::new(decoder);
 
-        let bin_dir = self.noir_dir.join("bin");
+        let bin_dir = self.base_dir.join("bin");
         fs::create_dir_all(&bin_dir).await?;
 
         let temp_dir = tempfile::tempdir()?;
@@ -208,11 +208,11 @@ impl NoirSetup {
         version_info.last_updated = Some(chrono_now());
         version_info.save(&self.version_file()).await?;
 
-        info!("✓ Installed Barretenberg v{}", version);
+        info!("installed Barretenberg v{}", version);
         Ok(())
     }
 
-    fn find_bb_in_dir(dir: &Path) -> Result<PathBuf, NoirProverError> {
+    fn find_bb_in_dir(dir: &Path) -> Result<PathBuf, ZkError> {
         use walkdir::WalkDir;
 
         for candidate in ["bb", "bin/bb", "barretenberg/bin/bb"] {
@@ -228,21 +228,21 @@ impl NoirSetup {
             .find(|e| e.file_name().to_string_lossy() == "bb" && e.file_type().is_file())
             .map(|e| e.path().to_path_buf())
             .ok_or_else(|| {
-                NoirProverError::IoError(std::io::Error::new(
+                ZkError::IoError(std::io::Error::new(
                     std::io::ErrorKind::NotFound,
                     "bb binary not found in archive",
                 ))
             })
     }
 
-    pub async fn download_circuits(&self) -> Result<(), NoirProverError> {
+    pub async fn download_circuits(&self) -> Result<(), ZkError> {
         let version = &self.config.required_circuits_version;
         let url = self
             .config
             .circuits_download_url
             .replace("{version}", version);
 
-        info!("Downloading circuits from: {}", url);
+        info!("downloading circuits from: {}", url);
 
         let result = self
             .download_with_progress(&url, "Downloading circuits")
@@ -250,31 +250,29 @@ impl NoirSetup {
 
         match result {
             Ok(bytes) => {
-                // Extract tarball
                 let decoder = GzDecoder::new(&bytes[..]);
                 let mut archive = Archive::new(decoder);
                 archive.unpack(&self.circuits_dir)?;
             }
             Err(e) => {
                 warn!(
-                    "Could not download circuits ({}), creating placeholder for testing",
+                    "could not download circuits ({}), creating placeholder for testing",
                     e
                 );
                 self.create_placeholder_circuits().await?;
             }
         }
 
-        // Update version info
         let mut version_info = self.load_version_info().await;
         version_info.circuits_version = Some(version.clone());
         version_info.last_updated = Some(chrono_now());
         version_info.save(&self.version_file()).await?;
 
-        info!("✓ Installed circuits v{}", version);
+        info!("installed circuits v{}", version);
         Ok(())
     }
 
-    async fn create_placeholder_circuits(&self) -> Result<(), NoirProverError> {
+    async fn create_placeholder_circuits(&self) -> Result<(), ZkError> {
         fs::create_dir_all(&self.circuits_dir).await?;
 
         let placeholder = serde_json::json!({
@@ -305,20 +303,16 @@ impl NoirSetup {
         Ok(())
     }
 
-    async fn download_with_progress(
-        &self,
-        url: &str,
-        message: &str,
-    ) -> Result<Vec<u8>, NoirProverError> {
+    async fn download_with_progress(&self, url: &str, message: &str) -> Result<Vec<u8>, ZkError> {
         let client = reqwest::Client::new();
         let response = client
             .get(url)
             .send()
             .await
-            .map_err(|e| NoirProverError::DownloadFailed(url.to_string(), e.to_string()))?;
+            .map_err(|e| ZkError::DownloadFailed(url.to_string(), e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(NoirProverError::DownloadFailed(
+            return Err(ZkError::DownloadFailed(
                 url.to_string(),
                 format!("HTTP {}", response.status()),
             ));
@@ -339,13 +333,13 @@ impl NoirSetup {
         let mut stream = response.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk
-                .map_err(|e| NoirProverError::DownloadFailed(url.to_string(), e.to_string()))?;
+            let chunk =
+                chunk.map_err(|e| ZkError::DownloadFailed(url.to_string(), e.to_string()))?;
             bytes.extend_from_slice(&chunk);
             pb.set_position(bytes.len() as u64);
         }
 
-        pb.finish_with_message("Download complete");
+        pb.finish_with_message("download complete");
         Ok(bytes)
     }
 
@@ -355,9 +349,9 @@ impl NoirSetup {
         hex::encode(hasher.finalize())
     }
 
-    pub async fn verify_bb(&self) -> Result<String, NoirProverError> {
+    pub async fn verify_bb(&self) -> Result<String, ZkError> {
         if !self.bb_binary.exists() {
-            return Err(NoirProverError::BbNotInstalled);
+            return Err(ZkError::BbNotInstalled);
         }
 
         let output = tokio::process::Command::new(&self.bb_binary)
@@ -366,7 +360,7 @@ impl NoirSetup {
             .await?;
 
         if !output.status.success() {
-            return Err(NoirProverError::ProveFailed(
+            return Err(ZkError::ProveFailed(
                 String::from_utf8_lossy(&output.stderr).to_string(),
             ));
         }
@@ -379,7 +373,7 @@ impl NoirSetup {
         self.work_dir.join(e3_id)
     }
 
-    pub async fn cleanup_work_dir(&self, e3_id: &str) -> Result<(), NoirProverError> {
+    pub async fn cleanup_work_dir(&self, e3_id: &str) -> Result<(), ZkError> {
         let work_dir = self.work_dir_for(e3_id);
         if work_dir.exists() {
             fs::remove_dir_all(&work_dir).await?;
@@ -398,17 +392,17 @@ mod tests {
     use tempfile::tempdir;
 
     #[tokio::test]
-    async fn test_setup_creates_directories() {
+    async fn test_backend_creates_directories() {
         let temp = tempdir().unwrap();
-        let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+        let backend = ZkBackend::new(temp.path(), ZkConfig::default());
 
-        fs::create_dir_all(&setup.noir_dir).await.unwrap();
-        fs::create_dir_all(&setup.circuits_dir).await.unwrap();
-        fs::create_dir_all(&setup.work_dir).await.unwrap();
+        fs::create_dir_all(&backend.base_dir).await.unwrap();
+        fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+        fs::create_dir_all(&backend.work_dir).await.unwrap();
 
-        assert!(setup.noir_dir.exists());
-        assert!(setup.circuits_dir.exists());
-        assert!(setup.work_dir.exists());
+        assert!(backend.base_dir.exists());
+        assert!(backend.circuits_dir.exists());
+        assert!(backend.work_dir.exists());
     }
 
     #[tokio::test]
