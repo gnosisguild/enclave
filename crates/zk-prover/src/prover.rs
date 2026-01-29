@@ -4,27 +4,47 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// Noir prover using native witness generation + bb CLI
-
-use crate::error::NoirProverError;
-use crate::setup::NoirSetup;
+use crate::backend::ZkBackend;
+use crate::error::ZkError;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs;
 use tokio::process::Command;
 use tracing::{debug, info};
 
-pub struct NoirProver {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[must_use]
+pub struct Proof {
+    /// Circuit name (e.g., "pk_bfv", "pk_trbfv").
+    pub circuit: String,
+    /// The proof bytes.
+    pub data: Vec<u8>,
+    /// Public signals (inputs and outputs) from the circuit.
+    pub public_signals: Vec<u8>,
+}
+
+impl Proof {
+    pub fn new(circuit: impl Into<String>, data: Vec<u8>, public_signals: Vec<u8>) -> Self {
+        Self {
+            circuit: circuit.into(),
+            data,
+            public_signals,
+        }
+    }
+}
+
+pub struct ZkProver {
     bb_binary: PathBuf,
     circuits_dir: PathBuf,
     work_dir: PathBuf,
 }
 
-impl NoirProver {
-    pub fn new(setup: &NoirSetup) -> Self {
+impl ZkProver {
+    pub fn new(backend: &ZkBackend) -> Self {
         Self {
-            bb_binary: setup.bb_binary.clone(),
-            circuits_dir: setup.circuits_dir.clone(),
-            work_dir: setup.work_dir.clone(),
+            bb_binary: backend.bb_binary.clone(),
+            circuits_dir: backend.circuits_dir.clone(),
+            work_dir: backend.work_dir.clone(),
         }
     }
 
@@ -41,14 +61,14 @@ impl NoirProver {
         circuit_name: &str,
         witness_data: &[u8],
         e3_id: &str,
-    ) -> Result<Vec<u8>, NoirProverError> {
+    ) -> Result<Proof, ZkError> {
         if !self.bb_binary.exists() {
-            return Err(NoirProverError::BbNotInstalled);
+            return Err(ZkError::BbNotInstalled);
         }
 
         let circuit_path = self.circuits_dir.join(format!("{}.json", circuit_name));
         if !circuit_path.exists() {
-            return Err(NoirProverError::CircuitNotFound(circuit_name.to_string()));
+            return Err(ZkError::CircuitNotFound(circuit_name.to_string()));
         }
 
         let vk_path = self
@@ -56,7 +76,7 @@ impl NoirProver {
             .join("vk")
             .join(format!("{}.vk", circuit_name));
         if !vk_path.exists() {
-            return Err(NoirProverError::CircuitNotFound(format!(
+            return Err(ZkError::CircuitNotFound(format!(
                 "VK not found: {}",
                 vk_path.display()
             )));
@@ -68,6 +88,7 @@ impl NoirProver {
         let witness_path = job_dir.join("witness.gz");
         let output_dir = job_dir.join("out");
         let proof_path = output_dir.join("proof");
+        let public_inputs_path = output_dir.join("public_inputs");
 
         fs::write(&witness_path, witness_data).await?;
 
@@ -92,23 +113,36 @@ impl NoirProver {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(NoirProverError::ProveFailed(stderr.to_string()));
+            return Err(ZkError::ProveFailed(stderr.to_string()));
         }
 
-        let proof = fs::read(&proof_path).await?;
-        info!("generated proof ({} bytes) for {}", proof.len(), e3_id);
+        let proof_data = fs::read(&proof_path).await?;
+        let public_signals = fs::read(&public_inputs_path).await?;
 
-        Ok(proof)
+        info!(
+            "generated proof ({} bytes) for {} / {}",
+            proof_data.len(),
+            circuit_name,
+            e3_id
+        );
+
+        Ok(Proof::new(circuit_name, proof_data, public_signals))
+    }
+
+    pub async fn verify(&self, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
+        self.verify_proof(&proof.circuit, &proof.data, &proof.public_signals, e3_id)
+            .await
     }
 
     pub async fn verify_proof(
         &self,
         circuit_name: &str,
-        proof: &[u8],
+        proof_data: &[u8],
+        public_signals: &[u8],
         e3_id: &str,
-    ) -> Result<bool, NoirProverError> {
+    ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
-            return Err(NoirProverError::BbNotInstalled);
+            return Err(ZkError::BbNotInstalled);
         }
 
         let vk_path = self
@@ -116,24 +150,20 @@ impl NoirProver {
             .join("vk")
             .join(format!("{}.vk", circuit_name));
         if !vk_path.exists() {
-            return Err(NoirProverError::CircuitNotFound(format!(
-                "{}.vk",
-                circuit_name
-            )));
+            return Err(ZkError::CircuitNotFound(format!("{}.vk", circuit_name)));
         }
 
         let job_dir = self.work_dir.join(e3_id);
         fs::create_dir_all(&job_dir).await?;
 
-        let proof_path = job_dir.join("proof_to_verify");
-        fs::write(&proof_path, proof).await?;
+        let out_dir = job_dir.join("out");
+        fs::create_dir_all(&out_dir).await?;
 
-        let public_inputs_path = job_dir.join("out").join("public_inputs");
-        if !public_inputs_path.exists() {
-            return Err(NoirProverError::ProveFailed(
-                "public_inputs not found".to_string(),
-            ));
-        }
+        let proof_path = job_dir.join("proof_to_verify");
+        let public_inputs_path = out_dir.join("public_inputs");
+
+        fs::write(&proof_path, proof_data).await?;
+        fs::write(&public_inputs_path, public_signals).await?;
 
         debug!("verifying proof for circuit: {}", circuit_name);
 
@@ -155,7 +185,7 @@ impl NoirProver {
         Ok(output.status.success())
     }
 
-    pub async fn cleanup(&self, e3_id: &str) -> Result<(), NoirProverError> {
+    pub async fn cleanup(&self, e3_id: &str) -> Result<(), ZkError> {
         let job_dir = self.work_dir.join(e3_id);
         if job_dir.exists() {
             fs::remove_dir_all(&job_dir).await?;
@@ -167,18 +197,16 @@ impl NoirProver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZkConfig;
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_prover_requires_bb() {
         let temp = tempdir().unwrap();
-        let prover = NoirProver {
-            bb_binary: temp.path().join("nonexistent"),
-            circuits_dir: temp.path().join("circuits"),
-            work_dir: temp.path().join("work"),
-        };
+        let backend = ZkBackend::new(temp.path(), ZkConfig::default());
+        let prover = ZkProver::new(&backend);
 
         let result = prover.generate_proof("test", b"witness", "e3-1").await;
-        assert!(matches!(result, Err(NoirProverError::BbNotInstalled)));
+        assert!(matches!(result, Err(ZkError::BbNotInstalled)));
     }
 }
