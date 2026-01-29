@@ -3310,6 +3310,8 @@ version = "0.1.8"
 dependencies = [
  "bincode",
  "criterion",
+ "fhe-math",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "serde",
