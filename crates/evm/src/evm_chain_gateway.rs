@@ -11,8 +11,8 @@ use actix::{Addr, Recipient};
 use anyhow::Result;
 use anyhow::{bail, Context};
 use e3_events::{
-    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, SyncEnd, SyncEvmEvent,
-    SyncStart,
+    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, SyncEnd,
+    SyncEvmEvent, SyncStart,
 };
 use e3_events::{EType, EvmEvent};
 use e3_events::{Event, EventPublisher};
@@ -94,7 +94,10 @@ impl EvmChainGateway {
 
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
-        bus.subscribe_all(&["SyncStart", "SyncEnd"], addr.clone().recipient());
+        bus.subscribe_all(
+            &[EventType::SyncStart, EventType::SyncEnd],
+            addr.clone().recipient(),
+        );
         addr
     }
 

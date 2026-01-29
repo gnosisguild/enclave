@@ -8,7 +8,7 @@ use std::mem::replace;
 
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
-use e3_events::{BusHandle, EventSubscriber, SyncStart};
+use e3_events::{BusHandle, EventSubscriber, EventType, SyncStart};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
     FixHistoricalOrder, OneShotRunner, SyncStartExtractor,
@@ -74,6 +74,6 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
                 Ok(())
             }
         }));
-        self.bus.subscribe("SyncStart", runner.recipient());
+        self.bus.subscribe(EventType::SyncStart, runner.recipient());
     }
 }

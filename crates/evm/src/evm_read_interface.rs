@@ -15,7 +15,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy_primitives::Address;
 use anyhow::anyhow;
-use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscriber};
+use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscriber, EventType};
 use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
 use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
@@ -111,7 +111,7 @@ impl<P: Provider + Clone + 'static> EvmReadInterface<P> {
 
         let addr = EvmReadInterface::new(params).start();
 
-        bus.subscribe("Shutdown", addr.clone().into());
+        bus.subscribe(EventType::Shutdown, addr.clone().into());
         addr
     }
 }

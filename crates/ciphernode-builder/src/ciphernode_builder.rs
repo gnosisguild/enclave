@@ -438,11 +438,6 @@ impl CiphernodeBuilder {
             ))
         }
 
-        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold)) {
-            info!("Setting up KeyshareExtension (legacy)!");
-            e3_builder = e3_builder.with(KeyshareExtension::create(&bus, &addr, &self.cipher))
-        }
-
         info!("building...");
 
         e3_builder.build().await?;
