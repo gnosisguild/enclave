@@ -5,22 +5,20 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::error::ZkError;
-use crate::prover::{Proof, ZkProver};
+use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
-use async_trait::async_trait;
+use e3_events::{CircuitName, Proof};
 use noirc_abi::InputMap;
 
 /// Trait for types that can generate ZK proofs.
 ///
-/// Implementors define how to build witness data from their inputs
-/// and how to parse the public output. The prove/verify methods
-/// are provided with default implementations.
-#[async_trait]
+/// Implementors define how to build witness data from their inputs.
+/// The prove/verify methods are provided with default implementations.
 pub trait Provable: Send + Sync {
     type Params: Send + Sync;
     type Input: Send + Sync;
 
-    fn circuit_name(&self) -> &'static str;
+    fn circuit(&self) -> CircuitName;
 
     fn build_witness(
         &self,
@@ -28,7 +26,7 @@ pub trait Provable: Send + Sync {
         input: &Self::Input,
     ) -> Result<InputMap, ZkError>;
 
-    async fn prove(
+    fn prove(
         &self,
         prover: &ZkProver,
         params: &Self::Params,
@@ -39,25 +37,23 @@ pub trait Provable: Send + Sync {
 
         let circuit_path = prover
             .circuits_dir()
-            .join(format!("{}.json", self.circuit_name()));
-        let circuit = CompiledCircuit::from_file(&circuit_path).await?;
+            .join(format!("{}.json", self.circuit().as_str()));
+        let circuit = CompiledCircuit::from_file(&circuit_path)?;
 
         let witness_gen = WitnessGenerator::new();
-        let witness = witness_gen.generate_witness(&circuit, inputs).await?;
+        let witness = witness_gen.generate_witness(&circuit, inputs)?;
 
-        prover
-            .generate_proof(self.circuit_name(), &witness, e3_id)
-            .await
+        prover.generate_proof(self.circuit(), &witness, e3_id)
     }
 
-    async fn verify(&self, prover: &ZkProver, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
-        if proof.circuit != self.circuit_name() {
+    fn verify(&self, prover: &ZkProver, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
+        if proof.circuit != self.circuit() {
             return Err(ZkError::VerifyFailed(format!(
                 "circuit mismatch: expected {}, got {}",
-                self.circuit_name(),
+                self.circuit(),
                 proof.circuit
             )));
         }
-        prover.verify(proof, e3_id).await
+        prover.verify(proof, e3_id)
     }
 }
