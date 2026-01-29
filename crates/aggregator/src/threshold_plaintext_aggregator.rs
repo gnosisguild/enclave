@@ -319,12 +319,15 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                         ..
                     })) = act.state.get()
                     {
-                        ctx.notify(ComputeAggregate {
-                            shares: shares.clone(),
-                            ciphertext_output: ciphertext_output.clone(),
-                            threshold_m,
-                            threshold_n,
-                        })
+                        act.notify_sync(
+                            ctx,
+                            ComputeAggregate {
+                                shares: shares.clone(),
+                                ciphertext_output: ciphertext_output.clone(),
+                                threshold_m,
+                                threshold_n,
+                            },
+                        )
                     }
 
                     Ok(())
