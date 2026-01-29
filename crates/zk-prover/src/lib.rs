@@ -17,7 +17,7 @@ pub use backend::{SetupStatus, ZkBackend};
 pub use config::{VersionInfo, ZkConfig};
 pub use error::ZkError;
 pub use ext::{ZkProofExtension, ZK_PROVER_KEY};
-pub use prover::{Proof, ZkProver};
+pub use prover::ZkProver;
 pub use traits::Provable;
 pub use witness::{input_map, CompiledCircuit, WitnessGenerator};
 

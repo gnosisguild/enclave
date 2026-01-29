@@ -31,8 +31,8 @@ impl CompiledCircuit {
         serde_json::from_str(json).map_err(ZkError::JsonError)
     }
 
-    pub async fn from_file(path: &std::path::Path) -> Result<Self, ZkError> {
-        let contents = tokio::fs::read_to_string(path).await?;
+    pub fn from_file(path: &std::path::Path) -> Result<Self, ZkError> {
+        let contents = std::fs::read_to_string(path)?;
         Self::from_json(&contents)
     }
 }
@@ -86,24 +86,18 @@ impl WitnessGenerator {
         Self
     }
 
-    pub async fn generate_witness(
+    pub fn generate_witness(
         &self,
         circuit: &CompiledCircuit,
         inputs: InputMap,
     ) -> Result<Vec<u8>, ZkError> {
-        let bytecode = circuit.bytecode.clone();
-        let abi = circuit.abi.clone();
+        let initial_witness = circuit
+            .abi
+            .encode(&inputs, None)
+            .map_err(|e| ZkError::WitnessGenerationFailed(format!("ABI encode: {:?}", e)))?;
 
-        tokio::task::spawn_blocking(move || {
-            let initial_witness = abi
-                .encode(&inputs, None)
-                .map_err(|e| ZkError::WitnessGenerationFailed(format!("ABI encode: {:?}", e)))?;
-
-            let witness_stack = execute(&bytecode, initial_witness)?;
-            serialize_witness(&witness_stack)
-        })
-        .await
-        .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?
+        let witness_stack = execute(&circuit.bytecode, initial_witness)?;
+        serialize_witness(&witness_stack)
     }
 }
 
@@ -139,26 +133,26 @@ mod tests {
         assert_eq!(circuit.abi.parameters.len(), 3);
     }
 
-    #[tokio::test]
-    async fn test_generate_witness() {
+    #[test]
+    fn test_generate_witness() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
         let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
 
-        let witness = generator.generate_witness(&circuit, inputs).await.unwrap();
+        let witness = generator.generate_witness(&circuit, inputs).unwrap();
 
         assert!(witness.len() > 2);
         assert_eq!(witness[0], 0x1f);
         assert_eq!(witness[1], 0x8b);
     }
 
-    #[tokio::test]
-    async fn test_wrong_sum_fails() {
+    #[test]
+    fn test_wrong_sum_fails() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
         let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]);
 
-        let result = generator.generate_witness(&circuit, inputs).await;
+        let result = generator.generate_witness(&circuit, inputs);
         assert!(result.is_err());
     }
 }

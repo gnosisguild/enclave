@@ -43,6 +43,7 @@ e3-zk-helpers.workspace = true
 e3-request.workspace = true
 e3-events.workspace = true
 e3-data.workspace = true
+e3-utils.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

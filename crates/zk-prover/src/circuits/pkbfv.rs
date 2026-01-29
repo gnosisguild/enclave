@@ -7,7 +7,7 @@
 use crate::error::ZkError;
 use crate::traits::Provable;
 use acir::FieldElement;
-use async_trait::async_trait;
+use e3_events::CircuitName;
 use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
 use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
 use fhe::bfv::{BfvParameters, PublicKey};
@@ -17,13 +17,12 @@ use num_bigint::BigInt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[async_trait]
 impl Provable for PkBfvCircuit {
     type Params = Arc<BfvParameters>;
     type Input = PublicKey;
 
-    fn circuit_name(&self) -> &'static str {
-        "pk_bfv"
+    fn circuit(&self) -> CircuitName {
+        CircuitName::PkBfv
     }
 
     fn build_witness(
