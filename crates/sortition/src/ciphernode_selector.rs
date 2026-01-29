@@ -12,7 +12,7 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::E3RequestComplete;
 use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CommitteeFinalized, E3Requested, E3id, EType,
-    EnclaveEvent, EnclaveEventData, Shutdown, TicketGenerated, TicketId,
+    EnclaveEvent, EnclaveEventData, EventType, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
 use std::collections::HashMap;
@@ -55,9 +55,9 @@ impl CiphernodeSelector {
         let e3_cache = selector_store.load_or_default(HashMap::new()).await?;
         let addr = CiphernodeSelector::new(bus, sortition, e3_cache, address).start();
 
-        bus.subscribe("E3Requested", addr.clone().recipient());
-        bus.subscribe("CommitteeFinalized", addr.clone().recipient());
-        bus.subscribe("Shutdown", addr.clone().recipient());
+        bus.subscribe(EventType::E3Requested, addr.clone().recipient());
+        bus.subscribe(EventType::CommitteeFinalized, addr.clone().recipient());
+        bus.subscribe(EventType::Shutdown, addr.clone().recipient());
 
         info!("CiphernodeSelector listening!");
         Ok(addr)

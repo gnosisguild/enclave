@@ -9,10 +9,7 @@ use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache,
 use actix::{Actor, Addr};
 use anyhow::Result;
 use derivative::Derivative;
-use e3_aggregator::ext::{
-    PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
-    ThresholdPlaintextAggregatorExtension,
-};
+use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
 use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
@@ -21,7 +18,7 @@ use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, 
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
-use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
+use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use e3_request::E3Router;
@@ -60,7 +57,6 @@ pub struct CiphernodeBuilder {
     multithread_concurrent_jobs: Option<usize>,
     multithread_report: Option<Addr<MultithreadReport>>,
     name: String,
-    plaintext_agg: bool,
     pubkey_agg: bool,
     rng: SharedRng,
     sortition_backend: SortitionBackend,
@@ -103,7 +99,6 @@ pub enum BusMode<T> {
 #[derive(Clone, Debug)]
 pub enum KeyshareKind {
     Threshold,
-    NonThreshold, // Soft Deprecated
 }
 
 impl CiphernodeBuilder {
@@ -126,7 +121,6 @@ impl CiphernodeBuilder {
             multithread_concurrent_jobs: None,
             multithread_report: None,
             name: name.to_owned(),
-            plaintext_agg: false,
             pubkey_agg: false,
             rng,
             sortition_backend: SortitionBackend::score(),
@@ -156,13 +150,6 @@ impl CiphernodeBuilder {
     /// Use the TrBFV feature
     pub fn with_trbfv(mut self) -> Self {
         self.keyshare = Some(KeyshareKind::Threshold);
-        self
-    }
-
-    /// Use the Deprecated Keyshare feature
-    #[deprecated = "in future versions we will migrate to with_trbfv()"]
-    pub fn with_keyshare(mut self) -> Self {
-        self.keyshare = Some(KeyshareKind::NonThreshold);
         self
     }
 
@@ -218,12 +205,6 @@ impl CiphernodeBuilder {
     /// Do public key aggregation
     pub fn with_pubkey_aggregation(mut self) -> Self {
         self.pubkey_agg = true;
-        self
-    }
-
-    /// Do plaintext aggregation
-    pub fn with_plaintext_aggregation(mut self) -> Self {
-        self.plaintext_agg = true;
         self
     }
 
@@ -439,10 +420,7 @@ impl CiphernodeBuilder {
             ))
         }
 
-        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold))
-            || self.pubkey_agg
-            || self.plaintext_agg
-        {
+        if self.pubkey_agg {
             info!("Setting up FheExtension");
             e3_builder = e3_builder.with(FheExtension::create(&bus, &self.rng))
         }
@@ -452,13 +430,8 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus))
         }
 
-        if self.plaintext_agg {
-            info!("Setting up PlaintextAggregationExtension (legacy)");
-            e3_builder = e3_builder.with(PlaintextAggregatorExtension::create(&bus, &sortition))
-        }
-
         if self.threshold_plaintext_agg {
-            info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
+            info!("Setting up ThresholdPlaintextAggregatorExtension");
             let _ = self.ensure_multithread(&bus);
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
                 &bus, &sortition,

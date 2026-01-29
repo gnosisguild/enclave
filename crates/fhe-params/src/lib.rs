@@ -18,4 +18,6 @@ pub use builder::{
 };
 #[cfg(feature = "abi-encoding")]
 pub use encoding::{decode_bfv_params, decode_bfv_params_arc, encode_bfv_params, EncodingError};
-pub use presets::{BfvParamSet, BfvPreset, PresetError, PresetMetadata, PresetSearchDefaults};
+pub use presets::{
+    BfvParamSet, BfvPreset, ParameterType, PresetError, PresetMetadata, PresetSearchDefaults,
+};

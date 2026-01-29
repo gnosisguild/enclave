@@ -13,8 +13,8 @@ use e3_data::{
 };
 use e3_events::hlc::Hlc;
 use e3_events::{
-    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter, Sequencer,
-    StoreEventRequested,
+    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter, EventType,
+    Sequencer, StoreEventRequested,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -483,7 +483,7 @@ mod tests {
         .start();
 
         // Send all evts to the listener
-        handle.subscribe("*", listener.clone().into());
+        handle.subscribe(EventType::All, listener.clone().into());
 
         // Lets store some data
         datastore.scope("/foo/name").write("Fred".to_string());

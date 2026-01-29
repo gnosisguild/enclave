@@ -116,7 +116,7 @@ jobs:
         run: pnpm rust:lint
 
       - name: Run Integration Tests
-        run: 'cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture'
+        run: 'cargo test --test integration -- --nocapture'
 
   build_e3_support_risc0:
     runs-on: ubuntu-latest

@@ -94,12 +94,81 @@ use std::{
     hash::Hash,
 };
 
-/// Macro to help define From traits for EnclaveEventData
-macro_rules! impl_into_event_data {
-    ($($variant:ident),*) => {
+// In crates/events/src/enclave_event/mod.rs
+
+/// Macro to generate EventType enum and implement From traits
+macro_rules! impl_event_types {
+    ($($variant:ident),* $(,)?) => {
+        // Generate the EventType enum
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        pub enum EventType {
+            /// Wildcard - matches all events
+            All,
+            $($variant,)*
+        }
+
+        impl EventType {
+            /// Get the string representation of this event type
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    EventType::All => "*",
+                    $(EventType::$variant => stringify!($variant),)*
+                }
+            }
+
+            /// Parse an EventType from a string
+            pub fn from_str(s: &str) -> Option<Self> {
+                match s {
+                    "*" => Some(EventType::All),
+                    $(stringify!($variant) => Some(EventType::$variant),)*
+                    _ => None,
+                }
+            }
+
+            /// Get all event types (excluding All wildcard)
+            pub fn all_types() -> Vec<EventType> {
+                vec![
+                    $(EventType::$variant,)*
+                ]
+            }
+        }
+
+        impl fmt::Display for EventType {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.as_str())
+            }
+        }
+
+        impl From<EventType> for String {
+            fn from(event_type: EventType) -> Self {
+                event_type.as_str().to_string()
+            }
+        }
+
+        impl From<&EventType> for String {
+            fn from(event_type: &EventType) -> Self {
+                event_type.as_str().to_string()
+            }
+        }
+
+        // Implement From<EnclaveEventData> for EventType
+        impl From<&EnclaveEventData> for EventType {
+            fn from(data: &EnclaveEventData) -> Self {
+                match data {
+                    $(EnclaveEventData::$variant(_) => EventType::$variant,)*
+                }
+            }
+        }
+
+        impl From<EnclaveEventData> for EventType {
+            fn from(data: EnclaveEventData) -> Self {
+                (&data).into()
+            }
+        }
+
         $(
             impl From<$variant> for EnclaveEventData {
-                fn from(data:$variant) -> Self {
+                fn from(data: $variant) -> Self {
                     EnclaveEventData::$variant(data)
                 }
             }
@@ -381,7 +450,7 @@ impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
     }
 }
 
-impl_into_event_data!(
+impl_event_types!(
     KeyshareCreated,
     E3Requested,
     PublicKeyAggregated,
@@ -437,6 +506,14 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
         } else {
             return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
         }
+    }
+}
+
+// Add convenience method to EnclaveEvent
+impl<S: SeqState> EnclaveEvent<S> {
+    /// Get the EventType enum for this event
+    pub fn event_type_enum(&self) -> EventType {
+        (&self.payload).into()
     }
 }
 

@@ -57,6 +57,15 @@ pub enum BfvPreset {
     SecureDkg8192,
 }
 
+/// Parameter type for BFV presets
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ParameterType {
+    /// Threshold BFV (TRBFV) parameters
+    THRESHOLD,
+    /// DKG parameters (BFV)
+    DKG,
+}
+
 /// Metadata describing a BFV preset configuration
 ///
 /// This struct contains high-level information about a preset, including
@@ -80,6 +89,8 @@ pub struct PresetMetadata {
     /// Higher values provide stronger security guarantees but may require
     /// larger parameters. Typically 80 for secure presets, 2 for insecure.
     pub lambda: usize,
+    /// Parameter type (BFV / trBFV).
+    pub parameter_type: ParameterType,
 }
 
 /// Default search parameters for BFV parameter generation
@@ -218,17 +229,33 @@ impl BfvPreset {
 
     pub fn metadata(&self) -> PresetMetadata {
         match self {
-            BfvPreset::InsecureThresholdBfv512 | BfvPreset::InsecureDkg512 => PresetMetadata {
+            BfvPreset::InsecureThresholdBfv512 => PresetMetadata {
                 name: self.name(),
                 degree: insecure_512::DEGREE,
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
+                parameter_type: ParameterType::THRESHOLD,
             },
-            BfvPreset::SecureThresholdBfv8192 | BfvPreset::SecureDkg8192 => PresetMetadata {
+            BfvPreset::InsecureDkg512 => PresetMetadata {
+                name: self.name(),
+                degree: insecure_512::DEGREE,
+                num_parties: insecure_512::NUM_PARTIES,
+                lambda: DEFAULT_INSECURE_LAMBDA,
+                parameter_type: ParameterType::DKG,
+            },
+            BfvPreset::SecureThresholdBfv8192 => PresetMetadata {
                 name: self.name(),
                 degree: secure_8192::DEGREE,
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
+                parameter_type: ParameterType::THRESHOLD,
+            },
+            BfvPreset::SecureDkg8192 => PresetMetadata {
+                name: self.name(),
+                degree: secure_8192::DEGREE,
+                num_parties: secure_8192::NUM_PARTIES,
+                lambda: DEFAULT_SECURE_LAMBDA,
+                parameter_type: ParameterType::DKG,
             },
         }
     }

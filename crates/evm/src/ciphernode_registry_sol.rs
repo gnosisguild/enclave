@@ -20,8 +20,8 @@ use alloy::{
 use anyhow::Result;
 use e3_events::{
     prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
-    EnclaveEvent, EnclaveEventData, EventSubscriber, OrderedSet, PublicKeyAggregated, Seed,
-    Shutdown, TicketGenerated, TicketId,
+    EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, PublicKeyAggregated,
+    Seed, Shutdown, TicketGenerated, TicketId,
 };
 use tracing::{error, info, trace};
 
@@ -254,7 +254,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
 
         if is_aggregator {
             bus.subscribe_all(
-                &["PublicKeyAggregated", "CommitteeFinalizeRequested"],
+                &[
+                    EventType::PublicKeyAggregated,
+                    EventType::CommitteeFinalizeRequested,
+                ],
                 addr.clone().into(),
             )
         }
@@ -262,9 +265,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
         bus.subscribe_all(
             &[
                 // Subscribe to TicketGenerated for ticket submission
-                "TicketGenerated",
+                EventType::TicketGenerated,
                 // Stop gracefully on shutdown
-                "Shutdown",
+                EventType::Shutdown,
             ],
             addr.clone().into(),
         );

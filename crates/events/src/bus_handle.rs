@@ -19,7 +19,7 @@ use crate::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventType,
     HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
@@ -79,7 +79,7 @@ impl BusHandle {
         F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
     {
         let pipe = BusHandlePipe::new(other.to_owned(), predicate).start();
-        self.subscribe("*", pipe.into());
+        self.subscribe(EventType::All, pipe.into());
     }
 }
 
@@ -152,12 +152,16 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
 }
 
 impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
-    fn subscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Sequenced>>) {
+    fn subscribe(&self, event_type: EventType, recipient: Recipient<EnclaveEvent<Sequenced>>) {
         self.event_bus
             .do_send(Subscribe::new(event_type, recipient))
     }
 
-    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<EnclaveEvent<Sequenced>>) {
+    fn subscribe_all(
+        &self,
+        event_types: &[EventType],
+        recipient: Recipient<EnclaveEvent<Sequenced>>,
+    ) {
         for event_type in event_types.into_iter() {
             self.event_bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
@@ -185,7 +189,8 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
-        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, TestEvent,
+        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, EventType,
+        TestEvent,
     };
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
@@ -263,12 +268,12 @@ mod tests {
         .start();
 
         // pipe all bus_a and bus_b events to bus_c
-        bus_a.subscribe("*", forwarder.clone().into());
-        bus_b.subscribe("*", forwarder.into());
+        bus_a.subscribe(EventType::All, forwarder.clone().into());
+        bus_b.subscribe(EventType::All, forwarder.into());
 
         // Create and subscribe the Saver to bus_c
         let saver = Saver { events: vec![] }.start();
-        bus_c.subscribe("*", saver.clone().into());
+        bus_c.subscribe(EventType::All, saver.clone().into());
 
         // Publish events in causal order across buses
         bus_a.publish(TestEvent::new("one", 1))?;

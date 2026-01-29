@@ -11,7 +11,7 @@ use std::hash::Hash;
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    EnclaveEvent, EventId, Sequenced, Unsequenced,
+    EnclaveEvent, EventId, EventType, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus
@@ -102,9 +102,9 @@ pub trait ErrorDispatcher<E: ErrorEvent> {
 /// Trait to subscribe to events
 pub trait EventSubscriber<E: Event> {
     /// Subscribe the recipient to events matching the given event type
-    fn subscribe(&self, event_type: &str, recipient: Recipient<E>);
+    fn subscribe(&self, event_type: EventType, recipient: Recipient<E>);
     /// Subscribe the recipient to events matching any of the given event types
-    fn subscribe_all(&self, event_types: &[&str], recipient: Recipient<E>);
+    fn subscribe_all(&self, event_types: &[EventType], recipient: Recipient<E>);
     /// Subscribe the recipient to events matching the given event type
     fn unsubscribe(&self, event_type: &str, recipient: Recipient<E>);
 }
