@@ -12,8 +12,10 @@ use e3_events::{
     prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
     PublicKeyAggregated, Seed,
 };
+use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_utils::ArcBytes;
+use e3_utils::NotifySync;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -139,11 +141,14 @@ impl Actor for PublicKeyAggregator {
 impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::KeyshareCreated(data) => ctx.notify(data),
-            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
-            _ => (),
-        }
+        trap(EType::KeyGeneration, &self.bus.clone(), || {
+            match msg.into_data() {
+                EnclaveEventData::KeyshareCreated(data) => self.notify_sync(ctx, data)?,
+                EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+                _ => (),
+            };
+            Ok(())
+        });
     }
 }
 
@@ -163,10 +168,13 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
         self.add_keyshare(pubkey, node)?;
 
         if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) = &self.state.get() {
-            ctx.notify(ComputeAggregate {
-                keyshares: keyshares.clone(),
-                e3_id,
-            })
+            self.notify_sync(
+                ctx,
+                ComputeAggregate {
+                    keyshares: keyshares.clone(),
+                    e3_id,
+                },
+            )?
         }
 
         Ok(())
@@ -215,6 +223,6 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
 impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
-        ctx.stop()
+        ctx.stop();
     }
 }

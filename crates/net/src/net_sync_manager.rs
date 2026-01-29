@@ -11,7 +11,7 @@ use e3_events::{
     EnclaveEventData, Event, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
     ReceiveEvents, Unsequenced,
 };
-use e3_utils::{retry_with_backoff, to_retry, OnceTake};
+use e3_utils::{retry_with_backoff, to_retry, NotifySync, OnceTake};
 use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use std::{collections::HashMap, sync::Arc, time::Duration};

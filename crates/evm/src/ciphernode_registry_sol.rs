@@ -23,6 +23,7 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, PublicKeyAggregated,
     Seed, Shutdown, TicketGenerated, TicketId,
 };
+use e3_utils::NotifySync;
 use tracing::{error, info, trace};
 
 sol!(
@@ -290,21 +291,21 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
             EnclaveEventData::PublicKeyAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    ctx.notify(data);
+                    self.notify_sync(ctx, data);
                 }
             }
             EnclaveEventData::CommitteeFinalizeRequested(data) => {
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    ctx.notify(data);
+                    self.notify_sync(ctx, data);
                 }
             }
             EnclaveEventData::TicketGenerated(data) => {
                 // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    ctx.notify(data);
+                    self.notify_sync(ctx, data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

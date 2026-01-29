@@ -9,6 +9,7 @@ use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
     EnclaveEvent, EnclaveEventData, EventType, Shutdown,
 };
+use e3_utils::NotifySync;
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
@@ -48,8 +49,8 @@ impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::CommitteeRequested(data) => ctx.notify(data),
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::CommitteeRequested(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

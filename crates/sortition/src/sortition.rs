@@ -15,6 +15,7 @@ use e3_events::{
     PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
+use e3_utils::NotifySync;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::info;
@@ -232,14 +233,16 @@ impl Handler<EnclaveEvent> for Sortition {
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::CiphernodeAdded(data) => ctx.notify(data.clone()),
-            EnclaveEventData::CiphernodeRemoved(data) => ctx.notify(data.clone()),
-            EnclaveEventData::TicketBalanceUpdated(data) => ctx.notify(data.clone()),
-            EnclaveEventData::OperatorActivationChanged(data) => ctx.notify(data.clone()),
-            EnclaveEventData::ConfigurationUpdated(data) => ctx.notify(data.clone()),
-            EnclaveEventData::CommitteePublished(data) => ctx.notify(data.clone()),
-            EnclaveEventData::PlaintextOutputPublished(data) => ctx.notify(data.clone()),
-            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data.clone()),
+            EnclaveEventData::CiphernodeAdded(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::CiphernodeRemoved(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::TicketBalanceUpdated(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::OperatorActivationChanged(data) => {
+                self.notify_sync(ctx, data.clone())
+            }
+            EnclaveEventData::ConfigurationUpdated(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::CommitteePublished(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::PlaintextOutputPublished(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::CommitteeFinalized(data) => self.notify_sync(ctx, data.clone()),
             _ => (),
         }
     }

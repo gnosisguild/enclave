@@ -25,6 +25,7 @@ use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_utils::NotifySync;
 use tracing::info;
 
 sol!(
@@ -79,10 +80,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
             EnclaveEventData::PlaintextAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    ctx.notify(data);
+                    self.notify_sync(ctx, data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

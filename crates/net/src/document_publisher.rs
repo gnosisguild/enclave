@@ -21,6 +21,7 @@ use e3_events::{
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
+use e3_utils::NotifySync;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -137,8 +138,8 @@ impl Handler<EnclaveEvent> for DocumentPublisher {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::PublishDocumentRequested(data) => ctx.notify(data),
-            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(data),
-            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
+            EnclaveEventData::CiphernodeSelected(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
@@ -508,9 +509,9 @@ impl Handler<EnclaveEvent> for EventConverter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
-            EnclaveEventData::ThresholdShareCreated(data) => ctx.notify(data),
-            EnclaveEventData::EncryptionKeyCreated(data) => ctx.notify(data),
-            EnclaveEventData::DocumentReceived(data) => ctx.notify(data),
+            EnclaveEventData::ThresholdShareCreated(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::EncryptionKeyCreated(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::DocumentReceived(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

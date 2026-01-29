@@ -15,6 +15,7 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EventType, Shutdown, TicketGenerated, TicketId,
 };
 use e3_request::E3Meta;
+use e3_utils::NotifySync;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -69,9 +70,9 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::E3Requested(data) => ctx.notify(data),
-            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
-            EnclaveEventData::CommitteeFinalized(data) => ctx.notify(data),
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::CommitteeFinalized(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

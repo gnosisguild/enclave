@@ -27,6 +27,7 @@ use e3_trbfv::{
     shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
+use e3_utils::NotifySync;
 use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
@@ -407,8 +408,6 @@ impl ThresholdKeyshare {
     }
 
     pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
-        self.bus.set_ctx(msg.get_ctx());
-        self.state.set_ctx(msg.get_ctx());
         match &msg.response {
             TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
             TrBFVResponse::GenPkShareAndSkSss(_) => {
@@ -943,16 +942,20 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.clone().into_data() {
-            EnclaveEventData::CiphernodeSelected(data) => ctx.notify(msg.to_typed_event(data)),
-            EnclaveEventData::CiphertextOutputPublished(data) => ctx.notify(data),
+            EnclaveEventData::CiphernodeSelected(data) => {
+                self.notify_sync(ctx, msg.to_typed_event(data))
+            }
+            EnclaveEventData::CiphertextOutputPublished(data) => self.notify_sync(ctx, data),
             EnclaveEventData::ThresholdShareCreated(data) => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
             }
             EnclaveEventData::EncryptionKeyCreated(data) => {
                 let _ = self.handle_encryption_key_created(data, ctx.address());
             }
-            EnclaveEventData::E3RequestComplete(data) => ctx.notify(data),
-            EnclaveEventData::ComputeResponse(data) => ctx.notify(msg.to_typed_event(data)),
+            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::ComputeResponse(data) => {
+                self.notify_sync(ctx, msg.to_typed_event(data))
+            }
             _ => (),
         }
     }
@@ -1065,7 +1068,7 @@ impl Handler<E3RequestComplete> for ThresholdKeyshare {
     fn handle(&mut self, _: E3RequestComplete, ctx: &mut Self::Context) -> Self::Result {
         self.encryption_key_collector = None;
         self.decryption_key_collector = None;
-        ctx.notify(Die);
+        self.notify_sync(ctx, Die);
     }
 }
 
