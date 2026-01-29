@@ -17,16 +17,14 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::BusHandle;
-use e3_events::ComputeRequestErrorKind;
-use e3_events::EType;
-use e3_events::EnclaveEvent;
-use e3_events::EnclaveEventData;
-use e3_events::ErrorDispatcher;
-use e3_events::Event;
-use e3_events::EventPublisher;
-use e3_events::EventSubscriber;
-use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
+use e3_events::{
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
+    ComputeResponse, EType, EnclaveEvent, EnclaveEventData, ErrorDispatcher, Event, EventPublisher,
+    EventSubscriber, EventType, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError,
+    ZkRequest, ZkResponse,
+};
+use e3_fhe_params::decode_bfv_params_arc;
+use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
@@ -34,6 +32,9 @@ use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
+use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+use fhe::bfv::PublicKey;
+use fhe_traits::DeserializeParametrized;
 use rand::Rng;
 use tracing::error;
 use tracing::info;
@@ -45,6 +46,7 @@ pub struct Multithread {
     cipher: Arc<Cipher>,
     task_pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
+    zk_prover: Option<Arc<ZkProver>>,
 }
 
 impl Multithread {
@@ -61,7 +63,14 @@ impl Multithread {
             cipher,
             task_pool,
             report,
+            zk_prover: None,
         }
+    }
+
+    /// Set the ZK prover for handling proof requests.
+    pub fn with_zk_prover(mut self, prover: Arc<ZkProver>) -> Self {
+        self.zk_prover = Some(prover);
+        self
     }
 
     /// Subtract the given amount from the total number of available threads and return the result
@@ -81,6 +90,22 @@ impl Multithread {
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
+        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+        addr
+    }
+
+    pub fn attach_with_zk(
+        bus: &BusHandle,
+        rng: SharedRng,
+        cipher: Arc<Cipher>,
+        task_pool: TaskPool,
+        report: Option<Addr<MultithreadReport>>,
+        zk_backend: &ZkBackend,
+    ) -> Addr<Self> {
+        let zk_prover = Arc::new(ZkProver::new(zk_backend));
+        let actor = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report)
+            .with_zk_prover(zk_prover);
+        let addr = actor.start();
         bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
         addr
     }
@@ -113,9 +138,11 @@ impl Handler<ComputeRequest> for Multithread {
         let bus = self.bus.clone();
         let pool = self.task_pool.clone();
         let report = self.report.clone();
-        // TODO: replace with trap_fut
+        let zk_prover = self.zk_prover.clone();
+
         Box::pin(async move {
-            match handle_compute_request_event(msg, bus, cipher, rng, pool, report).await {
+            match handle_compute_request_event(msg, bus, cipher, rng, pool, report, zk_prover).await
+            {
                 Ok(_) => (),
                 Err(e) => error!("{e}"),
             }
@@ -130,20 +157,17 @@ async fn handle_compute_request_event(
     rng: SharedRng,
     pool: TaskPool,
     report: Option<Addr<MultithreadReport>>,
+    zk_prover: Option<Arc<ZkProver>>,
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
 
-    // We spawn a thread on rayon moving to "sync"-land
     let (result, duration) = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
-            // Do the actual work this is gonna take a while...
-            handle_compute_request(rng, cipher, msg)
+            handle_compute_request(rng, cipher, zk_prover, msg)
         })
         .await?;
-    // we are back in async io land...
 
-    // incase we are collecting events for a report
     if let Some(report) = report {
         report.do_send(TrackDuration::new(msg_string, duration))
     };
@@ -163,29 +187,45 @@ fn timefunc<F>(
 where
     F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
 {
-    info!("\nSTARTING MULTITHREAD `{}({})`\n", name, id);
+    info!("STARTING MULTITHREAD `{}({})`", name, id);
     let start = Instant::now();
     let out = func();
     let dur = start.elapsed();
-    info!("\nFINISHED MULTITHREAD `{}`({}) in {:?}\n", name, id, dur);
-    (out, dur) // return output as well as timing info
+    info!("FINISHED MULTITHREAD `{}`({}) in {:?}", name, id, dur);
+    (out, dur)
 }
 
-/// Handle our compute request. This function is run on a rayon threadpool.
+/// Handle compute request. This function is run on a rayon threadpool.
 fn handle_compute_request(
     rng: SharedRng,
     cipher: Arc<Cipher>,
+    zk_prover: Option<Arc<ZkProver>>,
     request: ComputeRequest,
 ) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
     let id: u8 = rand::thread_rng().gen();
 
     match request.request.clone() {
+        ComputeRequestKind::TrBFV(trbfv_req) => {
+            handle_trbfv_request(rng, cipher, trbfv_req, request, id)
+        }
+        ComputeRequestKind::Zk(zk_req) => handle_zk_request(zk_prover, zk_req, request, id),
+    }
+}
+
+fn handle_trbfv_request(
+    rng: SharedRng,
+    cipher: Arc<Cipher>,
+    trbfv_req: TrBFVRequest,
+    request: ComputeRequest,
+    id: u8,
+) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
+    match trbfv_req {
         TrBFVRequest::GenPkShareAndSkSss(req) => {
             timefunc(
                 "gen_pk_share_and_sk_sss",
                 id,
                 || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
-                    Ok(o) => Ok(ComputeResponse::new(
+                    Ok(o) => Ok(ComputeResponse::trbfv(
                         TrBFVResponse::GenPkShareAndSkSss(o),
                         request.correlation_id,
                         request.e3_id,
@@ -201,7 +241,7 @@ fn handle_compute_request(
         }
         TrBFVRequest::GenEsiSss(req) => timefunc("gen_esi_sss", id, || {
             match gen_esi_sss(&rng, &cipher, req) {
-                Ok(o) => Ok(ComputeResponse::new(
+                Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::GenEsiSss(o),
                     request.correlation_id,
                     request.e3_id,
@@ -216,7 +256,7 @@ fn handle_compute_request(
             "calculate_decryption_key",
             id,
             || match calculate_decryption_key(&cipher, req) {
-                Ok(o) => Ok(ComputeResponse::new(
+                Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::CalculateDecryptionKey(o),
                     request.correlation_id,
                     request.e3_id,
@@ -236,7 +276,7 @@ fn handle_compute_request(
             "calculate_decryption_share",
             id,
             || match calculate_decryption_share(&cipher, req) {
-                Ok(o) => Ok(ComputeResponse::new(
+                Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::CalculateDecryptionShare(o),
                     request.correlation_id,
                     request.e3_id,
@@ -253,7 +293,7 @@ fn handle_compute_request(
             "calculate_threshold_decryption",
             id,
             || match calculate_threshold_decryption(req) {
-                Ok(o) => Ok(ComputeResponse::new(
+                Ok(o) => Ok(ComputeResponse::trbfv(
                     TrBFVResponse::CalculateThresholdDecryption(o),
                     request.correlation_id,
                     request.e3_id,
@@ -267,4 +307,73 @@ fn handle_compute_request(
             },
         ),
     }
+}
+
+fn handle_zk_request(
+    zk_prover: Option<Arc<ZkProver>>,
+    zk_req: ZkRequest,
+    request: ComputeRequest,
+    id: u8,
+) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
+    let Some(prover) = zk_prover else {
+        return (
+            Err(ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(
+                    "ZK prover not configured".to_string(),
+                )),
+                request,
+            )),
+            Duration::ZERO,
+        );
+    };
+
+    match zk_req {
+        ZkRequest::PkBfv(req) => timefunc("zk_pk_bfv", id, || {
+            handle_pk_bfv_proof(&prover, req, request.clone())
+        }),
+    }
+}
+
+fn handle_pk_bfv_proof(
+    prover: &ZkProver,
+    req: PkBfvProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    let params = decode_bfv_params_arc(&req.params).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(format!(
+                "Failed to decode params: {}",
+                e
+            ))),
+            request.clone(),
+        )
+    })?;
+
+    let pk_bfv = PublicKey::from_bytes(&req.pk_bfv, &params).map_err(|e| {
+        ComputeRequestError::new(
+            ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(format!(
+                "Failed to deserialize pk_bfv: {:?}",
+                e
+            ))),
+            request.clone(),
+        )
+    })?;
+
+    let circuit = PkBfvCircuit;
+    let e3_id_str = request.e3_id.to_string();
+
+    let proof = circuit
+        .prove(prover, &params, &pk_bfv, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::PkBfv(PkBfvProofResponse::new(proof)),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }

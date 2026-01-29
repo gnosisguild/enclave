@@ -12,6 +12,7 @@ use e3_data::{
     InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
 };
 use e3_events::hlc::Hlc;
+use e3_events::EventType;
 use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, Sequencer};
 use once_cell::sync::OnceCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
