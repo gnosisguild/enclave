@@ -3092,6 +3092,7 @@ dependencies = [
  "e3-sortition",
  "e3-trbfv",
  "e3-utils",
+ "e3-zk-prover",
  "once_cell",
  "rayon",
  "tempfile",
@@ -3115,8 +3116,8 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-init",
- "e3-noir-prover",
  "e3-support-scripts",
+ "e3-zk-prover",
  "hex",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -3444,6 +3445,7 @@ dependencies = [
  "e3-request",
  "e3-trbfv",
  "e3-utils",
+ "e3-zk-prover",
  "fhe",
  "fhe-traits",
  "ndarray",
@@ -3508,43 +3510,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "zeroize",
-]
-
-[[package]]
-name = "e3-noir-prover"
-version = "0.1.7"
-dependencies = [
- "acir",
- "acvm",
- "anyhow",
- "async-trait",
- "base64",
- "bincode 1.3.3",
- "bn254_blackbox_solver",
- "chrono",
- "directories 5.0.1",
- "e3-fhe-params",
- "e3-pvss",
- "e3-zk-helpers",
- "fhe",
- "flate2",
- "futures-util",
- "hex",
- "indicatif 0.17.11",
- "nargo",
- "noirc_abi",
- "num-bigint",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.8.23",
- "tracing",
- "walkdir",
 ]
 
 [[package]]
@@ -3855,6 +3820,46 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-zk-prover"
+version = "0.1.7"
+dependencies = [
+ "acir",
+ "acvm",
+ "anyhow",
+ "async-trait",
+ "base64",
+ "bincode 1.3.3",
+ "bn254_blackbox_solver",
+ "chrono",
+ "directories 5.0.1",
+ "e3-data",
+ "e3-events",
+ "e3-fhe-params",
+ "e3-pvss",
+ "e3-request",
+ "e3-zk-helpers",
+ "fhe",
+ "flate2",
+ "futures-util",
+ "hex",
+ "indicatif 0.17.11",
+ "nargo",
+ "noirc_abi",
+ "num-bigint",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

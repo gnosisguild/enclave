@@ -33,6 +33,7 @@ use e3_sortition::{
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_utils::{rand_eth_addr, SharedRng};
+use e3_zk_prover::{ZkBackend, ZkProofExtension};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -71,6 +72,7 @@ pub struct CiphernodeBuilder {
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
+    zk_backend: Option<ZkBackend>,
 }
 
 #[derive(Default, Debug)]
@@ -121,6 +123,7 @@ impl CiphernodeBuilder {
             task_pool: None,
             threads: None,
             threshold_plaintext_agg: false,
+            zk_backend: None,
         }
     }
 
@@ -238,6 +241,12 @@ impl CiphernodeBuilder {
     /// Setup a ThresholdPlaintextAggregator
     pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
         self.threshold_plaintext_agg = true;
+        self
+    }
+
+    /// Enable ZK proof generation with the given backend.
+    pub fn with_zkproof(mut self, backend: ZkBackend) -> Self {
+        self.zk_backend = Some(backend);
         self
     }
 
@@ -482,6 +491,12 @@ impl CiphernodeBuilder {
                 &bus, &sortition,
             ))
         }
+
+        if let Some(ref backend) = self.zk_backend {
+            info!("Setting up ZkProofExtension");
+            e3_builder = e3_builder.with(ZkProofExtension::create(backend))
+        }
+
         info!("building...");
         e3_builder.build().await?;
 
