@@ -24,7 +24,7 @@ e3-entrypoint = { workspace = true }
 e3-evm = { workspace = true }
 e3-events = { workspace = true }
 e3-init = { workspace = true }
-e3-noir-prover = { workspace = true }
+e3-zk-prover = { workspace = true }
 e3-support-scripts = { workspace = true }
 hex = { workspace = true }
 opentelemetry = { workspace = true }

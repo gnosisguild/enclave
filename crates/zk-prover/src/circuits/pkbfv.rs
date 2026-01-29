@@ -2,10 +2,10 @@
 //
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
+// or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::error::NoirProverError;
-use crate::traits::CircuitProver;
+use crate::error::ZkError;
+use crate::traits::Provable;
 use acir::FieldElement;
 use async_trait::async_trait;
 use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
@@ -17,20 +17,10 @@ use num_bigint::BigInt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct PkBfvCommitment(pub Vec<u8>);
-
-impl AsRef<[u8]> for PkBfvCommitment {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
 #[async_trait]
-impl CircuitProver for PkBfvCircuit {
+impl Provable for PkBfvCircuit {
     type Params = Arc<BfvParameters>;
     type Input = PublicKey;
-    type Output = PkBfvCommitment;
 
     fn circuit_name(&self) -> &'static str {
         "pk_bfv"
@@ -40,10 +30,10 @@ impl CircuitProver for PkBfvCircuit {
         &self,
         params: &Self::Params,
         input: &Self::Input,
-    ) -> Result<InputMap, NoirProverError> {
+    ) -> Result<InputMap, ZkError> {
         let output = self
             .compute(params, input)
-            .map_err(|e| NoirProverError::WitnessGenerationFailed(e.to_string()))?;
+            .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
         let reduced = output.witness.reduce_to_zkp_modulus();
 
@@ -53,13 +43,9 @@ impl CircuitProver for PkBfvCircuit {
 
         Ok(inputs)
     }
-
-    fn parse_output(&self, bytes: &[u8]) -> Result<Self::Output, NoirProverError> {
-        Ok(PkBfvCommitment(bytes.to_vec()))
-    }
 }
 
-fn to_polynomial_array(vecs: &[Vec<BigInt>]) -> Result<InputValue, NoirProverError> {
+fn to_polynomial_array(vecs: &[Vec<BigInt>]) -> Result<InputValue, ZkError> {
     let mut polynomials = Vec::with_capacity(vecs.len());
 
     for coeffs in vecs {
@@ -68,7 +54,7 @@ fn to_polynomial_array(vecs: &[Vec<BigInt>]) -> Result<InputValue, NoirProverErr
         for b in coeffs {
             let s = b.to_string();
             let field = FieldElement::try_from_str(&s).ok_or_else(|| {
-                NoirProverError::SerializationError(format!("invalid field element: {}", s))
+                ZkError::SerializationError(format!("invalid field element: {}", s))
             })?;
             field_coeffs.push(InputValue::Field(field));
         }

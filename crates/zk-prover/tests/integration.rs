@@ -5,14 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
-use e3_noir_prover::{
-    input_map, CircuitProver, CompiledCircuit, NoirConfig, NoirProver, NoirSetup, SetupStatus,
-    WitnessGenerator,
-};
-use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
 use e3_pvss::sample::generate_sample;
 use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
 use e3_zk_helpers::commitments::compute_pk_bfv_commitment;
+use e3_zk_prover::{
+    input_map, CompiledCircuit, PkBfvCircuit, Provable, SetupStatus, WitnessGenerator, ZkBackend,
+    ZkConfig, ZkProver,
+};
 use num_bigint::BigInt;
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -21,21 +20,21 @@ use tokio::{fs, process::Command};
 #[tokio::test]
 async fn test_check_status_on_empty_dir() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
 
-    let status = setup.check_status().await;
+    let status = backend.check_status().await;
     assert!(matches!(status, SetupStatus::FullSetupNeeded));
 }
 
 #[tokio::test]
 async fn test_placeholder_circuits_creation() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
 
-    fs::create_dir_all(&setup.circuits_dir).await.unwrap();
-    setup.download_circuits().await.unwrap();
+    fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+    backend.download_circuits().await.unwrap();
 
-    let circuit_path = setup.circuits_dir.join("pk_bfv.json");
+    let circuit_path = backend.circuits_dir.join("pk_bfv.json");
     assert!(circuit_path.exists());
 
     let content = fs::read_to_string(&circuit_path).await.unwrap();
@@ -45,37 +44,37 @@ async fn test_placeholder_circuits_creation() {
 #[tokio::test]
 async fn test_work_dir_creation_and_cleanup() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
 
     let e3_id = "test-e3-123";
-    let work_dir = setup.work_dir_for(e3_id);
+    let work_dir = backend.work_dir_for(e3_id);
 
     fs::create_dir_all(&work_dir).await.unwrap();
     assert!(work_dir.exists());
 
     fs::write(work_dir.join("test.txt"), "hello").await.unwrap();
 
-    setup.cleanup_work_dir(e3_id).await.unwrap();
+    backend.cleanup_work_dir(e3_id).await.unwrap();
     assert!(!work_dir.exists());
 }
 
 #[tokio::test]
 async fn test_version_info_persistence() {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
-    fs::create_dir_all(&setup.noir_dir).await.unwrap();
+    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
+    fs::create_dir_all(&backend.base_dir).await.unwrap();
 
-    let info = setup.load_version_info().await;
+    let info = backend.load_version_info().await;
     assert!(info.bb_version.is_none());
 
     let mut info = info;
     info.bb_version = Some("0.87.0".to_string());
     info.circuits_version = Some("0.1.0".to_string());
-    info.save(&setup.noir_dir.join("version.json"))
+    info.save(&backend.base_dir.join("version.json"))
         .await
         .unwrap();
 
-    let reloaded = setup.load_version_info().await;
+    let reloaded = backend.load_version_info().await;
     assert_eq!(reloaded.bb_version, Some("0.87.0".to_string()));
     assert_eq!(reloaded.circuits_version, Some("0.1.0".to_string()));
 }
@@ -109,23 +108,23 @@ fn fixtures_dir() -> PathBuf {
         .join("fixtures")
 }
 
-async fn setup_test_prover(bb: &PathBuf) -> (NoirSetup, tempfile::TempDir) {
+async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
     let temp = tempdir().unwrap();
-    let setup = NoirSetup::new(temp.path(), NoirConfig::default());
+    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
 
-    fs::create_dir_all(&setup.circuits_dir).await.unwrap();
-    fs::create_dir_all(setup.circuits_dir.join("vk"))
+    fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+    fs::create_dir_all(backend.circuits_dir.join("vk"))
         .await
         .unwrap();
-    fs::create_dir_all(&setup.work_dir).await.unwrap();
-    fs::create_dir_all(setup.noir_dir.join("bin"))
+    fs::create_dir_all(&backend.work_dir).await.unwrap();
+    fs::create_dir_all(backend.base_dir.join("bin"))
         .await
         .unwrap();
 
     #[cfg(unix)]
-    std::os::unix::fs::symlink(bb, &setup.bb_binary).unwrap();
+    std::os::unix::fs::symlink(bb, &backend.bb_binary).unwrap();
 
-    (setup, temp)
+    (backend, temp)
 }
 
 #[tokio::test]
@@ -138,18 +137,18 @@ async fn test_dummy_circuit() {
         }
     };
 
-    let (setup, _temp) = setup_test_prover(&bb).await;
+    let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
     fs::copy(
         fixtures.join("dummy.json"),
-        setup.circuits_dir.join("dummy.json"),
+        backend.circuits_dir.join("dummy.json"),
     )
     .await
     .unwrap();
     fs::copy(
         fixtures.join("dummy.vk"),
-        setup.circuits_dir.join("vk").join("dummy.vk"),
+        backend.circuits_dir.join("vk").join("dummy.vk"),
     )
     .await
     .unwrap();
@@ -164,14 +163,14 @@ async fn test_dummy_circuit() {
         .await
         .unwrap();
 
-    let prover = NoirProver::new(&setup);
+    let prover = ZkProver::new(&backend);
     let e3_id = "test-e3-001";
 
     let proof = prover
         .generate_proof("dummy", &witness, e3_id)
         .await
         .unwrap();
-    let valid = prover.verify_proof("dummy", &proof, e3_id).await.unwrap();
+    let valid = prover.verify(&proof, e3_id).await.unwrap();
 
     assert!(valid);
     prover.cleanup(e3_id).await.unwrap();
@@ -187,18 +186,18 @@ async fn test_pk_bfv_proof() {
         }
     };
 
-    let (setup, _temp) = setup_test_prover(&bb).await;
+    let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
     fs::copy(
         fixtures.join("pk_bfv.json"),
-        setup.circuits_dir.join("pk_bfv.json"),
+        backend.circuits_dir.join("pk_bfv.json"),
     )
     .await
     .unwrap();
     fs::copy(
         fixtures.join("pk_bfv.vk"),
-        setup.circuits_dir.join("vk").join("pk_bfv.vk"),
+        backend.circuits_dir.join("vk").join("pk_bfv.vk"),
     )
     .await
     .unwrap();
@@ -207,11 +206,11 @@ async fn test_pk_bfv_proof() {
     let params = build_bfv_params_from_set_arc(preset.into());
     let sample = generate_sample(&params);
 
-    let prover = NoirProver::new(&setup);
+    let prover = ZkProver::new(&backend);
     let circuit = PkBfvCircuit;
     let e3_id = "1";
 
-    let proof_result = circuit
+    let proof = circuit
         .prove(&prover, &params, &sample.public_key, e3_id)
         .await
         .unwrap();
@@ -223,15 +222,11 @@ async fn test_pk_bfv_proof() {
         &reduced_witness.pk1is,
         computation_output.bits.pk_bit,
     );
-    let commitment_from_proof =
-        BigInt::from_bytes_be(num_bigint::Sign::Plus, proof_result.output.as_ref());
+    let commitment_from_proof = BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_output);
 
     assert_eq!(commitment_calculated, commitment_from_proof);
 
-    let valid = circuit
-        .verify(&prover, &proof_result.proof, &proof_result.output, e3_id)
-        .await
-        .unwrap();
+    let valid = circuit.verify(&prover, &proof, e3_id).await.unwrap();
 
     assert!(valid);
     prover.cleanup(e3_id).await.unwrap();
