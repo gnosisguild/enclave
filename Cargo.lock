@@ -3358,8 +3358,11 @@ version = "0.1.7"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
+ "anyhow",
+ "clap",
  "fhe",
  "num-bigint",
+ "num-traits",
  "thiserror 1.0.69",
 ]
 
