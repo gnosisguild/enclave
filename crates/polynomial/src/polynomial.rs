@@ -57,11 +57,6 @@ pub enum PolynomialError {
 /// required for cryptographic operations. The polynomial is represented as:
 /// `a_n * x^n + a_{n-1} * x^{n-1} + ... + a_1 * x + a_0`
 ///
-/// Coefficients are in descending order so that evaluation in the circuit matches
-/// Horner's method in a single forward pass: P(x) = ((...((a_n * x + a_{n-1}) * x + ...) * x + a_0).
-/// The circuit can then iterate `result = result * x + coefficients[i]` from i = 0 without
-/// reversing or reindexing, keeping the constraint system simple and efficient.
-///
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Polynomial {

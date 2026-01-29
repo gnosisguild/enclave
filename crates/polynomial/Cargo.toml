@@ -12,6 +12,8 @@ num-traits = { workspace = true }
 serde = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true }
 thiserror = { workspace = true }
+fhe-math = { workspace = true }
+ndarray = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"
