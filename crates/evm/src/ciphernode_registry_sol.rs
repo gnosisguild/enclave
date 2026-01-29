@@ -291,18 +291,18 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
             EnclaveEventData::PublicKeyAggregated(data) => {
                 // Only publish if the src and destination chains match
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    self.notify_sync(ctx, data);
+                    ctx.notify(data);
                 }
             }
             EnclaveEventData::CommitteeFinalizeRequested(data) => {
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    self.notify_sync(ctx, data);
+                    ctx.notify(data);
                 }
             }
             EnclaveEventData::TicketGenerated(data) => {
                 // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
-                    self.notify_sync(ctx, data);
+                    ctx.notify(data);
                 }
             }
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
