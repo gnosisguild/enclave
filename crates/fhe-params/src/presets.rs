@@ -96,10 +96,10 @@ pub struct PresetMetadata {
 /// Default search parameters for BFV parameter generation
 ///
 /// These values are used when searching for optimal BFV parameters using
-/// the crypto_params search algorithm. They define the constraints and
+/// the search algorithm. They define the constraints and
 /// requirements for parameter selection.
 ///
-/// See `crypto_params::bfv::BfvSearchConfig` for more details.
+/// See `search::bfv::BfvSearchConfig` for more details.
 #[derive(Debug, Clone, Copy)]
 pub struct PresetSearchDefaults {
     /// Number of parties (n) - the number of ciphernodes in the system supported by
