@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "pk_trbfv",
-    "pk_agg_trbfv",
-    "greco",
-    "dec_share_trbfv",
-    "dec_shares_agg_trbfv"   
+    "pk_generation",
+    "pk_aggregation",
+    "user_data_encryption",
+    "share_decryption",
+    "decrypted_shares_aggregation"   
 ]

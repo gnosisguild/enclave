@@ -4,11 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::core::greco::Configs as GrecoConfigs;
-use crate::core::trbfv_dec_share::Configs as DecShareTrBfvConfigs;
-use crate::core::trbfv_dec_shares_agg::Configs as DecShareAggTrBfvConfigs;
-use crate::core::trbfv_pk::Configs as TrbfvPkConfigs;
-use crate::core::trbfv_pk_agg::Configs as PkAggTrBfvConfigs;
+use crate::core::threshold::decrypted_shares_aggregation::Configs as DecryptedSharesAggregationConfigs;
+use crate::core::threshold::pk_aggregation::Configs as PkAggregationConfigs;
+use crate::core::threshold::pk_generation::Configs as PkGenerationConfigs;
+use crate::core::threshold::share_decryption::Configs as ShareDecryptionConfigs;
+use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
 
 // Global configs for threshold insecure preset
 pub global N: u32 = 512;
@@ -22,129 +22,128 @@ pub global T_INV_MOD_Q: Field = 1416703358393105942938;
 
 /************************************
 -------------------------------------
-pk_trbfv (CIRCUIT 1 - PUBLIC KEY THRESHOLD BFV)
+pk_generation (CIRCUIT 1)
 -------------------------------------
 ************************************/
 
-// pk_trbfv - bit parameters
-pub global PK_TRBFV_BIT_EEK: u32 = 6;
-pub global PK_TRBFV_BIT_SK: u32 = 2;
-pub global PK_TRBFV_BIT_E_SM: u32 = 18;
-pub global PK_TRBFV_BIT_R1: u32 = 14;
-pub global PK_TRBFV_BIT_R2: u32 = 36;
-pub global PK_TRBFV_BIT_PK: u32 = 36;
+// pk_generation - bit parameters
+pub global PK_GENERATION_BIT_EEK: u32 = 6;
+pub global PK_GENERATION_BIT_SK: u32 = 2;
+pub global PK_GENERATION_BIT_E_SM: u32 = 18;
+pub global PK_GENERATION_BIT_R1: u32 = 14;
+pub global PK_GENERATION_BIT_R2: u32 = 36;
+pub global PK_GENERATION_BIT_PK: u32 = 36;
 
-// pk_trbfv - bounds
-pub global PK_TRBFV_EEK_BOUND: Field = 20;
-pub global PK_TRBFV_SK_BOUND: Field = 1;
-pub global PK_TRBFV_E_SM_BOUND: Field = 122892;
-pub global PK_TRBFV_R1_BOUNDS: [Field; L] = [5120, 5120];
-pub global PK_TRBFV_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+// pk_generation - bounds
+pub global PK_GENERATION_EEK_BOUND: Field = 20;
+pub global PK_GENERATION_SK_BOUND: Field = 1;
+pub global PK_GENERATION_E_SM_BOUND: Field = 122892;
+pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [5120, 5120];
+pub global PK_GENERATION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-// pk_trbfv - configs
-pub global PK_TRBFV_CONFIGS: TrbfvPkConfigs<N, L> = TrbfvPkConfigs::new(
+// pk_generation - configs
+pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
-    PK_TRBFV_EEK_BOUND,
-    PK_TRBFV_SK_BOUND,
-    PK_TRBFV_E_SM_BOUND,
-    PK_TRBFV_R1_BOUNDS,
-    PK_TRBFV_R2_BOUNDS,
+    PK_GENERATION_EEK_BOUND,
+    PK_GENERATION_SK_BOUND,
+    PK_GENERATION_E_SM_BOUND,
+    PK_GENERATION_R1_BOUNDS,
+    PK_GENERATION_R2_BOUNDS,
 );
 
 /************************************
 -------------------------------------
-pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
+pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-// pk_agg_trbfv - bit parameters
-pub global PK_AGG_TRBFV_BIT_PK: u32 = 36;
+// pk_aggregation - bit parameters
+pub global PK_AGGREGATION_BIT_PK: u32 = 36;
 
-// pk_agg_trbfv - configs
-pub global PK_AGG_TRBFV_CONFIGS: PkAggTrBfvConfigs<L> = PkAggTrBfvConfigs::new(QIS);
+// pk_aggregation - configs
+pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************
 -------------------------------------
-greco (USED FOR ENCRYPTION TRBFV x PVSS)
+user_data_encryption (CIRCUIT 6)
 -------------------------------------
 ************************************/
 
-// greco - bit parameters
-pub global GRECO_BIT_PK: u32 = 36;
-pub global GRECO_BIT_CT: u32 = 36;
-pub global GRECO_BIT_U: u32 = 2;
-pub global GRECO_BIT_E0: u32 = 6;
-pub global GRECO_BIT_E1: u32 = 6;
-pub global GRECO_BIT_K: u32 = 4;
-pub global GRECO_BIT_R1: u32 = 10;
-pub global GRECO_BIT_R2: u32 = 36;
-pub global GRECO_BIT_P1: u32 = 10;
-pub global GRECO_BIT_P2: u32 = 36;
+// user_data_encryption - bit parameters
+pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 36;
+pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 36;
+pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 2;
+pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 6;
+pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 6;
+pub global USER_DATA_ENCRYPTION_BIT_K: u32 = 4;
+pub global USER_DATA_ENCRYPTION_BIT_R1: u32 = 10;
+pub global USER_DATA_ENCRYPTION_BIT_R2: u32 = 36;
+pub global USER_DATA_ENCRYPTION_BIT_P1: u32 = 10;
+pub global USER_DATA_ENCRYPTION_BIT_P2: u32 = 36;
 
-// greco - bounds
-pub global GRECO_Q_MOD_T: Field = 3;
-pub global GRECO_K0IS: [Field; L] = [61847462708, 20615769293];
-pub global GRECO_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
-pub global GRECO_E0_BOUND: Field = 20;
-pub global GRECO_E1_BOUND: Field = 20;
-pub global GRECO_U_BOUND: Field = 1;
-pub global GRECO_K1_LOW_BOUND: Field = 5;
-pub global GRECO_K1_UP_BOUND: Field = 4;
-pub global GRECO_R1_LOW_BOUNDS: [Field; L] = [261, 258];
-pub global GRECO_R1_UP_BOUNDS: [Field; L] = [260, 258];
-pub global GRECO_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
-pub global GRECO_P1_BOUNDS: [Field; L] = [256, 256];
-pub global GRECO_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+// user_data_encryption - bounds
+pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] = [61847462708, 20615769293];
+pub global USER_DATA_ENCRYPTION_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
+pub global USER_DATA_ENCRYPTION_E0_BOUND: Field = 20;
+pub global USER_DATA_ENCRYPTION_E1_BOUND: Field = 20;
+pub global USER_DATA_ENCRYPTION_U_BOUND: Field = 1;
+pub global USER_DATA_ENCRYPTION_K1_LOW_BOUND: Field = 5;
+pub global USER_DATA_ENCRYPTION_K1_UP_BOUND: Field = 4;
+pub global USER_DATA_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [261, 258];
+pub global USER_DATA_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [260, 258];
+pub global USER_DATA_ENCRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
+pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
 // greco - configs
-pub global GRECO_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
-    GRECO_Q_MOD_T,
+pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
+    Q_MOD_T,
     QIS,
-    GRECO_K0IS,
-    GRECO_PK_BOUNDS,
-    GRECO_E0_BOUND,
-    GRECO_E1_BOUND,
-    GRECO_U_BOUND,
-    GRECO_R1_LOW_BOUNDS,
-    GRECO_R1_UP_BOUNDS,
-    GRECO_R2_BOUNDS,
-    GRECO_P1_BOUNDS,
-    GRECO_P2_BOUNDS,
-    GRECO_K1_LOW_BOUND,
-    GRECO_K1_UP_BOUND,
+    USER_DATA_ENCRYPTION_K0IS,
+    USER_DATA_ENCRYPTION_PK_BOUNDS,
+    USER_DATA_ENCRYPTION_E0_BOUND,
+    USER_DATA_ENCRYPTION_E1_BOUND,
+    USER_DATA_ENCRYPTION_U_BOUND,
+    USER_DATA_ENCRYPTION_R1_LOW_BOUNDS,
+    USER_DATA_ENCRYPTION_R1_UP_BOUNDS,
+    USER_DATA_ENCRYPTION_R2_BOUNDS,
+    USER_DATA_ENCRYPTION_P1_BOUNDS,
+    USER_DATA_ENCRYPTION_P2_BOUNDS,
+    USER_DATA_ENCRYPTION_K1_LOW_BOUND,
+    USER_DATA_ENCRYPTION_K1_UP_BOUND,
 );
 
 /************************************
 -------------------------------------
-dec_share_trbfv (CIRCUIT 6 - DECRYPTION SHARE TRBFV)
+share_decryption (GRECO)
 -------------------------------------
 ************************************/
 
-// dec_share_trbfv - bit parameters
-pub global DEC_SHARES_BIT_CT: u32 = 36;
-pub global DEC_SHARES_BIT_S: u32 = 36;
-pub global DEC_SHARES_BIT_E: u32 = 36;
-pub global DEC_SHARES_BIT_R1: u32 = 44;
-pub global DEC_SHARES_BIT_R2: u32 = 36;
-pub global DEC_SHARES_BIT_D: u32 = 36;
+// share_decryption - bit parameters
+pub global SHARE_DECRYPTION_BIT_CT: u32 = 36;
+pub global SHARE_DECRYPTION_BIT_SK: u32 = 36;
+pub global SHARE_DECRYPTION_BIT_E_SM: u32 = 36;
+pub global SHARE_DECRYPTION_BIT_R1: u32 = 44;
+pub global SHARE_DECRYPTION_BIT_R2: u32 = 36;
+pub global SHARE_DECRYPTION_BIT_D: u32 = 36;
 
-// dec_share_trbfv - bounds
-pub global DEC_SHARES_R1_BOUNDS: [Field; L] = [8796083584897, 8796061564801];
-pub global DEC_SHARES_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+// share_decryption - bounds
+pub global SHARE_DECRYPTION_R1_BOUNDS: [Field; L] = [8796083584897, 8796061564801];
+pub global SHARE_DECRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-// dec_share_trbfv - configs
-pub global DEC_SHARES_CONFIGS: DecShareTrBfvConfigs<L> =
-    DecShareTrBfvConfigs::new(QIS, DEC_SHARES_R1_BOUNDS, DEC_SHARES_R2_BOUNDS);
+// share_decryption - configs
+pub global SHARE_DECRYPTION_CONFIGS: ShareDecryptionConfigs<L> =
+    ShareDecryptionConfigs::new(QIS, SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS);
 
 /************************************
 -------------------------------------
-dec_shares_agg_trbfv (CIRCUIT 7 - DECRYPTION SHARE AGGREGATION TRBFV)
+decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
 
-// dec_shares_agg_trbfv - bit parameters
-pub global DEC_SHARES_AGG_BIT_NOISE: u32 = 69;
+// decrypted_shares_aggregation - bit parameters
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 69;
 
-// dec_shares_agg_trbfv - configs
-pub global DEC_SHARES_AGG_CONFIGS: DecShareAggTrBfvConfigs<L> =
-    DecShareAggTrBfvConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
+// decrypted_shares_aggregation - configs
+pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =
+    DecryptedSharesAggregationConfigs::new(QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T);
