@@ -9,5 +9,5 @@ use e3_fhe_params::{BfvParamSet, BfvPreset};
 // This could eventually be set here with an environment var once we allow for dynamic circuit selection.
 pub fn get_default_paramset() -> BfvParamSet {
     // NOTE: parameters are insecure. These parameters are mainly for testing and demonstration
-    BfvPreset::InsecureThresholdBfv512.into()
+    BfvPreset::InsecureThreshold512.into()
 }

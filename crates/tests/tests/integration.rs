@@ -124,7 +124,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let bus = system.handle()?;
 
     // Parameters (128bits of security)
-    let params_raw = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+    let params_raw = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
 
     // Encoded Params
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));

@@ -91,7 +91,7 @@ pub fn get_common_setup(
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let param_set = param_set.unwrap_or(BfvPreset::InsecureThresholdBfv512.into());
+    let param_set = param_set.unwrap_or(BfvPreset::InsecureThreshold512.into());
     let degree = param_set.degree;
     let plaintext_modulus = param_set.plaintext_modulus;
     let moduli = param_set.moduli;

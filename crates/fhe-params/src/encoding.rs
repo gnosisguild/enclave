@@ -166,7 +166,7 @@ mod tests {
     fn test_encode_decode_roundtrip_preset() {
         use crate::presets::BfvParamSet;
 
-        let preset = BfvPreset::SecureThresholdBfv8192;
+        let preset = BfvPreset::SecureThreshold8192;
         let param_set: BfvParamSet = preset.into();
         let params = param_set.build();
 
@@ -206,12 +206,12 @@ mod tests {
 
     #[cfg(feature = "abi-encoding")]
     #[test]
-    fn test_encode_decode_roundtrip_trbfv() {
+    fn test_encode_decode_roundtrip_threshold() {
         use crate::builder::build_bfv_params;
         use num_bigint::BigUint;
         use std::str::FromStr;
 
-        // Use secure threshold preset constants for testing TRBFV parameter encoding
+        // Use secure threshold preset constants for testing threshold parameter encoding
         let degree = secure_8192::DEGREE;
         let plaintext_modulus = secure_8192::threshold::PLAINTEXT_MODULUS;
         let moduli = secure_8192::threshold::MODULI;
@@ -224,7 +224,7 @@ mod tests {
         assert_eq!(decoded.degree(), degree);
         assert_eq!(decoded.plaintext(), plaintext_modulus);
         assert_eq!(decoded.moduli(), moduli);
-        // Verify error1_variance is preserved for trBFV
+        // Verify error1_variance is preserved for threshold
         assert_eq!(
             decoded.get_error1_variance(),
             &BigUint::from_str(error1_variance).unwrap()
@@ -236,7 +236,7 @@ mod tests {
     fn test_encode_decode_arc_roundtrip() {
         use crate::presets::BfvParamSet;
 
-        let preset = BfvPreset::InsecureThresholdBfv512;
+        let preset = BfvPreset::InsecureThreshold512;
         let param_set: BfvParamSet = preset.into();
         let params = param_set.build_arc();
 
@@ -280,7 +280,7 @@ mod tests {
     fn test_encode_deterministic() {
         use crate::presets::BfvParamSet;
 
-        let preset = BfvPreset::SecureThresholdBfv8192;
+        let preset = BfvPreset::SecureThreshold8192;
         let param_set: BfvParamSet = preset.into();
         let params = param_set.build();
 

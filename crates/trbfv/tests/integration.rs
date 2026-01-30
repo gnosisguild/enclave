@@ -44,7 +44,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     let _guard = tracing::subscriber::set_default(subscriber);
     let rng = create_shared_rng_from_u64(42);
 
-    let params_raw = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+    let params_raw = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // E3Parameters

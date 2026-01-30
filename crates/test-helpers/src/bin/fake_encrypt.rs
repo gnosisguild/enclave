@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let params = if let Some(params_bytes) = args.params {
         decode_bfv_params_arc(&params_bytes.0).expect("Failed to decode BFV params")
     } else {
-        build_bfv_params_from_set_arc(BfvPreset::InsecureThresholdBfv512.into())
+        build_bfv_params_from_set_arc(BfvPreset::InsecureThreshold512.into())
     };
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
     let raw_plaintext = args.plaintext;

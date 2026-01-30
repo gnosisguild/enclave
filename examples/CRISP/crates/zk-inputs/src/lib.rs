@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn test_inputs_generation_with_custom_params() {
         let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThresholdBfv512));
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_get_bfv_params() {
         let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThresholdBfv512));
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == insecure_512::DEGREE);

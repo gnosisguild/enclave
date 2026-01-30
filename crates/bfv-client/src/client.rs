@@ -218,7 +218,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -242,7 +242,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -273,7 +273,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -303,7 +303,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;

@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_bfv_public_key_to_greco() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_bfv_ciphertext_to_greco() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);

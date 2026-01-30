@@ -37,7 +37,7 @@ mod tests {
     fn test() -> Result<()> {
         let mut rng = thread_rng();
 
-        let params_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let params_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let params = build_bfv_params_arc(
             params_set.degree,
             params_set.plaintext_modulus,

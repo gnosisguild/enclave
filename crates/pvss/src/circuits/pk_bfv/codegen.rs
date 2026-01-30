@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let preset = BfvPreset::InsecureThresholdBfv512;
+        let preset = BfvPreset::InsecureThreshold512;
         let params = BfvParamSet::from(preset).build_arc();
         let sample = sample::generate_sample(&params);
         let artifacts = codegen(preset, sample.public_key).unwrap();

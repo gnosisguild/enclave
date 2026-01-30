@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn test_generate_sample() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
         let sample = generate_sample(&params);
 
         assert_eq!(sample.public_key.c.c.len(), 2);

@@ -14,7 +14,7 @@ pub mod insecure_512 {
     pub const DEGREE: usize = 512;
     pub const NUM_PARTIES: u128 = 5;
 
-    /// Threshold BFV (TRBFV) parameters
+    /// Threshold BFV parameters
     pub mod threshold {
         pub const PLAINTEXT_MODULUS: u64 = 10;
         pub const MODULI: &[u64] = &[0xffffee001, 0xffffc4001];
@@ -41,7 +41,7 @@ pub mod secure_8192 {
     pub const DEGREE: usize = 8192;
     pub const NUM_PARTIES: u128 = 100;
 
-    /// Threshold BFV (TRBFV) parameters
+    /// Threshold BFV parameters
     pub mod threshold {
         pub const PLAINTEXT_MODULUS: u64 = 100;
         pub const MODULI: &[u64] = &[

@@ -44,7 +44,7 @@ async fn test_indexer() -> Result<()> {
     const THRESHOLD: u64 = 10;
     const INDEXER_DELAY_MS: u64 = 10;
 
-    let param_set = BfvPreset::InsecureThresholdBfv512.into();
+    let param_set = BfvPreset::InsecureThreshold512.into();
     let params = build_bfv_params_from_set_arc(param_set);
 
     let (
