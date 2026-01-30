@@ -29,6 +29,6 @@ pub mod crt_polynomial;
 pub mod polynomial;
 pub mod utils;
 
-pub use crt_polynomial::{CrtContext, CrtPolynomial, CrtPolynomialError};
+pub use crt_polynomial::{CrtPolynomial, CrtPolynomialError};
 pub use polynomial::{Polynomial, PolynomialError};
 pub use utils::*;

@@ -2107,6 +2107,7 @@ name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
  "e3-fhe-params",
+ "e3-polynomial",
  "getrandom 0.2.16",
  "js-sys",
  "num-bigint",
@@ -2381,6 +2382,7 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
@@ -6786,7 +6788,6 @@ dependencies = [
  "hex",
  "itertools 0.14.0",
  "num-bigint",
- "num-integer",
  "num-traits",
  "rand 0.8.5",
  "rayon",

@@ -7,75 +7,18 @@
 //! CRT (Chinese Remainder Theorem) polynomial representation.
 
 use crate::polynomial::Polynomial;
-use crate::reduce_and_center_coefficients_mut;
-use std::sync::Arc;
-use thiserror::Error;
-
 use fhe_math::rq::{Poly, Representation};
 use num_bigint::BigInt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Errors that can occur during CRT polynomial operations.
 #[derive(Debug, Error)]
 pub enum CrtPolynomialError {
-    /// Moduli list must not be empty.
-    #[error("moduli must be non-empty")]
-    EmptyModuli,
-
-    /// Ring degree `n` must be non-zero.
-    #[error("n must be > 0")]
-    InvalidN,
-
-    /// Number of limbs must match number of moduli.
-    #[error("limbs.len() ({actual}) must match ctx.moduli.len() ({expected})")]
-    LimbCountMismatch { expected: usize, actual: usize },
-
-    /// Each limb must have exactly `n` coefficients.
-    #[error("limb {limb_index} length ({actual}) must match ctx.n ({expected})")]
-    LimbLengthMismatch {
-        limb_index: usize,
-        expected: usize,
-        actual: usize,
-    },
-
-    /// fhe-math Poly must be in PowerBasis representation for conversion.
-    #[error("fhe Poly must be in PowerBasis representation")]
-    UnsupportedRepresentation,
-}
-
-/// CRT context for a family of polynomials sharing the same ring degree `n` and CRT moduli.
-///
-/// Notes:
-/// - `n` is the ring degree (also the number of coefficients / NTT size). Each limb has exactly `n` coefficients.
-/// - The maximum exponent is `n - 1`.
-/// - `moduli` are the CRT factors q_0..q_{L-1} (u64 primes).
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CrtContext {
-    pub n: usize,
-    pub moduli: Vec<u64>,
-}
-
-impl CrtContext {
-    /// Creates a new CRT context.
-    ///
-    /// # Errors
-    /// Returns `CrtPolynomialError::InvalidN` if `n` is zero.
-    /// Returns `CrtPolynomialError::EmptyModuli` if `moduli` is empty.
-    pub fn new(n: usize, moduli: Vec<u64>) -> Result<Self, CrtPolynomialError> {
-        if n == 0 {
-            return Err(CrtPolynomialError::InvalidN);
-        }
-        if moduli.is_empty() {
-            return Err(CrtPolynomialError::EmptyModuli);
-        }
-        Ok(Self { n, moduli })
-    }
-
-    pub fn num_moduli(&self) -> usize {
-        self.moduli.len()
-    }
+    /// Moduli slice length does not match number of limbs.
+    #[error("moduli length ({moduli_len}) must match limbs length ({limbs_len})")]
+    ModuliLengthMismatch { limbs_len: usize, moduli_len: usize },
 }
 
 /// A polynomial in CRT form: one limb polynomial per modulus.
@@ -85,100 +28,121 @@ impl CrtContext {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CrtPolynomial {
-    pub ctx: Arc<CrtContext>,
     pub limbs: Vec<Polynomial>,
 }
 
 impl CrtPolynomial {
-    /// Creates a new CRT polynomial and validates limb dimensions.
+    /// Builds a `CrtPolynomial` from a vector of polynomials.
     ///
-    /// # Errors
-    /// Returns `CrtPolynomialError::LimbCountMismatch` if the number of limbs does not match `ctx.moduli.len()`.
-    /// Returns `CrtPolynomialError::LimbLengthMismatch` if any limb has a coefficient vector length different from `ctx.n`.
-    pub fn new(ctx: Arc<CrtContext>, limbs: Vec<Polynomial>) -> Result<Self, CrtPolynomialError> {
-        let expected_limbs = ctx.moduli.len();
-
-        if limbs.len() != expected_limbs {
-            return Err(CrtPolynomialError::LimbCountMismatch {
-                expected: expected_limbs,
-                actual: limbs.len(),
-            });
-        }
-
-        let expected_len = ctx.n;
-
-        for (i, limb) in limbs.iter().enumerate() {
-            let actual_len = limb.coefficients().len();
-            if actual_len != expected_len {
-                return Err(CrtPolynomialError::LimbLengthMismatch {
-                    limb_index: i,
-                    expected: expected_len,
-                    actual: actual_len,
-                });
-            }
-        }
-
-        Ok(Self { ctx, limbs })
+    /// # Arguments
+    ///
+    /// * `limbs` - Vector of polynomials.
+    pub fn new(limbs: Vec<Polynomial>) -> Self {
+        Self { limbs }
     }
 
-    /// Ring degree (number of coefficients).
-    pub fn n(&self) -> usize {
-        self.ctx.n
-    }
+    /// Builds a `CrtPolynomial` from coefficient vectors (one `Vec<BigInt>` per modulus).
+    ///
+    /// # Arguments
+    ///
+    /// * `limbs` - Vector of coefficient vectors.
+    pub fn from_bigint_vectors(limbs: Vec<Vec<BigInt>>) -> Self {
+        let limbs = limbs.into_iter().map(Polynomial::new).collect::<Vec<_>>();
 
-    /// Maximum exponent (at most `n - 1`).
-    pub fn max_exponent(&self) -> usize {
-        self.ctx.n.saturating_sub(1)
-    }
-
-    pub fn modulus(&self, i: usize) -> u64 {
-        self.ctx.moduli[i]
-    }
-
-    pub fn limb(&self, i: usize) -> &Polynomial {
-        &self.limbs[i]
+        Self { limbs }
     }
 
     /// Builds a `CrtPolynomial` from an fhe-math `Poly` in PowerBasis representation.
     ///
-    /// Main use: preparing inputs for ZK circuits by converting from FHE BFV ciphertext
-    /// polynomials to a CRT limb format compatible with the circuits.
+    /// Used to prepare inputs for ZK circuits by converting FHE BFV ciphertext polynomials
+    /// into CRT limb format. If `p` is in NTT form, it is converted to PowerBasis first.
     ///
-    /// Coefficient layout: fhe-math rows are ascending degree (c_0 + c_1·x + …).
-    /// We convert to descending order so that evaluation in the circuit matches
-    /// Horner's method in a single forward pass: P(x) = ((...((a_n * x + a_{n-1}) * x + ...) * x + a_0).
-    /// The circuit can then iterate `result = result * x + coefficients[i]` from i = 0 without
-    /// reversing or reindexing, keeping the constraint system simple and efficient.
+    /// # Arguments
     ///
-    /// # Errors
-    /// Returns `CrtPolynomialError::UnsupportedRepresentation` if the poly is not in PowerBasis.
-    pub fn from_fhe_poly(p: &Poly) -> Result<Self, CrtPolynomialError> {
+    /// * `p` - An fhe-math polynomial (PowerBasis or Ntt).
+    ///
+    /// # Coefficient order
+    ///
+
+    pub fn from_fhe_polynomial(p: &Poly) -> Self {
         let mut p = p.clone();
 
         if *p.representation() == Representation::Ntt {
             p.change_representation(Representation::PowerBasis);
         }
 
-        let ctx = p.ctx.as_ref();
-        let n = ctx.degree;
-        let moduli = ctx.moduli().to_vec();
-        let crt_ctx = Arc::new(CrtContext::new(n, moduli)?);
-
-        let coeffs = p.coefficients();
-
-        let limbs: Vec<Polynomial> = coeffs
+        let limbs = p
+            .coefficients()
             .outer_iter()
-            .zip(crt_ctx.moduli.iter())
-            .map(|(row, qi)| {
-                let mut coeffs: Vec<BigInt> = row.iter().rev().map(|&c| BigInt::from(c)).collect();
-                let qi_bigint = BigInt::from(*qi);
-
-                reduce_and_center_coefficients_mut(&mut coeffs, &qi_bigint);
-
-                Polynomial::new(coeffs)
-            })
+            .map(|row| Polynomial::from_u64_vector(row.to_vec()))
             .collect();
 
-        CrtPolynomial::new(crt_ctx, limbs)
+        Self { limbs }
+    }
+
+    /// Reverses the coefficient order of every limb in-place.
+    ///
+    /// For each limb, converts between descending degree (a_n, …, a_0) and ascending
+    /// degree (a_0, …, a_n). Calling this twice restores the original order.
+    pub fn reverse(&mut self) {
+        for limb in &mut self.limbs {
+            limb.reverse();
+        }
+    }
+
+    /// Reduces and centers each limb's coefficients modulo the corresponding modulus in-place.
+    ///
+    /// Each limb `self.limbs[i]` is reduced modulo `moduli[i]`, with coefficients centered
+    /// in the symmetric range `(-q/2, q/2]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `moduli` - One modulus per limb; `moduli[i]` is used for `self.limbs[i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CrtPolynomialError::ModuliLengthMismatch`] if `moduli.len() != self.limbs.len()`.
+    pub fn reduce_and_center(&mut self, moduli: &[u64]) -> Result<(), CrtPolynomialError> {
+        if self.limbs.len() != moduli.len() {
+            return Err(CrtPolynomialError::ModuliLengthMismatch {
+                limbs_len: self.limbs.len(),
+                moduli_len: moduli.len(),
+            });
+        }
+
+        for (limb, qi) in self.limbs.iter_mut().zip(moduli.iter()) {
+            limb.reduce_and_center(&BigInt::from(*qi));
+        }
+
+        Ok(())
+    }
+
+    /// Returns a reference to the limb polynomial at the given index.
+    ///
+    /// # Arguments
+    ///
+    /// * `i` - Limb index; must be in range `0..self.limbs.len()`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the polynomial for modulus `i`. Coefficients are expected to be
+    /// reduced/centered modulo the corresponding modulus as required by the caller.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `i >= self.limbs.len()`.
+    pub fn limb(&self, i: usize) -> &Polynomial {
+        &self.limbs[i]
+    }
+
+    /// Returns limb coefficient vectors (one `Vec<BigInt>` per modulus).
+    ///
+    /// Use when you need a raw CRT representation for serialization, hashing,
+    /// or APIs that expect `&[Vec<BigInt>]`. The inverse of [`from_limb_coefficients`](Self::from_limb_coefficients).
+    pub fn to_limb_coefficients(&self) -> Vec<Vec<BigInt>> {
+        self.limbs
+            .iter()
+            .map(|l| l.coefficients().to_vec())
+            .collect()
     }
 }

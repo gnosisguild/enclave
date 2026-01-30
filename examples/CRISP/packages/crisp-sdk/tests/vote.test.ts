@@ -14,7 +14,7 @@ import {
   encodeVote,
   generateCircuitInputs,
   executeCircuit,
-  computeCommitment,
+  computeCiphertextCommitment,
   encryptVote,
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
@@ -127,7 +127,7 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
+      const commitment = computeCiphertextCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
       expect(returnValue).toEqual(commitment)
     })
@@ -151,7 +151,7 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
+      const commitment = computeCiphertextCommitment(crispInputs.sum_ct0is, crispInputs.sum_ct1is)
 
       expect(returnValue).toEqual(commitment)
     })
@@ -174,7 +174,7 @@ describe('Vote', () => {
       })
 
       const { returnValue } = await executeCircuit(crispInputs)
-      const commitment = computeCommitment(crispInputs.ct0is, crispInputs.ct1is)
+      const commitment = computeCiphertextCommitment(crispInputs.ct0is, crispInputs.ct1is)
 
       expect(returnValue).toEqual(commitment)
     })

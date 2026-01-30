@@ -93,19 +93,21 @@ pub fn construct_inputs(
     ZKInputs {
         prev_ct0is: ciphertext_addition_inputs_standard
             .prev_ct0is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
         prev_ct1is: ciphertext_addition_inputs_standard
             .prev_ct1is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
@@ -114,37 +116,41 @@ pub fn construct_inputs(
             .to_string(),
         sum_ct0is: ciphertext_addition_inputs_standard
             .sum_ct0is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
         sum_ct1is: ciphertext_addition_inputs_standard
             .sum_ct1is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
         sum_r0is: ciphertext_addition_inputs_standard
             .r0is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
         sum_r1is: ciphertext_addition_inputs_standard
             .r1is
+            .limbs
             .iter()
-            .map(|v| {
+            .map(|limb| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(v)
+                    "coefficients": to_string_1d_vec(limb.coefficients())
                 })
             })
             .collect(),
@@ -349,14 +355,34 @@ mod tests {
     }
 
     fn create_mock_ciphertext_addition_inputs() -> CiphertextAdditionInputs {
+        use e3_polynomial::{CrtPolynomial, Polynomial};
+
         CiphertextAdditionInputs {
-            prev_ct0is: vec![vec![BigInt::from(1), BigInt::from(2)]],
-            prev_ct1is: vec![vec![BigInt::from(3), BigInt::from(4)]],
+            prev_ct0is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]),
+                Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]),
+            ]),
+            prev_ct1is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(3), BigInt::from(4)]),
+                Polynomial::new(vec![BigInt::from(3), BigInt::from(4)]),
+            ]),
             prev_ct_commitment: BigInt::from(0),
-            sum_ct0is: vec![vec![BigInt::from(5), BigInt::from(6)]],
-            sum_ct1is: vec![vec![BigInt::from(7), BigInt::from(8)]],
-            r0is: vec![vec![BigInt::from(9), BigInt::from(10)]],
-            r1is: vec![vec![BigInt::from(11), BigInt::from(12)]],
+            sum_ct0is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(5), BigInt::from(6)]),
+                Polynomial::new(vec![BigInt::from(5), BigInt::from(6)]),
+            ]),
+            sum_ct1is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(7), BigInt::from(8)]),
+                Polynomial::new(vec![BigInt::from(7), BigInt::from(8)]),
+            ]),
+            r0is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(9), BigInt::from(10)]),
+                Polynomial::new(vec![BigInt::from(9), BigInt::from(10)]),
+            ]),
+            r1is: CrtPolynomial::new(vec![
+                Polynomial::new(vec![BigInt::from(11), BigInt::from(12)]),
+                Polynomial::new(vec![BigInt::from(11), BigInt::from(12)]),
+            ]),
         }
     }
 
@@ -376,12 +402,12 @@ mod tests {
 
         // Verify basic structure.
         assert!(inputs.params.is_object());
-        assert_eq!(inputs.prev_ct0is.len(), 1);
-        assert_eq!(inputs.prev_ct1is.len(), 1);
-        assert_eq!(inputs.sum_ct0is.len(), 1);
-        assert_eq!(inputs.sum_ct1is.len(), 1);
-        assert_eq!(inputs.sum_r0is.len(), 1);
-        assert_eq!(inputs.sum_r1is.len(), 1);
+        assert_eq!(inputs.prev_ct0is.len(), 2); // 2 moduli
+        assert_eq!(inputs.prev_ct1is.len(), 2); // 2 moduli
+        assert_eq!(inputs.sum_ct0is.len(), 2); // 2 moduli
+        assert_eq!(inputs.sum_ct1is.len(), 2); // 2 moduli
+        assert_eq!(inputs.sum_r0is.len(), 2); // 2 moduli
+        assert_eq!(inputs.sum_r1is.len(), 2); // 2 moduli
         assert_eq!(inputs.ct0is.len(), 2);
         assert_eq!(inputs.ct1is.len(), 2);
         assert_eq!(inputs.pk0is.len(), 2);
