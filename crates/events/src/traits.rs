@@ -168,6 +168,8 @@ pub trait WithAggregateId {
 /// An EventContextManager hold the current event context for use in event publishing and
 /// persistence management
 pub trait EventContextManager {
-    fn set_ctx(&mut self, value: &EventContext<Sequenced>);
+    fn set_ctx<C>(&mut self, value: C)
+    where
+        C: Into<EventContext<Sequenced>>;
     fn get_ctx(&self) -> Option<EventContext<Sequenced>>;
 }

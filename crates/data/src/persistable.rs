@@ -251,8 +251,11 @@ impl<T> EventContextManager for Persistable<T> {
         self.ctx.clone()
     }
 
-    fn set_ctx(&mut self, value: &EventContext<Sequenced>) {
-        self.ctx = Some(value.clone())
+    fn set_ctx<C>(&mut self, value: C)
+    where
+        C: Into<EventContext<Sequenced>>,
+    {
+        self.ctx = Some(value.into().clone())
     }
 }
 

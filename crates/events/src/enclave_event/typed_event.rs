@@ -24,8 +24,11 @@ pub struct TypedEvent<T> {
 }
 
 impl<T> TypedEvent<T> {
-    pub fn new(inner: T, ctx: EventContext<Sequenced>) -> Self {
-        Self { inner, ctx }
+    pub fn new(inner: T, ctx: impl Into<EventContext<Sequenced>>) -> Self {
+        Self {
+            inner,
+            ctx: ctx.into(),
+        }
     }
 
     pub fn into_inner(self) -> T {

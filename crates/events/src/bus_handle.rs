@@ -175,8 +175,11 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
 }
 
 impl EventContextManager for BusHandle {
-    fn set_ctx(&mut self, value: &EventContext<Sequenced>) {
-        self.ctx = Some(value.clone());
+    fn set_ctx<C>(&mut self, value: C)
+    where
+        C: Into<EventContext<Sequenced>>,
+    {
+        self.ctx = Some(value.into().clone());
     }
     fn get_ctx(&self) -> Option<EventContext<Sequenced>> {
         self.ctx.clone()
