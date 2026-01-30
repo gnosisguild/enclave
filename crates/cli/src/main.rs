@@ -27,6 +27,7 @@ mod nodes_start;
 mod nodes_status;
 mod nodes_stop;
 mod nodes_up;
+pub mod noir;
 mod password;
 mod password_delete;
 mod password_set;

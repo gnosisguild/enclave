@@ -28,6 +28,7 @@ use e3_sortition::{
 };
 use e3_sync::Synchronizer;
 use e3_utils::{rand_eth_addr, SharedRng};
+use e3_zk_prover::{ZkBackend, ZkProofExtension};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -66,6 +67,7 @@ pub struct CiphernodeBuilder {
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
+    zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
 }
 
@@ -131,6 +133,7 @@ impl CiphernodeBuilder {
             threads: None,
             threshold_plaintext_agg: false,
             net_config: None,
+            zk_backend: None,
         }
     }
 
@@ -248,6 +251,12 @@ impl CiphernodeBuilder {
     /// Setup a ThresholdPlaintextAggregator
     pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
         self.threshold_plaintext_agg = true;
+        self
+    }
+
+    /// Enable ZK proof generation with the given backend.
+    pub fn with_zkproof(mut self, backend: ZkBackend) -> Self {
+        self.zk_backend = Some(backend);
         self
     }
 
@@ -419,6 +428,7 @@ impl CiphernodeBuilder {
                 &self.cipher,
                 &addr,
                 share_encryption_params,
+                self.zk_backend.clone(),
             ))
         }
 
@@ -438,6 +448,11 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
                 &bus, &sortition,
             ))
+        }
+
+        if let Some(ref backend) = self.zk_backend {
+            info!("Setting up ZkProofExtension");
+            e3_builder = e3_builder.with(ZkProofExtension::create(backend))
         }
 
         info!("building...");
@@ -491,14 +506,26 @@ impl CiphernodeBuilder {
             )
         });
 
-        // Create it
-        let addr = Multithread::attach(
-            bus,
-            self.rng.clone(),
-            self.cipher.clone(),
-            task_pool,
-            self.multithread_report.clone(),
-        );
+        // Create it with or without ZK prover
+        let addr = if let Some(ref backend) = self.zk_backend {
+            info!("Multithread actor with ZK prover");
+            Multithread::attach_with_zk(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+                backend,
+            )
+        } else {
+            Multithread::attach(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+            )
+        };
 
         // Set the cache
         self.multithread_cache = Some(addr.clone());
