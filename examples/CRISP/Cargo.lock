@@ -2467,6 +2467,8 @@ dependencies = [
 name = "e3-polynomial"
 version = "0.1.8"
 dependencies = [
+ "fhe-math",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "serde",
@@ -3932,6 +3934,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]
