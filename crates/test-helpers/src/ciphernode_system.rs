@@ -16,7 +16,7 @@ use tokio::time::timeout;
 type SetupFn<'a> =
     Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<CiphernodeHandle>> + 'a>> + 'a>;
 type ThenFn<'a> =
-    Box<dyn Fn(CiphernodeHandle) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> + 'a>;
+    Box<dyn Fn(&CiphernodeHandle) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> + 'a>;
 
 /// This builds a ciphernode system using the actor model only. This helps us simulate the network
 /// in tests that we can run in the /crates/tests crate
@@ -85,8 +85,8 @@ impl<'a> CiphernodeSystemBuilder<'a> {
         }
 
         for then_fn in self.thens {
-            for node in nodes.clone() {
-                then_fn(node).await?;
+            for node in nodes.iter() {
+                then_fn(&node).await?;
             }
         }
 
@@ -140,7 +140,7 @@ impl CiphernodeSystem {
         Ok(CiphernodeHistory(history))
     }
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
-        let nodes = self.0.clone();
+        let nodes = &self.0;
         for node in nodes.iter() {
             let Some(history) = node.history() else {
                 break;
@@ -199,6 +199,7 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
+    use tokio::task::JoinHandle;
 
     async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
@@ -207,6 +208,7 @@ mod tests {
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
         let bus = EventSystem::new("test").with_event_bus(bus).handle()?;
+        let handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async { Ok(()) });
 
         Ok(CiphernodeHandle {
             address,
@@ -214,6 +216,8 @@ mod tests {
             bus,
             history: Some(history),
             errors: Some(errors),
+            join_handle: handle,
+            peer_id: "-unknown peer id-".to_string(),
         })
     }
 

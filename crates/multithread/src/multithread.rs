@@ -33,6 +33,7 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
+use e3_utils::NotifySync;
 use e3_utils::SharedRng;
 use rand::Rng;
 use tracing::error;

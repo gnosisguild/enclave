@@ -85,6 +85,7 @@ COPY crates/request/Cargo.toml crates/request/Cargo.toml
 COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
+COPY crates/sync/Cargo.toml crates/sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml crates/trbfv/Cargo.toml

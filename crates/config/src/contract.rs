@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy_primitives::Address;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Hash, Eq, Deserialize, Serialize, PartialEq)]
@@ -17,12 +19,17 @@ pub enum Contract {
 }
 
 impl Contract {
-    pub fn address(&self) -> &String {
+    pub fn address_str(&self) -> &str {
         use Contract::*;
         match self {
             Full { address, .. } => address,
             AddressOnly(v) => v,
         }
+    }
+
+    pub fn address(&self) -> Result<Address> {
+        let addr = self.address_str().parse()?;
+        Ok(addr)
     }
 
     pub fn deploy_block(&self) -> Option<u64> {
@@ -41,4 +48,19 @@ pub struct ContractAddresses {
     pub bonding_registry: Contract,
     pub e3_program: Option<Contract>,
     pub fee_token: Option<Contract>,
+}
+
+impl ContractAddresses {
+    pub fn contracts(&self) -> Vec<&Contract> {
+        [
+            Some(&self.enclave),
+            Some(&self.ciphernode_registry),
+            Some(&self.bonding_registry),
+            self.e3_program.as_ref(),
+            self.fee_token.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 }

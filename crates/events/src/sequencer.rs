@@ -8,7 +8,7 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
 
 use crate::{
     events::{CommitSnapshot, EventStored, StoreEventRequested},
-    EnclaveEvent, EventBus, Sequenced, Unsequenced,
+    EnclaveEvent, EventBus, EventContextAccessors, EventContextSeq, Sequenced, Unsequenced,
 };
 
 /// Component to sequence the storage of events
@@ -48,8 +48,9 @@ impl Handler<EventStored> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
         let event = msg.into_event();
-        let seq = event.get_seq();
-        self.buffer.do_send(CommitSnapshot::new(seq));
+        let seq = event.seq();
+        self.buffer
+            .do_send(CommitSnapshot::new(seq, event.aggregate_id()));
         self.bus.do_send(event)
     }
 }

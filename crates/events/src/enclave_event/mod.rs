@@ -21,19 +21,26 @@ mod e3_requested;
 mod enclave_error;
 mod encryption_key_collection_failed;
 mod encryption_key_created;
+mod evm_sync_events_received;
 mod keyshare_created;
+mod net_sync_events_received;
 mod operator_activation_changed;
+mod outgoing_sync_requested;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
+mod sync_effect;
+mod sync_end;
+mod sync_start;
 mod test_event;
 mod threshold_share_collection_failed;
 mod threshold_share_created;
 mod ticket_balance_updated;
 mod ticket_generated;
 mod ticket_submitted;
+mod typed_event;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
@@ -53,24 +60,32 @@ use e3_utils::{colorize, Color};
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
+pub use evm_sync_events_received::*;
 pub use keyshare_created::*;
+pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
+pub use outgoing_sync_requested::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 use strum::IntoStaticStr;
+pub use sync_effect::*;
+pub use sync_end::*;
+pub use sync_start::*;
 pub use test_event::*;
 pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
+pub use typed_event::*;
 
 use crate::{
-    traits::{ErrorEvent, Event, EventConstructorWithTimestamp},
-    E3id, EventId,
+    event_context::{AggregateId, EventContext},
+    traits::{ErrorEvent, Event, EventConstructorWithTimestamp, EventContextAccessors},
+    E3id, EventContextSeq, EventId, WithAggregateId,
 };
 use actix::Message;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -191,9 +206,15 @@ pub enum EnclaveEventData {
     EncryptionKeyCreated(EncryptionKeyCreated),
     EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
     ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
-    ComputeRequest(ComputeRequest),
-    ComputeResponse(ComputeResponse),
-    ComputeRequestError(ComputeRequestError),
+    ComputeRequest(ComputeRequest),           // ComputeRequested
+    ComputeResponse(ComputeResponse),         // ComputeResponseReceived
+    ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
+    OutgoingSyncRequested(OutgoingSyncRequested),
+    NetSyncEventsReceived(NetSyncEventsReceived),
+    EvmSyncEventsReceived(EvmSyncEventsReceived),
+    SyncStart(SyncStart),
+    SyncEffect(SyncEffect),
+    SyncEnd(SyncEnd),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -234,11 +255,13 @@ impl SeqState for Sequenced {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
+#[serde(bound(
+    serialize = "S: SeqState, S::Seq: Serialize",
+    deserialize = "S: SeqState, S::Seq: DeserializeOwned"
+))]
 pub struct EnclaveEvent<S: SeqState = Sequenced> {
-    id: EventId,
     payload: EnclaveEventData,
-    seq: S::Seq,
-    ts: u128,
+    ctx: EventContext<S>,
 }
 
 impl<S> EnclaveEvent<S>
@@ -253,38 +276,57 @@ where
         bincode::deserialize(bytes)
     }
 
-    pub fn get_id(&self) -> EventId {
-        self.into()
-    }
-
-    pub fn get_ts(&self) -> u128 {
-        self.ts
-    }
-
     pub fn split(self) -> (EnclaveEventData, u128) {
-        (self.payload, self.ts)
+        (self.payload, self.ctx.ts())
+    }
+
+    pub fn get_ctx(&self) -> &EventContext<S> {
+        &self.ctx
+    }
+}
+
+impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
+    fn causation_id(&self) -> EventId {
+        self.ctx.causation_id()
+    }
+    fn origin_id(&self) -> EventId {
+        self.ctx.origin_id()
+    }
+    fn ts(&self) -> u128 {
+        self.ctx.ts()
+    }
+    fn id(&self) -> EventId {
+        self.ctx.id()
+    }
+    fn aggregate_id(&self) -> AggregateId {
+        self.ctx.aggregate_id()
+    }
+}
+
+impl EventContextSeq for EnclaveEvent<Sequenced> {
+    fn seq(&self) -> u64 {
+        self.ctx.seq()
     }
 }
 
 impl EnclaveEvent<Sequenced> {
-    pub fn get_seq(&self) -> u64 {
-        self.seq
+    pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
+        let ts = self.ts();
+        let data = self.clone().into_data();
+        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts)
     }
 
-    pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
-        let ts = self.get_ts();
-        let data = self.clone().into_data();
-        EnclaveEvent::new_with_timestamp(data, ts)
+    pub fn to_typed_event<T>(&self, data: T) -> TypedEvent<T> {
+        let ctx: EventContext<Sequenced> = self.get_ctx().clone();
+        TypedEvent::new(data, ctx)
     }
 }
 
 impl EnclaveEvent<Unsequenced> {
     pub fn into_sequenced(self, seq: u64) -> EnclaveEvent<Sequenced> {
         EnclaveEvent::<Sequenced> {
-            id: self.id,
             payload: self.payload,
-            ts: self.ts,
-            seq,
+            ctx: self.ctx.sequence(seq),
         }
     }
 }
@@ -293,12 +335,12 @@ impl EnclaveEvent<Unsequenced> {
 impl EnclaveEvent<Sequenced> {
     /// test-helpers only utility function to create a new unsequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, time).into_sequenced(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time).into_sequenced(seq)
     }
 
     /// test-helpers only utility function to remove time information from an event
     pub fn strip_ts(&self) -> EnclaveEvent {
-        EnclaveEvent::new_stored_event(self.get_data().clone(), 0, self.get_seq())
+        EnclaveEvent::new_stored_event(self.get_data().clone(), 0, self.seq())
     }
 }
 
@@ -306,12 +348,12 @@ impl<S: SeqState> Event for EnclaveEvent<S> {
     type Id = EventId;
     type Data = EnclaveEventData;
 
-    fn event_type(&self) -> String {
-        self.payload.event_type()
+    fn event_id(&self) -> Self::Id {
+        self.ctx.id()
     }
 
-    fn event_id(&self) -> Self::Id {
-        self.get_id()
+    fn event_type(&self) -> String {
+        self.payload.event_type()
     }
 
     fn get_data(&self) -> &EnclaveEventData {
@@ -331,33 +373,38 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         err_type: Self::ErrType,
         msg: impl Into<Self::FromError>,
         ts: u128,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> anyhow::Result<Self> {
         let payload = EnclaveError::new(err_type, msg);
         let id = EventId::hash(&payload);
+        let aggregate_id = AggregateId::new(0); // Error events use default aggregate_id
+
+        let ctx = caused_by
+            .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
+            .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id));
+
         Ok(EnclaveEvent {
             payload: payload.into(),
-            id,
-            seq: (),
-            ts,
+            ctx,
         })
     }
 }
 
 impl<S: SeqState> From<EnclaveEvent<S>> for EventId {
     fn from(value: EnclaveEvent<S>) -> Self {
-        value.id
+        value.ctx.id()
     }
 }
 
 impl<S: SeqState> From<&EnclaveEvent<S>> for EventId {
     fn from(value: &EnclaveEvent<S>) -> Self {
-        value.id.clone()
+        value.ctx.id()
     }
 }
 
-impl<S: SeqState> EnclaveEvent<S> {
+impl EnclaveEventData {
     pub fn get_e3_id(&self) -> Option<E3id> {
-        match self.payload {
+        match self {
             EnclaveEventData::KeyshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Requested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PublicKeyAggregated(ref data) => Some(data.e3_id.clone()),
@@ -377,6 +424,29 @@ impl<S: SeqState> EnclaveEvent<S> {
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
+    }
+}
+
+impl WithAggregateId for EnclaveEventData {
+    fn get_aggregate_id(&self) -> AggregateId {
+        let maybe_e3_id = self.get_e3_id();
+        if let Some(e3_id) = maybe_e3_id {
+            AggregateId::new(e3_id.chain_id() as usize)
+        } else {
+            AggregateId::new(0)
+        }
+    }
+}
+
+impl<S: SeqState> EnclaveEvent<S> {
+    pub fn get_e3_id(&self) -> Option<E3id> {
+        self.payload.get_e3_id()
+    }
+}
+
+impl<S: SeqState> WithAggregateId for EnclaveEvent<S> {
+    fn get_aggregate_id(&self) -> AggregateId {
+        self.payload.get_aggregate_id()
     }
 }
 
@@ -412,7 +482,13 @@ impl_event_types!(
     ThresholdShareCollectionFailed,
     ComputeRequest,
     ComputeResponse,
-    ComputeRequestError
+    ComputeRequestError,
+    OutgoingSyncRequested,
+    NetSyncEventsReceived,
+    EvmSyncEventsReceived,
+    SyncStart,
+    SyncEffect,
+    SyncEnd
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
@@ -449,14 +525,19 @@ impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
 }
 
 impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
-    fn new_with_timestamp(data: Self::Data, ts: u128) -> Self {
-        let payload = data.into();
+    fn new_with_timestamp(
+        data: Self::Data,
+        caused_by: Option<EventContext<Sequenced>>,
+        ts: u128,
+    ) -> Self {
+        let payload: EnclaveEventData = data.into();
         let id = EventId::hash(&payload);
+        let aggregate_id = payload.get_aggregate_id();
         EnclaveEvent {
-            id,
             payload,
-            seq: (),
-            ts,
+            ctx: caused_by
+                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
+                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id)),
         }
     }
 }

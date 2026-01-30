@@ -21,7 +21,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     // add cli peers to the config
     config.add_peers(peers);
 
-    let (bus, handle, peer_id) = match config.role() {
+    let node = match config.role() {
         // Launch in aggregator configuration
         NodeRole::Aggregator {
             pubkey_write_path,
@@ -44,10 +44,10 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         "LAUNCHING CIPHERNODE: ({}/{}/{})",
         config.name(),
         address,
-        peer_id
+        node.peer_id
     );
 
-    tokio::spawn(listen_for_shutdown(bus, handle)).await?;
+    tokio::spawn(listen_for_shutdown(node)).await?;
 
     Ok(())
 }

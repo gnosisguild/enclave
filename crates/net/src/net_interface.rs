@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use e3_events::CorrelationId;
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
-    identify::{self, Behaviour as IdentifyBehaviour},
+    identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
     identity::Keypair,
     kad::{
         self,
@@ -19,15 +19,21 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
+    request_response::{
+        self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
+        Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
+    },
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
+use rand::prelude::IteratorRandom;
 use std::sync::atomic::AtomicBool;
 use std::{
     collections::HashMap,
     sync::{atomic::Ordering, Arc},
     time::Instant,
 };
+
 use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
@@ -36,7 +42,10 @@ const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
-use crate::events::{GossipData, NetCommand};
+use crate::events::{
+    GossipData, NetCommand, OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue,
+    SyncResponseValue,
+};
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
 
@@ -46,6 +55,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
+    sync: CborRequestResponse<SyncRequestValue, SyncResponseValue>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -167,8 +177,8 @@ fn create_behaviour(
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
-    let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/enclave/0.0.1".into(), key.public())
+    let identify = IdentifyBehaviour::new(
+        IdentifyConfig::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -183,7 +193,13 @@ fn create_behaviour(
         gossipsub::MessageAuthenticity::Signed(key.clone()),
         gossipsub_config,
     )?;
-
+    let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
+        [(
+            StreamProtocol::new("/enclave/sync/0.0.1"),
+            ProtocolSupport::Full,
+        )],
+        request_response::Config::default(),
+    );
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
     config
         .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
@@ -203,7 +219,8 @@ fn create_behaviour(
         gossipsub,
         kademlia,
         connection_limits,
-        identify: identify_config,
+        identify,
+        sync,
     })
 }
 
@@ -349,9 +366,11 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
+
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
         }
+
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
             topic,
@@ -360,6 +379,34 @@ async fn process_swarm_event(
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            message:
+                RequestResponseMessage::Request {
+                    request,
+                    channel,
+                    request_id,
+                },
+            ..
+        })) => {
+            // received a request for events
+            event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
+                request_id,
+                channel: OnceTake::new(channel),
+                value: request,
+            }))?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            message: RequestResponseMessage::Response { response, .. },
+            ..
+        })) => {
+            // received a response to a request for events
+            event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
+                OutgoingSyncRequestSucceeded { value: response },
+            ))?;
+        }
+
         unknown => {
             trace!("Unknown event: {:?}", unknown);
         }
@@ -405,6 +452,8 @@ async fn process_swarm_command(
             key,
         } => handle_get_record(swarm, correlator, correlation_id, key),
         NetCommand::Shutdown => handle_shutdown(swarm, shutdown_flag),
+        NetCommand::OutgoingSyncRequest { value } => handle_outgoing_sync_request(swarm, value),
+        NetCommand::SyncResponse { value, channel } => handle_sync_response(swarm, channel, value),
     }
 }
 
@@ -527,6 +576,47 @@ fn handle_shutdown(
     }
 
     info!("Graceful shutdown complete");
+    Ok(())
+}
+
+fn handle_outgoing_sync_request(
+    swarm: &mut Swarm<NodeBehaviour>,
+    value: SyncRequestValue,
+) -> Result<()> {
+    // TODO:
+    // This is a first pass.
+    // Lots of stuff to work through here:
+    // How can I know events are correct?
+    // How can I trust this peer?
+    // Can I validate events with another peer?
+    // Should I use an OrderedSet with a hash and request the hash from a second peer?
+
+    // Pick a random peer
+    let Some(peer) = swarm
+        .connected_peers()
+        .choose(&mut rand::thread_rng())
+        .copied()
+    else {
+        bail!("No peer found on swarm!")
+    };
+
+    // Request events
+    swarm.behaviour_mut().sync.send_request(&peer, value);
+    Ok(())
+}
+
+fn handle_sync_response(
+    swarm: &mut Swarm<NodeBehaviour>,
+    channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+    value: SyncResponseValue,
+) -> Result<()> {
+    let channel = channel.try_take()?;
+    match swarm.behaviour_mut().sync.send_response(channel, value) {
+        Ok(_) => (),
+        Err(_res) => {
+            // TODO: report failure
+        }
+    }
     Ok(())
 }
 

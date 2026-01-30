@@ -29,6 +29,7 @@ members = [
   "crates/sdk",
   "crates/sortition",
   "crates/support-scripts",
+  "crates/sync",
   "crates/test-helpers",
   "crates/tests",
   "crates/trbfv",
@@ -51,6 +52,8 @@ exclude = [
 ]
 resolver = "3"
 msrv = "1.86.0"
+
+[workspace.metadata.release]
 shared-version = true
 pre-release-commit-message = "chore: Release {{crate_name}} v{{version}}"
 pre-release-replacements = [
@@ -98,6 +101,7 @@ e3-sortition = { version = "0.1.7", path = "./crates/sortition" }
 e3-program-server = { version = "0.1.7", path = "./crates/program-server" }
 e3-polynomial = { version = "0.1.7", path = "./crates/polynomial" }
 e3-support-scripts = { version = "0.1.7", path = "./crates/support-scripts" }
+e3-sync = { version = "0.1.7", path = "./crates/sync" }
 e3-test-helpers = { version = "0.1.7", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.7", path = "./crates/tests" }
 e3-trbfv = { version = "0.1.7", path = "./crates/trbfv" }
@@ -195,6 +199,8 @@ libp2p = { version = "=0.54.1", features = [
   "ping",
   "quic",
   "tokio",
+  "request-response",
+  "cbor"
 ]}
 zeroize = "=1.8.1"
 

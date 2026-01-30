@@ -7,21 +7,47 @@
 use crate::IntoKey;
 use actix::Message;
 use anyhow::Result;
+use e3_events::{EventContext, Sequenced};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "()")]
-pub struct Insert(pub Vec<u8>, pub Vec<u8>);
+pub struct Insert {
+    key: Vec<u8>,
+    value: Vec<u8>,
+    ctx: Option<EventContext<Sequenced>>,
+}
+
 impl Insert {
     pub fn new<K: IntoKey>(key: K, value: Vec<u8>) -> Self {
-        Self(key.into_key(), value)
+        Self {
+            key: key.into_key(),
+            value,
+            ctx: None,
+        }
+    }
+
+    pub fn new_with_context<K: IntoKey>(
+        key: K,
+        value: Vec<u8>,
+        ctx: EventContext<Sequenced>,
+    ) -> Self {
+        Self {
+            key: key.into_key(),
+            value,
+            ctx: Some(ctx),
+        }
     }
 
     pub fn key(&self) -> &Vec<u8> {
-        &self.0
+        &self.key
     }
 
     pub fn value(&self) -> &Vec<u8> {
-        &self.1
+        &self.value
+    }
+
+    pub fn ctx(&self) -> Option<&EventContext<Sequenced>> {
+        self.ctx.as_ref()
     }
 }
 

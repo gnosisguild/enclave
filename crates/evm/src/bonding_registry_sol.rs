@@ -4,20 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{
-    event_reader::EvmEventReaderState, helpers::EthProvider, EnclaveEvmEvent, EvmEventReader,
-};
-use actix::{Addr, Recipient};
+use crate::{events::EvmEventProcessor, evm_parser::EvmParser};
+use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
-    providers::Provider,
     sol,
     sol_types::SolEvent,
 };
-use anyhow::Result;
-use e3_data::Repository;
-use e3_events::{BusHandle, EnclaveEventData};
-use tracing::{error, info, trace};
+use e3_events::EnclaveEventData;
+use tracing::{error, trace};
 
 sol!(
     #[sol(rpc)]
@@ -141,64 +136,8 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 
 /// Connects to BondingRegistry.sol converting EVM events to EnclaveEvents
 pub struct BondingRegistrySolReader;
-
 impl BondingRegistrySolReader {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
-    where
-        P: Provider + Clone + 'static,
-    {
-        let addr = EvmEventReader::attach(
-            provider,
-            extractor,
-            contract_address,
-            start_block,
-            processor,
-            bus,
-            repository,
-            rpc_url,
-        )
-        .await?;
-
-        info!(address=%contract_address, "BondingRegistrySolReader is listening to address");
-
-        Ok(addr)
-    }
-}
-
-/// Wrapper for a reader
-pub struct BondingRegistrySol;
-
-impl BondingRegistrySol {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<()>
-    where
-        P: Provider + Clone + 'static,
-    {
-        BondingRegistrySolReader::attach(
-            processor,
-            bus,
-            provider,
-            contract_address,
-            repository,
-            start_block,
-            rpc_url,
-        )
-        .await?;
-        Ok(())
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }

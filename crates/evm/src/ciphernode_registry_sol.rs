@@ -5,9 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    event_reader::EvmEventReaderState,
+    events::{EnclaveEvmEvent, EvmEventProcessor},
+    evm_parser::EvmParser,
     helpers::{send_tx_with_retry, EthProvider},
-    EnclaveEvmEvent, EvmEventReader,
 };
 use actix::prelude::*;
 use alloy::{
@@ -18,12 +18,12 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use e3_data::Repository;
 use e3_events::{
     prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
     EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, PublicKeyAggregated,
     Seed, Shutdown, TicketGenerated, TicketId,
 };
+use e3_utils::NotifySync;
 use tracing::{error, info, trace};
 
 sol!(
@@ -218,33 +218,8 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
-    where
-        P: Provider + Clone + 'static,
-    {
-        let addr = EvmEventReader::attach(
-            provider,
-            extractor,
-            contract_address,
-            start_block,
-            processor,
-            bus,
-            repository,
-            rpc_url,
-        )
-        .await?;
-
-        info!(address=%contract_address, "CiphernodeRegistrySolReader is listening to address");
-
-        Ok(addr)
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }
 
@@ -271,10 +246,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
     pub async fn attach(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
-        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address.parse()?)
+        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address)
             .await?
             .start();
 
@@ -330,7 +305,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
@@ -555,35 +530,14 @@ pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone 
 pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<()>
-    where
-        P: Provider + Clone + 'static,
-    {
-        CiphernodeRegistrySolReader::attach(
-            processor,
-            bus,
-            provider,
-            contract_address,
-            repository,
-            start_block,
-            rpc_url,
-        )
-        .await?;
-        Ok(())
+    pub fn attach(processor: &Recipient<EnclaveEvmEvent>) -> Addr<EvmParser> {
+        CiphernodeRegistrySolReader::setup(processor)
     }
 
     pub async fn attach_writer<P>(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
         is_aggregator: bool,
     ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>
     where
