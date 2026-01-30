@@ -123,12 +123,13 @@ pub fn write_artifacts(
 mod tests {
     use super::*;
     use crate::sample;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvParamSet;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = DEFAULT_BFV_PRESET;
         let params = BfvParamSet::from(preset).build_arc();
         let sample = sample::generate_sample(&params);
         let artifacts = codegen(preset, sample.public_key).unwrap();

@@ -14,12 +14,13 @@ use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
+use e3_config::bfv_config::DEFAULT_BFV_PRESET;
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
     EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
-use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_fhe_params::BfvParamSet;
 use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
@@ -91,7 +92,7 @@ pub fn get_common_setup(
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let param_set = param_set.unwrap_or(BfvPreset::InsecureThreshold512.into());
+    let param_set = param_set.unwrap_or(DEFAULT_BFV_PRESET.into());
     let degree = param_set.degree;
     let plaintext_modulus = param_set.plaintext_modulus;
     let moduli = param_set.moduli;

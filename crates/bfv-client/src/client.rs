@@ -209,7 +209,8 @@ pub fn compute_ct_commitment(
 
 #[cfg(test)]
 mod tests {
-    use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet, BfvPreset};
+    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet};
 
     use super::*;
 
@@ -218,7 +219,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -242,7 +243,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -273,7 +274,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -303,7 +304,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;

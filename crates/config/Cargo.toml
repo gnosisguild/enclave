@@ -11,6 +11,7 @@ alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
 e3-events = { workspace = true }
+e3-fhe-params = { workspace = true }
 figment = { workspace = true }
 path-clean = { workspace = true }
 petname = { workspace = true }

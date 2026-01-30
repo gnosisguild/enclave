@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+use e3_fhe_params::BfvParamSet;
 
 // This could eventually be set here with an environment var once we allow for dynamic circuit selection.
 pub fn get_default_paramset() -> BfvParamSet {
     // NOTE: parameters are insecure. These parameters are mainly for testing and demonstration
-    BfvPreset::InsecureThreshold512.into()
+    DEFAULT_BFV_PRESET.into()
 }

@@ -283,8 +283,8 @@ impl ZKInputsGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
     use e3_fhe_params::constants::insecure_512;
-    use e3_fhe_params::BfvPreset;
 
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
@@ -315,8 +315,7 @@ mod tests {
 
     #[test]
     fn test_inputs_generation_with_custom_params() {
-        let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
+        let generator = ZKInputsGenerator::from_set(BfvParamSet::from(DEFAULT_BFV_PRESET));
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -360,8 +359,7 @@ mod tests {
 
     #[test]
     fn test_get_bfv_params() {
-        let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
+        let generator = ZKInputsGenerator::from_set(BfvParamSet::from(DEFAULT_BFV_PRESET));
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == insecure_512::DEGREE);

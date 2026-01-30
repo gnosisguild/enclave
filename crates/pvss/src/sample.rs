@@ -21,11 +21,12 @@ pub fn generate_sample(params: &Arc<BfvParameters>) -> Sample {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvParamSet;
 
     #[test]
     fn test_generate_sample() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThreshold512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
         let sample = generate_sample(&params);
 
         assert_eq!(sample.public_key.c.c.len(), 2);
