@@ -127,6 +127,13 @@ impl Polynomial {
         Self { coefficients }
     }
 
+    /// Creates a new polynomial from a vector of u64 coefficients.
+    pub fn from_u64_vector(coefficients: Vec<u64>) -> Self {
+        let coefficients = coefficients.iter().map(|&c| BigInt::from(c)).collect();
+
+        Self { coefficients }
+    }
+
     /// Creates a polynomial from coefficients in ascending order format.
     ///
     /// This method converts from ascending order coefficient ordering (lowest degree first)
@@ -153,6 +160,14 @@ impl Polynomial {
         let mut coefficients = self.coefficients.clone();
         coefficients.reverse();
         coefficients
+    }
+
+    /// Reverses the coefficient order in-place.
+    ///
+    /// Converts between descending order (highest degree first) and ascending order
+    /// (lowest degree first). Calling `reverse()` twice restores the original order.
+    pub fn reverse(&mut self) {
+        self.coefficients.reverse()
     }
 
     /// Creates a zero polynomial of specified degree.
@@ -459,14 +474,12 @@ impl Polynomial {
     /// # Returns
     ///
     /// A new polynomial with coefficients reduced and centered.            
-    pub fn reduce_and_center(&self, modulus: &BigInt) -> Self {
+    pub fn reduce_and_center(&mut self, modulus: &BigInt) {
         let half_modulus = modulus / 2;
-        let reduced_coeffs = self
-            .coefficients
-            .iter()
-            .map(|x| reduce_and_center(x, modulus, &half_modulus))
-            .collect();
-        Polynomial::new(reduced_coeffs)
+
+        self.coefficients
+            .iter_mut()
+            .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
     }
 
     /// Evaluates the polynomial at a given point using Horner's method.
