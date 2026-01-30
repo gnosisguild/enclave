@@ -6,7 +6,7 @@
 
 //! Polynomial arithmetic implementation.
 
-use crate::utils::reduce_and_center;
+use crate::utils::{reduce, reduce_and_center};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use std::fmt;
@@ -480,6 +480,13 @@ impl Polynomial {
         self.coefficients
             .iter_mut()
             .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
+    }
+
+    /// Reduces coefficients modulo a modulus (in range [0, modulus)).
+    pub fn reduce(&mut self, modulus: &BigInt) {
+        self.coefficients
+            .iter_mut()
+            .for_each(|x| *x = reduce(x, modulus));
     }
 
     /// Evaluates the polynomial at a given point using Horner's method.
