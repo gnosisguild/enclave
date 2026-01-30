@@ -18,7 +18,6 @@ use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
 use rand::thread_rng;
-use std::sync::Arc;
 
 /// Encrypt some data using BFV homomorphic encryption
 ///
