@@ -4,7 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod default;
-pub mod committee;
-pub mod insecure;
-pub mod secure;
+pub mod small;

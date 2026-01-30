@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "pk_trbfv",
+    "pk_agg_trbfv",
+    "greco",
+    "dec_share_trbfv",
+    "dec_shares_agg_trbfv"   
+]
