@@ -242,6 +242,19 @@ impl BfvPreset {
         Self::PAIR_PRESETS.contains(self)
     }
 
+    /// Returns the DKG preset that pairs with this threshold preset.
+    ///
+    /// Used when you have a threshold preset (e.g. for encryption/decryption) and need
+    /// the corresponding DKG parameters (e.g. for share encryption during key generation).
+    /// Returns `None` when called on a DKG preset.
+    pub fn dkg_counterpart(self) -> Option<BfvPreset> {
+        match self {
+            BfvPreset::InsecureThreshold512 => Some(BfvPreset::InsecureDkg512),
+            BfvPreset::SecureThreshold8192 => Some(BfvPreset::SecureDkg8192),
+            BfvPreset::InsecureDkg512 | BfvPreset::SecureDkg8192 => None,
+        }
+    }
+
     pub fn metadata(&self) -> PresetMetadata {
         match self {
             BfvPreset::InsecureThreshold512 => PresetMetadata {
