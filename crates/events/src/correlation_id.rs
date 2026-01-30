@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use std::{
+    fmt,
+    fmt::Debug,
     fmt::Display,
+    fmt::Formatter,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -14,7 +17,7 @@ use serde::{Deserialize, Serialize};
 static NEXT_CORRELATION_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// CorrelationId provides a way to correlate commands and the events they create.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CorrelationId {
     id: usize,
 }
@@ -28,6 +31,12 @@ impl CorrelationId {
 
 impl Display for CorrelationId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
+impl Debug for CorrelationId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.id)
     }
 }

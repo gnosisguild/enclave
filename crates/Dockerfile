@@ -74,6 +74,7 @@ COPY crates/safe/Cargo.toml ./safe/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
+COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml

@@ -12,55 +12,59 @@ use derivative::Derivative;
 use tracing::error;
 
 use crate::{
+    event_context::EventContext,
     hlc::Hlc,
     sequencer::Sequencer,
     traits::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
         EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventType, HistoryCollector,
-    Sequenced, Subscribe, Unsequenced,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventType,
+    HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
 #[derive(Clone, Derivative)]
 #[derivative(Debug, PartialEq, Eq)]
 pub struct BusHandle {
     /// EventBus that actors can consume sequenced events from
-    consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
+    event_bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     /// Sequencer that new events should be produced from
-    producer: Addr<Sequencer>,
+    sequencer: Addr<Sequencer>,
     /// Hlc clock used to time all events created on this BusHandle
     #[derivative(Debug = "ignore")]
     hlc: Arc<Hlc>,
+    /// Temporary context for events the bus publishes
+    ctx: Option<EventContext<Sequenced>>,
 }
 
 impl BusHandle {
     /// Create a new BusHandle
     pub fn new(
-        consumer: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-        producer: Addr<Sequencer>,
+        event_bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
+        sequencer: Addr<Sequencer>,
         hlc: Hlc,
     ) -> Self {
         Self {
-            consumer,
-            producer,
+            event_bus,
+            sequencer,
             hlc: Arc::new(hlc),
+            ctx: None,
         }
     }
 
     /// Return a HistoryCollector for examining events that have passed through on the events bus
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
-        EventBus::<EnclaveEvent<Sequenced>>::history(&self.consumer)
+        EventBus::<EnclaveEvent<Sequenced>>::history(&self.event_bus)
     }
 
-    /// Access the producer to internally dispatch am event to
-    pub fn producer(&self) -> &Addr<Sequencer> {
-        &self.producer
+    /// Access the sequencer to internally dispatch am event to
+    pub fn sequencer(&self) -> &Addr<Sequencer> {
+        &self.sequencer
     }
 
-    /// Access the consumer to internally subscribe to events
-    pub fn consumer(&self) -> &Addr<EventBus<EnclaveEvent<Sequenced>>> {
-        &self.consumer
+    /// Access the event_bus to internally subscribe to events
+    pub fn event_bus(&self) -> &Addr<EventBus<EnclaveEvent<Sequenced>>> {
+        &self.event_bus
     }
 
     /// Get a new timestamp. Note this ticks over the internal Hlc.
@@ -81,36 +85,41 @@ impl BusHandle {
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
-        let evt = self.event_from(data)?;
-        self.producer.do_send(evt);
+        let evt = self.event_from(data, self.get_ctx())?;
+        self.sequencer.do_send(evt);
         Ok(())
     }
 
     fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
-        let evt = self.event_from_remote_source(data, ts)?;
-        self.producer.do_send(evt);
+        let evt = self.event_from_remote_source(data, self.get_ctx(), ts)?;
+        self.sequencer.do_send(evt);
         Ok(())
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
-        self.producer.do_send(event);
+        self.sequencer.do_send(event);
     }
 }
 
 impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
-        match self.event_from_error(err_type, error) {
-            Ok(evt) => self.producer.do_send(evt),
+        match self.event_from_error(err_type, error, self.get_ctx()) {
+            Ok(evt) => self.sequencer.do_send(evt),
             Err(e) => error!("{e}"),
         }
     }
 }
 
 impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
-    fn event_from(&self, data: impl Into<EnclaveEventData>) -> Result<EnclaveEvent<Unsequenced>> {
+    fn event_from(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        caused_by: Option<EventContext<Sequenced>>,
+    ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
+            caused_by,
             ts.into(),
         ))
     }
@@ -118,11 +127,13 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     fn event_from_remote_source(
         &self,
         data: impl Into<EnclaveEventData>,
+        caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
+            caused_by,
             ts.into(),
         ))
     }
@@ -133,15 +144,17 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         err_type: EType,
         error: impl Into<anyhow::Error>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.tick()?;
-        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into())
+        EnclaveEvent::<Unsequenced>::from_error(err_type, error, ts.into(), caused_by)
     }
 }
 
 impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
     fn subscribe(&self, event_type: EventType, recipient: Recipient<EnclaveEvent<Sequenced>>) {
-        self.consumer.do_send(Subscribe::new(event_type, recipient))
+        self.event_bus
+            .do_send(Subscribe::new(event_type, recipient))
     }
 
     fn subscribe_all(
@@ -150,9 +163,23 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
         recipient: Recipient<EnclaveEvent<Sequenced>>,
     ) {
         for event_type in event_types.into_iter() {
-            self.consumer
+            self.event_bus
                 .do_send(Subscribe::new(*event_type, recipient.clone()));
         }
+    }
+
+    fn unsubscribe(&self, event_type: &str, recipient: Recipient<EnclaveEvent<Sequenced>>) {
+        self.event_bus
+            .do_send(Unsubscribe::new(event_type, recipient));
+    }
+}
+
+impl EventContextManager for BusHandle {
+    fn set_ctx(&mut self, value: &EventContext<Sequenced>) {
+        self.ctx = Some(value.clone());
+    }
+    fn get_ctx(&self) -> Option<EventContext<Sequenced>> {
+        self.ctx.clone()
     }
 }
 
@@ -192,7 +219,7 @@ mod tests {
         impl Handler<EnclaveEvent> for Forwarder {
             type Result = ();
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-                let ts = msg.get_ts();
+                let ts = msg.ts();
                 self.dest.publish_from_remote(msg.into_data(), ts).unwrap()
             }
         }
@@ -263,7 +290,7 @@ mod tests {
 
         // Sort by HLC timestamp
         let mut sorted_events = events.clone();
-        sorted_events.sort_by_key(|e| e.get_ts());
+        sorted_events.sort_by_key(|e| e.ts());
 
         // Extract the payloads/names in HLC-sorted order
         let ordered_names: Vec<_> = sorted_events
@@ -282,7 +309,7 @@ mod tests {
         );
 
         // ASSERTION 2: All timestamps are unique (HLC guarantee)
-        let timestamps: Vec<_> = sorted_events.iter().map(|e| e.get_ts()).collect();
+        let timestamps: Vec<_> = sorted_events.iter().map(|e| e.ts()).collect();
         let unique_timestamps: std::collections::HashSet<_> = timestamps.iter().collect();
         assert_eq!(
             timestamps.len(),

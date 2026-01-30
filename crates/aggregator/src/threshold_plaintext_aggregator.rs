@@ -20,6 +20,7 @@ use e3_trbfv::{
     TrBFVResponse,
 };
 use e3_utils::utility_types::ArcBytes;
+use e3_utils::NotifySync;
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -263,8 +264,8 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
-            EnclaveEventData::E3RequestComplete(_) => ctx.notify(Die),
-            EnclaveEventData::ComputeResponse(data) => ctx.notify(data),
+            EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
@@ -318,12 +319,15 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                         ..
                     })) = act.state.get()
                     {
-                        ctx.notify(ComputeAggregate {
-                            shares: shares.clone(),
-                            ciphertext_output: ciphertext_output.clone(),
-                            threshold_m,
-                            threshold_n,
-                        })
+                        act.notify_sync(
+                            ctx,
+                            ComputeAggregate {
+                                shares: shares.clone(),
+                                ciphertext_output: ciphertext_output.clone(),
+                                threshold_m,
+                                threshold_n,
+                            },
+                        )
                     }
 
                     Ok(())

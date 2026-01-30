@@ -6,20 +6,27 @@
 
 use actix::{Message, Recipient};
 
-use crate::{EnclaveEvent, Sequenced, Unsequenced};
+use crate::{AggregateId, CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
 
 /// Direct event received by the snapshot buffer in order to save snapshot to disk
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct CommitSnapshot(u64);
+pub struct CommitSnapshot {
+    seq: u64,
+    aggregate_id: AggregateId,
+}
 
 impl CommitSnapshot {
-    pub fn new(seq: u64) -> Self {
-        Self(seq)
+    pub fn new(seq: u64, aggregate_id: AggregateId) -> Self {
+        Self { seq, aggregate_id }
     }
 
     pub fn seq(&self) -> u64 {
-        self.0
+        self.seq
+    }
+
+    pub fn aggregate_id(&self) -> AggregateId {
+        self.aggregate_id
     }
 }
 
@@ -47,29 +54,53 @@ impl StoreEventRequested {
 #[derive(Message, Debug)]
 #[rtype("()")]
 pub struct GetEventsAfter {
-    pub ts: u128,
-    pub sender: Recipient<ReceiveEvents>,
+    correlation_id: CorrelationId,
+    ts: u128,
+    sender: Recipient<ReceiveEvents>,
 }
 
 impl GetEventsAfter {
-    pub fn new(ts: u128, sender: impl Into<Recipient<ReceiveEvents>>) -> Self {
+    pub fn new(
+        correlation_id: CorrelationId,
+        ts: u128,
+        sender: impl Into<Recipient<ReceiveEvents>>,
+    ) -> Self {
         Self {
+            correlation_id,
             ts,
             sender: sender.into(),
         }
+    }
+
+    pub fn ts(&self) -> u128 {
+        self.ts
+    }
+
+    pub fn id(&self) -> CorrelationId {
+        self.correlation_id
+    }
+
+    pub fn sender(&self) -> &Recipient<ReceiveEvents> {
+        &self.sender
     }
 }
 
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct ReceiveEvents(Vec<EnclaveEvent<Sequenced>>);
+pub struct ReceiveEvents {
+    id: CorrelationId,
+    events: Vec<EnclaveEvent<Sequenced>>,
+}
 
 impl ReceiveEvents {
-    pub fn new(events: Vec<EnclaveEvent>) -> Self {
-        Self(events)
+    pub fn new(id: CorrelationId, events: Vec<EnclaveEvent>) -> Self {
+        Self { id, events }
     }
     pub fn events(&self) -> &Vec<EnclaveEvent> {
-        &self.0
+        &self.events
+    }
+    pub fn id(&self) -> CorrelationId {
+        self.id
     }
 }
 

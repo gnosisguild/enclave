@@ -2060,6 +2060,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
+name = "cbor4ii"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "472931dd4dfcc785075b09be910147f9c6258883fc4591d0dac6116392b2daa6"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2800,7 +2809,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-aggregator"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -2823,7 +2832,7 @@ dependencies = [
 
 [[package]]
 name = "e3-bfv-client"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
@@ -2838,7 +2847,7 @@ dependencies = [
 
 [[package]]
 name = "e3-ciphernode-builder"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -2854,8 +2863,10 @@ dependencies = [
  "e3-fhe",
  "e3-keyshare",
  "e3-multithread",
+ "e3-net",
  "e3-request",
  "e3-sortition",
+ "e3-sync",
  "e3-trbfv",
  "e3-utils",
  "once_cell",
@@ -2867,7 +2878,7 @@ dependencies = [
 
 [[package]]
 name = "e3-cli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -2900,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -2919,7 +2930,7 @@ dependencies = [
 
 [[package]]
 name = "e3-config"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -2940,7 +2951,7 @@ dependencies = [
 
 [[package]]
 name = "e3-crypto"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2958,7 +2969,7 @@ dependencies = [
 
 [[package]]
 name = "e3-data"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -2976,7 +2987,7 @@ dependencies = [
 
 [[package]]
 name = "e3-entrypoint"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "actix-web",
@@ -3015,7 +3026,7 @@ dependencies = [
 
 [[package]]
 name = "e3-events"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3048,7 +3059,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3056,12 +3067,14 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
+ "bloom",
  "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",
  "e3-data",
  "e3-entrypoint",
  "e3-events",
+ "e3-evm",
  "e3-fhe-params",
  "e3-sortition",
  "e3-trbfv",
@@ -3071,13 +3084,14 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "url",
  "zeroize",
 ]
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "alloy",
  "anyhow",
@@ -3093,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -3118,7 +3132,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe-params"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -3132,7 +3146,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fs"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3145,7 +3159,7 @@ dependencies = [
 
 [[package]]
 name = "e3-greco-helpers"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "e3-fhe-params",
  "e3-zk-helpers",
@@ -3159,7 +3173,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "alloy",
  "async-trait",
@@ -3179,7 +3193,7 @@ dependencies = [
 
 [[package]]
 name = "e3-init"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3197,7 +3211,7 @@ dependencies = [
 
 [[package]]
 name = "e3-keyshare"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -3224,7 +3238,7 @@ dependencies = [
 
 [[package]]
 name = "e3-logger"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "base64",
@@ -3234,7 +3248,7 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -3253,7 +3267,7 @@ dependencies = [
 
 [[package]]
 name = "e3-net"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -3270,6 +3284,7 @@ dependencies = [
  "futures",
  "hex",
  "libp2p",
+ "rand 0.8.5",
  "serde",
  "sha2",
  "tokio",
@@ -3280,7 +3295,7 @@ dependencies = [
 
 [[package]]
 name = "e3-parity-matrix"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3291,7 +3306,7 @@ dependencies = [
 
 [[package]]
 name = "e3-polynomial"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "bincode",
  "criterion",
@@ -3303,7 +3318,7 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -3318,7 +3333,7 @@ dependencies = [
 
 [[package]]
 name = "e3-pvss"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
@@ -3340,7 +3355,7 @@ dependencies = [
 
 [[package]]
 name = "e3-pvss-cli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -3350,7 +3365,7 @@ dependencies = [
 
 [[package]]
 name = "e3-request"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "anyhow",
@@ -3366,7 +3381,7 @@ dependencies = [
 
 [[package]]
 name = "e3-safe"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3377,7 +3392,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "e3-bfv-client",
  "e3-evm-helpers",
@@ -3387,7 +3402,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sortition"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3408,7 +3423,7 @@ dependencies = [
 
 [[package]]
 name = "e3-support-scripts"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3418,8 +3433,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-sync"
+version = "0.1.8"
+dependencies = [
+ "actix",
+ "anyhow",
+ "e3-ciphernode-builder",
+ "e3-events",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "e3-test-helpers"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3453,7 +3480,7 @@ dependencies = [
 
 [[package]]
 name = "e3-tests"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3497,7 +3524,7 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3526,7 +3553,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "actix",
  "alloy",
@@ -3541,7 +3568,7 @@ dependencies = [
 
 [[package]]
 name = "e3-wasm"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "e3-bfv-client",
  "e3-fhe-params",
@@ -3553,7 +3580,7 @@ dependencies = [
 
 [[package]]
 name = "e3-zk-helpers"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3647,7 +3674,7 @@ dependencies = [
 
 [[package]]
 name = "enclaveup"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -5150,6 +5177,7 @@ dependencies = [
  "libp2p-metrics",
  "libp2p-ping",
  "libp2p-quic",
+ "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-tcp",
  "libp2p-upnp",
@@ -5408,6 +5436,28 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "libp2p-request-response"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1356c9e376a94a75ae830c42cdaea3d4fe1290ba409a22c809033d1b7dcab0a6"
+dependencies = [
+ "async-trait",
+ "cbor4ii",
+ "futures",
+ "futures-bounded",
+ "futures-timer",
+ "libp2p-core",
+ "libp2p-identity",
+ "libp2p-swarm",
+ "rand 0.8.5",
+ "serde",
+ "smallvec",
+ "tracing",
+ "void",
+ "web-time",
 ]
 
 [[package]]

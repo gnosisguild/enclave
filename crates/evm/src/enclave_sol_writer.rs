@@ -25,6 +25,7 @@ use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_utils::NotifySync;
 use tracing::info;
 
 sol!(
@@ -56,9 +57,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub async fn attach(
         bus: &BusHandle,
         provider: EthProvider<P>,
-        contract_address: &str,
+        contract_address: Address,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
-        let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
+        let addr = EnclaveSolWriter::new(bus, provider, contract_address)?.start();
         bus.subscribe_all(
             &[EventType::PlaintextAggregated, EventType::Shutdown],
             addr.clone().into(),
@@ -82,7 +83,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }

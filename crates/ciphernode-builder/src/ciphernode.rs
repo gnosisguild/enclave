@@ -5,16 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Addr;
+use anyhow::Result;
 use e3_data::{DataStore, InMemStore, StoreAddr};
 use e3_events::{BusHandle, EnclaveEvent, HistoryCollector};
+use tokio::task::JoinHandle;
 
-#[derive(Clone, Debug)]
+/// A Sharable handle to a Ciphernode. NOTE: clones are available for use in the CiphernodeSystem
+/// but they cannot await the task.
+#[derive(Debug)]
 pub struct CiphernodeHandle {
     pub address: String,
     pub store: DataStore,
     pub bus: BusHandle,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+    pub peer_id: String,
+    pub join_handle: JoinHandle<Result<()>>,
 }
 
 impl CiphernodeHandle {
@@ -24,6 +30,8 @@ impl CiphernodeHandle {
         bus: BusHandle,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+        peer_id: String,
+        join_handle: JoinHandle<Result<()>>,
     ) -> Self {
         Self {
             address,
@@ -31,6 +39,8 @@ impl CiphernodeHandle {
             bus,
             history,
             errors,
+            peer_id,
+            join_handle,
         }
     }
 
@@ -52,6 +62,10 @@ impl CiphernodeHandle {
 
     pub fn store(&self) -> &DataStore {
         &self.store
+    }
+
+    pub fn split(self) -> (BusHandle, JoinHandle<Result<()>>) {
+        (self.bus, self.join_handle)
     }
 
     pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {

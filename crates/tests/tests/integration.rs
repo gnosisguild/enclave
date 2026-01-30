@@ -12,12 +12,14 @@ use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
-    E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
-    TicketBalanceUpdated,
+    E3Requested, E3id, EnclaveEvent, EnclaveEventData, OperatorActivationChanged,
+    PlaintextAggregated, Seed, TakeEvents, TicketBalanceUpdated,
 };
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{encode_bfv_params, BfvParamSet};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
+use e3_net::events::{GossipData, NetEvent};
+use e3_net::NetEventTranslator;
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
@@ -26,8 +28,11 @@ use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, Instant};
 use std::{fs, sync::Arc};
+use tokio::sync::{broadcast, mpsc};
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
@@ -174,7 +179,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_with_forked_bus(bus.consumer())
+                .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
                 .await
@@ -189,7 +194,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
                 .with_sortition_score()
-                .testmode_with_forked_bus(bus.consumer())
+                .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
                 .await
@@ -256,6 +261,11 @@ async fn test_trbfv_actor() -> Result<()> {
 
     println!("Emitting CommitteeFinalized with {} nodes", committee.len());
 
+    let expected = vec!["E3Requested"];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
+        .await?;
+
     bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee,
@@ -264,7 +274,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let committee_finalized_timer = Instant::now();
 
-    let expected = vec!["E3Requested", "CommitteeFinalized"];
+    let expected = vec!["CommitteeFinalized"];
     let _ = nodes
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
@@ -541,16 +551,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
 #[actix::test]
 async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
-    use e3_events::{EnclaveEvent, TakeEvents};
-    use e3_net::events::GossipData;
-    use e3_net::{events::NetEvent, NetEventTranslator};
-    use rand::SeedableRng;
-    use rand_chacha::ChaCha20Rng;
-    use std::sync::Arc;
-    use tokio::sync::broadcast;
-    use tokio::sync::mpsc;
-
-    let seed = e3_events::Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
+    let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
 
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
@@ -564,8 +565,8 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Capture messages from output on msgs vec
     let event = E3Requested {
         e3_id: E3id::new("1235", 1),
-        threshold_m: 2,
-        threshold_n: 5,
+        threshold_m: 3,
+        threshold_n: 3,
         seed: seed.clone(),
         params: ArcBytes::from_bytes(&[1, 2, 3, 4]),
         ..E3Requested::default()
@@ -573,7 +574,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
-        bus.event_from(event.clone())?.to_bytes()?,
+        bus.event_from(event.clone(), None)?.to_bytes()?,
     )));
 
     // check the history of the event bus
@@ -626,7 +627,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
             .with_trbfv()
             .with_address(addr)
-            .testmode_with_forked_bus(bus.consumer())
+            .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
             .with_pubkey_aggregation()
@@ -833,7 +834,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
             .with_trbfv()
             .with_address(addr)
-            .testmode_with_forked_bus(bus.consumer())
+            .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
             .with_pubkey_aggregation()

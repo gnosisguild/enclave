@@ -4,19 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::event_reader::EvmEventReaderState;
-use crate::helpers::EthProvider;
-use crate::{EnclaveEvmEvent, EvmEventReader};
-use actix::{Addr, Recipient};
+use crate::events::EvmEventProcessor;
+use crate::evm_parser::EvmParser;
+use actix::{Actor, Addr};
 use alloy::primitives::{LogData, B256};
-use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
-use anyhow::Result;
-use e3_data::Repository;
-use e3_events::{BusHandle, E3id, EnclaveEventData};
+use e3_events::E3id;
+use e3_events::EnclaveEventData;
 use e3_fhe_params::decode_bfv_params_arc;
 use e3_trbfv::helpers::calculate_error_size;
-use e3_utils::utility_types::ArcBytes;
+use e3_utils::ArcBytes;
 use num_bigint::BigUint;
 use tracing::{error, info, trace, warn};
 
@@ -141,32 +138,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
-    where
-        P: Provider + Clone + 'static,
-    {
-        let addr = EvmEventReader::attach(
-            provider,
-            extractor,
-            contract_address,
-            start_block,
-            processor,
-            bus,
-            repository,
-            rpc_url,
-        )
-        .await?;
-
-        info!(address=%contract_address, "EnclaveSolReader is listening to address");
-
-        Ok(addr)
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }
