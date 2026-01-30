@@ -545,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_spm_commitment_from_shares_matches_manual_payload() {
+    fn compute_share_encryption_commitment_from_shares_matches_manual_payload() {
         let y = vec![
             vec![
                 vec![BigInt::from(0), BigInt::from(11), BigInt::from(12)],
@@ -573,21 +573,55 @@ mod tests {
 
         let input_size = payload.len() as u32;
         let io_pattern = [0x80000000 | input_size, 1];
-        let expected = field_to_bigint(compute_commitments(payload, DS_SPM, io_pattern)[0]);
+        let expected =
+            field_to_bigint(compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0]);
 
-        let actual = compute_spm_commitment_from_shares(&y, party_idx, mod_idx);
+        let actual = compute_share_encryption_commitment_from_shares(&y, party_idx, mod_idx);
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn challenge_lengths_match_expected_output() {
+    fn compute_threshold_pk_challenge_returns_2l_elements() {
         let payload = vec![Field::from(1u64), Field::from(2u64)];
         let l = 3;
 
-        let pk_trbfv = compute_pk_trbfv_challenge(payload.clone(), l);
-        let bfv_enc = compute_bfv_enc_challenge(payload, l);
+        let challenges = compute_threshold_pk_challenge(payload, l);
+        assert_eq!(challenges.len(), 2 * l);
+    }
 
-        assert_eq!(pk_trbfv.len(), 2 * l);
-        assert_eq!(bfv_enc.len(), 2 * l);
+    #[test]
+    fn compute_share_encryption_challenge_returns_2l_elements() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+        let l = 3;
+
+        let challenges = compute_share_encryption_challenge(payload, l);
+        assert_eq!(challenges.len(), 2 * l);
+    }
+
+    #[test]
+    fn compute_aggregation_commitment_matches_manual_payload() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected =
+            field_to_bigint(compute_commitments(payload.clone(), DS_AGGREGATION, io_pattern)[0]);
+
+        let actual = compute_aggregation_commitment(payload);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn compute_threshold_share_decryption_challenge_returns_single_bigint() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = field_to_bigint(
+            compute_commitments(payload.clone(), DS_CLG_SHARE_DECRYPTION, io_pattern)[0],
+        );
+
+        let actual = compute_threshold_share_decryption_challenge(payload);
+        assert_eq!(actual, expected);
     }
 }
