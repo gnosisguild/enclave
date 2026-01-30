@@ -1,6 +1,9 @@
 #!/usr/bin/env tsx
 // SPDX-License-Identifier: LGPL-3.0-only
-// Push/pull circuit artifacts via git branch
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { execSync } from 'child_process'
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
@@ -55,15 +58,21 @@ async function push() {
 async function pull() {
   try {
     run(`git fetch origin ${BRANCH}`)
-  } catch {
-    console.error(`❌ Branch '${BRANCH}' not found`)
+  } catch (e: any) {
+    const isNetworkError =
+      e.message?.includes('Could not resolve host') || e.message?.includes('unable to access') || e.message?.includes('Connection refused')
+    if (isNetworkError) {
+      console.error('❌ Network error fetching branch')
+    } else {
+      console.error(`❌ Branch '${BRANCH}' not found`)
+    }
     process.exit(1)
   }
 
   if (existsSync(DIST)) rmSync(DIST, { recursive: true })
   mkdirSync(DIST, { recursive: true })
 
-  runV(`git archive origin/${BRANCH} | tar -x -C ${DIST}`)
+  runV(`git archive origin/${BRANCH} | tar -x -C "${DIST}"`)
   console.log(`✅ Pulled to ${DIST}`)
 }
 

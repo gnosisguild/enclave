@@ -1,6 +1,9 @@
 #!/usr/bin/env tsx
 // SPDX-License-Identifier: LGPL-3.0-only
-// Noir Circuit Builder for Enclave Monorepo
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { execSync } from 'child_process'
 import { createHash } from 'crypto'
