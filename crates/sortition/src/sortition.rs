@@ -8,7 +8,7 @@ use crate::backends::{SortitionBackend, SortitionList};
 use crate::CiphernodeSelector;
 use actix::prelude::*;
 use alloy::primitives::U256;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
@@ -306,10 +306,10 @@ impl Sortition {
         let map = self
             .backends
             .get()
-            .ok_or_else(|| anyhow::anyhow!("Could not get backends cache"))?;
+            .ok_or_else(|| anyhow!("Could not get backends cache"))?;
         let backend = map
             .get(&chain_id)
-            .ok_or_else(|| anyhow::anyhow!("No backend for chain_id {}", chain_id))?;
+            .ok_or_else(|| anyhow!("No backend for chain_id {}", chain_id))?;
         Ok(backend.nodes())
     }
 
@@ -333,15 +333,24 @@ impl Sortition {
             })
     }
 
-    fn get_committe(&self, e3_id: E3id) -> Vec<String> {
+    fn get_committe(&self, e3_id: &E3id) -> Vec<String> {
         self.finalized_committees
             .get()
-            .and_then(|committees| committees.get(&e3_id).cloned())
+            .and_then(|committees| committees.get(e3_id).cloned())
             .unwrap_or_else(|| Vec::new())
     }
 
     fn committee_contains(&mut self, e3_id: E3id, node: String) -> bool {
-        let committee = self.get_committe(e3_id);
+        let committee = self.get_committe(&e3_id);
+
+        if committee.len() == 0 {
+            // Non blocking error
+            self.bus.err(
+                EType::Sortition,
+                anyhow!("No finalized committee found for E3 {}", e3_id),
+            );
+        }
+
         committee.contains(&node)
     }
 }
