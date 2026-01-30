@@ -310,6 +310,55 @@ jobs:
         working-directory: packages/enclave-react
         run: npm publish --access public --tag ${{ steps.npm_tag.outputs.tag }} --provenance
 
+  download-circuits:
+    name: Download Circuit Artifacts
+    runs-on: ubuntu-latest
+    needs: validate-and-prepare
+    outputs:
+      found: ${{ steps.pull.outputs.found }}
+      source_hash: ${{ steps.pull.outputs.source_hash }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Pull circuit artifacts
+        id: pull
+        run: |
+          SOURCE_HASH=$(pnpm tsx scripts/build-circuits.ts hash)
+          echo "source_hash=$SOURCE_HASH" >> $GITHUB_OUTPUT
+
+          if git fetch origin circuit-artifacts 2>/dev/null; then
+            mkdir -p dist/circuits
+            git archive origin/circuit-artifacts | tar -x -C dist/circuits
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release archive
+        if: steps.pull.outputs.found == 'true'
+        run: |
+          cd dist
+          tar -czvf circuits-${{ needs.validate-and-prepare.outputs.version }}.tar.gz circuits/
+
+      - uses: actions/upload-artifact@v4
+        if: steps.pull.outputs.found == 'true'
+        with:
+          name: noir-circuits
+          path: |
+            dist/circuits-*.tar.gz
+            dist/circuits/SHA256SUMS
+            dist/circuits/checksums.json
+
   create-github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -321,6 +370,7 @@ jobs:
         build-binaries,
         publish-rust-crates,
         publish-npm-packages,
+        download-circuits,
       ]
     if: always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
     steps:
@@ -455,6 +505,15 @@ jobs:
           cd ..
 
           echo '```' >> release_notes.md
+
+          if [[ "${{ needs.download-circuits.outputs.found }}" == "true" ]]; then
+            cat >> release_notes.md << EOF
+
+          ## 🔮 Noir Circuits
+
+          Source hash: \`${{ needs.download-circuits.outputs.source_hash }}\`
+          EOF
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
