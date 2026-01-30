@@ -59,4 +59,7 @@ pub enum ZkError {
 
     #[error("Witness generation failed: {0}")]
     WitnessGenerationFailed(String),
+
+    #[error("checksum missing for {0}")]
+    ChecksumMissing(String),
 }
