@@ -170,8 +170,8 @@ pub fn bfv_public_key_to_greco(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
     use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
     use e3_zk_helpers::utils::calculate_bit_width;
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;

@@ -2925,6 +2925,7 @@ dependencies = [
  "anyhow",
  "dirs 5.0.1",
  "e3-events",
+ "e3-fhe-params",
  "figment",
  "path-clean",
  "petname",

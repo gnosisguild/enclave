@@ -4,11 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_config::bfv_config::DEFAULT_BFV_PRESET;
-use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::default_param_set;
 
 // This could eventually be set here with an environment var once we allow for dynamic circuit selection.
-pub fn get_default_paramset() -> BfvParamSet {
+pub fn get_default_paramset() -> e3_fhe_params::BfvParamSet {
     // NOTE: parameters are insecure. These parameters are mainly for testing and demonstration
-    DEFAULT_BFV_PRESET.into()
+    default_param_set()
 }

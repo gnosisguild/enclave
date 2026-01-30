@@ -172,8 +172,8 @@ mod tests {
     use crate::sample::generate_sample;
     use crate::traits::ConvertToJson;
     use crate::traits::ReduceToZkpModulus;
-    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
     use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {

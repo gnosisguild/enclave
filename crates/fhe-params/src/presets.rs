@@ -57,6 +57,21 @@ pub enum BfvPreset {
     SecureDkg8192,
 }
 
+/// Default BFV preset used across the workspace.
+///
+/// This is the canonical preset for production (secure threshold 8192).
+/// Use this constant when you need a single default rather than
+/// hardcoding a specific preset. For the corresponding parameter set,
+/// use [`default_param_set()`] or `BfvParamSet::from(DEFAULT_BFV_PRESET)`.
+pub const DEFAULT_BFV_PRESET: BfvPreset = BfvPreset::InsecureThreshold512;
+
+/// Returns the default BFV parameter set (same as `DEFAULT_BFV_PRESET` converted to [`BfvParamSet`]).
+///
+/// Convenience for crates that need a [`BfvParamSet`] without depending on config.
+pub fn default_param_set() -> BfvParamSet {
+    DEFAULT_BFV_PRESET.into()
+}
+
 /// Parameter type for BFV presets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ParameterType {

@@ -9,13 +9,13 @@ use alloy::primitives::{FixedBytes, I256, U256};
 use anyhow::{bail, Result};
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
-use e3_config::bfv_config::DEFAULT_BFV_PRESET;
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
     E3Requested, E3id, EnclaveEventData, OperatorActivationChanged, PlaintextAggregated,
     TicketBalanceUpdated,
 };
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{encode_bfv_params, BfvParamSet};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;

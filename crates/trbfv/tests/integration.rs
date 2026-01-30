@@ -10,9 +10,9 @@ use std::{
 
 use anyhow::Result;
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_config::bfv_config::DEFAULT_BFV_PRESET;
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
 use e3_trbfv::{

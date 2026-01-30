@@ -9,4 +9,3 @@ repository.workspace = true
 [dependencies]
 e3-sdk = { workspace = true, default-features = false, features=["bfv"] }
 e3-fhe-params = { workspace = true }
-e3-config = { workspace = true }

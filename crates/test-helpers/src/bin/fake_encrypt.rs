@@ -6,7 +6,7 @@
 
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_bfv_params_from_set_arc, decode_bfv_params_arc};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};

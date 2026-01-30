@@ -21,8 +21,8 @@ pub fn generate_sample(params: &Arc<BfvParameters>) -> Sample {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
     use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_generate_sample() {

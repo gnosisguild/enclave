@@ -26,7 +26,7 @@ pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use e3_config::bfv_config::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
     use e3_fhe_params::{build_bfv_params_arc, encode_bfv_params, BfvParamSet};
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;

@@ -6,9 +6,9 @@
 
 use crate::shares::ShamirShare;
 use anyhow::Result;
-use e3_config::bfv_config::DEFAULT_BFV_PRESET;
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use fhe::mbfv::PublicKeyShare;
 use fhe::{
     bfv::{self, BfvParameters, SecretKey},
