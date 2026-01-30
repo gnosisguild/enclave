@@ -13,8 +13,8 @@ use e3_events::{
     ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
     E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
     EncryptionKeyCollectionFailed, EncryptionKeyCreated, KeyshareCreated, PartyId,
-    PkBfvProofRequest, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ZkRequest, ZkResponse,TypedEvent
+    PkBfvProofRequest, PkBfvProofResponse, ThresholdShare, ThresholdShareCollectionFailed,
+    ThresholdShareCreated, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_fhe::create_crp;
 use e3_trbfv::{
@@ -507,49 +507,32 @@ impl ThresholdKeyshare {
         } else {
             info!("ZK backend not configured, skipping T0 proof generation");
 
-        let state = self.state.try_get()?;
-        let e3_id = state.e3_id.clone();
-
-        if self.zk_backend.is_some() {
-            let correlation_id = CorrelationId::new();
-            let params_bytes = state.params.clone();
-
-            // Transition to GeneratingPkBfvProof state
             self.state.try_mutate(|s| {
-                s.new_state(KeyshareState::GeneratingPkBfvProof(
-                    GeneratingPkBfvProofData {
-                        sk_bfv: sk_bfv_encrypted,
+                s.new_state(KeyshareState::CollectingEncryptionKeys(
+                    CollectingEncryptionKeysData {
+                        sk_bfv: sk_bfv_encrypted.clone(),
                         pk_bfv: pk_bfv_bytes.clone(),
-                        ciphernode_selected: msg,
-                        correlation_id: correlation_id.clone(),
+                        ciphernode_selected: msg.into_inner(),
                     },
                 ))
             })?;
 
-            let proof_request = ComputeRequest::zk(
-                ZkRequest::PkBfv(PkBfvProofRequest::new(pk_bfv_bytes, params_bytes)),
-                correlation_id,
-                e3_id,
-            );
+            self.bus.publish(EncryptionKeyCreated {
+                e3_id: state.e3_id.clone(),
+                key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
+                external: false,
+            })?;
+        }
 
-            info!("Requesting T0 proof generation");
-            self.bus.publish(proof_request)?;
-        } else {
-            info!("ZK backend not configured, skipping T0 proof generation");
+        Ok(())
+    }
 
-        self.state.try_mutate(|s| {
-            s.new_state(KeyshareState::CollectingEncryptionKeys(
-                CollectingEncryptionKeysData {
-                    sk_bfv: sk_bfv_encrypted.clone(),
-                    pk_bfv: pk_bfv_bytes.clone(),
-                    ciphernode_selected: msg.clone(),
-                },
-            ))
-        })?;
-
+    /// 1b. PkBfv proof response - T0 proof received, transition to CollectingEncryptionKeys
+    pub fn handle_pk_bfv_proof_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+        let proof_response: PkBfvProofResponse = msg.into_inner().try_into()?;
+        let current: GeneratingPkBfvProofData = self.state.try_get()?.try_into()?;
         let state = self.state.try_get()?;
 
-        // Transition to CollectingEncryptionKeys state
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::CollectingEncryptionKeys(
                 CollectingEncryptionKeysData {
@@ -722,7 +705,10 @@ impl ThresholdKeyshare {
     }
 
     /// 3a. GenPkShareAndSkSss result
-    pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
+    pub fn handle_gen_pk_share_and_sk_sss_response(
+        &mut self,
+        res: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
         let output: GenPkShareAndSkSssResponse = res
             .into_inner()
             .try_into()
@@ -923,7 +909,10 @@ impl ThresholdKeyshare {
     }
 
     /// 5a. CalculateDecryptionKeyResponse -> KeyshareCreated
-    pub fn handle_calculate_decryption_key_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
+    pub fn handle_calculate_decryption_key_response(
+        &mut self,
+        res: TypedEvent<ComputeResponse>,
+    ) -> Result<()> {
         let output: CalculateDecryptionKeyResponse = res
             .into_inner()
             .try_into()
