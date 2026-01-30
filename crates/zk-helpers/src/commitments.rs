@@ -521,8 +521,7 @@ pub fn compute_threshold_share_decryption_challenge(payload: Vec<Field>) -> BigI
 mod tests {
     use super::*;
     use crate::utils::bigint_to_field;
-    use e3_polynomial::{CrtContext, CrtPolynomial};
-    use std::sync::Arc;
+    use e3_polynomial::CrtPolynomial;
 
     fn field_to_bigint(value: Field) -> BigInt {
         let bytes = value.into_bigint().to_bytes_le();
@@ -532,12 +531,8 @@ mod tests {
     #[test]
     fn compute_ciphertext_commitment_matches_manual_payload() {
         let bit_ct = 4;
-        let ct0 =
-            CrtPolynomial::from_limb_coefficients(vec![vec![BigInt::from(1), BigInt::from(2)]])
-                .unwrap();
-        let ct1 =
-            CrtPolynomial::from_limb_coefficients(vec![vec![BigInt::from(3), BigInt::from(4)]])
-                .unwrap();
+        let ct0 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(1), BigInt::from(2)]]);
+        let ct1 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(3), BigInt::from(4)]]);
 
         let mut payload = Vec::new();
         payload = flatten(payload, &ct0.limbs, bit_ct);
