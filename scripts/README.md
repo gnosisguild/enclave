@@ -157,3 +157,90 @@ pnpm clean --help
 - **Provides granular control** over what gets cleaned via skip options
 - **Shows detailed statistics** about what was removed and space freed
 - **Prevents accidental deletion** of important files by using a whitelist approach
+
+## Circuit Builder
+
+`build-circuits.ts` - Compiles Noir circuits, generates verification keys, and prepares release
+artifacts.
+
+### Usage
+
+```bash
+# Build all circuits
+pnpm build:circuits
+
+# Build only insecure circuits (skip heavy production ones)
+pnpm build:circuits --skip-production
+
+# Skip verification key generation (faster)
+pnpm build:circuits --skip-vk
+
+# Dry run to see what would be built
+pnpm build:circuits --dry-run
+
+# Get source hash for change detection
+pnpm build:circuits hash
+
+# Generate manifest file
+pnpm build:circuits manifest --version 1.0.0
+```
+
+### What it does
+
+1. **Discovers circuits** in `circuits/bin/insecure/` and `circuits/bin/production/`
+2. **Compiles** each circuit using `nargo compile`
+3. **Generates verification keys** using `bb write_vk`
+4. **Sanitizes paths** in compiled JSON (removes local filesystem paths for opsec)
+5. **Generates checksums** (`SHA256SUMS` and `checksums.json`)
+6. **Copies artifacts** to `dist/circuits/`
+
+### Options
+
+- `--skip-production` - Only build insecure circuits
+- `--skip-vk` - Skip verification key generation
+- `--skip-checksums` - Skip checksum generation
+- `--env <envs>` - Environments (comma-separated: insecure,production)
+- `--circuit <name>` - Build specific circuit(s)
+- `-o, --output <dir>` - Output directory (default: dist/circuits)
+- `--dry-run` - Show what would be built
+- `--no-clean` - Don't clean output directory
+
+### Prerequisites
+
+- `nargo` - Noir compiler ([install](https://noir-lang.org/docs/getting_started/installation/))
+- `bb` - Barretenberg prover (for verification keys)
+
+## Circuit Artifacts
+
+`circuit-artifacts.ts` - Push/pull pre-built circuit artifacts via git branch.
+
+### Usage
+
+```bash
+# Build circuits locally, then push to git branch
+pnpm build:circuits --skip-production
+pnpm store:circuits push
+
+# Pull circuits from git branch (used by CI)
+pnpm store:circuits pull
+```
+
+### What it does
+
+- **Push**: Copies `dist/circuits/` to the `circuit-artifacts` orphan branch and pushes to origin
+- **Pull**: Fetches the `circuit-artifacts` branch and extracts to `dist/circuits/`
+
+### Workflow
+
+Since production circuits are heavy to compile, they're built locally and stored in a git branch:
+
+1. **Local**: Build circuits and push to branch
+
+   ```bash
+   pnpm build:circuits --skip-production
+   pnpm tsx scripts/circuit-artifacts.ts push
+   ```
+
+2. **CI**: Pulls from branch during release, attaches to GitHub release
+
+3. **After release**: Circuits live permanently in release assets
