@@ -15,7 +15,9 @@ use crate::utils::compute_safe;
 use ark_bn254::Fr as Field;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use num_bigint::BigInt;
+use std::slice::from_ref;
 
 // ============================================================================
 // DOMAIN SEPARATORS
@@ -157,16 +159,16 @@ pub fn compute_commitments(
 /// This matches the Noir `compute_pk_bfv_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the BFV public key (one vector per modulus)
-/// * `pk1` - Second component of the BFV public key (one vector per modulus)
+/// * `pk0` - First component of the BFV public key (CRT limbs)
+/// * `pk1` - Second component of the BFV public key (CRT limbs)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_pk_bfv_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_pk: u32) -> BigInt {
+pub fn compute_pk_bfv_commitment(pk0: &CrtPolynomial, pk1: &CrtPolynomial, bit_pk: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, pk0, bit_pk);
-    payload = flatten(payload, pk1, bit_pk);
+    payload = flatten(payload, &pk0.limbs, bit_pk);
+    payload = flatten(payload, &pk1.limbs, bit_pk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -181,20 +183,20 @@ pub fn compute_pk_bfv_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_p
 /// This matches the Noir `compute_pk_trbfv_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the TRBFV public key (one vector per modulus)
-/// * `pk1` - Second component of the TRBFV public key (one vector per modulus)
+/// * `pk0` - First component of the TRBFV public key (CRT limbs)
+/// * `pk1` - Second component of the TRBFV public key (CRT limbs)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
 pub fn compute_pk_trbfv_commitment(
-    pk0: &[Vec<BigInt>],
-    pk1: &[Vec<BigInt>],
+    pk0: &CrtPolynomial,
+    pk1: &CrtPolynomial,
     bit_pk: u32,
 ) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, pk0, bit_pk);
-    payload = flatten(payload, pk1, bit_pk);
+    payload = flatten(payload, &pk0.limbs, bit_pk);
+    payload = flatten(payload, &pk1.limbs, bit_pk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -209,14 +211,14 @@ pub fn compute_pk_trbfv_commitment(
 /// This matches the Noir `compute_secret_sk_commitment` function exactly.
 ///
 /// # Arguments
-/// * `sk` - Secret key polynomial coefficients
+/// * `sk` - Secret key polynomial
 /// * `bit_sk` - The bit width for secret key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_secret_sk_commitment(sk: &[BigInt], bit_sk: u32) -> BigInt {
+pub fn compute_secret_sk_commitment(sk: &Polynomial, bit_sk: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, &[sk.to_vec()], bit_sk);
+    payload = flatten(payload, from_ref(sk), bit_sk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -231,14 +233,14 @@ pub fn compute_secret_sk_commitment(sk: &[BigInt], bit_sk: u32) -> BigInt {
 /// This matches the Noir `compute_secret_e_sm_commitment` function exactly.
 ///
 /// # Arguments
-/// * `e_sm` - Smudging noise polynomial coefficients (one vector per modulus)
+/// * `e_sm` - Smudging noise polynomial (CRT limbs)
 /// * `bit_e_sm` - The bit width for smudging noise coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_secret_e_sm_commitment(e_sm: &[Vec<BigInt>], bit_e_sm: u32) -> BigInt {
+pub fn compute_secret_e_sm_commitment(e_sm: &CrtPolynomial, bit_e_sm: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, e_sm, bit_e_sm);
+    payload = flatten(payload, &e_sm.limbs, bit_e_sm);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -257,14 +259,14 @@ pub fn compute_secret_e_sm_commitment(e_sm: &[Vec<BigInt>], bit_e_sm: u32) -> Bi
 /// This matches the Noir `compute_spm_commitment_from_message` function exactly.
 ///
 /// # Arguments
-/// * `message` - Message polynomial coefficients
+/// * `message` - Message polynomial
 /// * `bit_msg` - The bit width for message coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_spm_commitment_from_message(message: &[BigInt], bit_msg: u32) -> BigInt {
+pub fn compute_spm_commitment_from_message(message: &Polynomial, bit_msg: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, &[message.to_vec()], bit_msg);
+    payload = flatten(payload, from_ref(message), bit_msg);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -319,16 +321,16 @@ pub fn compute_spm_commitment_from_shares(
 /// This matches the Noir `compute_pk_agg_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the public key (one vector per modulus)
-/// * `pk1` - Second component of the public key (one vector per modulus)
+/// * `pk0` - First component of the public key (CRT limbs)
+/// * `pk1` - Second component of the public key (CRT limbs)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_pk_agg_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_pk: u32) -> BigInt {
+pub fn compute_pk_agg_commitment(pk0: &CrtPolynomial, pk1: &CrtPolynomial, bit_pk: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, pk0, bit_pk);
-    payload = flatten(payload, pk1, bit_pk);
+    payload = flatten(payload, &pk0.limbs, bit_pk);
+    payload = flatten(payload, &pk1.limbs, bit_pk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -359,20 +361,20 @@ pub fn compute_aggregation_commitment(payload: Vec<Field>) -> BigInt {
 /// Compute CRISP ciphertext commitment.
 ///
 /// # Arguments
-/// * `ct0` - First component of the ciphertext (one vector per modulus)
-/// * `ct1` - Second component of the ciphertext (one vector per modulus)
+/// * `ct0` - First component of the ciphertext (CRT limbs)
+/// * `ct1` - Second component of the ciphertext (CRT limbs)
 /// * `bit_ct` - The bit width for ciphertext coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
 pub fn compute_ciphertext_commitment(
-    ct0: &[Vec<BigInt>],
-    ct1: &[Vec<BigInt>],
+    ct0: &CrtPolynomial,
+    ct1: &CrtPolynomial,
     bit_ct: u32,
 ) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, ct0, bit_ct);
-    payload = flatten(payload, ct1, bit_ct);
+    payload = flatten(payload, &ct0.limbs, bit_ct);
+    payload = flatten(payload, &ct1.limbs, bit_ct);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -387,14 +389,14 @@ pub fn compute_ciphertext_commitment(
 /// This matches the Noir `compute_aggregated_shares_commitment` function exactly.
 ///
 /// # Arguments
-/// * `agg_shares` - Array of aggregated share polynomials (one per modulus)
+/// * `agg_shares` - Aggregated share polynomial (CRT limbs)
 /// * `bit_msg` - The bit width for message coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_aggregated_shares_commitment(agg_shares: &[Vec<BigInt>], bit_msg: u32) -> BigInt {
+pub fn compute_aggregated_shares_commitment(agg_shares: &CrtPolynomial, bit_msg: u32) -> BigInt {
     let mut payload = Vec::new();
-    payload = flatten(payload, agg_shares, bit_msg);
+    payload = flatten(payload, &agg_shares.limbs, bit_msg);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
@@ -460,8 +462,8 @@ pub fn compute_bfv_enc_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
 /// Verifies pk_commitment using pk0is and pk1is, then generates challenges from gammas_payload.
 ///
 /// # Arguments
-/// * `pk0is` - First component of public keys (one vector per modulus)
-/// * `pk1is` - Second component of public keys (one vector per modulus)
+/// * `pk0is` - First component of public keys (CRT limbs)
+/// * `pk1is` - Second component of public keys (CRT limbs)
 /// * `gammas_payload` - Payload for generating challenges
 /// * `pk_commitment` - Expected public key commitment value
 /// * `bit_pk` - The bit width for public key coefficient bounds
@@ -473,14 +475,13 @@ pub fn compute_bfv_enc_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
 /// # Panics
 /// Panics if the computed public key commitment doesn't match `pk_commitment`
 pub fn compute_greco_challenge_commitment(
-    pk0is: &[Vec<BigInt>],
-    pk1is: &[Vec<BigInt>],
+    pk0is: &CrtPolynomial,
+    pk1is: &CrtPolynomial,
     gammas_payload: Vec<Field>,
     pk_commitment: &BigInt,
     bit_pk: u32,
     l: usize,
 ) -> Vec<BigInt> {
-    // Verify pk_commitment matches the commitment from pk0is and pk1is
     let computed_pk_commitment = compute_pk_agg_commitment(pk0is, pk1is, bit_pk);
     if computed_pk_commitment != *pk_commitment {
         panic!(
@@ -523,6 +524,7 @@ pub fn compute_dec_share_challenge(payload: Vec<Field>) -> BigInt {
 mod tests {
     use super::*;
     use crate::utils::bigint_to_field;
+    use e3_polynomial::CrtPolynomial;
 
     fn field_to_bigint(value: Field) -> BigInt {
         let bytes = value.into_bigint().to_bytes_le();
@@ -531,13 +533,13 @@ mod tests {
 
     #[test]
     fn compute_ciphertext_commitment_matches_manual_payload() {
-        let ct0 = vec![vec![BigInt::from(1), BigInt::from(2)]];
-        let ct1 = vec![vec![BigInt::from(3), BigInt::from(4)]];
         let bit_ct = 4;
+        let ct0 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(1), BigInt::from(2)]]);
+        let ct1 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(3), BigInt::from(4)]]);
 
         let mut payload = Vec::new();
-        payload = flatten(payload, &ct0, bit_ct);
-        payload = flatten(payload, &ct1, bit_ct);
+        payload = flatten(payload, &ct0.limbs, bit_ct);
+        payload = flatten(payload, &ct1.limbs, bit_ct);
 
         let input_size = payload.len() as u32;
         let io_pattern = [0x80000000 | input_size, 1];

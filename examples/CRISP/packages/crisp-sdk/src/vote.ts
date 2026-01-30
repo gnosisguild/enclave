@@ -152,8 +152,8 @@ export const generatePublicKey = (): Uint8Array => {
  * @param ct1is - The second component of the ciphertext polynomials.
  * @returns The commitment as a bigint.
  */
-export const computeCommitment = (ct0is: Polynomial[], ct1is: Polynomial[]): bigint => {
-  const commitment = zkInputsGenerator.computeCommitment(
+export const computeCiphertextCommitment = (ct0is: Polynomial[], ct1is: Polynomial[]): bigint => {
+  const commitment = zkInputsGenerator.computeCiphertextCommitment(
     ct0is.map((p) => p.coefficients),
     ct1is.map((p) => p.coefficients),
   )

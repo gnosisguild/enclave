@@ -86,7 +86,11 @@ fn benchmark_modular_reduction(c: &mut Criterion) {
         let modulus = BigInt::from(1000000007); // Large prime
 
         group.bench_function(&format!("degree_{}", degree), |b| {
-            b.iter(|| black_box(poly1.reduce_and_center(&modulus)))
+            b.iter(|| {
+                let mut p = poly1.clone();
+                p.reduce_and_center(&modulus);
+                black_box(p)
+            })
         });
     }
 

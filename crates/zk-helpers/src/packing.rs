@@ -11,6 +11,7 @@
 
 use ark_bn254::Fr as Field;
 use ark_ff::PrimeField;
+use e3_polynomial::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
 
@@ -38,27 +39,26 @@ fn packing_layout(bit: u32) -> (u32, u32) {
     (nibble_bits, group)
 }
 
-/// Pack values into a Vec<Field> of carriers using the shared hex-aligned layout.
+/// Pack a polynomial's coefficients into a Vec<Field> of carriers using the shared hex-aligned layout.
 ///
 /// Matches the Noir `packer` function exactly.
 /// Packs multiple coefficients into each field element using nibble-aligned layout.
 ///
 /// # Arguments
-/// * `values` - Slice of BigInt coefficients to pack
+/// * `poly` - Polynomial whose coefficients to pack
 /// * `bit` - The bit width for coefficient bounds
 ///
 /// # Returns
 /// A vector of field elements containing the packed coefficients.
-/// The number of field elements is `ceil(values.len() / group)` where `group` is
+/// The number of field elements is `ceil(poly.coefficients().len() / group)` where `group` is
 /// determined by the packing layout.
-fn packer(values: &[BigInt], bit: u32) -> Vec<Field> {
-    // Layout parameters: nibble-aligned width and limbs-per-carrier group size.
+fn packer(polynomial: &Polynomial, bit: u32) -> Vec<Field> {
+    let values = polynomial.coefficients();
     let (nibble_bits, group) = packing_layout(bit);
 
     let base = BigInt::from(2).pow(nibble_bits);
     let radix = BigInt::from(2).pow(nibble_bits + 4);
 
-    // Number of chunks to emit: ceil(A / group).
     let a = values.len() as u32;
     let num_chunks = a.div_ceil(group);
     let mut out = Vec::new();
@@ -97,29 +97,24 @@ fn packer(values: &[BigInt], bit: u32) -> Vec<Field> {
     out
 }
 
-/// Flatten `L` polynomials into a single linear stream of packed `Field` carriers.
+/// Flatten a slice of polynomials into a single linear stream of packed `Field` carriers.
 ///
 /// Matches the Noir `flatten` function exactly.
-/// Packs each polynomial using the same bit width and appends them sequentially.
+/// Packs each polynomial's coefficients using the same bit width and appends them sequentially.
 ///
 /// # Arguments
 /// * `inputs` - Initial vector of field elements to append to
-/// * `polys` - Slice of polynomials (each represented as Vec<BigInt>)
+/// * `polys` - Slice of polynomials to pack
 /// * `bit` - The bit width for coefficient bounds
 ///
 /// # Returns
 /// Extended vector with packed polynomial coefficients appended in order.
 /// The polynomials are packed sequentially, maintaining a stable transcript layout.
-pub fn flatten(mut inputs: Vec<Field>, polys: &[Vec<BigInt>], bit: u32) -> Vec<Field> {
-    for poly in polys {
-        // Pack coefficients into carriers using the same BIT layout.
-        let packed = packer(poly, bit);
-
-        // Append carriers in-order to `inputs` to keep a stable transcript layout.
+pub fn flatten(mut inputs: Vec<Field>, polynomials: &[Polynomial], bit: u32) -> Vec<Field> {
+    for polynomial in polynomials {
+        let packed = packer(polynomial, bit);
         inputs.extend(packed);
     }
-
-    // Return the extended input stream.
     inputs
 }
 
@@ -142,15 +137,15 @@ mod tests {
 
     #[test]
     fn test_packer_single_value() {
-        let values = vec![BigInt::from(42)];
-        let packed = packer(&values, 8);
+        let poly = Polynomial::new(vec![BigInt::from(42)]);
+        let packed = packer(&poly, 8);
         assert!(!packed.is_empty());
     }
 
     #[test]
     fn test_flatten_empty() {
         let inputs = Vec::new();
-        let polys: Vec<Vec<BigInt>> = vec![];
+        let polys: Vec<Polynomial> = vec![];
         let result = flatten(inputs, &polys, 8);
         assert_eq!(result.len(), 0);
     }
@@ -158,7 +153,7 @@ mod tests {
     #[test]
     fn test_flatten_single_poly() {
         let inputs = Vec::new();
-        let poly = vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)];
+        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
         let polys = vec![poly];
         let result = flatten(inputs, &polys, 8);
         assert!(!result.is_empty());
