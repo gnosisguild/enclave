@@ -4,12 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::config::{VersionInfo, ZkConfig};
+use crate::config::{verify_checksum, BbTarget, VersionInfo, ZkConfig};
 use crate::error::ZkError;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use tokio::fs;
@@ -139,34 +138,16 @@ impl ZkBackend {
         }
     }
 
-    fn detect_platform() -> Result<(String, String), ZkError> {
-        let os = match std::env::consts::OS {
-            "linux" => "linux",
-            "macos" => "darwin",
-            os => {
-                return Err(ZkError::UnsupportedPlatform {
-                    os: os.to_string(),
-                    arch: std::env::consts::ARCH.to_string(),
-                })
-            }
-        };
-
-        let arch = match std::env::consts::ARCH {
-            "x86_64" => "amd64",
-            "aarch64" => "arm64",
-            arch => {
-                return Err(ZkError::UnsupportedPlatform {
-                    os: std::env::consts::OS.to_string(),
-                    arch: arch.to_string(),
-                })
-            }
-        };
-
-        Ok((os.to_string(), arch.to_string()))
+    fn current_target() -> Result<BbTarget, ZkError> {
+        BbTarget::current().ok_or_else(|| ZkError::UnsupportedPlatform {
+            os: std::env::consts::OS.to_string(),
+            arch: std::env::consts::ARCH.to_string(),
+        })
     }
 
     pub async fn download_bb(&self) -> Result<(), ZkError> {
-        let (os, arch) = Self::detect_platform()?;
+        let target = Self::current_target()?;
+        let (arch, os) = target.url_parts();
         let version = &self.config.required_bb_version;
 
         let url = self
@@ -179,7 +160,8 @@ impl ZkBackend {
         info!("downloading Barretenberg from: {}", url);
 
         let bytes = self.download_with_progress(&url, "Downloading bb").await?;
-        let checksum = self.compute_checksum(&bytes);
+        let expected_checksum = self.config.bb_checksum_for(target);
+        verify_checksum(&format!("bb-{}", target), &bytes, expected_checksum)?;
 
         let decoder = GzDecoder::new(&bytes[..]);
         let mut archive = Archive::new(decoder);
@@ -204,7 +186,7 @@ impl ZkBackend {
 
         let mut version_info = self.load_version_info().await;
         version_info.bb_version = Some(version.clone());
-        version_info.bb_checksum = Some(checksum);
+        version_info.bb_checksum = expected_checksum.map(|s| s.to_string());
         version_info.last_updated = Some(chrono_now());
         version_info.save(&self.version_file()).await?;
 
@@ -343,12 +325,6 @@ impl ZkBackend {
         Ok(bytes)
     }
 
-    fn compute_checksum(&self, bytes: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        hex::encode(hasher.finalize())
-    }
-
     pub async fn verify_bb(&self) -> Result<String, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
@@ -389,7 +365,12 @@ fn chrono_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use tempfile::tempdir;
+
+    fn versions_json_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
+    }
 
     #[tokio::test]
     async fn test_backend_creates_directories() {
@@ -403,6 +384,10 @@ mod tests {
         assert!(backend.base_dir.exists());
         assert!(backend.circuits_dir.exists());
         assert!(backend.work_dir.exists());
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
     }
 
     #[tokio::test]
@@ -421,5 +406,202 @@ mod tests {
 
         assert_eq!(loaded.bb_version, info.bb_version);
         assert_eq!(loaded.circuits_version, info.circuits_version);
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_check_status_full_setup_needed() {
+        let temp = tempdir().unwrap();
+        let backend = ZkBackend::new(temp.path(), ZkConfig::default());
+
+        let status = backend.check_status().await;
+        assert!(matches!(status, SetupStatus::FullSetupNeeded));
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_check_status_ready_when_installed() {
+        let temp = tempdir().unwrap();
+        let config = ZkConfig::default();
+        let backend = ZkBackend::new(temp.path(), config.clone());
+
+        fs::create_dir_all(&backend.base_dir.join("bin"))
+            .await
+            .unwrap();
+        fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+        fs::write(&backend.bb_binary, b"fake bb binary")
+            .await
+            .unwrap();
+
+        let info = VersionInfo {
+            bb_version: Some(config.required_bb_version.clone()),
+            circuits_version: Some(config.required_circuits_version.clone()),
+            ..Default::default()
+        };
+        info.save(&backend.version_file()).await.unwrap();
+
+        let status = backend.check_status().await;
+        assert!(matches!(status, SetupStatus::Ready));
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_check_status_bb_needs_update() {
+        let temp = tempdir().unwrap();
+        let config = ZkConfig::default();
+        let backend = ZkBackend::new(temp.path(), config.clone());
+
+        fs::create_dir_all(&backend.base_dir.join("bin"))
+            .await
+            .unwrap();
+        fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+        fs::write(&backend.bb_binary, b"fake bb binary")
+            .await
+            .unwrap();
+
+        let info = VersionInfo {
+            bb_version: Some("0.0.1".to_string()),
+            circuits_version: Some(config.required_circuits_version.clone()),
+            ..Default::default()
+        };
+        info.save(&backend.version_file()).await.unwrap();
+
+        let status = backend.check_status().await;
+        assert!(matches!(status, SetupStatus::BbNeedsUpdate { .. }));
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_work_dir_cleanup() {
+        let temp = tempdir().unwrap();
+        let backend = ZkBackend::new(temp.path(), ZkConfig::default());
+
+        fs::create_dir_all(&backend.work_dir).await.unwrap();
+
+        let e3_id = "test-e3-123";
+        let work_dir = backend.work_dir_for(e3_id);
+
+        fs::create_dir_all(&work_dir).await.unwrap();
+        fs::write(work_dir.join("proof.bin"), b"fake proof")
+            .await
+            .unwrap();
+        fs::write(work_dir.join("witness.bin"), b"fake witness")
+            .await
+            .unwrap();
+        assert!(work_dir.exists());
+
+        backend.cleanup_work_dir(e3_id).await.unwrap();
+        assert!(!work_dir.exists());
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    // Integration tests - require network
+
+    #[tokio::test]
+    async fn test_download_bb_with_checksum() {
+        let config = ZkConfig::load(&versions_json_path())
+            .await
+            .expect("versions.json should exist");
+
+        let temp = tempdir().unwrap();
+        let backend = ZkBackend::new(temp.path(), config);
+
+        let result = backend.download_bb().await;
+        assert!(result.is_ok(), "download failed: {:?}", result);
+
+        assert!(backend.bb_binary.exists(), "bb binary not found");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::metadata(&backend.bb_binary).unwrap().permissions();
+            assert_eq!(perms.mode() & 0o111, 0o111, "bb not executable");
+        }
+
+        let version_info = backend.load_version_info().await;
+        assert!(version_info.bb_version.is_some());
+        assert!(version_info.last_updated.is_some());
+
+        if backend
+            .config
+            .bb_checksum_for(BbTarget::current().unwrap())
+            .is_some()
+        {
+            assert!(version_info.bb_checksum.is_some());
+        }
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_download_bb_fails_with_wrong_checksum() {
+        let mut config = ZkConfig::load(&versions_json_path())
+            .await
+            .expect("versions.json should exist");
+
+        for checksum in config.bb_checksums.values_mut() {
+            *checksum = "0".repeat(64);
+        }
+
+        let temp = tempdir().unwrap();
+        let backend = ZkBackend::new(temp.path(), config);
+
+        let result = backend.download_bb().await;
+
+        assert!(
+            matches!(result, Err(ZkError::ChecksumMismatch { .. })),
+            "expected ChecksumMismatch, got {:?}",
+            result
+        );
+
+        assert!(!backend.bb_binary.exists());
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_ensure_installed_full_flow() {
+        let config = ZkConfig::load(&versions_json_path())
+            .await
+            .expect("versions.json should exist");
+
+        let temp = tempdir().unwrap();
+        let backend = ZkBackend::new(temp.path(), config);
+
+        assert!(matches!(
+            backend.check_status().await,
+            SetupStatus::FullSetupNeeded
+        ));
+
+        let result = backend.ensure_installed().await;
+        assert!(result.is_ok(), "ensure_installed failed: {:?}", result);
+
+        assert!(matches!(backend.check_status().await, SetupStatus::Ready));
+
+        let version = backend.verify_bb().await;
+        assert!(version.is_ok(), "bb --version failed: {:?}", version);
+
+        let temp_path = temp.path().to_path_buf();
+        drop(temp);
+        assert!(!temp_path.exists());
     }
 }
