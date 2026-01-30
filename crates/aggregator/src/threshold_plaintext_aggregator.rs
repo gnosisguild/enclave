@@ -14,14 +14,14 @@ use e3_events::{
     DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, PlaintextAggregated,
     Seed,
 };
-use e3_sortition::{GetNodesForE3, Sortition};
+use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
 use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
     TrBFVResponse,
 };
 use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -272,67 +272,72 @@ impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
 }
 
 impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = ();
+    fn handle(&mut self, msg: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
+        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
+            let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
+                self.state.get()
+            else {
+                debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
+                return Ok(());
+            };
 
-    fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
-        let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
-            self.state.get()
-        else {
-            debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
-            return Box::pin(fut::ready(Ok(())));
-        };
-        info!(event=?event, "Processing DecryptionShareCreated...");
-        let address = event.node.clone();
-        let party_id = event.party_id;
-        let e3_id = event.e3_id.clone();
-        let decryption_share = event.decryption_share.clone();
+            let request =
+                E3CommitteeContainsRequest::new(&msg.e3_id, &msg.node, msg.clone(), ctx.address());
+            self.sortition.try_send(request)?;
+            Ok(())
+        })
+    }
+}
 
-        Box::pin(
-            self.sortition
-                .send(GetNodesForE3 {
-                    e3_id: e3_id.clone(),
-                    chain_id: e3_id.chain_id(),
-                })
-                .into_actor(self)
-                .map(move |res, act, ctx| {
-                    let nodes = res?;
+impl Handler<E3CommitteeContainsResponse<DecryptionshareCreated>> for ThresholdPlaintextAggregator {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: E3CommitteeContainsResponse<DecryptionshareCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
+            let e3_id = &msg.e3_id;
+            if *e3_id != self.e3_id {
+                bail!("Wrong e3_id sent to aggregator. This should not happen.")
+            };
 
-                    if !nodes.contains(&address) {
-                        trace!("Node {} not found in finalized committee", address);
-                        return Ok(());
-                    }
+            if !msg.is_found_in_committee() {
+                trace!("Node {} not found in finalized committee", &msg.node);
+                return Ok(());
+            };
 
-                    if e3_id != act.e3_id {
-                        error!("Wrong e3_id sent to aggregator. This should not happen.");
-                        return Ok(());
-                    }
+            // Trust the party_id from the event - it's based on CommitteeFinalized order
+            // which is the authoritative source of truth for party IDs
+            let DecryptionshareCreated {
+                party_id,
+                decryption_share,
+                ..
+            } = msg.into_inner();
 
-                    // Trust the party_id from the event - it's based on CommitteeFinalized order
-                    // which is the authoritative source of truth for party IDs
-                    act.add_share(party_id, decryption_share)?;
+            self.add_share(party_id, decryption_share)?;
 
-                    if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
+            if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
+                threshold_m,
+                threshold_n,
+                shares,
+                ciphertext_output,
+                ..
+            })) = self.state.get()
+            {
+                self.notify_sync(
+                    ctx,
+                    ComputeAggregate {
+                        shares: shares.clone(),
+                        ciphertext_output: ciphertext_output.clone(),
                         threshold_m,
                         threshold_n,
-                        shares,
-                        ciphertext_output,
-                        ..
-                    })) = act.state.get()
-                    {
-                        act.notify_sync(
-                            ctx,
-                            ComputeAggregate {
-                                shares: shares.clone(),
-                                ciphertext_output: ciphertext_output.clone(),
-                                threshold_m,
-                                threshold_n,
-                            },
-                        )
-                    }
-
-                    Ok(())
-                }),
-        )
+                    },
+                )
+            }
+            Ok(())
+        })
     }
 }
 

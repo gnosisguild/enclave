@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::WithSortitionPartyTicket;
+use crate::WithSortitionTicket;
 use actix::prelude::*;
 use anyhow::bail;
 use anyhow::Result;
@@ -73,12 +73,12 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     }
 }
 
-impl Handler<WithSortitionPartyTicket<E3Requested>> for CiphernodeSelector {
+impl Handler<WithSortitionTicket<E3Requested>> for CiphernodeSelector {
     type Result = ();
 
     fn handle(
         &mut self,
-        data: WithSortitionPartyTicket<E3Requested>,
+        data: WithSortitionTicket<E3Requested>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let bus = self.bus.clone();

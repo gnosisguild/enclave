@@ -11,9 +11,9 @@ use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
+    prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
+    ConfigurationUpdated, E3Requested, E3id, EType, EnclaveEvent, EventType,
+    OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use e3_utils::NotifySync;
@@ -97,23 +97,15 @@ impl NodeStateStore {
     }
 }
 
-/// Message: request the current set of registered node addresses for `chain_id`.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Vec<String>")]
-pub struct GetNodes {
-    /// Target chain.
-    pub chain_id: u64,
-}
-
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "()")]
-pub struct WithSortitionPartyTicket<T> {
+pub struct WithSortitionTicket<T> {
     inner: T,
     party_ticket_id: Option<(u64, Option<u64>)>,
     address: String,
 }
 
-impl<T> WithSortitionPartyTicket<T> {
+impl<T> WithSortitionTicket<T> {
     pub fn new(inner: T, party_ticket_id: Option<(u64, Option<u64>)>, address: &str) -> Self {
         Self {
             inner,
@@ -139,21 +131,76 @@ impl<T> WithSortitionPartyTicket<T> {
     }
 }
 
-impl<T> Deref for WithSortitionPartyTicket<T> {
+impl<T> Deref for WithSortitionTicket<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-/// Message to get the finalized committee nodes for a specific E3.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Vec<String>")]
-pub struct GetNodesForE3 {
-    /// E3 ID to get nodes for.
-    pub e3_id: e3_events::E3id,
-    /// Chain ID
-    pub chain_id: u64,
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+pub struct E3CommitteeContainsRequest<T: Send + Sync>
+where
+    T: Send + Sync,
+{
+    inner: T,
+    e3_id: E3id,
+    node: String,
+    sender: Recipient<E3CommitteeContainsResponse<T>>,
+}
+
+impl<T> E3CommitteeContainsRequest<T>
+where
+    T: Send + Sync,
+{
+    pub fn new(
+        e3_id: &E3id,
+        node: &str,
+        inner: T,
+        sender: impl Into<Recipient<E3CommitteeContainsResponse<T>>>,
+    ) -> Self {
+        Self {
+            inner,
+            e3_id: e3_id.clone(),
+            node: node.to_owned(),
+            sender: sender.into(),
+        }
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+pub struct E3CommitteeContainsResponse<T: Send + Sync> {
+    inner: T,
+    is_found_in_committee: bool,
+}
+
+impl<T> E3CommitteeContainsResponse<T>
+where
+    T: Send + Sync,
+{
+    pub fn new(inner: T, is_found_in_committee: bool) -> Self {
+        Self {
+            inner,
+            is_found_in_committee,
+        }
+    }
+
+    pub fn is_found_in_committee(&self) -> bool {
+        self.is_found_in_committee
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 /// Message to get the current node state.
@@ -285,6 +332,18 @@ impl Sortition {
                 None
             })
     }
+
+    fn get_committe(&self, e3_id: E3id) -> Vec<String> {
+        self.finalized_committees
+            .get()
+            .and_then(|committees| committees.get(&e3_id).cloned())
+            .unwrap_or_else(|| Vec::new())
+    }
+
+    fn committee_contains(&mut self, e3_id: E3id, node: String) -> bool {
+        let committee = self.get_committe(e3_id);
+        committee.contains(&node)
+    }
 }
 
 impl Actor for Sortition {
@@ -314,16 +373,15 @@ impl Handler<EnclaveEvent> for Sortition {
 
 impl Handler<E3Requested> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: E3Requested, _: &mut Self::Context) -> Self::Result {
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
         let threshold_n = msg.threshold_n;
-        self.ciphernode_selector
-            .do_send(WithSortitionPartyTicket::new(
-                msg,
-                self.get_node_index(seed, threshold_n, chain_id),
-                &self.address,
-            ))
+        self.ciphernode_selector.do_send(WithSortitionTicket::new(
+            msg,
+            self.get_node_index(seed, threshold_n, chain_id),
+            &self.address,
+        ));
     }
 }
 
@@ -511,6 +569,28 @@ impl Handler<CommitteePublished> for Sortition {
         }
     }
 }
+
+impl<T> Handler<E3CommitteeContainsRequest<T>> for Sortition
+where
+    T: Clone + Send + Sync + 'static,
+{
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: E3CommitteeContainsRequest<T>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::Sortition, &self.bus.clone(), || {
+            let response = E3CommitteeContainsResponse::new(
+                msg.inner,
+                self.committee_contains(msg.e3_id, msg.node),
+            );
+            msg.sender.try_send(response)?;
+            Ok(())
+        })
+    }
+}
+
 /// PlaintextOutputPublished is currently used as a signal to decrement the active jobs for the nodes in the committee
 /// But in reality, E3 Jobs might not emit that in case there are no votes or the job fails.
 /// We need to find a better way to handle the end of an E3, Reduce the jobs in case of of an Error
@@ -577,40 +657,6 @@ impl Handler<CommitteeFinalized> for Sortition {
         }) {
             self.bus.err(EType::Sortition, err);
         }
-    }
-}
-
-impl Handler<GetNodes> for Sortition {
-    type Result = Vec<String>;
-
-    fn handle(&mut self, msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
-        self.get_nodes(msg.chain_id).unwrap_or_else(|err| {
-            tracing::warn!("Failed to get nodes for chain {}: {}", msg.chain_id, err);
-            Vec::new()
-        })
-    }
-}
-
-impl Handler<GetNodesForE3> for Sortition {
-    type Result = Vec<String>;
-
-    fn handle(&mut self, msg: GetNodesForE3, _ctx: &mut Self::Context) -> Self::Result {
-        if msg.e3_id.chain_id() != msg.chain_id {
-            tracing::warn!(
-                "Chain ID mismatch: e3_id has chain_id {}, but requested chain_id {}",
-                msg.e3_id.chain_id(),
-                msg.chain_id
-            );
-            return Vec::new();
-        }
-
-        self.finalized_committees
-            .get()
-            .and_then(|committees| committees.get(&msg.e3_id).cloned())
-            .unwrap_or_else(|| {
-                tracing::warn!("No finalized committee found for E3 {}", msg.e3_id);
-                Vec::new()
-            })
     }
 }
 
