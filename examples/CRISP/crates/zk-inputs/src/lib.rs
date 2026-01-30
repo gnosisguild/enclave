@@ -16,7 +16,6 @@ use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::utils::calculate_bit_width;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
-use std::sync::Arc;
 use fhe::bfv::Ciphertext;
 use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
@@ -27,6 +26,7 @@ use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use rand::thread_rng;
+use std::sync::Arc;
 mod ciphertext_addition;
 use crate::ciphertext_addition::CiphertextAdditionInputs;
 mod serialization;
@@ -139,7 +139,7 @@ impl ZKInputsGenerator {
             &crypto_params,
             &bounds,
             &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs.standard_form(),
+            &ciphertext_addition_inputs,
         );
 
         let inputs_json = serialize_inputs_to_json(&inputs)?;
@@ -206,7 +206,7 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
             &prev_ct,
             &ct,
             &sum_ct,
@@ -215,15 +215,12 @@ impl ZKInputsGenerator {
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
-        // For first votes, set prev_ct_commitment to 0 since there's no previous ciphertext
-        ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
-
         // Construct Inputs Section.
         let inputs = construct_inputs(
             &crypto_params,
             &bounds,
             &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs.standard_form(),
+            &ciphertext_addition_inputs,
         );
 
         let inputs_json = serialize_inputs_to_json(&inputs)?;

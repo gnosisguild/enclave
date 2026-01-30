@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_polynomial::{reduce_coefficients, CrtPolynomial, Polynomial};
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
@@ -47,7 +47,6 @@ impl CiphertextAdditionInputs {
         params: Arc<BfvParameters>,
         bit_ct: u32,
     ) -> Result<CiphertextAdditionInputs> {
-        let n = params.degree();
         let moduli = params.moduli();
 
         let mut crt_polynomials = [
@@ -68,15 +67,30 @@ impl CiphertextAdditionInputs {
             c.reduce_and_center(&moduli)?;
         }
 
-        let [prev_ct0, prev_ct1, ct0, ct1, sum_ct0, sum_ct1] = crt_polynomials;
+        let [mut prev_ct0, mut prev_ct1, mut ct0, mut ct1, mut sum_ct0, mut sum_ct1] =
+            crt_polynomials;
 
         // Compute quotient polynomials: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
         // For ciphertext addition: sum_centered = ct_centered + prev_ct_centered + r * qi.
         // So: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
-        let r0 = Self::compute_quotient(&sum_ct0, &ct0, &prev_ct0, n, &moduli)
+        let mut r0 = Self::compute_quotient(&sum_ct0, &ct0, &prev_ct0, &moduli)
             .with_context(|| "Failed to compute r0 quotient")?;
-        let r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, n, &moduli)
+        let mut r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, &moduli)
             .with_context(|| "Failed to compute r1 quotient")?;
+
+        let zkp_modulus = &get_zkp_modulus();
+
+        // Reduce all coefficients modulo the ZKP modulus so they lie in the proof system's
+        // native field. The circuit expects witnesses in [0, zkp_modulus); unreduced values
+        // would break constraint satisfaction or overflow the field representation.
+        prev_ct0.reduce_uniform(zkp_modulus);
+        prev_ct1.reduce_uniform(zkp_modulus);
+        ct0.reduce_uniform(zkp_modulus);
+        ct1.reduce_uniform(zkp_modulus);
+        sum_ct0.reduce_uniform(zkp_modulus);
+        sum_ct1.reduce_uniform(zkp_modulus);
+        r0.reduce_uniform(zkp_modulus);
+        r1.reduce_uniform(zkp_modulus);
 
         let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, bit_ct);
 
@@ -89,23 +103,6 @@ impl CiphertextAdditionInputs {
             r1is: r1,
             prev_ct_commitment,
         })
-    }
-
-    /// Converts the inputs to standard form by reducing coefficients modulo the ZKP modulus.
-    ///
-    /// # Returns
-    /// A new CiphertextAdditionInputs with coefficients reduced to the ZKP modulus
-    pub fn standard_form(&self) -> Self {
-        let zkp_modulus = &get_zkp_modulus();
-        CiphertextAdditionInputs {
-            prev_ct0is: reduce_crt_polynomial(&self.prev_ct0is, zkp_modulus),
-            prev_ct1is: reduce_crt_polynomial(&self.prev_ct1is, zkp_modulus),
-            prev_ct_commitment: self.prev_ct_commitment.clone() % zkp_modulus,
-            sum_ct0is: reduce_crt_polynomial(&self.sum_ct0is, zkp_modulus),
-            sum_ct1is: reduce_crt_polynomial(&self.sum_ct1is, zkp_modulus),
-            r0is: reduce_crt_polynomial(&self.r0is, zkp_modulus),
-            r1is: reduce_crt_polynomial(&self.r1is, zkp_modulus),
-        }
     }
 
     /// Computes the quotient CRT polynomial `(sum - (a + b)) / q_i` per modulus.
@@ -130,7 +127,6 @@ impl CiphertextAdditionInputs {
         sum: &CrtPolynomial,
         a: &CrtPolynomial,
         b: &CrtPolynomial,
-        _n: usize,
         moduli: &[u64],
     ) -> Result<CrtPolynomial> {
         let num_moduli = moduli.len();
@@ -164,21 +160,6 @@ impl CiphertextAdditionInputs {
 
         Ok(CrtPolynomial::new(quotient_limbs))
     }
-}
-
-/// Reduces all coefficients of a CRT polynomial modulo the given modulus.
-fn reduce_crt_polynomial(crt_poly: &CrtPolynomial, modulus: &BigInt) -> CrtPolynomial {
-    let reduced_limbs: Vec<Polynomial> = crt_poly
-        .limbs
-        .iter()
-        .map(|limb| {
-            let reduced_coeffs = reduce_coefficients(limb.coefficients(), modulus);
-            Polynomial::new(reduced_coeffs)
-        })
-        .collect();
-
-    // Safe to unwrap because we're preserving the structure
-    CrtPolynomial::new(reduced_limbs)
 }
 
 #[cfg(test)]
@@ -244,28 +225,5 @@ mod tests {
         assert_eq!(inputs.sum_ct1is.limbs.len(), num_moduli);
         assert_eq!(inputs.r0is.limbs.len(), num_moduli);
         assert_eq!(inputs.r1is.limbs.len(), num_moduli);
-    }
-
-    #[test]
-    fn test_standard_form_conversion() {
-        let (bfv_params, pk, _sk) = create_test_generator();
-        let mut rng = thread_rng();
-
-        let pt = create_test_plaintext(&bfv_params, 1);
-        let (ct1, _u1, _e0_1, _e1_1) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-        let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-        let sum_ct = &ct1 + &ct2;
-
-        let bit_ct = test_bit_ct(&bfv_params);
-        let inputs =
-            CiphertextAdditionInputs::compute(&ct1, &ct2, &sum_ct, bfv_params.clone(), bit_ct)
-                .unwrap();
-        let standard_form = inputs.standard_form();
-
-        // Verify structure is preserved.
-        assert_eq!(
-            standard_form.prev_ct0is.limbs.len(),
-            inputs.prev_ct0is.limbs.len()
-        );
     }
 }

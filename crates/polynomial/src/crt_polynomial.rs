@@ -117,6 +117,45 @@ impl CrtPolynomial {
         Ok(())
     }
 
+    /// Reduces each limb's coefficients modulo the corresponding modulus in-place (range [0, qi)).
+    ///
+    /// # Arguments
+    ///
+    /// * `moduli` - One modulus per limb; `moduli[i]` is used for `self.limbs[i]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CrtPolynomialError::ModuliLengthMismatch`] if `moduli.len() != self.limbs.len()`.
+    pub fn reduce(&mut self, moduli: &[u64]) -> Result<(), CrtPolynomialError> {
+        if self.limbs.len() != moduli.len() {
+            return Err(CrtPolynomialError::ModuliLengthMismatch {
+                limbs_len: self.limbs.len(),
+                moduli_len: moduli.len(),
+            });
+        }
+
+        for (limb, qi) in self.limbs.iter_mut().zip(moduli.iter()) {
+            limb.reduce(&BigInt::from(*qi));
+        }
+
+        Ok(())
+    }
+
+    /// Reduces each limb's coefficients modulo the same modulus in-place.
+    ///
+    /// Every limb uses the same `modulus`; coefficients are reduced into the range `[0, modulus)`.
+    /// Use this when all limbs should be reduced by one common modulus (e.g. a single prime)
+    /// instead of per-limb moduli as in [`reduce`](Self::reduce).
+    ///
+    /// # Arguments
+    ///
+    /// * `modulus` - The modulus applied to every limb.
+    pub fn reduce_uniform(&mut self, modulus: &BigInt) {
+        for limb in &mut self.limbs {
+            limb.reduce(&modulus);
+        }
+    }
+
     /// Returns a reference to the limb polynomial at the given index.
     ///
     /// # Arguments
