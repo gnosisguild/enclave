@@ -56,11 +56,11 @@ pub trait EventFactory<E: Event> {
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
+    ///
+    /// The Option `caused_by` is for correlation when we send a remote request and receive a response.
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
-        // NOTE: `caused_by` makes sense here as we could be sending out requests and receiving
-        // responses that relate to the request
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
     ) -> Result<E>;
@@ -83,12 +83,30 @@ pub trait EventPublisher<E: Event> {
     /// to the event bus.
     ///
     /// This method should be used for events that have originated locally.
-    fn publish(&self, data: impl Into<E::Data>) -> Result<()>;
+    ///
+    /// The ctx parameter is to pass on the current context to the local event.
+    fn publish(&self, data: impl Into<E::Data>, ctx: EventContext<Sequenced>) -> Result<()>;
+    /// This creates a context based on the given data. This should only be used when an event is
+    /// the origin event
+    fn publish_origin(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) -> Result<()>;
+    fn publish_from_remote(&self, data: impl Into<E::Data>, remote_ts: u128) -> Result<()>;
+    /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
+    /// event ordering and publish it.
+    ///
+    /// This method should be used for events that originated from remote sources as a response to
+    /// a request we have sent
+    ///
+    /// The `caused_by` parameter is for correlation when we send a remote request and receive a response.
+    fn publish_from_remote_as_response(
+        &self,
+        data: impl Into<E::Data>,
+        remote_ts: u128,
+        caused_by: EventContext<Sequenced>,
+    ) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
 }

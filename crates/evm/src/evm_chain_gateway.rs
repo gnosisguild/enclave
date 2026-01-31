@@ -241,7 +241,7 @@ mod tests {
         // SyncStart: Init -> ForwardToSyncActor
         let mut evm_config = EvmEventConfig::new();
         evm_config.insert(chain_id, EvmEventConfigChain::new(0));
-        bus.publish(SyncStart::new(collector.clone(), evm_config))
+        bus.publish_origin(SyncStart::new(collector.clone(), evm_config))
             .unwrap();
 
         // Send EVM event while forwarding - should reach collector
@@ -285,7 +285,7 @@ mod tests {
         addr.do_send(EnclaveEvmEvent::Event(buffered_event));
 
         // SyncEnd: BufferUntilLive -> Live (publishes buffered events to bus)
-        bus.publish(SyncEnd::new()).unwrap();
+        bus.publish_origin(SyncEnd::new()).unwrap();
 
         // Allow time for async message processing
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;

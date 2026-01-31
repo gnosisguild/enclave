@@ -57,7 +57,7 @@ impl BusHandle {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.event_bus)
     }
 
-    /// Access the sequencer to internally dispatch am event to
+    /// Access the sequencer to internally dispatch an event to
     pub fn sequencer(&self) -> &Addr<Sequencer> {
         &self.sequencer
     }
@@ -84,20 +84,59 @@ impl BusHandle {
 }
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
-    fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
-        let evt = self.event_from(data, self.get_ctx())?;
-        self.sequencer.do_send(evt);
-        Ok(())
+    fn publish(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        ctx: EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.publish_local(data, Some(ctx))
     }
 
-    fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
-        let evt = self.event_from_remote_source(data, self.get_ctx(), ts)?;
-        self.sequencer.do_send(evt);
-        Ok(())
+    fn publish_origin(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
+        self.publish_local(data, None)
+    }
+
+    fn publish_from_remote(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+    ) -> Result<()> {
+        self.publish_from_remote_impl(data, remote_ts, None)
+    }
+
+    fn publish_from_remote_as_response(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+        caused_by: EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.publish_from_remote_impl(data, remote_ts, Some(caused_by))
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
         self.sequencer.do_send(event);
+    }
+}
+
+impl BusHandle {
+    fn publish_from_remote_impl(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+        caused_by: Option<EventContext<Sequenced>>,
+    ) -> Result<()> {
+        let evt = self.event_from_remote_source(data, caused_by, remote_ts)?;
+        self.sequencer.do_send(evt);
+        Ok(())
+    }
+    fn publish_local(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        ctx: Option<EventContext<Sequenced>>,
+    ) -> Result<()> {
+        let evt = self.event_from(data, ctx)?;
+        self.sequencer.do_send(evt);
+        Ok(())
     }
 }
 
@@ -279,13 +318,13 @@ mod tests {
         bus_c.subscribe(EventType::All, saver.clone().into());
 
         // Publish events in causal order across buses
-        bus_a.publish(TestEvent::new("one", 1))?;
+        bus_a.publish_origin(TestEvent::new("one", 1))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish(TestEvent::new("two", 2))?;
+        bus_b.publish_origin(TestEvent::new("two", 2))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_a.publish(TestEvent::new("three", 3))?;
+        bus_a.publish_origin(TestEvent::new("three", 3))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish(TestEvent::new("four", 4))?;
+        bus_b.publish_origin(TestEvent::new("four", 4))?;
         sleep(Duration::from_millis(50)).await; // next tick
 
         // Get events

@@ -10,7 +10,7 @@ use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
-    PublicKeyAggregated, Seed,
+    PublicKeyAggregated, Seed, TypedEvent,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -142,8 +142,11 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::KeyGeneration, &self.bus.clone(), || {
-            match msg.into_data() {
-                EnclaveEventData::KeyshareCreated(data) => self.notify_sync(ctx, data)?,
+            let (msg, ec) = msg.into_components();
+            match msg {
+                EnclaveEventData::KeyshareCreated(data) => {
+                    self.notify_sync(ctx, TypedEvent::new(data, ec))
+                }
                 EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
                 _ => (),
             };
@@ -152,71 +155,84 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
     }
 }
 
-impl Handler<KeyshareCreated> for PublicKeyAggregator {
-    type Result = Result<()>;
+impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
+    type Result = ();
 
-    fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
-        let e3_id = event.e3_id.clone();
-        let pubkey = event.pubkey.clone();
-        let node = event.node.clone();
+    fn handle(
+        &mut self,
+        event: TypedEvent<KeyshareCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
+            let (event, ec) = event.into_components();
+            let e3_id = event.e3_id.clone();
+            let pubkey = event.pubkey.clone();
+            let node = event.node.clone();
 
-        if e3_id != self.e3_id {
-            error!("Wrong e3_id sent to aggregator. This should not happen.");
-            return Ok(());
-        }
+            if e3_id != self.e3_id {
+                error!("Wrong e3_id sent to aggregator. This should not happen.");
+                return Ok(());
+            }
 
-        self.add_keyshare(pubkey, node)?;
+            self.add_keyshare(pubkey, node)?;
 
-        if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) = &self.state.get() {
-            self.notify_sync(
-                ctx,
-                ComputeAggregate {
-                    keyshares: keyshares.clone(),
-                    e3_id,
-                },
-            )?
-        }
+            if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) = &self.state.get() {
+                self.notify_sync(
+                    ctx,
+                    TypedEvent::new(
+                        ComputeAggregate {
+                            keyshares: keyshares.clone(),
+                            e3_id,
+                        },
+                        ec,
+                    ),
+                )
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 }
 
-impl Handler<ComputeAggregate> for PublicKeyAggregator {
-    type Result = Result<()>;
+impl Handler<TypedEvent<ComputeAggregate>> for PublicKeyAggregator {
+    type Result = ();
 
-    fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        info!("Computing Aggregate PublicKey...");
-        let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
-            keyshares: msg.keyshares,
-        })?;
+    fn handle(&mut self, msg: TypedEvent<ComputeAggregate>, _: &mut Self::Context) -> Self::Result {
+        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
+            let (msg, ec) = msg.into_components();
+            info!("Computing Aggregate PublicKey...");
+            let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
+                keyshares: msg.keyshares,
+            })?;
 
-        let public_key_hash = compute_pk_commitment(
-            pubkey.clone(),
-            self.fhe.params.degree(),
-            self.fhe.params.plaintext(),
-            self.fhe.params.moduli().to_vec(),
-        )?;
+            let public_key_hash = compute_pk_commitment(
+                pubkey.clone(),
+                self.fhe.params.degree(),
+                self.fhe.params.plaintext(),
+                self.fhe.params.moduli().to_vec(),
+            )?;
 
-        // Update the local state
-        self.set_pubkey(pubkey)?;
+            // Update the local state
+            self.set_pubkey(pubkey)?;
 
-        if let Some(PublicKeyAggregatorState::Complete {
-            public_key: pubkey,
-            nodes,
-            ..
-        }) = self.state.get()
-        {
-            info!("Notifying network of PublicKey");
-            info!("Sending PublicKeyAggregated...");
-            let event = PublicKeyAggregated {
-                pubkey,
-                public_key_hash,
-                e3_id: msg.e3_id,
+            if let Some(PublicKeyAggregatorState::Complete {
+                public_key: pubkey,
                 nodes,
-            };
-            self.bus.publish(event)?;
-        }
-        Ok(())
+                ..
+            }) = self.state.get()
+            {
+                info!("Notifying network of PublicKey");
+                info!("Sending PublicKeyAggregated...");
+                let event = PublicKeyAggregated {
+                    pubkey,
+                    public_key_hash,
+                    e3_id: msg.e3_id,
+                    nodes,
+                };
+                self.bus.publish(event, ec)?;
+            }
+            Ok(())
+        })
     }
 }
 

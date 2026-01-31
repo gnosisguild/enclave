@@ -13,7 +13,7 @@ use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
     ConfigurationUpdated, E3Requested, E3id, EType, EnclaveEvent, EventType,
-    OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated,
+    OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated, TypedEvent,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use e3_utils::NotifySync;
@@ -358,8 +358,9 @@ impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, data.clone()),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
             EnclaveEventData::CiphernodeAdded(data) => self.notify_sync(ctx, data.clone()),
             EnclaveEventData::CiphernodeRemoved(data) => self.notify_sync(ctx, data.clone()),
             EnclaveEventData::TicketBalanceUpdated(data) => self.notify_sync(ctx, data.clone()),
@@ -375,9 +376,9 @@ impl Handler<EnclaveEvent> for Sortition {
     }
 }
 
-impl Handler<E3Requested> for Sortition {
+impl Handler<TypedEvent<E3Requested>> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: E3Requested, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<E3Requested>, _: &mut Self::Context) -> Self::Result {
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
         let threshold_n = msg.threshold_n;

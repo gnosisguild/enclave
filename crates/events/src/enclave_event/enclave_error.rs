@@ -45,6 +45,7 @@ pub enum EType {
     Data,
     Event,
     Computation,
+    DocumentPublishing,
 }
 
 impl EnclaveError {

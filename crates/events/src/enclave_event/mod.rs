@@ -280,6 +280,10 @@ where
         (self.payload, self.ctx.ts())
     }
 
+    pub fn into_components(self) -> (EnclaveEventData, EventContext<S>) {
+        (self.payload, self.ctx)
+    }
+
     pub fn get_ctx(&self) -> &EventContext<S> {
         &self.ctx
     }

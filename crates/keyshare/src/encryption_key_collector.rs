@@ -11,7 +11,9 @@ use std::{
 };
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
-use e3_events::{E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated};
+use e3_events::{
+    E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, TypedEvent,
+};
 use e3_trbfv::PartyId;
 use tracing::{info, warn};
 
@@ -96,9 +98,14 @@ impl Actor for EncryptionKeyCollector {
     }
 }
 
-impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
+impl Handler<TypedEvent<EncryptionKeyCreated>> for EncryptionKeyCollector {
     type Result = ();
-    fn handle(&mut self, msg: EncryptionKeyCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let start = Instant::now();
         info!("EncryptionKeyCollector: EncryptionKeyCreated received");
 
@@ -141,7 +148,8 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: AllEncryptionKeysCollected = self.keys.clone().into();
+            let event: TypedEvent<AllEncryptionKeysCollected> =
+                TypedEvent::new(self.keys.clone().into(), ec);
             self.parent.do_send(event);
         }
 

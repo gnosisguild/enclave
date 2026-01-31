@@ -12,7 +12,7 @@ use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, ComputeRequest, ComputeResponse, CorrelationId,
     DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, PlaintextAggregated,
-    Seed,
+    Seed, TypedEvent,
 };
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
 use e3_trbfv::{
@@ -196,7 +196,8 @@ impl ThresholdPlaintextAggregator {
         })
     }
 
-    pub fn handle_compute_aggregate(&mut self, msg: ComputeAggregate) -> Result<()> {
+    pub fn handle_compute_aggregate(&mut self, msg: TypedEvent<ComputeAggregate>) -> Result<()> {
+        let (msg, ec) = msg.into_components();
         info!("create_calculate_threshold_decryption_event...");
 
         let e3_id = self.e3_id.clone();
@@ -221,11 +222,12 @@ impl ThresholdPlaintextAggregator {
             CorrelationId::new(),
             e3_id,
         );
-        self.bus.publish(event)?;
+        self.bus.publish(event, ec)?;
         Ok(())
     }
 
-    pub fn handle_compute_response(&mut self, msg: ComputeResponse) -> Result<()> {
+    pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
+        let (msg, ec) = msg.into_components();
         ensure!(
             msg.e3_id == self.e3_id,
             "PlaintextAggregator should never receive incorrect e3_id msgs"
@@ -250,7 +252,7 @@ impl ThresholdPlaintextAggregator {
         };
 
         info!("Dispatching plaintext event {:?}", event);
-        self.bus.publish(event)?;
+        self.bus.publish(event, ec)?;
         Ok(())
     }
 }
@@ -262,18 +264,25 @@ impl Actor for ThresholdPlaintextAggregator {
 impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::DecryptionshareCreated(data) => ctx.notify(TypedEvent::new(data, ec)),
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::ComputeResponse(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
+impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregator {
     type Result = ();
-    fn handle(&mut self, msg: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DecryptionshareCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         trap(EType::PublickeyAggregation, &self.bus.clone(), || {
             let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
                 self.state.get()
@@ -290,11 +299,13 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
     }
 }
 
-impl Handler<E3CommitteeContainsResponse<DecryptionshareCreated>> for ThresholdPlaintextAggregator {
+impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
+    for ThresholdPlaintextAggregator
+{
     type Result = ();
     fn handle(
         &mut self,
-        msg: E3CommitteeContainsResponse<DecryptionshareCreated>,
+        msg: E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(EType::PublickeyAggregation, &self.bus.clone(), || {
@@ -310,11 +321,14 @@ impl Handler<E3CommitteeContainsResponse<DecryptionshareCreated>> for ThresholdP
 
             // Trust the party_id from the event - it's based on CommitteeFinalized order
             // which is the authoritative source of truth for party IDs
-            let DecryptionshareCreated {
-                party_id,
-                decryption_share,
-                ..
-            } = msg.into_inner();
+            let (
+                DecryptionshareCreated {
+                    party_id,
+                    decryption_share,
+                    ..
+                },
+                ec,
+            ) = msg.into_inner().into_components();
 
             self.add_share(party_id, decryption_share)?;
 
@@ -328,12 +342,15 @@ impl Handler<E3CommitteeContainsResponse<DecryptionshareCreated>> for ThresholdP
             {
                 self.notify_sync(
                     ctx,
-                    ComputeAggregate {
-                        shares: shares.clone(),
-                        ciphertext_output: ciphertext_output.clone(),
-                        threshold_m,
-                        threshold_n,
-                    },
+                    TypedEvent::new(
+                        ComputeAggregate {
+                            shares: shares.clone(),
+                            ciphertext_output: ciphertext_output.clone(),
+                            threshold_m,
+                            threshold_n,
+                        },
+                        ec,
+                    ),
                 )
             }
             Ok(())
@@ -341,18 +358,18 @@ impl Handler<E3CommitteeContainsResponse<DecryptionshareCreated>> for ThresholdP
     }
 }
 
-impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
+impl Handler<TypedEvent<ComputeAggregate>> for ThresholdPlaintextAggregator {
     type Result = ();
-    fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<ComputeAggregate>, _: &mut Self::Context) -> Self::Result {
         trap(EType::PlaintextAggregation, &self.bus.clone(), || {
             self.handle_compute_aggregate(msg)
         })
     }
 }
 
-impl Handler<ComputeResponse> for ThresholdPlaintextAggregator {
+impl Handler<TypedEvent<ComputeResponse>> for ThresholdPlaintextAggregator {
     type Result = ();
-    fn handle(&mut self, msg: ComputeResponse, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<ComputeResponse>, _: &mut Self::Context) -> Self::Result {
         trap(EType::PlaintextAggregation, &self.bus.clone(), || {
             self.handle_compute_response(msg)
         })

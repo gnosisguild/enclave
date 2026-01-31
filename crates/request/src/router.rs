@@ -184,8 +184,8 @@ impl Handler<EnclaveEvent> for E3Router {
             }
 
             context.forward_message(&msg, &mut self.buffer);
-
-            match msg.into_data() {
+            let (data, ctx) = msg.into_components();
+            match data {
                 EnclaveEventData::PlaintextAggregated(_) => {
                     // Here we are detemining that by receiving the PlaintextAggregated event our request is
                     // complete and we can notify everyone. This might change as we consider other factors
@@ -195,7 +195,7 @@ impl Handler<EnclaveEvent> for E3Router {
                     };
 
                     // Send to bus so all other actors can react to a request being complete.
-                    self.bus.publish(event)?;
+                    self.bus.publish(event, ctx)?;
                 }
                 EnclaveEventData::E3RequestComplete(_) => {
                     // Note this will be sent above to the children who can kill themselves based on

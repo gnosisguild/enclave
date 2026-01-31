@@ -108,7 +108,7 @@ impl Handler<SyncEvmEvent> for FakeSyncActor {
                         let (data, ts, _) = evt.split();
                         self.bus.publish_from_remote(data, ts)?;
                     }
-                    self.bus.publish(SyncEnd::new())?;
+                    self.bus.publish_origin(SyncEnd::new())?;
                 }
             };
             Ok(())
@@ -160,7 +160,7 @@ async fn evm_reader() -> Result<()> {
     // This should trigger all chains to start to sync
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish(SyncStart::new(sync, evm_info))?;
+    bus.publish_origin(SyncStart::new(sync, evm_info))?;
 
     sleep(Duration::from_secs(1)).await;
     contract
@@ -238,7 +238,7 @@ async fn ensure_historical_events() -> Result<()> {
         .build();
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish(SyncStart::new(sync, evm_info))?;
+    bus.publish_origin(SyncStart::new(sync, evm_info))?;
 
     for msg in live_events.clone() {
         contract

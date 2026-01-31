@@ -38,6 +38,10 @@ impl<T> TypedEvent<T> {
     pub fn get_ctx(&self) -> &EventContext<Sequenced> {
         &self.ctx
     }
+
+    pub fn into_components(self) -> (T, EventContext<Sequenced>) {
+        (self.inner, self.ctx)
+    }
 }
 
 impl<T> Deref for TypedEvent<T> {

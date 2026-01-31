@@ -71,6 +71,7 @@ pub struct SyncRequestValue {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncResponseValue {
     pub events: Vec<GossipData>,
+    pub ts: u128,
 }
 
 #[derive(Message, Clone, Debug)]
@@ -228,11 +229,12 @@ impl NetEvent {
 pub struct DocumentPublishedNotification {
     pub meta: DocumentMeta,
     pub key: Cid,
+    pub ts: u128,
 }
 
 impl DocumentPublishedNotification {
-    pub fn new(meta: DocumentMeta, key: Cid) -> Self {
-        Self { meta, key }
+    pub fn new(meta: DocumentMeta, key: Cid, ts: u128) -> Self {
+        Self { meta, key, ts }
     }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>> {

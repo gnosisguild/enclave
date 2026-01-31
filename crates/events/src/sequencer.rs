@@ -73,7 +73,7 @@ mod tests {
         ];
 
         for d in event_data.clone() {
-            bus.publish(d)?;
+            bus.publish_origin(d)?;
         }
 
         let expected = event_data

@@ -17,6 +17,7 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
+use e3_events::trap_fut;
 use e3_events::BusHandle;
 use e3_events::ComputeRequestErrorKind;
 use e3_events::EType;
@@ -26,6 +27,7 @@ use e3_events::ErrorDispatcher;
 use e3_events::Event;
 use e3_events::EventPublisher;
 use e3_events::EventSubscriber;
+use e3_events::TypedEvent;
 use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
@@ -33,7 +35,6 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
-use e3_utils::NotifySync;
 use e3_utils::SharedRng;
 use rand::Rng;
 use tracing::error;
@@ -99,33 +100,32 @@ impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         info!("Multithread received EnclaveEvent!");
-        match msg.get_data() {
-            EnclaveEventData::ComputeRequest(data) => ctx.notify(data.clone()),
+        let (data, ec) = msg.into_components();
+        match data {
+            EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
             _ => (),
         }
     }
 }
 
-impl Handler<ComputeRequest> for Multithread {
+impl Handler<TypedEvent<ComputeRequest>> for Multithread {
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<ComputeRequest>, _: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
         let pool = self.task_pool.clone();
         let report = self.report.clone();
-        // TODO: replace with trap_fut
-        Box::pin(async move {
-            match handle_compute_request_event(msg, bus, cipher, rng, pool, report).await {
-                Ok(_) => (),
-                Err(e) => error!("{e}"),
-            }
-        })
+        trap_fut(
+            EType::Computation,
+            &self.bus.clone(),
+            handle_compute_request_event(msg, bus, cipher, rng, pool, report),
+        )
     }
 }
 
 async fn handle_compute_request_event(
-    msg: ComputeRequest,
+    msg: TypedEvent<ComputeRequest>,
     bus: BusHandle,
     cipher: Arc<Cipher>,
     rng: SharedRng,
@@ -134,7 +134,7 @@ async fn handle_compute_request_event(
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
-
+    let (msg, ctx) = msg.into_components();
     // We spawn a thread on rayon moving to "sync"-land
     let (result, duration) = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
@@ -150,7 +150,7 @@ async fn handle_compute_request_event(
     };
 
     match result {
-        Ok(val) => bus.publish(val)?,
+        Ok(val) => bus.publish(val, ctx)?,
         Err(e) => bus.err(EType::Computation, e),
     };
     Ok(())
