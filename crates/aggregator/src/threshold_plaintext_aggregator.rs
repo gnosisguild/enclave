@@ -281,9 +281,9 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                 debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
                 return Ok(());
             };
-
-            let request =
-                E3CommitteeContainsRequest::new(&msg.e3_id, &msg.node, msg.clone(), ctx.address());
+            let node = msg.node.clone();
+            let e3_id = msg.e3_id.clone();
+            let request = E3CommitteeContainsRequest::new(e3_id, node, msg, ctx.address());
             self.sortition.try_send(request)?;
             Ok(())
         })

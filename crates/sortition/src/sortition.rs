@@ -155,15 +155,15 @@ where
     T: Send + Sync,
 {
     pub fn new(
-        e3_id: &E3id,
-        node: &str,
+        e3_id: E3id,
+        node: String,
         inner: T,
         sender: impl Into<Recipient<E3CommitteeContainsResponse<T>>>,
     ) -> Self {
         Self {
             inner,
-            e3_id: e3_id.clone(),
-            node: node.to_owned(),
+            e3_id,
+            node,
             sender: sender.into(),
         }
     }
