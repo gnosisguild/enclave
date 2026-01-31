@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "pk",
+    "sk_share_computation",
+    "sk_share_encryption",
+    "sk_share_decryption",
+    "e_sm_share_computation",
+    "e_sm_share_encryption",
+    "e_sm_share_decryption",
+]

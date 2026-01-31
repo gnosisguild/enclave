@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use lib::configs::default::threshold::{
+    L, N, SHARE_DECRYPTION_BIT_CT, SHARE_DECRYPTION_BIT_D, SHARE_DECRYPTION_BIT_E_SM,
+    SHARE_DECRYPTION_BIT_R1, SHARE_DECRYPTION_BIT_R2, SHARE_DECRYPTION_BIT_SK,
+    SHARE_DECRYPTION_CONFIGS,
+};
+use lib::core::threshold::share_decryption::ShareDecryption;
+use lib::math::polynomial::Polynomial;
+
+fn main(
+    expected_sk_commitment: pub Field,
+    expected_e_sm_commitment: pub Field,
+    c_0: pub [Polynomial<N>; L],
+    c_1: pub [Polynomial<N>; L],
+    sk: [Polynomial<N>; L],
+    e_sm: [Polynomial<N>; L],
+    r_1: [Polynomial<(2 * N) - 1>; L],
+    r_2: [Polynomial<N - 1>; L],
+    d: [Polynomial<N>; L],
+) {
+    let share_decryption: ShareDecryption<N, L, SHARE_DECRYPTION_BIT_CT, SHARE_DECRYPTION_BIT_SK, SHARE_DECRYPTION_BIT_E_SM, SHARE_DECRYPTION_BIT_R1, SHARE_DECRYPTION_BIT_R2, SHARE_DECRYPTION_BIT_D> = ShareDecryption::new(
+        SHARE_DECRYPTION_CONFIGS,
+        expected_sk_commitment,
+        expected_e_sm_commitment,
+        c_0,
+        c_1,
+        sk,
+        e_sm,
+        r_1,
+        r_2,
+        d,
+    );
+    share_decryption.execute()
+}

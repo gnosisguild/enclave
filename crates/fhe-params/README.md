@@ -29,10 +29,10 @@ system. It supports two main workflows:
 
 Pre-configured BFV parameter sets for PVSS (Public Verifiable Secret Sharing) protocol:
 
-- **`BfvPreset::SecureThresholdBfv8192`** (default): Production-ready threshold BFV parameters
+- **`BfvPreset::SecureThreshold8192`** (default): Production-ready threshold BFV parameters
   (degree 8192)
 - **`BfvPreset::SecureDkg8192`**: Production-ready DKG parameters (degree 8192)
-- **`BfvPreset::InsecureThresholdBfv512`**: Testing-only threshold BFV parameters (degree 512)
+- **`BfvPreset::InsecureThreshold512`**: Testing-only threshold BFV parameters (degree 512)
 - **`BfvPreset::InsecureDkg512`**: Testing-only DKG parameters (degree 512)
 
 In the PVSS protocol, two types of BFV parameters are needed:
@@ -99,7 +99,7 @@ The `bfv_search()` function implements a search algorithm that:
 Returns the first feasible parameter set found, or an error if none exist.
 
 **Note**: Some resulting parameter sets from this search are hardcoded as presets in the
-`presets.rs` file for production use (e.g., `BfvPreset::SecureThresholdBfv8192`).
+`presets.rs` file for production use (e.g., `BfvPreset::SecureThreshold8192`).
 
 #### Search Result
 
@@ -132,10 +132,10 @@ use std::sync::Arc;
 
 fn example() -> Result<(), e3_fhe_params::PresetError> {
     // Build threshold BFV parameters
-    let params = build_bfv_params_arc(BfvPreset::SecureThresholdBfv8192)?;
+    let params = build_bfv_params_arc(BfvPreset::SecureThreshold8192)?;
 
     // Build both threshold and DKG parameter pairs
-    let (threshold_params, dkg_params) = build_pair_for_preset(BfvPreset::SecureThresholdBfv8192)?;
+    let (threshold_params, dkg_params) = build_pair_for_preset(BfvPreset::SecureThreshold8192)?;
 
     Ok(())
 }
@@ -260,7 +260,7 @@ The CLI displays:
 use e3_fhe_params::{BfvPreset, build_bfv_params_arc, encode_bfv_params, decode_bfv_params, decode_bfv_params_arc};
 
 // Build parameters from a preset
-let params = build_bfv_params_arc(BfvPreset::SecureThresholdBfv8192)?;
+let params = build_bfv_params_arc(BfvPreset::SecureThreshold8192)?;
 
 // Encode parameters to ABI bytes for smart contract use
 let encoded_bytes = encode_bfv_params(&params);

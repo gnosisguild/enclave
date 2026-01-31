@@ -11,6 +11,7 @@ use alloy::{
 };
 use e3_bfv_client::compute_pk_commitment;
 use e3_evm_helpers::contracts::ReadOnly;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
 use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
@@ -44,7 +45,7 @@ async fn test_indexer() -> Result<()> {
     const THRESHOLD: u64 = 10;
     const INDEXER_DELAY_MS: u64 = 10;
 
-    let param_set = BfvPreset::InsecureThresholdBfv512.into();
+    let param_set = DEFAULT_BFV_PRESET.into();
     let params = build_bfv_params_from_set_arc(param_set);
 
     let (

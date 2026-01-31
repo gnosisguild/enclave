@@ -15,7 +15,8 @@ use e3_events::{
     E3Requested, E3id, EnclaveEvent, EnclaveEventData, OperatorActivationChanged,
     PlaintextAggregated, Seed, TakeEvents, TicketBalanceUpdated,
 };
-use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
+use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::{encode_bfv_params, BfvParamSet};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
@@ -129,7 +130,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let bus = system.handle()?;
 
     // Parameters (128bits of security)
-    let params_raw = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+    let params_raw = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
 
     // Encoded Params
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));

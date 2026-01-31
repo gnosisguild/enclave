@@ -39,7 +39,7 @@
 //! 3. Verifies the addition equations hold at these points
 //! 4. Checks range constraints on all coefficients
 
-use lib::core::greco::Configs as GrecoConfigs;
+use lib::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
 use lib::math::commitments::compute_commitments;
 use lib::math::polynomial::Polynomial;
 
@@ -52,7 +52,7 @@ use lib::math::polynomial::Polynomial;
 /// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
 /// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
-    configs: GrecoConfigs<N, L>,
+    configs: UserDataEncryptionConfigs<N, L>,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     ct_commitment: Field,
@@ -76,7 +76,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
-        configs: GrecoConfigs<N, L>,
+        configs: UserDataEncryptionConfigs<N, L>,
         ct0is: [Polynomial<N>; L],
         ct1is: [Polynomial<N>; L],
         ct_commitment: Field,
@@ -148,7 +148,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     ///
     /// # Returns
     /// `true` if all ciphertext addition constraints are satisfied, `false` otherwise.
-    pub fn verify(self) -> bool {
+    pub fn execute(self) -> bool {
         // Step 1: Perform range checks on all polynomial coefficients
         self.check_range_bounds();
 

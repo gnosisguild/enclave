@@ -4,5 +4,5 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod bfv;
-pub mod trbfv;
+pub mod dkg;
+pub mod threshold;
