@@ -444,7 +444,7 @@ impl ThresholdKeyshare {
         let sk_bfv_encrypted = SensitiveBytes::new(sk_bytes, &self.cipher)?;
         let pk_bfv_bytes = ArcBytes::from_bytes(&pk_bfv.to_bytes());
 
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             s.new_state(KeyshareState::CollectingEncryptionKeys(
                 CollectingEncryptionKeysData {
                     sk_bfv: sk_bfv_encrypted.clone(),
@@ -483,7 +483,7 @@ impl ThresholdKeyshare {
 
         let current: CollectingEncryptionKeysData = self.state.try_get()?.try_into()?;
 
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             s.new_state(KeyshareState::GeneratingThresholdShare(
                 GeneratingThresholdShareData {
                     sk_sss: None,
@@ -553,7 +553,7 @@ impl ThresholdKeyshare {
 
         let esi_sss = output.esi_sss;
 
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
 
             info!("try_store_esi_sss");
@@ -642,7 +642,7 @@ impl ThresholdKeyshare {
 
         let (pk_share, sk_sss) = (output.pk_share, output.sk_sss);
 
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             info!("try_store_pk_share_and_sk_sss");
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
             let next = match current.esi_sss {
@@ -850,7 +850,7 @@ impl ThresholdKeyshare {
 
         let (sk_poly_sum, es_poly_sum) = (output.sk_poly_sum, output.es_poly_sum);
 
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             info!("Try store decryption key");
 
@@ -891,7 +891,7 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
         // Set state to decrypting
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
 
             let current: ReadyForDecryption = s.clone().try_into()?;
@@ -949,10 +949,10 @@ impl ThresholdKeyshare {
         };
 
         // send the decryption share
-        self.bus.publish(event, ec)?;
+        self.bus.publish(event, ec.clone())?;
 
         // mark as complete
-        self.state.try_mutate(|s| {
+        self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             info!("Decryption share sending process is complete");
 

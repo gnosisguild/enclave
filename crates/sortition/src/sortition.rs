@@ -262,7 +262,7 @@ impl Sortition {
         let node_state = node_state_store.load_or_default(HashMap::new()).await?;
         let finalized_committees = committees_store.load_or_default(HashMap::new()).await?;
 
-        backends.try_mutate(|mut list| {
+        backends.try_mutate_without_context(|mut list| {
             list.insert(u64::MAX, default_backend);
             Ok(list)
         })?;
@@ -361,16 +361,30 @@ impl Handler<EnclaveEvent> for Sortition {
         let (msg, ec) = msg.into_components();
         match msg {
             EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::CiphernodeAdded(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CiphernodeRemoved(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::TicketBalanceUpdated(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::OperatorActivationChanged(data) => {
-                self.notify_sync(ctx, data.clone())
+            EnclaveEventData::CiphernodeAdded(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ConfigurationUpdated(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CommitteePublished(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::PlaintextOutputPublished(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CommitteeFinalized(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::CiphernodeRemoved(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::TicketBalanceUpdated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::OperatorActivationChanged(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ConfigurationUpdated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteePublished(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::PlaintextOutputPublished(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteeFinalized(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -390,14 +404,15 @@ impl Handler<TypedEvent<E3Requested>> for Sortition {
     }
 }
 
-impl Handler<CiphernodeAdded> for Sortition {
+impl Handler<TypedEvent<CiphernodeAdded>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<CiphernodeAdded>, _: &mut Self::Context) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let chain_id = msg.chain_id;
         let addr = msg.address.clone();
 
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_state = state_map
                 .entry(chain_id)
                 .or_insert_with(NodeStateStore::default);
@@ -410,7 +425,7 @@ impl Handler<CiphernodeAdded> for Sortition {
             self.bus.err(EType::Sortition, err);
         }
 
-        if let Err(err) = self.backends.try_mutate(move |mut list_map| {
+        if let Err(err) = self.backends.try_mutate(&ec, move |mut list_map| {
             let default_backend = list_map
                 .get(&u64::MAX)
                 .cloned()
@@ -429,14 +444,19 @@ impl Handler<CiphernodeAdded> for Sortition {
     }
 }
 
-impl Handler<CiphernodeRemoved> for Sortition {
+impl Handler<TypedEvent<CiphernodeRemoved>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CiphernodeRemoved>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let chain_id = msg.chain_id;
         let addr = msg.address.clone();
 
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             if let Some(chain_state) = state_map.get_mut(&chain_id) {
                 chain_state.nodes.remove(&addr);
             }
@@ -445,7 +465,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
             self.bus.err(EType::Sortition, err);
         }
 
-        if let Err(err) = self.backends.try_mutate(move |mut list_map| {
+        if let Err(err) = self.backends.try_mutate(&ec, move |mut list_map| {
             if let Some(backend) = list_map.get_mut(&chain_id) {
                 backend.remove(addr);
             }
@@ -458,11 +478,16 @@ impl Handler<CiphernodeRemoved> for Sortition {
     }
 }
 
-impl Handler<TicketBalanceUpdated> for Sortition {
+impl Handler<TypedEvent<TicketBalanceUpdated>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: TicketBalanceUpdated, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<TicketBalanceUpdated>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_state = state_map
                 .entry(msg.chain_id)
                 .or_insert_with(NodeStateStore::default);
@@ -486,11 +511,16 @@ impl Handler<TicketBalanceUpdated> for Sortition {
     }
 }
 
-impl Handler<OperatorActivationChanged> for Sortition {
+impl Handler<TypedEvent<OperatorActivationChanged>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: OperatorActivationChanged, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<OperatorActivationChanged>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             // Update all entries for this operator across all chains
             for (_, chain_state) in state_map.iter_mut() {
                 let node = chain_state
@@ -513,12 +543,17 @@ impl Handler<OperatorActivationChanged> for Sortition {
     }
 }
 
-impl Handler<ConfigurationUpdated> for Sortition {
+impl Handler<TypedEvent<ConfigurationUpdated>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: ConfigurationUpdated, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ConfigurationUpdated>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         if msg.parameter == "ticketPrice" {
-            if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+            if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
                 let chain_state = state_map
                     .entry(msg.chain_id)
                     .or_insert_with(NodeStateStore::default);
@@ -537,11 +572,16 @@ impl Handler<ConfigurationUpdated> for Sortition {
     }
 }
 
-impl Handler<CommitteePublished> for Sortition {
+impl Handler<TypedEvent<CommitteePublished>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteePublished, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteePublished>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_id = msg.e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, msg.e3_id.e3_id());
             let chain_state = state_map
@@ -600,11 +640,16 @@ where
 /// But in reality, E3 Jobs might not emit that in case there are no votes or the job fails.
 /// We need to find a better way to handle the end of an E3, Reduce the jobs in case of of an Error
 /// so the tickets do not get locked up.
-impl Handler<PlaintextOutputPublished> for Sortition {
+impl Handler<TypedEvent<PlaintextOutputPublished>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: PlaintextOutputPublished, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<PlaintextOutputPublished>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec,|mut state_map| {
             let chain_id = msg.e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, msg.e3_id.e3_id());
 
@@ -646,17 +691,22 @@ impl Handler<PlaintextOutputPublished> for Sortition {
     }
 }
 
-impl Handler<CommitteeFinalized> for Sortition {
+impl Handler<TypedEvent<CommitteeFinalized>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeFinalized>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         info!(
             e3_id = %msg.e3_id,
             committee_size = msg.committee.len(),
             "Storing finalized committee"
         );
 
-        if let Err(err) = self.finalized_committees.try_mutate(|mut committees| {
+        if let Err(err) = self.finalized_committees.try_mutate(&ec, |mut committees| {
             committees.insert(msg.e3_id.clone(), msg.committee.clone());
             Ok(committees)
         }) {

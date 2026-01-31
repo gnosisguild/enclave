@@ -9,8 +9,8 @@ use anyhow::Result;
 use e3_bfv_client::client::compute_pk_commitment;
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, KeyshareCreated, OrderedSet,
-    PublicKeyAggregated, Seed, TypedEvent,
+    prelude::*, BusHandle, Die, E3id, EnclaveEvent, EnclaveEventData, EventContext,
+    KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed, Sequenced, TypedEvent,
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
@@ -88,8 +88,13 @@ impl PublicKeyAggregator {
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: ArcBytes, node: String) -> Result<()> {
-        self.state.try_mutate(|mut state| {
+    pub fn add_keyshare(
+        &mut self,
+        keyshare: ArcBytes,
+        node: String,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(&ec, |mut state| {
             let PublicKeyAggregatorState::Collecting {
                 threshold_n,
                 keyshares,
@@ -119,8 +124,8 @@ impl PublicKeyAggregator {
         })
     }
 
-    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<()> {
-        self.state.try_mutate(|mut state| {
+    pub fn set_pubkey(&mut self, pubkey: Vec<u8>, ec: &EventContext<Sequenced>) -> Result<()> {
+        self.state.try_mutate(ec, |mut state| {
             let PublicKeyAggregatorState::Computing { keyshares, nodes } = &mut state else {
                 return Ok(state);
             };
@@ -174,7 +179,7 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
                 return Ok(());
             }
 
-            self.add_keyshare(pubkey, node)?;
+            self.add_keyshare(pubkey, node, &ec)?;
 
             if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) = &self.state.get() {
                 self.notify_sync(
@@ -213,7 +218,7 @@ impl Handler<TypedEvent<ComputeAggregate>> for PublicKeyAggregator {
             )?;
 
             // Update the local state
-            self.set_pubkey(pubkey)?;
+            self.set_pubkey(pubkey, &ec)?;
 
             if let Some(PublicKeyAggregatorState::Complete {
                 public_key: pubkey,

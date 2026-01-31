@@ -13,7 +13,8 @@ use serde::{de::DeserializeOwned, Serialize};
 pub trait PersistableData: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
 impl<T> PersistableData for T where T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
 
-/// AutoPersist enables a repository to generate a persistable container
+/// AutoPersist enables a repository to generate a persistable container. This is not a database and
+/// should not be thought of as a database. This is for creating actor snapshots.
 #[async_trait]
 pub trait AutoPersist<T>
 where
@@ -193,10 +194,25 @@ where
     }
 
     /// Mutate the content if available or return an error
-    pub fn try_mutate<F>(&mut self, mutator: F) -> Result<()>
+    pub fn try_mutate_without_context<F>(&mut self, mutator: F) -> Result<()>
     where
         F: FnOnce(T) -> Result<T>,
     {
+        self.try_mutate_impl(mutator, None)
+    }
+
+    pub fn try_mutate<F>(&mut self, ctx: &EventContext<Sequenced>, mutator: F) -> Result<()>
+    where
+        F: FnOnce(T) -> Result<T>,
+    {
+        self.try_mutate_impl(mutator, Some(ctx.clone()))
+    }
+
+    fn try_mutate_impl<F>(&mut self, mutator: F, ctx: Option<EventContext<Sequenced>>) -> Result<()>
+    where
+        F: FnOnce(T) -> Result<T>,
+    {
+        self.ctx = ctx; // Set the context
         let content = self.data.clone().ok_or(anyhow!("Data has not been set"))?;
         self.data = Some(mutator(content)?);
         self.write_to_store();

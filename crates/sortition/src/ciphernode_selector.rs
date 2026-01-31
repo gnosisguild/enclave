@@ -67,7 +67,9 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let (msg, ec) = msg.into_components();
         match msg {
-            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::E3RequestComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             EnclaveEventData::CommitteeFinalized(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
@@ -86,7 +88,7 @@ impl Handler<WithSortitionTicket<TypedEvent<E3Requested>>> for CiphernodeSelecto
         _: &mut Self::Context,
     ) -> Self::Result {
         trap(EType::Sortition, &self.bus.clone(), || {
-            self.e3_cache.try_mutate(|mut cache| {
+            self.e3_cache.try_mutate(data.get_ctx(), |mut cache| {
                 info!(
                     "Mutating e3_cache: appending data: {:?}",
                     data.e3_id.clone()
@@ -121,7 +123,7 @@ impl Handler<WithSortitionTicket<TypedEvent<E3Requested>>> for CiphernodeSelecto
                         ticket_id: TicketId::Score(tid),
                         node: data.address().to_owned(),
                     },
-                    data.get_ctx().clone(),
+                    data.get_ctx().to_owned(),
                 )?;
             }
 
@@ -130,11 +132,15 @@ impl Handler<WithSortitionTicket<TypedEvent<E3Requested>>> for CiphernodeSelecto
     }
 }
 
-impl Handler<E3RequestComplete> for CiphernodeSelector {
+impl Handler<TypedEvent<E3RequestComplete>> for CiphernodeSelector {
     type Result = ();
-    fn handle(&mut self, msg: E3RequestComplete, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<E3RequestComplete>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         trap(EType::Sortition, &self.bus.clone(), move || {
-            self.e3_cache.try_mutate(|mut cache| {
+            self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
                 cache.remove(&msg.e3_id);
                 Ok(cache)
             })

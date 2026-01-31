@@ -11,8 +11,8 @@ use anyhow::{anyhow, bail, ensure, Result};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, ComputeRequest, ComputeResponse, CorrelationId,
-    DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, PlaintextAggregated,
-    Seed, TypedEvent,
+    DecryptionshareCreated, Die, E3id, EType, EnclaveEvent, EnclaveEventData, EventContext,
+    PlaintextAggregated, Seed, Sequenced, TypedEvent,
 };
 use e3_sortition::{E3CommitteeContainsRequest, E3CommitteeContainsResponse, Sortition};
 use e3_trbfv::{
@@ -145,8 +145,13 @@ impl ThresholdPlaintextAggregator {
         }
     }
 
-    pub fn add_share(&mut self, party_id: u64, share: Vec<ArcBytes>) -> Result<()> {
-        self.state.try_mutate(|state| {
+    pub fn add_share(
+        &mut self,
+        party_id: u64,
+        share: Vec<ArcBytes>,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |state| {
             info!("Adding share for party_id={}", party_id);
             let current: Collecting = state.clone().try_into()?;
             let ciphertext_output = current.ciphertext_output;
@@ -181,8 +186,12 @@ impl ThresholdPlaintextAggregator {
         })
     }
 
-    pub fn set_decryption(&mut self, decrypted: Vec<ArcBytes>) -> Result<()> {
-        self.state.try_mutate(|mut state| {
+    pub fn set_decryption(
+        &mut self,
+        decrypted: Vec<ArcBytes>,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |mut state| {
             let ThresholdPlaintextAggregatorState::Computing(Computing { shares, .. }) = &mut state
             else {
                 return Ok(state.clone());
@@ -243,7 +252,7 @@ impl ThresholdPlaintextAggregator {
         // Update the local state
         let plaintext = response.plaintext;
 
-        self.set_decryption(plaintext.clone())?;
+        self.set_decryption(plaintext.clone(), &ec)?;
 
         // Dispatch the PlaintextAggregated event
         let event = PlaintextAggregated {
@@ -330,7 +339,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                 ec,
             ) = msg.into_inner().into_components();
 
-            self.add_share(party_id, decryption_share)?;
+            self.add_share(party_id, decryption_share, &ec)?;
 
             if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
                 threshold_m,
