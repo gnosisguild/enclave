@@ -203,11 +203,6 @@ impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
     }
 }
 
-/// Message to get the current node state.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Option<HashMap<u64, NodeStateStore>>")]
-pub struct GetNodeState;
-
 /// Sortition actor that manages the sortition algorithm and the node state.
 pub struct Sortition {
     /// Persistent map of `chain_id -> SortitionBackend`.
@@ -666,13 +661,5 @@ impl Handler<CommitteeFinalized> for Sortition {
         }) {
             self.bus.err(EType::Sortition, err);
         }
-    }
-}
-
-impl Handler<GetNodeState> for Sortition {
-    type Result = Option<HashMap<u64, NodeStateStore>>;
-
-    fn handle(&mut self, _msg: GetNodeState, _: &mut Self::Context) -> Self::Result {
-        self.node_state.get()
     }
 }
