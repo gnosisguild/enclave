@@ -280,6 +280,10 @@ where
         (self.payload, self.ctx.ts())
     }
 
+    pub fn into_components(self) -> (EnclaveEventData, EventContext<S>) {
+        (self.payload, self.ctx)
+    }
+
     pub fn get_ctx(&self) -> &EventContext<S> {
         &self.ctx
     }
@@ -506,6 +510,16 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
         } else {
             return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
         }
+    }
+}
+impl From<EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: EnclaveEvent) -> Self {
+        (&value).into()
+    }
+}
+impl From<&EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: &EnclaveEvent) -> Self {
+        value.ctx.clone()
     }
 }
 

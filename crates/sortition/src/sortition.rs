@@ -8,12 +8,12 @@ use crate::backends::{SortitionBackend, SortitionList};
 use crate::CiphernodeSelector;
 use actix::prelude::*;
 use alloy::primitives::U256;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
+    prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
+    ConfigurationUpdated, E3Requested, E3id, EType, EnclaveEvent, EventType,
+    OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated, TypedEvent,
 };
 use e3_events::{BusHandle, EnclaveEventData};
 use e3_utils::NotifySync;
@@ -97,23 +97,15 @@ impl NodeStateStore {
     }
 }
 
-/// Message: request the current set of registered node addresses for `chain_id`.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Vec<String>")]
-pub struct GetNodes {
-    /// Target chain.
-    pub chain_id: u64,
-}
-
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "()")]
-pub struct WithSortitionPartyTicket<T> {
+pub struct WithSortitionTicket<T> {
     inner: T,
     party_ticket_id: Option<(u64, Option<u64>)>,
     address: String,
 }
 
-impl<T> WithSortitionPartyTicket<T> {
+impl<T> WithSortitionTicket<T> {
     pub fn new(inner: T, party_ticket_id: Option<(u64, Option<u64>)>, address: &str) -> Self {
         Self {
             inner,
@@ -139,27 +131,77 @@ impl<T> WithSortitionPartyTicket<T> {
     }
 }
 
-impl<T> Deref for WithSortitionPartyTicket<T> {
+impl<T> Deref for WithSortitionTicket<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-/// Message to get the finalized committee nodes for a specific E3.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Vec<String>")]
-pub struct GetNodesForE3 {
-    /// E3 ID to get nodes for.
-    pub e3_id: e3_events::E3id,
-    /// Chain ID
-    pub chain_id: u64,
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+pub struct E3CommitteeContainsRequest<T: Send + Sync>
+where
+    T: Send + Sync,
+{
+    inner: T,
+    e3_id: E3id,
+    node: String,
+    sender: Recipient<E3CommitteeContainsResponse<T>>,
 }
 
-/// Message to get the current node state.
-#[derive(Message, Clone, Debug)]
-#[rtype(result = "Option<HashMap<u64, NodeStateStore>>")]
-pub struct GetNodeState;
+impl<T> E3CommitteeContainsRequest<T>
+where
+    T: Send + Sync,
+{
+    pub fn new(
+        e3_id: E3id,
+        node: String,
+        inner: T,
+        sender: impl Into<Recipient<E3CommitteeContainsResponse<T>>>,
+    ) -> Self {
+        Self {
+            inner,
+            e3_id,
+            node,
+            sender: sender.into(),
+        }
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "()")]
+pub struct E3CommitteeContainsResponse<T: Send + Sync> {
+    inner: T,
+    is_found_in_committee: bool,
+}
+
+impl<T> E3CommitteeContainsResponse<T>
+where
+    T: Send + Sync,
+{
+    pub fn new(inner: T, is_found_in_committee: bool) -> Self {
+        Self {
+            inner,
+            is_found_in_committee,
+        }
+    }
+
+    pub fn is_found_in_committee(&self) -> bool {
+        self.is_found_in_committee
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T: Send + Sync> Deref for E3CommitteeContainsResponse<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 
 /// Sortition actor that manages the sortition algorithm and the node state.
 pub struct Sortition {
@@ -220,7 +262,7 @@ impl Sortition {
         let node_state = node_state_store.load_or_default(HashMap::new()).await?;
         let finalized_committees = committees_store.load_or_default(HashMap::new()).await?;
 
-        backends.try_mutate(|mut list| {
+        backends.try_mutate_without_context(|mut list| {
             list.insert(u64::MAX, default_backend);
             Ok(list)
         })?;
@@ -259,10 +301,10 @@ impl Sortition {
         let map = self
             .backends
             .get()
-            .ok_or_else(|| anyhow::anyhow!("Could not get backends cache"))?;
+            .ok_or_else(|| anyhow!("Could not get backends cache"))?;
         let backend = map
             .get(&chain_id)
-            .ok_or_else(|| anyhow::anyhow!("No backend for chain_id {}", chain_id))?;
+            .ok_or_else(|| anyhow!("No backend for chain_id {}", chain_id))?;
         Ok(backend.nodes())
     }
 
@@ -285,6 +327,27 @@ impl Sortition {
                 None
             })
     }
+
+    fn get_committe(&self, e3_id: &E3id) -> Vec<String> {
+        self.finalized_committees
+            .get()
+            .and_then(|committees| committees.get(e3_id).cloned())
+            .unwrap_or_else(|| Vec::new())
+    }
+
+    fn committee_contains(&mut self, e3_id: E3id, node: String) -> bool {
+        let committee = self.get_committe(&e3_id);
+
+        if committee.len() == 0 {
+            // Non blocking error
+            self.bus.err(
+                EType::Sortition,
+                anyhow!("No finalized committee found for E3 {}", e3_id),
+            );
+        }
+
+        committee.contains(&node)
+    }
 }
 
 impl Actor for Sortition {
@@ -295,46 +358,61 @@ impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CiphernodeAdded(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CiphernodeRemoved(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::TicketBalanceUpdated(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::OperatorActivationChanged(data) => {
-                self.notify_sync(ctx, data.clone())
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::E3Requested(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            EnclaveEventData::CiphernodeAdded(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::ConfigurationUpdated(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CommitteePublished(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::PlaintextOutputPublished(data) => self.notify_sync(ctx, data.clone()),
-            EnclaveEventData::CommitteeFinalized(data) => self.notify_sync(ctx, data.clone()),
+            EnclaveEventData::CiphernodeRemoved(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::TicketBalanceUpdated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::OperatorActivationChanged(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ConfigurationUpdated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteePublished(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::PlaintextOutputPublished(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteeFinalized(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<E3Requested> for Sortition {
+impl Handler<TypedEvent<E3Requested>> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<E3Requested>, _: &mut Self::Context) -> Self::Result {
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
         let threshold_n = msg.threshold_n;
-        self.ciphernode_selector
-            .do_send(WithSortitionPartyTicket::new(
-                msg,
-                self.get_node_index(seed, threshold_n, chain_id),
-                &self.address,
-            ))
+        self.ciphernode_selector.do_send(WithSortitionTicket::new(
+            msg,
+            self.get_node_index(seed, threshold_n, chain_id),
+            &self.address,
+        ));
     }
 }
 
-impl Handler<CiphernodeAdded> for Sortition {
+impl Handler<TypedEvent<CiphernodeAdded>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<CiphernodeAdded>, _: &mut Self::Context) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let chain_id = msg.chain_id;
         let addr = msg.address.clone();
 
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_state = state_map
                 .entry(chain_id)
                 .or_insert_with(NodeStateStore::default);
@@ -347,7 +425,7 @@ impl Handler<CiphernodeAdded> for Sortition {
             self.bus.err(EType::Sortition, err);
         }
 
-        if let Err(err) = self.backends.try_mutate(move |mut list_map| {
+        if let Err(err) = self.backends.try_mutate(&ec, move |mut list_map| {
             let default_backend = list_map
                 .get(&u64::MAX)
                 .cloned()
@@ -366,14 +444,19 @@ impl Handler<CiphernodeAdded> for Sortition {
     }
 }
 
-impl Handler<CiphernodeRemoved> for Sortition {
+impl Handler<TypedEvent<CiphernodeRemoved>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CiphernodeRemoved>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let chain_id = msg.chain_id;
         let addr = msg.address.clone();
 
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             if let Some(chain_state) = state_map.get_mut(&chain_id) {
                 chain_state.nodes.remove(&addr);
             }
@@ -382,7 +465,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
             self.bus.err(EType::Sortition, err);
         }
 
-        if let Err(err) = self.backends.try_mutate(move |mut list_map| {
+        if let Err(err) = self.backends.try_mutate(&ec, move |mut list_map| {
             if let Some(backend) = list_map.get_mut(&chain_id) {
                 backend.remove(addr);
             }
@@ -395,11 +478,16 @@ impl Handler<CiphernodeRemoved> for Sortition {
     }
 }
 
-impl Handler<TicketBalanceUpdated> for Sortition {
+impl Handler<TypedEvent<TicketBalanceUpdated>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: TicketBalanceUpdated, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<TicketBalanceUpdated>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_state = state_map
                 .entry(msg.chain_id)
                 .or_insert_with(NodeStateStore::default);
@@ -423,11 +511,16 @@ impl Handler<TicketBalanceUpdated> for Sortition {
     }
 }
 
-impl Handler<OperatorActivationChanged> for Sortition {
+impl Handler<TypedEvent<OperatorActivationChanged>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: OperatorActivationChanged, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<OperatorActivationChanged>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             // Update all entries for this operator across all chains
             for (_, chain_state) in state_map.iter_mut() {
                 let node = chain_state
@@ -450,12 +543,17 @@ impl Handler<OperatorActivationChanged> for Sortition {
     }
 }
 
-impl Handler<ConfigurationUpdated> for Sortition {
+impl Handler<TypedEvent<ConfigurationUpdated>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: ConfigurationUpdated, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ConfigurationUpdated>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         if msg.parameter == "ticketPrice" {
-            if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+            if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
                 let chain_state = state_map
                     .entry(msg.chain_id)
                     .or_insert_with(NodeStateStore::default);
@@ -474,11 +572,16 @@ impl Handler<ConfigurationUpdated> for Sortition {
     }
 }
 
-impl Handler<CommitteePublished> for Sortition {
+impl Handler<TypedEvent<CommitteePublished>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteePublished, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteePublished>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_id = msg.e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, msg.e3_id.e3_id());
             let chain_state = state_map
@@ -511,15 +614,42 @@ impl Handler<CommitteePublished> for Sortition {
         }
     }
 }
+
+impl<T> Handler<E3CommitteeContainsRequest<T>> for Sortition
+where
+    T: Clone + Send + Sync + 'static,
+{
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: E3CommitteeContainsRequest<T>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::Sortition, &self.bus.clone(), || {
+            let response = E3CommitteeContainsResponse::new(
+                msg.inner,
+                self.committee_contains(msg.e3_id, msg.node),
+            );
+            msg.sender.try_send(response)?;
+            Ok(())
+        })
+    }
+}
+
 /// PlaintextOutputPublished is currently used as a signal to decrement the active jobs for the nodes in the committee
 /// But in reality, E3 Jobs might not emit that in case there are no votes or the job fails.
 /// We need to find a better way to handle the end of an E3, Reduce the jobs in case of of an Error
 /// so the tickets do not get locked up.
-impl Handler<PlaintextOutputPublished> for Sortition {
+impl Handler<TypedEvent<PlaintextOutputPublished>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: PlaintextOutputPublished, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<PlaintextOutputPublished>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        if let Err(err) = self.node_state.try_mutate(&ec,|mut state_map| {
             let chain_id = msg.e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, msg.e3_id.e3_id());
 
@@ -561,63 +691,26 @@ impl Handler<PlaintextOutputPublished> for Sortition {
     }
 }
 
-impl Handler<CommitteeFinalized> for Sortition {
+impl Handler<TypedEvent<CommitteeFinalized>> for Sortition {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteeFinalized, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeFinalized>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         info!(
             e3_id = %msg.e3_id,
             committee_size = msg.committee.len(),
             "Storing finalized committee"
         );
 
-        if let Err(err) = self.finalized_committees.try_mutate(|mut committees| {
+        if let Err(err) = self.finalized_committees.try_mutate(&ec, |mut committees| {
             committees.insert(msg.e3_id.clone(), msg.committee.clone());
             Ok(committees)
         }) {
             self.bus.err(EType::Sortition, err);
         }
-    }
-}
-
-impl Handler<GetNodes> for Sortition {
-    type Result = Vec<String>;
-
-    fn handle(&mut self, msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
-        self.get_nodes(msg.chain_id).unwrap_or_else(|err| {
-            tracing::warn!("Failed to get nodes for chain {}: {}", msg.chain_id, err);
-            Vec::new()
-        })
-    }
-}
-
-impl Handler<GetNodesForE3> for Sortition {
-    type Result = Vec<String>;
-
-    fn handle(&mut self, msg: GetNodesForE3, _ctx: &mut Self::Context) -> Self::Result {
-        if msg.e3_id.chain_id() != msg.chain_id {
-            tracing::warn!(
-                "Chain ID mismatch: e3_id has chain_id {}, but requested chain_id {}",
-                msg.e3_id.chain_id(),
-                msg.chain_id
-            );
-            return Vec::new();
-        }
-
-        self.finalized_committees
-            .get()
-            .and_then(|committees| committees.get(&msg.e3_id).cloned())
-            .unwrap_or_else(|| {
-                tracing::warn!("No finalized committee found for E3 {}", msg.e3_id);
-                Vec::new()
-            })
-    }
-}
-
-impl Handler<GetNodeState> for Sortition {
-    type Result = Option<HashMap<u64, NodeStateStore>>;
-
-    fn handle(&mut self, _msg: GetNodeState, _: &mut Self::Context) -> Self::Result {
-        self.node_state.get()
     }
 }

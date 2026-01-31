@@ -9,8 +9,8 @@ use std::collections::HashSet;
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
 use e3_events::{
-    trap, BusHandle, EType, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd, SyncEvmEvent,
-    SyncStart,
+    trap, BusHandle, EType, EventContext, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd,
+    SyncEvmEvent, SyncStart,
 };
 use tracing::info;
 
@@ -57,6 +57,7 @@ impl Synchronizer {
     }
 
     fn handle_sync_end(&mut self) -> Result<()> {
+        // TODO: WORK OUT WHAT IS GOING ON HERE WITH PUBLISHING AND CONTEXT
         info!("all chains synced draining to bus and running sync end");
         // Order all events (theoretically)
         self.evm_buffer.sort_by_key(|i| i.ts());
@@ -64,10 +65,11 @@ impl Synchronizer {
         // publish them in order
         for evt in self.evm_buffer.drain(..) {
             let (data, _, _) = evt.split();
-            self.bus.publish(data)?; // Use publish here as historical events will be correctly
-                                     // ordered as part of the preparatory process
+            self.bus.publish_origin(data)?; // Use publish_origin here as historical events will be correctly
+                                            // ordered as part of the preparatory process and these
+                                            // events have no
         }
-        self.bus.publish(SyncEnd::new())?;
+        self.bus.publish_origin(SyncEnd::new())?;
         Ok(())
     }
 }
@@ -105,7 +107,8 @@ impl Handler<Bootstrap> for Synchronizer {
             )?;
 
             // TODO: Get information about what has and has not been synced then fire SyncStart
-            self.bus.publish(SyncStart::new(ctx.address(), evm_config))
+            self.bus
+                .publish_origin(SyncStart::new(ctx.address(), evm_config))
         })
     }
 }

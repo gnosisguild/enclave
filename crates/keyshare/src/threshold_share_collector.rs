@@ -11,7 +11,9 @@ use std::{
 };
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
-use e3_events::{E3id, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated};
+use e3_events::{
+    E3id, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
+};
 use e3_trbfv::PartyId;
 use tracing::{info, warn};
 
@@ -68,9 +70,14 @@ impl Actor for ThresholdShareCollector {
     }
 }
 
-impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
+impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ThresholdShareCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let start = Instant::now();
         info!("ThresholdShareCollector: ThresholdShareCreated received by collector");
 
@@ -108,7 +115,8 @@ impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: AllThresholdSharesCollected = self.shares.clone().into();
+            let event: TypedEvent<AllThresholdSharesCollected> =
+                TypedEvent::new(self.shares.clone().into(), ec);
             self.parent.do_send(event);
         }
         info!(

@@ -14,10 +14,10 @@ use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
-    DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, Event, EventType, Filter, PartyId, PublishDocumentRequested,
-    ThresholdShareCreated,
+    prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind,
+    DocumentMeta, DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
+    EncryptionKeyCreated, Event, EventContext, EventType, Filter, PartyId,
+    PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -55,7 +55,7 @@ pub struct DocumentPublisher {
 }
 
 impl DocumentPublisher {
-    /// Create a new NetEventTranslator actor
+    /// Create a new DocumentPublisher actor
     pub fn new(
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
@@ -153,42 +153,33 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
         let rx = self.rx.clone();
         let bus = self.bus.clone();
         let topic = self.topic.clone();
-        Box::pin(async move {
-            match handle_publish_document_requested(tx, rx, msg, topic).await {
-                Ok(_) => (),
-                Err(e) => {
-                    error!(error=?e, "Could not handle publish document requested");
-                    bus.err(EType::IO, e)
-                }
-            }
-        })
+        trap_fut(
+            EType::IO,
+            &bus.clone(),
+            handle_publish_document_requested(tx, rx, msg, topic, bus),
+        )
     }
 }
 
 impl Handler<CiphernodeSelected> for DocumentPublisher {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_ciphernode_selected(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                error!("{e}")
-            }
-        }
+        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+            self.handle_ciphernode_selected(msg)
+        })
     }
 }
 
 impl Handler<E3RequestComplete> for DocumentPublisher {
     type Result = ();
     fn handle(&mut self, msg: E3RequestComplete, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_e3_request_complete(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                error!("{e}")
-            }
-        }
+        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+            self.handle_e3_request_complete(msg)
+        })
     }
 }
 
+/// Receiving DocumentPublishedNotification from libp2p
 impl Handler<DocumentPublishedNotification> for DocumentPublisher {
     type Result = ResponseFuture<()>;
     fn handle(
@@ -199,18 +190,13 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
         let ids = self.ids.clone();
         let bus = self.bus.clone();
         let tx = self.tx.clone();
-        let msg = msg.clone();
         let rx = self.rx.clone();
-
-        Box::pin(async move {
-            match handle_document_published_notification(tx, rx, bus.clone(), ids, msg).await {
-                Ok(_) => (),
-                Err(e) => {
-                    error!(error=?e, "Could not handle document published notification");
-                    bus.err(EType::IO, e);
-                }
-            }
-        })
+        let msg = msg.clone();
+        trap_fut(
+            EType::IO,
+            &bus,
+            handle_document_published_notification(tx, rx, bus.clone(), ids, msg),
+        )
     }
 }
 
@@ -233,6 +219,7 @@ pub async fn handle_publish_document_requested(
     rx: Arc<broadcast::Receiver<NetEvent>>,
     event: PublishDocumentRequested,
     topic: impl Into<String>,
+    bus: BusHandle,
 ) -> Result<()> {
     let value = event.value;
     let key = Cid::from_content(&value);
@@ -247,7 +234,7 @@ pub async fn handle_publish_document_requested(
         1000,
     )
     .await?;
-    let notification = DocumentPublishedNotification::new(event.meta, key);
+    let notification = DocumentPublishedNotification::new(event.meta, key, bus.ts()?);
     broadcast_document_published_notification(tx, rx, notification, topic).await?;
     Ok(())
 }
@@ -283,10 +270,13 @@ pub async fn handle_document_published_notification(
     .await?;
 
     debug!("Sending received event...");
-    bus.publish(DocumentReceived {
-        meta: event.meta,
-        value,
-    })?;
+    bus.publish_from_remote(
+        DocumentReceived {
+            meta: event.meta,
+            value,
+        },
+        event.ts,
+    )?;
 
     Ok(())
 }
@@ -421,6 +411,7 @@ impl EventConverter {
         receivable: ReceivableDocument,
         e3_id: &E3id,
         party_id: u64,
+        ctx: EventContext<Sequenced>,
     ) -> Result<()> {
         let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
         let meta = DocumentMeta::new(
@@ -430,13 +421,17 @@ impl EventConverter {
             None,
         );
         self.bus
-            .publish(PublishDocumentRequested::new(meta, value))?;
+            .publish(PublishDocumentRequested::new(meta, value), ctx)?;
         Ok(())
     }
 
     /// Local node created a threshold share (already split per-party by ThresholdKeyshare).
     /// Publishes the single-party document with appropriate filter.
-    pub fn handle_threshold_share_created(&self, msg: ThresholdShareCreated) -> Result<()> {
+    pub fn handle_threshold_share_created(
+        &self,
+        msg: TypedEvent<ThresholdShareCreated>,
+    ) -> Result<()> {
+        let (msg, ctx) = msg.into_components();
         if msg.external {
             return Ok(());
         }
@@ -447,29 +442,35 @@ impl EventConverter {
             msg.share.party_id, target_party_id, msg.e3_id
         );
 
+        let e3_id = msg.e3_id.clone();
+
         self.publish_filtered(
-            ReceivableDocument::ThresholdShareCreated(msg.clone()),
-            &msg.e3_id,
+            ReceivableDocument::ThresholdShareCreated(msg),
+            &e3_id,
             target_party_id,
+            ctx,
         )?;
 
         Ok(())
     }
-    fn handle_encryption_key_created(&self, msg: EncryptionKeyCreated) -> Result<()> {
+    fn handle_encryption_key_created(&self, msg: TypedEvent<EncryptionKeyCreated>) -> Result<()> {
+        let (msg, ctx) = msg.into_components();
         if msg.external {
             return Ok(());
         }
-        let receivable = ReceivableDocument::EncryptionKeyCreated(msg.clone());
+
+        let meta = DocumentMeta::new(msg.e3_id.clone(), DocumentKind::TrBFV, vec![], None);
+        let receivable = ReceivableDocument::EncryptionKeyCreated(msg);
         let value = ArcBytes::from_bytes(&receivable.to_bytes()?);
-        let meta = DocumentMeta::new(msg.e3_id, DocumentKind::TrBFV, vec![], None);
         self.bus
-            .publish(PublishDocumentRequested::new(meta, value))?;
+            .publish(PublishDocumentRequested::new(meta, value), ctx)?;
         Ok(())
     }
 
     /// Convert received document to internal events.
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
-    fn handle_document_received(&self, msg: DocumentReceived) -> Result<()> {
+    fn handle_document_received(&self, msg: TypedEvent<DocumentReceived>) -> Result<()> {
+        let (msg, ctx) = msg.into_components();
         let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
 
         match receivable {
@@ -478,23 +479,29 @@ impl EventConverter {
                     "Received ThresholdShareCreated from party {} for target party {}",
                     evt.share.party_id, evt.target_party_id
                 );
-                self.bus.publish(ThresholdShareCreated {
-                    external: true,
-                    e3_id: evt.e3_id,
-                    share: evt.share,
-                    target_party_id: evt.target_party_id,
-                })?;
+                self.bus.publish(
+                    ThresholdShareCreated {
+                        external: true,
+                        e3_id: evt.e3_id,
+                        share: evt.share,
+                        target_party_id: evt.target_party_id,
+                    },
+                    ctx.clone(),
+                )?;
             }
             ReceivableDocument::EncryptionKeyCreated(evt) => {
                 debug!(
                     "Received EncryptionKeyCreated from party {}",
                     evt.key.party_id
                 );
-                self.bus.publish(EncryptionKeyCreated {
-                    external: true,
-                    e3_id: evt.e3_id,
-                    key: evt.key,
-                })?;
+                self.bus.publish(
+                    EncryptionKeyCreated {
+                        external: true,
+                        e3_id: evt.e3_id,
+                        key: evt.key,
+                    },
+                    ctx,
+                )?;
             }
         }
         Ok(())
@@ -508,42 +515,58 @@ impl Actor for EventConverter {
 impl Handler<EnclaveEvent> for EventConverter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::ThresholdShareCreated(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::EncryptionKeyCreated(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::DocumentReceived(data) => self.notify_sync(ctx, data),
+        let (data, ec) = msg.into_components();
+        match data {
+            EnclaveEventData::ThresholdShareCreated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::EncryptionKeyCreated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::DocumentReceived(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<ThresholdShareCreated> for EventConverter {
+impl Handler<TypedEvent<ThresholdShareCreated>> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_threshold_share_created(msg) {
-            Ok(_) => (),
-            Err(err) => error!("{err}"),
-        }
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ThresholdShareCreated>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+            self.handle_threshold_share_created(msg)
+        })
     }
 }
 
-impl Handler<EncryptionKeyCreated> for EventConverter {
+impl Handler<TypedEvent<EncryptionKeyCreated>> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: EncryptionKeyCreated, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_encryption_key_created(msg) {
-            Ok(_) => (),
-            Err(err) => error!("{err}"),
-        }
+    fn handle(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyCreated>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+            self.handle_encryption_key_created(msg)
+        })
     }
 }
 
-impl Handler<DocumentReceived> for EventConverter {
+impl Handler<TypedEvent<DocumentReceived>> for EventConverter {
     type Result = ();
-    fn handle(&mut self, msg: DocumentReceived, _ctx: &mut Self::Context) -> Self::Result {
-        match self.handle_document_received(msg) {
-            Ok(_) => (),
-            Err(err) => error!("{err}"),
-        }
+    fn handle(
+        &mut self,
+        msg: TypedEvent<DocumentReceived>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+            self.handle_document_received(msg)
+        })
     }
 }
 
@@ -612,7 +635,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // 1. Send a request to publish
-        bus.publish(PublishDocumentRequested {
+        bus.publish_origin(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         })?;
@@ -686,7 +709,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.publish(CiphernodeSelected {
+        bus.publish_origin(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
@@ -697,6 +720,7 @@ mod tests {
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: cid.clone(),
                 meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
+                ts: 123,
             }),
         ))?;
 
@@ -748,7 +772,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // Send a request to publish
-        bus.publish(PublishDocumentRequested {
+        bus.publish_origin(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         })?;
@@ -798,7 +822,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.publish(CiphernodeSelected {
+        bus.publish_origin(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
@@ -815,6 +839,7 @@ mod tests {
                     vec![],
                     Some(expires_at),
                 ),
+                ts: 123,
             }),
         ))?;
 
@@ -828,6 +853,7 @@ mod tests {
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: cid.clone(),
                 meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], Some(expires_at)),
+                ts: 123,
             }),
         ))?;
 

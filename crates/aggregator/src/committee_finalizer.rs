@@ -114,7 +114,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
                                 trap(EType::Sortition, &act.bus.clone(), || {
-                                    bus.publish(CommitteeFinalizeRequested {
+                                    bus.publish_origin(CommitteeFinalizeRequested {
                                         e3_id: e3_id_clone.clone(),
                                     })?;
                                     Ok(())
