@@ -14,11 +14,12 @@ use super::{EnclaveEvent, Unsequenced};
 #[rtype(result = "()")]
 pub struct EvmSyncEventsReceived {
     pub events: Vec<EnclaveEvent<Unsequenced>>,
+    pub chain_id: u64,
 }
 
 impl EvmSyncEventsReceived {
-    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>) -> Self {
-        Self { events }
+    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>, chain_id: u64) -> Self {
+        Self { events, chain_id }
     }
 }
 

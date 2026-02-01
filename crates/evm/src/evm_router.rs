@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Handler};
 use alloy_primitives::Address;
 use std::collections::HashMap;
 use tracing::{debug, error, info};
@@ -25,12 +25,12 @@ impl EvmRouter {
         }
     }
 
-    pub fn add_route(&mut self, address: Address, dest: &EvmEventProcessor) -> &mut Self {
+    pub fn add_route(mut self, address: Address, dest: &EvmEventProcessor) -> Self {
         self.routing_table.insert(address, dest.clone());
         self
     }
 
-    pub fn add_fallback(&mut self, fallback: &EvmEventProcessor) -> &mut Self {
+    pub fn add_fallback(mut self, fallback: &EvmEventProcessor) -> Self {
         self.fallback = Some(fallback.clone());
         self
     }
@@ -46,7 +46,7 @@ impl Actor for EvmRouter {
 
 impl Handler<EnclaveEvmEvent> for EvmRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         match msg.clone() {
             // Take all log events and route them
             EnclaveEvmEvent::Log(EvmLog { log, .. }) => {

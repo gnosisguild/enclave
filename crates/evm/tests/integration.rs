@@ -16,8 +16,8 @@ use alloy::{
 use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
-    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, EvmEventConfig,
-    EvmEventConfigChain, GetEvents, HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
+    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEventConfig,
+    EvmEventConfigChain, EvmSyncEventsReceived, GetEvents, SyncEnd, SyncStart, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
 use std::{sync::Arc, time::Duration};
@@ -61,24 +61,8 @@ impl TestEventParser {
     }
 }
 
-async fn get_msgs(history_collector: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<Vec<String>> {
-    let history = history_collector
-        .send(GetEvents::<EnclaveEvent>::new())
-        .await?;
-    let msgs: Vec<String> = history
-        .into_iter()
-        .filter_map(|evt| match evt.into_data() {
-            EnclaveEventData::TestEvent(data) => Some(data.msg),
-            _ => None,
-        })
-        .collect();
-
-    Ok(msgs)
-}
-
 struct FakeSyncActor {
     bus: BusHandle,
-    buffer: Vec<EvmEvent>,
 }
 
 impl Actor for FakeSyncActor {
@@ -87,30 +71,18 @@ impl Actor for FakeSyncActor {
 
 impl FakeSyncActor {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
-        Self {
-            bus: bus.clone(),
-            buffer: Vec::new(),
-        }
-        .start()
+        Self { bus: bus.clone() }.start()
     }
 }
 
-impl Handler<SyncEvmEvent> for FakeSyncActor {
+impl Handler<EvmSyncEventsReceived> for FakeSyncActor {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, mut msg: EvmSyncEventsReceived, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
-            match msg {
-                // Buffer events as the sync actor receives them
-                SyncEvmEvent::Event(event) => self.buffer.push(event),
-                // When we hear that sync is complete send all events on chain then publish SyncEnd
-                SyncEvmEvent::HistoricalSyncComplete(_) => {
-                    for evt in self.buffer.drain(..) {
-                        let (data, ts, _) = evt.split();
-                        self.bus.publish_from_remote(data, ts)?;
-                    }
-                    self.bus.publish_without_context(SyncEnd::new())?;
-                }
-            };
+            for evt in msg.events.drain(..) {
+                self.bus.naked_dispatch(evt);
+            }
+            self.bus.publish_without_context(SyncEnd::new())?;
             Ok(())
         })
     }

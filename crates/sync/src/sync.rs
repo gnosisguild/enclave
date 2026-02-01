@@ -9,8 +9,9 @@ use std::collections::HashSet;
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
 use e3_events::{
-    trap, BusHandle, EType, EventContext, EventPublisher, EvmEvent, EvmEventConfig, SyncEnd,
-    SyncEvmEvent, SyncStart,
+    trap, BusHandle, EType, EnclaveEvent, EventContext, EventContextAccessors, EventPublisher,
+    EvmEvent, EvmEventConfig, EvmSyncEventsReceived, SyncEnd, SyncEvmEvent, SyncStart, TypedEvent,
+    Unsequenced,
 };
 use tracing::info;
 
@@ -21,7 +22,7 @@ type ChainId = u64;
 pub struct Synchronizer {
     bus: BusHandle,
     evm_config: Option<EvmEventConfig>,
-    evm_buffer: Vec<EvmEvent>,
+    evm_events: Vec<EnclaveEvent<Unsequenced>>,
     evm_to_sync: HashSet<ChainId>,
     // net_config: NetEventConfig,
 }
@@ -32,8 +33,8 @@ impl Synchronizer {
         Self {
             evm_config: Some(evm_config),
             bus: bus.clone(),
-            evm_buffer: Vec::new(),
             evm_to_sync,
+            evm_events: Vec::new(),
         }
     }
 
@@ -41,14 +42,11 @@ impl Synchronizer {
         Self::new(bus, evm_config).start()
     }
 
-    fn buffer_evm_event(&mut self, event: EvmEvent) {
-        info!("buffer evm event({})", event.get_id());
-        self.evm_buffer.push(event);
-    }
-
-    fn handle_sync_complete(&mut self, chain_id: u64) -> Result<()> {
+    fn handle_sync_complete(&mut self, mut msg: EvmSyncEventsReceived) -> Result<()> {
+        let chain_id = msg.chain_id;
         info!("handle sync complete for chain({})", chain_id);
         self.evm_to_sync.remove(&chain_id);
+        self.evm_events.append(&mut msg.events);
         info!("{} chains left to sync...", self.evm_to_sync.len());
         if self.evm_to_sync.is_empty() {
             self.handle_sync_end()?;
@@ -57,18 +55,13 @@ impl Synchronizer {
     }
 
     fn handle_sync_end(&mut self) -> Result<()> {
-        // TODO: WORK OUT WHAT IS GOING ON HERE WITH PUBLISHING AND CONTEXT
         info!("all chains synced draining to bus and running sync end");
         // Order all events (theoretically)
-        self.evm_buffer.sort_by_key(|i| i.ts());
+        self.evm_events.sort_by_key(|i| i.ts());
 
         // publish them in order
-        for evt in self.evm_buffer.drain(..) {
-            let (data, _, _) = evt.split();
-            self.bus.publish_without_context(data)?; // Use publish_without_context here as historical events will be correctly
-                                                     // ordered as part of the preparatory process and these
-                                                     // events have no prior or causal events as
-                                                     // they come from the blockchain
+        for evt in self.evm_events.drain(..) {
+            self.bus.naked_dispatch(evt);
         }
         self.bus.publish_without_context(SyncEnd::new())?;
         Ok(())
@@ -82,22 +75,11 @@ impl Actor for Synchronizer {
     }
 }
 
-// TODO: Make SyncEvmevent carry EnclaveEvent<Unsequenced> as the evm package should be in the
-// business of creating EnclaveEvents for the rest of the application. It should not be
-// Synchronizers responsability to do this otherwise it knows too much about the evm package
-impl Handler<SyncEvmEvent> for Synchronizer {
+impl Handler<EvmSyncEventsReceived> for Synchronizer {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) -> Self::Result {
-        // TODO: extract contect from enclave event
+    fn handle(&mut self, msg: EvmSyncEventsReceived, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
-            match msg {
-                // Buffer events as the sync actor receives them
-                SyncEvmEvent::Event(event) => self.buffer_evm_event(event),
-                // When we hear that sync is complete send all events on chain then publish SyncEnd
-                SyncEvmEvent::HistoricalSyncComplete(chain_id) => {
-                    self.handle_sync_complete(chain_id)?
-                }
-            };
+            self.handle_sync_complete(msg)?;
             Ok(())
         })
     }

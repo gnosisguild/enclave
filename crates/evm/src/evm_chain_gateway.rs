@@ -4,17 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::mem::take;
+
 use crate::events::EnclaveEvmEvent;
 use crate::HistoricalSyncComplete;
 use actix::{Actor, Handler};
 use actix::{Addr, Recipient};
 use anyhow::Result;
 use anyhow::{bail, Context};
+use e3_events::EType;
 use e3_events::{
-    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, SyncEnd,
-    SyncEvmEvent, SyncStart,
+    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventFactory, EventSubscriber, EventType,
+    EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
 };
-use e3_events::{EType, EvmEvent};
 use e3_events::{Event, EventPublisher};
 use tracing::info;
 
@@ -25,16 +27,28 @@ pub struct EvmChainGateway {
     status: SyncStatus,
 }
 
+#[derive(Clone, Default, Debug)]
+struct ForwardToSyncActorData {
+    pub sender: Option<Recipient<EvmSyncEventsReceived>>,
+    pub buffer: Vec<EnclaveEvent<Unsequenced>>,
+}
+
+impl ForwardToSyncActorData {
+    pub fn add_event(&mut self, event: EnclaveEvent<Unsequenced>) {
+        self.buffer.push(event);
+    }
+}
+
 /// This state machine coordinates the function of the EvmChainGateway
 #[derive(Clone, Debug)]
 enum SyncStatus {
     /// Intial State
-    Init(Vec<EvmEvent>), // Include a buffer to hold events that arrive too early
+    Init(Vec<EnclaveEvent<Unsequenced>>), // Include a buffer to hold events that arrive too early
     /// After SyncStart we forward all events to SyncActor
-    ForwardToSyncActor(Option<Recipient<SyncEvmEvent>>),
+    ForwardToSyncActor(ForwardToSyncActorData),
     /// Once the chain has completed historical sync then we buffer all "live" events until sync is
     /// complete
-    BufferUntilLive(Vec<EvmEvent>),
+    BufferUntilLive(Vec<EnclaveEvent<Unsequenced>>),
     /// Forward all events directly to the bus
     Live,
 }
@@ -48,8 +62,8 @@ impl Default for SyncStatus {
 impl SyncStatus {
     pub fn forward_to_sync_actor(
         &mut self,
-        sender: Recipient<SyncEvmEvent>,
-    ) -> Result<Vec<EvmEvent>> {
+        sender: Recipient<EvmSyncEventsReceived>,
+    ) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
         let Self::Init(buffer) = self else {
             bail!(
                 "Cannot change state to ForwardToSyncActor when state is {:?}",
@@ -58,23 +72,27 @@ impl SyncStatus {
         };
 
         let buffer = std::mem::take(buffer);
-        *self = SyncStatus::ForwardToSyncActor(Some(sender));
+        *self = SyncStatus::ForwardToSyncActor(ForwardToSyncActorData {
+            sender: Some(sender),
+            buffer: Vec::new(),
+        });
         Ok(buffer)
     }
 
-    pub fn buffer_until_live(&mut self) -> Result<Recipient<SyncEvmEvent>> {
+    pub fn buffer_until_live(&mut self) -> Result<ForwardToSyncActorData> {
         let Self::ForwardToSyncActor(sender) = self else {
             bail!(
                 "Cannot change state to BufferUntilLive when state is {:?}",
                 self
             );
         };
-        let sender = std::mem::take(sender).context("Cannot call buffer_until_live twice")?;
+
+        let state_data = take(sender);
         *self = SyncStatus::BufferUntilLive(vec![]);
-        Ok(sender)
+        Ok(state_data)
     }
 
-    pub fn live(&mut self) -> Result<Vec<EvmEvent>> {
+    pub fn live(&mut self) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
         let Self::BufferUntilLive(buffer) = self else {
             bail!("Cannot change state to Live when state is {:?}", self);
         };
@@ -123,9 +141,8 @@ impl EvmChainGateway {
         Ok(())
     }
 
-    fn publish_evm_event(&mut self, msg: EvmEvent) -> Result<()> {
-        let (data, ts, _) = msg.split();
-        self.bus.publish_from_remote(data, ts)?;
+    fn publish_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
+        self.bus.naked_dispatch(msg);
         Ok(())
     }
 
@@ -136,7 +153,10 @@ impl EvmChainGateway {
                 Ok(())
             }
             EnclaveEvmEvent::Event(event) => {
-                self.process_evm_event(event)?;
+                info!("Received event!");
+                let (data,ts,_) = event.split();
+                let enclave_event = self.bus.event_from_remote_source(data,None,ts)?;
+                self.process_evm_event(enclave_event)?;
                 Ok(())
             }
             _ => panic!("EvmChainGateway is only designed to receive EnclaveEvmEvent::HistoricalSyncComplete or EnclaveEvmEvent::Event events"),
@@ -148,31 +168,28 @@ impl EvmChainGateway {
             "handling historical sync complete for chain_id({})",
             event.chain_id
         );
-        let sender = self.status.buffer_until_live()?;
+        let state = self.status.buffer_until_live()?;
         info!("Sending historical sync complete event to sender.");
-        sender.try_send(SyncEvmEvent::HistoricalSyncComplete(event.chain_id))?;
+        let sender = state
+            .sender
+            .context("ForwardToSyncActor state must hold a sender")?;
+        let event = EvmSyncEventsReceived::new(state.buffer, event.chain_id);
+        sender.try_send(event)?;
         Ok(())
     }
 
-    fn process_evm_event(&mut self, msg: EvmEvent) -> Result<()> {
+    fn process_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
         match &mut self.status {
-            SyncStatus::BufferUntilLive(buffer) => {
-                info!("saving evm event({}) to pre-live buffer", msg.get_id());
-                buffer.push(msg)
-            }
-            SyncStatus::ForwardToSyncActor(Some(sync_actor)) => {
-                info!("forwarding evm event({}) to SyncActor", msg.get_id());
-                sync_actor.do_send(msg.into());
-            }
-            SyncStatus::Live => {
-                info!("publishing evm event({})", msg.get_id());
-                self.publish_evm_event(msg)?
-            }
             SyncStatus::Init(buffer) => {
-                info!("saving evm event({}) to pre-sync buffer", msg.get_id());
-                buffer.push(msg)
+                info!("Buffering until Forwarding... {:?}", msg);
+                buffer.push(msg);
             }
-            _ => (),
+            SyncStatus::BufferUntilLive(buffer) => {
+                info!("Buffering until live... {:?}", msg);
+                buffer.push(msg);
+            }
+            SyncStatus::ForwardToSyncActor(state) => state.add_event(msg),
+            SyncStatus::Live => self.publish_evm_event(msg)?,
         };
         Ok(())
     }
@@ -199,6 +216,7 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
 impl Handler<EnclaveEvmEvent> for EvmChainGateway {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+        info!("Handler<EnclaveEvmEvent>");
         trap(EType::Evm, &self.bus.clone(), || self.handle_evm_event(msg))
     }
 }
@@ -208,28 +226,41 @@ mod tests {
     use super::*;
     use e3_ciphernode_builder::EventSystem;
 
-    use e3_events::{CorrelationId, EvmEventConfig, EvmEventConfigChain, TestEvent};
+    use e3_events::{
+        CorrelationId, EvmEvent, EvmEventConfig, EvmEventConfigChain, GetEvents, TakeEvents,
+        TestEvent,
+    };
     use tokio::sync::mpsc;
+    use tracing_subscriber::{fmt, EnvFilter};
 
     struct SyncEventCollector {
-        tx: mpsc::UnboundedSender<SyncEvmEvent>,
+        tx: mpsc::UnboundedSender<EvmSyncEventsReceived>,
     }
 
     impl Actor for SyncEventCollector {
         type Context = actix::Context<Self>;
     }
 
-    impl Handler<SyncEvmEvent> for SyncEventCollector {
+    impl Handler<EvmSyncEventsReceived> for SyncEventCollector {
         type Result = ();
-        fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) {
+        fn handle(&mut self, msg: EvmSyncEventsReceived, _: &mut Self::Context) {
             let _ = self.tx.send(msg);
         }
     }
 
     #[actix::test]
-    async fn test_evm_chain_gateway() {
+    async fn test_evm_chain_gateway() -> Result<()> {
+        let _foo = tracing::subscriber::set_default(
+            fmt()
+                .with_env_filter(EnvFilter::new("info"))
+                .with_test_writer()
+                .finish(),
+        );
+
         let system = EventSystem::new("test").with_fresh_bus();
-        let bus = system.handle().unwrap();
+        let bus: BusHandle = system.handle()?;
+
+        let history_collector = bus.history();
 
         let (tx, mut rx) = mpsc::unbounded_channel();
         let collector = SyncEventCollector { tx }.start();
@@ -248,7 +279,7 @@ mod tests {
         let evm_event = EvmEvent::new(
             CorrelationId::new(),
             TestEvent {
-                msg: "test".to_string(),
+                msg: "Before Complete".to_string(),
                 entropy: 1,
             }
             .into(),
@@ -256,25 +287,28 @@ mod tests {
             12345,
             chain_id,
         );
-        // This will actually arrive earlier than SyncStart but aught to be buffered
-        addr.do_send(EnclaveEvmEvent::Event(evm_event));
 
-        let received = rx.recv().await.unwrap();
-        assert!(matches!(received, SyncEvmEvent::Event(_)));
+        // This will actually arrive earlier than SyncStart but aught to be buffered
+        addr.send(EnclaveEvmEvent::Event(evm_event)).await?;
 
         // HistoricalSyncComplete: ForwardToSyncActor -> BufferUntilLive
-        addr.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
+        addr.send(EnclaveEvmEvent::HistoricalSyncComplete(
             HistoricalSyncComplete::new(chain_id, None),
-        ));
+        ))
+        .await?;
 
+        // Normal Synchronizer will take this and wait for other events before flushing events to
+        // the bus here we simulate it
         let received = rx.recv().await.unwrap();
-        assert!(matches!(received, SyncEvmEvent::HistoricalSyncComplete(_)));
+        for event in received.events {
+            bus.naked_dispatch(event);
+        }
 
         // Send EVM event while buffering - should be buffered (not received)
         let buffered_event = EvmEvent::new(
             CorrelationId::new(),
             TestEvent {
-                msg: "buffered".to_string(),
+                msg: "Before SyncEnd".to_string(),
                 entropy: 2,
             }
             .into(),
@@ -282,15 +316,56 @@ mod tests {
             12346,
             chain_id,
         );
-        addr.do_send(EnclaveEvmEvent::Event(buffered_event));
+        addr.send(EnclaveEvmEvent::Event(buffered_event)).await?;
 
-        // SyncEnd: BufferUntilLive -> Live (publishes buffered events to bus)
-        bus.publish_without_context(SyncEnd::new()).unwrap();
+        // The Synchronizer will publish the SyncEnd event when it has all the information it needs
+        // and has published everything to the bus
+        bus.publish_without_context(SyncEnd::new())?;
 
-        // Allow time for async message processing
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let after_event = EvmEvent::new(
+            CorrelationId::new(),
+            TestEvent {
+                msg: "After SyncEnd".to_string(),
+                entropy: 2,
+            }
+            .into(),
+            101,
+            12346,
+            chain_id,
+        );
 
-        // Verify no more messages were sent to collector (buffered events go to bus, not collector)
-        assert!(rx.try_recv().is_err());
+        addr.send(EnclaveEvmEvent::Event(after_event)).await?;
+
+        let full = history_collector.send(TakeEvents::new(5)).await?;
+
+        let test_events: Vec<String> = full
+            .iter()
+            .filter_map(|e| {
+                if let EnclaveEventData::TestEvent(TestEvent { msg, .. }) = e.get_data() {
+                    Some(msg.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert_eq!(
+            test_events,
+            vec!["Before Complete", "Before SyncEnd", "After SyncEnd"]
+        );
+
+        let event_types: Vec<String> = full.iter().map(|e| e.event_type()).collect();
+
+        assert_eq!(
+            event_types,
+            vec![
+                "SyncStart",
+                "TestEvent",
+                "SyncEnd",
+                "TestEvent",
+                "TestEvent"
+            ]
+        );
+        Ok(())
     }
 }

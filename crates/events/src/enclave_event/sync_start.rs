@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::EnclaveEventData;
-use crate::{CorrelationId, SyncEvmEvent};
+use super::{EnclaveEventData, EvmSyncEventsReceived};
+use crate::CorrelationId;
 use crate::{EvmEventConfig, EvmEventConfigChain};
 use actix::{Message, Recipient};
 use anyhow::Context;
@@ -68,14 +68,17 @@ pub struct SyncStart {
 
     #[serde(skip)]
     /// We include the sender here so that the evm can communicate directly with the sync actor
-    pub sender: Option<Recipient<SyncEvmEvent>>, // Must be Option to allow serde deserialize on
-                                                 // EnclaveEvent as Default is required to be
-                                                 // implemented this is fine as this event is never
-                                                 // shared
+    pub sender: Option<Recipient<EvmSyncEventsReceived>>, // Must be Option to allow serde deserialize on
+                                                          // EnclaveEvent as Default is required to be
+                                                          // implemented this is fine as this event is never
+                                                          // shared
 }
 
 impl SyncStart {
-    pub fn new(sender: impl Into<Recipient<SyncEvmEvent>>, evm_config: EvmEventConfig) -> Self {
+    pub fn new(
+        sender: impl Into<Recipient<EvmSyncEventsReceived>>,
+        evm_config: EvmEventConfig,
+    ) -> Self {
         Self {
             sender: Some(sender.into()),
             evm_config,

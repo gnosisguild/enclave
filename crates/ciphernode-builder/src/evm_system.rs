@@ -97,11 +97,10 @@ fn configure_router(
     route_factories: Vec<(Address, Box<dyn RouteFn>)>,
 ) -> EvmRouter {
     let next = next.into();
-    let mut router = EvmRouter::new();
-    router.add_fallback(&next);
+    let mut router = EvmRouter::new().add_fallback(&next);
     for (address, route_fn) in route_factories {
         let processor = route_fn(next.clone());
-        router.add_route(address, &processor);
+        router = router.add_route(address, &processor);
     }
     router
 }
