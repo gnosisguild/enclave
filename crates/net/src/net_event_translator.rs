@@ -161,9 +161,10 @@ impl Handler<LibP2pEvent> for NetEventTranslator {
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
         let LibP2pEvent(data) = msg;
         let event: EnclaveEvent<Unsequenced> = data.try_into()?;
-        self.sent_events.insert(event.id());
-        let (data, ts) = event.split();
-        self.bus.publish_from_remote(data, ts)?;
+        let id = event.id();
+        let (data, ec) = event.into_components();
+        self.bus.publish_from_remote(data, ec.ts(), None)?;
+        self.sent_events.insert(id);
         Ok(())
     }
 }

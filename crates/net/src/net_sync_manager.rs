@@ -136,6 +136,7 @@ impl Handler<TypedEvent<OutgoingSyncRequestSucceeded>> for NetSyncManager {
                 },
                 msg.value.ts,
                 ctx,
+                None,
             )?;
 
             Ok(())

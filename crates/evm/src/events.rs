@@ -81,7 +81,7 @@ impl EvmEvent {
     pub fn into_enclave_event(self, bus: &BusHandle) -> Result<EnclaveEvent<Unsequenced>> {
         let data = self.data;
         let ts = self.ts;
-        bus.event_from_remote_source(data, None, ts)
+        bus.event_from_remote_source(data, None, ts, Some(self.block))
     }
 }
 

@@ -58,11 +58,13 @@ pub trait EventFactory<E: Event> {
     /// This method should be used for events that originated from remote sources.
     ///
     /// The Option `caused_by` is for correlation when we send a remote request and receive a response.
+    /// Block should be provided when the event is from the blockchain
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
     ) -> Result<E>;
 }
 
@@ -87,13 +89,18 @@ pub trait EventPublisher<E: Event> {
     /// The ctx parameter is to pass on the current context to the local event.
     fn publish(&self, data: impl Into<E::Data>, ctx: EventContext<Sequenced>) -> Result<()>;
     /// This creates a context based on the given data. This should only be used when an event is
-    /// the origin event
+    /// the origin event and does not originate remotely. This is also useful in tests.
     fn publish_without_context(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn publish_from_remote(&self, data: impl Into<E::Data>, remote_ts: u128) -> Result<()>;
+    fn publish_from_remote(
+        &self,
+        data: impl Into<E::Data>,
+        remote_ts: u128,
+        block: Option<u64>,
+    ) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
@@ -106,6 +113,7 @@ pub trait EventPublisher<E: Event> {
         data: impl Into<E::Data>,
         remote_ts: u128,
         caused_by: EventContext<Sequenced>,
+        block: Option<u64>,
     ) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
@@ -134,6 +142,7 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
         data: Self::Data,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
     ) -> Self;
 }
 
@@ -171,6 +180,8 @@ pub trait EventContextAccessors {
     fn ts(&self) -> u128;
     /// The aggregate id for this event
     fn aggregate_id(&self) -> AggregateId;
+    /// The highest block watermark we have seen
+    fn block(&self) -> Option<u64>;
 }
 
 pub trait EventContextSeq {

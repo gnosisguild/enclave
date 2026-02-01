@@ -298,6 +298,7 @@ pub async fn handle_document_published_notification(
             value,
         },
         event.ts,
+        None,
     )?;
 
     Ok(())

@@ -92,6 +92,7 @@ impl Handler<Bootstrap> for Synchronizer {
                 "EvmEventConfig was not set likely Bootstrap was called more than once.",
             )?;
 
+            // What was the last block we processed for each aggregate?
             // TODO: Get information about what has and has not been synced then fire SyncStart
             self.bus
                 .publish_without_context(SyncStart::new(ctx.address(), evm_config))
@@ -162,24 +163,28 @@ mod tests {
             EnclaveEventData::TestEvent(TestEvent::new("2-first", 1)),
             None,
             timelord.next().unwrap(),
+            Some(1),
         )?;
 
         let h_1_1 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("1-first", 1)),
             None,
             timelord.next().unwrap(),
+            Some(1),
         )?;
 
         let h_1_2 = bus.event_from_remote_source(
-            EnclaveEventData::TestEvent(TestEvent::new("1-second", 1)),
+            EnclaveEventData::TestEvent(TestEvent::new("1-second", 2)),
             None,
             timelord.next().unwrap(),
+            Some(2),
         )?;
 
         let h_2_2 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("2-second", 2)),
             None,
             timelord.next().unwrap(),
+            Some(2),
         )?;
 
         // Send events in mixed order to test sorting

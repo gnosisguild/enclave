@@ -201,6 +201,7 @@ mod tests {
             EventId::hash(1),
             old_hlc.into(),
             aggregate_id.clone(),
+            None,
         )
         .sequence(1);
 
@@ -210,6 +211,7 @@ mod tests {
             EventId::hash(2),
             new_hlc.into(),
             aggregate_id.clone(),
+            None,
         )
         .sequence(2);
 

@@ -71,6 +71,10 @@ impl<T> EventContextAccessors for TypedEvent<T> {
     fn aggregate_id(&self) -> AggregateId {
         self.ctx.aggregate_id()
     }
+
+    fn block(&self) -> Option<u64> {
+        self.ctx.block()
+    }
 }
 
 impl<T> EventContextSeq for TypedEvent<T> {

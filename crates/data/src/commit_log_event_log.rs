@@ -82,7 +82,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data.into().into(), None, 123)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data.into().into(), None, 123, None)
     }
 
     #[test]

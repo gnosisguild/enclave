@@ -106,8 +106,9 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         data: impl Into<EnclaveEventData>,
         remote_ts: u128,
+        block: Option<u64>,
     ) -> Result<()> {
-        self.publish_from_remote_impl(data, remote_ts, None)
+        self.publish_from_remote_impl(data, remote_ts, None, block)
     }
 
     fn publish_from_remote_as_response(
@@ -115,8 +116,9 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         data: impl Into<EnclaveEventData>,
         remote_ts: u128,
         caused_by: EventContext<Sequenced>,
+        block: Option<u64>,
     ) -> Result<()> {
-        self.publish_from_remote_impl(data, remote_ts, Some(caused_by))
+        self.publish_from_remote_impl(data, remote_ts, Some(caused_by), block)
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
@@ -130,8 +132,9 @@ impl BusHandle {
         data: impl Into<EnclaveEventData>,
         remote_ts: u128,
         caused_by: Option<EventContext<Sequenced>>,
+        block: Option<u64>,
     ) -> Result<()> {
-        let evt = self.event_from_remote_source(data, caused_by, remote_ts)?;
+        let evt = self.event_from_remote_source(data, caused_by, remote_ts, block)?;
         self.sequencer.do_send(evt);
         Ok(())
     }
@@ -166,6 +169,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
             data.into(),
             caused_by,
             ts.into(),
+            None,
         ))
     }
 
@@ -174,12 +178,14 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         data: impl Into<EnclaveEventData>,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
             caused_by,
             ts.into(),
+            block,
         ))
     }
 }
@@ -268,7 +274,9 @@ mod tests {
             type Result = ();
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
                 let ts = msg.ts();
-                self.dest.publish_from_remote(msg.into_data(), ts).unwrap()
+                self.dest
+                    .publish_from_remote(msg.into_data(), ts, None)
+                    .unwrap()
             }
         }
 
@@ -414,7 +422,8 @@ where
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         if (self.predicate)(&msg) {
             let (data, ts) = msg.split();
-            let _ = self.handle.publish_from_remote(data, ts);
+            let _ = self.handle.publish_from_remote(data, ts, None); // TODO: check if this is fine
+                                                                     // to erase block data
         }
     }
 }
