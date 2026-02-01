@@ -9,9 +9,8 @@ use std::collections::HashSet;
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
 use e3_events::{
-    trap, BusHandle, EType, EnclaveEvent, EventContext, EventContextAccessors, EventPublisher,
-    EvmEvent, EvmEventConfig, EvmSyncEventsReceived, SyncEnd, SyncEvmEvent, SyncStart, TypedEvent,
-    Unsequenced,
+    trap, BusHandle, EType, EnclaveEvent, EventContextAccessors, EventPublisher, EvmEventConfig,
+    EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
 };
 use tracing::info;
 
@@ -42,19 +41,19 @@ impl Synchronizer {
         Self::new(bus, evm_config).start()
     }
 
-    fn handle_sync_complete(&mut self, mut msg: EvmSyncEventsReceived) -> Result<()> {
+    fn handle_evm_sync_events_received(&mut self, mut msg: EvmSyncEventsReceived) -> Result<()> {
         let chain_id = msg.chain_id;
         info!("handle sync complete for chain({})", chain_id);
         self.evm_to_sync.remove(&chain_id);
         self.evm_events.append(&mut msg.events);
         info!("{} chains left to sync...", self.evm_to_sync.len());
         if self.evm_to_sync.is_empty() {
-            self.handle_sync_end()?;
+            self.sort_and_finalize()?;
         }
         Ok(())
     }
 
-    fn handle_sync_end(&mut self) -> Result<()> {
+    fn sort_and_finalize(&mut self) -> Result<()> {
         info!("all chains synced draining to bus and running sync end");
         // Order all events (theoretically)
         self.evm_events.sort_by_key(|i| i.ts());
@@ -79,7 +78,7 @@ impl Handler<EvmSyncEventsReceived> for Synchronizer {
     type Result = ();
     fn handle(&mut self, msg: EvmSyncEventsReceived, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
-            self.handle_sync_complete(msg)?;
+            self.handle_evm_sync_events_received(msg)?;
             Ok(())
         })
     }
@@ -108,11 +107,10 @@ pub struct Bootstrap;
 mod tests {
     use super::*;
     use e3_ciphernode_builder::EventSystem;
+    use e3_events::{EnclaveEvent, EventFactory};
     use e3_events::{
-        CorrelationId, EnclaveEventData, Event, EvmEventConfig, EvmEventConfigChain, GetEvents,
-        TestEvent,
+        EnclaveEventData, Event, EvmEventConfig, EvmEventConfigChain, GetEvents, TestEvent,
     };
-    use e3_events::{EnclaveEvent, EventContextAccessors};
     use std::time::Duration;
     use tokio::time::sleep;
 
@@ -131,9 +129,10 @@ mod tests {
 
     #[actix::test]
     async fn test_synchronizer_full_flow() -> Result<()> {
+        let _guard = e3_test_helpers::with_tracing("info");
         // Setup event system and synchronizer
         let system = EventSystem::new("test").with_fresh_bus();
-        let bus = system.handle()?;
+        let bus: BusHandle = system.handle()?;
         let history_collector = bus.history();
 
         // Configure test chains
@@ -157,62 +156,48 @@ mod tests {
 
         // Create test events with timestamps
         let mut timelord = hlc_faucet(&bus, 100)?;
-        let (chain_1, chain_2) = (1, 2);
-        let (block_1, block_2) = (1, 2);
 
         // Test events - timestamps generated in order
-        let h_2_1 = SyncEvmEvent::Event(EvmEvent::new(
-            CorrelationId::new(),
+        let h_2_1 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("2-first", 1)),
-            block_1,
+            None,
             timelord.next().unwrap(),
-            chain_2,
-        ));
+        )?;
 
-        let h_1_1 = SyncEvmEvent::Event(EvmEvent::new(
-            CorrelationId::new(),
+        let h_1_1 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("1-first", 1)),
-            block_1,
+            None,
             timelord.next().unwrap(),
-            chain_1,
-        ));
+        )?;
 
-        let h_1_2 = SyncEvmEvent::Event(EvmEvent::new(
-            CorrelationId::new(),
+        let h_1_2 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("1-second", 1)),
-            block_2,
+            None,
             timelord.next().unwrap(),
-            chain_1,
-        ));
+        )?;
 
-        let h_2_2 = SyncEvmEvent::Event(EvmEvent::new(
-            CorrelationId::new(),
+        let h_2_2 = bus.event_from_remote_source(
             EnclaveEventData::TestEvent(TestEvent::new("2-second", 2)),
-            block_2,
+            None,
             timelord.next().unwrap(),
-            chain_2,
-        ));
-
-        // Chain completion signals
-        let hc_1 = SyncEvmEvent::HistoricalSyncComplete(chain_1);
-        let hc_2 = SyncEvmEvent::HistoricalSyncComplete(chain_2);
+        )?;
 
         // Send events in mixed order to test sorting
-        sync_addr.send(h_2_2).await?;
-        sync_addr.send(h_2_1).await?;
-        sync_addr.send(hc_2).await?;
-        sync_addr.send(h_1_1).await?;
-        sync_addr.send(h_1_2).await?;
-        sync_addr.send(hc_1).await?;
+        sync_addr
+            .send(EvmSyncEventsReceived::new(vec![h_2_2, h_2_1], 2))
+            .await?;
+        sync_addr
+            .send(EvmSyncEventsReceived::new(vec![h_1_1, h_1_2], 1))
+            .await?;
 
         settle().await;
 
         // Get final event history and verify ordering
-        let history = history_collector
+        let full = history_collector
             .send(GetEvents::<EnclaveEvent>::new())
             .await?;
-
-        let events: Vec<EnclaveEvent> = history
+        println!("full = {}", full.len());
+        let events: Vec<EnclaveEvent> = full
             .into_iter()
             .filter(|e| matches!(e.get_data(), EnclaveEventData::TestEvent(_)))
             .collect();

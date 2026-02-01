@@ -3076,6 +3076,7 @@ dependencies = [
  "e3-evm",
  "e3-fhe-params",
  "e3-sortition",
+ "e3-test-helpers",
  "e3-trbfv",
  "e3-utils",
  "futures-util",
@@ -3440,6 +3441,7 @@ dependencies = [
  "anyhow",
  "e3-ciphernode-builder",
  "e3-events",
+ "e3-test-helpers",
  "tokio",
  "tracing",
 ]
@@ -3476,6 +3478,7 @@ dependencies = [
  "rand_chacha 0.3.1",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

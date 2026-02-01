@@ -5,12 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler};
-use e3_events::{hlc::HlcTimestamp, EnclaveEventData, EvmEvent};
+use e3_events::{hlc::HlcTimestamp, EnclaveEventData};
 use tracing::info;
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},
-    ExtractorFn,
+    EvmEvent, ExtractorFn,
 };
 
 pub struct EvmParser {

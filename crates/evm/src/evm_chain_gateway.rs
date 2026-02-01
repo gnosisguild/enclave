@@ -223,13 +223,12 @@ impl Handler<EnclaveEvmEvent> for EvmChainGateway {
 
 #[cfg(test)]
 mod tests {
+    use crate::EvmEvent;
+
     use super::*;
     use e3_ciphernode_builder::EventSystem;
 
-    use e3_events::{
-        CorrelationId, EvmEvent, EvmEventConfig, EvmEventConfigChain, GetEvents, TakeEvents,
-        TestEvent,
-    };
+    use e3_events::{CorrelationId, EvmEventConfig, EvmEventConfigChain, TakeEvents, TestEvent};
     use tokio::sync::mpsc;
     use tracing_subscriber::{fmt, EnvFilter};
 

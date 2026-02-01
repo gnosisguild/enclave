@@ -22,8 +22,6 @@ use e3_events::{
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
-use tracing::subscriber::DefaultGuard;
-use tracing_subscriber::{fmt, EnvFilter};
 
 sol!(
     #[sol(rpc)]
@@ -88,18 +86,9 @@ impl Handler<EvmSyncEventsReceived> for FakeSyncActor {
     }
 }
 
-fn add_tracing() -> DefaultGuard {
-    tracing::subscriber::set_default(
-        fmt()
-            .with_env_filter(EnvFilter::new("info"))
-            .with_test_writer()
-            .finish(),
-    )
-}
-
 #[actix::test]
 async fn evm_reader() -> Result<()> {
-    let _guard = add_tracing();
+    let _guard = e3_test_helpers::with_tracing("info");
 
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
@@ -169,7 +158,7 @@ async fn evm_reader() -> Result<()> {
 }
 #[actix::test]
 async fn ensure_historical_events() -> Result<()> {
-    let _guard = add_tracing();
+    let _guard = e3_test_helpers::with_tracing("info");
 
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH

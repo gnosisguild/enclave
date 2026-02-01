@@ -4,59 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::{EnclaveEventData, EvmSyncEventsReceived};
-use crate::CorrelationId;
+use super::EvmSyncEventsReceived;
 use crate::{EvmEventConfig, EvmEventConfigChain};
 use actix::{Message, Recipient};
 use anyhow::Context;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
-
-/// This is a processed EvmEvent specifically typed for the Sync actor
-#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct EvmEvent {
-    data: EnclaveEventData,
-    block: u64,
-    chain_id: u64,
-    ts: u128,
-    id: CorrelationId,
-}
-
-impl EvmEvent {
-    pub fn new(
-        id: CorrelationId,
-        data: EnclaveEventData,
-        block: u64,
-        ts: u128,
-        chain_id: u64,
-    ) -> Self {
-        Self {
-            id,
-            data,
-            block,
-            ts,
-            chain_id,
-        }
-    }
-
-    pub fn split(self) -> (EnclaveEventData, u128, u64) {
-        (self.data, self.ts, self.block)
-    }
-
-    pub fn get_id(&self) -> CorrelationId {
-        self.id
-    }
-
-    pub fn chain_id(&self) -> u64 {
-        self.chain_id
-    }
-
-    pub fn ts(&self) -> u128 {
-        self.ts
-    }
-}
 
 /// Dispatched by the Sync actor when initial data is read and the sync process needs to be started
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

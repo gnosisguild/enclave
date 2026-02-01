@@ -6,7 +6,7 @@
 
 use actix::{Message, Recipient};
 use alloy::rpc::types::Log;
-use e3_events::{CorrelationId, EvmEvent};
+use e3_events::{CorrelationId, EnclaveEventData};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -28,6 +28,51 @@ impl HistoricalSyncComplete {
 
     pub fn get_id(&self) -> CorrelationId {
         self.id
+    }
+}
+
+/// This is a processed EvmEvent specifically typed for the Sync actor
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct EvmEvent {
+    data: EnclaveEventData,
+    block: u64,
+    chain_id: u64,
+    ts: u128,
+    id: CorrelationId,
+}
+
+impl EvmEvent {
+    pub fn new(
+        id: CorrelationId,
+        data: EnclaveEventData,
+        block: u64,
+        ts: u128,
+        chain_id: u64,
+    ) -> Self {
+        Self {
+            id,
+            data,
+            block,
+            ts,
+            chain_id,
+        }
+    }
+
+    pub fn split(self) -> (EnclaveEventData, u128, u64) {
+        (self.data, self.ts, self.block)
+    }
+
+    pub fn get_id(&self) -> CorrelationId {
+        self.id
+    }
+
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+
+    pub fn ts(&self) -> u128 {
+        self.ts
     }
 }
 
