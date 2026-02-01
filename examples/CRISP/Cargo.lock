@@ -2540,6 +2540,7 @@ dependencies = [
  "derivative",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "regex",
  "serde",
  "tokio",
  "tracing",
@@ -4814,9 +4815,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.12.2"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843bc0191f75f3e22651ae5f1e72939ab2f72a4bc30fa80a066bd66edefc24d4"
+checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
 dependencies = [
  "aho-corasick",
  "memchr",
