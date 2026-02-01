@@ -171,7 +171,7 @@ impl Handler<LibP2pEvent> for NetEventTranslator {
 impl Handler<EnclaveEvent> for NetEventTranslator {
     type Result = ();
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Net, &self.bus.clone(), || {
+        trap(EType::Net, &self.bus.with_ec(event.get_ctx()), || {
             let sent_events = self.sent_events.clone();
             let tx = self.tx.clone();
             let evt = event.clone();

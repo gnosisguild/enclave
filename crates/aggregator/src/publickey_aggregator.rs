@@ -146,17 +146,14 @@ impl Actor for PublicKeyAggregator {
 impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            let (msg, ec) = msg.into_components();
-            match msg {
-                EnclaveEventData::KeyshareCreated(data) => {
-                    self.notify_sync(ctx, TypedEvent::new(data, ec))
-                }
-                EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
-                _ => (),
-            };
-            Ok(())
-        });
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::KeyshareCreated(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            _ => (),
+        };
     }
 }
 
@@ -168,8 +165,8 @@ impl Handler<TypedEvent<KeyshareCreated>> for PublicKeyAggregator {
         event: TypedEvent<KeyshareCreated>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
-            let (event, ec) = event.into_components();
+        let (event, ec) = event.into_components();
+        trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
             let e3_id = event.e3_id.clone();
             let pubkey = event.pubkey.clone();
             let node = event.node.clone();
@@ -203,8 +200,8 @@ impl Handler<TypedEvent<ComputeAggregate>> for PublicKeyAggregator {
     type Result = ();
 
     fn handle(&mut self, msg: TypedEvent<ComputeAggregate>, _: &mut Self::Context) -> Self::Result {
-        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
-            let (msg, ec) = msg.into_components();
+        let (msg, ec) = msg.into_components();
+        trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
             info!("Computing Aggregate PublicKey...");
             let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
                 keyshares: msg.keyshares,

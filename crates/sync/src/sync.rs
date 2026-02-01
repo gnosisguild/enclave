@@ -67,7 +67,8 @@ impl Synchronizer {
             let (data, _, _) = evt.split();
             self.bus.publish_without_context(data)?; // Use publish_without_context here as historical events will be correctly
                                                      // ordered as part of the preparatory process and these
-                                                     // events have no
+                                                     // events have no prior or causal events as
+                                                     // they come from the blockchain
         }
         self.bus.publish_without_context(SyncEnd::new())?;
         Ok(())
@@ -81,9 +82,12 @@ impl Actor for Synchronizer {
     }
 }
 
+// TODO: Make SyncEvmevent carry EnclaveEvent<Unsequenced> as the evm package should be in the
+// business of creating EnclaveEvents for the rest of the application. It should not be
+// Synchronizers responsability to do this otherwise it knows too much about the evm package
 impl Handler<SyncEvmEvent> for Synchronizer {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
                 // Buffer events as the sync actor receives them

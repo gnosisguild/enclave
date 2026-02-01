@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
-    EnclaveEvent, EnclaveEventData, EventType, Shutdown,
+    EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
 };
 use e3_utils::NotifySync;
 use std::collections::HashMap;
@@ -48,23 +48,31 @@ impl Actor for CommitteeFinalizer {
 impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::CommitteeRequested(data) => self.notify_sync(ctx, data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::CommitteeRequested(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
 }
 
-impl Handler<CommitteeRequested> for CommitteeFinalizer {
+impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteeRequested, ctx: &mut Self::Context) -> Self::Result {
+    // TODO: Remove all async from this function. Remove reliance on e3_evm package. Add unit test.
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeRequested>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let ec = msg.get_ctx().clone();
         let e3_id = msg.e3_id.clone();
         let submission_deadline = msg.submission_deadline;
 
         const FINALIZATION_BUFFER_SECONDS: u64 = 1;
-
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
             match e3_evm::helpers::get_current_timestamp().await {
@@ -113,10 +121,10 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                trap(EType::Sortition, &act.bus.clone(), || {
-                                    bus.publish_without_context(CommitteeFinalizeRequested {
+                                trap(EType::Sortition, &act.bus.with_ec(&ec), || {
+                                    bus.publish(CommitteeFinalizeRequested {
                                         e3_id: e3_id_clone.clone(),
-                                    })?;
+                                    },ec)?;
                                     Ok(())
                                 });
 

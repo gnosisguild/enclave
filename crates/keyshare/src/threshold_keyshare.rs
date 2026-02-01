@@ -995,9 +995,11 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
 impl Handler<TypedEvent<ComputeResponse>> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: TypedEvent<ComputeResponse>, _: &mut Self::Context) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            self.handle_compute_response(msg)
-        })
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_compute_response(msg),
+        )
     }
 }
 
@@ -1008,9 +1010,11 @@ impl Handler<TypedEvent<CiphernodeSelected>> for ThresholdKeyshare {
         msg: TypedEvent<CiphernodeSelected>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            self.handle_ciphernode_selected(msg, ctx.address())
-        })
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_ciphernode_selected(msg, ctx.address()),
+        )
     }
 }
 
@@ -1021,9 +1025,11 @@ impl Handler<TypedEvent<AllEncryptionKeysCollected>> for ThresholdKeyshare {
         msg: TypedEvent<AllEncryptionKeysCollected>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            self.handle_all_encryption_keys_collected(msg)
-        })
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_all_encryption_keys_collected(msg),
+        )
     }
 }
 
@@ -1034,9 +1040,11 @@ impl Handler<TypedEvent<AllThresholdSharesCollected>> for ThresholdKeyshare {
         msg: TypedEvent<AllThresholdSharesCollected>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            self.handle_all_threshold_shares_collected(msg)
-        })
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_all_threshold_shares_collected(msg),
+        )
     }
 }
 
@@ -1047,9 +1055,11 @@ impl Handler<TypedEvent<CiphertextOutputPublished>> for ThresholdKeyshare {
         msg: TypedEvent<CiphertextOutputPublished>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::KeyGeneration, &self.bus.clone(), || {
-            self.handle_ciphertext_output_published(msg)
-        })
+        trap(
+            EType::KeyGeneration,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_ciphertext_output_published(msg),
+        )
     }
 }
 

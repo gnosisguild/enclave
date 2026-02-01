@@ -108,7 +108,7 @@ impl Handler<TypedEvent<OutgoingSyncRequested>> for NetSyncManager {
     ) -> Self::Result {
         trap_fut(
             EType::Net,
-            &self.bus.clone(),
+            &self.bus.with_ec(msg.get_ctx()),
             handle_sync_request_event(self.tx.clone(), self.rx.clone(), msg, ctx.address()),
         )
     }
@@ -122,7 +122,7 @@ impl Handler<TypedEvent<OutgoingSyncRequestSucceeded>> for NetSyncManager {
         msg: TypedEvent<OutgoingSyncRequestSucceeded>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::Net, &self.bus.clone(), || {
+        trap(EType::Net, &self.bus.with_ec(msg.get_ctx()), || {
             let (msg, ctx) = msg.into_components();
             self.bus.publish_from_remote_as_response(
                 NetSyncEventsReceived {

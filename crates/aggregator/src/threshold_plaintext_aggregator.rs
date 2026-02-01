@@ -292,19 +292,23 @@ impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregato
         msg: TypedEvent<DecryptionshareCreated>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
-            let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
-                self.state.get()
-            else {
-                debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
-                return Ok(());
-            };
-            let node = msg.node.clone();
-            let e3_id = msg.e3_id.clone();
-            let request = E3CommitteeContainsRequest::new(e3_id, node, msg, ctx.address());
-            self.sortition.try_send(request)?;
-            Ok(())
-        })
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || {
+                let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting { .. })) =
+                    self.state.get()
+                else {
+                    debug!(state=?self.state, "Aggregator has been closed for collecting so ignoring this event.");
+                    return Ok(());
+                };
+                let node = msg.node.clone();
+                let e3_id = msg.e3_id.clone();
+                let request = E3CommitteeContainsRequest::new(e3_id, node, msg, ctx.address());
+                self.sortition.try_send(request)?;
+                Ok(())
+            },
+        )
     }
 }
 
@@ -317,71 +321,79 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
         msg: E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::PublickeyAggregation, &self.bus.clone(), || {
-            let e3_id = &msg.e3_id;
-            if *e3_id != self.e3_id {
-                bail!("Wrong e3_id sent to aggregator. This should not happen.")
-            };
+        trap(
+            EType::PublickeyAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || {
+                let e3_id = &msg.e3_id;
+                if *e3_id != self.e3_id {
+                    bail!("Wrong e3_id sent to aggregator. This should not happen.")
+                };
 
-            if !msg.is_found_in_committee() {
-                trace!("Node {} not found in finalized committee", &msg.node);
-                return Ok(());
-            };
+                if !msg.is_found_in_committee() {
+                    trace!("Node {} not found in finalized committee", &msg.node);
+                    return Ok(());
+                };
 
-            // Trust the party_id from the event - it's based on CommitteeFinalized order
-            // which is the authoritative source of truth for party IDs
-            let (
-                DecryptionshareCreated {
-                    party_id,
-                    decryption_share,
+                // Trust the party_id from the event - it's based on CommitteeFinalized order
+                // which is the authoritative source of truth for party IDs
+                let (
+                    DecryptionshareCreated {
+                        party_id,
+                        decryption_share,
+                        ..
+                    },
+                    ec,
+                ) = msg.into_inner().into_components();
+
+                self.add_share(party_id, decryption_share, &ec)?;
+
+                if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
+                    threshold_m,
+                    threshold_n,
+                    shares,
+                    ciphertext_output,
                     ..
-                },
-                ec,
-            ) = msg.into_inner().into_components();
-
-            self.add_share(party_id, decryption_share, &ec)?;
-
-            if let Some(ThresholdPlaintextAggregatorState::Computing(Computing {
-                threshold_m,
-                threshold_n,
-                shares,
-                ciphertext_output,
-                ..
-            })) = self.state.get()
-            {
-                self.notify_sync(
-                    ctx,
-                    TypedEvent::new(
-                        ComputeAggregate {
-                            shares: shares.clone(),
-                            ciphertext_output: ciphertext_output.clone(),
-                            threshold_m,
-                            threshold_n,
-                        },
-                        ec,
-                    ),
-                )
-            }
-            Ok(())
-        })
+                })) = self.state.get()
+                {
+                    self.notify_sync(
+                        ctx,
+                        TypedEvent::new(
+                            ComputeAggregate {
+                                shares: shares.clone(),
+                                ciphertext_output: ciphertext_output.clone(),
+                                threshold_m,
+                                threshold_n,
+                            },
+                            ec,
+                        ),
+                    )
+                }
+                Ok(())
+            },
+        )
     }
 }
 
 impl Handler<TypedEvent<ComputeAggregate>> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: TypedEvent<ComputeAggregate>, _: &mut Self::Context) -> Self::Result {
-        trap(EType::PlaintextAggregation, &self.bus.clone(), || {
-            self.handle_compute_aggregate(msg)
-        })
+        trap(
+            EType::PlaintextAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_compute_aggregate(msg),
+        )
     }
 }
 
 impl Handler<TypedEvent<ComputeResponse>> for ThresholdPlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: TypedEvent<ComputeResponse>, _: &mut Self::Context) -> Self::Result {
-        trap(EType::PlaintextAggregation, &self.bus.clone(), || {
-            self.handle_compute_response(msg)
-        })
+        trap(
+            EType::PlaintextAggregation,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_compute_response(msg),
+        )
     }
 }
 

@@ -97,7 +97,7 @@ impl FakeSyncActor {
 
 impl Handler<SyncEvmEvent> for FakeSyncActor {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
                 // Buffer events as the sync actor receives them

@@ -150,7 +150,7 @@ impl Actor for E3Router {
 impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Event, &self.bus.clone(), || {
+        trap(EType::Event, &self.bus.with_ec(msg.get_ctx()), || {
             // If we are shutting down then bail on anything else
             if let EnclaveEventData::Shutdown(_) = msg.get_data() {
                 for (_, ctx) in self.contexts.iter() {

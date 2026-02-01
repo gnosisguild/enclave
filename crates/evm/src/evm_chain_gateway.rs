@@ -185,7 +185,7 @@ impl Actor for EvmChainGateway {
 impl Handler<EnclaveEvent> for EvmChainGateway {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Evm, &self.bus.clone(), || {
+        trap(EType::Evm, &self.bus.with_ec(msg.get_ctx()), || {
             match msg.into_data() {
                 EnclaveEventData::SyncStart(e) => self.handle_sync_start(e)?,
                 EnclaveEventData::SyncEnd(e) => self.handle_sync_end(e)?,
@@ -198,7 +198,7 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
 
 impl Handler<EnclaveEvmEvent> for EvmChainGateway {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Evm, &self.bus.clone(), || self.handle_evm_event(msg))
     }
 }
