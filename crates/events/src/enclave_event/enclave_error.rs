@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Message;
+use actix::{Addr, Message};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -12,7 +12,9 @@ use std::{
     pin::Pin,
 };
 
-use crate::{BusHandle, ErrorDispatcher};
+use crate::{BusHandle, ErrorDispatcher, EventBus};
+
+use super::EnclaveEvent;
 
 pub trait FromError {
     fn from_error(err_type: EType, error: impl Into<String>) -> Self;

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::E3id;
+use e3_events::{AggregateId, E3id};
 
 pub struct StoreKeys;
 
@@ -75,5 +75,17 @@ impl StoreKeys {
 
     pub fn ciphernode_selector() -> String {
         String::from("//ciphernode_selector")
+    }
+
+    pub fn aggregate_seq(aggregate_id: AggregateId) -> String {
+        format!("//aggregate_seq/{}", aggregate_id)
+    }
+
+    pub fn aggregate_block(aggregate_id: AggregateId) -> String {
+        format!("//aggregate_block/{}", aggregate_id)
+    }
+
+    pub fn aggregate_ts(aggregate_id: AggregateId) -> String {
+        format!("//aggregate_ts/{}", aggregate_id)
     }
 }

@@ -4,12 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
-
 use crate::{
     events::{CommitSnapshot, EventStored, StoreEventRequested},
-    EnclaveEvent, EventBus, EventContextAccessors, EventContextSeq, Sequenced, Unsequenced,
+    EnclaveEvent, EventBus, Sequenced, Unsequenced,
 };
+use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
+use anyhow::Result;
+use e3_utils::major_issue;
 
 /// Component to sequence the storage of events
 pub struct Sequencer {
@@ -30,6 +31,13 @@ impl Sequencer {
             buffer: buffer.into(),
         }
     }
+
+    fn handle_event_stored(&self, msg: EventStored) -> Result<()> {
+        let event = msg.into_event();
+        self.buffer.try_send(CommitSnapshot::new(&event))?;
+        self.bus.try_send(event)?;
+        Ok(())
+    }
 }
 
 impl Actor for Sequencer {
@@ -39,22 +47,24 @@ impl Actor for Sequencer {
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
-        self.eventstore
-            .do_send(StoreEventRequested::new(msg, ctx.address()))
+        if let Err(e) = self
+            .eventstore
+            .try_send(StoreEventRequested::new(msg, ctx.address()))
+        {
+            panic!("{}", major_issue("Could not store event in eventstore.", e))
+        }
     }
 }
 
 impl Handler<EventStored> for Sequencer {
     type Result = ();
     fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
-        let event = msg.into_event();
-        let seq = event.seq();
-        self.buffer.do_send(CommitSnapshot::new(
-            seq,
-            event.aggregate_id(),
-            event.block(),
-        ));
-        self.bus.do_send(event)
+        if let Err(e) = self.handle_event_stored(msg) {
+            panic!(
+                "{}",
+                major_issue("Could not send event to buffer or bus.", e)
+            )
+        }
     }
 }
 

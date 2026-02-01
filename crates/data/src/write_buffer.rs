@@ -5,14 +5,19 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler, Message, Recipient};
+use e3_config::StoreKeys;
 use e3_events::hlc::HlcTimestamp;
-use e3_events::{AggregateId, CommitSnapshot, EventContextAccessors};
+use e3_events::{AggregateId, CommitSnapshot, EventContext, EventContextAccessors};
 use std::{
     collections::HashMap,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{Insert, InsertBatch};
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Start;
 
 /// Central configuration for aggregates in the WriteBuffer
 #[derive(Debug, Clone)]
@@ -34,6 +39,10 @@ impl AggregateConfig {
     pub fn indexed_ids(&self) -> Vec<usize> {
         self.delays.keys().map(|id| id.to_usize()).collect()
     }
+
+    pub fn aggregates(&self) -> Vec<AggregateId> {
+        self.delays.keys().cloned().collect()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -47,7 +56,14 @@ impl AggregateBuffer {
     }
 }
 
+pub enum WriteBufferStatus {
+    Paused,
+    Runnning,
+}
+
 pub struct WriteBuffer {
+    /// The status of the write buffer
+    status: WriteBufferStatus,
     /// Destination recipient for batched inserts
     dest: Option<Recipient<InsertBatch>>,
     /// Per-aggregate buffers for organizing inserts
@@ -65,6 +81,7 @@ impl Actor for WriteBuffer {
 impl WriteBuffer {
     pub fn new() -> Self {
         Self {
+            status: WriteBufferStatus::Paused,
             dest: None,
             aggregate_buffers: HashMap::new(),
             block_height_seen: HashMap::new(),
@@ -74,6 +91,7 @@ impl WriteBuffer {
 
     pub fn with_config(config: AggregateConfig) -> Self {
         Self {
+            status: WriteBufferStatus::Paused,
             dest: None,
             aggregate_buffers: HashMap::new(),
             block_height_seen: HashMap::new(),
@@ -82,6 +100,10 @@ impl WriteBuffer {
     }
 
     fn handle_insert(&mut self, msg: Insert) {
+        if let WriteBufferStatus::Paused = self.status {
+            return;
+        }
+
         handle_insert(
             msg,
             &mut self.aggregate_buffers,
@@ -96,17 +118,29 @@ impl WriteBuffer {
     }
 
     fn handle_commit_snapshot(&mut self, msg: CommitSnapshot) {
+        if let WriteBufferStatus::Paused = self.status {
+            return;
+        }
+
         // Store the sequence number as an Insert message so snapshots hold the most recent event
         // they were created against
         let aggregate_id = msg.aggregate_id();
+
+        // NOTE: can not use repository here as we need to insert operations in stream
         self.handle_insert(Insert::new(
-            &format!("//aggregate_seq/{}", aggregate_id),
-            encode_u64(msg.seq()), // Same as bincode avoiding result
+            &StoreKeys::aggregate_seq(aggregate_id),
+            encode_u64(msg.seq()),
         ));
 
         self.handle_insert(Insert::new(
-            &format!("//aggregate_block/{}", aggregate_id),
+            &StoreKeys::aggregate_block(aggregate_id),
             encode_u64(self.get_highest_block(aggregate_id, msg.block())),
+        ));
+
+        self.handle_insert(Insert::new(
+            // NOT NEW NEED CTX
+            &StoreKeys::aggregate_ts(aggregate_id),
+            encode_u128(msg.ts()),
         ));
 
         let now = SystemTime::now()
@@ -144,6 +178,11 @@ impl Handler<Insert> for WriteBuffer {
 
 /// Encode the same as bincode without using a result
 fn encode_u64(value: u64) -> Vec<u8> {
+    value.to_le_bytes().to_vec()
+}
+
+/// Encode the same as bincode without using a result
+fn encode_u128(value: u128) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
@@ -217,6 +256,13 @@ impl Handler<CommitSnapshot> for WriteBuffer {
 
     fn handle(&mut self, msg: CommitSnapshot, _: &mut Self::Context) -> Self::Result {
         self.handle_commit_snapshot(msg)
+    }
+}
+
+impl Handler<Start> for WriteBuffer {
+    type Result = ();
+    fn handle(&mut self, msg: Start, ctx: &mut Self::Context) -> Self::Result {
+        self.status = WriteBufferStatus::Runnning;
     }
 }
 

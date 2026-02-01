@@ -6,6 +6,7 @@
 
 pub mod actix;
 pub mod alloy;
+pub mod error;
 pub mod formatters;
 pub mod helpers;
 pub mod path;
@@ -13,6 +14,7 @@ pub mod retry;
 pub mod utility_types;
 pub use actix::*;
 pub use alloy::*;
+pub use error::*;
 pub use formatters::*;
 pub use helpers::*;
 pub use path::*;

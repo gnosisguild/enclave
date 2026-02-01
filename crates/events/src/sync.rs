@@ -37,6 +37,11 @@ impl EvmEventConfig {
             config: BTreeMap::new(),
         }
     }
+    pub fn from_config(config: impl Into<BTreeMap<ChainId, EvmEventConfigChain>>) -> Self {
+        EvmEventConfig {
+            config: config.into(),
+        }
+    }
     pub fn get(&self, chain_id: &ChainId) -> Option<&EvmEventConfigChain> {
         self.config.get(&chain_id)
     }
@@ -47,5 +52,9 @@ impl EvmEventConfig {
 
     pub fn chains(&self) -> HashSet<u64> {
         self.config.keys().cloned().collect()
+    }
+
+    pub fn deploy_block(&self, chain_id: u64) -> Option<u64> {
+        self.get(&chain_id).map(|c| c.deploy_block())
     }
 }

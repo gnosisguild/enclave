@@ -4,14 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::HashSet;
-
+use crate::SyncRepositoryFactory;
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
+use e3_data::{AggregateConfig, Repositories, WriteBuffer};
 use e3_events::{
-    trap, BusHandle, EType, EnclaveEvent, EventContextAccessors, EventPublisher, EvmEventConfig,
-    EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
+    trap, trap_fut, AggregateId, BusHandle, EType, EnclaveEvent, EventContextAccessors,
+    EventPublisher, EvmEventConfig, EvmEventConfigChain, EvmSyncEventsReceived, SyncEnd, SyncStart,
+    Unsequenced,
 };
+use std::collections::{BTreeMap, HashMap, HashSet};
 use tracing::info;
 
 // NOTE: This is a WIP. We need to synchronize events from EVM as well as libp2p
@@ -23,22 +25,47 @@ pub struct Synchronizer {
     evm_config: Option<EvmEventConfig>,
     evm_events: Vec<EnclaveEvent<Unsequenced>>,
     evm_to_sync: HashSet<ChainId>,
+    repositories: Repositories,
+    write_buffer: Addr<WriteBuffer>,
     // net_config: NetEventConfig,
+    aggregate_config: AggregateConfig,
 }
 
 impl Synchronizer {
-    pub fn new(bus: &BusHandle, evm_config: EvmEventConfig) -> Self {
+    pub fn new(
+        bus: BusHandle,
+        evm_config: EvmEventConfig,
+        repositories: Repositories,
+        aggregate_config: AggregateConfig,
+        write_buffer: Addr<WriteBuffer>,
+    ) -> Self {
         let evm_to_sync = evm_config.chains();
         Self {
             evm_config: Some(evm_config),
-            bus: bus.clone(),
+            bus,
             evm_to_sync,
             evm_events: Vec::new(),
+            repositories,
+            aggregate_config,
+            write_buffer,
         }
     }
 
-    pub fn setup(bus: &BusHandle, evm_config: EvmEventConfig) -> Addr<Self> {
-        Self::new(bus, evm_config).start()
+    pub fn setup(
+        bus: &BusHandle,
+        evm_config: &EvmEventConfig,
+        repositories: &Repositories,
+        aggregate_config: &AggregateConfig,
+        write_buffer: &Addr<WriteBuffer>,
+    ) -> Addr<Self> {
+        Self::new(
+            bus.clone(),
+            evm_config.clone(),
+            repositories.clone(),
+            aggregate_config.clone(),
+            write_buffer.clone(),
+        )
+        .start()
     }
 
     fn handle_evm_sync_events_received(&mut self, mut msg: EvmSyncEventsReceived) -> Result<()> {
@@ -85,18 +112,134 @@ impl Handler<EvmSyncEventsReceived> for Synchronizer {
 }
 
 impl Handler<Bootstrap> for Synchronizer {
-    type Result = ();
+    type Result = actix::ResponseFuture<()>;
     fn handle(&mut self, _: Bootstrap, ctx: &mut Self::Context) -> Self::Result {
-        trap(EType::Sync, &self.bus.clone(), || {
-            let evm_config = self.evm_config.take().context(
-                "EvmEventConfig was not set likely Bootstrap was called more than once.",
-            )?;
+        let address = ctx.address();
+        let repositories = self.repositories.clone();
+        let evm_config = self.evm_config.take();
+        let aggregates = self.aggregate_config.aggregates();
+        let bus = self.bus.clone();
+        trap_fut(
+            EType::Sync,
+            &self.bus.clone(),
+            handle_bootstrap(bus, address, repositories, evm_config, aggregates),
+        )
+    }
+}
 
-            // What was the last block we processed for each aggregate?
-            // TODO: Get information about what has and has not been synced then fire SyncStart
-            self.bus
-                .publish_without_context(SyncStart::new(ctx.address(), evm_config))
-        })
+async fn handle_bootstrap(
+    bus: BusHandle,
+    address: Addr<Synchronizer>,
+    repositories: Repositories,
+    evm_config: Option<EvmEventConfig>,
+    aggregates: Vec<AggregateId>,
+) -> Result<()> {
+    let evm_config = evm_config
+        .context("EvmEventConfig was not set likely Bootstrap was called more than once.")?;
+    // ============================================================
+    // Phase 1: Load Snapshot
+    // ============================================================
+
+    // 1.1 Read snapshot from disk (may not exist on first boot)
+    let snapshot = SnapshotMeta::read_from_disk(aggregates, evm_config, repositories).await?;
+
+    // 1.2 Extract state, last_applied_hlc, last_block_number (use defaults if no snapshot)
+
+    // 1.4 Pause WriteBuffer streaming (don't write replayed mutations to disk)
+
+    // ============================================================
+    // Phase 2: Replay Missed Events
+    // ============================================================
+
+    // 2.1 Query EventStore for all events WHERE hlc > last_applied_hlc ORDER BY hlc
+
+    // 2.2 For each event:
+    //     - Route to appropriate actor by aggregate_id
+    //     - Apply event mutation (in-memory only)
+    //     - Track highest block_number seen (if event has one)
+
+    // ============================================================
+    // Phase 3: Determine Blockchain Resume Point
+    // ============================================================
+
+    // 3.1 Get highest block_number from replayed events (if any had block numbers)
+
+    // 3.2 Fall back to snapshot.last_block_number if no blockchain events replayed
+
+    // 3.3 Calculate resume_block = max(config.deploy_block, highest_block + 1)
+
+    // ============================================================
+    // Phase 4: Resume Normal Operation
+    // ============================================================
+
+    // 4.1 Update WriteBuffer watermark to current HLC
+
+    // 4.2 Resume WriteBuffer streaming (mutations now flow to disk)
+
+    // 4.3 Subscribe to blockchain from resume_block
+
+    // 4.4 Return Ok / start event loop
+    // Get the sequences for each aggregate
+    // bus.publish_without_context(SyncStart::new(address, aggregate_states.as_evm_config()))?;
+    Ok(())
+}
+
+/// Latest event information in store
+pub struct AggregateState {
+    ts: u128,
+    aggregate_id: AggregateId,
+    seq: u64,
+    block: u64,
+}
+
+struct SnapshotMeta {
+    aggregate_state: Vec<AggregateState>,
+}
+
+impl SnapshotMeta {
+    pub async fn read_from_disk(
+        ids: Vec<AggregateId>,
+        initial_evm_config: EvmEventConfig,
+        repositories: Repositories,
+    ) -> Result<Self> {
+        let mut aggregate_state = Vec::new();
+        for aggregate_id in ids {
+            let deploy_block = aggregate_id
+                .to_chain_id()
+                .and_then(|chain_id| initial_evm_config.deploy_block(chain_id))
+                .unwrap_or(0);
+            let seq_repo = repositories.aggregate_seq(aggregate_id);
+            let block_repo = repositories.aggregate_block(aggregate_id);
+            let ts_repo = repositories.aggregate_ts(aggregate_id);
+            let seq = seq_repo.read().await?.unwrap_or(0);
+            let block = block_repo.read().await?.unwrap_or(deploy_block);
+            let ts = ts_repo.read().await?.unwrap_or(0);
+            let agg_state = AggregateState {
+                aggregate_id,
+                seq,
+                block,
+                ts,
+            };
+            aggregate_state.push(agg_state);
+        }
+
+        Ok(Self { aggregate_state })
+    }
+
+    pub fn as_evm_config(&self) -> EvmEventConfig {
+        let map: BTreeMap<u64, EvmEventConfigChain> = self
+            .aggregate_state
+            .iter()
+            .map(|s| (s.aggregate_id.to_chain_id(), s.block))
+            .filter_map(|s| {
+                if let Some(chain) = s.0 {
+                    Some((chain, EvmEventConfigChain::new(s.1)))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        EvmEventConfig::from_config(map)
     }
 }
 
@@ -140,9 +283,10 @@ mod tests {
         let mut evm_config = EvmEventConfig::new();
         evm_config.insert(1, EvmEventConfigChain::new(0));
         evm_config.insert(2, EvmEventConfigChain::new(0));
+        let repositories = Repositories::in_mem();
 
         // Start synchronizer
-        let sync_addr = Synchronizer::setup(&bus, evm_config);
+        let sync_addr = Synchronizer::setup(&bus, evm_config, &repositories);
         settle().await;
 
         // Verify SyncStart was published

@@ -6,36 +6,39 @@
 
 use actix::{Message, Recipient};
 
-use crate::{AggregateId, CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
+use crate::{
+    AggregateId, CorrelationId, EnclaveEvent, EventContext, EventContextAccessors, EventContextSeq,
+    Sequenced, Unsequenced,
+};
 
 /// Direct event received by the snapshot buffer in order to save snapshot to disk
 #[derive(Message, Debug)]
 #[rtype("()")]
 pub struct CommitSnapshot {
-    seq: u64,
-    aggregate_id: AggregateId,
-    block: Option<u64>,
+    ec: EventContext<Sequenced>,
 }
 
 impl CommitSnapshot {
-    pub fn new(seq: u64, aggregate_id: AggregateId, block: Option<u64>) -> Self {
+    pub fn new(event: &EnclaveEvent<Sequenced>) -> Self {
         Self {
-            seq,
-            aggregate_id,
-            block,
+            ec: event.get_ctx().clone(),
         }
     }
 
     pub fn seq(&self) -> u64 {
-        self.seq
+        self.ec.seq()
     }
 
     pub fn aggregate_id(&self) -> AggregateId {
-        self.aggregate_id
+        self.ec.aggregate_id()
     }
 
     pub fn block(&self) -> Option<u64> {
-        self.block
+        self.ec.block()
+    }
+
+    pub fn ts(&self) -> u128 {
+        self.ec.ts()
     }
 }
 

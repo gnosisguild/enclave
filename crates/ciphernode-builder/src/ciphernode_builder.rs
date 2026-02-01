@@ -356,7 +356,7 @@ impl CiphernodeBuilder {
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
                 EventSystem::persisted(&addr, log_path, kv_path)
                     .with_event_bus(local_bus)
-                    .with_aggregate_config(aggregate_config)
+                    .with_aggregate_config(aggregate_config.clone())
             } else {
                 if let Some(ref store) = self.in_mem_store {
                     EventSystem::in_mem_from_store(&addr, store)
@@ -462,7 +462,7 @@ impl CiphernodeBuilder {
             )
         };
 
-        Synchronizer::setup(&bus, evm_config); // TODO: add net config if required
+        Synchronizer::setup(&bus, &evm_config, &repositories, &aggregate_config);
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
@@ -523,7 +523,7 @@ fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
 
 /// Build delay configuration for a specific chain
 fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, u64) {
-    let aggregate_id = AggregateId::new(actual_chain_id as usize);
+    let aggregate_id = AggregateId::from_chain_id(Some(actual_chain_id));
     let finalization_ms = chain.finalization_ms.unwrap_or(0);
     let delay_us = finalization_ms * 1000; // ms → microseconds
     (aggregate_id, delay_us)

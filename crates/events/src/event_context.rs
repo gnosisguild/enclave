@@ -23,15 +23,31 @@ impl AggregateId {
     pub fn to_usize(&self) -> usize {
         self.0
     }
+
+    /// Create AggregateId from Option<chain_id>
+    /// None → AggregateId(0), Some(chain_id) → AggregateId(chain_id)
+    pub fn from_chain_id(chain_id: Option<u64>) -> Self {
+        match chain_id {
+            None => Self::new(0),
+            Some(id) => Self::new(id.try_into().unwrap_or(0)),
+        }
+    }
+
+    /// Convert back to Option<chain_id>
+    /// AggregateId(0) → None, otherwise → Some(chain_id)
+    pub fn to_chain_id(&self) -> Option<u64> {
+        if self.0 == 0 {
+            None
+        } else {
+            Some(self.0 as u64)
+        }
+    }
 }
 
 impl From<Option<E3id>> for AggregateId {
     fn from(value: Option<E3id>) -> Self {
-        if let Some(e3_id) = value {
-            Self::new(e3_id.chain_id() as usize)
-        } else {
-            Self::new(0)
-        }
+        let chain_id = value.map(|e3_id| e3_id.chain_id());
+        Self::from_chain_id(chain_id)
     }
 }
 

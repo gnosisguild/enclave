@@ -12,6 +12,7 @@ use crate::{
 use crate::{CorrelationId, ReceiveEvents};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
+use e3_utils::major_issue;
 use std::collections::HashMap;
 use tracing::error;
 
@@ -66,7 +67,7 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreR
 
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_store_event_requested(msg) {
-            error!("Failed to route store event request: {}", e);
+            panic!("{}", major_issue("Could not store event in eventstore.", e))
         }
     }
 }

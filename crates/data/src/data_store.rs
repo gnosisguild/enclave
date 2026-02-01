@@ -171,7 +171,10 @@ impl DataStore {
         }
     }
 
-    pub fn from_sled_store(addr: &Addr<SledStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
+    pub fn from_sled_store_with_buffer(
+        addr: &Addr<SledStore>,
+        write_buffer: &Addr<WriteBuffer>,
+    ) -> Self {
         Self {
             addr: StoreAddr::Sled(addr.clone()),
             get: addr.clone().recipient(),
@@ -182,11 +185,36 @@ impl DataStore {
         }
     }
 
-    pub fn from_in_mem(addr: &Addr<InMemStore>, write_buffer: &Addr<WriteBuffer>) -> Self {
+    pub fn from_in_mem_with_buffer(
+        addr: &Addr<InMemStore>,
+        write_buffer: &Addr<WriteBuffer>,
+    ) -> Self {
         Self {
             addr: StoreAddr::InMem(addr.clone()),
             get: addr.clone().recipient(),
             insert: write_buffer.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_in_mem(addr: &Addr<InMemStore>) -> Self {
+        Self {
+            addr: StoreAddr::InMem(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_sled_store(addr: &Addr<SledStore>) -> Self {
+        Self {
+            addr: StoreAddr::Sled(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],

@@ -326,7 +326,7 @@ impl EventSystem {
                     .store
                     .get_or_init(|| InMemStore::new(true).start())
                     .clone();
-                DataStore::from_in_mem(&addr, &self.buffer())
+                DataStore::from_in_mem_with_buffer(&addr, &self.buffer())
             }
             EventSystemBackend::Persisted(b) => {
                 let addr = b
@@ -336,7 +336,7 @@ impl EventSystem {
                         SledStore::new(&handle, &b.sled_path)
                     })?
                     .clone();
-                DataStore::from_sled_store(&addr, &self.buffer())
+                DataStore::from_sled_store_with_buffer(&addr, &self.buffer())
             }
         };
         self.wire_if_ready();

@@ -437,12 +437,8 @@ impl EnclaveEventData {
 
 impl WithAggregateId for EnclaveEventData {
     fn get_aggregate_id(&self) -> AggregateId {
-        let maybe_e3_id = self.get_e3_id();
-        if let Some(e3_id) = maybe_e3_id {
-            AggregateId::new(e3_id.chain_id() as usize)
-        } else {
-            AggregateId::new(0)
-        }
+        let chain_id = self.get_e3_id().map(|e3_id| e3_id.chain_id());
+        AggregateId::from_chain_id(chain_id)
     }
 }
 
