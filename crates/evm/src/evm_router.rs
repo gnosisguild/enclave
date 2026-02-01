@@ -25,12 +25,12 @@ impl EvmRouter {
         }
     }
 
-    pub fn add_route(mut self, address: Address, dest: &EvmEventProcessor) -> Self {
+    pub fn add_route(&mut self, address: Address, dest: &EvmEventProcessor) -> &mut Self {
         self.routing_table.insert(address, dest.clone());
         self
     }
 
-    pub fn add_fallback(mut self, fallback: &EvmEventProcessor) -> Self {
+    pub fn add_fallback(&mut self, fallback: &EvmEventProcessor) -> &mut Self {
         self.fallback = Some(fallback.clone());
         self
     }

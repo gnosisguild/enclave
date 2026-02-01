@@ -48,32 +48,64 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
     }
 
     pub fn build(&mut self) {
-        let gateway = FixHistoricalOrder::setup(EvmChainGateway::setup(&self.bus));
-        let runner = SyncStartExtractor::setup(OneShotRunner::setup({
+        // Think about the following in reverse order
+
+        // Gateway is the final step before connecting to the bus
+        let next = EvmChainGateway::setup(&self.bus);
+
+        // Fix the historical order to avoid missing historical events
+        let next = FixHistoricalOrder::setup(next);
+
+        // This will run once when the SyncStart event is received
+        let next = OneShotRunner::setup({
+            // Clone self refs for closure
             let bus = self.bus.clone();
             let provider = self.provider.clone();
-            let gateway = gateway.clone();
             let chain_id = self.chain_id;
-            // Only gets consumed once so fine to do this
+
+            // Only gets consumed once so fine to use replace to clean out route_factories
             let route_factories = replace(&mut self.route_factories, Vec::new());
+
+            // The event is defined here
             move |msg: SyncStart| {
-                let config = msg.get_evm_config(chain_id)?;
-                let gateway = gateway.recipient();
-                let mut router = EvmRouter::new();
+                // Extract config
+                let deploy_block = msg.get_evm_config(chain_id)?.deploy_block();
 
-                for (address, route_fn) in route_factories {
-                    let processor = route_fn(gateway.clone());
-                    router = router.add_route(address, &processor);
-                }
+                // Pass next to the router
+                let router = configure_router(next, route_factories);
 
-                router = router.add_fallback(&gateway);
-                let filters =
-                    Filters::from_routing_table(router.get_routing_table(), config.deploy_block());
-                let router = router.start();
-                EvmReadInterface::setup(&provider, &router.recipient(), &bus, filters);
+                // Extract filters from the router
+                let filters = filters_from_router(&router, deploy_block);
+
+                // Setup and start the read interface and the router
+                EvmReadInterface::setup(&provider, router.start(), &bus, filters);
                 Ok(())
             }
-        }));
-        self.bus.subscribe(EventType::SyncStart, runner.recipient());
+        });
+
+        // We get a SyncStart event and sent to oneShotRunner
+        let next = SyncStartExtractor::setup(next);
+
+        // Finaly subscribe to the bus and wait for SyncStart
+        self.bus.subscribe(EventType::SyncStart, next.recipient());
     }
+}
+
+/// Setup a router with a fallback and route factories all forwarding to next
+fn configure_router(
+    next: impl Into<EvmEventProcessor>,
+    route_factories: Vec<(Address, Box<dyn RouteFn>)>,
+) -> EvmRouter {
+    let next = next.into();
+    let mut router = EvmRouter::new();
+    router.add_fallback(&next);
+    for (address, route_fn) in route_factories {
+        let processor = route_fn(next.clone());
+        router.add_route(address, &processor);
+    }
+    router
+}
+
+fn filters_from_router(router: &EvmRouter, deploy_block: u64) -> Filters {
+    Filters::from_routing_table(router.get_routing_table(), deploy_block)
 }
