@@ -49,8 +49,11 @@ impl Handler<EventStored> for Sequencer {
     fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
         let event = msg.into_event();
         let seq = event.seq();
-        self.buffer
-            .do_send(CommitSnapshot::new(seq, event.aggregate_id()));
+        self.buffer.do_send(CommitSnapshot::new(
+            seq,
+            event.aggregate_id(),
+            event.block(),
+        ));
         self.bus.do_send(event)
     }
 }

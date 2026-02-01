@@ -14,11 +14,16 @@ use crate::{AggregateId, CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
 pub struct CommitSnapshot {
     seq: u64,
     aggregate_id: AggregateId,
+    block: Option<u64>,
 }
 
 impl CommitSnapshot {
-    pub fn new(seq: u64, aggregate_id: AggregateId) -> Self {
-        Self { seq, aggregate_id }
+    pub fn new(seq: u64, aggregate_id: AggregateId, block: Option<u64>) -> Self {
+        Self {
+            seq,
+            aggregate_id,
+            block,
+        }
     }
 
     pub fn seq(&self) -> u64 {
@@ -27,6 +32,10 @@ impl CommitSnapshot {
 
     pub fn aggregate_id(&self) -> AggregateId {
         self.aggregate_id
+    }
+
+    pub fn block(&self) -> Option<u64> {
+        self.block
     }
 }
 

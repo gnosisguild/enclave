@@ -89,12 +89,24 @@ impl WriteBuffer {
         )
     }
 
+    fn get_highest_block(&self, agg: AggregateId, block: Option<u64>) -> u64 {
+        block
+            .max(self.block_height_seen.get(&agg).map(ToOwned::to_owned))
+            .unwrap_or(0)
+    }
+
     fn handle_commit_snapshot(&mut self, msg: CommitSnapshot) {
         // Store the sequence number as an Insert message so snapshots hold the most recent event
         // they were created against
+        let aggregate_id = msg.aggregate_id();
         self.handle_insert(Insert::new(
-            &format!("//aggregate_seq/{}", msg.aggregate_id()),
-            msg.seq().to_le_bytes().to_vec(), // Same as bincode avoiding result
+            &format!("//aggregate_seq/{}", aggregate_id),
+            encode_u64(msg.seq()), // Same as bincode avoiding result
+        ));
+
+        self.handle_insert(Insert::new(
+            &format!("//aggregate_block/{}", aggregate_id),
+            encode_u64(self.get_highest_block(aggregate_id, msg.block())),
         ));
 
         let now = SystemTime::now()
@@ -128,6 +140,11 @@ impl Handler<Insert> for WriteBuffer {
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
         self.handle_insert(msg)
     }
+}
+
+/// Encode the same as bincode without using a result
+fn encode_u64(value: u64) -> Vec<u8> {
+    value.to_le_bytes().to_vec()
 }
 
 fn process_expired_inserts(
