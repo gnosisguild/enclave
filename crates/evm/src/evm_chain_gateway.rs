@@ -120,7 +120,6 @@ impl EvmChainGateway {
     }
 
     fn handle_sync_start(&mut self, msg: SyncStart) -> Result<()> {
-        info!("Processing SyncStart message");
         // Received a SyncStart event from the event bus. Get the sender within that event and forward
         // all events to that actor
         let sender = msg.sender.context("No sender on SyncStart Message")?;
@@ -133,7 +132,6 @@ impl EvmChainGateway {
     }
 
     fn handle_sync_end(&mut self, _: SyncEnd) -> Result<()> {
-        info!("Processing SyncEnd message");
         let buffer = self.status.live()?;
         for evt in buffer {
             self.publish_evm_event(evt)?;
@@ -153,10 +151,7 @@ impl EvmChainGateway {
                 Ok(())
             }
             EnclaveEvmEvent::Event(event) => {
-                info!("Received event!");
-                let (data,ts,_) = event.split();
-                let enclave_event = self.bus.event_from_remote_source(data,None,ts)?;
-                self.process_evm_event(enclave_event)?;
+                self.process_evm_event(event.into_enclave_event(&self.bus)?)?;
                 Ok(())
             }
             _ => panic!("EvmChainGateway is only designed to receive EnclaveEvmEvent::HistoricalSyncComplete or EnclaveEvmEvent::Event events"),
@@ -164,12 +159,7 @@ impl EvmChainGateway {
     }
 
     fn forward_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
-        info!(
-            "handling historical sync complete for chain_id({})",
-            event.chain_id
-        );
         let state = self.status.buffer_until_live()?;
-        info!("Sending historical sync complete event to sender.");
         let sender = state
             .sender
             .context("ForwardToSyncActor state must hold a sender")?;
@@ -180,14 +170,8 @@ impl EvmChainGateway {
 
     fn process_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
         match &mut self.status {
-            SyncStatus::Init(buffer) => {
-                info!("Buffering until Forwarding... {:?}", msg);
-                buffer.push(msg);
-            }
-            SyncStatus::BufferUntilLive(buffer) => {
-                info!("Buffering until live... {:?}", msg);
-                buffer.push(msg);
-            }
+            SyncStatus::Init(buffer) => buffer.push(msg),
+            SyncStatus::BufferUntilLive(buffer) => buffer.push(msg),
             SyncStatus::ForwardToSyncActor(state) => state.add_event(msg),
             SyncStatus::Live => self.publish_evm_event(msg)?,
         };
