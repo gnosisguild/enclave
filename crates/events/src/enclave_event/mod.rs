@@ -56,7 +56,7 @@ pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
-use e3_utils::{colorize, Color};
+use e3_utils::{colorize, colorize_event_ids, Color};
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
@@ -534,7 +534,13 @@ impl<S: SeqState> EnclaveEvent<S> {
 impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let t = self.event_type();
-        f.write_str(&format!("{} {:?}", colorize(t, Color::Cyan), self))
+        let colorized_debug = colorize_event_ids(self);
+
+        let s = match t.as_str() {
+            "EnclaveError" => format!("{} {}", colorize(t, Color::Red), colorized_debug),
+            _ => format!("{} {}", colorize(t, Color::Cyan), colorized_debug),
+        };
+        f.write_str(&s)
     }
 }
 

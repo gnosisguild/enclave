@@ -81,6 +81,12 @@ impl BusHandle {
         let pipe = BusHandlePipe::new(other.to_owned(), predicate).start();
         self.subscribe(EventType::All, pipe.into());
     }
+
+    pub fn with_ec(&self, ec: &EventContext<Sequenced>) -> Self {
+        let mut bus = self.clone();
+        bus.set_ctx(ec.clone());
+        bus
+    }
 }
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {

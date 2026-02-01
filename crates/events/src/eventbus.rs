@@ -8,6 +8,7 @@ use crate::traits::{ErrorEvent, Event};
 use crate::EventType;
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
+use e3_utils::{colorize, Color};
 use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use tracing::info;
@@ -131,7 +132,7 @@ impl<E: Event> Handler<E> for EventBus<E> {
         }
 
         // TODO: workshop to work out best display format
-        tracing::info!(">>> {}", event);
+        tracing::info!("{} {}", colorize(">>>", Color::Yellow), event);
         self.track(event);
     }
 }

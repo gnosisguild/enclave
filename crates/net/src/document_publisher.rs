@@ -11,6 +11,7 @@ use crate::{
     Cid,
 };
 use actix::prelude::*;
+use anyhow::Context;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
@@ -136,44 +137,65 @@ impl Actor for DocumentPublisher {
 impl Handler<EnclaveEvent> for DocumentPublisher {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::PublishDocumentRequested(data) => ctx.notify(data),
-            EnclaveEventData::CiphernodeSelected(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::PublishDocumentRequested(data) => {
+                ctx.notify(TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CiphernodeSelected(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::E3RequestComplete(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<PublishDocumentRequested> for DocumentPublisher {
+impl Handler<TypedEvent<PublishDocumentRequested>> for DocumentPublisher {
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: PublishDocumentRequested, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<PublishDocumentRequested>,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         let tx = self.tx.clone();
-        let msg = msg.clone();
+        let (msg, ec) = msg.into_components();
         let rx = self.rx.clone();
         let bus = self.bus.clone();
         let topic = self.topic.clone();
         trap_fut(
             EType::IO,
-            &bus.clone(),
+            &bus.with_ec(&ec),
             handle_publish_document_requested(tx, rx, msg, topic, bus),
         )
     }
 }
 
-impl Handler<CiphernodeSelected> for DocumentPublisher {
+impl Handler<TypedEvent<CiphernodeSelected>> for DocumentPublisher {
     type Result = ();
-    fn handle(&mut self, msg: CiphernodeSelected, _ctx: &mut Self::Context) -> Self::Result {
-        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CiphernodeSelected>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        trap(EType::DocumentPublishing, &self.bus.with_ec(&ec), || {
             self.handle_ciphernode_selected(msg)
         })
     }
 }
 
-impl Handler<E3RequestComplete> for DocumentPublisher {
+impl Handler<TypedEvent<E3RequestComplete>> for DocumentPublisher {
     type Result = ();
-    fn handle(&mut self, msg: E3RequestComplete, _ctx: &mut Self::Context) -> Self::Result {
-        trap(EType::DocumentPublishing, &self.bus.clone(), || {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<E3RequestComplete>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
+        trap(EType::DocumentPublishing, &self.bus.with_ec(&ec), || {
             self.handle_e3_request_complete(msg)
         })
     }
@@ -471,8 +493,8 @@ impl EventConverter {
     /// Note: Filtering already happened in DocumentPublisher before DHT fetch.
     fn handle_document_received(&self, msg: TypedEvent<DocumentReceived>) -> Result<()> {
         let (msg, ctx) = msg.into_components();
-        let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())?;
-
+        let receivable = ReceivableDocument::from_bytes(&msg.value.extract_bytes())
+            .context("Could not deserialize document bytes")?;
         match receivable {
             ReceivableDocument::ThresholdShareCreated(evt) => {
                 debug!(
@@ -538,9 +560,11 @@ impl Handler<TypedEvent<ThresholdShareCreated>> for EventConverter {
         msg: TypedEvent<ThresholdShareCreated>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::DocumentPublishing, &self.bus.clone(), || {
-            self.handle_threshold_share_created(msg)
-        })
+        trap(
+            EType::DocumentPublishing,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_threshold_share_created(msg),
+        )
     }
 }
 
@@ -551,9 +575,11 @@ impl Handler<TypedEvent<EncryptionKeyCreated>> for EventConverter {
         msg: TypedEvent<EncryptionKeyCreated>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::DocumentPublishing, &self.bus.clone(), || {
-            self.handle_encryption_key_created(msg)
-        })
+        trap(
+            EType::DocumentPublishing,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_encryption_key_created(msg),
+        )
     }
 }
 
@@ -564,9 +590,11 @@ impl Handler<TypedEvent<DocumentReceived>> for EventConverter {
         msg: TypedEvent<DocumentReceived>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::DocumentPublishing, &self.bus.clone(), || {
-            self.handle_document_received(msg)
-        })
+        trap(
+            EType::DocumentPublishing,
+            &self.bus.with_ec(msg.get_ctx()),
+            || self.handle_document_received(msg),
+        )
     }
 }
 
@@ -853,7 +881,7 @@ mod tests {
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: cid.clone(),
                 meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], Some(expires_at)),
-                ts: 123,
+                ts: 100,
             }),
         ))?;
 
@@ -874,7 +902,7 @@ mod tests {
         net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
             key: cid,
             correlation_id,
-            value,
+            value, // This will error because this is not a ReceivableDocument which is fine
         })?;
 
         // wait for events to settle
@@ -882,8 +910,12 @@ mod tests {
 
         // Check event was dispatched
         let events = history.send(GetEvents::new()).await?;
-        let Some(EnclaveEventData::DocumentReceived(DocumentReceived { value: doc, .. })) =
-            events.last().map(|e| e.get_data())
+        let Some(EnclaveEventData::DocumentReceived(DocumentReceived { value: doc, .. })) = events
+            .iter()
+            // Filter out the error
+            .filter(|e| e.event_type() != "EnclaveError")
+            .last()
+            .map(|e| e.get_data())
         else {
             bail!("No event sent");
         };
