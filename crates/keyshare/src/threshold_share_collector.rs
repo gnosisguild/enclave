@@ -33,11 +33,17 @@ pub(crate) enum CollectorState {
 pub struct ThresholdShareCollectionTimeout;
 
 pub struct ThresholdShareCollector {
+    /// The E3id for the round
     e3_id: E3id,
+    /// The partys the collector expects to receive from
     todo: HashSet<PartyId>,
+    /// The parent actor that has requested collection
     parent: Addr<ThresholdKeyshare>,
+    /// The current state of the collector
     state: CollectorState,
+    /// The shares collected
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
+    /// A timeout handle for when this collector will report failure
     timeout_handle: Option<SpawnHandle>,
 }
 

@@ -87,7 +87,7 @@ impl Handler<WithSortitionTicket<TypedEvent<E3Requested>>> for CiphernodeSelecto
         data: WithSortitionTicket<TypedEvent<E3Requested>>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::Sortition, &self.bus.clone(), || {
+        trap(EType::Sortition, &self.bus.with_ec(data.get_ctx()), || {
             self.e3_cache.try_mutate(data.get_ctx(), |mut cache| {
                 info!(
                     "Mutating e3_cache: appending data: {:?}",
@@ -139,12 +139,16 @@ impl Handler<TypedEvent<E3RequestComplete>> for CiphernodeSelector {
         msg: TypedEvent<E3RequestComplete>,
         _: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::Sortition, &self.bus.clone(), move || {
-            self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
-                cache.remove(&msg.e3_id);
-                Ok(cache)
-            })
-        })
+        trap(
+            EType::Sortition,
+            &self.bus.with_ec(msg.get_ctx()),
+            move || {
+                self.e3_cache.try_mutate(msg.get_ctx(), |mut cache| {
+                    cache.remove(&msg.e3_id);
+                    Ok(cache)
+                })
+            },
+        )
     }
 }
 
@@ -156,60 +160,65 @@ impl Handler<TypedEvent<CommitteeFinalized>> for CiphernodeSelector {
         msg: TypedEvent<CommitteeFinalized>,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        trap(EType::Sortition, &self.bus.clone(), move || {
-            let (msg, ec) = msg.into_components();
-            info!("CiphernodeSelector received CommitteeFinalized.");
-            let bus = self.bus.clone();
-            info!("Getting e3_cache...");
-            let Some(e3_cache) = self.e3_cache.get() else {
-                bail!("Could not get cache");
-            };
+        trap(
+            EType::Sortition,
+            &self.bus.with_ec(msg.get_ctx()),
+            move || {
+                let (msg, ec) = msg.into_components();
+                info!("CiphernodeSelector received CommitteeFinalized.");
+                let bus = self.bus.clone();
+                info!("Getting e3_cache...");
+                let Some(e3_cache) = self.e3_cache.get() else {
+                    bail!("Could not get cache");
+                };
 
-            info!("Getting e3_meta...");
-            let Some(e3_meta) = e3_cache.get(&msg.e3_id) else {
-                bail!(
-                    "Could not find E3Meta on CiphernodeSelector for {}",
-                    msg.e3_id
-                );
-            };
+                info!("Getting e3_meta...");
+                let Some(e3_meta) = e3_cache.get(&msg.e3_id) else {
+                    bail!(
+                        "Could not find E3Meta on CiphernodeSelector for {}",
+                        msg.e3_id
+                    );
+                };
 
-            // Check if this node is in the finalized committee
-            if !msg.committee.contains(&self.address) {
-                info!(node = self.address, "Node not in finalized committee");
-                return Ok(());
-            }
+                // Check if this node is in the finalized committee
+                if !msg.committee.contains(&self.address) {
+                    info!(node = self.address, "Node not in finalized committee");
+                    return Ok(());
+                }
 
-            // Retrieve E3 metadata from repository
-            let Some(party_id) = msg.committee.iter().position(|addr| addr == &self.address) else {
+                // Retrieve E3 metadata from repository
+                let Some(party_id) = msg.committee.iter().position(|addr| addr == &self.address)
+                else {
+                    info!(
+                        node = self.address,
+                        "Node address not found in committee list (should not happen)"
+                    );
+                    return Ok(());
+                };
+
                 info!(
                     node = self.address,
-                    "Node address not found in committee list (should not happen)"
+                    party_id = party_id,
+                    "Node is in finalized committee, emitting CiphernodeSelected"
                 );
-                return Ok(());
-            };
 
-            info!(
-                node = self.address,
-                party_id = party_id,
-                "Node is in finalized committee, emitting CiphernodeSelected"
-            );
+                bus.publish(
+                    CiphernodeSelected {
+                        party_id: party_id as u64,
+                        e3_id: msg.e3_id,
+                        threshold_m: e3_meta.threshold_m,
+                        threshold_n: e3_meta.threshold_n,
+                        esi_per_ct: e3_meta.esi_per_ct,
+                        error_size: e3_meta.error_size.clone(),
+                        params: e3_meta.params.clone(),
+                        seed: e3_meta.seed,
+                    },
+                    ec,
+                )?;
 
-            bus.publish(
-                CiphernodeSelected {
-                    party_id: party_id as u64,
-                    e3_id: msg.e3_id,
-                    threshold_m: e3_meta.threshold_m,
-                    threshold_n: e3_meta.threshold_n,
-                    esi_per_ct: e3_meta.esi_per_ct,
-                    error_size: e3_meta.error_size.clone(),
-                    params: e3_meta.params.clone(),
-                    seed: e3_meta.seed,
-                },
-                ec,
-            )?;
-
-            Ok(())
-        })
+                Ok(())
+            },
+        )
     }
 }
 

@@ -88,6 +88,7 @@ impl Actor for Synchronizer {
 impl Handler<SyncEvmEvent> for Synchronizer {
     type Result = ();
     fn handle(&mut self, msg: SyncEvmEvent, _: &mut Self::Context) -> Self::Result {
+        // TODO: extract contect from enclave event
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
                 // Buffer events as the sync actor receives them
