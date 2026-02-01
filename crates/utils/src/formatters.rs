@@ -70,7 +70,7 @@ static EVENT_ID_RE: LazyLock<Regex> =
 /// Hashes a string to an ANSI 256 color within `[hue_min, hue_max)` degrees.
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// hash_str_to_ansi_color_in_hue_range(s, 30.0, 300.0);   // orange to purple
 /// hash_str_to_ansi_color_in_hue_range(s, 30.0, 330.0);   // full spectrum, no red
 /// hash_str_to_ansi_color_in_hue_range(s, 0.0, 360.0);    // full spectrum
