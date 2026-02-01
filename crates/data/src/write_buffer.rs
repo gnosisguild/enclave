@@ -36,7 +36,7 @@ impl AggregateConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct AggregateBuffer {
     buffer: Vec<Insert>,
 }
@@ -52,6 +52,8 @@ pub struct WriteBuffer {
     dest: Option<Recipient<InsertBatch>>,
     /// Per-aggregate buffers for organizing inserts
     aggregate_buffers: HashMap<AggregateId, AggregateBuffer>,
+    /// Per-aggregate blockheight highwatermarks
+    block_height_seen: HashMap<AggregateId, u64>,
     /// Per-aggregate wait time configuration
     config: AggregateConfig,
 }
@@ -65,6 +67,7 @@ impl WriteBuffer {
         Self {
             dest: None,
             aggregate_buffers: HashMap::new(),
+            block_height_seen: HashMap::new(),
             config: AggregateConfig::new(HashMap::new()),
         }
     }
@@ -73,22 +76,17 @@ impl WriteBuffer {
         Self {
             dest: None,
             aggregate_buffers: HashMap::new(),
+            block_height_seen: HashMap::new(),
             config,
         }
     }
 
     fn handle_insert(&mut self, msg: Insert) {
-        let aggregate_id = if let Some(event_ctx) = msg.ctx() {
-            event_ctx.aggregate_id().clone()
-        } else {
-            AggregateId::new(0)
-        };
-
-        let agg_buffer = self
-            .aggregate_buffers
-            .entry(aggregate_id)
-            .or_insert_with(|| AggregateBuffer::new());
-        agg_buffer.buffer.push(msg.clone());
+        handle_insert(
+            msg,
+            &mut self.aggregate_buffers,
+            &mut self.block_height_seen,
+        )
     }
 
     fn handle_commit_snapshot(&mut self, msg: CommitSnapshot) {
@@ -172,6 +170,31 @@ fn process_expired_inserts(
     (updated_buffers, all_expired_inserts)
 }
 
+fn handle_insert(
+    msg: Insert,
+    aggregate_buffers: &mut HashMap<AggregateId, AggregateBuffer>,
+    block_height_seen: &mut HashMap<AggregateId, u64>,
+) {
+    let aggregate_id = msg
+        .ctx()
+        .map(|ec| {
+            if let Some(block) = ec.block() {
+                block_height_seen
+                    .entry(ec.aggregate_id().clone())
+                    .and_modify(|e| *e = (*e).max(block))
+                    .or_insert(block);
+            }
+            ec.aggregate_id().clone()
+        })
+        .unwrap_or_else(|| AggregateId::new(0));
+
+    aggregate_buffers
+        .entry(aggregate_id)
+        .or_default()
+        .buffer
+        .push(msg);
+}
+
 impl Handler<CommitSnapshot> for WriteBuffer {
     type Result = ();
 
@@ -186,6 +209,60 @@ mod tests {
     use crate::events::Insert;
     use e3_events::{hlc::HlcTimestamp, EventContext, EventId};
 
+    fn insert_with_block(agg: AggregateId, block: u64) -> Insert {
+        Insert::new_with_context(
+            "key",
+            b"value".to_vec(),
+            EventContext::new_origin(EventId::hash(1), 123, agg, Some(block)).sequence(1),
+        )
+    }
+
+    fn insert_without_block(agg: AggregateId) -> Insert {
+        Insert::new_with_context(
+            "key",
+            b"value".to_vec(),
+            EventContext::new_origin(EventId::hash(1), 123, agg, None).sequence(1),
+        )
+    }
+
+    fn insert_no_context() -> Insert {
+        Insert::new("key", b"value".to_vec())
+    }
+
+    #[test]
+    fn tracks_highwater_mark() {
+        let mut buffers = HashMap::new();
+        let mut heights = HashMap::new();
+        let agg_1 = AggregateId::new(1);
+        let agg_42 = AggregateId::new(42);
+
+        // Initial inserts for both aggregates
+        handle_insert(insert_with_block(agg_42, 24), &mut buffers, &mut heights);
+        handle_insert(insert_with_block(agg_1, 25), &mut buffers, &mut heights);
+
+        // Higher block for agg_42 - should update
+        handle_insert(insert_with_block(agg_42, 100), &mut buffers, &mut heights);
+
+        // Lower block for agg_42 - should NOT update
+        handle_insert(insert_with_block(agg_42, 50), &mut buffers, &mut heights);
+
+        // No block context - should not affect heights
+        handle_insert(insert_without_block(agg_1), &mut buffers, &mut heights);
+
+        // No context at all - uses default aggregate
+        handle_insert(insert_no_context(), &mut buffers, &mut heights);
+
+        // Verify highwater marks
+        assert_eq!(heights.get(&agg_42), Some(&100));
+        assert_eq!(heights.get(&agg_1), Some(&25));
+        assert_eq!(heights.get(&AggregateId::new(0)), None);
+
+        // Verify buffer counts
+        assert_eq!(buffers.get(&agg_42).unwrap().buffer.len(), 3);
+        assert_eq!(buffers.get(&agg_1).unwrap().buffer.len(), 2);
+        assert_eq!(buffers.get(&AggregateId::new(0)).unwrap().buffer.len(), 1);
+    }
+
     #[test]
     fn test_process_expired_inserts() {
         let aggregate_id = AggregateId::new(1);
@@ -195,25 +272,13 @@ mod tests {
         let old_hlc = HlcTimestamp::new(500_000, 0, 1); // 0.5 seconds ago
         let new_hlc = HlcTimestamp::new(3_000_000, 0, 2); // 3 seconds from epoch
 
-        let old_ctx = EventContext::new(
-            EventId::hash(1),
-            EventId::hash(1),
-            EventId::hash(1),
-            old_hlc.into(),
-            aggregate_id.clone(),
-            None,
-        )
-        .sequence(1);
+        let old_ctx =
+            EventContext::new_origin(EventId::hash(1), old_hlc.into(), aggregate_id.clone(), None)
+                .sequence(1);
 
-        let new_ctx = EventContext::new(
-            EventId::hash(2),
-            EventId::hash(2),
-            EventId::hash(2),
-            new_hlc.into(),
-            aggregate_id.clone(),
-            None,
-        )
-        .sequence(2);
+        let new_ctx =
+            EventContext::new_origin(EventId::hash(2), new_hlc.into(), aggregate_id.clone(), None)
+                .sequence(2);
 
         let old_insert = Insert::new_with_context("old_key", b"old_value".to_vec(), old_ctx);
         let new_insert = Insert::new_with_context("new_key", b"new_value".to_vec(), new_ctx);
