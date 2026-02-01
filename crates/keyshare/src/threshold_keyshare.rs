@@ -1072,7 +1072,7 @@ impl Handler<EncryptionKeyCollectionFailed> for ThresholdKeyshare {
             self.encryption_key_collector = None;
 
             // Publish failure event to event bus for sync tracking
-            self.bus.publish_origin(msg)?;
+            self.bus.publish_without_context(msg)?;
 
             // Stop this actor since we can't proceed without all encryption keys
             ctx.stop();
@@ -1100,7 +1100,7 @@ impl Handler<ThresholdShareCollectionFailed> for ThresholdKeyshare {
             self.decryption_key_collector = None;
 
             // Publish failure event to event bus for sync tracking
-            self.bus.publish_origin(msg)?;
+            self.bus.publish_without_context(msg)?;
 
             ctx.stop();
             Ok(())

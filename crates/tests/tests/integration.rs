@@ -43,7 +43,7 @@ async fn setup_score_sortition_environment(
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
-    bus.publish_origin(ConfigurationUpdated {
+    bus.publish_without_context(ConfigurationUpdated {
         parameter: "ticketPrice".to_string(),
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
@@ -54,7 +54,7 @@ async fn setup_score_sortition_environment(
     for addr in eth_addrs {
         adder.add(addr).await?;
 
-        bus.publish_origin(TicketBalanceUpdated {
+        bus.publish_without_context(TicketBalanceUpdated {
             operator: addr.clone(),
             delta: I256::try_from(1_000_000_000u64).unwrap(),
             new_balance: U256::from(1_000_000_000u64),
@@ -62,7 +62,7 @@ async fn setup_score_sortition_environment(
             chain_id,
         })?;
 
-        bus.publish_origin(OperatorActivationChanged {
+        bus.publish_without_context(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
@@ -238,7 +238,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    bus.publish_origin(e3_requested)?;
+    bus.publish_without_context(e3_requested)?;
 
     // For score sortition, we need to wait for nodes to process E3Requested and run sortition
     // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
@@ -265,7 +265,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
 
-    bus.publish_origin(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee,
         chain_id,
@@ -383,7 +383,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish_origin(ciphertext_published_event.clone())?;
+    bus.publish_without_context(ciphertext_published_event.clone())?;
 
     println!("CiphertextOutputPublished event has been dispatched!");
 
@@ -520,9 +520,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         ..CiphernodeSelected::default()
     };
 
-    bus.publish_origin(evt_1.clone())?;
-    bus.publish_origin(evt_2.clone())?;
-    bus.publish_origin(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
+    bus.publish_without_context(evt_1.clone())?;
+    bus.publish_without_context(evt_2.clone())?;
+    bus.publish_without_context(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
 
     // check the history of the event bus
     let history = history_collector
@@ -674,7 +674,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         };
 
         // Send e3request
-        bus.publish_origin(E3Requested {
+        bus.publish_without_context(E3Requested {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             threshold_n: 2,
@@ -683,7 +683,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             ..E3Requested::default()
         })?;
 
-        bus.publish_origin(CommitteeFinalized {
+        bus.publish_without_context(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
             chain_id: 1,
@@ -699,7 +699,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         assert_eq!(errors.len(), 0);
 
         // SEND SHUTDOWN!
-        bus.publish_origin(Shutdown)?;
+        bus.publish_without_context(Shutdown)?;
 
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
@@ -764,7 +764,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     use e3_test_helpers::encrypt_ciphertext;
     let raw_plaintext = vec![vec![4, 5]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
-    bus.publish_origin(CiphertextOutputPublished {
+    bus.publish_without_context(CiphertextOutputPublished {
         ciphertext_output: ciphertext
             .iter()
             .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
@@ -911,7 +911,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     setup_score_sortition_environment(&bus, &eth_addrs, 2).await?;
 
     // Send the computation requested event
-    bus.publish_origin(E3Requested {
+    bus.publish_without_context(E3Requested {
         e3_id: E3id::new("1234", 1),
         threshold_m: 2,
         threshold_n: 5,
@@ -920,7 +920,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     })?;
 
-    bus.publish_origin(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
         chain_id: 1,
@@ -955,7 +955,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     );
 
     // Send the computation requested event
-    bus.publish_origin(E3Requested {
+    bus.publish_without_context(E3Requested {
         e3_id: E3id::new("1234", 2),
         threshold_m: 2,
         threshold_n: 5,
@@ -964,7 +964,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     })?;
 
-    bus.publish_origin(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
         chain_id: 2,

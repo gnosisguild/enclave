@@ -98,7 +98,7 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         self.publish_local(data, Some(ctx))
     }
 
-    fn publish_origin(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
+    fn publish_without_context(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
         self.publish_local(data, None)
     }
 
@@ -324,13 +324,13 @@ mod tests {
         bus_c.subscribe(EventType::All, saver.clone().into());
 
         // Publish events in causal order across buses
-        bus_a.publish_origin(TestEvent::new("one", 1))?;
+        bus_a.publish_without_context(TestEvent::new("one", 1))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish_origin(TestEvent::new("two", 2))?;
+        bus_b.publish_without_context(TestEvent::new("two", 2))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_a.publish_origin(TestEvent::new("three", 3))?;
+        bus_a.publish_without_context(TestEvent::new("three", 3))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish_origin(TestEvent::new("four", 4))?;
+        bus_b.publish_without_context(TestEvent::new("four", 4))?;
         sleep(Duration::from_millis(50)).await; // next tick
 
         // Get events

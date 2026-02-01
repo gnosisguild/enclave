@@ -65,11 +65,11 @@ impl Synchronizer {
         // publish them in order
         for evt in self.evm_buffer.drain(..) {
             let (data, _, _) = evt.split();
-            self.bus.publish_origin(data)?; // Use publish_origin here as historical events will be correctly
-                                            // ordered as part of the preparatory process and these
-                                            // events have no
+            self.bus.publish_without_context(data)?; // Use publish_without_context here as historical events will be correctly
+                                                     // ordered as part of the preparatory process and these
+                                                     // events have no
         }
-        self.bus.publish_origin(SyncEnd::new())?;
+        self.bus.publish_without_context(SyncEnd::new())?;
         Ok(())
     }
 }
@@ -108,7 +108,7 @@ impl Handler<Bootstrap> for Synchronizer {
 
             // TODO: Get information about what has and has not been synced then fire SyncStart
             self.bus
-                .publish_origin(SyncStart::new(ctx.address(), evm_config))
+                .publish_without_context(SyncStart::new(ctx.address(), evm_config))
         })
     }
 }

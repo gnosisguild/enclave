@@ -22,7 +22,7 @@ pub async fn listen_for_shutdown(node: CiphernodeHandle) {
             info!("SIGTERM received, initiating graceful shutdown...");
 
             // Stop the actor system
-            match bus.publish_origin(Shutdown){
+            match bus.publish_without_context(Shutdown){
                 Ok(_) => (),
                 Err(e) => error!("Shutdown failed to publish! {e}")
             }

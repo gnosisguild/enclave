@@ -505,7 +505,7 @@ mod tests {
         );
 
         // Push an event
-        handle.publish_origin(TestEvent::new("pink", 1))?;
+        handle.publish_without_context(TestEvent::new("pink", 1))?;
         sleep(Duration::from_millis(1)).await;
 
         // Now we have published an event all data should be written we can get the data from the store
@@ -523,9 +523,9 @@ mod tests {
         let ts = handle.ts()?;
 
         // Push a few other events
-        handle.publish_origin(TestEvent::new("yellow", 1))?;
-        handle.publish_origin(TestEvent::new("red", 1))?;
-        handle.publish_origin(TestEvent::new("white", 1))?;
+        handle.publish_without_context(TestEvent::new("yellow", 1))?;
+        handle.publish_without_context(TestEvent::new("red", 1))?;
+        handle.publish_without_context(TestEvent::new("white", 1))?;
         sleep(Duration::from_millis(100)).await;
 
         // Get the event logs from the listener

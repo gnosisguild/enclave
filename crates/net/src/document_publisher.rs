@@ -663,7 +663,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // 1. Send a request to publish
-        bus.publish_origin(PublishDocumentRequested {
+        bus.publish_without_context(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         })?;
@@ -737,7 +737,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.publish_origin(CiphernodeSelected {
+        bus.publish_without_context(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,
@@ -800,7 +800,7 @@ mod tests {
         let e3_id = E3id::new("1243", 1);
 
         // Send a request to publish
-        bus.publish_origin(PublishDocumentRequested {
+        bus.publish_without_context(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         })?;
@@ -850,7 +850,7 @@ mod tests {
         let cid = Cid::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
-        bus.publish_origin(CiphernodeSelected {
+        bus.publish_without_context(CiphernodeSelected {
             e3_id: e3_id.clone(),
             threshold_m: 3,
             threshold_n: 5,

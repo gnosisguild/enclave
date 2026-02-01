@@ -181,7 +181,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.publish_origin(evt.clone())?;
+        self.bus.publish_without_context(evt.clone())?;
 
         Ok(evt.into())
     }

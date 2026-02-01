@@ -88,7 +88,7 @@ pub trait EventPublisher<E: Event> {
     fn publish(&self, data: impl Into<E::Data>, ctx: EventContext<Sequenced>) -> Result<()>;
     /// This creates a context based on the given data. This should only be used when an event is
     /// the origin event
-    fn publish_origin(&self, data: impl Into<E::Data>) -> Result<()>;
+    fn publish_without_context(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
