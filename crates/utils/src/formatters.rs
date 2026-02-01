@@ -67,7 +67,7 @@ pub fn colorize<T: std::fmt::Display>(s: T, color: Color) -> String {
 static EVENT_ID_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"EventId\(0x([a-fA-F0-9]+)\)").unwrap());
 
-/// Hashes a string to an ANSI 256 color within `[hue_min, hue_max)` degrees.
+/// Hashes a string to an ANSI 256 color within `[hue_min, hue_max]` degrees.
 ///
 /// # Examples
 /// ```ignore
