@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Actor;
-use alloy::primitives::{FixedBytes, I256, U256};
+use alloy::primitives::{Address, FixedBytes, I256, U256};
 use anyhow::{bail, Result};
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
@@ -19,6 +19,7 @@ use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
+use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
 use e3_trbfv::helpers::calculate_error_size;
@@ -31,11 +32,85 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, Instant};
 use std::{fs, sync::Arc};
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    sync::{broadcast, mpsc},
+    time::sleep,
+};
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
+}
+
+/// Determines the committee for a given E3 request using deterministic sortition.
+///
+/// This function runs the same sortition algorithm that the ciphernodes use internally,
+/// ensuring the test committee matches what the nodes will compute.
+///
+/// # Arguments
+/// * `e3_id` - The E3 computation ID
+/// * `seed` - The random seed for sortition
+/// * `threshold_m` - Minimum nodes required for decryption
+/// * `threshold_n` - Committee size
+/// * `registered_addrs` - List of node addresses eligible for selection
+/// * `collector_addr` - Address of the collector node (for validation)
+///
+/// # Returns
+/// A tuple of (committee_addresses, buffer_addresses)
+fn determine_committee(
+    e3_id: &E3id,
+    seed: Seed,
+    threshold_m: usize,
+    threshold_n: usize,
+    registered_addrs: &[String],
+    collector_addr: &str,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let buffer = calculate_buffer_size(threshold_m, threshold_n);
+    let total_selection_size = threshold_n + buffer;
+
+    let registered_nodes: Vec<RegisteredNode> = registered_addrs
+        .iter()
+        .map(|addr| {
+            let address: Address = addr.parse().unwrap();
+            RegisteredNode {
+                address,
+                tickets: vec![Ticket { ticket_id: 1 }],
+            }
+        })
+        .collect();
+
+    let winners = ScoreSortition::new(total_selection_size).get_committee(
+        e3_id.clone(),
+        seed,
+        &registered_nodes,
+    )?;
+
+    let committee: Vec<String> = winners
+        .iter()
+        .take(threshold_n)
+        .map(|w| w.address.to_string())
+        .collect();
+
+    let buffer_nodes: Vec<String> = winners
+        .iter()
+        .skip(threshold_n)
+        .map(|w| w.address.to_string())
+        .collect();
+
+    for addr in &committee {
+        if addr.eq_ignore_ascii_case(collector_addr) {
+            bail!(
+                "Collector node was selected in committee. \
+                 This should never happen as collector should not be registered for sortition.\n\
+                 Collector: {}\n\
+                 Registered nodes: {}",
+                collector_addr,
+                registered_addrs.len()
+            );
+        }
+    }
+
+    Ok((committee, buffer_nodes))
 }
 
 async fn setup_score_sortition_environment(
@@ -164,7 +239,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     let nodes = CiphernodeSystemBuilder::new()
-        // Adding 7 total nodes of which we are only choosing 5 for the committee
+        // Adding 20 total nodes: 5 for committee + 4 buffer = 9 selected, 11 unselected
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
@@ -183,7 +258,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .build()
                 .await
         })
-        .add_group(6, || async {
+        .add_group(19, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
             CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
@@ -206,7 +281,24 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let committee_setup = Instant::now();
     let chain_id = 1u64;
-    let eth_addrs: Vec<String> = nodes.iter().map(|n| n.address()).collect();
+
+    // Only register nodes 1-19 in sortition (exclude collector at index 0).
+    // This ensures the collector is never selected, making the test deterministic.
+    // The collector node will observe events as a non-participant.
+    let collector_addr = nodes.get(0).unwrap().address();
+    let eth_addrs: Vec<String> = nodes
+        .iter()
+        .skip(1) // Skip the collector node
+        .map(|n| n.address())
+        .collect();
+
+    println!(
+        "Test setup: {} registered nodes, {} threshold, collector (observer): {}",
+        eth_addrs.len(),
+        threshold_n,
+        collector_addr
+    );
+
     setup_score_sortition_environment(&bus, &eth_addrs, chain_id).await?;
 
     // Flush all events
@@ -238,27 +330,28 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
+    println!(
+        "Publishing E3Requested: e3_id={}, threshold={}/{}",
+        e3_id, threshold_m, threshold_n
+    );
     bus.publish(e3_requested)?;
 
-    // For score sortition, we need to wait for nodes to process E3Requested and run sortition
-    // Since TicketGenerated is a local-only event (not shared across network), we can't collect it
-    // we need to manually construct the committee that sortition would select
+    sleep(Duration::from_millis(500)).await;
 
-    // For seed=123, these 5 nodes get selected by sortition:
-    // P0: Node 3 - 0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba (ticket 29)
-    // P1: Node 0 - 0x781199F9d55d18E855a7AA84C5e4B40dA2C96fc8 (ticket 14)
-    // P2: Node 6 - 0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB (ticket 18)
-    // P3: Node 5 - 0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479 (ticket 17)
-    // P4: Node 4 - 0x8966a013047aef67Cac52Bc96eB77bC11B5D2572 (ticket 92)
-    let committee: Vec<String> = vec![
-        "0x95b8a2b9b93aE9e0F13e215A49b8C53172c4f4ba".to_string(),
-        "0x781199F9d55d18E855a7AA84C5e4B40dA2C96fc8".to_string(),
-        "0x83A06c5Ac9E4207526C3eFA79812808428Dd5FaB".to_string(),
-        "0x2B1eD59AC30f668B5b9EcF3D8718A44C15E0E479".to_string(),
-        "0x8966a013047aef67Cac52Bc96eB77bC11B5D2572".to_string(),
-    ];
+    let (committee, buffer_nodes) = determine_committee(
+        &e3_id,
+        seed,
+        threshold_m,
+        threshold_n,
+        &eth_addrs,
+        &collector_addr,
+    )?;
 
-    println!("Emitting CommitteeFinalized with {} nodes", committee.len());
+    println!(
+        "Committee selected: {} nodes, {} buffer nodes",
+        committee.len(),
+        buffer_nodes.len()
+    );
 
     let expected = vec!["E3Requested"];
     let _ = nodes
@@ -267,7 +360,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     bus.publish(CommitteeFinalized {
         e3_id: e3_id.clone(),
-        committee,
+        committee: committee.clone(),
         chain_id,
     })?;
 
