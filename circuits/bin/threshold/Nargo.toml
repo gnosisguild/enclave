@@ -4,5 +4,6 @@ members = [
     "pk_aggregation",
     "user_data_encryption",
     "share_decryption",
-    "decrypted_shares_aggregation"   
+    "decrypted_shares_aggregation_bn",
+    "decrypted_shares_aggregation_mod"  
 ]

@@ -2099,6 +2099,7 @@ name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
  "e3-fhe-params",
+ "e3-polynomial 0.1.8",
  "getrandom 0.2.17",
  "js-sys",
  "num-bigint",
@@ -2373,6 +2374,7 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
+ "e3-polynomial 0.1.8",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
@@ -2459,6 +2461,8 @@ dependencies = [
 name = "e3-polynomial"
 version = "0.1.8"
 dependencies = [
+ "fhe-math",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "serde",
@@ -2468,7 +2472,7 @@ dependencies = [
 [[package]]
 name = "e3-polynomial"
 version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
+source = "git+https://github.com/gnosisguild/enclave?branch=main#e29a5a1308e2395fea85cc2f9540ab8c9d16a668"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2505,7 +2509,7 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
+source = "git+https://github.com/gnosisguild/enclave#e29a5a1308e2395fea85cc2f9540ab8c9d16a668"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3946,6 +3950,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]
@@ -6776,7 +6781,6 @@ dependencies = [
  "hex",
  "itertools 0.14.0",
  "num-bigint",
- "num-integer",
  "num-traits",
  "rand 0.8.5",
  "rayon",

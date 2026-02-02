@@ -7,6 +7,7 @@
 use anyhow::{anyhow, Result};
 use e3_fhe_params::build_bfv_params_arc;
 use e3_greco_helpers::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
+use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::commitments::{
     compute_ciphertext_commitment, compute_pk_aggregation_commitment,
 };
@@ -149,7 +150,11 @@ pub fn compute_pk_commitment(
     let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-    let commitment_bigint = compute_pk_aggregation_commitment(&pk0is, &pk1is, bit_pk);
+
+    let pk0 = CrtPolynomial::from_bigint_vectors(pk0is);
+    let pk1 = CrtPolynomial::from_bigint_vectors(pk1is);
+
+    let commitment_bigint = compute_pk_aggregation_commitment(&pk0, &pk1, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
 
@@ -187,7 +192,10 @@ pub fn compute_ct_commitment(
     let (_, bounds) = GrecoBounds::compute(&params, 0)?;
     let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
-    let commitment_bigint = compute_ciphertext_commitment(&ct0is, &ct1is, bit_ct);
+    let ct0 = CrtPolynomial::from_bigint_vectors(ct0is);
+    let ct1 = CrtPolynomial::from_bigint_vectors(ct1is);
+
+    let commitment_bigint = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
 
     let bytes = commitment_bigint.to_bytes_be().1;
 

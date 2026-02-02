@@ -4,20 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_polynomial::{reduce_and_center_coefficients_mut, reduce_coefficients_2d};
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::utils::{calculate_bit_width, get_zkp_modulus};
+use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
-use fhe::bfv::Plaintext;
-use fhe_math::rq::Representation;
-use greco::bounds::GrecoBounds;
-use itertools::izip;
 use num_bigint::BigInt;
-use num_integer::Integer;
-use num_traits::Zero;
-use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::sync::Arc;
 
 /// Set of inputs for validation of a ciphertext addition.
@@ -26,37 +19,19 @@ use std::sync::Arc;
 /// was performed correctly in the zero-knowledge proof system.
 #[derive(Clone, Debug)]
 pub struct CiphertextAdditionInputs {
-    pub prev_ct0is: Vec<Vec<BigInt>>,
-    pub prev_ct1is: Vec<Vec<BigInt>>,
+    pub prev_ct0is: CrtPolynomial,
+    pub prev_ct1is: CrtPolynomial,
+    pub sum_ct0is: CrtPolynomial,
+    pub sum_ct1is: CrtPolynomial,
+    pub r0is: CrtPolynomial,
+    pub r1is: CrtPolynomial,
     pub prev_ct_commitment: BigInt,
-    pub sum_ct0is: Vec<Vec<BigInt>>,
-    pub sum_ct1is: Vec<Vec<BigInt>>,
-    pub r0is: Vec<Vec<BigInt>>,
-    pub r1is: Vec<Vec<BigInt>>,
 }
 
 impl CiphertextAdditionInputs {
-    /// Creates a new CiphertextAdditionInputs with zero-initialized vectors.
-    ///
-    /// # Arguments
-    /// * `num_moduli` - Number of CRT moduli
-    /// * `degree` - Polynomial degree
-    pub fn new(num_moduli: usize, degree: usize) -> Self {
-        CiphertextAdditionInputs {
-            prev_ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            prev_ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            prev_ct_commitment: BigInt::zero(),
-            sum_ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            sum_ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            r0is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            r1is: vec![vec![BigInt::zero(); degree]; num_moduli],
-        }
-    }
-
     /// Computes the ciphertext addition inputs for zero-knowledge proof validation.
     ///
     /// # Arguments
-    /// * `pt` - The plaintext being encrypted
     /// * `prev_ct` - The existing ciphertext to add to
     /// * `ct` - The ciphertext being added (from Greco)
     /// * `sum_ct` - The result of the ciphertext addition
@@ -66,211 +41,158 @@ impl CiphertextAdditionInputs {
     /// # Returns
     /// CiphertextAdditionInputs containing all necessary proof data
     pub fn compute(
-        pt: &Plaintext,
         prev_ct: &Ciphertext,
         ct: &Ciphertext,
         sum_ct: &Ciphertext,
         params: Arc<BfvParameters>,
+        bit_ct: u32,
     ) -> Result<CiphertextAdditionInputs> {
-        let ctx: &Arc<fhe_math::rq::Context> = params
-            .ctx_at_level(pt.level())
-            .with_context(|| "Failed to get context at level")?;
-        let n: u64 = params.degree() as u64;
+        let moduli = params.moduli();
 
-        // Extract and convert ciphertexts to power basis representation.
-        let mut prev_ct0 = prev_ct.c[0].clone();
-        let mut prev_ct1 = prev_ct.c[1].clone();
-        prev_ct0.change_representation(Representation::PowerBasis);
-        prev_ct1.change_representation(Representation::PowerBasis);
+        let mut crt_polynomials = [
+            CrtPolynomial::from_fhe_polynomial(&prev_ct.c[0]),
+            CrtPolynomial::from_fhe_polynomial(&prev_ct.c[1]),
+            CrtPolynomial::from_fhe_polynomial(&ct.c[0]),
+            CrtPolynomial::from_fhe_polynomial(&ct.c[1]),
+            CrtPolynomial::from_fhe_polynomial(&sum_ct.c[0]),
+            CrtPolynomial::from_fhe_polynomial(&sum_ct.c[1]),
+        ];
 
-        let mut ct0 = ct.c[0].clone();
-        let mut ct1 = ct.c[1].clone();
-        ct0.change_representation(Representation::PowerBasis);
-        ct1.change_representation(Representation::PowerBasis);
-
-        let mut sum_ct0 = sum_ct.c[0].clone();
-        let mut sum_ct1 = sum_ct.c[1].clone();
-        sum_ct0.change_representation(Representation::PowerBasis);
-        sum_ct1.change_representation(Representation::PowerBasis);
-
-        // Initialize matrices to store results.
-        let mut res = CiphertextAdditionInputs::new(params.moduli().len(), n as usize);
-
-        let prev_ct0_coeffs = prev_ct0.coefficients();
-        let prev_ct1_coeffs = prev_ct1.coefficients();
-        let ct0_coeffs = ct0.coefficients();
-        let ct1_coeffs = ct1.coefficients();
-        let sum_ct0_coeffs = sum_ct0.coefficients();
-        let sum_ct1_coeffs = sum_ct1.coefficients();
-
-        let prev_ct0_coeffs_rows = prev_ct0_coeffs.rows();
-        let prev_ct1_coeffs_rows = prev_ct1_coeffs.rows();
-        let ct0_coeffs_rows = ct0_coeffs.rows();
-        let ct1_coeffs_rows = ct1_coeffs.rows();
-        let sum_ct0_coeffs_rows = sum_ct0_coeffs.rows();
-        let sum_ct1_coeffs_rows = sum_ct1_coeffs.rows();
-
-        // Perform the main computation logic in parallel across moduli.
-        let results: Vec<_> = izip!(
-            ctx.moduli_operators(),
-            prev_ct0_coeffs_rows,
-            prev_ct1_coeffs_rows,
-            ct0_coeffs_rows,
-            ct1_coeffs_rows,
-            sum_ct0_coeffs_rows,
-            sum_ct1_coeffs_rows,
-        )
-        .enumerate()
-        .par_bridge()
-        .map(
-            |(
-                i,
-                (
-                    qi,
-                    prev_ct0_coeffs,
-                    prev_ct1_coeffs,
-                    ct0_coeffs,
-                    ct1_coeffs,
-                    sum_ct0_coeffs,
-                    sum_ct1_coeffs,
-                ),
-            )| {
-                // Convert to vectors of BigInt, center, and reverse order.
-                let mut prev_ct0i: Vec<BigInt> = prev_ct0_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-                let mut prev_ct1i: Vec<BigInt> = prev_ct1_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-                let mut ct0i: Vec<BigInt> = ct0_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-                let mut ct1i: Vec<BigInt> = ct1_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-                let mut sum_ct0i: Vec<BigInt> = sum_ct0_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-                let mut sum_ct1i: Vec<BigInt> = sum_ct1_coeffs
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect();
-
-                let qi_bigint = BigInt::from(qi.modulus());
-
-                // Center coefficients around zero for proper modular arithmetic.
-                reduce_and_center_coefficients_mut(&mut prev_ct0i, &qi_bigint);
-                reduce_and_center_coefficients_mut(&mut prev_ct1i, &qi_bigint);
-                reduce_and_center_coefficients_mut(&mut ct0i, &qi_bigint);
-                reduce_and_center_coefficients_mut(&mut ct1i, &qi_bigint);
-                reduce_and_center_coefficients_mut(&mut sum_ct0i, &qi_bigint);
-                reduce_and_center_coefficients_mut(&mut sum_ct1i, &qi_bigint);
-
-                // Compute quotient polynomials: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
-                // For ciphertext addition: sum_centered = ct_centered + prev_ct_centered + r * qi.
-                // So: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
-                let mut r0i = Vec::new();
-                let mut r1i = Vec::new();
-
-                // Reserve space for the quotient polynomials.
-                r0i.reserve_exact(n as usize);
-                r1i.reserve_exact(n as usize);
-
-                for j in 0..n as usize {
-                    let diff0 = &sum_ct0i[j] - (&ct0i[j] + &prev_ct0i[j]);
-                    let (q0, r0) = diff0.div_rem(&qi_bigint);
-                    if !r0.is_zero() {
-                        return Err(eyre::eyre!(
-                            "Non-zero remainder in ct0 division at modulus index {}, coeff {}: remainder = {}", i, j, r0
-                        ));
-                    }
-                    if q0 < (-1).into() || q0 > 1.into() {
-                        return Err(eyre::eyre!(
-                            "Quotient out of range [-1, 1] for ct0 at modulus index {}, coeff {}: quotient = {}", i, j, q0
-                        ));
-                    }
-                    let diff1 = &sum_ct1i[j] - (&ct1i[j] + &prev_ct1i[j]);
-                    let (q1, r1) = diff1.div_rem(&qi_bigint);
-                    if !r1.is_zero() {
-                        return Err(eyre::eyre!(
-                            "Non-zero remainder in ct1 division at modulus index {}, coeff {}: remainder = {}", i, j, r1
-                        ));
-                    }
-                    if q1 < (-1).into() || q1 > 1.into() {
-                        return Err(eyre::eyre!(
-                            "Quotient out of range [-1, 1] for ct1 at modulus index {}, coeff {}: quotient = {}", i, j, q1
-                        ));
-                    }
-                    r0i.push(q0);
-                    r1i.push(q1);
-                }
-
-                Ok((i, prev_ct0i, prev_ct1i, sum_ct0i, sum_ct1i, r0i, r1i))
-            },
-        )
-        .collect::<Result<Vec<_>, _>>()?;
-
-        // Merge results into the `res` structure after parallel execution.
-        for (i, prev_ct0i, prev_ct1i, sum_ct0i, sum_ct1i, r0i, r1i) in results {
-            res.prev_ct0is[i] = prev_ct0i;
-            res.prev_ct1is[i] = prev_ct1i;
-            res.sum_ct0is[i] = sum_ct0i;
-            res.sum_ct1is[i] = sum_ct1i;
-            res.r0is[i] = r0i;
-            res.r1is[i] = r1i;
+        // fhe-math stores coefficients in ascending degree (c_0, c_1, …). But here we want
+        // that each limb is stored in **descending** order (a_n, …, a_0) so circuit evaluation can use Horner's
+        // method in one forward pass: `result = result * x + coefficients[i]` from i = 0,
+        // i.e. P(x) = ((…((a_n·x + a_{n-1})·x + …)·x + a_0), with no extra reversing or reindexing.
+        //
+        // We center so the quotient r = (sum − (prev + ct)) / q_i lies in {-1, 0, 1}.
+        // BFV/fhe-math already gives coefficients in [0, q_i), so reduce is redundant. We need centering
+        // into (-q/2, q/2]: then the difference per coefficient is small in absolute value, and for valid
+        // ciphertext addition that difference is a multiple of q_i, so the quotient is in {-1, 0, 1},
+        // which the circuit and compute_quotient expect.
+        for c in &mut crt_polynomials {
+            c.reverse();
+            c.center(&moduli)?;
         }
 
-        let (_, bounds) = GrecoBounds::compute(&params, 0)?;
-        let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-        res.prev_ct_commitment =
-            compute_ciphertext_commitment(&res.prev_ct0is, &res.prev_ct1is, bit);
+        let [mut prev_ct0, mut prev_ct1, mut ct0, mut ct1, mut sum_ct0, mut sum_ct1] =
+            crt_polynomials;
 
-        Ok(res)
+        // Compute quotient polynomials: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
+        // For ciphertext addition: sum_centered = ct_centered + prev_ct_centered + r * qi.
+        // So: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
+        let mut r0 = Self::compute_quotient(&sum_ct0, &ct0, &prev_ct0, &moduli)
+            .with_context(|| "Failed to compute r0 quotient")?;
+        let mut r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, &moduli)
+            .with_context(|| "Failed to compute r1 quotient")?;
+
+        let zkp_modulus = &get_zkp_modulus();
+
+        // Reduce all coefficients modulo the ZKP modulus so they lie in the proof system's
+        // native field. The circuit expects witnesses in [0, zkp_modulus); unreduced values
+        // would break constraint satisfaction or overflow the field representation.
+        prev_ct0.reduce_uniform(zkp_modulus);
+        prev_ct1.reduce_uniform(zkp_modulus);
+        ct0.reduce_uniform(zkp_modulus);
+        ct1.reduce_uniform(zkp_modulus);
+        sum_ct0.reduce_uniform(zkp_modulus);
+        sum_ct1.reduce_uniform(zkp_modulus);
+        r0.reduce_uniform(zkp_modulus);
+        r1.reduce_uniform(zkp_modulus);
+
+        let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, bit_ct);
+
+        Ok(CiphertextAdditionInputs {
+            prev_ct0is: prev_ct0,
+            prev_ct1is: prev_ct1,
+            sum_ct0is: sum_ct0,
+            sum_ct1is: sum_ct1,
+            r0is: r0,
+            r1is: r1,
+            prev_ct_commitment,
+        })
     }
 
-    /// Converts the inputs to standard form by reducing coefficients modulo the ZKP modulus.
+    /// Computes the quotient CRT polynomial `(sum - (a + b)) / q_i` per modulus.
+    ///
+    /// For each limb index `i`, divides `sum_i - (a_i + b_i)` by the modulus `q_i`.
+    /// Used when verifying that sum ciphertext equals a + b and recovering the
+    /// quotient (small integer) from the difference.
+    ///
+    /// # Arguments
+    ///
+    /// * `sum` - CRT polynomial of the sum ciphertext
+    /// * `a` - CRT polynomial of the first ciphertext
+    /// * `b` - CRT polynomial of the second ciphertext
+    /// * `n` - polynomial degree (number of coefficients per limb)
+    /// * `moduli` - moduli for each CRT limb
     ///
     /// # Returns
-    /// A new CiphertextAdditionInputs with coefficients reduced to the ZKP modulus
-    pub fn standard_form(&self) -> Self {
-        let zkp_modulus = &get_zkp_modulus();
-        CiphertextAdditionInputs {
-            prev_ct0is: reduce_coefficients_2d(&self.prev_ct0is, zkp_modulus),
-            prev_ct1is: reduce_coefficients_2d(&self.prev_ct1is, zkp_modulus),
-            prev_ct_commitment: self.prev_ct_commitment.clone() % zkp_modulus,
-            sum_ct0is: reduce_coefficients_2d(&self.sum_ct0is, zkp_modulus),
-            sum_ct1is: reduce_coefficients_2d(&self.sum_ct1is, zkp_modulus),
-            r0is: reduce_coefficients_2d(&self.r0is, zkp_modulus),
-            r1is: reduce_coefficients_2d(&self.r1is, zkp_modulus),
+    ///
+    /// The quotient CRT polynomial, or an error if division is not exact or the
+    /// quotient is not in `{-1, 0, 1}`.
+    fn compute_quotient(
+        sum: &CrtPolynomial,
+        a: &CrtPolynomial,
+        b: &CrtPolynomial,
+        moduli: &[u64],
+    ) -> Result<CrtPolynomial> {
+        let num_moduli = moduli.len();
+
+        let mut quotient_limbs = Vec::with_capacity(num_moduli);
+
+        for i in 0..num_moduli {
+            let sum_limb = sum.limb(i);
+            let a_limb = a.limb(i);
+            let b_limb = b.limb(i);
+            let qi = Polynomial::constant(BigInt::from(moduli[i]));
+
+            let diff = sum_limb.sub(&a_limb.add(b_limb));
+            let (q_poly, remainder) = diff
+                .div(&qi)
+                .map_err(|e| eyre::eyre!("division by modulus q_i at index {}: {}", i, e))?;
+
+            if !remainder.is_zero() {
+                return Err(eyre::eyre!(
+                    "Division by q_i at modulus index {} was not exact; non-zero remainder",
+                    i
+                ));
+            }
+
+            for (j, q) in q_poly.coefficients().iter().enumerate() {
+                if *q < (-1).into() || *q > 1.into() {
+                    return Err(eyre::eyre!(
+                        "Quotient out of range [-1, 1] at modulus index {}, coeff {}: quotient = {}",
+                        i,
+                        j,
+                        q
+                    ));
+                }
+            }
+
+            quotient_limbs.push(q_poly);
         }
+
+        Ok(CrtPolynomial::new(quotient_limbs))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey};
+    use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_zk_helpers::utils::calculate_bit_width;
+    use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
+    use greco::bounds::GrecoBounds;
     use rand::thread_rng;
 
+    fn test_bit_ct(params: &Arc<BfvParameters>) -> u32 {
+        let (_, bounds) = GrecoBounds::compute(params, 0).unwrap();
+        calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap()
+    }
+
     fn create_test_generator() -> (Arc<BfvParameters>, PublicKey, SecretKey) {
-        let bfv_params = BfvParametersBuilder::new()
-            .set_degree(1024) // Smaller degree for faster tests.
-            .set_plaintext_modulus(1032193)
-            .set_moduli(&[0x3FFFFFFF000001])
-            .build_arc()
-            .unwrap();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
+        let bfv_params = param_set.build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&bfv_params, &mut rng);
@@ -283,18 +205,6 @@ mod tests {
         let mut message_data = vec![3u64; params.degree()];
         message_data[0] = if vote == 1 { 1 } else { 0 };
         Plaintext::try_encode(&message_data, Encoding::poly(), params).unwrap()
-    }
-
-    #[test]
-    fn test_new_initialization() {
-        let inputs = CiphertextAdditionInputs::new(2, 1024);
-
-        assert_eq!(inputs.prev_ct0is.len(), 2);
-        assert_eq!(inputs.prev_ct1is.len(), 2);
-        assert_eq!(inputs.sum_ct0is.len(), 2);
-        assert_eq!(inputs.sum_ct1is.len(), 2);
-        assert_eq!(inputs.r0is.len(), 2);
-        assert_eq!(inputs.r1is.len(), 2);
     }
 
     #[test]
@@ -314,37 +224,19 @@ mod tests {
         let sum_ct = &ct1 + &ct2;
 
         // Compute ciphertext addition inputs.
+        let bit_ct = test_bit_ct(&bfv_params);
         let result =
-            CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, bfv_params.clone());
+            CiphertextAdditionInputs::compute(&ct1, &ct2, &sum_ct, bfv_params.clone(), bit_ct);
 
         assert!(result.is_ok());
         let inputs = result.unwrap();
 
-        // Verify structure.
-        assert_eq!(inputs.prev_ct0is.len(), 1); // One modulus
-        assert_eq!(inputs.prev_ct1is.len(), 1);
-        assert_eq!(inputs.sum_ct0is.len(), 1);
-        assert_eq!(inputs.sum_ct1is.len(), 1);
-        assert_eq!(inputs.r0is.len(), 1);
-        assert_eq!(inputs.r1is.len(), 1);
-    }
-
-    #[test]
-    fn test_standard_form_conversion() {
-        let (bfv_params, pk, _sk) = create_test_generator();
-        let mut rng = thread_rng();
-
-        let pt = create_test_plaintext(&bfv_params, 1);
-        let (ct1, _u1, _e0_1, _e1_1) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-        let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
-        let sum_ct = &ct1 + &ct2;
-
-        let inputs =
-            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, bfv_params.clone())
-                .unwrap();
-        let standard_form = inputs.standard_form();
-
-        // Verify structure is preserved.
-        assert_eq!(standard_form.prev_ct0is.len(), inputs.prev_ct0is.len());
+        let num_moduli = bfv_params.moduli().len();
+        assert_eq!(inputs.prev_ct0is.limbs.len(), num_moduli);
+        assert_eq!(inputs.prev_ct1is.limbs.len(), num_moduli);
+        assert_eq!(inputs.sum_ct0is.limbs.len(), num_moduli);
+        assert_eq!(inputs.sum_ct1is.limbs.len(), num_moduli);
+        assert_eq!(inputs.r0is.limbs.len(), num_moduli);
+        assert_eq!(inputs.r1is.limbs.len(), num_moduli);
     }
 }

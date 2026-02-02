@@ -1266,6 +1266,7 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
@@ -1321,6 +1322,8 @@ dependencies = [
 name = "e3-polynomial"
 version = "0.1.8"
 dependencies = [
+ "fhe-math",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "thiserror",
@@ -2483,6 +2486,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]

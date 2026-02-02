@@ -2837,6 +2837,7 @@ dependencies = [
  "anyhow",
  "e3-fhe-params",
  "e3-greco-helpers",
+ "e3-polynomial 0.1.8",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
@@ -3310,6 +3311,8 @@ version = "0.1.8"
 dependencies = [
  "bincode",
  "criterion",
+ "fhe-math",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "serde",
