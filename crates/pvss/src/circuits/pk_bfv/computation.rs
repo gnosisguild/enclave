@@ -7,8 +7,8 @@
 use crate::traits::Computation;
 use crate::traits::ConvertToJson;
 use crate::traits::ReduceToZkpModulus;
+use e3_polynomial::center_coefficients_mut;
 use e3_polynomial::reduce_coefficients_2d;
-use e3_polynomial::utils::reduce_and_center_coefficients_mut;
 use e3_zk_helpers::utils::calculate_bit_width;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use fhe::bfv::BfvParameters;
@@ -126,8 +126,8 @@ impl Computation for Witness {
                 let mut pk1i: Vec<BigInt> =
                     pk1_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
 
-                reduce_and_center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
-                reduce_and_center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
+                center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
+                center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
 
                 (pk0i, pk1i)
             })
@@ -172,11 +172,12 @@ mod tests {
     use crate::sample::generate_sample;
     use crate::traits::ConvertToJson;
     use crate::traits::ReduceToZkpModulus;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
         let bounds = Bounds::compute(&params, &()).unwrap();
         let bits = Bits::compute(&params, &bounds).unwrap();
         let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
@@ -187,7 +188,7 @@ mod tests {
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
         let encryption_data = generate_sample(&params);
         let witness = Witness::compute(&params, &encryption_data.public_key).unwrap();
         let zkp_reduced = witness.reduce_to_zkp_modulus();
@@ -200,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
         let constants = Constants::compute(&params, &()).unwrap();
 
         let json = constants.convert_to_json().unwrap();

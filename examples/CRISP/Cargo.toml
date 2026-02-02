@@ -6,7 +6,6 @@ members = [
   "crates/zk-inputs",
   "crates/zk-inputs-wasm",
   "crates/evm_helpers",
-  "crates/crisp-constants",
   "crates/crisp-utils"
 ]
 resolver = "3"
@@ -20,7 +19,6 @@ repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
 e3-user-program = { path = "./program" }
-crisp-constants = { path = "./crates/crisp-constants" }
 crisp-utils = { path = "./crates/crisp-utils" }
 
 alloy = { version = "=1.0.41", features = ["full", "rpc-types-eth"] }

@@ -170,7 +170,8 @@ pub fn bfv_public_key_to_greco(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
     use e3_zk_helpers::utils::calculate_bit_width;
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
@@ -180,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_bfv_public_key_to_greco() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);
@@ -267,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_bfv_ciphertext_to_greco() {
-        let params = BfvParamSet::from(BfvPreset::InsecureThresholdBfv512).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
 
         let mut rng = thread_rng();
         let sk = SecretKey::random(&params, &mut rng);

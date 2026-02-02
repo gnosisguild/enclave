@@ -15,7 +15,7 @@ use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
 use chrono::Utc;
-use crisp_constants::get_default_paramset;
+use e3_fhe_params::default_param_set;
 use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
@@ -199,7 +199,7 @@ pub async fn initialize_crisp_round(
     }
 
     info!("Generating parameters...");
-    let params = encode_bfv_params(&build_bfv_params_from_set_arc(get_default_paramset()));
+    let params = encode_bfv_params(&build_bfv_params_from_set_arc(default_param_set()));
 
     let token_address: Address = token_address.parse()?;
     let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;

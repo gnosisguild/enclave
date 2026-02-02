@@ -11,6 +11,31 @@ use crate::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
 
+/// Centers a value already in [0, modulus) into the symmetric range (-modulus/2, modulus/2].
+///
+/// Caller must ensure `x` is in [0, modulus). For odd modulus the range is (-(q-1)/2, (q-1)/2];
+/// for even modulus, values ≥ q/2 become negative.
+///
+/// # Arguments
+///
+/// * `x` - Value in [0, modulus).
+/// * `modulus` - The modulus.
+pub fn center(x: &BigInt, modulus: &BigInt) -> BigInt {
+    let half_modulus = modulus / 2;
+
+    let mut r = x.clone();
+
+    if (modulus % BigInt::from(2)) == BigInt::from(1) {
+        if r > half_modulus {
+            r -= modulus;
+        }
+    } else if r >= half_modulus {
+        r -= modulus;
+    }
+
+    r
+}
+
 /// Reduces a number modulo a prime modulus and centers it.
 ///
 /// This function takes an arbitrary number and reduces it modulo the specified prime modulus.
@@ -27,11 +52,7 @@ use num_traits::Zero;
 ///
 /// A `BigInt` representing the reduced and centered number.
 pub fn reduce_and_center(x: &BigInt, modulus: &BigInt, half_modulus: &BigInt) -> BigInt {
-    // Calculate the remainder ensuring it's non-negative.
-    let mut r: BigInt = x % modulus;
-    if r < BigInt::zero() {
-        r += modulus;
-    }
+    let mut r = reduce(x, modulus);
 
     // Adjust the remainder if it is greater than half_modulus.
     if (modulus % BigInt::from(2)) == BigInt::from(1) {
@@ -45,78 +66,34 @@ pub fn reduce_and_center(x: &BigInt, modulus: &BigInt, half_modulus: &BigInt) ->
     r
 }
 
-/// Reduces and centers polynomial coefficients modulo a prime modulus.
-///
-/// This function iterates over a mutable slice of polynomial coefficients, reducing each coefficient
-/// modulo a given prime modulus and adjusting the result to be within the symmetric range
-/// [−(modulus−1)/2, (modulus−1)/2].
+/// Reduces a number modulo a modulus.
 ///
 /// # Arguments
 ///
-/// * `coefficients` - A mutable slice of `BigInt` coefficients to be reduced and centered
-/// * `modulus` - A prime modulus `BigInt` used for reduction and centering
-///
-/// # Panics
-///
-/// Panics if `modulus` is zero due to division by zero
-pub fn reduce_and_center_coefficients_mut(coefficients: &mut [BigInt], modulus: &BigInt) {
-    let half_modulus = modulus / 2;
-    coefficients
-        .iter_mut()
-        .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
-}
-
-/// Reduces and centers polynomial coefficients modulo a prime modulus.
-///
-/// This function creates a new vector with coefficients reduced and centered modulo the given modulus.
-///
-/// # Arguments
-///
-/// * `coefficients` - A slice of `BigInt` coefficients to be reduced and centered
-/// * `modulus` - A prime modulus `BigInt` used for reduction and centering
-///
-/// # Returns
-///
-/// A new `Vec<BigInt>` with reduced and centered coefficients
-pub fn reduce_and_center_coefficients(coefficients: &[BigInt], modulus: &BigInt) -> Vec<BigInt> {
-    let half_modulus = modulus / 2;
-    coefficients
-        .iter()
-        .map(|x| reduce_and_center(x, modulus, &half_modulus))
-        .collect()
-}
-
-/// Reduces and centers a scalar value.
-///
-/// # Arguments
-///
-/// * `x` - The scalar value to reduce and center
+/// * `x` - The number to reduce
 /// * `modulus` - The modulus to reduce by
 ///
 /// # Returns
 ///
-/// The reduced and centered scalar value
-pub fn reduce_and_center_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
-    let half_modulus = modulus / 2;
-    reduce_and_center(x, modulus, &half_modulus)
-}
-
-/// Reduces a scalar value modulo a modulus.
-///
-/// # Arguments
-///
-/// * `x` - The scalar value to reduce
-/// * `modulus` - The modulus to reduce by
-///
-/// # Returns
-///
-/// The reduced scalar value in the range [0, modulus)
-pub fn reduce_scalar(x: &BigInt, modulus: &BigInt) -> BigInt {
+/// The reduced number in the range [0, modulus)
+pub fn reduce(x: &BigInt, modulus: &BigInt) -> BigInt {
     let mut r = x % modulus;
     if r < BigInt::zero() {
         r += modulus;
     }
     r
+}
+
+/// Centers polynomial coefficients that are already in [0, modulus) into (-modulus/2, modulus/2].
+///
+/// # Arguments
+///
+/// * `coefficients` - Coefficients in [0, modulus); mutated in place.
+/// * `modulus` - The modulus.
+pub fn center_coefficients_mut(coefficients: &mut [BigInt], modulus: &BigInt) {
+    coefficients
+        .iter_mut()
+        .for_each(|x| *x = center(x, modulus));
 }
 
 /// Reduces a polynomial's coefficients within a polynomial ring defined by a cyclotomic polynomial and a modulus.
@@ -147,7 +124,8 @@ pub fn reduce_in_ring(
     let poly = Polynomial::new(coeffs);
     let reduced = poly.reduce_by_cyclotomic(cyclo)?;
     *coefficients = reduced.coefficients;
-    reduce_and_center_coefficients_mut(coefficients, modulus);
+    reduce_coefficients_mut(coefficients, modulus);
+    center_coefficients_mut(coefficients, modulus);
     Ok(())
 }
 
@@ -166,16 +144,7 @@ pub fn reduce_in_ring(
 ///
 /// A `Vec<BigInt>` where each element is reduced modulo `p`.
 pub fn reduce_coefficients(coefficients: &[BigInt], p: &BigInt) -> Vec<BigInt> {
-    coefficients
-        .iter()
-        .map(|coeff| {
-            let mut r = coeff % p;
-            if r < BigInt::zero() {
-                r += p;
-            }
-            r
-        })
-        .collect()
+    coefficients.iter().map(|coeff| reduce(coeff, p)).collect()
 }
 
 /// Reduces coefficients in a 2D matrix.
@@ -227,11 +196,7 @@ pub fn reduce_coefficients_3d(
 /// * `p` - A reference to a `BigInt` that represents the modulus value.
 pub fn reduce_coefficients_mut(coefficients: &mut [BigInt], p: &BigInt) {
     for coeff in coefficients.iter_mut() {
-        let mut r = &*coeff % p;
-        if r < BigInt::zero() {
-            r += p;
-        }
-        *coeff = r;
+        *coeff = reduce(coeff, p);
     }
 }
 
@@ -436,46 +401,35 @@ mod tests {
     }
 
     #[test]
-    fn test_reduce_and_center_coefficients() {
-        let coeffs = vec![BigInt::from(10), BigInt::from(15), BigInt::from(20)];
-        let modulus = BigInt::from(7);
-        let result = reduce_and_center_coefficients(&coeffs, &modulus);
-        assert_eq!(
-            result,
-            vec![BigInt::from(3), BigInt::from(1), BigInt::from(-1)]
-        );
-    }
-
-    #[test]
-    fn test_reduce_scalar() {
+    fn test_reduce() {
         let x = BigInt::from(-3);
         let modulus = BigInt::from(7);
-        let result = reduce_scalar(&x, &modulus);
+        let result = reduce(&x, &modulus);
         assert_eq!(result, BigInt::from(4));
     }
 
     #[test]
-    fn test_reduce_scalar_less_than_neg_modulus() {
+    fn test_reduce_less_than_neg_modulus() {
         let modulus = BigInt::from(7);
 
         // Test value < -p (the bug fix case)
-        assert_eq!(reduce_scalar(&BigInt::from(-10), &modulus), BigInt::from(4)); // -10 % 7 = -3, -3 + 7 = 4
-        assert_eq!(reduce_scalar(&BigInt::from(-14), &modulus), BigInt::from(0)); // -14 % 7 = 0
-        assert_eq!(reduce_scalar(&BigInt::from(-15), &modulus), BigInt::from(6)); // -15 % 7 = -1, -1 + 7 = 6
-        assert_eq!(reduce_scalar(&BigInt::from(-21), &modulus), BigInt::from(0)); // -21 % 7 = 0
+        assert_eq!(reduce(&BigInt::from(-10), &modulus), BigInt::from(4)); // -10 % 7 = -3, -3 + 7 = 4
+        assert_eq!(reduce(&BigInt::from(-14), &modulus), BigInt::from(0)); // -14 % 7 = 0
+        assert_eq!(reduce(&BigInt::from(-15), &modulus), BigInt::from(6)); // -15 % 7 = -1, -1 + 7 = 6
+        assert_eq!(reduce(&BigInt::from(-21), &modulus), BigInt::from(0)); // -21 % 7 = 0
 
         // Test exactly -p
-        assert_eq!(reduce_scalar(&BigInt::from(-7), &modulus), BigInt::from(0));
+        assert_eq!(reduce(&BigInt::from(-7), &modulus), BigInt::from(0));
 
         // Test values in [-p, 0)
-        assert_eq!(reduce_scalar(&BigInt::from(-6), &modulus), BigInt::from(1)); // -6 % 7 = -6, -6 + 7 = 1
-        assert_eq!(reduce_scalar(&BigInt::from(-1), &modulus), BigInt::from(6)); // -1 % 7 = -1, -1 + 7 = 6
+        assert_eq!(reduce(&BigInt::from(-6), &modulus), BigInt::from(1)); // -6 % 7 = -6, -6 + 7 = 1
+        assert_eq!(reduce(&BigInt::from(-1), &modulus), BigInt::from(6)); // -1 % 7 = -1, -1 + 7 = 6
 
         // Test positive values
-        assert_eq!(reduce_scalar(&BigInt::from(0), &modulus), BigInt::from(0));
-        assert_eq!(reduce_scalar(&BigInt::from(3), &modulus), BigInt::from(3));
-        assert_eq!(reduce_scalar(&BigInt::from(7), &modulus), BigInt::from(0));
-        assert_eq!(reduce_scalar(&BigInt::from(10), &modulus), BigInt::from(3));
+        assert_eq!(reduce(&BigInt::from(0), &modulus), BigInt::from(0));
+        assert_eq!(reduce(&BigInt::from(3), &modulus), BigInt::from(3));
+        assert_eq!(reduce(&BigInt::from(7), &modulus), BigInt::from(0));
+        assert_eq!(reduce(&BigInt::from(10), &modulus), BigInt::from(3));
 
         // Verify all results are in [0, modulus)
         let test_values = vec![
@@ -490,7 +444,7 @@ mod tests {
             BigInt::from(100),
         ];
         for val in test_values {
-            let result = reduce_scalar(&val, &modulus);
+            let result = reduce(&val, &modulus);
             assert!(
                 result >= BigInt::from(0),
                 "Result {} should be >= 0",
@@ -503,14 +457,6 @@ mod tests {
                 modulus
             );
         }
-    }
-
-    #[test]
-    fn test_reduce_and_center_scalar() {
-        let x = BigInt::from(6);
-        let modulus = BigInt::from(7);
-        let result = reduce_and_center_scalar(&x, &modulus);
-        assert_eq!(result, BigInt::from(-1));
     }
 
     #[test]

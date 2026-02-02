@@ -8,6 +8,7 @@
 //!
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
 
+use e3_polynomial::CrtPolynomial;
 use js_sys;
 use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
@@ -128,8 +129,12 @@ impl ZKInputsGenerator {
     }
 
     /// Compute the commitment to a set of ciphertext polynomials from JavaScript.
-    #[wasm_bindgen(js_name = "computeCommitment")]
-    pub fn compute_ct_commitment(&self, ct0is: JsValue, ct1is: JsValue) -> Result<String, JsValue> {
+    #[wasm_bindgen(js_name = "computeCiphertextCommitment")]
+    pub fn compute_ciphertext_commitment(
+        &self,
+        ct0is: JsValue,
+        ct1is: JsValue,
+    ) -> Result<String, JsValue> {
         // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb)
         let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
         let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
@@ -176,7 +181,10 @@ impl ZKInputsGenerator {
             ct1is_vec.push(coefficients);
         }
 
-        match self.generator.compute_commitment(&ct0is_vec, &ct1is_vec) {
+        let ct0 = CrtPolynomial::from_bigint_vectors(ct0is_vec);
+        let ct1 = CrtPolynomial::from_bigint_vectors(ct1is_vec);
+
+        match self.generator.compute_commitment(&ct0, &ct1) {
             Ok(commitment) => Ok(commitment.to_string()),
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }

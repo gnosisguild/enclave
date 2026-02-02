@@ -14,8 +14,8 @@ pub fn build_pair_for_preset(
     preset: BfvPreset,
 ) -> Result<(Arc<BfvParameters>, Arc<BfvParameters>), PresetError> {
     match preset {
-        BfvPreset::InsecureThresholdBfv512 => {
-            let params_trbfv = BfvParametersBuilder::new()
+        BfvPreset::InsecureThreshold512 => {
+            let params_threshold = BfvParametersBuilder::new()
                 .set_degree(insecure_512::DEGREE)
                 .set_plaintext_modulus(insecure_512::threshold::PLAINTEXT_MODULUS)
                 .set_moduli(insecure_512::threshold::MODULI)
@@ -25,7 +25,7 @@ pub fn build_pair_for_preset(
                 .build_arc()
                 .unwrap();
 
-            let params_bfv = BfvParametersBuilder::new()
+            let params_dkg = BfvParametersBuilder::new()
                 .set_degree(insecure_512::DEGREE)
                 .set_plaintext_modulus(insecure_512::dkg::PLAINTEXT_MODULUS)
                 .set_moduli(insecure_512::dkg::MODULI)
@@ -33,10 +33,10 @@ pub fn build_pair_for_preset(
                 .build_arc()
                 .unwrap();
 
-            Ok((params_trbfv, params_bfv))
+            Ok((params_threshold, params_dkg))
         }
-        BfvPreset::SecureThresholdBfv8192 => {
-            let params_trbfv = BfvParametersBuilder::new()
+        BfvPreset::SecureThreshold8192 => {
+            let params_threshold = BfvParametersBuilder::new()
                 .set_degree(secure_8192::DEGREE)
                 .set_plaintext_modulus(secure_8192::threshold::PLAINTEXT_MODULUS)
                 .set_moduli(secure_8192::threshold::MODULI)
@@ -45,14 +45,14 @@ pub fn build_pair_for_preset(
                 .build_arc()
                 .unwrap();
 
-            let params_bfv = BfvParametersBuilder::new()
+            let params_dkg = BfvParametersBuilder::new()
                 .set_degree(secure_8192::DEGREE)
-                .set_plaintext_modulus(secure_8192::dkg::BFV_PLAINTEXT_MODULUS)
-                .set_moduli(secure_8192::dkg::BFV_MODULI)
+                .set_plaintext_modulus(secure_8192::dkg::PLAINTEXT_MODULUS)
+                .set_moduli(secure_8192::dkg::MODULI)
                 .build_arc()
                 .unwrap();
 
-            Ok((params_trbfv, params_bfv))
+            Ok((params_threshold, params_dkg))
         }
         other => Err(PresetError::MissingPair(other.name())),
     }
@@ -131,7 +131,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn test_build_bfv_params_insecure_dkg() {
+    fn test_build_insecure_dkg_params() {
         // Test building BFV params using insecure DKG preset constants
         let degree = insecure_512::DEGREE;
         let plaintext_modulus = insecure_512::dkg::PLAINTEXT_MODULUS;
@@ -144,31 +144,32 @@ mod tests {
         assert_eq!(params.variance(), defaults::VARIANCE);
         assert_eq!(
             params.get_error1_variance(),
-            &BigUint::from(defaults::ERROR1_VARIANCE)
+            &BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
     }
 
     #[test]
-    fn test_build_bfv_params_arc_insecure_dkg() {
+    fn test_build_insecure_dkg_params_arc() {
         // Test building Arc<BFV params> using insecure DKG preset constants
         let degree = insecure_512::DEGREE;
         let plaintext_modulus = insecure_512::dkg::PLAINTEXT_MODULUS;
         let moduli = insecure_512::dkg::MODULI;
 
         let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+
         assert_eq!(params.degree(), degree);
         assert_eq!(params.plaintext(), plaintext_modulus);
         assert_eq!(params.moduli(), moduli);
         assert_eq!(params.variance(), defaults::VARIANCE);
         assert_eq!(
             params.get_error1_variance(),
-            &BigUint::from(defaults::ERROR1_VARIANCE)
+            &BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
     }
 
     #[test]
-    fn test_build_trbfv_params_secure_threshold() {
-        // Test building TRBFV params using secure threshold preset constants
+    fn test_build_secure_threshold_params() {
+        // Test building threshold params using secure threshold preset constants
         let degree = secure_8192::DEGREE;
         let plaintext_modulus = secure_8192::threshold::PLAINTEXT_MODULUS;
         let moduli = secure_8192::threshold::MODULI;
@@ -186,8 +187,8 @@ mod tests {
     }
 
     #[test]
-    fn test_build_trbfv_params_arc_secure_threshold() {
-        // Test building Arc<TRBFV params> using secure threshold preset constants
+    fn test_build_secure_threshold_params_arc() {
+        // Test building Arc<threshold params> using secure threshold preset constants
         let degree = secure_8192::DEGREE;
         let plaintext_modulus = secure_8192::threshold::PLAINTEXT_MODULUS;
         let moduli = secure_8192::threshold::MODULI;
@@ -205,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_bfv_params_from_set_insecure_dkg() {
+    fn test_build_insecure_dkg_params_from_set() {
         // Test building from BfvParamSet using insecure DKG preset
         let preset = BfvPreset::InsecureDkg512;
         let param_set = preset.into();
@@ -217,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_bfv_params_from_set_arc_insecure_dkg() {
+    fn test_build_insecure_dkg_params_from_set_arc() {
         // Test building Arc from BfvParamSet using insecure DKG preset
         let preset = BfvPreset::InsecureDkg512;
         let param_set = preset.into();
@@ -229,9 +230,9 @@ mod tests {
     }
 
     #[test]
-    fn test_build_bfv_params_from_set_secure_threshold() {
+    fn test_build_secure_threshold_params_from_set() {
         // Test building from BfvParamSet using secure threshold preset
-        let preset = BfvPreset::SecureThresholdBfv8192;
+        let preset = BfvPreset::SecureThreshold8192;
         let param_set = preset.into();
         let params = build_bfv_params_from_set(param_set);
 
@@ -248,9 +249,9 @@ mod tests {
     }
 
     #[test]
-    fn test_build_bfv_params_from_set_arc_secure_threshold() {
+    fn test_build_secure_threshold_params_from_set_arc() {
         // Test building Arc from BfvParamSet using secure threshold preset
-        let preset = BfvPreset::SecureThresholdBfv8192;
+        let preset = BfvPreset::SecureThreshold8192;
         let param_set = preset.into();
         let params = build_bfv_params_from_set_arc(param_set);
 

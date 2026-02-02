@@ -8,9 +8,10 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
-use crisp_constants::get_default_paramset;
 use e3_fhe_params::build_bfv_params_arc;
+use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
+use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::utils::calculate_bit_width;
 use eyre::{Context, Result};
@@ -62,7 +63,7 @@ impl ZKInputsGenerator {
     /// # Returns
     /// A new ZKInputsGenerator instance with default BFV parameters
     pub fn with_defaults() -> Self {
-        Self::from_set(get_default_paramset())
+        Self::from_set(default_param_set())
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.
@@ -123,16 +124,22 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs =
-            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, self.bfv_params.clone())
-                .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        // bit_pk
+        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+            &prev_ct,
+            &ct,
+            &sum_ct,
+            self.bfv_params.clone(),
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
             &crypto_params,
             &bounds,
             &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs.standard_form(),
+            &ciphertext_addition_inputs,
         );
 
         let inputs_json = serialize_inputs_to_json(&inputs)?;
@@ -199,11 +206,17 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs =
-            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, self.bfv_params.clone())
-                .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+            &prev_ct,
+            &ct,
+            &sum_ct,
+            self.bfv_params.clone(),
+            bit_pk,
+        )
+        .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
-        // For first votes, set prev_ct_commitment to 0 since there's no previous ciphertext
+        // IMPORTANT: First-in-slot votes have no previous ciphertext; set prev_ct_commitment to 0
+        // so the on-chain verifier accepts the proof.
         ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
 
         // Construct Inputs Section.
@@ -211,7 +224,7 @@ impl ZKInputsGenerator {
             &crypto_params,
             &bounds,
             &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs.standard_form(),
+            &ciphertext_addition_inputs,
         );
 
         let inputs_json = serialize_inputs_to_json(&inputs)?;
@@ -263,20 +276,16 @@ impl ZKInputsGenerator {
     /// Computes the commitment to a set of ciphertext polynomials.
     ///
     /// # Arguments
-    /// * `ct0is` - The first component of the ciphertext polynomials.
-    /// * `ct1is` - The second component of the ciphertext polynomials.
+    /// * `ct0` - First component of the ciphertext (CRT limbs).
+    /// * `ct1` - Second component of the ciphertext (CRT limbs).
     ///
     /// # Returns
     /// The commitment as a BigInt.
-    pub fn compute_commitment(
-        &self,
-        ct0is: &[Vec<BigInt>],
-        ct1is: &[Vec<BigInt>],
-    ) -> Result<BigInt> {
+    pub fn compute_commitment(&self, ct0: &CrtPolynomial, ct1: &CrtPolynomial) -> Result<BigInt> {
         let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
         let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
-        Ok(compute_ciphertext_commitment(ct0is, ct1is, bit))
+        Ok(compute_ciphertext_commitment(ct0, ct1, bit))
     }
 }
 
@@ -284,7 +293,7 @@ impl ZKInputsGenerator {
 mod tests {
     use super::*;
     use e3_fhe_params::constants::insecure_512;
-    use e3_fhe_params::BfvPreset;
+    use e3_fhe_params::{BfvParamSet, BfvPreset};
 
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
@@ -316,7 +325,7 @@ mod tests {
     #[test]
     fn test_inputs_generation_with_custom_params() {
         let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThresholdBfv512));
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -361,7 +370,7 @@ mod tests {
     #[test]
     fn test_get_bfv_params() {
         let generator =
-            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThresholdBfv512));
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == insecure_512::DEGREE);
