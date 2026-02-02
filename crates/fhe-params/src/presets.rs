@@ -10,7 +10,7 @@ use crate::constants::{
     defaults::DEFAULT_INSECURE_LAMBDA,
     defaults::DEFAULT_SECURE_LAMBDA,
     insecure_512,
-    search_defaults::{B, B_CHI},
+    search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z},
     secure_8192,
 };
 use std::sync::Arc;
@@ -291,17 +291,17 @@ impl BfvPreset {
     pub fn search_defaults(&self) -> Option<PresetSearchDefaults> {
         match self {
             BfvPreset::InsecureThreshold512 => Some(PresetSearchDefaults {
-                n: insecure_512::threshold::SEARCH_N,
-                k: insecure_512::threshold::SEARCH_K,
-                z: insecure_512::threshold::SEARCH_Z,
+                n: SEARCH_N,
+                k: SEARCH_K,
+                z: SEARCH_Z,
                 lambda: DEFAULT_INSECURE_LAMBDA as u32,
                 b: B,
                 b_chi: B_CHI,
             }),
             BfvPreset::SecureThreshold8192 => Some(PresetSearchDefaults {
-                n: secure_8192::threshold::SEARCH_N,
-                k: secure_8192::threshold::SEARCH_K,
-                z: secure_8192::threshold::SEARCH_Z,
+                n: SEARCH_N,
+                k: SEARCH_K,
+                z: SEARCH_Z,
                 lambda: DEFAULT_SECURE_LAMBDA as u32,
                 b: B,
                 b_chi: B_CHI,
@@ -328,7 +328,7 @@ impl From<BfvPreset> for BfvParamSet {
                 degree: insecure_512::DEGREE,
                 moduli: insecure_512::dkg::MODULI,
                 plaintext_modulus: insecure_512::dkg::PLAINTEXT_MODULUS,
-                error1_variance: insecure_512::dkg::ERROR1_VARIANCE,
+                error1_variance: Some(insecure_512::dkg::ERROR1_VARIANCE),
             },
             BfvPreset::SecureThreshold8192 => BfvParamSet {
                 degree: secure_8192::DEGREE,
@@ -340,7 +340,7 @@ impl From<BfvPreset> for BfvParamSet {
                 degree: secure_8192::DEGREE,
                 plaintext_modulus: secure_8192::dkg::PLAINTEXT_MODULUS,
                 moduli: secure_8192::dkg::MODULI,
-                error1_variance: secure_8192::dkg::ERROR1_VARIANCE,
+                error1_variance: Some(secure_8192::dkg::ERROR1_VARIANCE),
             },
         }
     }
@@ -380,8 +380,8 @@ mod tests {
         );
         assert_eq!(threshold.moduli(), secure_8192::threshold::MODULI);
         assert_eq!(dkg.degree(), secure_8192::DEGREE);
-        assert_eq!(dkg.plaintext(), secure_8192::dkg::BFV_PLAINTEXT_MODULUS);
-        assert_eq!(dkg.moduli(), secure_8192::dkg::BFV_MODULI);
+        assert_eq!(dkg.plaintext(), secure_8192::dkg::PLAINTEXT_MODULUS);
+        assert_eq!(dkg.moduli(), secure_8192::dkg::MODULI);
     }
 
     #[test]
@@ -432,16 +432,16 @@ mod tests {
     fn test_search_defaults() {
         let preset = BfvPreset::InsecureThreshold512;
         let defaults = preset.search_defaults().unwrap();
-        assert_eq!(defaults.n, insecure_512::threshold::SEARCH_N);
-        assert_eq!(defaults.k, insecure_512::threshold::SEARCH_K);
-        assert_eq!(defaults.z, insecure_512::threshold::SEARCH_Z);
+        assert_eq!(defaults.n, SEARCH_N);
+        assert_eq!(defaults.k, SEARCH_K);
+        assert_eq!(defaults.z, SEARCH_Z);
         assert_eq!(defaults.lambda, DEFAULT_INSECURE_LAMBDA as u32);
 
         let preset = BfvPreset::SecureThreshold8192;
         let defaults = preset.search_defaults().unwrap();
-        assert_eq!(defaults.n, secure_8192::threshold::SEARCH_N);
-        assert_eq!(defaults.k, secure_8192::threshold::SEARCH_K);
-        assert_eq!(defaults.z, secure_8192::threshold::SEARCH_Z);
+        assert_eq!(defaults.n, SEARCH_N);
+        assert_eq!(defaults.k, SEARCH_K);
+        assert_eq!(defaults.z, SEARCH_Z);
         assert_eq!(defaults.lambda, DEFAULT_SECURE_LAMBDA as u32);
 
         // DKG presets don't have search defaults

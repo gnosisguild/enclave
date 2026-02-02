@@ -47,8 +47,8 @@ pub fn build_pair_for_preset(
 
             let params_dkg = BfvParametersBuilder::new()
                 .set_degree(secure_8192::DEGREE)
-                .set_plaintext_modulus(secure_8192::dkg::BFV_PLAINTEXT_MODULUS)
-                .set_moduli(secure_8192::dkg::BFV_MODULI)
+                .set_plaintext_modulus(secure_8192::dkg::PLAINTEXT_MODULUS)
+                .set_moduli(secure_8192::dkg::MODULI)
                 .build_arc()
                 .unwrap();
 
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(params.variance(), defaults::VARIANCE);
         assert_eq!(
             params.get_error1_variance(),
-            &BigUint::from(defaults::ERROR1_VARIANCE)
+            &BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
     }
 
@@ -156,13 +156,14 @@ mod tests {
         let moduli = insecure_512::dkg::MODULI;
 
         let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+
         assert_eq!(params.degree(), degree);
         assert_eq!(params.plaintext(), plaintext_modulus);
         assert_eq!(params.moduli(), moduli);
         assert_eq!(params.variance(), defaults::VARIANCE);
         assert_eq!(
             params.get_error1_variance(),
-            &BigUint::from(defaults::ERROR1_VARIANCE)
+            &BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
     }
 

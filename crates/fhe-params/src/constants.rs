@@ -20,18 +20,13 @@ pub mod insecure_512 {
         pub const MODULI: &[u64] = &[0xffffee001, 0xffffc4001];
         pub const ERROR1_VARIANCE: &str = "3";
         pub const ERROR1_VARIANCE_BIGUINT: u32 = 3;
-
-        /// Search defaults for insecure threshold BFV
-        pub const SEARCH_N: u128 = 5;
-        pub const SEARCH_K: u128 = 1000;
-        pub const SEARCH_Z: u128 = 1000;
     }
 
     /// DKG parameters
     pub mod dkg {
         pub const PLAINTEXT_MODULUS: u64 = 0xffffee001;
         pub const MODULI: &[u64] = &[0x7fffffffe0001];
-        pub const ERROR1_VARIANCE: Option<&str> = None;
+        pub const ERROR1_VARIANCE: &str = "10";
         pub const VARIANCE: u32 = 3;
     }
 }
@@ -51,30 +46,26 @@ pub mod secure_8192 {
             0x00100000006e0001,
         ];
         pub const ERROR1_VARIANCE: &str =
-            "1004336277661868922213726307713258317841382576849282939643494400";
-
-        /// Search defaults for secure threshold BFV
-        pub const SEARCH_N: u128 = 100;
-        pub const SEARCH_K: u128 = 100;
-        pub const SEARCH_Z: u128 = 100;
+            "523091811282223396986315785267318739368948664428268466733056000";
     }
 
     /// DKG parameters
     pub mod dkg {
-        pub const PLAINTEXT_MODULUS: u64 = 144115188075855872;
-        pub const MODULI: &[u64] = &[288230376173076481, 288230376167047169];
-        pub const ERROR1_VARIANCE: Option<&str> = None;
-
-        /// BFV plaintext modulus for pair building
-        pub const BFV_PLAINTEXT_MODULUS: u64 = 18014398509481984;
-        pub const BFV_MODULI: &[u64] = &[0x0100000002a20001, 0x0100000001760001];
+        pub const PLAINTEXT_MODULUS: u64 = 18014398509481984;
+        pub const MODULI: &[u64] = &[0x0100000002a20001, 0x0100000001760001];
+        pub const ERROR1_VARIANCE: &str = "10";
     }
 }
 
 /// Common search defaults shared across presets
+/// These are for the SecureThreshold8192 preset.
+/// The InsecureThreshold512 preset has been generated manually.
 pub mod search_defaults {
     pub const B: u128 = 20;
     pub const B_CHI: u128 = 1;
+    pub const SEARCH_N: u128 = 100;
+    pub const SEARCH_K: u128 = 100;
+    pub const SEARCH_Z: u128 = 100;
 }
 
 /// Default values for BFV parameters
@@ -83,7 +74,6 @@ pub mod defaults {
     /// This is the standard default variance (and error1_variance) used in BFV
     /// when variance is not specified. Both variance() and error1_variance default to this value.
     pub const VARIANCE: usize = 10;
-    pub const ERROR1_VARIANCE: u32 = 10;
 
     /// Default insecure security parameter (λ).
     pub const DEFAULT_INSECURE_LAMBDA: usize = 2;

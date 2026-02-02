@@ -158,8 +158,9 @@ pub fn decode_bfv_params_arc(bytes: &[u8]) -> Result<Arc<BfvParameters>, Encodin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{defaults, insecure_512, secure_8192};
+    use crate::constants::{insecure_512, secure_8192};
     use crate::presets::BfvPreset;
+    use std::str::FromStr;
 
     #[cfg(feature = "abi-encoding")]
     #[test]
@@ -199,7 +200,7 @@ mod tests {
         // Verify error1_variance is preserved (defaults to 10 for standard BFV)
         assert_eq!(
             decoded.get_error1_variance(),
-            &num_bigint::BigUint::from(defaults::ERROR1_VARIANCE)
+            &num_bigint::BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
         assert_eq!(decoded.get_error1_variance(), params.get_error1_variance());
     }
@@ -270,7 +271,7 @@ mod tests {
         // Verify error1_variance is preserved (defaults to 10 for standard BFV)
         assert_eq!(
             decoded.get_error1_variance(),
-            &num_bigint::BigUint::from(defaults::ERROR1_VARIANCE)
+            &num_bigint::BigUint::from_str(insecure_512::dkg::ERROR1_VARIANCE).unwrap()
         );
         assert_eq!(decoded.get_error1_variance(), params.get_error1_variance());
     }
