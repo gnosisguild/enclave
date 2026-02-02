@@ -16,9 +16,9 @@ use e3_pvss::traits::CircuitCodegen;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Minimal PVSS CLI for generating circuit artifacts.
+/// Minimal ZK CLI for generating circuit artifacts.
 #[derive(Debug, Parser)]
-#[command(name = "pvss-cli")]
+#[command(name = "zk-cli")]
 struct Cli {
     /// List all available circuits and exit.
     #[arg(long)]

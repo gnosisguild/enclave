@@ -38,8 +38,7 @@ members = [
   "crates/parity-matrix",
   "crates/polynomial",
   "crates/zk-helpers",
-  "crates/pvss",
-  "crates/pvss-cli"
+  "crates/pvss"
 ]
 exclude = [
   "examples/CRISP",
