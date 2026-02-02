@@ -60,10 +60,6 @@ impl CrtPolynomial {
     /// # Arguments
     ///
     /// * `p` - An fhe-math polynomial (PowerBasis or Ntt).
-    ///
-    /// # Coefficient order
-    ///
-
     pub fn from_fhe_polynomial(p: &Poly) -> Self {
         let mut p = p.clone();
 
@@ -172,16 +168,5 @@ impl CrtPolynomial {
     /// Panics if `i >= self.limbs.len()`.
     pub fn limb(&self, i: usize) -> &Polynomial {
         &self.limbs[i]
-    }
-
-    /// Returns limb coefficient vectors (one `Vec<BigInt>` per modulus).
-    ///
-    /// Use when you need a raw CRT representation for serialization, hashing,
-    /// or APIs that expect `&[Vec<BigInt>]`. The inverse of [`from_limb_coefficients`](Self::from_limb_coefficients).
-    pub fn to_limb_coefficients(&self) -> Vec<Vec<BigInt>> {
-        self.limbs
-            .iter()
-            .map(|l| l.coefficients().to_vec())
-            .collect()
     }
 }
