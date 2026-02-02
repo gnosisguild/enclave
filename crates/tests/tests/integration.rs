@@ -68,14 +68,21 @@ fn determine_committee(
     let buffer = calculate_buffer_size(threshold_m, threshold_n);
     let total_selection_size = threshold_n + buffer;
 
+    // Calculate tickets based on the same balance/ticket_price ratio as production
+    // ticket_price = 10_000_000, balance = 1_000_000_000
+    // => num_tickets = 1_000_000_000 / 10_000_000 = 100 tickets per node
+    const TICKET_PRICE: u64 = 10_000_000;
+    const BALANCE: u64 = 1_000_000_000;
+    let num_tickets = BALANCE / TICKET_PRICE;
+
     let registered_nodes: Vec<RegisteredNode> = registered_addrs
         .iter()
         .map(|addr| {
             let address: Address = addr.parse().unwrap();
-            RegisteredNode {
-                address,
-                tickets: vec![Ticket { ticket_id: 1 }],
-            }
+            let tickets: Vec<Ticket> = (0..num_tickets)
+                .map(|ticket_id| Ticket { ticket_id })
+                .collect();
+            RegisteredNode { address, tickets }
         })
         .collect();
 
