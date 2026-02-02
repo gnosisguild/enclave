@@ -18,6 +18,9 @@ pub global QIS: [Field; L] =
 pub global Q_MOD_T: Field = -19;
 pub global PLAINTEXT_MODULUS: Field = 100;
 pub global Q_INVERSE_MOD_T: Field = 21;
+pub global T_INV_MOD_Q: Field = 162493576071160894262400971579825215135378801169890023914222388;
+pub global N_PARTIES: u32 = 100;
+pub global N_CIPHERTEXTS: u32 = 100;
 
 /************************************
 -------------------------------------
@@ -39,6 +42,7 @@ pub global PK_GENERATION_E_SM_BOUND: Field =
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [81920, 81920, 81920, 81920];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
+pub global PK_GENERATION_B_ENC: Field = 39614081257132168796771975168000; //used in the esm bound calculator
 
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
