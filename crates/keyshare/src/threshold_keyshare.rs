@@ -452,7 +452,7 @@ impl ThresholdKeyshare {
         })?;
 
         self.bus.publish(EncryptionKeyPending {
-            e3_id: state.e3_id.clone(),
+            e3_id,
             key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
             params: state.params.clone(),
         })?;
