@@ -51,16 +51,12 @@ pub enum PolynomialError {
     ParseError(#[from] num_bigint::ParseBigIntError),
 }
 
-/// A polynomial represented by its coefficients in descending order of degree.
-///
-/// The coefficients are stored as `BigInt` to support arbitrary precision arithmetic
-/// required for cryptographic operations. The polynomial is represented as:
-/// `a_n * x^n + a_{n-1} * x^{n-1} + ... + a_1 * x + a_0`
+/// A polynomial with coefficients stored as `BigInt` for arbitrary precision arithmetic.
+
 ///
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Polynomial {
-    /// Coefficients in descending order (highest degree first).
     pub(crate) coefficients: Vec<BigInt>,
 }
 
@@ -122,7 +118,7 @@ impl Polynomial {
     ///
     /// # Arguments
     ///
-    /// * `coefficients` - Vector of coefficients in descending order of degree.
+    /// * `coefficients` - Vector of coefficients (see [`reverse`](Self::reverse) for ordering).
     pub fn new(coefficients: Vec<BigInt>) -> Self {
         Self { coefficients }
     }
@@ -134,38 +130,11 @@ impl Polynomial {
         Self { coefficients }
     }
 
-    /// Creates a polynomial from coefficients in ascending order format.
+    /// Reverses coefficient order in-place.
     ///
-    /// This method converts from ascending order coefficient ordering (lowest degree first)
-    /// to this library's ordering (highest degree first).
-    ///
-    /// # Arguments
-    ///
-    /// * `ascending_coefficients` - Vector of coefficients in ascending order.
-    pub fn from_ascending_coefficients(ascending_coefficients: Vec<BigInt>) -> Self {
-        let mut coefficients = ascending_coefficients;
-        coefficients.reverse();
-        Self { coefficients }
-    }
-
-    /// Converts the polynomial to ascending order coefficient format.
-    ///
-    /// This method converts from this library's ordering (highest degree first)
-    /// to ascending order (lowest degree first).
-    ///
-    /// # Returns
-    ///
-    /// Vector of coefficients in ascending order.
-    pub fn to_ascending_coefficients(&self) -> Vec<BigInt> {
-        let mut coefficients = self.coefficients.clone();
-        coefficients.reverse();
-        coefficients
-    }
-
-    /// Reverses the coefficient order in-place.
-    ///
-    /// Converts between descending order (highest degree first) and ascending order
-    /// (lowest degree first). Calling `reverse()` twice restores the original order.
+    /// **Coefficient ordering:** Converts between **descending** (highest degree first,
+    /// internal storage) and **ascending** (lowest degree first). Calling `reverse()`
+    /// twice restores the original order.
     pub fn reverse(&mut self) {
         self.coefficients.reverse()
     }
@@ -660,73 +629,6 @@ mod tests {
         assert_eq!(trimmed.coefficients(), &[BigInt::from(0)]);
     }
 
-    #[test]
-    fn test_ascending_coefficients_conversion() {
-        // Test conversion from ascending format to Rust format
-        let ascending_coeffs = vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)]; // 2 + 3x + x^2
-        let poly = Polynomial::from_ascending_coefficients(ascending_coeffs);
-        assert_eq!(
-            poly.coefficients(),
-            &[BigInt::from(1), BigInt::from(3), BigInt::from(2)]
-        ); // x^2 + 3x + 2
-
-        // Test conversion back to ascending format
-        let back_to_ascending = poly.to_ascending_coefficients();
-        assert_eq!(
-            back_to_ascending,
-            vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)]
-        );
-    }
-
-    #[test]
-    fn test_ascending_coefficients_conversion_edge_cases() {
-        // Test empty polynomial
-        let empty_ascending = vec![];
-        let poly_empty = Polynomial::from_ascending_coefficients(empty_ascending);
-        assert_eq!(poly_empty.coefficients(), &[]);
-        assert_eq!(poly_empty.to_ascending_coefficients(), vec![]);
-
-        // Test single coefficient
-        let single_ascending = vec![BigInt::from(5)];
-        let poly_single = Polynomial::from_ascending_coefficients(single_ascending);
-        assert_eq!(poly_single.coefficients(), &[BigInt::from(5)]);
-        assert_eq!(
-            poly_single.to_ascending_coefficients(),
-            vec![BigInt::from(5)]
-        );
-
-        // Test two coefficients
-        let two_ascending = vec![BigInt::from(1), BigInt::from(2)]; // 1 + 2x
-        let poly_two = Polynomial::from_ascending_coefficients(two_ascending);
-        assert_eq!(poly_two.coefficients(), &[BigInt::from(2), BigInt::from(1)]); // 2x + 1
-        assert_eq!(
-            poly_two.to_ascending_coefficients(),
-            vec![BigInt::from(1), BigInt::from(2)]
-        );
-    }
-
-    #[test]
-    fn test_ascending_coefficients_compatibility_example() {
-        // This test demonstrates the exact scenario mentioned in the issue
-        // Ascending: [2, 3, 1] represents 2 + 3x + x^2
-        let ascending_coefficients = vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)];
-        let poly = Polynomial::from_ascending_coefficients(ascending_coefficients);
-
-        // Rust: [1, 3, 2] represents x^2 + 3x + 2
-        assert_eq!(
-            poly.coefficients(),
-            &[BigInt::from(1), BigInt::from(3), BigInt::from(2)]
-        );
-        assert_eq!(poly.to_string(), "x^2 + 3x + 2");
-
-        // Convert back to ascending format
-        let back_to_ascending = poly.to_ascending_coefficients();
-        assert_eq!(
-            back_to_ascending,
-            vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)]
-        );
-    }
-
     #[cfg(feature = "serde")]
     mod serialization_tests {
         use super::*;
@@ -816,21 +718,6 @@ mod tests {
             let original_product = poly1.mul(&poly2);
             let reconstructed_product = reconstructed1.mul(&reconstructed2);
             assert_eq!(original_product, reconstructed_product);
-        }
-
-        #[test]
-        fn test_polynomial_bincode_serialization_ascending_conversion() {
-            // Test that ascending coefficient conversion works after serialization
-            let ascending_coeffs = vec![BigInt::from(2), BigInt::from(3), BigInt::from(1)];
-            let poly = Polynomial::from_ascending_coefficients(ascending_coeffs.clone());
-
-            let bytes = bincode::serialize(&poly).expect("Failed to serialize");
-            let reconstructed: Polynomial =
-                bincode::deserialize(&bytes).expect("Failed to deserialize");
-
-            // Test ascending conversion still works
-            let back_to_ascending = reconstructed.to_ascending_coefficients();
-            assert_eq!(back_to_ascending, ascending_coeffs);
         }
     }
 

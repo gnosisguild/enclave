@@ -150,32 +150,6 @@ fn benchmark_utility_functions(c: &mut Criterion) {
     group.finish();
 }
 
-fn benchmark_coefficient_conversion(c: &mut Criterion) {
-    let mut group = c.benchmark_group("coefficient_conversion");
-
-    for degree in [10, 50, 100, 500, 1000] {
-        let (poly, _) = create_test_polynomials(degree);
-
-        // Benchmark conversion from ascending to descending order
-        let ascending_coeffs: Vec<BigInt> = (0..=degree).map(|i| BigInt::from(i)).collect();
-
-        group.bench_function(&format!("from_ascending_degree_{}", degree), |b| {
-            b.iter(|| {
-                black_box(Polynomial::from_ascending_coefficients(
-                    ascending_coeffs.clone(),
-                ))
-            })
-        });
-
-        // Benchmark conversion from descending to ascending order
-        group.bench_function(&format!("to_ascending_degree_{}", degree), |b| {
-            b.iter(|| black_box(poly.to_ascending_coefficients()))
-        });
-    }
-
-    group.finish();
-}
-
 criterion_group!(
     benches,
     benchmark_polynomial_addition,
@@ -184,7 +158,6 @@ criterion_group!(
     benchmark_polynomial_evaluation,
     benchmark_modular_reduction,
     benchmark_cyclotomic_reduction,
-    benchmark_utility_functions,
-    benchmark_coefficient_conversion
+    benchmark_utility_functions
 );
 criterion_main!(benches);
