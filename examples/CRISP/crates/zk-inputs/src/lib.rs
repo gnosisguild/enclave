@@ -206,7 +206,7 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
             &prev_ct,
             &ct,
             &sum_ct,
@@ -214,6 +214,10 @@ impl ZKInputsGenerator {
             bit_pk,
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
+
+        // IMPORTANT: First-in-slot votes have no previous ciphertext; set prev_ct_commitment to 0
+        // so the on-chain verifier accepts the proof.
+        ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
