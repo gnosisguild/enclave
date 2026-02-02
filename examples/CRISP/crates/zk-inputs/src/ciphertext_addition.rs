@@ -140,9 +140,16 @@ impl CiphertextAdditionInputs {
             let qi = Polynomial::constant(BigInt::from(moduli[i]));
 
             let diff = sum_limb.sub(&a_limb.add(b_limb));
-            let (q_poly, _remainder) = diff
+            let (q_poly, remainder) = diff
                 .div(&qi)
                 .map_err(|e| eyre::eyre!("division by modulus q_i at index {}: {}", i, e))?;
+
+            if !remainder.is_zero() {
+                return Err(eyre::eyre!(
+                    "Division by q_i at modulus index {} was not exact; non-zero remainder",
+                    i
+                ));
+            }
 
             for (j, q) in q_poly.coefficients().iter().enumerate() {
                 if *q < (-1).into() || *q > 1.into() {
