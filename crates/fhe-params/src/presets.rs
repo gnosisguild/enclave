@@ -87,7 +87,7 @@ pub enum ParameterType {
 /// its security properties and basic parameter dimensions.
 #[derive(Debug, Clone, Copy)]
 pub struct PresetMetadata {
-    /// The canonical name of the preset (e.g., "INSECURE_THRESHOLD_BFV_512")
+    /// The canonical name of the preset (e.g., "INSECURE_THRESHOLD_512")
     pub name: &'static str,
     /// LWE dimension (d) - the degree of the polynomial ring, must be a power of 2
     ///

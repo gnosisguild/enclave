@@ -40,7 +40,7 @@ async function createPrivateSDK() {
       feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
     chainId: CHAIN_ID,
-    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
   await sdk.initialize()
