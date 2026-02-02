@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::backends::{SortitionBackend, SortitionList};
+use crate::ticket_sortition;
 use crate::CiphernodeSelector;
 use actix::prelude::*;
 use alloy::primitives::U256;
@@ -334,11 +335,25 @@ impl Handler<E3Requested> for Sortition {
         let e3_id = msg.e3_id.clone();
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
+        let threshold_m = msg.threshold_m;
         let threshold_n = msg.threshold_n;
+
+        let buffer = ticket_sortition::calculate_buffer_size(threshold_m, threshold_n);
+        let total_selection_size = threshold_n + buffer;
+
+        info!(
+            e3_id = %e3_id,
+            threshold_m = threshold_m,
+            threshold_n = threshold_n,
+            buffer = buffer,
+            total_selection_size = total_selection_size,
+            "Performing Sortition with buffer"
+        );
+
         self.ciphernode_selector
             .do_send(WithSortitionPartyTicket::new(
                 msg,
-                self.get_node_index(e3_id, seed, threshold_n, chain_id),
+                self.get_node_index(e3_id, seed, total_selection_size, chain_id),
                 &self.address,
             ))
     }

@@ -10,6 +10,67 @@ use anyhow::Result;
 use e3_events::{E3id, Seed};
 use std::collections::{hash_map::Entry, HashMap};
 
+/// Calculate the buffer size for committee selection based on the threshold ratio.
+///
+/// This buffer allows backup nodes to submit tickets in case primary committee
+/// members are unavailable or fail to submit.
+///
+/// # Formula
+/// ```text
+/// buffer = (threshold_n - threshold_m) + safety_margin
+/// ```
+///
+/// Where safety_margin is determined by the threshold ratio:
+/// - ratio >= 0.8: safety_margin = 3 (tight threshold, need more backup)
+/// - ratio >= 0.6: safety_margin = 2 (moderate backup)
+/// - ratio < 0.6:  safety_margin = 1 (already fault-tolerant)
+///
+/// # Parameters
+/// - `threshold_m`: Minimum nodes required for decryption
+/// - `threshold_n`: Requested committee size
+///
+/// # Returns
+/// The number of additional nodes that should be selected as backup
+///
+/// # Examples
+/// ```
+/// use e3_sortition::calculate_buffer_size;
+///
+/// // High security requirement (4 of 5)
+/// let buffer = calculate_buffer_size(4, 5);
+/// assert_eq!(buffer, 4); // 1 + 3 safety margin
+///
+/// // Balanced (3 of 5)
+/// let buffer = calculate_buffer_size(3, 5);
+/// assert_eq!(buffer, 4); // 2 + 2 safety margin
+///
+/// // High fault tolerance (3 of 10)
+/// let buffer = calculate_buffer_size(3, 10);
+/// assert_eq!(buffer, 8); // 7 + 1 safety margin
+/// ```
+pub fn calculate_buffer_size(threshold_m: usize, threshold_n: usize) -> usize {
+    if threshold_n == 0 {
+        return 0;
+    }
+
+    // Base buffer is the number of nodes that can fail without breaking threshold
+    let base_buffer = threshold_n.saturating_sub(threshold_m);
+
+    // Calculate threshold ratio to determine safety margin
+    let ratio = threshold_m as f64 / threshold_n as f64;
+
+    // Determine safety margin based on how tight the threshold is
+    let safety_margin = if ratio >= 0.8 {
+        3 // Tight threshold (e.g., 4/5), need more backup
+    } else if ratio >= 0.6 {
+        2 // Moderate threshold (e.g., 3/5), balanced backup
+    } else {
+        1 // Loose threshold (e.g., 3/10), minimal backup needed
+    };
+
+    base_buffer + safety_margin
+}
+
 /// Deterministic committee selection based on ticket scores.
 ///
 /// This struct encapsulates the logic to:
@@ -154,5 +215,44 @@ mod tests {
         assert_eq!(committee[2].address, nodes[1].address);
 
         println!("COMMITTEE {:#?}", committee);
+    }
+
+    #[test]
+    fn test_buffer_calculation() {
+        // Edge cases
+        assert_eq!(super::calculate_buffer_size(0, 0), 0);
+        assert_eq!(super::calculate_buffer_size(5, 5), 3); // ratio=1.0, safety=3
+        assert_eq!(super::calculate_buffer_size(1, 1), 3); // ratio=1.0, safety=3
+
+        // Tight threshold (ratio >= 0.8) - safety margin = 3
+        assert_eq!(super::calculate_buffer_size(4, 5), 4); // 80%: base=1, safety=3
+        assert_eq!(super::calculate_buffer_size(8, 10), 5); // 80%: base=2, safety=3
+        assert_eq!(super::calculate_buffer_size(9, 10), 4); // 90%: base=1, safety=3
+
+        // Moderate threshold (0.6 <= ratio < 0.8) - safety margin = 2
+        assert_eq!(super::calculate_buffer_size(3, 5), 4); // 60%: base=2, safety=2
+        assert_eq!(super::calculate_buffer_size(7, 10), 5); // 70%: base=3, safety=2
+
+        // Loose threshold (ratio < 0.6) - safety margin = 1
+        assert_eq!(super::calculate_buffer_size(2, 5), 4); // 40%: base=3, safety=1
+        assert_eq!(super::calculate_buffer_size(3, 10), 8); // 30%: base=7, safety=1
+        assert_eq!(super::calculate_buffer_size(5, 20), 16); // 25%: base=15, safety=1
+
+        // Real-world scenarios
+        let cases = [
+            (4, 5, 9, "Small committee, high security"),
+            (7, 10, 15, "Medium committee, balanced"),
+            (10, 30, 51, "Large committee, high fault tolerance"),
+        ];
+
+        for (threshold_m, threshold_n, expected_total, desc) in cases {
+            let buffer = super::calculate_buffer_size(threshold_m, threshold_n);
+            let total = threshold_n + buffer;
+            assert_eq!(
+                total, expected_total,
+                "{}: Need {}/{} nodes, expected {} total",
+                desc, threshold_m, threshold_n, expected_total
+            );
+        }
     }
 }
