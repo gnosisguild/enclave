@@ -171,7 +171,7 @@ pub fn bfv_verifiable_encrypt_vector(
 /// Retrieves a BFV parameter set by name.
 ///
 /// # Parameters
-/// * `name` - Parameter set identifier (e.g., "SECURE_THRESHOLD_BFV_8192")
+/// * `name` - Parameter set identifier (e.g., "SECURE_THRESHOLD_8192")
 ///
 /// # Returns
 /// A JavaScript object with the following structure:
@@ -202,7 +202,7 @@ pub fn get_bfv_params(name: &str) -> Result<JsValue, JsValue> {
 ///
 /// # Returns
 /// Array of parameter set names that can be passed to `get_bfv_params()`.
-/// Includes both production-ready sets (e.g., "SECURE_THRESHOLD_BFV_8192") and
+/// Includes both production-ready sets (e.g., "SECURE_THRESHOLD_8192") and
 /// insecure sets for testing (prefixed with "INSECURE_").
 pub fn get_bfv_params_list() -> Vec<String> {
     BfvPreset::list()

@@ -7,7 +7,9 @@
 use anyhow::{anyhow, Result};
 use e3_fhe_params::build_bfv_params_arc;
 use e3_greco_helpers::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
-use e3_zk_helpers::commitments::{compute_ciphertext_commitment, compute_pk_agg_commitment};
+use e3_zk_helpers::commitments::{
+    compute_ciphertext_commitment, compute_pk_aggregation_commitment,
+};
 use e3_zk_helpers::utils::calculate_bit_width;
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
@@ -147,7 +149,7 @@ pub fn compute_pk_commitment(
     let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-    let commitment_bigint = compute_pk_agg_commitment(&pk0is, &pk1is, bit_pk);
+    let commitment_bigint = compute_pk_aggregation_commitment(&pk0is, &pk1is, bit_pk);
 
     let bytes = commitment_bigint.to_bytes_be().1;
 
@@ -209,7 +211,8 @@ pub fn compute_ct_commitment(
 
 #[cfg(test)]
 mod tests {
-    use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet, BfvPreset};
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet};
 
     use super::*;
 
@@ -218,7 +221,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -242,7 +245,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -273,7 +276,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;
@@ -303,7 +306,7 @@ mod tests {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = DEFAULT_BFV_PRESET.into();
         let params = build_bfv_params_from_set_arc(param_set);
         let degree = param_set.degree;
         let plaintext_modulus = param_set.plaintext_modulus;

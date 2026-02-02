@@ -7,7 +7,7 @@
 use crate::shares::ShamirShare;
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
-use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_fhe_params::{BfvParamSet, DEFAULT_BFV_PRESET};
 use fhe::mbfv::PublicKeyShare;
 use fhe::{
     bfv::{self, BfvParameters, SecretKey},
@@ -44,8 +44,13 @@ pub fn deserialize_secret_key(bytes: &[u8], params: &Arc<BfvParameters>) -> Resu
 }
 
 /// TODO: Make this modular
+/// Returns DKG BFV parameters (used for share encryption during key generation),
+/// matching the security level of the default threshold preset.
 pub fn get_share_encryption_params() -> Arc<BfvParameters> {
-    let param_set: BfvParamSet = BfvPreset::InsecureDkg512.into();
+    let dkg_preset = DEFAULT_BFV_PRESET
+        .dkg_counterpart()
+        .expect("default threshold preset has DKG counterpart");
+    let param_set: BfvParamSet = dkg_preset.into();
     param_set.build_arc()
 }
 

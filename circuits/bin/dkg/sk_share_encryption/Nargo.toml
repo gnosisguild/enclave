@@ -1,0 +1,9 @@
+[package]
+name = "sk_share_encryption"
+type = "bin"
+authors = ["Gnosis Guild / Enclave"]
+version = "1.0.0-beta.15"
+
+
+[dependencies]
+lib = { path = "../../../lib" }

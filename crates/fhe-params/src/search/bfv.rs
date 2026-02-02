@@ -86,7 +86,7 @@ impl BfvSearchResult {
 /// Returns the first feasible parameter set found, or an error if none exist.
 ///
 /// Note: Some resulting parameter sets from this search are hardcoded as presets
-/// in the `presets.rs` file for production use (e.g., `BfvPreset::SecureThresholdBfv8192`).
+/// in the `presets.rs` file for production use (e.g., `BfvPreset::SecureThreshold8192`).
 pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSearchResult> {
     let prime_items = build_prime_items();
 

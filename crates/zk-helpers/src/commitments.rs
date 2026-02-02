@@ -21,64 +21,41 @@ use num_bigint::BigInt;
 // DOMAIN SEPARATORS
 // ============================================================================
 
-/// Domain separator for BFV public key commitments.
-/// String: "PK_BFV"
-const DS_PK_BFV: [u8; 64] = [
-    0x50, 0x4b, 0x5f, 0x42, 0x46, 0x56, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "PK"
+const DS_PK: [u8; 64] = [
+    0x50, 0x4b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Domain separator for TRBFV public key commitments.
-/// String: "PK_TRBFV"
-const DS_PK_TRBFV: [u8; 64] = [
-    0x50, 0x4b, 0x5f, 0x54, 0x52, 0x42, 0x46, 0x56, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "PK_GENERATION"
+const DS_PK_GENERATION: [u8; 64] = [
+    0x50, 0x4b, 0x5f, 0x47, 0x45, 0x4e, 0x45, 0x52, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Domain separator for secret commitments (sk_trbfv or e_sm).
-/// String: "SECRET"
-const DS_SECRET: [u8; 64] = [
-    0x53, 0x45, 0x43, 0x52, 0x45, 0x54, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "SHARE_COMPUTATION"
+const DS_SHARE_COMPUTATION: [u8; 64] = [
+    0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x43, 0x4f, 0x4d, 0x50, 0x55, 0x54, 0x41, 0x54, 0x49, 0x4f,
+    0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+/// String: "SHARE_ENCRYPTION"
+const DS_SHARE_ENCRYPTION: [u8; 64] = [
+    0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x45, 0x4e, 0x43, 0x52, 0x59, 0x50, 0x54, 0x49, 0x4f, 0x4e,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Domain separator for shares party-modulus commitments.
-/// String: "SPM"
-const DS_SPM: [u8; 64] = [
-    0x53, 0x50, 0x4d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-/// Domain separator for aggregated shares commitments.
-/// String: "AGG_SHARES"
-const DS_AGG_SHARES: [u8; 64] = [
-    0x41, 0x47, 0x47, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-/// Domain separator for public key aggregation commitments.
-/// String: "PK_AGG"
-const DS_PK_AGG: [u8; 64] = [
-    0x50, 0x4b, 0x5f, 0x41, 0x47, 0x47, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-/// Domain separator for aggregation commitments.
-/// String: "AGGREGATION"
-const DS_AGGREGATION: [u8; 64] = [
-    0x41, 0x47, 0x47, 0x52, 0x45, 0x47, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "PK_AGGREGATION"
+const DS_PK_AGGREGATION: [u8; 64] = [
+    0x50, 0x4b, 0x5f, 0x41, 0x47, 0x47, 0x52, 0x45, 0x47, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -93,38 +70,51 @@ const DS_CIPHERTEXT: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Domain separator for public key TRBFV challenge.
-/// String: "CLG_PK_TRBFV"
-const DS_CLG_PK_TRBFV: [u8; 64] = [
-    0x43, 0x4c, 0x47, 0x5f, 0x50, 0x4b, 0x5f, 0x54, 0x52, 0x42, 0x46, 0x56, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-];
-
-/// Domain separator for encryption BFV challenge.
-/// String: "CLG_ENC_BFV"
-const DS_CLG_ENC_BFV: [u8; 64] = [
-    0x43, 0x4c, 0x47, 0x5f, 0x45, 0x4e, 0x43, 0x5f, 0x42, 0x46, 0x56, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "AGGREGATED_SHARES"
+const DS_AGGREGATED_SHARES: [u8; 64] = [
+    0x41, 0x47, 0x47, 0x52, 0x45, 0x47, 0x41, 0x54, 0x45, 0x44, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45,
+    0x53, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// Domain separator for Greco challenge.
-/// String: "CLG_GRECO"
-const DS_CLG_GRECO: [u8; 64] = [
-    0x43, 0x4c, 0x47, 0x5f, 0x47, 0x52, 0x45, 0x43, 0x4f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "RECURSIVE_AGGREGATION"
+const DS_RECURSIVE_AGGREGATION: [u8; 64] = [
+    0x52, 0x45, 0x43, 0x55, 0x52, 0x53, 0x49, 0x56, 0x45, 0x5f, 0x41, 0x47, 0x47, 0x52, 0x45, 0x47,
+    0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+/// String: "CLG_PK_GENERATION"
+const DS_CLG_PK_GENERATION: [u8; 64] = [
+    0x43, 0x4c, 0x47, 0x5f, 0x50, 0x4b, 0x5f, 0x47, 0x45, 0x4e, 0x45, 0x52, 0x41, 0x54, 0x49, 0x4f,
+    0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+/// String: "CLG_SHARE_ENCRYPTION"
+const DS_CLG_SHARE_ENCRYPTION: [u8; 64] = [
+    0x43, 0x4c, 0x47, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x45, 0x4e, 0x43, 0x52, 0x59, 0x50,
+    0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+/// String: "CLG_USER_DATA_ENCRYPTION"
+const DS_CLG_USER_DATA_ENCRYPTION: [u8; 64] = [
+    0x43, 0x4c, 0x47, 0x5f, 0x55, 0x53, 0x45, 0x52, 0x5f, 0x44, 0x41, 0x54, 0x41, 0x5f, 0x45, 0x4e,
+    0x43, 0x52, 0x59, 0x50, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
 /// Domain separator for decryption share challenge.
-/// String: "CLG_DEC_SHARE"
-const DS_CLG_DEC_SHARE: [u8; 64] = [
-    0x43, 0x4c, 0x47, 0x5f, 0x44, 0x45, 0x43, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "CLG_SHARE_DECRYPTION"
+const DS_CLG_SHARE_DECRYPTION: [u8; 64] = [
+    0x43, 0x4c, 0x47, 0x5f, 0x53, 0x48, 0x41, 0x52, 0x45, 0x5f, 0x44, 0x45, 0x43, 0x52, 0x59, 0x50,
+    0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
@@ -152,18 +142,22 @@ pub fn compute_commitments(
     compute_safe(domain_separator, payload, io_pattern)
 }
 
-/// Compute a commitment to the BFV public key polynomials by flattening them and hashing.
+// ============================================================================
+// COMMITMENTS
+// ============================================================================
+
+/// Compute a commitment to the correct DKG public key polynomials by flattening them and hashing.
 ///
-/// This matches the Noir `compute_pk_bfv_commitment` function exactly.
+/// This matches the Noir `compute_pk_generation_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the BFV public key (one vector per modulus)
-/// * `pk1` - Second component of the BFV public key (one vector per modulus)
+/// * `pk0` - First component of the correct DKG public key (one vector per modulus)
+/// * `pk1` - Second component of the correct DKG public key (one vector per modulus)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_pk_bfv_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_pk: u32) -> BigInt {
+pub fn compute_dkg_pk_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_pk: u32) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, pk0, bit_pk);
     payload = flatten(payload, pk1, bit_pk);
@@ -171,23 +165,23 @@ pub fn compute_pk_bfv_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_p
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_PK_BFV, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_PK, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute a commitment to the TRBFV public key polynomials by flattening them and hashing.
+/// Compute a commitment to the threshold public key polynomials by flattening them and hashing.
 ///
-/// This matches the Noir `compute_pk_trbfv_commitment` function exactly.
+/// This matches the Noir `compute_threshold_pk_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the TRBFV public key (one vector per modulus)
-/// * `pk1` - Second component of the TRBFV public key (one vector per modulus)
+/// * `pk0` - First component of the threshold public key (one vector per modulus)
+/// * `pk1` - Second component of the threshold public key (one vector per modulus)
 /// * `bit_pk` - The bit width for public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_pk_trbfv_commitment(
+pub fn compute_threshold_pk_commitment(
     pk0: &[Vec<BigInt>],
     pk1: &[Vec<BigInt>],
     bit_pk: u32,
@@ -199,62 +193,58 @@ pub fn compute_pk_trbfv_commitment(
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_PK_TRBFV, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_PK_GENERATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute a commitment to the secret key polynomial by flattening it and hashing.
+/// Compute a commitment to the threshold secret key share by flattening it and hashing.
 ///
-/// This matches the Noir `compute_secret_sk_commitment` function exactly.
+/// This matches the Noir `compute_share_computation_sk_commitment` function exactly.
 ///
 /// # Arguments
-/// * `sk` - Secret key polynomial coefficients
-/// * `bit_sk` - The bit width for secret key coefficient bounds
+/// * `sk` - Threshold secret key share coefficients
+/// * `bit_sk` - The bit width for threshold secret key share coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_secret_sk_commitment(sk: &[BigInt], bit_sk: u32) -> BigInt {
+pub fn compute_share_computation_sk_commitment(sk: &[BigInt], bit_sk: u32) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, &[sk.to_vec()], bit_sk);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_SECRET, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_SHARE_COMPUTATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute a commitment to the smudging noise (e_sm).
+/// Compute a commitment to the threshold smudging noise share by flattening it and hashing.
 ///
-/// This matches the Noir `compute_secret_e_sm_commitment` function exactly.
+/// This matches the Noir `compute_share_computation_e_sm_commitment` function exactly.
 ///
 /// # Arguments
-/// * `e_sm` - Smudging noise polynomial coefficients (one vector per modulus)
-/// * `bit_e_sm` - The bit width for smudging noise coefficient bounds
+/// * `e_sm` - Threshold smudging noise share coefficients (one vector per modulus)
+/// * `bit_e_sm` - The bit width for threshold smudging noise share coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_secret_e_sm_commitment(e_sm: &[Vec<BigInt>], bit_e_sm: u32) -> BigInt {
+pub fn compute_share_computation_e_sm_commitment(e_sm: &[Vec<BigInt>], bit_e_sm: u32) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, e_sm, bit_e_sm);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_SECRET, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_SHARE_COMPUTATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-// ============================================================================
-// COMMITMENTS
-// ============================================================================
-
-/// Compute SPM commitment from message polynomial.
+/// Compute share encryption commitment from message polynomial.
 ///
-/// This matches the Noir `compute_spm_commitment_from_message` function exactly.
+/// This matches the Noir `compute_share_encryption_commitment_from_message` function exactly.
 ///
 /// # Arguments
 /// * `message` - Message polynomial coefficients
@@ -262,21 +252,24 @@ pub fn compute_secret_e_sm_commitment(e_sm: &[Vec<BigInt>], bit_e_sm: u32) -> Bi
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_spm_commitment_from_message(message: &[BigInt], bit_msg: u32) -> BigInt {
+pub fn compute_share_encryption_commitment_from_message(
+    message: &[BigInt],
+    bit_msg: u32,
+) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, &[message.to_vec()], bit_msg);
 
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_SPM, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute SPM commitment from shares.
+/// Compute share encryption commitment from shares.
 ///
-/// This matches the Noir `compute_spm_commitment_from_shares` function exactly.
+/// This matches the Noir `compute_share_encryption_commitment_from_shares` function exactly.
 /// Used in C2 (verify shares circuit).
 ///
 /// # Arguments
@@ -286,7 +279,7 @@ pub fn compute_spm_commitment_from_message(message: &[BigInt], bit_msg: u32) -> 
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_spm_commitment_from_shares(
+pub fn compute_share_encryption_commitment_from_shares(
     y: &[Vec<Vec<BigInt>>],
     party_idx: usize,
     mod_idx: usize,
@@ -309,23 +302,27 @@ pub fn compute_spm_commitment_from_shares(
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_SPM, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
-/// Compute public key aggregation commitment.
+/// Compute threshold public key aggregation commitment.
 ///
-/// This matches the Noir `compute_pk_agg_commitment` function exactly.
+/// This matches the Noir `compute_pk_aggregation_commitment` function exactly.
 ///
 /// # Arguments
-/// * `pk0` - First component of the public key (one vector per modulus)
-/// * `pk1` - Second component of the public key (one vector per modulus)
-/// * `bit_pk` - The bit width for public key coefficient bounds
+/// * `pk0` - First component of the threshold public key (one vector per modulus)
+/// * `pk1` - Second component of the threshold public key (one vector per modulus)
+/// * `bit_pk` - The bit width for threshold public key coefficient bounds
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_pk_agg_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_pk: u32) -> BigInt {
+pub fn compute_pk_aggregation_commitment(
+    pk0: &[Vec<BigInt>],
+    pk1: &[Vec<BigInt>],
+    bit_pk: u32,
+) -> BigInt {
     let mut payload = Vec::new();
     payload = flatten(payload, pk0, bit_pk);
     payload = flatten(payload, pk1, bit_pk);
@@ -333,25 +330,25 @@ pub fn compute_pk_agg_commitment(pk0: &[Vec<BigInt>], pk1: &[Vec<BigInt>], bit_p
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_PK_AGG, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_PK_AGGREGATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
 /// Compute aggregation commitment.
 ///
-/// This matches the Noir `compute_aggregation_commitment` function exactly.
+/// This matches the Noir `compute_recursive_aggregation_commitment` function exactly.
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_aggregation_commitment(payload: Vec<Field>) -> BigInt {
+pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> BigInt {
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_AGGREGATION, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_RECURSIVE_AGGREGATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
@@ -399,7 +396,7 @@ pub fn compute_aggregated_shares_commitment(agg_shares: &[Vec<BigInt>], bit_msg:
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_AGG_SHARES, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_AGGREGATED_SHARES, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
@@ -408,9 +405,9 @@ pub fn compute_aggregated_shares_commitment(agg_shares: &[Vec<BigInt>], bit_msg:
 // COMMITMENTS FOR CHALLENGES
 // ============================================================================
 
-/// Compute public key TRBFV challenge.
+/// Compute public key generation challenge.
 ///
-/// This matches the Noir `compute_pk_trbfv_challenge` function exactly.
+/// This matches the Noir `compute_threshold_pk_challenge` function exactly.
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
@@ -418,11 +415,11 @@ pub fn compute_aggregated_shares_commitment(agg_shares: &[Vec<BigInt>], bit_msg:
 ///
 /// # Returns
 /// A vector of `BigInt` challenges (2*L elements)
-pub fn compute_pk_trbfv_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
+pub fn compute_threshold_pk_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, (2 * l as u32)];
 
-    compute_commitments(payload, DS_CLG_PK_TRBFV, io_pattern)
+    compute_commitments(payload, DS_CLG_PK_GENERATION, io_pattern)
         .into_iter()
         .map(|challenge_field| {
             let challenge_bytes = challenge_field.into_bigint().to_bytes_le();
@@ -431,9 +428,9 @@ pub fn compute_pk_trbfv_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> 
         .collect()
 }
 
-/// Compute BFV encryption challenge.
+/// Compute share encryption challenge.
 ///
-/// This matches the Noir `compute_bfv_enc_challenge` function exactly.
+/// This matches the Noir `compute_share_encryption_challenge` function exactly.
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
@@ -441,11 +438,11 @@ pub fn compute_pk_trbfv_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> 
 ///
 /// # Returns
 /// A vector of `BigInt` challenges (2*L elements)
-pub fn compute_bfv_enc_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
+pub fn compute_share_encryption_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, (2 * l as u32)];
 
-    compute_commitments(payload, DS_CLG_ENC_BFV, io_pattern)
+    compute_commitments(payload, DS_CLG_SHARE_ENCRYPTION, io_pattern)
         .into_iter()
         .map(|challenge_field| {
             let challenge_bytes = challenge_field.into_bigint().to_bytes_le();
@@ -454,9 +451,9 @@ pub fn compute_bfv_enc_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
         .collect()
 }
 
-/// Compute Greco challenge commitment.
+/// Compute User Data Encryption challenge commitment.
 ///
-/// This matches the Noir `compute_greco_challenge_commitment` function exactly.
+/// This matches the Noir `compute_user_data_encryption_challenge_commitment` function exactly.
 /// Verifies pk_commitment using pk0is and pk1is, then generates challenges from gammas_payload.
 ///
 /// # Arguments
@@ -472,7 +469,7 @@ pub fn compute_bfv_enc_challenge(payload: Vec<Field>, l: usize) -> Vec<BigInt> {
 ///
 /// # Panics
 /// Panics if the computed public key commitment doesn't match `pk_commitment`
-pub fn compute_greco_challenge_commitment(
+pub fn compute_user_data_encryption_challenge_commitment(
     pk0is: &[Vec<BigInt>],
     pk1is: &[Vec<BigInt>],
     gammas_payload: Vec<Field>,
@@ -481,10 +478,10 @@ pub fn compute_greco_challenge_commitment(
     l: usize,
 ) -> Vec<BigInt> {
     // Verify pk_commitment matches the commitment from pk0is and pk1is
-    let computed_pk_commitment = compute_pk_agg_commitment(pk0is, pk1is, bit_pk);
+    let computed_pk_commitment = compute_pk_aggregation_commitment(pk0is, pk1is, bit_pk);
     if computed_pk_commitment != *pk_commitment {
         panic!(
-            "PK commitment mismatch in Greco circuit: expected {}, got {}",
+            "PK commitment mismatch in User Data Encryption circuit: expected {}, got {}",
             pk_commitment, computed_pk_commitment
         );
     }
@@ -492,7 +489,7 @@ pub fn compute_greco_challenge_commitment(
     let input_size = gammas_payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, (2 * l as u32)];
 
-    compute_commitments(gammas_payload, DS_CLG_GRECO, io_pattern)
+    compute_commitments(gammas_payload, DS_CLG_USER_DATA_ENCRYPTION, io_pattern)
         .into_iter()
         .map(|challenge_field| {
             let challenge_bytes = challenge_field.into_bigint().to_bytes_le();
@@ -501,20 +498,20 @@ pub fn compute_greco_challenge_commitment(
         .collect()
 }
 
-/// Compute decryption share challenge.
+/// Compute threshold share decryption challenge.
 ///
-/// This matches the Noir `compute_dec_share_challenge` function exactly.
+/// This matches the Noir `compute_threshold_share_decryption_challenge` function exactly.
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_dec_share_challenge(payload: Vec<Field>) -> BigInt {
+pub fn compute_threshold_share_decryption_challenge(payload: Vec<Field>) -> BigInt {
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_CLG_DEC_SHARE, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_CLG_SHARE_DECRYPTION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
@@ -548,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_spm_commitment_from_shares_matches_manual_payload() {
+    fn compute_share_encryption_commitment_from_shares_matches_manual_payload() {
         let y = vec![
             vec![
                 vec![BigInt::from(0), BigInt::from(11), BigInt::from(12)],
@@ -576,21 +573,56 @@ mod tests {
 
         let input_size = payload.len() as u32;
         let io_pattern = [0x80000000 | input_size, 1];
-        let expected = field_to_bigint(compute_commitments(payload, DS_SPM, io_pattern)[0]);
+        let expected =
+            field_to_bigint(compute_commitments(payload, DS_SHARE_ENCRYPTION, io_pattern)[0]);
 
-        let actual = compute_spm_commitment_from_shares(&y, party_idx, mod_idx);
+        let actual = compute_share_encryption_commitment_from_shares(&y, party_idx, mod_idx);
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn challenge_lengths_match_expected_output() {
+    fn compute_threshold_pk_challenge_returns_2l_elements() {
         let payload = vec![Field::from(1u64), Field::from(2u64)];
         let l = 3;
 
-        let pk_trbfv = compute_pk_trbfv_challenge(payload.clone(), l);
-        let bfv_enc = compute_bfv_enc_challenge(payload, l);
+        let challenges = compute_threshold_pk_challenge(payload, l);
+        assert_eq!(challenges.len(), 2 * l);
+    }
 
-        assert_eq!(pk_trbfv.len(), 2 * l);
-        assert_eq!(bfv_enc.len(), 2 * l);
+    #[test]
+    fn compute_share_encryption_challenge_returns_2l_elements() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+        let l = 3;
+
+        let challenges = compute_share_encryption_challenge(payload, l);
+        assert_eq!(challenges.len(), 2 * l);
+    }
+
+    #[test]
+    fn compute_recursive_aggregation_commitment_matches_manual_payload() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = field_to_bigint(
+            compute_commitments(payload.clone(), DS_RECURSIVE_AGGREGATION, io_pattern)[0],
+        );
+
+        let actual = compute_recursive_aggregation_commitment(payload);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn compute_threshold_share_decryption_challenge_returns_single_bigint() {
+        let payload = vec![Field::from(1u64), Field::from(2u64)];
+
+        let input_size = payload.len() as u32;
+        let io_pattern = [0x80000000 | input_size, 1];
+        let expected = field_to_bigint(
+            compute_commitments(payload.clone(), DS_CLG_SHARE_DECRYPTION, io_pattern)[0],
+        );
+
+        let actual = compute_threshold_share_decryption_challenge(payload);
+        assert_eq!(actual, expected);
     }
 }

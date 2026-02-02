@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crisp_constants::get_default_paramset;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
+use e3_fhe_params::default_param_set;
 use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -317,7 +317,7 @@ pub async fn decrypt_and_publish_result(
 }
 
 fn generate_bfv_parameters() -> Arc<BfvParameters> {
-    build_bfv_params_from_set_arc(get_default_paramset())
+    build_bfv_params_from_set_arc(default_param_set())
 }
 
 fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
