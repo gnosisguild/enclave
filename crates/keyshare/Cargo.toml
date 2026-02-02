@@ -20,7 +20,6 @@ e3-multithread = { workspace = true }
 e3-request = { workspace = true }
 e3-trbfv = { workspace = true }
 e3-utils = { workspace = true }
-e3-zk-prover = { workspace = true }
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 rand = { workspace = true }
