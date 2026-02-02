@@ -7,7 +7,7 @@ description = "A polynomial library with big integer coefficients for cryptograp
 repository = "https://github.com/gnosisguild/enclave/crates/polynomial"
 
 [dependencies]
-num-bigint = { workspace = true, features = ["serde"] }
+num-bigint = { workspace = true, features = ["rand", "serde"] }
 num-traits = { workspace = true }
 serde = { workspace = true, optional = true, features = ["rc"] }
 bincode = { workspace = true, optional = true }
