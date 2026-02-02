@@ -88,7 +88,8 @@ fn benchmark_modular_reduction(c: &mut Criterion) {
         group.bench_function(&format!("degree_{}", degree), |b| {
             b.iter(|| {
                 let mut p = poly1.clone();
-                p.reduce_and_center(&modulus);
+                p.reduce(&modulus);
+                p.center(&modulus);
                 black_box(p)
             })
         });

@@ -6,7 +6,7 @@
 
 //! Polynomial arithmetic implementation.
 
-use crate::utils::{reduce, reduce_and_center};
+use crate::utils::{center, reduce};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use std::fmt;
@@ -376,7 +376,7 @@ impl Polynomial {
     ///
     /// # Returns
     ///
-    /// A new polynomial with each coefficient multiplied by the scalar.
+    /// Mutates the polynomial in place.
     pub fn scalar_mul(&self, scalar: &BigInt) -> Self {
         Polynomial::new(self.coefficients.iter().map(|x| x * scalar).collect())
     }
@@ -396,7 +396,7 @@ impl Polynomial {
     ///
     /// # Returns
     ///
-    /// A new polynomial of degree `n-1` representing the remainder after reduction.
+    /// Mutates the polynomial in place.
     ///
     /// # Errors
     ///
@@ -434,21 +434,19 @@ impl Polynomial {
         Ok(Polynomial::new(out))
     }
 
-    /// Reduces coefficients modulo a prime and centers them.
+    /// Centers coefficients already in [0, modulus) into (-modulus/2, modulus/2].
     ///
     /// # Arguments
     ///
-    /// * `modulus` - The prime modulus.
+    /// * `modulus` - The modulus.
     ///
     /// # Returns
     ///
-    /// A new polynomial with coefficients reduced and centered.            
-    pub fn reduce_and_center(&mut self, modulus: &BigInt) {
-        let half_modulus = modulus / 2;
-
+    /// Mutates the polynomial in place.
+    pub fn center(&mut self, modulus: &BigInt) {
         self.coefficients
             .iter_mut()
-            .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
+            .for_each(|x| *x = center(x, modulus));
     }
 
     /// Reduces coefficients modulo a modulus (in range [0, modulus)).

@@ -62,9 +62,15 @@ impl CiphertextAdditionInputs {
         // that each limb is stored in **descending** order (a_n, …, a_0) so circuit evaluation can use Horner's
         // method in one forward pass: `result = result * x + coefficients[i]` from i = 0,
         // i.e. P(x) = ((…((a_n·x + a_{n-1})·x + …)·x + a_0), with no extra reversing or reindexing.
+        //
+        // We center so the quotient r = (sum − (prev + ct)) / q_i lies in {-1, 0, 1}.
+        // BFV/fhe-math already gives coefficients in [0, q_i), so reduce is redundant. We need centering
+        // into (-q/2, q/2]: then the difference per coefficient is small in absolute value, and for valid
+        // ciphertext addition that difference is a multiple of q_i, so the quotient is in {-1, 0, 1},
+        // which the circuit and compute_quotient expect.
         for c in &mut crt_polynomials {
             c.reverse();
-            c.reduce_and_center(&moduli)?;
+            c.center(&moduli)?;
         }
 
         let [mut prev_ct0, mut prev_ct1, mut ct0, mut ct1, mut sum_ct0, mut sum_ct1] =

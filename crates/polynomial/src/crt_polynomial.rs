@@ -86,10 +86,7 @@ impl CrtPolynomial {
         }
     }
 
-    /// Reduces and centers each limb's coefficients modulo the corresponding modulus in-place.
-    ///
-    /// Each limb `self.limbs[i]` is reduced modulo `moduli[i]`, with coefficients centered
-    /// in the symmetric range `(-q/2, q/2]`.
+    /// Centers each limb's coefficients (already in [0, q_i)) into (-q_i/2, q_i/2] in-place.
     ///
     /// # Arguments
     ///
@@ -98,7 +95,7 @@ impl CrtPolynomial {
     /// # Errors
     ///
     /// Returns [`CrtPolynomialError::ModuliLengthMismatch`] if `moduli.len() != self.limbs.len()`.
-    pub fn reduce_and_center(&mut self, moduli: &[u64]) -> Result<(), CrtPolynomialError> {
+    pub fn center(&mut self, moduli: &[u64]) -> Result<(), CrtPolynomialError> {
         if self.limbs.len() != moduli.len() {
             return Err(CrtPolynomialError::ModuliLengthMismatch {
                 limbs_len: self.limbs.len(),
@@ -107,7 +104,7 @@ impl CrtPolynomial {
         }
 
         for (limb, qi) in self.limbs.iter_mut().zip(moduli.iter()) {
-            limb.reduce_and_center(&BigInt::from(*qi));
+            limb.center(&BigInt::from(*qi));
         }
 
         Ok(())

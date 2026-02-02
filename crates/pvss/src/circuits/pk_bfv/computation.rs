@@ -7,8 +7,8 @@
 use crate::traits::Computation;
 use crate::traits::ConvertToJson;
 use crate::traits::ReduceToZkpModulus;
+use e3_polynomial::center_coefficients_mut;
 use e3_polynomial::reduce_coefficients_2d;
-use e3_polynomial::utils::reduce_and_center_coefficients_mut;
 use e3_zk_helpers::utils::calculate_bit_width;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use fhe::bfv::BfvParameters;
@@ -126,8 +126,8 @@ impl Computation for Witness {
                 let mut pk1i: Vec<BigInt> =
                     pk1_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
 
-                reduce_and_center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
-                reduce_and_center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
+                center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
+                center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
 
                 (pk0i, pk1i)
             })

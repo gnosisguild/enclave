@@ -11,6 +11,31 @@ use crate::Polynomial;
 use num_bigint::BigInt;
 use num_traits::Zero;
 
+/// Centers a value already in [0, modulus) into the symmetric range (-modulus/2, modulus/2].
+///
+/// Caller must ensure `x` is in [0, modulus). For odd modulus the range is (-(q-1)/2, (q-1)/2];
+/// for even modulus, values ≥ q/2 become negative.
+///
+/// # Arguments
+///
+/// * `x` - Value in [0, modulus).
+/// * `modulus` - The modulus.
+pub fn center(x: &BigInt, modulus: &BigInt) -> BigInt {
+    let half_modulus = modulus / 2;
+
+    let mut r = x.clone();
+
+    if (modulus % BigInt::from(2)) == BigInt::from(1) {
+        if r > half_modulus {
+            r -= modulus;
+        }
+    } else if r >= half_modulus {
+        r -= modulus;
+    }
+
+    r
+}
+
 /// Reduces a number modulo a prime modulus and centers it.
 ///
 /// This function takes an arbitrary number and reduces it modulo the specified prime modulus.
@@ -59,45 +84,16 @@ pub fn reduce(x: &BigInt, modulus: &BigInt) -> BigInt {
     r
 }
 
-/// Reduces and centers polynomial coefficients modulo a prime modulus.
-///
-/// This function iterates over a mutable slice of polynomial coefficients, reducing each coefficient
-/// modulo a given prime modulus and adjusting the result to be within the symmetric range
-/// [−(modulus−1)/2, (modulus−1)/2].
+/// Centers polynomial coefficients that are already in [0, modulus) into (-modulus/2, modulus/2].
 ///
 /// # Arguments
 ///
-/// * `coefficients` - A mutable slice of `BigInt` coefficients to be reduced and centered
-/// * `modulus` - A prime modulus `BigInt` used for reduction and centering
-///
-/// # Panics
-///
-/// Panics if `modulus` is zero due to division by zero
-pub fn reduce_and_center_coefficients_mut(coefficients: &mut [BigInt], modulus: &BigInt) {
-    let half_modulus = modulus / 2;
+/// * `coefficients` - Coefficients in [0, modulus); mutated in place.
+/// * `modulus` - The modulus.
+pub fn center_coefficients_mut(coefficients: &mut [BigInt], modulus: &BigInt) {
     coefficients
         .iter_mut()
-        .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
-}
-
-/// Reduces and centers polynomial coefficients modulo a prime modulus.
-///
-/// This function creates a new vector with coefficients reduced and centered modulo the given modulus.
-///
-/// # Arguments
-///
-/// * `coefficients` - A slice of `BigInt` coefficients to be reduced and centered
-/// * `modulus` - A prime modulus `BigInt` used for reduction and centering
-///
-/// # Returns
-///
-/// A new `Vec<BigInt>` with reduced and centered coefficients
-pub fn reduce_and_center_coefficients(coefficients: &[BigInt], modulus: &BigInt) -> Vec<BigInt> {
-    let half_modulus = modulus / 2;
-    coefficients
-        .iter()
-        .map(|x| reduce_and_center(x, modulus, &half_modulus))
-        .collect()
+        .for_each(|x| *x = center(x, modulus));
 }
 
 /// Reduces a polynomial's coefficients within a polynomial ring defined by a cyclotomic polynomial and a modulus.
@@ -128,7 +124,8 @@ pub fn reduce_in_ring(
     let poly = Polynomial::new(coeffs);
     let reduced = poly.reduce_by_cyclotomic(cyclo)?;
     *coefficients = reduced.coefficients;
-    reduce_and_center_coefficients_mut(coefficients, modulus);
+    reduce_coefficients_mut(coefficients, modulus);
+    center_coefficients_mut(coefficients, modulus);
     Ok(())
 }
 
@@ -401,17 +398,6 @@ mod tests {
         let bound = BigInt::from(5);
         let modulus = BigInt::from(7);
         assert!(range_check_standard(&vec, &bound, &modulus));
-    }
-
-    #[test]
-    fn test_reduce_and_center_coefficients() {
-        let coeffs = vec![BigInt::from(10), BigInt::from(15), BigInt::from(20)];
-        let modulus = BigInt::from(7);
-        let result = reduce_and_center_coefficients(&coeffs, &modulus);
-        assert_eq!(
-            result,
-            vec![BigInt::from(3), BigInt::from(1), BigInt::from(-1)]
-        );
     }
 
     #[test]
