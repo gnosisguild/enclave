@@ -169,11 +169,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         ) {
             return IEnclave.E3Stage.CommitteeFinalized;
         }
-        if (reason == IEnclave.FailureReason.ActivationWindowExpired) {
-            return IEnclave.E3Stage.KeyPublished;
-        }
         if (reason == IEnclave.FailureReason.NoInputsReceived) {
-            return IEnclave.E3Stage.Activated;
+            return IEnclave.E3Stage.KeyPublished;
         }
         if (
             reason == IEnclave.FailureReason.ComputeTimeout ||
@@ -181,7 +178,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             reason == IEnclave.FailureReason.ComputeProviderFailed ||
             reason == IEnclave.FailureReason.RequesterCancelled
         ) {
-            return IEnclave.E3Stage.Activated;
+            return IEnclave.E3Stage.KeyPublished;
         }
         if (
             reason == IEnclave.FailureReason.DecryptionTimeout ||
@@ -210,10 +207,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             // Failed during DKG = sortition work done
             workCompletedBps = alloc.committeeFormationBps;
         } else if (stage == IEnclave.E3Stage.KeyPublished) {
-            // Failed before activation = sortition + DKG done
-            workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
-        } else if (stage == IEnclave.E3Stage.Activated) {
-            // Failed during active phase = sortition + DKG done (no additional work)
+            // Failed during input phase = sortition + DKG done (no additional work)
             workCompletedBps = alloc.committeeFormationBps + alloc.dkgBps;
         } else if (stage == IEnclave.E3Stage.CiphertextReady) {
             // Failed during decryption = sortition + DKG done (awaiting decryption shares)

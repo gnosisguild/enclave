@@ -23,8 +23,9 @@ interface IEnclave {
         None,
         Requested,
         CommitteeFinalized,
+        // Once a key is published, it is possible to then accept inputs
+        // as long as we are within the input deadline (start and end)
         KeyPublished,
-        Activated,
         CiphertextReady,
         Complete,
         Failed
@@ -37,7 +38,6 @@ interface IEnclave {
         InsufficientCommitteeMembers,
         DKGTimeout,
         DKGInvalidShares,
-        ActivationWindowExpired,
         NoInputsReceived,
         ComputeTimeout,
         ComputeProviderExpired,
@@ -67,7 +67,6 @@ interface IEnclave {
     struct E3Deadlines {
         uint256 committeeDeadline;
         uint256 dkgDeadline;
-        uint256 activationDeadline;
         uint256 computeDeadline;
         uint256 decryptionDeadline;
     }
@@ -83,16 +82,6 @@ interface IEnclave {
     /// @param e3 Details of the E3.
     /// @param e3Program Address of the Computation module selected.
     event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
-
-    /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
-    /// @param e3Id ID of the E3.
-    /// @param expiration Timestamp when committee duties expire.
-    /// @param committeePublicKey Hash of the public key of the committee.
-    event E3Activated(
-        uint256 e3Id,
-        uint256 expiration,
-        bytes32 committeePublicKey
-    );
 
     /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is
     /// successfully published.
@@ -213,18 +202,14 @@ interface IEnclave {
 
     /// @notice This struct contains the parameters to submit a request to Enclave.
     /// @param threshold The M/N threshold for the committee.
-    /// @param startWindow The start window for the computation.
-    /// @param inputDeadline When the program will stop accepting inputs.
-    /// @param duration How long should ciphernodes be active for.
+    /// @param inputWindow When the program will start and stop accepting inputs.
     /// @param e3Program The address of the E3 Program.
     /// @param e3ProgramParams The ABI encoded computation parameters.
     /// @param computeProviderParams The ABI encoded compute provider parameters.
     /// @param customParams Arbitrary ABI-encoded application-defined parameters.
     struct E3RequestParams {
         uint32[2] threshold;
-        uint256[2] startWindow;
-        uint256 inputDeadline;
-        uint256 duration;
+        uint256[2] inputWindow;
         IE3Program e3Program;
         bytes e3ProgramParams;
         bytes computeProviderParams;
@@ -245,15 +230,6 @@ interface IEnclave {
     function request(
         E3RequestParams calldata requestParams
     ) external returns (uint256 e3Id, E3 memory e3);
-
-    /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been
-    /// initialized and is ready for input.
-    /// @dev This function MUST emit the E3Activated event.
-    /// @dev This function MUST revert if the given E3 has not yet been requested.
-    /// @dev This function MUST revert if the selected node committee has not yet published a public key.
-    /// @param e3Id ID of the E3.
-    /// @return success True if the E3 was successfully activated.
-    function activate(uint256 e3Id) external returns (bool success);
 
     /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the CiphertextOutputPublished event.

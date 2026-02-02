@@ -91,31 +91,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "expiration",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "committeePublicKey",
-          "type": "bytes32"
-        }
-      ],
-      "name": "E3Activated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
@@ -229,23 +204,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -501,25 +461,6 @@
       "type": "event"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        }
-      ],
-      "name": "activate",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "inputs": [],
       "name": "bondingRegistry",
       "outputs": [
@@ -632,11 +573,6 @@
             },
             {
               "internalType": "uint256",
-              "name": "activationDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
               "name": "computeDeadline",
               "type": "uint256"
             },
@@ -702,23 +638,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -785,18 +706,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -1064,18 +975,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -1129,23 +1030,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -1331,5 +1217,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-b8d376a6d483745bdfa7c65152a43dfc9ef6ea70"
+  "buildInfoId": "solc-0_8_28-d7dc0996aa43cf2431d9200c0f63b9debbb93237"
 }
