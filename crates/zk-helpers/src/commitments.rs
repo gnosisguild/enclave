@@ -78,10 +78,10 @@ const DS_AGGREGATED_SHARES: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
-/// String: "AGGREGATION"
-const DS_AGGREGATION: [u8; 64] = [
-    0x41, 0x47, 0x47, 0x52, 0x45, 0x47, 0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/// String: "RECURSIVE_AGGREGATION"
+const DS_RECURSIVE_AGGREGATION: [u8; 64] = [
+    0x52, 0x45, 0x43, 0x55, 0x52, 0x53, 0x49, 0x56, 0x45, 0x5f, 0x41, 0x47, 0x47, 0x52, 0x45, 0x47,
+    0x41, 0x54, 0x49, 0x4f, 0x4e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
@@ -337,18 +337,18 @@ pub fn compute_threshold_pk_aggregation_commitment(
 
 /// Compute aggregation commitment.
 ///
-/// This matches the Noir `compute_aggregation_commitment` function exactly.
+/// This matches the Noir `compute_recursive_aggregation_commitment` function exactly.
 ///
 /// # Arguments
 /// * `payload` - Prepared payload as a vector of field elements
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_aggregation_commitment(payload: Vec<Field>) -> BigInt {
+pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> BigInt {
     let input_size = payload.len() as u32;
     let io_pattern = [0x80000000 | input_size, 1];
 
-    let commitment_field = compute_commitments(payload, DS_AGGREGATION, io_pattern)[0];
+    let commitment_field = compute_commitments(payload, DS_RECURSIVE_AGGREGATION, io_pattern)[0];
     let commitment_bytes = commitment_field.into_bigint().to_bytes_le();
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
@@ -599,15 +599,16 @@ mod tests {
     }
 
     #[test]
-    fn compute_aggregation_commitment_matches_manual_payload() {
+    fn compute_recursive_aggregation_commitment_matches_manual_payload() {
         let payload = vec![Field::from(1u64), Field::from(2u64)];
 
         let input_size = payload.len() as u32;
         let io_pattern = [0x80000000 | input_size, 1];
-        let expected =
-            field_to_bigint(compute_commitments(payload.clone(), DS_AGGREGATION, io_pattern)[0]);
+        let expected = field_to_bigint(
+            compute_commitments(payload.clone(), DS_RECURSIVE_AGGREGATION, io_pattern)[0],
+        );
 
-        let actual = compute_aggregation_commitment(payload);
+        let actual = compute_recursive_aggregation_commitment(payload);
         assert_eq!(actual, expected);
     }
 

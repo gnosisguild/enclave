@@ -5,12 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
-use lib::{configs::default::dkg::{L, N}, math::commitments::compute_aggregation_commitment};
+use lib::math::commitments::compute_recursive_aggregation_commitment;
 
 // Number of proofs.
-pub global N_PROOFS: u32 = 2;
+pub global N_PROOFS: u32 = 1;
 /// Number of public inputs/outputs per proof.
-pub global N_PUBLIC_INPUTS: u32 = (2 * L * N) + 2;
+pub global N_PUBLIC_INPUTS: u32 = 1;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
@@ -30,5 +30,5 @@ fn main(
         }
     }
 
-    compute_aggregation_commitment(aggregated_public_inputs)
+    compute_recursive_aggregation_commitment(aggregated_public_inputs)
 }

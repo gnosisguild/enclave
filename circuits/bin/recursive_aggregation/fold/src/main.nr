@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
-use lib::math::commitments::compute_aggregation_commitment;
+use lib::math::commitments::compute_recursive_aggregation_commitment;
 
 fn main(
     verification_key: UltraHonkVerificationKey,
@@ -21,5 +21,5 @@ fn main(
     commitments_vec.push(commitments[0]);
     commitments_vec.push(commitments[1]);
 
-    compute_aggregation_commitment(commitments_vec)
+    compute_recursive_aggregation_commitment(commitments_vec)
 }

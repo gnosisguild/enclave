@@ -4,9 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::{
-    compute_threshold_pk_aggregation_commitment, compute_threshold_pk_commitment,
-};
+use crate::math::commitments::{compute_pk_aggregation_commitment, compute_threshold_pk_commitment};
 use crate::math::modulo::U128::ModU128;
 use crate::math::polynomial::Polynomial;
 
@@ -116,6 +114,6 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
         }
 
         // 2. Commit to aggregated threshold public key
-        compute_threshold_pk_aggregation_commitment::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg)
+        compute_pk_aggregation_commitment::<N, L, BIT_PK>(self.pk0_agg, self.pk1_agg)
     }
 }
