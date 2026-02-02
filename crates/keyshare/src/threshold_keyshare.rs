@@ -12,9 +12,8 @@ use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
     ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
     E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, KeyshareCreated, PartyId,
-    PkBfvProofRequest, PkBfvProofResponse, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, TypedEvent, ZkRequest, ZkResponse,
+    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, KeyshareCreated,
+    PartyId, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_fhe::create_crp;
 use e3_trbfv::{
@@ -30,7 +29,6 @@ use e3_trbfv::{
 };
 use e3_utils::NotifySync;
 use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
-use e3_zk_prover::ZkBackend;
 use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
@@ -47,20 +45,12 @@ use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyC
 use crate::threshold_share_collector::ThresholdShareCollector;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
-struct StartThresholdShareGeneration(CiphernodeSelected);
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenPkShareAndSkSss(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenEsiSss(CiphernodeSelected);
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
-struct SharesGenerated;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -74,14 +64,6 @@ impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
             shares: to_ordered_vec(value),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct GeneratingPkBfvProofData {
-    sk_bfv: SensitiveBytes,
-    pk_bfv: ArcBytes,
-    ciphernode_selected: CiphernodeSelected,
-    correlation_id: CorrelationId,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -128,8 +110,6 @@ pub struct Decrypting {
 pub enum KeyshareState {
     // Before anything
     Init,
-    // Generating BFV public key proof (T0)
-    GeneratingPkBfvProof(GeneratingPkBfvProofData),
     // Collecting BFV encryption keys from all parties
     CollectingEncryptionKeys(CollectingEncryptionKeysData),
     // Generating TrBFV share material
@@ -154,9 +134,7 @@ impl KeyshareState {
                 true
             } else {
                 match (self, &new_state) {
-                    (K::Init, K::GeneratingPkBfvProof(_)) => true,
-                    (K::Init, K::CollectingEncryptionKeys(_)) => true, // Skip proof if ZK disabled
-                    (K::GeneratingPkBfvProof(_), K::CollectingEncryptionKeys(_)) => true,
+                    (K::Init, K::CollectingEncryptionKeys(_)) => true,
                     (K::CollectingEncryptionKeys(_), K::GeneratingThresholdShare(_)) => true,
                     (K::GeneratingThresholdShare(_), K::AggregatingDecryptionKey(_)) => true,
                     (K::AggregatingDecryptionKey(_), K::ReadyForDecryption(_)) => true,
@@ -180,7 +158,6 @@ impl KeyshareState {
     pub fn variant_name(&self) -> &'static str {
         match self {
             Self::Init => "Init",
-            Self::GeneratingPkBfvProof(_) => "GeneratingPkBfvProof",
             Self::CollectingEncryptionKeys(_) => "CollectingEncryptionKeys",
             Self::GeneratingThresholdShare(_) => "GeneratingThresholdShare",
             Self::AggregatingDecryptionKey(_) => "AggregatingDecryptionKey",
@@ -264,16 +241,6 @@ impl ThresholdKeyshareState {
     }
 }
 
-impl TryInto<GeneratingPkBfvProofData> for ThresholdKeyshareState {
-    type Error = anyhow::Error;
-    fn try_into(self) -> std::result::Result<GeneratingPkBfvProofData, Self::Error> {
-        match self.state {
-            KeyshareState::GeneratingPkBfvProof(s) => Ok(s),
-            _ => Err(anyhow!("Invalid state: expected GeneratingPkBfvProof")),
-        }
-    }
-}
-
 impl TryInto<CollectingEncryptionKeysData> for ThresholdKeyshareState {
     type Error = anyhow::Error;
     fn try_into(self) -> std::result::Result<CollectingEncryptionKeysData, Self::Error> {
@@ -329,7 +296,6 @@ pub struct ThresholdKeyshareParams {
     pub cipher: Arc<Cipher>,
     pub state: Persistable<ThresholdKeyshareState>,
     pub share_encryption_params: Arc<BfvParameters>,
-    pub zk_backend: Option<ZkBackend>,
 }
 
 pub struct ThresholdKeyshare {
@@ -339,7 +305,6 @@ pub struct ThresholdKeyshare {
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     state: Persistable<ThresholdKeyshareState>,
     share_encryption_params: Arc<BfvParameters>,
-    zk_backend: Option<ZkBackend>,
 }
 
 impl ThresholdKeyshare {
@@ -351,7 +316,6 @@ impl ThresholdKeyshare {
             encryption_key_collector: None,
             state: params.state,
             share_encryption_params: params.share_encryption_params,
-            zk_backend: params.zk_backend,
         }
     }
 }
@@ -395,10 +359,9 @@ impl ThresholdKeyshare {
         );
         let e3_id = state.e3_id.clone();
         let threshold_n = state.threshold_n;
-        let zk_backend = self.zk_backend.clone();
-        let addr = self.encryption_key_collector.get_or_insert_with(|| {
-            EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id, zk_backend)
-        });
+        let addr = self
+            .encryption_key_collector
+            .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
         Ok(addr.clone())
     }
 
@@ -451,13 +414,11 @@ impl ThresholdKeyshare {
                 }
                 _ => Ok(()),
             },
-            ComputeResponseKind::Zk(zk) => match zk {
-                ZkResponse::PkBfv(_) => self.handle_pk_bfv_proof_response(msg),
-            },
+            ComputeResponseKind::Zk(_) => Ok(()),
         }
     }
 
-    /// 1. CiphernodeSelected - Generate BFV keys and optionally request T0 proof
+    /// 1. CiphernodeSelected - Generate BFV keys and publish EncryptionKeyPending
     pub fn handle_ciphernode_selected(
         &mut self,
         msg: TypedEvent<CiphernodeSelected>,
@@ -480,78 +441,22 @@ impl ThresholdKeyshare {
         let state = self.state.try_get()?;
         let e3_id = state.e3_id.clone();
 
-        if self.zk_backend.is_some() {
-            let correlation_id = CorrelationId::new();
-            let params_bytes = state.params.clone();
-
-            // Transition to GeneratingPkBfvProof state
-            self.state.try_mutate(|s| {
-                s.new_state(KeyshareState::GeneratingPkBfvProof(
-                    GeneratingPkBfvProofData {
-                        sk_bfv: sk_bfv_encrypted,
-                        pk_bfv: pk_bfv_bytes.clone(),
-                        ciphernode_selected: msg.into_inner(),
-                        correlation_id: correlation_id.clone(),
-                    },
-                ))
-            })?;
-
-            let proof_request = ComputeRequest::zk(
-                ZkRequest::PkBfv(PkBfvProofRequest::new(pk_bfv_bytes, params_bytes)),
-                correlation_id,
-                e3_id,
-            );
-
-            info!("Requesting T0 proof generation");
-            self.bus.publish(proof_request)?;
-        } else {
-            info!("ZK backend not configured, skipping T0 proof generation");
-
-            self.state.try_mutate(|s| {
-                s.new_state(KeyshareState::CollectingEncryptionKeys(
-                    CollectingEncryptionKeysData {
-                        sk_bfv: sk_bfv_encrypted.clone(),
-                        pk_bfv: pk_bfv_bytes.clone(),
-                        ciphernode_selected: msg.into_inner(),
-                    },
-                ))
-            })?;
-
-            self.bus.publish(EncryptionKeyCreated {
-                e3_id: state.e3_id.clone(),
-                key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
-                external: false,
-            })?;
-        }
-
-        Ok(())
-    }
-
-    /// 1b. PkBfv proof response - T0 proof received, transition to CollectingEncryptionKeys
-    pub fn handle_pk_bfv_proof_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
-        let proof_response: PkBfvProofResponse = msg.into_inner().try_into()?;
-        let current: GeneratingPkBfvProofData = self.state.try_get()?.try_into()?;
-        let state = self.state.try_get()?;
-
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::CollectingEncryptionKeys(
                 CollectingEncryptionKeysData {
-                    sk_bfv: current.sk_bfv,
-                    pk_bfv: current.pk_bfv.clone(),
-                    ciphernode_selected: current.ciphernode_selected,
+                    sk_bfv: sk_bfv_encrypted.clone(),
+                    pk_bfv: pk_bfv_bytes.clone(),
+                    ciphernode_selected: msg.into_inner(),
                 },
             ))
         })?;
 
-        self.bus.publish(EncryptionKeyCreated {
-            e3_id: state.e3_id.clone(),
-            key: Arc::new(
-                EncryptionKey::new(state.party_id, current.pk_bfv).with_proof(proof_response.proof),
-            ),
-            external: false,
+        self.bus.publish(EncryptionKeyPending {
+            e3_id,
+            key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
+            params: state.params.clone(),
         })?;
 
-        info!("EncryptionKeyCreated published with T0 proof");
         Ok(())
     }
 

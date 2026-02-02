@@ -149,6 +149,14 @@ impl ComputeRequestError {
     pub fn get_err(&self) -> &ComputeRequestErrorKind {
         &self.kind
     }
+
+    pub fn correlation_id(&self) -> &CorrelationId {
+        &self.request.correlation_id
+    }
+
+    pub fn request(&self) -> &ComputeRequest {
+        &self.request
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

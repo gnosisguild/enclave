@@ -13,8 +13,7 @@ use std::{
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
 use e3_events::{E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated};
 use e3_trbfv::PartyId;
-use e3_zk_prover::{ZkBackend, ZkProver};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -66,16 +65,10 @@ pub struct EncryptionKeyCollector {
     state: CollectorState,
     keys: HashMap<PartyId, Arc<EncryptionKey>>,
     timeout_handle: Option<SpawnHandle>,
-    zk_backend: Option<ZkBackend>,
 }
 
 impl EncryptionKeyCollector {
-    pub fn setup(
-        parent: Addr<ThresholdKeyshare>,
-        total: u64,
-        e3_id: E3id,
-        zk_backend: Option<ZkBackend>,
-    ) -> Addr<Self> {
+    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64, e3_id: E3id) -> Addr<Self> {
         let collector = Self {
             e3_id,
             todo: (0..total).collect(),
@@ -83,7 +76,6 @@ impl EncryptionKeyCollector {
             state: CollectorState::Collecting,
             keys: HashMap::new(),
             timeout_handle: None,
-            zk_backend,
         };
         collector.start()
     }
@@ -125,50 +117,6 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
 
         let pid = msg.key.party_id;
         info!("EncryptionKeyCollector: party_id = {}", pid);
-
-        // Verify T0 proof for external keys
-        if msg.external {
-            let Some(proof) = &msg.key.proof else {
-                warn!(
-                    "External key from party {} is missing T0 proof - rejecting",
-                    pid
-                );
-                return;
-            };
-
-            // Verify proof if ZK backend is available
-            if let Some(ref backend) = self.zk_backend {
-                let prover = ZkProver::new(backend);
-                let e3_id_str = self.e3_id.to_string();
-                match prover.verify(proof, &e3_id_str) {
-                    Ok(true) => {
-                        info!(
-                            "T0 proof verified for party {} (circuit: {})",
-                            pid, proof.circuit
-                        );
-                    }
-                    Ok(false) => {
-                        error!(
-                            "T0 proof verification FAILED for party {} - rejecting key",
-                            pid
-                        );
-                        return;
-                    }
-                    Err(e) => {
-                        error!(
-                            "T0 proof verification error for party {}: {} - rejecting key",
-                            pid, e
-                        );
-                        return;
-                    }
-                }
-            } else {
-                warn!(
-                    "ZK backend not available - accepting key from party {} without verification",
-                    pid
-                );
-            }
-        }
 
         let Some(_) = self.todo.take(&pid) else {
             info!(
