@@ -96,23 +96,6 @@ impl NodeStateStore {
     }
 }
 
-/// Message: ask the `Sortition` whether `address` would be in the
-/// committee of size `size` for randomness `seed` on `chain_id`.
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Option<(u64, Option<u64>)>")]
-pub struct GetNodeIndex {
-    /// The E3 computation ID.
-    pub e3_id: E3id,
-    /// Round seed / randomness used by the sortition algorithm.
-    pub seed: Seed,
-    /// Hex-encoded node address (e.g., `"0x..."`).
-    pub address: String,
-    /// Committee size (top-N).
-    pub size: usize,
-    /// Target chain.
-    pub chain_id: u64,
-}
-
 /// Message: request the current set of registered node addresses for `chain_id`.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Vec<String>")]
@@ -609,42 +592,6 @@ impl Handler<CommitteeFinalized> for Sortition {
         }) {
             self.bus.err(EType::Sortition, err);
         }
-    }
-}
-
-impl Handler<GetNodeIndex> for Sortition {
-    type Result = ResponseFuture<Option<(u64, Option<u64>)>>;
-
-    fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
-        let backends_snapshot = self.backends.get();
-        let node_state_snapshot = self.node_state.get();
-        let bus = self.bus.clone();
-
-        Box::pin(async move {
-            if let (Some(map), Some(state_map)) = (backends_snapshot, node_state_snapshot) {
-                if let (Some(backend), Some(state)) =
-                    (map.get(&msg.chain_id), state_map.get(&msg.chain_id))
-                {
-                    backend
-                        .get_index(
-                            msg.e3_id,
-                            msg.seed,
-                            msg.size,
-                            msg.address.clone(),
-                            msg.chain_id,
-                            state,
-                        )
-                        .unwrap_or_else(|err| {
-                            bus.err(EType::Sortition, err);
-                            None
-                        })
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
     }
 }
 
