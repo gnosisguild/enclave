@@ -3470,7 +3470,6 @@ dependencies = [
  "e3-request",
  "e3-trbfv",
  "e3-utils",
- "e3-zk-prover",
  "fhe",
  "fhe-traits",
  "ndarray",
@@ -3904,6 +3903,7 @@ name = "e3-zk-prover"
 version = "0.1.7"
 dependencies = [
  "acir",
+ "actix",
  "acvm",
  "anyhow",
  "async-trait",

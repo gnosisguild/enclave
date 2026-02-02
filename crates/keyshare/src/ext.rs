@@ -15,7 +15,6 @@ use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
-use e3_zk_prover::ZkBackend;
 use std::sync::Arc;
 
 use crate::KeyshareState;
@@ -25,7 +24,6 @@ pub struct ThresholdKeyshareExtension {
     cipher: Arc<Cipher>,
     address: String,
     share_encryption_params: Arc<fhe::bfv::BfvParameters>,
-    zk_backend: Option<ZkBackend>,
 }
 
 impl ThresholdKeyshareExtension {
@@ -34,14 +32,12 @@ impl ThresholdKeyshareExtension {
         cipher: &Arc<Cipher>,
         address: &str,
         share_encryption_params: Arc<fhe::bfv::BfvParameters>,
-        zk_backend: Option<ZkBackend>,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             address: address.to_owned(),
             share_encryption_params,
-            zk_backend,
         })
     }
 }
@@ -84,7 +80,6 @@ impl E3Extension for ThresholdKeyshareExtension {
                     cipher: self.cipher.clone(),
                     state: container,
                     share_encryption_params: self.share_encryption_params.clone(),
-                    zk_backend: self.zk_backend.clone(),
                 })
                 .start()
                 .into(),
@@ -115,7 +110,6 @@ impl E3Extension for ThresholdKeyshareExtension {
             cipher: self.cipher.clone(),
             state,
             share_encryption_params: self.share_encryption_params.clone(),
-            zk_backend: self.zk_backend.clone(),
         })
         .start()
         .into();
