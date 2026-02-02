@@ -8,8 +8,8 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
-use crisp_constants::get_default_paramset;
 use e3_fhe_params::build_bfv_params_arc;
+use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::utils::calculate_bit_width;
@@ -62,7 +62,7 @@ impl ZKInputsGenerator {
     /// # Returns
     /// A new ZKInputsGenerator instance with default BFV parameters
     pub fn with_defaults() -> Self {
-        Self::from_set(get_default_paramset())
+        Self::from_set(default_param_set())
     }
 
     /// Generates CRISP ZK inputs for a vote encryption and addition operation.
@@ -283,8 +283,8 @@ impl ZKInputsGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
     use e3_fhe_params::constants::insecure_512;
+    use e3_fhe_params::{BfvParamSet, BfvPreset};
 
     /// Helper function to create a vote vector with alternating 0s and 1s (deterministic)
     fn create_vote_vector() -> Vec<u64> {
@@ -315,7 +315,8 @@ mod tests {
 
     #[test]
     fn test_inputs_generation_with_custom_params() {
-        let generator = ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
+        let generator =
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
@@ -359,7 +360,8 @@ mod tests {
 
     #[test]
     fn test_get_bfv_params() {
-        let generator = ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
+        let generator =
+            ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
         let bfv_params = generator.get_bfv_params();
 
         assert!(bfv_params.degree() == insecure_512::DEGREE);
