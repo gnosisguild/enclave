@@ -309,7 +309,7 @@ pub fn compute_share_encryption_commitment_from_shares(
 
 /// Compute threshold public key aggregation commitment.
 ///
-/// This matches the Noir `compute_threshold_pk_aggregation_commitment` function exactly.
+/// This matches the Noir `compute_pk_aggregation_commitment` function exactly.
 ///
 /// # Arguments
 /// * `pk0` - First component of the threshold public key (one vector per modulus)
@@ -318,7 +318,7 @@ pub fn compute_share_encryption_commitment_from_shares(
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-pub fn compute_threshold_pk_aggregation_commitment(
+pub fn compute_pk_aggregation_commitment(
     pk0: &[Vec<BigInt>],
     pk1: &[Vec<BigInt>],
     bit_pk: u32,
@@ -478,7 +478,7 @@ pub fn compute_user_data_encryption_challenge_commitment(
     l: usize,
 ) -> Vec<BigInt> {
     // Verify pk_commitment matches the commitment from pk0is and pk1is
-    let computed_pk_commitment = compute_threshold_pk_aggregation_commitment(pk0is, pk1is, bit_pk);
+    let computed_pk_commitment = compute_pk_aggregation_commitment(pk0is, pk1is, bit_pk);
     if computed_pk_commitment != *pk_commitment {
         panic!(
             "PK commitment mismatch in User Data Encryption circuit: expected {}, got {}",
