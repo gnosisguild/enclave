@@ -191,7 +191,7 @@ mod tests {
     }
 
     fn create_test_generator() -> (Arc<BfvParameters>, PublicKey, SecretKey) {
-        let param_set: BfvParamSet = BfvPreset::InsecureThresholdBfv512.into();
+        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
         let bfv_params = param_set.build_arc();
 
         let mut rng = thread_rng();
