@@ -93,7 +93,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         }
     }
 
-    /// Verifies that s hashes to expected_s_commitment
+    /// Verifies that aggregated secret shares hash to expected_sk_commitment
     fn verify_agg_sk_commitment(self) {
         assert(
             compute_aggregated_shares_commitment::<N, L, BIT_SK>(self.sk)
@@ -102,7 +102,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         );
     }
 
-    /// Verifies that e hashes to expected_e_commitment
+    /// Verifies that aggregated noise shares hash to expected_e_sm_commitment
     fn verify_agg_e_sm_commitment(self) {
         assert(
             compute_aggregated_shares_commitment::<N, L, BIT_E_SM>(self.e_sm)

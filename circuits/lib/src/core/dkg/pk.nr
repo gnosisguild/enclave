@@ -9,7 +9,7 @@ use crate::math::polynomial::Polynomial;
 
 /// Correct DKG Public Key Circuit (Circuit 0).
 pub struct Pk<let N: u32, let L: u32, let BIT_PK: u32> {
-    /// Correct DKG public key components (public input)
+    /// Correct DKG public key components
     /// pk0[i] is the first component for modulus i
     pk0: [Polynomial<N>; L],
     /// pk1[i] is the second component for modulus i
