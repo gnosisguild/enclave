@@ -8,16 +8,8 @@
 
 use crate::circuits::pk_bfv::circuit::PkBfvCircuitInput;
 use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
-use crate::circuits::PkBfvCircuit;
-use crate::codegen::Artifacts;
-use crate::codegen::CircuitCodegen;
-use crate::computation::Computation;
-use crate::computation::Configs;
-use crate::computation::ReduceToZkpModulus;
-use crate::computation::Toml;
-use crate::errors::CircuitsErrors;
-use crate::registry::Circuit;
-use crate::utils::map_witness_2d_vector_to_json;
+use crate::{Artifacts, CircuitCodegen, CircuitsErrors, Configs, PkBfvCircuit};
+
 use fhe::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -57,9 +49,9 @@ pub struct TomlJson {
 }
 
 /// Builds the Prover TOML string from the pk-bfv witness (pk0is, pk1is).
-pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
-    let pk0is = map_witness_2d_vector_to_json(&witness.pk0is);
-    let pk1is = map_witness_2d_vector_to_json(&witness.pk1is);
+pub fn generate_toml(witness: Witness) -> Result<Toml, CodegenError> {
+    let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
+    let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
 
     let toml_json = TomlJson { pk0is, pk1is };
     Ok(toml::to_string(&toml_json)?)

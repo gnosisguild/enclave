@@ -9,23 +9,14 @@
 //! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::circuits::pk_bfv::circuit::PkBfvCircuitInput;
-use crate::computation::CircuitComputation;
-use crate::computation::Computation;
-use crate::computation::ConvertToJson;
-use crate::computation::ReduceToZkpModulus;
-use crate::errors::CircuitsErrors;
-use crate::utils::calculate_bit_width;
-use crate::utils::get_zkp_modulus;
-use crate::PkBfvCircuit;
-use e3_polynomial::center_coefficients_mut;
-use e3_polynomial::reduce_coefficients_2d;
+use crate::traits::Computation;
+use crate::traits::ConvertToJson;
+use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
+use e3_zk_helpers::get_zkp_modulus;
+use e3_zk_helpers::utils::calculate_bit_width;
 use fhe::bfv::BfvParameters;
-use fhe_math::rq::Representation;
-use itertools::izip;
-use num_bigint::BigInt;
+use fhe::bfv::PublicKey;
 use num_bigint::BigUint;
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Output of [`CircuitComputation::compute`] for [`PkBfvCircuit`]: bounds, bit widths, and witness.
@@ -95,10 +86,9 @@ pub struct Bounds {
 /// Witness data for the pk-bfv circuit: public key polynomials in CRT form for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
-    /// First component of the public key per modulus (coefficients as BigInt).
-    pub pk0is: Vec<Vec<BigInt>>,
-    /// Second component of the public key per modulus (coefficients as BigInt).
-    pub pk1is: Vec<Vec<BigInt>>,
+    /// Public key polynomials (pk0, pk1) for each CRT basis.
+    pub pk0is: CrtPolynomial,
+    pub pk1is: CrtPolynomial,
 }
 
 impl Computation for Configs {
@@ -158,42 +148,24 @@ impl Computation for Bounds {
 impl Computation for Witness {
     type Params = BfvParameters;
     type Input = PkBfvCircuitInput;
-    type Error = fhe::Error;
+    type Error = CrtPolynomialError;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         let moduli = params.moduli();
 
-        // Extract public key components (pk0, pk1) from the ciphertext structure
-        // and change representation to Power Basis.
-        let mut pk0 = input.public_key.c.c[0].clone();
-        let mut pk1 = input.public_key.c.c[1].clone();
-        pk0.change_representation(Representation::PowerBasis);
-        pk1.change_representation(Representation::PowerBasis);
+        let mut pk0is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[0]);
+        let mut pk1is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[1]);
 
-        let pk0_coeffs = pk0.coefficients();
-        let pk1_coeffs = pk1.coefficients();
-        let pk0_rows = pk0_coeffs.rows();
-        let pk1_rows = pk1_coeffs.rows();
+        pk0is.reverse();
+        pk1is.reverse();
 
-        // Extract and convert public key polynomials per modulus
-        // Collect into Vec first to preserve moduli ordering with par_iter
-        let zipped: Vec<_> = izip!(moduli, pk0_rows, pk1_rows).collect();
-        let results: Vec<(Vec<BigInt>, Vec<BigInt>)> = zipped
-            .par_iter()
-            .map(|(qi, pk0_coeffs, pk1_coeffs)| {
-                let mut pk0i: Vec<BigInt> =
-                    pk0_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
-                let mut pk1i: Vec<BigInt> =
-                    pk1_coeffs.iter().rev().map(|&x| BigInt::from(x)).collect();
+        pk0is.center(&moduli)?;
+        pk1is.center(&moduli)?;
 
-                center_coefficients_mut(&mut pk0i, &BigInt::from(**qi));
-                center_coefficients_mut(&mut pk1i, &BigInt::from(**qi));
+        let zkp_modulus = &get_zkp_modulus();
 
-                (pk0i, pk1i)
-            })
-            .collect();
-
-        let (pk0is, pk1is): (Vec<_>, Vec<_>) = results.into_iter().unzip();
+        pk0is.reduce_uniform(zkp_modulus);
+        pk1is.reduce_uniform(zkp_modulus);
 
         Ok(Witness { pk0is, pk1is })
     }
@@ -217,21 +189,12 @@ impl ConvertToJson for Witness {
     }
 }
 
-impl ReduceToZkpModulus for Witness {
-    fn reduce_to_zkp_modulus(&self) -> Witness {
-        Witness {
-            pk0is: reduce_coefficients_2d(&self.pk0is, &get_zkp_modulus()),
-            pk1is: reduce_coefficients_2d(&self.pk1is, &get_zkp_modulus()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::computation::ConvertToJson;
-    use crate::computation::ReduceToZkpModulus;
-    use crate::sample::Sample;
+
+    use crate::sample::generate_sample;
+    use crate::traits::ConvertToJson;
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
@@ -249,7 +212,7 @@ mod tests {
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
         let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = Sample::generate(&params);
+        let encryption_data = generate_sample(&params);
         let witness = Witness::compute(
             &params,
             &PkBfvCircuitInput {
@@ -257,12 +220,11 @@ mod tests {
             },
         )
         .unwrap();
-        let zkp_reduced = witness.reduce_to_zkp_modulus();
-        let json = zkp_reduced.convert_to_json().unwrap();
+        let json = witness.convert_to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
 
-        assert_eq!(decoded.pk0is, zkp_reduced.pk0is);
-        assert_eq!(decoded.pk1is, zkp_reduced.pk1is);
+        assert_eq!(decoded.pk0is, witness.pk0is);
+        assert_eq!(decoded.pk1is, witness.pk1is);
     }
 
     #[test]

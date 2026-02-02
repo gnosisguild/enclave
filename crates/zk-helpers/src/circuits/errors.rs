@@ -19,7 +19,7 @@ pub enum CircuitsErrors {
     #[error("BFV error: {0}")]
     Fhe(#[from] fhe::Error),
     #[error("ZK helper error: {0}")]
-    ZkHelpers(#[from] ZkHelpersUtilsError),
+    ZkHelpers(#[from] e3_zk_helpers::utils::ZkHelpersUtilsError),
     #[error("Unexpected error: {0}")]
     Other(String),
 }
