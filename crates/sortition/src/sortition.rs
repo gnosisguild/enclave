@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::backends::{SortitionBackend, SortitionList};
+use crate::ticket_sortition;
 use crate::CiphernodeSelector;
 use actix::prelude::*;
 use alloy::primitives::U256;
@@ -15,14 +16,12 @@ use e3_events::{
     ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
     PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
-use e3_events::{BusHandle, EnclaveEventData};
+use e3_events::{BusHandle, E3id, EnclaveEventData};
 use e3_utils::NotifySync;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
-use tracing::info;
-use tracing::instrument;
-use tracing::warn;
+use tracing::{info, instrument, warn};
 
 /// State for a single ciphernode
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -268,6 +267,7 @@ impl Sortition {
 
     pub fn get_node_index(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         chain_id: u64,
@@ -279,7 +279,7 @@ impl Sortition {
         let state = state_map.get(&chain_id)?;
 
         backend
-            .get_index(seed, size, self.address.clone(), chain_id, state)
+            .get_index(e3_id, seed, size, self.address.clone(), chain_id, state)
             .unwrap_or_else(|err| {
                 bus.err(EType::Sortition, err);
                 None
@@ -314,14 +314,29 @@ impl Handler<EnclaveEvent> for Sortition {
 
 impl Handler<E3Requested> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
+        let e3_id = msg.e3_id.clone();
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
+        let threshold_m = msg.threshold_m;
         let threshold_n = msg.threshold_n;
+
+        let buffer = ticket_sortition::calculate_buffer_size(threshold_m, threshold_n);
+        let total_selection_size = threshold_n + buffer;
+
+        info!(
+            e3_id = %e3_id,
+            threshold_m = threshold_m,
+            threshold_n = threshold_n,
+            buffer = buffer,
+            total_selection_size = total_selection_size,
+            "Performing Sortition with buffer"
+        );
+
         self.ciphernode_selector
             .do_send(WithSortitionPartyTicket::new(
                 msg,
-                self.get_node_index(seed, threshold_n, chain_id),
+                self.get_node_index(e3_id, seed, total_selection_size, chain_id),
                 &self.address,
             ))
     }

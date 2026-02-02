@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::primitives::{keccak256, Address};
+use alloy::primitives::{keccak256, Address, U256};
+use alloy::sol_types::SolValue;
 use anyhow::{anyhow, Result};
+use e3_events::{E3id, Seed};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +26,7 @@ pub struct Ticket {
     pub ticket_id: u64,
 }
 
-/// A node’s candidate for committee selection.
+/// A node's candidate for committee selection.
 /// Chosen as the ticket with the lowest score among all of its tickets.
 #[derive(Clone, Debug)]
 pub struct WinnerTicket {
@@ -35,25 +37,16 @@ pub struct WinnerTicket {
     pub score: BigUint,
 }
 
-/// Build the message to hash for a ticket’s score.
-///
-/// Message format:
-/// `b"ticket_score" || seed_be64 || address(20B) || ticket_id_be64`
-fn serialize_message(seed: u64, address: Address, ticket_id: u64) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(12 + 8 + 20 + 8);
-    buf.extend_from_slice(b"ticket_score"); // domain separation tag
-    buf.extend_from_slice(&seed.to_be_bytes());
-    buf.extend_from_slice(address.as_slice());
-    buf.extend_from_slice(&ticket_id.to_be_bytes());
-    buf
-}
-
 /// Compute a deterministic score for a ticket.
 ///
-/// The score is defined as the Keccak-256 hash of the domain-separated
-/// message, interpreted as a big-endian integer.
-pub fn hash_to_score(seed: u64, address: Address, ticket_id: u64) -> BigUint {
-    let msg = serialize_message(seed, address, ticket_id);
+/// The score is defined as the Keccak-256 hash:
+/// `keccak256(abi.encodePacked(node, ticketNumber, e3Id, seed))`
+pub fn hash_to_score(address: Address, ticket_id: u64, e3_id: E3id, seed: Seed) -> BigUint {
+    let e3_id_u256: U256 = e3_id.try_into().expect("E3id should be valid U256");
+    let seed_u256 = U256::from_le_bytes(seed.into());
+
+    // Format: address(20B) || ticketNumber(32B) || e3Id(32B) || seed(32B)
+    let msg = (address, U256::from(ticket_id), e3_id_u256, seed_u256).abi_encode_packed();
     let digest = keccak256(&msg);
     BigUint::from_bytes_be(&digest.0)
 }
@@ -67,7 +60,8 @@ pub fn hash_to_score(seed: u64, address: Address, ticket_id: u64) -> BigUint {
 /// # Errors
 /// Returns an error if the node has no tickets.
 pub fn calculate_best_ticket_for_node(
-    seed: u64,
+    e3_id: E3id,
+    seed: Seed,
     registered_node: &RegisteredNode,
 ) -> Result<WinnerTicket> {
     if registered_node.tickets.is_empty() {
@@ -77,7 +71,12 @@ pub fn calculate_best_ticket_for_node(
     let mut best: Option<WinnerTicket> = None;
 
     for ticket in &registered_node.tickets {
-        let score = hash_to_score(seed, registered_node.address, ticket.ticket_id);
+        let score = hash_to_score(
+            registered_node.address,
+            ticket.ticket_id,
+            e3_id.clone(),
+            seed,
+        );
 
         match &best {
             None => {
