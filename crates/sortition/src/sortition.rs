@@ -283,6 +283,7 @@ impl Sortition {
 
     pub fn get_node_index(
         &self,
+        e3_id: E3id,
         seed: Seed,
         size: usize,
         chain_id: u64,
@@ -294,7 +295,7 @@ impl Sortition {
         let state = state_map.get(&chain_id)?;
 
         backend
-            .get_index(seed, size, self.address.clone(), chain_id, state)
+            .get_index(e3_id, seed, size, self.address.clone(), chain_id, state)
             .unwrap_or_else(|err| {
                 bus.err(EType::Sortition, err);
                 None
@@ -329,14 +330,15 @@ impl Handler<EnclaveEvent> for Sortition {
 
 impl Handler<E3Requested> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: E3Requested, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
+        let e3_id = msg.e3_id.clone();
         let chain_id = msg.e3_id.chain_id();
         let seed = msg.seed;
         let threshold_n = msg.threshold_n;
         self.ciphernode_selector
             .do_send(WithSortitionPartyTicket::new(
                 msg,
-                self.get_node_index(seed, threshold_n, chain_id),
+                self.get_node_index(e3_id, seed, threshold_n, chain_id),
                 &self.address,
             ))
     }
