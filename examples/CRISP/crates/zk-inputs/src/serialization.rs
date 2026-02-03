@@ -8,11 +8,9 @@
 //!
 //! This module handles the serialization of inputs data to JSON format.
 
-use crate::ciphertext_addition::CiphertextAdditionInputs;
+use crate::ciphertext_addition::CiphertextAdditionWitness;
+use e3_zk_helpers::{threshold::UserDataEncryptionComputationOutput, to_string_1d_vec};
 use eyre::{Context, Result};
-use greco::bounds::GrecoBounds;
-use greco::bounds::GrecoCryptographicParameters;
-use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use serde::Serialize;
 
@@ -43,36 +41,23 @@ pub struct ZKInputs {
     pk_commitment: String,
 }
 
-/// Converts a 1D vector of BigInt to a vector of strings.
-fn to_string_1d_vec(vec: &[BigInt]) -> Vec<String> {
-    vec.iter().map(|x| x.to_string()).collect()
-}
-
-/// Constructs a ZKInputs from GRECO bounds and vectors.
+/// Constructs a ZKInputs from user data encryption computation output and ciphertext addition witness.
 ///
 /// # Arguments
-/// * `crypto_params` - Cryptographic parameters from GRECO
-/// * `bounds` - Bounds from GRECO
-/// * `vectors_standard` - Standard form vectors from GRECO
-/// * `ciphertext_addition_inputs_standard` - Standard form ciphertext addition inputs
+/// * `user_data_encryption_computation_output` - User data encryption computation output
+/// * `ciphertext_addition_witness` - Ciphertext addition witness
 ///
 /// # Returns
 /// A ZKInputs struct ready for JSON serialization
 pub fn construct_inputs(
-    crypto_params: &GrecoCryptographicParameters,
-    bounds: &GrecoBounds,
-    vectors_standard: &GrecoVectors,
-    ciphertext_addition_inputs_standard: &CiphertextAdditionInputs,
+    user_data_encryption_computation_output: &UserDataEncryptionComputationOutput,
+    ciphertext_addition_witness: &CiphertextAdditionWitness,
 ) -> ZKInputs {
     let mut params_json = serde_json::Map::new();
 
-    // Add crypto params.
-    let crypto_json = serde_json::json!({
-        "q_mod_t": crypto_params.q_mod_t.to_string(),
-        "qis": crypto_params.moduli.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-        "k0is": crypto_params.k0is.iter().map(|b| b.to_string()).collect::<Vec<_>>(),
-    });
-    params_json.insert("crypto".to_string(), crypto_json);
+    let bounds = user_data_encryption_computation_output.bounds;
+    let bits = user_data_encryption_computation_output.bits;
+    let witness = user_data_encryption_computation_output.witness;
 
     // Add bounds.
     let bounds_json = serde_json::json!({
@@ -91,17 +76,18 @@ pub fn construct_inputs(
     params_json.insert("bounds".to_string(), bounds_json);
 
     ZKInputs {
-        prev_ct0is: ciphertext_addition_inputs_standard
-            .prev_ct0is
+        prev_ct0is: witness
+            .pk0is
             .limbs
             .iter()
-            .map(|limb| {
+            .map(|v| {
                 serde_json::json!({
-                    "coefficients": to_string_1d_vec(limb.coefficients())
+                    "coefficients": to_string_1d_vec(v)
                 })
             })
             .collect(),
-        prev_ct1is: ciphertext_addition_inputs_standard
+        prev_ct1is: witness
+            .pk1is
             .prev_ct1is
             .limbs
             .iter()
@@ -354,10 +340,10 @@ mod tests {
         }
     }
 
-    fn create_mock_ciphertext_addition_inputs() -> CiphertextAdditionInputs {
+    fn create_mock_ciphertext_addition_inputs() -> CiphertextAdditionWitness {
         use e3_polynomial::{CrtPolynomial, Polynomial};
 
-        CiphertextAdditionInputs {
+        CiphertextAdditionWitness {
             prev_ct0is: CrtPolynomial::new(vec![
                 Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]),
                 Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]),

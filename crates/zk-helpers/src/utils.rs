@@ -16,10 +16,11 @@
 use ark_bn254::Fr as Field;
 use ark_bn254::Fr as FieldElement;
 use ark_ff::PrimeField;
-use e3_polynomial::CrtPolynomial;
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_safe::SafeSponge;
 use num_bigint::BigInt;
 use num_traits::Zero;
+use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error as ThisError;
 
@@ -62,6 +63,21 @@ pub fn to_string_2d_vec(poly: &[Vec<BigInt>]) -> Vec<Vec<String>> {
 /// A 3D vector of strings
 pub fn to_string_3d_vec(vec: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<String>>> {
     vec.iter().map(|d1| to_string_2d_vec(d1)).collect()
+}
+
+/// Join a vector of values into a string with the given separator.
+///
+/// # Arguments
+/// * `vec` - Slice of values to join
+/// * `sep` - Separator to use between values
+///
+/// # Returns
+/// A string with the values joined by the separator
+pub fn join_display<T: Display>(vec: &[T], sep: &str) -> String {
+    vec.iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join(sep)
 }
 
 /// Compute SAFE sponge hash with the given domain separator and inputs.
@@ -185,6 +201,21 @@ pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_jso
                 })
                 .collect()
         })
+        .collect()
+}
+
+/// Map a polynomial to a vector of JSON values.
+///
+/// # Arguments
+/// * `polynomial` - Polynomial to convert to TOML JSON
+///
+/// # Returns
+/// A vector of JSON values
+pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> Vec<serde_json::Value> {
+    polynomial
+        .coefficients()
+        .iter()
+        .map(|c| serde_json::json!({ "coefficient": c.to_string() }))
         .collect()
 }
 

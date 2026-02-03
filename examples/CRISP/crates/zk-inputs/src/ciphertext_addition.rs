@@ -18,7 +18,7 @@ use std::sync::Arc;
 /// This struct contains all the necessary data to prove that a ciphertext addition
 /// was performed correctly in the zero-knowledge proof system.
 #[derive(Clone, Debug)]
-pub struct CiphertextAdditionInputs {
+pub struct CiphertextAdditionWitness {
     pub prev_ct0is: CrtPolynomial,
     pub prev_ct1is: CrtPolynomial,
     pub sum_ct0is: CrtPolynomial,
@@ -28,7 +28,7 @@ pub struct CiphertextAdditionInputs {
     pub prev_ct_commitment: BigInt,
 }
 
-impl CiphertextAdditionInputs {
+impl CiphertextAdditionWitness {
     /// Computes the ciphertext addition inputs for zero-knowledge proof validation.
     ///
     /// # Arguments
@@ -41,12 +41,12 @@ impl CiphertextAdditionInputs {
     /// # Returns
     /// CiphertextAdditionInputs containing all necessary proof data
     pub fn compute(
+        params: Arc<BfvParameters>,
         prev_ct: &Ciphertext,
         ct: &Ciphertext,
         sum_ct: &Ciphertext,
-        params: Arc<BfvParameters>,
         bit_ct: u32,
-    ) -> Result<CiphertextAdditionInputs> {
+    ) -> Result<CiphertextAdditionWitness> {
         let moduli = params.moduli();
 
         let mut crt_polynomials = [
@@ -100,7 +100,7 @@ impl CiphertextAdditionInputs {
 
         let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, bit_ct);
 
-        Ok(CiphertextAdditionInputs {
+        Ok(CiphertextAdditionWitness {
             prev_ct0is: prev_ct0,
             prev_ct1is: prev_ct1,
             sum_ct0is: sum_ct0,
@@ -179,14 +179,16 @@ impl CiphertextAdditionInputs {
 mod tests {
     use super::*;
     use e3_fhe_params::{BfvParamSet, BfvPreset};
+    use e3_zk_helpers::threshold::user_data_encryption::computation::Bounds;
     use e3_zk_helpers::utils::calculate_bit_width;
+    use e3_zk_helpers::Computation;
     use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
-    use greco::bounds::GrecoBounds;
+
     use rand::thread_rng;
 
     fn test_bit_ct(params: &Arc<BfvParameters>) -> u32 {
-        let (_, bounds) = GrecoBounds::compute(params, 0).unwrap();
+        let bounds = Bounds::compute(params, &()).unwrap();
         calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap()
     }
 
@@ -226,7 +228,7 @@ mod tests {
         // Compute ciphertext addition inputs.
         let bit_ct = test_bit_ct(&bfv_params);
         let result =
-            CiphertextAdditionInputs::compute(&ct1, &ct2, &sum_ct, bfv_params.clone(), bit_ct);
+            CiphertextAdditionWitness::compute(bfv_params.clone(), &ct1, &ct2, &sum_ct, bit_ct);
 
         assert!(result.is_ok());
         let inputs = result.unwrap();

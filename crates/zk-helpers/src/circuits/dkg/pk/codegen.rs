@@ -6,11 +6,17 @@
 
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
-use crate::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
-use crate::{
-    crt_polynomial_to_toml_json, Artifacts, Bits, Circuit, CircuitCodegen, CircuitComputation,
-    CircuitsErrors, Configs, PkComputationOutput, Toml, Witness,
-};
+use crate::circuits::dkg::pk::circuit::PkCircuit;
+use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::circuits::dkg::pk::computation::{Bits, PkComputationOutput, Witness};
+use crate::crt_polynomial_to_toml_json;
+use crate::Artifacts;
+use crate::Circuit;
+use crate::CircuitCodegen;
+use crate::CircuitComputation;
+use crate::CircuitsErrors;
+use crate::Configs;
+use crate::Toml;
 
 use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
@@ -83,9 +89,11 @@ mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
+    use crate::circuits::dkg::pk::computation::Bounds;
     use crate::codegen::write_artifacts;
-    use crate::prepare_pk_sample_for_test;
-    use crate::Bounds;
+    use crate::sample::Sample;
+
+    use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 

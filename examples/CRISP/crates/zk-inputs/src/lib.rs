@@ -13,7 +13,13 @@ use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
 use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
+use e3_zk_helpers::threshold::user_data_encryption::computation::Bounds as UserDataEncryptionBounds;
+use e3_zk_helpers::threshold::UserDataEncryptionCircuit;
+use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
+use e3_zk_helpers::threshold::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::utils::calculate_bit_width;
+use e3_zk_helpers::CircuitComputation;
+use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -21,14 +27,12 @@ use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
-use greco::bounds::GrecoBounds;
-use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use rand::thread_rng;
 use std::sync::Arc;
 mod ciphertext_addition;
-use crate::ciphertext_addition::CiphertextAdditionInputs;
+use crate::ciphertext_addition::CiphertextAdditionWitness;
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
 
@@ -90,47 +94,38 @@ impl ZKInputsGenerator {
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
-        // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut thread_rng())
-            .with_context(|| "Failed to encrypt plaintext")?;
-
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-
-        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        // Compute the vectors of the GRECO inputs.
-        let greco_vectors = GrecoVectors::compute(
-            &pt,
-            &u_rns,
-            &e0_rns,
-            &e1_rns,
-            &ct,
-            &pk,
+        let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
             &self.bfv_params,
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute vectors")?;
+            &UserDataEncryptionCircuitInput {
+                public_key: pk,
+                plaintext: pt,
+            },
+        )?;
 
-        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .with_context(|| "Failed to compute bounds")?;
+        let ct = Ciphertext::from_bytes(
+            &user_data_encryption_computation_output.witness.ciphertext,
+            &self.bfv_params,
+        )
+        .with_context(|| "Failed to deserialize ciphertext")?;
 
         // Ciphertext Addition Section.
         // Deserialize the previous ciphertext.
         let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
             .with_context(|| "Failed to deserialize previous ciphertext")?;
 
+        let bounds = UserDataEncryptionBounds::compute(&self.bfv_params, &())?;
+        let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
         // Compute the ciphertext addition.
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        // bit_pk
-        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+        let ciphertext_addition_inputs = CiphertextAdditionWitness::compute(
+            self.bfv_params.clone(),
             &prev_ct,
             &ct,
             &sum_ct,
-            self.bfv_params.clone(),
-            bit_pk,
+            bit_ct,
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
@@ -172,46 +167,38 @@ impl ZKInputsGenerator {
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
-        // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut thread_rng())
-            .with_context(|| "Failed to encrypt plaintext")?;
-
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-
-        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        // Compute the vectors of the GRECO inputs.
-        let greco_vectors = GrecoVectors::compute(
-            &pt,
-            &u_rns,
-            &e0_rns,
-            &e1_rns,
-            &ct,
-            &pk,
+        let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
             &self.bfv_params,
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute vectors")?;
+            &UserDataEncryptionCircuitInput {
+                public_key: pk,
+                plaintext: pt,
+            },
+        )?;
 
-        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .with_context(|| "Failed to compute bounds")?;
+        let ct = Ciphertext::from_bytes(
+            &user_data_encryption_computation_output.witness.ciphertext,
+            &self.bfv_params,
+        )
+        .with_context(|| "Failed to deserialize ciphertext")?;
 
         // Ciphertext Addition Section.
         // Deserialize the previous ciphertext.
         let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
             .with_context(|| "Failed to deserialize previous ciphertext")?;
 
+        let bounds = UserDataEncryptionBounds::compute(&self.bfv_params, &())?;
+        let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+
         // Compute the ciphertext addition.
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
+        let mut ciphertext_addition_inputs = CiphertextAdditionWitness::compute(
+            self.bfv_params.clone(),
             &prev_ct,
             &ct,
             &sum_ct,
-            self.bfv_params.clone(),
-            bit_pk,
+            bit_ct,
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
@@ -282,7 +269,7 @@ impl ZKInputsGenerator {
     /// # Returns
     /// The commitment as a BigInt.
     pub fn compute_commitment(&self, ct0: &CrtPolynomial, ct1: &CrtPolynomial) -> Result<BigInt> {
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
+        let bounds = UserDataEncryptionBounds::compute(&self.bfv_params, &())?;
         let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
 
         Ok(compute_ciphertext_commitment(ct0, ct1, bit))

@@ -10,10 +10,11 @@
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
-use crate::dkg::pk::PkCircuitInput;
+use crate::circuits::dkg::pk::circuit::PkCircuit;
+use crate::circuits::dkg::pk::circuit::PkCircuitInput;
 use crate::get_zkp_modulus;
 use crate::CircuitsErrors;
-use crate::PkCircuit;
+use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
