@@ -16,7 +16,6 @@ use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::threshold::user_data_encryption::computation::Bounds as UserDataEncryptionBounds;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuit;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
-use e3_zk_helpers::threshold::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::utils::calculate_bit_width;
 use e3_zk_helpers::CircuitComputation;
 use e3_zk_helpers::Computation;
@@ -131,9 +130,7 @@ impl ZKInputsGenerator {
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &greco_vectors.standard_form(),
+            &user_data_encryption_computation_output,
             &ciphertext_addition_inputs,
         );
 
@@ -208,9 +205,7 @@ impl ZKInputsGenerator {
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &greco_vectors.standard_form(),
+            &user_data_encryption_computation_output,
             &ciphertext_addition_inputs,
         );
 
@@ -306,7 +301,7 @@ mod tests {
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("bounds"));
     }
 
     #[test]
@@ -329,7 +324,7 @@ mod tests {
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("bounds"));
     }
 
     #[test]
@@ -351,7 +346,7 @@ mod tests {
         // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("bounds"));
     }
 
     #[test]
@@ -387,7 +382,7 @@ mod tests {
         assert!(!ciphertext_bytes.is_empty());
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("bounds"));
     }
 
     // Error handling tests
