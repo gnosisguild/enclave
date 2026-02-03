@@ -1426,6 +1426,7 @@ dependencies = [
  "e3-safe 0.1.8",
  "fhe",
  "fhe-math",
+ "fhe-traits",
  "itertools 0.14.0",
  "ndarray",
  "num-bigint",
