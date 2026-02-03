@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod commitments;
+pub mod circuits;
 pub mod packing;
+pub mod registry;
 pub mod utils;
 
-pub use commitments::*;
+pub use circuits::*;
 pub use packing::*;
+pub use registry::*;
 pub use utils::*;

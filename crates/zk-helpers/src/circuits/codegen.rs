@@ -4,8 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::computation::Configs;
+use crate::computation::Toml;
 use crate::errors::CircuitsErrors;
-use crate::types::{Configs, Toml};
 use std::path::Path;
 
 #[derive(Debug, Clone)]

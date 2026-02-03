@@ -7,10 +7,10 @@
 use crate::computation::Computation;
 use crate::computation::ConvertToJson;
 use crate::computation::ReduceToZkpModulus;
+use crate::utils::calculate_bit_width;
+use crate::utils::get_zkp_modulus;
 use e3_polynomial::center_coefficients_mut;
 use e3_polynomial::reduce_coefficients_2d;
-use e3_zk_helpers::utils::calculate_bit_width;
-use e3_zk_helpers::utils::get_zkp_modulus;
 use fhe::bfv::BfvParameters;
 use fhe::bfv::PublicKey;
 use fhe_math::rq::Representation;
@@ -64,7 +64,7 @@ impl Computation for Constants {
 impl Computation for Bits {
     type Params = BfvParameters;
     type Input = Bounds;
-    type Error = e3_zk_helpers::utils::ZkHelpersUtilsError;
+    type Error = crate::utils::ZkHelpersUtilsError;
 
     fn compute(_: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         Ok(Bits {

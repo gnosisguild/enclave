@@ -38,7 +38,6 @@ members = [
   "crates/parity-matrix",
   "crates/polynomial",
   "crates/zk-helpers",
-  "crates/pvss"
 ]
 exclude = [
   "examples/CRISP",
@@ -107,7 +106,6 @@ e3-trbfv = { version = "0.1.8", path = "./crates/trbfv" }
 e3-utils = { version = "0.1.8", path = "./crates/utils" }
 e3-safe = { version = "0.1.8", path = "./crates/safe" }
 e3-zk-helpers = { version = "0.1.8", path = "./crates/zk-helpers" }
-e3-pvss = { version = "0.1.8", path = "./crates/pvss" }
 
 actix = "=0.13.5"
 actix-web = "=4.11.0"

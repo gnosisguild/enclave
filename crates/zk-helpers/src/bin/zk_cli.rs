@@ -5,14 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{anyhow, Context, Result};
-use clap::Parser;
+use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
-use e3_pvss::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
-use e3_pvss::circuits::pk_bfv::codegen::write_artifacts;
-use e3_pvss::registry::CircuitRegistry;
-use e3_pvss::sample;
-use e3_pvss::traits::Circuit;
-use e3_pvss::traits::CircuitCodegen;
+use e3_zk_helpers::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
+use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
+use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
+use e3_zk_helpers::sample::Sample;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -94,7 +92,7 @@ fn main() -> Result<()> {
 
     // Generate artifacts based on circuit name from registry.
     let params = BfvParamSet::from(preset).build_arc();
-    let sample = sample::generate_sample(&params);
+    let sample = Sample::generate(&params);
     let circuit_name = circuit_meta.name();
     let artifacts = match circuit_name {
         name if name == <PkBfvCircuit as Circuit>::NAME => {
@@ -109,9 +107,7 @@ fn main() -> Result<()> {
 
     write_artifacts(
         &artifacts.toml,
-        &artifacts.template,
         &artifacts.configs,
-        &artifacts.wrapper,
         Some(args.output.as_path()),
     )?;
 

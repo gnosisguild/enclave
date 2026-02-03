@@ -4,6 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod circuit;
 pub mod codegen;
+pub mod commitments;
 pub mod computation;
+pub mod errors;
+pub mod sample;
+
+pub use codegen::*;
+pub use commitments::*;
+pub use computation::*;
+pub use errors::*;
+pub use sample::*;
+
+pub mod pk_bfv;
+pub use pk_bfv::*;

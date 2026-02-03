@@ -4,11 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod circuits;
+pub mod circuit;
 pub mod codegen;
 pub mod computation;
-pub mod errors;
-pub mod registry;
-pub mod sample;
-pub mod types;
-pub mod utils;
+
+pub use circuit::*;
+pub use codegen::*;
+pub use computation::*;

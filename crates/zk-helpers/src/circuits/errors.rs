@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::utils::ZkHelpersUtilsError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,7 +16,7 @@ pub enum CircuitsErrors {
     #[error("BFV error: {0}")]
     Fhe(#[from] fhe::Error),
     #[error("ZK helper error: {0}")]
-    ZkHelpers(#[from] e3_zk_helpers::utils::ZkHelpersUtilsError),
+    ZkHelpers(#[from] ZkHelpersUtilsError),
     #[error("Unexpected error: {0}")]
     Other(String),
 }

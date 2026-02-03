@@ -4,11 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-/// TOML file for the circuit.
-pub type Toml = String;
-/// Configs file for the circuit.
-pub type Configs = String;
-
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
 /// instead of being a separate type in here. The pvss crate should import this and
 /// the default values that must be used and shared among the whole enclave repository.

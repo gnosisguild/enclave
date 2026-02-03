@@ -150,6 +150,24 @@ pub fn get_zkp_modulus() -> BigInt {
     .expect("Invalid ZKP modulus")
 }
 
+/// Map a 2D vector of BigInt to a vector of JSON values.
+///
+/// # Arguments
+/// * `values` - 2D vector of BigInt values
+///
+/// # Returns
+/// A vector of JSON values
+pub fn map_witness_2d_vector_to_json(values: &Vec<Vec<BigInt>>) -> Vec<serde_json::Value> {
+    values
+        .iter()
+        .map(|value| {
+            serde_json::json!({
+                "coefficients": to_string_1d_vec(value)
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
