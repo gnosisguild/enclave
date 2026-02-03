@@ -358,7 +358,8 @@ mod tests {
         let num_moduli = witness.secret_crt.limbs.len();
         for coeff_idx in 0..degree {
             for mod_idx in 0..num_moduli {
-                let secret_coeff = witness.secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone();
+                let secret_coeff =
+                    witness.secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone();
                 let y_secret = witness.y[coeff_idx][mod_idx][0].clone();
                 assert_eq!(
                     secret_coeff, y_secret,
