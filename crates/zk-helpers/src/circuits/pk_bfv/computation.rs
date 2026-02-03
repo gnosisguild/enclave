@@ -9,24 +9,23 @@
 //! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::traits::Computation;
-use crate::traits::ConvertToJson;
-use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
-use e3_zk_helpers::get_zkp_modulus;
-use e3_zk_helpers::utils::calculate_bit_width;
+use crate::calculate_bit_width;
+use crate::get_zkp_modulus;
+use crate::pk_bfv::PkBfvCircuitInput;
+use crate::CircuitsErrors;
+use crate::ConvertToJson;
+use crate::PkBfvCircuit;
+use crate::{CircuitComputation, Computation};
+use e3_polynomial::CrtPolynomial;
 use fhe::bfv::BfvParameters;
-use fhe::bfv::PublicKey;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 /// Output of [`CircuitComputation::compute`] for [`PkBfvCircuit`]: bounds, bit widths, and witness.
 #[derive(Debug)]
 pub struct PkBfvComputationOutput {
-    /// Coefficient bounds for public key polynomials.
     pub bounds: Bounds,
-    /// Bit widths for the prover (e.g. pk_bit).
     pub bits: Bits,
-    /// Witness data (pk0is, pk1is) for the Noir prover.
     pub witness: Witness,
 }
 
@@ -37,11 +36,7 @@ impl CircuitComputation for PkBfvCircuit {
     type Output = PkBfvComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        &self,
-        params: &Self::Params,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error> {
+    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(params, &())?;
         let bits = Bits::compute(params, &bounds)?;
         let witness = Witness::compute(params, input)?;
@@ -57,29 +52,22 @@ impl CircuitComputation for PkBfvCircuit {
 /// BFV parameters extracted for the circuit: degree, number of moduli, and modulus values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Configs {
-    /// Polynomial degree (N).
     pub n: usize,
-    /// Number of CRT moduli (L).
     pub l: usize,
-    /// CRT moduli q_i.
     pub moduli: Vec<u64>,
-    /// Bits.
     pub bits: Bits,
-    /// Bounds.
     pub bounds: Bounds,
 }
 
 /// Bit widths used by the Noir prover (e.g. for packing coefficients).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bits {
-    /// Bit width for public key coefficients.
     pub pk_bit: u32,
 }
 
 /// Coefficient bounds for public key polynomials (used to derive bit widths).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bounds {
-    /// Bound for public key polynomials (pk0, pk1).
     pub pk_bound: BigUint,
 }
 
@@ -148,7 +136,7 @@ impl Computation for Bounds {
 impl Computation for Witness {
     type Params = BfvParameters;
     type Input = PkBfvCircuitInput;
-    type Error = CrtPolynomialError;
+    type Error = CircuitsErrors;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         let moduli = params.moduli();
@@ -193,8 +181,8 @@ impl ConvertToJson for Witness {
 mod tests {
     use super::*;
 
-    use crate::sample::generate_sample;
-    use crate::traits::ConvertToJson;
+    use crate::ConvertToJson;
+    use crate::Sample;
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
@@ -212,7 +200,7 @@ mod tests {
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
         let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = generate_sample(&params);
+        let encryption_data = Sample::generate(&params);
         let witness = Witness::compute(
             &params,
             &PkBfvCircuitInput {

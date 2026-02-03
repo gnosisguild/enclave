@@ -42,11 +42,7 @@ pub trait CircuitComputation: crate::registry::Circuit {
     type Error;
 
     /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
-    fn compute(
-        &self,
-        params: &Self::Params,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error>;
+    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error>;
 }
 
 /// Converts a value to a JSON [`serde_json::Value`] for serialization.

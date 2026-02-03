@@ -20,6 +20,5 @@ impl Circuit for PkBfvCircuit {
 }
 
 pub struct PkBfvCircuitInput {
-    /// BFV public key.
     pub public_key: PublicKey,
 }

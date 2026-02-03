@@ -6,9 +6,11 @@
 
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
-use crate::circuits::pk_bfv::circuit::PkBfvCircuitInput;
-use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
-use crate::{Artifacts, CircuitCodegen, CircuitsErrors, Configs, PkBfvCircuit};
+use crate::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput};
+use crate::{
+    crt_polynomial_to_toml_json, Artifacts, Bits, Circuit, CircuitCodegen, CircuitComputation,
+    CircuitsErrors, Configs, PkBfvComputationOutput, Toml, Witness,
+};
 
 use fhe::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
@@ -26,13 +28,9 @@ impl CircuitCodegen for PkBfvCircuit {
         params: &Self::Params,
         input: &Self::Input,
     ) -> Result<Artifacts, Self::Error> {
-        // Compute.
-        let bounds = Bounds::compute(&params, &())?;
-        let bits = Bits::compute(&params, &bounds)?;
-        let witness = Witness::compute(&params, input)?;
-        let zkp_witness = witness.reduce_to_zkp_modulus();
+        let PkBfvComputationOutput { witness, bits, .. } = PkBfvCircuit::compute(params, input)?;
 
-        let toml = generate_toml(zkp_witness)?;
+        let toml = generate_toml(witness)?;
         let configs = generate_configs(&params, &bits);
 
         Ok(Artifacts { toml, configs })
@@ -49,11 +47,12 @@ pub struct TomlJson {
 }
 
 /// Builds the Prover TOML string from the pk-bfv witness (pk0is, pk1is).
-pub fn generate_toml(witness: Witness) -> Result<Toml, CodegenError> {
+pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
     let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
 
     let toml_json = TomlJson { pk0is, pk1is };
+
     Ok(toml::to_string(&toml_json)?)
 }
 
@@ -83,8 +82,11 @@ pub global {}_BIT_PK: u32 = {};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
     use crate::sample::Sample;
+    use crate::Bounds;
+
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
@@ -138,6 +140,7 @@ mod tests {
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
         let bounds = Bounds::compute(&params, &()).unwrap();
         let bits = Bits::compute(&params, &bounds).unwrap();
+
         assert!(configs_content.contains(format!("N: u32 = {}", params.degree()).as_str()));
         assert!(configs_content.contains(format!("L: u32 = {}", params.moduli().len()).as_str()));
         assert!(configs_content.contains(format!("PK_BFV_BIT_PK: u32 = {}", bits.pk_bit).as_str()));
