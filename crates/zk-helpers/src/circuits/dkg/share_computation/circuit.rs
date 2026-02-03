@@ -17,7 +17,7 @@ pub struct ShareComputationCircuit;
 impl Circuit for ShareComputationCircuit {
     const NAME: &'static str = "share-computation";
     const PREFIX: &'static str = "SHARE_COMPUTATION";
-    const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
+    const SUPPORTED_PARAMETER: ParameterType = ParameterType::THRESHOLD;
     /// None: circuit accepts runtime-varying input type (SecretKey or SmudgingNoise via `ShareComputationCircuitInput::dkg_input_type`).
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }

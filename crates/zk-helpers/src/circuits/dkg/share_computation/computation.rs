@@ -108,16 +108,17 @@ impl Computation for Configs {
         preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Self, CircuitsErrors> {
-        let (_, dkg_params) =
+        let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
-        let moduli = dkg_params.moduli().to_vec();
+        let moduli = threshold_params.moduli().to_vec();
+        let l = moduli.len();
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            n: dkg_params.degree(),
-            l: moduli.len(),
+            n: threshold_params.degree(),
+            l,
             moduli,
             bits,
             bounds,

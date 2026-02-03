@@ -169,8 +169,11 @@ pub fn prepare_sample_for_test(
 ) -> Result<Sample, CircuitsErrors> {
     let (threshold_params, dkg_params) = build_pair_for_preset(threshold_preset)
         .map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-    let num_ciphertexts = threshold_preset.search_defaults().unwrap().z;
-    let lambda = threshold_preset.search_defaults().unwrap().lambda;
+    let defaults = threshold_preset
+        .search_defaults()
+        .ok_or_else(|| CircuitsErrors::Sample("preset has no search defaults".to_string()))?;
+    let num_ciphertexts = defaults.z;
+    let lambda = defaults.lambda;
     let sample = Sample::generate(
         &threshold_params,
         &dkg_params,

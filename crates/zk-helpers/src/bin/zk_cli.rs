@@ -12,7 +12,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, BfvPreset, ParameterType};
 use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
@@ -184,16 +184,17 @@ fn main() -> Result<()> {
     let (threshold_params, dkg_params) =
         build_pair_for_preset(preset).map_err(|e| anyhow!("failed to build params: {}", e))?;
 
-    // Validate DKG preset parameter type matches circuit's supported parameter type.
-    let dkg_preset = preset
-        .dkg_counterpart()
-        .expect("threshold preset has DKG counterpart");
-    let preset_param_type = dkg_preset.metadata().parameter_type;
+    // Validate preset matches circuit's supported parameter type (THRESHOLD or DKG).
     let circuit_param_type = circuit_meta.supported_parameter();
-    if preset_param_type != circuit_param_type {
+    let preset_ok = match circuit_param_type {
+        ParameterType::THRESHOLD => preset.metadata().parameter_type == ParameterType::THRESHOLD,
+        ParameterType::DKG => preset
+            .dkg_counterpart()
+            .is_some_and(|dkg| dkg.metadata().parameter_type == ParameterType::DKG),
+    };
+    if !preset_ok {
         return Err(anyhow!(
-            "preset has parameter type {:?}, but circuit {} requires {:?}",
-            preset_param_type,
+            "preset does not match circuit {} which requires {:?} (use insecure/secure for threshold circuits)",
             circuit,
             circuit_param_type
         ));
