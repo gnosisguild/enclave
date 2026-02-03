@@ -4,11 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Public-key BFV commitment circuit.
+//! DKG public-key BFV commitment circuit.
 //!
-//! This circuit proves knowledge of a BFV public key (pk0, pk1) and produces
-//! Prover.toml and configs.nr for the Noir prover. See [`PkBfvCircuit`] and
-//! [`PkBfvCodegenInput`].
+//! This circuit proves knowledge of a DKG BFV public key (pk0, pk1) and produces
+//! Prover.toml and configs.nr for the Noir prover. See [`PkCircuit`] and
+//! [`PkCircuitInput`].
 
 pub mod circuit;
 pub mod codegen;

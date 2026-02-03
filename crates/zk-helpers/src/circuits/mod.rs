@@ -25,7 +25,7 @@ pub use computation::{
 pub use errors::CircuitsErrors;
 pub use sample::Sample;
 
-pub mod pk_bfv;
-pub use pk_bfv::codegen::{generate_configs, generate_toml, TomlJson};
-pub use pk_bfv::computation::{Bits, Bounds, PkBfvComputationOutput, Witness};
-pub use pk_bfv::PkBfvCircuit;
+pub mod dkg;
+pub use dkg::pk::codegen::{generate_configs, generate_toml, TomlJson};
+pub use dkg::pk::computation::{Bits, Bounds, PkComputationOutput, Witness};
+pub use dkg::pk::PkCircuit;

@@ -10,15 +10,15 @@ use e3_fhe_params::ParameterType;
 use fhe::bfv::PublicKey;
 
 #[derive(Debug)]
-pub struct PkBfvCircuit;
+pub struct PkCircuit;
 
-impl Circuit for PkBfvCircuit {
-    const NAME: &'static str = "pk-bfv";
-    const PREFIX: &'static str = "PK_BFV";
+impl Circuit for PkCircuit {
+    const NAME: &'static str = "pk";
+    const PREFIX: &'static str = "PK";
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
-    const DKG_INPUT_TYPE: Option<DkgInputType> = None;
+    const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SecretKey);
 }
 
-pub struct PkBfvCircuitInput {
+pub struct PkCircuitInput {
     pub public_key: PublicKey,
 }

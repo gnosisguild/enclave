@@ -13,7 +13,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
-use e3_zk_helpers::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput};
+use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
 use e3_zk_helpers::sample::Sample;
@@ -55,7 +55,7 @@ fn main() -> Result<()> {
 
     // Register all circuits in the registry (metadata only).
     let mut registry = CircuitRegistry::new();
-    registry.register(Arc::new(PkBfvCircuit));
+    registry.register(Arc::new(PkCircuit));
 
     // Handle list circuits flag.
     if args.list_circuits {
@@ -103,11 +103,11 @@ fn main() -> Result<()> {
     let sample = Sample::generate(&params);
     let circuit_name = circuit_meta.name();
     let artifacts = match circuit_name {
-        name if name == <PkBfvCircuit as Circuit>::NAME => {
-            let circuit = PkBfvCircuit;
+        name if name == <PkCircuit as Circuit>::NAME => {
+            let circuit = PkCircuit;
             circuit.codegen(
                 &params,
-                &PkBfvCircuitInput {
+                &PkCircuitInput {
                     public_key: sample.public_key,
                 },
             )?

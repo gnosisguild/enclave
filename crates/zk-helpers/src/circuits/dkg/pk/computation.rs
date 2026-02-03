@@ -10,30 +10,30 @@
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
+use crate::dkg::pk::PkCircuitInput;
 use crate::get_zkp_modulus;
-use crate::pk_bfv::PkBfvCircuitInput;
 use crate::CircuitsErrors;
 use crate::ConvertToJson;
-use crate::PkBfvCircuit;
+use crate::PkCircuit;
 use crate::{CircuitComputation, Computation};
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::BfvParameters;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`PkBfvCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`PkCircuit`]: bounds, bit widths, and witness.
 #[derive(Debug)]
-pub struct PkBfvComputationOutput {
+pub struct PkComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
     pub witness: Witness,
 }
 
-/// Implementation of [`CircuitComputation`] for [`PkBfvCircuit`].
-impl CircuitComputation for PkBfvCircuit {
+/// Implementation of [`CircuitComputation`] for [`PkCircuit`].
+impl CircuitComputation for PkCircuit {
     type Params = BfvParameters;
-    type Input = PkBfvCircuitInput;
-    type Output = PkBfvComputationOutput;
+    type Input = PkCircuitInput;
+    type Output = PkComputationOutput;
     type Error = CircuitsErrors;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error> {
@@ -41,7 +41,7 @@ impl CircuitComputation for PkBfvCircuit {
         let bits = Bits::compute(params, &bounds)?;
         let witness = Witness::compute(params, input)?;
 
-        Ok(PkBfvComputationOutput {
+        Ok(PkComputationOutput {
             bounds,
             bits,
             witness,
@@ -135,7 +135,7 @@ impl Computation for Bounds {
 
 impl Computation for Witness {
     type Params = BfvParameters;
-    type Input = PkBfvCircuitInput;
+    type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
@@ -203,7 +203,7 @@ mod tests {
         let encryption_data = Sample::generate(&params);
         let witness = Witness::compute(
             &params,
-            &PkBfvCircuitInput {
+            &PkCircuitInput {
                 public_key: encryption_data.public_key,
             },
         )
