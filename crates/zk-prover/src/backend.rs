@@ -10,6 +10,7 @@ use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use tar::Archive;
 use tokio::fs;
 use tracing::{debug, info, warn};
@@ -286,7 +287,10 @@ impl ZkBackend {
     }
 
     async fn download_with_progress(&self, url: &str, message: &str) -> Result<Vec<u8>, ZkError> {
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(300))
+            .build()
+            .map_err(|e| ZkError::DownloadFailed(url.to_string(), e.to_string()))?;
         let response = client
             .get(url)
             .send()
@@ -350,6 +354,14 @@ impl ZkBackend {
     }
 
     pub async fn cleanup_work_dir(&self, e3_id: &str) -> Result<(), ZkError> {
+        // Sanitize e3_id to prevent path traversal
+        if e3_id.contains("..") || e3_id.contains('/') || e3_id.contains('\\') {
+            return Err(ZkError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "e3_id contains invalid characters",
+            )));
+        }
+
         let work_dir = self.work_dir_for(e3_id);
         if work_dir.exists() {
             fs::remove_dir_all(&work_dir).await?;

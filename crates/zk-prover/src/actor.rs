@@ -78,26 +78,27 @@ impl ZkActor {
 
         let request = ComputeRequest::zk(
             ZkRequest::PkBfv(PkBfvProofRequest::new(msg.key.pk_bfv.clone(), msg.params)),
-            correlation_id,
+            correlation_id.clone(),
             msg.e3_id,
         );
 
         info!("Requesting T0 proof generation");
         if let Err(err) = self.bus.publish(request) {
             error!("Failed to publish ZK proof request: {err}");
+            self.pending.remove(&correlation_id);
         }
     }
 
     fn handle_encryption_key_received(&mut self, msg: EncryptionKeyReceived) {
-        let Some(proof) = &msg.key.proof else {
-            warn!(
-                "External key from party {} is missing T0 proof - rejecting",
-                msg.key.party_id
-            );
-            return;
-        };
-
         if let Some(ref verifier) = self.verifier {
+            let Some(proof) = &msg.key.proof else {
+                warn!(
+                    "External key from party {} is missing T0 proof - rejecting",
+                    msg.key.party_id
+                );
+                return;
+            };
+
             let e3_id_str = msg.e3_id.to_string();
             match verifier.verify(proof, &e3_id_str) {
                 Ok(true) => info!(

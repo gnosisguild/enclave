@@ -81,13 +81,13 @@ impl ZkProver {
                 "--scheme",
                 "ultra_honk",
                 "-b",
-                circuit_path.to_str().unwrap(),
+                &circuit_path.to_string_lossy(),
                 "-w",
-                witness_path.to_str().unwrap(),
+                &witness_path.to_string_lossy(),
                 "-k",
-                vk_path.to_str().unwrap(),
+                &vk_path.to_string_lossy(),
                 "-o",
-                output_dir.to_str().unwrap(),
+                &output_dir.to_string_lossy(),
             ])
             .output()?;
 
@@ -157,11 +157,11 @@ impl ZkProver {
                 "--scheme",
                 "ultra_honk",
                 "-i",
-                public_inputs_path.to_str().unwrap(),
+                &public_inputs_path.to_string_lossy(),
                 "-p",
-                proof_path.to_str().unwrap(),
+                &proof_path.to_string_lossy(),
                 "-k",
-                vk_path.to_str().unwrap(),
+                &vk_path.to_string_lossy(),
             ])
             .output()?;
 
