@@ -4,16 +4,24 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Sample data generation for circuits.
+//!
+//! [`Sample`] produces a random BFV key pair; the public key is used as input
+//! for codegen and tests (e.g. pk-bfv circuit).
+
 use fhe::bfv::{BfvParameters, PublicKey, SecretKey};
 use rand::thread_rng;
 use std::sync::Arc;
 
+/// A sample BFV public key (and optionally related data) for circuit codegen or tests.
 #[derive(Debug, Clone)]
 pub struct Sample {
+    /// Randomly generated BFV public key.
     pub public_key: PublicKey,
 }
 
 impl Sample {
+    /// Generates a random secret key and public key for the given BFV parameters.
     pub fn generate(params: &Arc<BfvParameters>) -> Self {
         let mut rng = thread_rng();
 

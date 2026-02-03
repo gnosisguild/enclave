@@ -4,28 +4,35 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-/// TOML file for the circuit.
+//! Computation traits and artifact types.
+//!
+//! [`Computation`] is a generic trait for computing values from parameters and input.
+//! [`CircuitComputation`] extends it for circuits that produce witness/bounds/bits.
+//! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
+
+/// Prover TOML file content (witness and circuit inputs).
 pub type Toml = String;
-/// Configs file for the circuit.
+/// Noir configs file content (global constants for the prover).
 pub type Configs = String;
 
-/// Trait for computation.
+/// Generic computation from parameters and input to a result.
 pub trait Computation: Sized {
     type Params;
     type Input;
     type Error;
 
+    /// Computes the result from parameters and input.
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error>;
 }
 
-/// Trait for circuit computation.
+/// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
 pub trait CircuitComputation: crate::registry::Circuit {
     type Params;
     type Input;
     type Output;
     type Error;
 
-    /// Compute circuit-specific data.
+    /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
     fn compute(
         &self,
         params: &Self::Params,
@@ -33,12 +40,12 @@ pub trait CircuitComputation: crate::registry::Circuit {
     ) -> Result<Self::Output, Self::Error>;
 }
 
-/// Trait for converting to JSON.
+/// Converts a value to a JSON [`serde_json::Value`] for serialization.
 pub trait ConvertToJson {
     fn convert_to_json(&self) -> serde_json::Result<serde_json::Value>;
 }
 
-/// Trait for reducing to ZKP modulus.
+/// Reduces coefficients (or similar) to the ZKP field modulus for use in the prover.
 pub trait ReduceToZkpModulus: Sized {
     fn reduce_to_zkp_modulus(&self) -> Self;
 }

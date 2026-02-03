@@ -4,9 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Error types for circuit and codegen operations.
+
 use crate::utils::ZkHelpersUtilsError;
 use thiserror::Error;
 
+/// Errors that can occur during circuit codegen or artifact I/O.
 #[derive(Error, Debug)]
 pub enum CircuitsErrors {
     #[error("I/O error: {0}")]

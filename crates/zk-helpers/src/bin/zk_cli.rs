@@ -4,6 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! ZK CLI — command-line tool for zero-knowledge circuit artifact generation.
+//!
+//! This binary lists available circuits and generates Prover.toml and configs.nr
+//! for use with the Noir prover. Use `--list_circuits` to see circuits and
+//! `--circuit <name> --preset <preset>` to generate artifacts.
+
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -32,7 +38,8 @@ struct Cli {
     output: PathBuf,
 }
 
-/// Parse a preset name into a BFV preset.
+/// Parses a preset name (e.g. `"default"`) into a [`BfvPreset`].
+/// Returns an error listing available presets if the name is unknown.
 fn parse_preset(name: &str) -> Result<BfvPreset> {
     BfvPreset::from_name(name).map_err(|_| {
         let available = BfvPreset::list().join(", ");

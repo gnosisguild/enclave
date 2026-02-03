@@ -4,6 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Computation types for the pk-bfv circuit: constants, bounds, bit widths, and witness.
+//!
+//! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
+//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+
 use crate::computation::Computation;
 use crate::computation::ConvertToJson;
 use crate::computation::ReduceToZkpModulus;
@@ -20,28 +25,37 @@ use num_bigint::BigUint;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// BFV parameters extracted for the circuit: degree, number of moduli, and modulus values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constants {
+    /// Polynomial degree (N).
     pub n: usize,
+    /// Number of CRT moduli (L).
     pub l: usize,
+    /// CRT moduli q_i.
     pub moduli: Vec<u64>,
 }
 
+/// Bit widths used by the Noir prover (e.g. for packing coefficients).
 #[derive(Debug, Clone)]
 pub struct Bits {
+    /// Bit width for public key coefficients.
     pub pk_bit: u32,
 }
 
+/// Coefficient bounds for public key polynomials (used to derive bit widths).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bounds {
-    /// Bound for public key polynomials (pk0, pk1)
+    /// Bound for public key polynomials (pk0, pk1).
     pub pk_bound: BigUint,
 }
 
+/// Witness data for the pk-bfv circuit: public key polynomials in CRT form for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
-    /// Public key polynomials (pk0, pk1) for each CRT basis.
+    /// First component of the public key per modulus (coefficients as BigInt).
     pub pk0is: Vec<Vec<BigInt>>,
+    /// Second component of the public key per modulus (coefficients as BigInt).
     pub pk1is: Vec<Vec<BigInt>>,
 }
 

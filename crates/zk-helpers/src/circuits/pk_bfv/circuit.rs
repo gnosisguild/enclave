@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Public-key BFV circuit type and implementations of [`Circuit`], [`CircuitCodegen`], [`CircuitComputation`].
+
 use crate::circuits::pk_bfv::codegen;
 use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
 use crate::codegen::Artifacts;
@@ -16,19 +18,28 @@ use crate::registry::DkgInputType;
 use e3_fhe_params::{BfvPreset, ParameterType};
 use fhe::bfv::{BfvParameters, PublicKey};
 
+/// Public-key BFV commitment circuit (name: `pk-bfv`).
+/// Proves knowledge of a BFV public key; used for DKG parameter type.
 #[derive(Debug)]
 pub struct PkBfvCircuit;
 
+/// Output of [`CircuitComputation::compute`] for [`PkBfvCircuit`]: bounds, bit widths, and witness.
 #[derive(Debug)]
 pub struct PkBfvComputationOutput {
+    /// Coefficient bounds for public key polynomials.
     pub bounds: Bounds,
+    /// Bit widths for the prover (e.g. pk_bit).
     pub bits: Bits,
+    /// Witness data (pk0is, pk1is) for the Noir prover.
     pub witness: Witness,
 }
 
+/// Input for [`CircuitCodegen::codegen`] for [`PkBfvCircuit`]: BFV preset and public key.
 #[derive(Debug, Clone)]
 pub struct PkBfvCodegenInput {
+    /// BFV parameter preset (e.g. default).
     pub preset: BfvPreset,
+    /// BFV public key to commit to.
     pub public_key: PublicKey,
 }
 

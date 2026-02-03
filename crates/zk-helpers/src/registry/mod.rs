@@ -4,6 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Circuit registry and metadata.
+//!
+//! The registry maps circuit names (e.g. `pk-bfv`) to [`CircuitMetadata`]. Use
+//! [`CircuitRegistry`] to register and look up circuits by name.
+
 pub mod registry;
 
 pub use registry::*;

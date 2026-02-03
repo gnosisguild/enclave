@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
+
 use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
 use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
 use crate::codegen::Artifacts;
@@ -22,12 +24,16 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
 
+/// JSON-serializable structure for Prover.toml (pk0is, pk1is arrays).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TomlJson {
+    /// First component of the public key per modulus (for the prover).
     pub pk0is: Vec<serde_json::Value>,
+    /// Second component of the public key per modulus (for the prover).
     pub pk1is: Vec<serde_json::Value>,
 }
 
+/// Builds the Prover TOML string from the pk-bfv witness (pk0is, pk1is).
 pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     let pk0is = map_witness_2d_vector_to_json(&witness.pk0is);
     let pk1is = map_witness_2d_vector_to_json(&witness.pk1is);
@@ -36,6 +42,7 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     Ok(toml::to_string(&toml_json)?)
 }
 
+/// Generates full artifacts (Prover.toml and configs.nr) for the pk-bfv circuit from a preset and public key.
 pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> Result<Artifacts, CircuitsErrors> {
     let params = BfvParamSet::from(preset).build_arc();
     // Compute.
@@ -50,6 +57,7 @@ pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> Result<Artifacts, Ci
     Ok(Artifacts { toml, configs })
 }
 
+/// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
 pub fn generate_configs(params: &Arc<BfvParameters>, bits: &Bits) -> Configs {
     format!(
         r#"// Global configs for Public Key BFV circuit
