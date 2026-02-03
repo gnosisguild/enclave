@@ -239,13 +239,16 @@ fn main() -> Result<()> {
     );
 
     run_with_spinner(|| {
+        let sd = preset
+            .search_defaults()
+            .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
         let sample = Sample::generate(
             &threshold_params,
             &dkg_params,
             Some(dkg_input_type.clone()),
             CiphernodesCommitteeSize::Small,
-            preset.search_defaults().unwrap().z,
-            preset.search_defaults().unwrap().lambda,
+            sd.z,
+            sd.lambda,
         )?;
         let circuit_name = circuit_meta.name();
         let artifacts = match circuit_name {
