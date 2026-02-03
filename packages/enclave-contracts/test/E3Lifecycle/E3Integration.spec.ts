@@ -273,9 +273,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       const requestParams = {
         threshold: [2, 2] as [number, number],
-        startWindow: [startTime, startTime + ONE_DAY] as [number, number],
-        duration: ONE_DAY,
-        inputDeadline: startTime + ONE_DAY - 300,
+        inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
         // computeProviderParams must be exactly 32 bytes for MockE3Program.validate
@@ -439,7 +437,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       // Verify deadlines were set
       const deadlines = await enclave.getDeadlines(0);
       expect(deadlines.dkgDeadline).to.be.gt(0);
-      expect(deadlines.activationDeadline).to.be.gt(0);
     });
 
     it("emits CommitteeFormed event when committee is published", async function () {
@@ -557,7 +554,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await enclave.markE3Failed(0);
 
       const stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // E3Stage.Failed
+      expect(stage).to.equal(6); // E3Stage.Failed
 
       // Process the failure
       await expect(enclave.processE3Failure(0)).to.emit(
@@ -719,7 +716,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       await enclave.markE3Failed(0);
       stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // Failed
+      expect(stage).to.equal(6); // Failed
 
       // 4. Process failure
       await enclave.processE3Failure(0);
@@ -828,112 +825,12 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       await enclave.markE3Failed(0);
       stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // Failed
+      expect(stage).to.equal(6); // Failed
 
       const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(3); // DKGTimeout
 
       // 5. Process failure and claim refund
-      await enclave.processE3Failure(0);
-
-      const balanceBefore = await usdcToken.balanceOf(
-        await requester.getAddress(),
-      );
-      await e3RefundManager.connect(requester).claimRequesterRefund(0);
-      const balanceAfter = await usdcToken.balanceOf(
-        await requester.getAddress(),
-      );
-
-      const distribution = await e3RefundManager.getRefundDistribution(0);
-      expect(balanceAfter - balanceBefore).to.equal(
-        distribution.requesterAmount,
-      );
-    });
-  });
-
-  describe("Full Failure Flow - Activation Window Expiry", function () {
-    it("complete flow: request -> committee formed -> activation expires -> fail -> process -> claim", async function () {
-      const {
-        enclave,
-        e3RefundManager,
-        registry,
-        usdcToken,
-        e3Program,
-        decryptionVerifier,
-        requester,
-        operator1,
-        operator2,
-        setupOperator,
-      } = await loadFixture(setup);
-
-      await setupOperator(operator1);
-      await setupOperator(operator2);
-
-      // 1. Make request with short activation window
-      const currentTime = await time.latest();
-      const startTime = currentTime + 100;
-      const activationDeadline = startTime + ONE_HOUR;
-
-      const requestParams = {
-        threshold: [2, 2] as [number, number],
-        startWindow: [startTime, activationDeadline] as [number, number],
-        duration: ONE_DAY,
-        inputDeadline: startTime + ONE_DAY - 300,
-        e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
-        computeProviderParams: abiCoder.encode(
-          ["address"],
-          [await decryptionVerifier.getAddress()],
-        ),
-        customParams: abiCoder.encode(
-          ["address"],
-          ["0x1234567890123456789012345678901234567890"],
-        ),
-      };
-
-      const fee = await enclave.getE3Quote(requestParams);
-      await usdcToken
-        .connect(requester)
-        .approve(await enclave.getAddress(), fee);
-      await enclave.connect(requester).request(requestParams);
-
-      let stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(1); // Requested
-
-      // 2. Complete sortition and DKG
-      await registry.connect(operator1).submitTicket(0, 1);
-      await registry.connect(operator2).submitTicket(0, 1);
-      await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
-      await registry.finalizeCommittee(0);
-
-      const nodes = [
-        await operator1.getAddress(),
-        await operator2.getAddress(),
-      ];
-      const publicKey = "0x1234567890abcdef1234567890abcdef";
-      const publicKeyHash = ethers.keccak256(publicKey);
-      await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
-
-      stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(3); // KeyPublished
-
-      // 3. Wait past activation deadline without activating
-      await time.increase(ONE_HOUR + 200);
-
-      // 4. Check failure condition
-      const [canFail, reason] = await enclave.checkFailureCondition(0);
-      expect(canFail).to.be.true;
-      expect(reason).to.equal(5); // ActivationWindowExpired
-
-      // 5. Mark as failed
-      await enclave.markE3Failed(0);
-      stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // Failed
-
-      const failureReason = await enclave.getFailureReason(0);
-      expect(failureReason).to.equal(5); // ActivationWindowExpired
-
-      // 6. Process and claim
       await enclave.processE3Failure(0);
 
       const balanceBefore = await usdcToken.balanceOf(
@@ -990,31 +887,25 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
 
-      // 3. Activate E3
-      await time.increase(100);
-      await enclave.activate(0);
-      stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(4); // Activated
-
-      // 4. Wait past compute deadline (ciphertext never published)
+      // 3. Wait past compute deadline (ciphertext never published)
       const e3 = await enclave.getE3(0);
       const computeDeadline =
-        Number(e3.expiration) + defaultTimeoutConfig.computeWindow;
+        Number(e3.inputWindow[1]) + defaultTimeoutConfig.computeWindow;
       await time.increaseTo(computeDeadline + 1);
 
-      // 5. Check failure condition and mark as failed
+      // 4. Check failure condition and mark as failed
       const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
-      expect(reason).to.equal(7); // ComputeTimeout
+      expect(reason).to.equal(6); // ComputeTimeout
 
       await enclave.markE3Failed(0);
       stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // Failed
+      expect(stage).to.equal(6); // Failed
 
       const failureReason = await enclave.getFailureReason(0);
-      expect(failureReason).to.equal(7); // ComputeTimeout
+      expect(failureReason).to.equal(6); // ComputeTimeout
 
-      // 6. Process and claim
+      // 5. Process and claim
       await enclave.processE3Failure(0);
 
       const balanceBefore = await usdcToken.balanceOf(
@@ -1071,36 +962,30 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(3); // KeyPublished
 
-      // 3. Activate E3
-      await time.increase(100);
-      await enclave.activate(0);
-      stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(4); // Activated
-
-      // 4. Publish ciphertext output
+      // 3. Publish ciphertext output
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) - 100);
+      await time.increaseTo(Number(e3.inputWindow[1]));
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";
       await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
       stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(5); // CiphertextReady
+      expect(stage).to.equal(4); // CiphertextReady
 
-      // 5. Wait past decryption deadline (plaintext never published)
+      // 4. Wait past decryption deadline (plaintext never published)
       await time.increase(defaultTimeoutConfig.decryptionWindow + 1);
 
-      // 6. Check failure condition and mark as failed
+      // 5. Check failure condition and mark as failed
       const [canFail, reason] = await enclave.checkFailureCondition(0);
       expect(canFail).to.be.true;
-      expect(reason).to.equal(11); // DecryptionTimeout
+      expect(reason).to.equal(10); // DecryptionTimeout
 
       await enclave.markE3Failed(0);
       stage = await enclave.getE3Stage(0);
-      expect(stage).to.equal(7); // Failed
+      expect(stage).to.equal(6); // Failed
 
       const failureReason = await enclave.getFailureReason(0);
-      expect(failureReason).to.equal(11); // DecryptionTimeout
+      expect(failureReason).to.equal(10); // DecryptionTimeout
 
       // 7. Process failure and claim refund
       await enclave.processE3Failure(0);
@@ -1144,9 +1029,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
           threshold: [2, 2] as [number, number],
-          startWindow: [startTime, startTime + ONE_DAY] as [number, number],
-          duration: ONE_DAY,
-          inputDeadline: startTime + ONE_DAY - 300,
+          inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
           computeProviderParams: abiCoder.encode(
@@ -1179,7 +1062,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await enclave.markE3Failed(0);
 
       // E3 #0 is failed, but E3 #1 and #2 are still active
-      expect(await enclave.getE3Stage(0)).to.equal(7); // Failed
+      expect(await enclave.getE3Stage(0)).to.equal(6); // Failed
       expect(await enclave.getE3Stage(1)).to.equal(1); // Still Requested
       expect(await enclave.getE3Stage(2)).to.equal(1); // Still Requested
 
@@ -1195,7 +1078,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       // Now mark E3 #2 as failed (but not #1)
       await enclave.markE3Failed(2);
-      expect(await enclave.getE3Stage(2)).to.equal(7); // Now Failed
+      expect(await enclave.getE3Stage(2)).to.equal(6); // Now Failed
       expect(await enclave.getE3Stage(1)).to.equal(1); // Still Requested
 
       // Verify each E3 has independent failure reasons
@@ -1226,9 +1109,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         const startTime = (await time.latest()) + 100;
         const requestParams = {
           threshold: [2, 2] as [number, number],
-          startWindow: [startTime, startTime + ONE_DAY] as [number, number],
-          duration: ONE_DAY,
-          inputDeadline: startTime + ONE_DAY - 300,
+          inputWindow: [startTime, startTime + ONE_DAY] as [number, number],
           e3Program: await e3Program.getAddress(),
           e3ProgramParams: encodedE3ProgramParams,
           computeProviderParams: abiCoder.encode(
@@ -1314,24 +1195,19 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       expect(await enclave.getE3Stage(0)).to.equal(3); // KeyPublished
 
-      // 3. Activate E3
-      await time.increase(100); // Move past start window[0]
-      await enclave.activate(0);
-      expect(await enclave.getE3Stage(0)).to.equal(4); // Activated
-
-      // 4. Publish ciphertext output (after input deadline)
+      // 3. Publish ciphertext output (after input deadline)
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) - 100);
+      await time.increaseTo(Number(e3.inputWindow[1]));
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";
       await enclave.publishCiphertextOutput(0, ciphertextOutput, proof);
-      expect(await enclave.getE3Stage(0)).to.equal(5); // CiphertextReady
+      expect(await enclave.getE3Stage(0)).to.equal(4); // CiphertextReady
 
-      // 5. Publish plaintext output
+      // 4. Publish plaintext output
       const plaintextOutput = "0x" + "cd".repeat(100);
       await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
-      expect(await enclave.getE3Stage(0)).to.equal(6); // Complete
+      expect(await enclave.getE3Stage(0)).to.equal(5); // Complete
 
       // Cannot mark completed E3 as failed
       await expect(enclave.markE3Failed(0)).to.be.revertedWithCustomError(
@@ -1372,13 +1248,9 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const publicKeyHash = ethers.keccak256(publicKey);
       await registry.publishCommittee(0, nodes, publicKey, publicKeyHash);
 
-      // Activate
-      await time.increase(100);
-      await enclave.activate(0);
-
       // Publish outputs
       const e3 = await enclave.getE3(0);
-      await time.increaseTo(Number(e3.expiration) - 100);
+      await time.increaseTo(Number(e3.inputWindow[1]));
 
       const ciphertextOutput = "0x" + "ab".repeat(100);
       const proof = "0x1337";
@@ -1388,7 +1260,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await enclave.publishPlaintextOutput(0, plaintextOutput, proof);
 
       // Verify E3 is complete
-      expect(await enclave.getE3Stage(0)).to.equal(6); // Complete
+      expect(await enclave.getE3Stage(0)).to.equal(5); // Complete
 
       await expect(
         e3RefundManager.connect(requester).claimRequesterRefund(0),

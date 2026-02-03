@@ -273,16 +273,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         // the end of the input window should be after the start
         require(
-            requestParams.inputWindow[1] >= requestParams.inputWindow[0], 
+            requestParams.inputWindow[1] >= requestParams.inputWindow[0],
             InvalidInputDeadlineEnd(requestParams.inputWindow[1])
         );
 
-        // The total duration cannot be > maxDuration 
-        uint256 totalDuration = requestParams.inputWindow[1] - block.timestamp + _timeoutConfig.computeWindow + _timeoutConfig.decryptionWindow;
-        require(
-            totalDuration < maxDuration, 
-            InvalidDuration(totalDuration)
-        );
+        // The total duration cannot be > maxDuration
+        uint256 totalDuration = requestParams.inputWindow[1] -
+            block.timestamp +
+            _timeoutConfig.computeWindow +
+            _timeoutConfig.decryptionWindow;
+        require(totalDuration < maxDuration, InvalidDuration(totalDuration));
 
         require(
             e3Programs[requestParams.e3Program],
@@ -348,6 +348,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             block.timestamp +
             _timeoutConfig.committeeFormationWindow;
 
+        // the compute deadline is end of input window + compute window
+        _e3Deadlines[e3Id].computeDeadline =
+            e3.inputWindow[1] +
+            _timeoutConfig.computeWindow;
+
         emit E3Requested(e3Id, e3, requestParams.e3Program);
         emit E3StageChanged(e3Id, E3Stage.None, E3Stage.Requested);
     }
@@ -362,12 +367,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         E3Deadlines memory deadlines = _e3Deadlines[e3Id];
 
-        // check whether we are in the correct stage first 
-        E3Stage current = _e3Stages[e3Id];
-        if (current != E3Stage.KeyPublished) {
-            revert InvalidStage(e3Id, E3Stage.KeyPublished, current);
-        }
-
         // You cannot post outputs after the compute deadline
         require(
             deadlines.computeDeadline >= block.timestamp,
@@ -380,7 +379,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlineNotReached(e3Id, e3.inputWindow[1])
         );
 
-        // For now we only accept one output 
+        // For now we only accept one output
         require(
             e3.ciphertextOutput == bytes32(0),
             CiphertextOutputAlreadyPublished(e3Id)
@@ -399,7 +398,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _timeoutConfig.decryptionWindow;
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
-        emit E3StageChanged(e3Id, E3Stage.KeyPublished, E3Stage.CiphertextReady);
+        emit E3StageChanged(
+            e3Id,
+            E3Stage.KeyPublished,
+            E3Stage.CiphertextReady
+        );
     }
 
     /// @inheritdoc IEnclave
@@ -411,20 +414,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3 memory e3 = getE3(e3Id);
 
         // Check we are in the right stage
+        // no need to check if there's a ciphertext as we would not
+        // be in this stage otherwise
         E3Stage current = _e3Stages[e3Id];
         if (current != E3Stage.CiphertextReady) {
             revert InvalidStage(e3Id, E3Stage.CiphertextReady, current);
         }
-
-        // There must be a ciphertext to decrypt first
-        require(
-            e3.ciphertextOutput != bytes32(0),
-            CiphertextOutputNotPublished(e3Id)
-        );
-        require(
-            e3.plaintextOutput.length == 0,
-            PlaintextOutputAlreadyPublished(e3Id)
-        );
 
         // you cannot post a decryption after the decryption deadline
         // TODO - should we actually allow this?
@@ -685,13 +680,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id
     ) external onlyCiphernodeRegistry {
         // DKG complete, key published
-        E3 memory e3 = e3s[e3Id];
         E3Stage current = _e3Stages[e3Id];
         if (current != E3Stage.CommitteeFinalized) {
             revert InvalidStage(e3Id, E3Stage.CommitteeFinalized, current);
         }
         _e3Stages[e3Id] = E3Stage.KeyPublished;
-        _e3Deadlines[e3Id].computeDeadline = e3.inputWindow[1] + _timeoutConfig.computeWindow;
 
         emit CommitteeFormed(e3Id);
         emit E3StageChanged(
@@ -788,7 +781,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ) {
             return (true, FailureReason.DKGTimeout);
         }
-        if (stage == E3Stage.KeyPublished && block.timestamp > d.computeDeadline) {
+        if (
+            stage == E3Stage.KeyPublished && block.timestamp > d.computeDeadline
+        ) {
             return (true, FailureReason.ComputeTimeout);
         }
         if (

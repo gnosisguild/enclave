@@ -21,7 +21,6 @@ import {
   updateSubmissionWindow,
 } from "./tasks/ciphernode";
 import {
-  activateE3,
   enableE3,
   publishCiphertext,
   publishCommittee,
@@ -96,7 +95,6 @@ const config: HardhatUserConfig = {
     requestCommittee,
     publishPlaintext,
     publishCiphertext,
-    activateE3,
     publishCommittee,
     enableE3,
     cleanDeploymentsTask,
