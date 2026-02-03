@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the pk-bfv circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the pk circuit: constants, bounds, bit widths, and witness.
 //!
 //! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
@@ -75,7 +75,7 @@ pub struct Bounds {
     pub pk_bound: BigUint,
 }
 
-/// Witness data for the pk-bfv circuit: public key polynomials in CRT form for the prover.
+/// Witness data for the pk circuit: public key polynomials in CRT form for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
     /// Public key polynomials (pk0, pk1) for each CRT basis.

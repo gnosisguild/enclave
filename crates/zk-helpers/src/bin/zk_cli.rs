@@ -125,7 +125,7 @@ struct Cli {
     /// List all available circuits and exit.
     #[arg(long)]
     list_circuits: bool,
-    /// Circuit name to generate artifacts for (e.g. pk-bfv, share-computation).
+    /// Circuit name to generate artifacts for (e.g. pk, share-computation).
     #[arg(long, required_unless_present = "list_circuits")]
     circuit: Option<String>,
     /// Preset: "insecure" (512) or "secure" (8192). Drives both threshold and DKG params.

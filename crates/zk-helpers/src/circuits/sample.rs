@@ -7,7 +7,7 @@
 //! Sample data generation for circuits.
 //!
 //! [`Sample`] produces a random BFV key pair; the public key is used as input
-//! for codegen and tests (e.g. pk-bfv circuit). For share-computation, it can
+//! for codegen and tests (e.g. pk circuit). For share-computation, it can
 //! also produce secret-key or smudging-noise data: secret in CRT form, Shamir
 //! shares, and parity matrices. Smudging noise is generated with the computed
 //! smudging bound (error_size) so coefficients are non-zero.

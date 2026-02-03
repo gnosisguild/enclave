@@ -45,7 +45,7 @@ pub struct TomlJson {
     pub pk1is: Vec<serde_json::Value>,
 }
 
-/// Builds the Prover TOML string from the pk-bfv witness (pk0is, pk1is).
+/// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
 pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
     let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
