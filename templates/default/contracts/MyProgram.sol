@@ -72,7 +72,7 @@ contract MyProgram is IE3Program, Ownable {
   function publishInput(uint256 e3Id, bytes memory data) external {
     E3 memory e3 = enclave.getE3(e3Id);
 
-    if (block.timestamp > e3.inputDeadline) {
+    if (block.timestamp > e3.inputWindow[1]) {
       revert InputDeadlineReached();
     }
 

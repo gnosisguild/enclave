@@ -269,6 +269,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // input start date should be in the future
         require(
             requestParams.inputWindow[0] >= block.timestamp,
+            // &&
+            // requestParams.inputWindow[0] >= block.timestamp +
+            //     _timeoutConfig.dkgWindow,
             InvalidInputDeadlineStart(requestParams.inputWindow[0])
         );
         // the end of the input window should be after the start
@@ -282,6 +285,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             block.timestamp +
             _timeoutConfig.computeWindow +
             _timeoutConfig.decryptionWindow;
+        // TODO do we actually need a max duration?
         require(totalDuration < maxDuration, InvalidDuration(totalDuration));
 
         require(
@@ -298,7 +302,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.seed = seed;
         e3.threshold = requestParams.threshold;
         e3.requestBlock = block.number;
-        // the input window has a start and an end
         e3.inputWindow = requestParams.inputWindow;
         e3.e3Program = requestParams.e3Program;
         e3.e3ProgramParams = requestParams.e3ProgramParams;
@@ -344,9 +347,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Initialize E3 lifecycle
         _e3Stages[e3Id] = E3Stage.Requested;
         _e3Requesters[e3Id] = msg.sender;
-        _e3Deadlines[e3Id].committeeDeadline =
-            block.timestamp +
-            _timeoutConfig.committeeFormationWindow;
 
         // the compute deadline is end of input window + compute window
         _e3Deadlines[e3Id].computeDeadline =
@@ -417,13 +417,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // no need to check if there's a ciphertext as we would not
         // be in this stage otherwise
         E3Stage current = _e3Stages[e3Id];
-        if (current != E3Stage.CiphertextReady) {
-            revert InvalidStage(e3Id, E3Stage.CiphertextReady, current);
-        }
+        require(
+            current == E3Stage.CiphertextReady,
+            InvalidStage(e3Id, E3Stage.CiphertextReady, current)
+        );
 
         // you cannot post a decryption after the decryption deadline
-        // TODO - should we actually allow this?
-        // _checkFailureCondition actually will return true in this case
         E3Deadlines memory deadlines = _e3Deadlines[e3Id];
         require(
             deadlines.decryptionDeadline >= block.timestamp,
@@ -770,9 +769,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) internal view returns (bool canFail, FailureReason reason) {
         E3Deadlines memory d = _e3Deadlines[e3Id];
 
-        if (
-            stage == E3Stage.Requested && block.timestamp > d.committeeDeadline
-        ) {
+        uint256 committeeDeadline = ciphernodeRegistry.getCommitteeDeadline(
+            e3Id
+        );
+
+        if (stage == E3Stage.Requested && block.timestamp > committeeDeadline) {
             return (true, FailureReason.CommitteeFormationTimeout);
         }
         if (
@@ -850,10 +851,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Internal function to set timeout config
     function _setTimeoutConfig(E3TimeoutConfig calldata config) internal {
-        require(
-            config.committeeFormationWindow > 0,
-            "Invalid committee window"
-        );
         require(config.dkgWindow > 0, "Invalid DKG window");
         require(config.computeWindow > 0, "Invalid compute window");
         require(config.decryptionWindow > 0, "Invalid decryption window");

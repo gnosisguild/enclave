@@ -106,9 +106,7 @@ export class ContractClient {
    */
   public async requestE3(
     threshold: [number, number],
-    startWindow: [bigint, bigint],
-    inputDeadline: bigint,
-    duration: bigint,
+    inputWindow: [bigint, bigint],
     e3Program: `0x${string}`,
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
@@ -137,9 +135,7 @@ export class ContractClient {
         args: [
           {
             threshold,
-            startWindow,
-            inputDeadline,
-            duration,
+            inputWindow,
             e3Program,
             e3ProgramParams,
             computeProviderParams,
@@ -156,42 +152,6 @@ export class ContractClient {
       return hash
     } catch (error) {
       throw new SDKError(`Failed to request E3: ${error}`, 'REQUEST_E3_FAILED')
-    }
-  }
-
-  /**
-   * Activate an E3 computation
-   * activate(uint256 e3Id)
-   */
-  public async activateE3(e3Id: bigint, gasLimit?: bigint): Promise<Hash> {
-    if (!this.walletClient) {
-      throw new SDKError('Wallet client required for write operations', 'NO_WALLET')
-    }
-
-    if (!this.contractInfo) {
-      await this.initialize()
-    }
-
-    try {
-      const account = this.walletClient.account
-      if (!account) {
-        throw new SDKError('No account connected', 'NO_ACCOUNT')
-      }
-
-      const { request } = await this.publicClient.simulateContract({
-        address: this.addresses.enclave,
-        abi: Enclave__factory.abi,
-        functionName: 'activate',
-        args: [e3Id],
-        account,
-        gas: gasLimit,
-      })
-
-      const hash = await this.walletClient.writeContract(request)
-
-      return hash
-    } catch (error) {
-      throw new SDKError(`Failed to activate E3: ${error}`, 'ACTIVATE_E3_FAILED')
     }
   }
 

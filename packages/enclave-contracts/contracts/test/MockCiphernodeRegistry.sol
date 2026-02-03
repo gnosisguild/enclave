@@ -18,6 +18,10 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         success = true;
     }
 
+    function getCommitteeDeadline(uint256) external view returns (uint256) {
+        return block.timestamp + 10;
+    }
+
     function isEnabled(address) external pure returns (bool) {
         return true;
     }
@@ -101,6 +105,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint32[2] calldata
     ) external pure returns (bool success) {
         success = true;
+    }
+
+    function getCommitteeDeadline(uint256) external view returns (uint256) {
+        return block.timestamp + 10;
     }
 
     function isEnabled(address) external pure returns (bool) {

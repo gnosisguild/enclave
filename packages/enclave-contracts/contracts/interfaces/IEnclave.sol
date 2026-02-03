@@ -56,7 +56,6 @@ interface IEnclave {
 
     /// @notice Timeout configuration for E3 stages
     struct E3TimeoutConfig {
-        uint256 committeeFormationWindow;
         uint256 dkgWindow;
         uint256 computeWindow;
         uint256 decryptionWindow;
@@ -65,7 +64,6 @@ interface IEnclave {
 
     /// @notice Deadlines for each E3
     struct E3Deadlines {
-        uint256 committeeDeadline;
         uint256 dkgDeadline;
         uint256 computeDeadline;
         uint256 decryptionDeadline;

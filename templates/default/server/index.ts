@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import express, { Request, Response } from 'express'
-import { EnclaveSDK, EnclaveEventType, type E3ActivatedData } from '@enclave-e3/sdk'
+import { EnclaveSDK, RegistryEventType, CommitteePublishedData } from '@enclave-e3/sdk'
 import { Log, PublicClient } from 'viem'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
@@ -116,14 +116,11 @@ function getActivationDefer(e3Id: bigint): Defer {
   return d
 }
 
-async function handleE3ActivatedEvent(event: any) {
-  const data = event.data as E3ActivatedData
+async function handleCommitteePublishedEvent(event: any) {
+  const data = event.data as CommitteePublishedData
   const e3Id = data.e3Id
 
-  // This allows us to wait until the session has been activated avoiding race conditions
   const def = getActivationDefer(e3Id)
-
-  const sessionKey = e3Id.toString()
 
   const sdk = await createPrivateSDK()
   const publicClient = sdk.getPublicClient()
@@ -133,12 +130,15 @@ async function handleE3ActivatedEvent(event: any) {
 
   console.log('✅ Received E3 data from contract.')
 
-  const expiration = e3.inputDeadline
+  const expiration = e3.inputWindow[1]
 
-  console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`)
+  console.log(`🎯 Committee Published for: ${e3Id}, expiration: ${expiration}`)
 
-  if (!e3Sessions.has(sessionKey)) {
-    e3Sessions.set(sessionKey, {
+  console.log(`📥 Setting up session for E3 ${e3Id}...`)
+  console.log(e3Sessions)
+
+  if (!e3Sessions.has(e3Id.toString())) {
+    e3Sessions.set(e3Id.toString(), {
       e3Id,
       e3ProgramParams: e3.e3ProgramParams,
       expiration,
@@ -146,6 +146,7 @@ async function handleE3ActivatedEvent(event: any) {
       isProcessing: false,
       isCompleted: false,
     })
+
     def.resolve()
   }
 
@@ -213,7 +214,8 @@ async function setupEventListeners() {
 
   console.log('📡 Setting up event listeners...')
 
-  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent)
+  // we need to listen to CommitteePublished to know when an E3 is ready
+  sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
 
   await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n)
 

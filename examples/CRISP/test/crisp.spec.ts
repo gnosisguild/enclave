@@ -30,9 +30,9 @@ async function runCliInit(): Promise<number> {
   }
 }
 
-async function checkE3Activated(e3id: number): Promise<boolean> {
+async function checkE3Ready(e3id: number): Promise<boolean> {
   try {
-    const output = execSync(`pnpm cli check-activate --e3id ${e3id}`, {
+    const output = execSync(`pnpm cli check-e3-ready --e3id ${e3id}`, {
       encoding: 'utf-8',
     })
     const lines = output.trim().split('\n')
@@ -44,10 +44,10 @@ async function checkE3Activated(e3id: number): Promise<boolean> {
   }
 }
 
-async function waitForE3Activation(e3id: number, maxWaitMs: number = 30000): Promise<void> {
+async function waitForE3Ready(e3id: number, maxWaitMs: number = 30000): Promise<void> {
   const startTime = Date.now()
   while (Date.now() - startTime < maxWaitMs) {
-    const isActivated = await checkE3Activated(e3id)
+    const isActivated = await checkE3Ready(e3id)
     if (isActivated) {
       console.log(`E3 ${e3id} is activated`)
       return
@@ -99,8 +99,8 @@ test('CRISP smoke test', async ({ context, page, metamaskPage, extensionId }) =>
   log(`clicking try demo...`)
   await page.locator('button:has-text("Try Demo")').click()
 
-  log(`waiting for E3 activation...`)
-  await waitForE3Activation(e3id)
+  log(`waiting for E3 Committee being published...`)
+  await waitForE3Ready(e3id)
   log(`forcing page reload...`)
   await page.reload()
 

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
-    contract, network::{Ethereum, EthereumWallet}, primitives::{Address, Bytes, U256}, providers::{
+    network::{Ethereum, EthereumWallet}, primitives::{Address, Bytes, U256}, providers::{
         Identity, ProviderBuilder, RootProvider, fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,

@@ -174,9 +174,7 @@ pub struct E3StateLite {
     pub vote_count: u64,
 
     pub start_time: u64,
-    pub input_deadline: u64,
-    pub duration: u64,
-    pub expiration: u64,
+    pub end_time: u64,
     pub start_block: u64,
 
     pub committee_public_key: Vec<u8>,
@@ -205,9 +203,7 @@ pub struct E3 {
     // Timing-related
     pub start_time: u64,
     pub block_start: u64,
-    pub input_deadline: u64,
-    pub duration: u64,
-    pub expiration: u64,
+    pub end_time: u64,
 
     // Parameters
     pub e3_params: Vec<u8>,
@@ -232,6 +228,7 @@ pub struct E3Crisp {
     pub emojis: [String; 2],
     pub has_voted: Vec<String>,
     pub start_time: u64,
+    pub end_time: u64,
     pub status: String,
     pub votes_option_1: String,
     pub votes_option_2: String,
@@ -241,7 +238,6 @@ pub struct E3Crisp {
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub requester: String,
-    pub input_deadline: u64,
 }
 
 impl From<E3> for WebResultRequest {
@@ -253,7 +249,7 @@ impl From<E3> for WebResultRequest {
             option_1_emoji: e3.emojis[0].clone(),
             option_2_emoji: e3.emojis[1].clone(),
             total_votes: e3.vote_count,
-            end_time: e3.expiration,
+            end_time: e3.end_time,
             requester: e3.requester,
         }
     }

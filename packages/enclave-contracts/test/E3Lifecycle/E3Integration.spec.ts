@@ -367,26 +367,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const storedRequester = await enclave.getRequester(0);
       expect(storedRequester).to.equal(await requester.getAddress());
     });
-
-    it("sets committee formation deadline on request", async function () {
-      const { enclave, makeRequest, operator1, operator2, setupOperator } =
-        await loadFixture(setup);
-
-      await setupOperator(operator1);
-      await setupOperator(operator2);
-
-      const beforeTime = await time.latest();
-      await makeRequest();
-      const afterTime = await time.latest();
-
-      const deadlines = await enclave.getDeadlines(0);
-      expect(deadlines.committeeDeadline).to.be.gte(
-        beforeTime + defaultTimeoutConfig.committeeFormationWindow,
-      );
-      expect(deadlines.committeeDeadline).to.be.lte(
-        afterTime + defaultTimeoutConfig.committeeFormationWindow + 1,
-      );
-    });
   });
 
   describe("Committee Formed Integration", function () {
