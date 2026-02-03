@@ -33,7 +33,7 @@ pub fn get_security_level(lambda: usize) -> SecurityLevel {
 pub fn generate_wrapper(n_recursive_proofs: usize, n_public_inputs: usize) -> Wrapper {
     format!(
         r#"use bb_proof_verification::{{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof}};
-use lib::math::commitments::compute_aggregation_commitment;
+use lib::math::commitments::compute_recursive_aggregation_commitment;
 
 // Number of proofs.
 pub global N_PROOFS: u32 = {};
@@ -58,7 +58,7 @@ fn main(
         }}
     }}
 
-    compute_aggregation_commitment(aggregated_public_inputs)
+    compute_recursive_aggregation_commitment(aggregated_public_inputs)
 }}
 "#,
         n_recursive_proofs, n_public_inputs

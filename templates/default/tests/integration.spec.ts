@@ -166,7 +166,7 @@ describe('Integration', () => {
     },
     rpcUrl: 'ws://localhost:8545',
     privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
   it('should run an integration test', async () => {

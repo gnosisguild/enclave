@@ -68,7 +68,7 @@ export interface UseEnclaveSDKReturn {
  *       enclave: '0x...',
  *       ciphernodeRegistry: '0x...'
  *     },
- *     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_BFV_512',
+ *     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
  *   });
  *
  *   // Use the SDK...

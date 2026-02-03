@@ -15,4 +15,5 @@ pub use backends::*;
 pub use ciphernode_selector::*;
 pub use repo::*;
 pub use sortition::*;
+pub use ticket::*;
 pub use ticket_sortition::*;

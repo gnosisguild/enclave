@@ -20,18 +20,6 @@ reduction operations commonly used in:
 - **Homomorphic encryption**: BFV, BGV, and CKKS schemes
 - **Zero-knowledge proofs**: Polynomial commitment schemes
 
-### Polynomial Representation
-
-Polynomials are represented as:
-
-```
-a_n * x^n + a_{n-1} * x^{n-1} + ... + a_1 * x + a_0
-```
-
-Where coefficients are stored in descending order (highest degree first) of degree using `BigInt`
-for arbitrary precision. You can rely on some methods to transform to ascending order (lowest degree
-first) and viceversa.
-
 ### Performance
 
 The library is optimized for cryptographic workloads with:
