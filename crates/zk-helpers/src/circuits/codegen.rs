@@ -25,13 +25,16 @@ pub struct Artifacts {
 
 /// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific input.
 pub trait CircuitCodegen: crate::registry::Circuit {
+    /// Circuit-specific parameters (e.g. BFV parameters).
+    type Params;
     /// Circuit-specific codegen input (e.g. preset + public key).
     type Input;
     /// Error type for codegen failures.
     type Error;
 
     /// Produces [`Artifacts`] for this circuit from the given input.
-    fn codegen(&self, input: Self::Input) -> Result<Artifacts, Self::Error>;
+    fn codegen(&self, params: &Self::Params, input: &Self::Input)
+        -> Result<Artifacts, Self::Error>;
 }
 
 /// Writes the Prover TOML string to `path/Prover.toml`, or `./Prover.toml` if `path` is `None`.
@@ -48,13 +51,16 @@ pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), Circu
     Ok(std::fs::write(configs_path, configs)?)
 }
 
-/// Writes both Prover.toml and configs.nr into the given directory (or current directory if `None`).
+/// Writes Prover.toml (if `toml` is `Some`) and always configs.nr into the given directory
+/// (or current directory if `path` is `None`).
 pub fn write_artifacts(
-    toml: &Toml,
+    toml: Option<&Toml>,
     configs: &Configs,
     path: Option<&Path>,
 ) -> Result<(), CircuitsErrors> {
-    write_toml(toml, path)?;
+    if let Some(t) = toml {
+        write_toml(t, path)?;
+    }
     write_configs(configs, path)?;
     Ok(())
 }
@@ -94,7 +100,7 @@ key = "value"
         let configs_content = "pub global N: u32 = 1024;\n";
         let temp = TempDir::new().unwrap();
         write_artifacts(
-            &toml_content.to_string(),
+            Some(&toml_content.to_string()),
             &configs_content.to_string(),
             Some(temp.path()),
         )

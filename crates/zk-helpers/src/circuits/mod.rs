@@ -17,11 +17,15 @@ pub mod computation;
 pub mod errors;
 pub mod sample;
 
-pub use codegen::*;
+pub use codegen::{write_artifacts, Artifacts, CircuitCodegen};
 pub use commitments::*;
-pub use computation::*;
-pub use errors::*;
-pub use sample::*;
+pub use computation::{
+    CircuitComputation, Computation, Configs, ConvertToJson, ReduceToZkpModulus, Toml,
+};
+pub use errors::CircuitsErrors;
+pub use sample::Sample;
 
 pub mod pk_bfv;
-pub use pk_bfv::*;
+pub use pk_bfv::codegen::{generate_configs, generate_toml, TomlJson};
+pub use pk_bfv::computation::{Bits, Bounds, PkBfvComputationOutput, Witness};
+pub use pk_bfv::PkBfvCircuit;

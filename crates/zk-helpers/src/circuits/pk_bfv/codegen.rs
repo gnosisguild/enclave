@@ -6,9 +6,11 @@
 
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
-use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
+use crate::circuits::pk_bfv::circuit::PkBfvCircuitInput;
 use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
+use crate::circuits::PkBfvCircuit;
 use crate::codegen::Artifacts;
+use crate::codegen::CircuitCodegen;
 use crate::computation::Computation;
 use crate::computation::Configs;
 use crate::computation::ReduceToZkpModulus;
@@ -16,13 +18,34 @@ use crate::computation::Toml;
 use crate::errors::CircuitsErrors;
 use crate::registry::Circuit;
 use crate::utils::map_witness_2d_vector_to_json;
-use e3_fhe_params::BfvParamSet;
-use e3_fhe_params::BfvPreset;
 use fhe::bfv::BfvParameters;
-use fhe::bfv::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::sync::Arc;
+
+/// Implementation of [`CircuitCodegen`] for [`PkBfvCircuit`].
+impl CircuitCodegen for PkBfvCircuit {
+    type Params = Arc<BfvParameters>;
+    type Input = PkBfvCircuitInput;
+    type Error = CircuitsErrors;
+
+    fn codegen(
+        &self,
+        params: &Self::Params,
+        input: &Self::Input,
+    ) -> Result<Artifacts, Self::Error> {
+        // Compute.
+        let bounds = Bounds::compute(&params, &())?;
+        let bits = Bits::compute(&params, &bounds)?;
+        let witness = Witness::compute(&params, input)?;
+        let zkp_witness = witness.reduce_to_zkp_modulus();
+
+        let toml = generate_toml(zkp_witness)?;
+        let configs = generate_configs(&params, &bits);
+
+        Ok(Artifacts { toml, configs })
+    }
+}
 
 /// JSON-serializable structure for Prover.toml (pk0is, pk1is arrays).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,21 +63,6 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
 
     let toml_json = TomlJson { pk0is, pk1is };
     Ok(toml::to_string(&toml_json)?)
-}
-
-/// Generates full artifacts (Prover.toml and configs.nr) for the pk-bfv circuit from a preset and public key.
-pub fn codegen(preset: BfvPreset, public_key: PublicKey) -> Result<Artifacts, CircuitsErrors> {
-    let params = BfvParamSet::from(preset).build_arc();
-    // Compute.
-    let bounds = Bounds::compute(&params, &())?;
-    let bits = Bits::compute(&params, &bounds)?;
-    let witness = Witness::compute(&params, &public_key)?;
-    let zkp_witness = witness.reduce_to_zkp_modulus();
-
-    let toml = generate_toml(zkp_witness)?;
-    let configs = generate_configs(&params, &bits);
-
-    Ok(Artifacts { toml, configs })
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
@@ -91,10 +99,16 @@ mod tests {
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let preset = DEFAULT_BFV_PRESET;
-        let params = BfvParamSet::from(preset).build_arc();
+        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
         let sample = Sample::generate(&params);
-        let artifacts = codegen(preset, sample.public_key).unwrap();
+        let artifacts = PkBfvCircuit
+            .codegen(
+                &params,
+                &PkBfvCircuitInput {
+                    public_key: sample.public_key,
+                },
+            )
+            .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
         let pk0is = parsed
@@ -109,7 +123,12 @@ mod tests {
         assert!(!pk1is.is_empty());
 
         let temp_dir = TempDir::new().unwrap();
-        write_artifacts(&artifacts.toml, &artifacts.configs, Some(temp_dir.path())).unwrap();
+        write_artifacts(
+            Some(&artifacts.toml),
+            &artifacts.configs,
+            Some(temp_dir.path()),
+        )
+        .unwrap();
 
         let output_path = temp_dir.path().join("Prover.toml");
         assert!(output_path.exists());

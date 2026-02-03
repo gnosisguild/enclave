@@ -13,7 +13,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
-use e3_zk_helpers::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
+use e3_zk_helpers::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput};
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
 use e3_zk_helpers::sample::Sample;
@@ -36,6 +36,9 @@ struct Cli {
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
+    /// Skip generating Prover.toml (configs.nr is always generated).
+    #[arg(long)]
+    toml: bool,
 }
 
 /// Parses a preset name (e.g. `"default"`) into a [`BfvPreset`].
@@ -61,11 +64,9 @@ fn main() -> Result<()> {
         for circuit_name in circuits {
             if let Ok(circuit_meta) = registry.get(&circuit_name) {
                 println!(
-                    "  {} - params_type: {:?}, n_recursive_proofs: {}, pub_inputs: {}",
+                    "  {} - params_type: {:?}",
                     circuit_name,
                     circuit_meta.supported_parameter(),
-                    circuit_meta.n_recursive_proofs(),
-                    circuit_meta.n_public_inputs()
                 );
             }
         }
@@ -104,19 +105,22 @@ fn main() -> Result<()> {
     let artifacts = match circuit_name {
         name if name == <PkBfvCircuit as Circuit>::NAME => {
             let circuit = PkBfvCircuit;
-            circuit.codegen(PkBfvCodegenInput {
-                preset,
-                public_key: sample.public_key,
-            })?
+            circuit.codegen(
+                &params,
+                &PkBfvCircuitInput {
+                    public_key: sample.public_key,
+                },
+            )?
         }
         name => return Err(anyhow!("circuit {} not yet implemented", name)),
     };
 
-    write_artifacts(
-        &artifacts.toml,
-        &artifacts.configs,
-        Some(args.output.as_path()),
-    )?;
+    let toml = if !args.toml {
+        None
+    } else {
+        Some(&artifacts.toml)
+    };
+    write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
 
     println!("Artifacts written to {}", args.output.display());
     Ok(())

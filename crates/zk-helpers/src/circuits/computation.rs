@@ -10,6 +10,15 @@
 //! [`CircuitComputation`] extends it for circuits that produce witness/bounds/bits.
 //! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
 
+/// Variant for input types for DKG.
+#[derive(Clone)]
+pub enum DkgInputType {
+    /// The input type that generates shares of a secret key using secret sharing.
+    SecretKey,
+    /// The input type that generates shares of smudging noise instead of secret key shares.
+    SmudgingNoise,
+}
+
 /// Prover TOML file content (witness and circuit inputs).
 pub type Toml = String;
 /// Noir configs file content (global constants for the prover).
