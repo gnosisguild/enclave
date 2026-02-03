@@ -5,9 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod circuits;
+pub mod codegen;
+pub mod computation;
 pub mod errors;
 pub mod registry;
 pub mod sample;
-pub mod traits;
 pub mod types;
 pub mod utils;

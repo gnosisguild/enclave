@@ -6,9 +6,13 @@
 
 use crate::circuits::pk_bfv::codegen;
 use crate::circuits::pk_bfv::computation::{Bits, Bounds, Witness};
-use crate::errors::CodegenError;
-use crate::traits::{Circuit, CircuitCodegen, CircuitComputation, Computation};
-use crate::types::{Artifacts, DkgInputType};
+use crate::codegen::Artifacts;
+use crate::codegen::CircuitCodegen;
+use crate::computation::CircuitComputation;
+use crate::computation::Computation;
+use crate::errors::CircuitsErrors;
+use crate::registry::Circuit;
+use crate::registry::DkgInputType;
 use e3_fhe_params::{BfvPreset, ParameterType};
 use fhe::bfv::{BfvParameters, PublicKey};
 
@@ -39,7 +43,7 @@ impl Circuit for PkBfvCircuit {
 
 impl CircuitCodegen for PkBfvCircuit {
     type Input = PkBfvCodegenInput;
-    type Error = CodegenError;
+    type Error = CircuitsErrors;
 
     fn codegen(&self, input: Self::Input) -> Result<Artifacts, Self::Error> {
         codegen::codegen(input.preset, input.public_key)
@@ -50,7 +54,7 @@ impl CircuitComputation for PkBfvCircuit {
     type Params = BfvParameters;
     type Input = PublicKey;
     type Output = PkBfvComputationOutput;
-    type Error = CodegenError;
+    type Error = CircuitsErrors;
 
     fn compute(
         &self,

@@ -7,7 +7,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum CodegenError {
+pub enum CircuitsErrors {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("TOML serialization error: {0}")]

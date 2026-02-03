@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::traits::Computation;
-use crate::traits::ConvertToJson;
-use crate::traits::ReduceToZkpModulus;
+use crate::computation::Computation;
+use crate::computation::ConvertToJson;
+use crate::computation::ReduceToZkpModulus;
 use e3_polynomial::center_coefficients_mut;
 use e3_polynomial::reduce_coefficients_2d;
 use e3_zk_helpers::utils::calculate_bit_width;
@@ -76,7 +76,7 @@ impl Computation for Bits {
 impl Computation for Bounds {
     type Params = BfvParameters;
     type Input = ();
-    type Error = crate::errors::CodegenError;
+    type Error = fhe::Error;
 
     fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
         let mut pk_bound_max = BigUint::from(0u32);
@@ -169,9 +169,9 @@ impl ReduceToZkpModulus for Witness {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sample::generate_sample;
-    use crate::traits::ConvertToJson;
-    use crate::traits::ReduceToZkpModulus;
+    use crate::computation::ConvertToJson;
+    use crate::computation::ReduceToZkpModulus;
+    use crate::sample::Sample;
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
         let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = generate_sample(&params);
+        let encryption_data = Sample::generate(&params);
         let witness = Witness::compute(&params, &encryption_data.public_key).unwrap();
         let zkp_reduced = witness.reduce_to_zkp_modulus();
         let json = zkp_reduced.convert_to_json().unwrap();

@@ -3,24 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use fhe::bfv::PublicKey;
 
+/// TOML file for the circuit.
 pub type Toml = String;
-pub type Template = String;
+/// Configs file for the circuit.
 pub type Configs = String;
-pub type Wrapper = String;
-
-/// Variant for input types for DKG.
-///
-/// This variant is used to determine the type of input that is used for the DKG
-/// circuits (C2, C3, C4)
-#[derive(Clone)]
-pub enum DkgInputType {
-    /// The input type that generates shares of a secret key using secret sharing.
-    SecretKey,
-    /// The input type that generates shares of smudging noise instead of secret key shares.
-    SmudgingNoise,
-}
 
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
 /// instead of being a separate type in here. The pvss crate should import this and
@@ -68,32 +55,4 @@ impl CiphernodesCommitteeSize {
         //     threshold: 2,
         // },
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum SecurityLevel {
-    INSECURE,
-    PRODUCTION,
-}
-
-impl SecurityLevel {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            SecurityLevel::INSECURE => "insecure",
-            SecurityLevel::PRODUCTION => "production",
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Sample {
-    pub public_key: PublicKey,
-}
-
-#[derive(Debug, Clone)]
-pub struct Artifacts {
-    pub toml: Toml,
-    pub configs: Configs,
-    pub template: Template,
-    pub wrapper: Wrapper,
 }

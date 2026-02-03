@@ -3368,16 +3368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-pvss-cli"
-version = "0.1.8"
-dependencies = [
- "anyhow",
- "clap",
- "e3-fhe-params",
- "e3-pvss",
-]
-
-[[package]]
 name = "e3-request"
 version = "0.1.8"
 dependencies = [

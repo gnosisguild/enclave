@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::traits::CircuitMetadata;
-use crate::types::DkgInputType;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,6 +14,79 @@ use thiserror::Error;
 pub enum RegistryError {
     #[error("Unknown circuit: {name}")]
     UnknownCircuit { name: String },
+}
+
+/// Variant for input types for DKG.
+#[derive(Clone)]
+pub enum DkgInputType {
+    /// The input type that generates shares of a secret key using secret sharing.
+    SecretKey,
+    /// The input type that generates shares of smudging noise instead of secret key shares.
+    SmudgingNoise,
+}
+
+/// Trait for circuit metadata.
+pub trait Circuit: Send + Sync {
+    const NAME: &'static str;
+    const PREFIX: &'static str;
+    const SUPPORTED_PARAMETER: ParameterType;
+    const DKG_INPUT_TYPE: Option<DkgInputType>;
+    const N_PROOFS: usize;
+    const N_PUBLIC_INPUTS: usize;
+
+    fn name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn prefix(&self) -> &'static str {
+        Self::PREFIX
+    }
+
+    fn supported_parameter(&self) -> ParameterType {
+        Self::SUPPORTED_PARAMETER
+    }
+
+    fn dkg_input_type(&self) -> Option<DkgInputType> {
+        Self::DKG_INPUT_TYPE
+    }
+
+    fn n_recursive_proofs(&self) -> usize {
+        Self::N_PROOFS
+    }
+
+    fn n_public_inputs(&self) -> usize {
+        Self::N_PUBLIC_INPUTS
+    }
+}
+
+pub trait CircuitMetadata: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn supported_parameter(&self) -> ParameterType;
+    fn dkg_input_type(&self) -> Option<DkgInputType>;
+    fn n_recursive_proofs(&self) -> usize;
+    fn n_public_inputs(&self) -> usize;
+}
+
+impl<T: Circuit> CircuitMetadata for T {
+    fn name(&self) -> &'static str {
+        T::NAME
+    }
+
+    fn supported_parameter(&self) -> ParameterType {
+        T::SUPPORTED_PARAMETER
+    }
+
+    fn dkg_input_type(&self) -> Option<DkgInputType> {
+        T::DKG_INPUT_TYPE
+    }
+
+    fn n_recursive_proofs(&self) -> usize {
+        T::N_PROOFS
+    }
+
+    fn n_public_inputs(&self) -> usize {
+        T::N_PUBLIC_INPUTS
+    }
 }
 
 /// Registry for PVSS circuits.
@@ -77,8 +148,17 @@ impl CircuitRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
-    use crate::traits::Circuit;
+
+    pub struct TestCircuit;
+
+    impl Circuit for TestCircuit {
+        const NAME: &'static str = "test";
+        const PREFIX: &'static str = "TEST";
+        const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
+        const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SecretKey);
+        const N_PROOFS: usize = 1;
+        const N_PUBLIC_INPUTS: usize = 1;
+    }
 
     #[test]
     /// Unknown circuits should return an error.
@@ -94,19 +174,19 @@ mod tests {
     /// Registry should expose metadata for registered circuits.
     fn registry_reports_expected_metadata() {
         let mut registry = CircuitRegistry::new();
-        registry.register(Arc::new(PkBfvCircuit));
-        let circuit = registry.get(<PkBfvCircuit as Circuit>::NAME).unwrap();
+        registry.register(Arc::new(TestCircuit));
+        let circuit = registry.get(<TestCircuit as Circuit>::NAME).unwrap();
 
-        assert_eq!(circuit.name(), <PkBfvCircuit as Circuit>::NAME);
+        assert_eq!(circuit.name(), <TestCircuit as Circuit>::NAME);
         assert_eq!(circuit.supported_parameter(), ParameterType::DKG);
-        assert!(circuit.dkg_input_type().is_none());
+        assert!(circuit.dkg_input_type().is_some());
         assert_eq!(
             circuit.n_recursive_proofs(),
-            <PkBfvCircuit as Circuit>::N_PROOFS
+            <TestCircuit as Circuit>::N_PROOFS
         );
         assert_eq!(
             circuit.n_public_inputs(),
-            <PkBfvCircuit as Circuit>::N_PUBLIC_INPUTS
+            <TestCircuit as Circuit>::N_PUBLIC_INPUTS
         );
     }
 }
