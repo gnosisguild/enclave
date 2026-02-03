@@ -11,23 +11,19 @@ use ndarray::Array2;
 use num_bigint::BigInt;
 
 #[derive(Debug)]
-pub struct ShareComputationSkCircuit;
+pub struct ShareComputationCircuit;
 
-impl Circuit for ShareComputationSkCircuit {
-    const NAME: &'static str = "share_computation_sk";
-    const PREFIX: &'static str = "SHARE_COMPUTATION_SK";
+impl Circuit for ShareComputationCircuit {
+    const NAME: &'static str = "share_computation";
+    const PREFIX: &'static str = match DkgInputType::SecretKey {
+        DkgInputType::SecretKey => "SHARE_COMPUTATION_SK",
+        DkgInputType::SmudgingNoise => "SHARE_COMPUTATION_E_SM",
+    };
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
-    const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SecretKey);
-}
-
-#[derive(Debug)]
-pub struct ShareComputationEsmCircuit;
-
-impl Circuit for ShareComputationEsmCircuit {
-    const NAME: &'static str = "share_computation_e_sm";
-    const PREFIX: &'static str = "SHARE_COMPUTATION_E_SM";
-    const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
-    const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SmudgingNoise);
+    const DKG_INPUT_TYPE: Option<DkgInputType> = match DkgInputType::SecretKey {
+        DkgInputType::SecretKey => Some(DkgInputType::SecretKey),
+        DkgInputType::SmudgingNoise => Some(DkgInputType::SmudgingNoise),
+    };
 }
 
 pub struct ShareComputationCircuitInput {

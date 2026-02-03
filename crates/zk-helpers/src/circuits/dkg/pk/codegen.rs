@@ -12,26 +12,25 @@ use crate::{
     CircuitsErrors, Configs, PkComputationOutput, Toml, Witness,
 };
 
-use fhe::bfv::BfvParameters;
+use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::sync::Arc;
 
 /// Implementation of [`CircuitCodegen`] for [`PkCircuit`].
 impl CircuitCodegen for PkCircuit {
-    type Params = Arc<BfvParameters>;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
     fn codegen(
         &self,
-        params: &Self::Params,
+        preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Artifacts, Self::Error> {
-        let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(params, input)?;
+        let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(preset, input)?;
 
         let toml = generate_toml(witness)?;
-        let configs = generate_configs(&params, &bits);
+        let configs = generate_configs(preset, &bits);
 
         Ok(Artifacts { toml, configs })
     }
@@ -57,7 +56,7 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
-pub fn generate_configs(params: &Arc<BfvParameters>, bits: &Bits) -> Configs {
+pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> Configs {
     format!(
         r#"
 pub global N: u32 = {};
@@ -72,8 +71,8 @@ pk (CIRCUIT 0 - DKG BFV PUBLIC KEY)
 // pk - bit parameters
 pub global {}_BIT_PK: u32 = {};
 "#,
-        params.degree(),
-        params.moduli().len(),
+        preset.metadata().degree,
+        preset.metadata().num_moduli,
         <PkCircuit as Circuit>::PREFIX,
         bits.pk_bit,
     )
@@ -87,23 +86,18 @@ mod tests {
     use crate::codegen::write_artifacts;
     use crate::sample::prepare_sample_for_test;
     use crate::Bounds;
-    use e3_fhe_params::build_pair_for_preset;
-    use e3_fhe_params::BfvPreset;
+    use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let (_, params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = prepare_sample_for_test(
-            BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
-            None,
-        )
-        .unwrap();
+        let sample =
+            prepare_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small, None)
+                .unwrap();
 
         let artifacts = PkCircuit
             .codegen(
-                &params,
+                DEFAULT_BFV_PRESET,
                 &PkCircuitInput {
                     public_key: sample.dkg_public_key,
                 },
@@ -144,11 +138,13 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(&params, &()).unwrap();
-        let bits = Bits::compute(&params, &bounds).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
-        assert!(configs_content.contains(format!("N: u32 = {}", params.degree()).as_str()));
-        assert!(configs_content.contains(format!("L: u32 = {}", params.moduli().len()).as_str()));
+        assert!(configs_content
+            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
+        assert!(configs_content
+            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
         assert!(configs_content.contains(
             format!(
                 "{}_BIT_PK: u32 = {}",

@@ -16,8 +16,9 @@ use crate::CircuitsErrors;
 use crate::ConvertToJson;
 use crate::PkCircuit;
 use crate::{CircuitComputation, Computation};
+use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
-use fhe::bfv::BfvParameters;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -31,15 +32,18 @@ pub struct PkComputationOutput {
 
 /// Implementation of [`CircuitComputation`] for [`PkCircuit`].
 impl CircuitComputation for PkCircuit {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = PkCircuitInput;
     type Output = PkComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(params, &())?;
-        let bits = Bits::compute(params, &bounds)?;
-        let witness = Witness::compute(params, input)?;
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, &())?;
+        let bits = Bits::compute(preset, &bounds)?;
+        let witness = Witness::compute(preset, input)?;
 
         Ok(PkComputationOutput {
             bounds,
@@ -80,17 +84,23 @@ pub struct Witness {
 }
 
 impl Computation for Configs {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, CircuitsErrors> {
-        let moduli = params.moduli().to_vec();
-        let bounds = Bounds::compute(&params, &())?;
-        let bits = Bits::compute(&params, &bounds)?;
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        _: &Self::Input,
+    ) -> Result<Self, CircuitsErrors> {
+        let (_, dkg_params) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
+        let moduli = dkg_params.moduli().to_vec();
+        let bounds = Bounds::compute(preset, &())?;
+        let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            n: params.degree(),
+            n: dkg_params.degree(),
             l: moduli.len(),
             moduli,
             bits,
@@ -100,11 +110,14 @@ impl Computation for Configs {
 }
 
 impl Computation for Bits {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(_: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(
+        _: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self, Self::Error> {
         Ok(Bits {
             pk_bit: calculate_bit_width(&input.pk_bound.to_string())?,
         })
@@ -112,14 +125,20 @@ impl Computation for Bits {
 }
 
 impl Computation for Bounds {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = ();
-    type Error = fhe::Error;
+    type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        _: &Self::Input,
+    ) -> Result<Self, Self::Error> {
+        let (_, dkg_params) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
         let mut pk_bound_max = BigUint::from(0u32);
 
-        for &qi in params.moduli() {
+        for &qi in dkg_params.moduli() {
             let qi_bound: BigUint = (&BigUint::from(qi) - 1u32) / 2u32;
 
             if qi_bound > pk_bound_max {
@@ -134,12 +153,17 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
-        let moduli = params.moduli();
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self, Self::Error> {
+        let (_, dkg_params) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+        let moduli = dkg_params.moduli();
 
         let mut pk0is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[0]);
         let mut pk1is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[1]);
@@ -184,15 +208,13 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::sample::prepare_sample_for_test;
     use crate::ConvertToJson;
-    use e3_fhe_params::build_pair_for_preset;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
-        let bounds = Bounds::compute(&dkg_params, &()).unwrap();
-        let bits = Bits::compute(&dkg_params, &bounds).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
         let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
@@ -201,7 +223,6 @@ mod tests {
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
         let sample = prepare_sample_for_test(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
@@ -209,7 +230,7 @@ mod tests {
         )
         .unwrap();
         let witness = Witness::compute(
-            &dkg_params,
+            DEFAULT_BFV_PRESET,
             &PkCircuitInput {
                 public_key: sample.dkg_public_key,
             },
@@ -224,8 +245,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
-        let constants = Configs::compute(&dkg_params, &()).unwrap();
+        let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
 
         let json = constants.convert_to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

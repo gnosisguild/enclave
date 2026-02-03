@@ -94,6 +94,10 @@ pub struct PresetMetadata {
     /// This determines the size of the polynomial ring R_q = Z_q[X]/(X^d + 1).
     /// Common values are 512, 1024, 2048, 4096, 8192, etc.
     pub degree: usize,
+    /// Number of moduli (l) - the number of moduli used in the ciphertext space
+    ///
+    /// This determines the size of the ciphertext space.
+    pub num_moduli: usize,
     /// Number of parties (n) - the number of ciphernodes in the system supported by
     /// the preset.
     ///
@@ -260,6 +264,7 @@ impl BfvPreset {
             BfvPreset::InsecureThreshold512 => PresetMetadata {
                 name: self.name(),
                 degree: insecure_512::DEGREE,
+                num_moduli: insecure_512::threshold::MODULI.len(),
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
                 parameter_type: ParameterType::THRESHOLD,
@@ -267,6 +272,7 @@ impl BfvPreset {
             BfvPreset::InsecureDkg512 => PresetMetadata {
                 name: self.name(),
                 degree: insecure_512::DEGREE,
+                num_moduli: insecure_512::dkg::MODULI.len(),
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
                 parameter_type: ParameterType::DKG,
@@ -274,6 +280,7 @@ impl BfvPreset {
             BfvPreset::SecureThreshold8192 => PresetMetadata {
                 name: self.name(),
                 degree: secure_8192::DEGREE,
+                num_moduli: secure_8192::threshold::MODULI.len(),
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
                 parameter_type: ParameterType::THRESHOLD,
@@ -281,6 +288,7 @@ impl BfvPreset {
             BfvPreset::SecureDkg8192 => PresetMetadata {
                 name: self.name(),
                 degree: secure_8192::DEGREE,
+                num_moduli: secure_8192::dkg::MODULI.len(),
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
                 parameter_type: ParameterType::DKG,

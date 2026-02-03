@@ -131,7 +131,7 @@ fn main() -> Result<()> {
         name if name == <PkCircuit as Circuit>::NAME => {
             let circuit = PkCircuit;
             circuit.codegen(
-                &dkg_params,
+                security_preset.threshold_preset(),
                 &PkCircuitInput {
                     public_key: sample.dkg_public_key,
                 },
