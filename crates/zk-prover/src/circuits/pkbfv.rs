@@ -10,11 +10,11 @@ use acir::FieldElement;
 use e3_events::CircuitName;
 use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::circuits::{
-    CircuitComputation,
     pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput},
+    CircuitComputation,
 };
 use fhe::bfv::{BfvParameters, PublicKey};
-use noirc_abi::{InputMap, input_parser::InputValue};
+use noirc_abi::{input_parser::InputValue, InputMap};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
