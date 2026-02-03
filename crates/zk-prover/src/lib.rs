@@ -19,7 +19,7 @@ mod utils;
 pub use actor::ZkActor;
 pub use backend::{SetupStatus, ZkBackend};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
-pub use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
+pub use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuit;
 pub use error::ZkError;
 pub use prover::ZkProver;
 pub use traits::Provable;

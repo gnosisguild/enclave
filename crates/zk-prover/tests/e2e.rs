@@ -8,8 +8,8 @@ mod common;
 
 use common::fixtures_dir;
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
-use e3_pvss::sample::generate_sample;
-use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
+use e3_zk_helpers::circuits::sample::generate_sample;
+use e3_zk_helpers::circuits::{CircuitComputation, ReduceToZkpModulus};
 use e3_zk_helpers::commitments::compute_pk_bfv_commitment;
 use e3_zk_prover::{PkBfvCircuit, Provable, ZkBackend, ZkConfig, ZkProver};
 use num_bigint::BigInt;

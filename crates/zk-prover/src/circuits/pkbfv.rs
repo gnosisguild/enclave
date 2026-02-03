@@ -8,12 +8,13 @@ use crate::error::ZkError;
 use crate::traits::Provable;
 use acir::FieldElement;
 use e3_events::CircuitName;
-use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
-use e3_pvss::traits::{CircuitComputation, ReduceToZkpModulus};
+use e3_polynomial::CrtPolynomial;
+use e3_zk_helpers::circuits::{
+    CircuitComputation,
+    pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput},
+};
 use fhe::bfv::{BfvParameters, PublicKey};
-use noirc_abi::input_parser::InputValue;
-use noirc_abi::InputMap;
-use num_bigint::BigInt;
+use noirc_abi::{InputMap, input_parser::InputValue};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -30,24 +31,31 @@ impl Provable for PkBfvCircuit {
         params: &Self::Params,
         input: &Self::Input,
     ) -> Result<InputMap, ZkError> {
-        let output = self
-            .compute(params, input)
+        let circuit_input = PkBfvCircuitInput {
+            public_key: input.clone(),
+        };
+        let output = PkBfvCircuit::compute(params.as_ref(), &circuit_input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
-        let reduced = output.witness.reduce_to_zkp_modulus();
-
         let mut inputs = InputMap::new();
-        inputs.insert("pk0is".to_string(), to_polynomial_array(&reduced.pk0is)?);
-        inputs.insert("pk1is".to_string(), to_polynomial_array(&reduced.pk1is)?);
+        inputs.insert(
+            "pk0is".to_string(),
+            crt_polynomial_to_array(&output.witness.pk0is)?,
+        );
+        inputs.insert(
+            "pk1is".to_string(),
+            crt_polynomial_to_array(&output.witness.pk1is)?,
+        );
 
         Ok(inputs)
     }
 }
 
-fn to_polynomial_array(vecs: &[Vec<BigInt>]) -> Result<InputValue, ZkError> {
-    let mut polynomials = Vec::with_capacity(vecs.len());
+fn crt_polynomial_to_array(crt_poly: &CrtPolynomial) -> Result<InputValue, ZkError> {
+    let mut polynomials = Vec::with_capacity(crt_poly.limbs.len());
 
-    for coeffs in vecs {
+    for limb in &crt_poly.limbs {
+        let coeffs = limb.coefficients();
         let mut field_coeffs = Vec::with_capacity(coeffs.len());
 
         for b in coeffs {

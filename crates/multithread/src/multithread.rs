@@ -24,7 +24,6 @@ use e3_events::{
     ZkRequest, ZkResponse,
 };
 use e3_fhe_params::decode_bfv_params_arc;
-use e3_pvss::circuits::pk_bfv::circuit::PkBfvCircuit;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
@@ -33,6 +32,7 @@ use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::NotifySync;
 use e3_utils::SharedRng;
+use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuit;
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
