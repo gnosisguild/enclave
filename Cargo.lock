@@ -3227,6 +3227,7 @@ dependencies = [
  "e3-request",
  "e3-sortition",
  "e3-test-helpers",
+ "e3-zk-prover",
  "hex",
  "libp2p",
  "phf",

@@ -9,6 +9,7 @@ use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use std::sync::{Arc, Mutex};
@@ -18,6 +19,9 @@ use tracing::instrument;
 pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
+    let backend = ZkBackend::with_default_dir().await?;
+    backend.ensure_installed().await?;
+
     let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
@@ -28,6 +32,7 @@ pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeH
         .with_max_threads()
         .with_contract_ciphernode_registry()
         .with_trbfv()
+        .with_zkproof(backend)
         .with_net(config.peers(), config.quic_port())
         .build()
         .await?;
