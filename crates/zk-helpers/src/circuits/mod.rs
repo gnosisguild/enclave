@@ -8,8 +8,9 @@
 //!
 //! This module provides circuit metadata ([`Circuit`](crate::registry::Circuit)), artifact
 //! codegen ([`CircuitCodegen`], [`Artifacts`]), commitment helpers ([`commitments`]),
-//! and sample data generation ([`Sample`]). The `pk_bfv` submodule implements the
-//! public-key BFV commitment circuit.
+//! and sample data generation ([`Sample`]). The [`dkg::pk`](dkg::pk) submodule implements the
+//! public-key BFV commitment circuit and is re-exported here: [`generate_configs`], [`generate_toml`],
+//! [`TomlJson`], [`Bits`], [`Bounds`], [`PkComputationOutput`], [`Witness`], and [`PkCircuit`].
 
 pub mod codegen;
 pub mod commitments;

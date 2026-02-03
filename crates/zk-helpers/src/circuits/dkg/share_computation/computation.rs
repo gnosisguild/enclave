@@ -164,8 +164,11 @@ impl Computation for Bounds {
     ) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-        let num_ciphertexts = preset.search_defaults().unwrap().z;
-        let lambda = preset.search_defaults().unwrap().lambda;
+        let defaults = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("missing search defaults".to_string()))?;
+        let num_ciphertexts = defaults.z;
+        let lambda = defaults.lambda;
 
         let e_sm_config = SmudgingBoundCalculatorConfig::new(
             threshold_params,
