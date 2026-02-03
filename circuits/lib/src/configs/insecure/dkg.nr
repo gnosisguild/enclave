@@ -48,8 +48,8 @@ share_computation_sk (CIRCUIT 2a)
 ************************************/
 
 // share_computation_sk - bit parameters
-pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 37;
-pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 2;
+pub global SHARE_COMPUTATION_BIT_SHARE: u32 = 36;
+pub global SHARE_COMPUTATION_SK_BIT_SECRET: u32 = 1;
 
 // share_computation_sk - configs
 pub global SHARE_COMPUTATION_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
@@ -62,7 +62,7 @@ share_computation_e_sm (CIRCUIT 2b)
 ************************************/
 
 // share_computation_e_sm - bit parameters
-pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 18;
+pub global SHARE_COMPUTATION_E_SM_BIT_SECRET: u32 = 24;
 
 // verify_shares - configs
 pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =

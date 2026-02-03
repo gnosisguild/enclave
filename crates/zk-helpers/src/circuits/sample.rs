@@ -7,7 +7,10 @@
 //! Sample data generation for circuits.
 //!
 //! [`Sample`] produces a random BFV key pair; the public key is used as input
-//! for codegen and tests (e.g. pk-bfv circuit).
+//! for codegen and tests (e.g. pk-bfv circuit). For share-computation, it can
+//! also produce secret-key or smudging-noise data: secret in CRT form, Shamir
+//! shares, and parity matrices. Smudging noise is generated with the computed
+//! smudging bound (error_size) so coefficients are non-zero.
 
 use crate::ciphernodes_committee::CiphernodesCommittee;
 use crate::ciphernodes_committee::CiphernodesCommitteeSize;
@@ -49,12 +52,13 @@ impl Sample {
         threshold_params: &Arc<BfvParameters>,
         dkg_params: &Arc<BfvParameters>,
         dkg_input_type: Option<DkgInputType>,
+        committee_size: CiphernodesCommitteeSize,
         num_ciphertexts: u128, // z in the search defaults
         lambda: u32,
     ) -> Result<Self, CircuitsErrors> {
         let mut rng = thread_rng();
 
-        let committee = CiphernodesCommitteeSize::Small.values();
+        let committee = committee_size.values();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
@@ -171,6 +175,7 @@ pub fn prepare_sample_for_test(
         &threshold_params,
         &dkg_params,
         dkg_input_type,
+        committee,
         num_ciphertexts,
         lambda,
     )

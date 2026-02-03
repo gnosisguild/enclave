@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the pk-bfv circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the share-computation circuit: constants, bounds, bit widths, and witness.
 //!
-//! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
+//! and (for witness) secret plus shares. Witness values are normalized to [0, q_j) per modulus
+//! and then to the ZKP field modulus so the Noir circuit's range check and parity check succeed.
 
 use crate::calculate_bit_width;
 use crate::circuits::commitments::{
@@ -83,12 +84,16 @@ pub struct Bounds {
     pub e_sm_bound: BigUint,
 }
 
-/// Witness data for the share-computation circuit: secret in CRT form, y (secret + shares per coeff/modulus), h (parity matrix), and commitment.
+/// Witness data for the share-computation circuit: secret in CRT form, y (secret + shares per coeff/modulus), and commitment.
+///
+/// All coefficients are reduced to the ZKP field modulus for serialization. Before that,
+/// secret_crt and y are normalized so that per modulus j: secret and shares are in [0, q_j),
+/// ensuring the circuit's secret consistency (y[i][j][0] == e_sm_secret[j][i]), range check, and parity check pass.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
-    /// Secret polynomial in CRT form (SK or smudging noise).
+    /// Secret polynomial in CRT form (SK or smudging noise). Coefficients in [0, zkp_modulus) for serialization.
     pub secret_crt: CrtPolynomial,
-    /// y[coeff_idx][mod_idx][0] = secret at (mod_idx, coeff_idx); y[coeff_idx][mod_idx][1 + party] = share for party.
+    /// y[coeff_idx][mod_idx][0] = secret at (mod_idx, coeff_idx); y[coeff_idx][mod_idx][1 + party] = share for party. Values in [0, zkp_modulus).
     pub y: Vec<Vec<Vec<BigInt>>>,
     /// Expected secret commitment (matches C1's compute_secret_commitment).
     pub expected_secret_commitment: BigInt,
@@ -198,16 +203,24 @@ impl Computation for Witness {
         let mut secret_crt = input.secret.clone();
         let sss = &input.secret_sss;
 
-        // y[coeff_idx][mod_idx][0] = secret_crt[mod_idx][coeff_idx]; y[coeff_idx][mod_idx][1 + party] = sss[mod_idx][party, coeff_idx]
+        if input.dkg_input_type == DkgInputType::SmudgingNoise {
+            // Normalize secret_crt to [0, q_j) per limb so it matches what we put in y and what the circuit expects (e_sm_secret[j][i] == y[i][j][0]).
+            secret_crt
+                .reduce(moduli)
+                .map_err(|e| CircuitsErrors::Sample(format!("secret_crt reduce: {:?}", e)))?;
+        }
+
+        // y[coeff_idx][mod_idx][0] = secret_crt[mod_idx][coeff_idx] (already in [0, q_j)); y[coeff_idx][mod_idx][1+party] = share in [0, q_j).
         let mut y: Vec<Vec<Vec<BigInt>>> = Vec::with_capacity(degree);
         for coeff_idx in 0..degree {
             let mut y_coeff: Vec<Vec<BigInt>> = Vec::with_capacity(num_moduli);
             for mod_idx in 0..num_moduli {
+                let q_j = BigInt::from(moduli[mod_idx]);
                 let mut y_mod: Vec<BigInt> = Vec::with_capacity(1 + n_parties);
                 y_mod.push(secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone());
                 for party_idx in 0..n_parties {
-                    let share_value = sss[mod_idx][[party_idx, coeff_idx]].clone();
-                    y_mod.push(share_value);
+                    let share_value = &sss[mod_idx][[party_idx, coeff_idx]];
+                    y_mod.push(reduce(share_value, &q_j));
                 }
                 y_coeff.push(y_mod);
             }
@@ -329,6 +342,30 @@ mod tests {
             decoded.expected_secret_commitment,
             witness.expected_secret_commitment
         );
+    }
+
+    #[test]
+    fn test_witness_smudging_noise_secret_consistency() {
+        let sample = prepare_sample_for_test(
+            BfvPreset::InsecureThreshold512,
+            CiphernodesCommitteeSize::Small,
+            Some(DkgInputType::SmudgingNoise),
+        )
+        .unwrap();
+        let input = share_computation_input_from_sample(&sample, DkgInputType::SmudgingNoise);
+        let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let degree = witness.secret_crt.limb(0).coefficients().len();
+        let num_moduli = witness.secret_crt.limbs.len();
+        for coeff_idx in 0..degree {
+            for mod_idx in 0..num_moduli {
+                let secret_coeff = witness.secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone();
+                let y_secret = witness.y[coeff_idx][mod_idx][0].clone();
+                assert_eq!(
+                    secret_coeff, y_secret,
+                    "secret consistency: secret_crt[{mod_idx}][{coeff_idx}] must equal y[{coeff_idx}][{mod_idx}][0]"
+                );
+            }
+        }
     }
 
     #[test]

@@ -278,7 +278,7 @@ mod tests {
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
-        let prefix = <ShareComputationCircuit as Circuit>::NAME.to_uppercase();
+        let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
 
         assert!(configs_content
             .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));

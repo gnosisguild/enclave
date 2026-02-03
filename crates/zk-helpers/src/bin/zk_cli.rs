@@ -13,6 +13,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
     ShareComputationCircuit, ShareComputationCircuitInput,
@@ -21,8 +22,12 @@ use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
 use e3_zk_helpers::sample::Sample;
+use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 /// DKG input type for share-computation circuit: secret key or smudging noise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +44,78 @@ fn parse_input_type(s: &str) -> Result<DkgInputTypeArg> {
             "unknown input-type: {s}. Use \"secret-key\" or \"smudging-noise\""
         )),
     }
+}
+
+/// Clear the terminal screen (ANSI escape codes; works on Unix, macOS, and most Windows terminals).
+fn clear_terminal() {
+    print!("\x1b[2J\x1b[1H");
+    let _ = std::io::stdout().flush();
+}
+
+/// Print a summary of what will be generated (circuit, preset, witness, output, artifacts).
+fn print_generation_info(
+    circuit: &str,
+    preset: BfvPreset,
+    has_witness: bool,
+    dkg_input_type: DkgInputType,
+    output: &std::path::Path,
+    toml_only: bool,
+) {
+    let meta = preset.metadata();
+    println!("  Circuit:  {}", circuit);
+    println!(
+        "  Preset:   {} (degree {}, {} moduli)",
+        preset.security_config_name(),
+        meta.degree,
+        meta.num_moduli
+    );
+    if has_witness {
+        println!(
+            "  Witness:  {}",
+            match dkg_input_type {
+                DkgInputType::SecretKey => "secret-key",
+                DkgInputType::SmudgingNoise => "smudging-noise",
+            }
+        );
+    }
+    println!("  Output:   {}", output.display());
+    println!("  Artifacts:");
+    if !toml_only {
+        println!("    • configs.nr only (--toml: Prover.toml skipped)");
+    } else {
+        println!("    • configs.nr");
+        println!("    • Prover.toml");
+    }
+    println!();
+}
+
+/// Run a closure while showing a spinner. Returns the closure's result.
+fn run_with_spinner<F, T, E>(f: F) -> Result<T, E>
+where
+    F: FnOnce() -> Result<T, E>,
+{
+    let done = Arc::new(AtomicBool::new(false));
+    let done_clone = Arc::clone(&done);
+    let spinner = thread::spawn(move || {
+        let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        let mut i = 0usize;
+        while !done_clone.load(Ordering::Relaxed) {
+            print!("\r  {} Generating artifacts... ", frames[i % frames.len()]);
+            i = i.wrapping_add(1);
+            std::io::stdout().flush().ok();
+            thread::sleep(Duration::from_millis(80));
+        }
+    });
+
+    let result = f();
+    done.store(true, Ordering::Relaxed);
+    spinner.join().ok();
+    result
+}
+
+/// Print the final success message.
+fn print_success(output: &std::path::Path) {
+    println!("\r  ✓ Artifacts written to {}", output.display());
 }
 
 /// Minimal ZK CLI for generating circuit artifacts.
@@ -61,7 +138,7 @@ struct Cli {
     #[arg(long, default_value = "output")]
     output: PathBuf,
     /// Skip generating Prover.toml (configs.nr is always generated).
-    #[arg(long)]
+    #[arg(long, default_value = "false")]
     toml: bool,
 }
 
@@ -145,52 +222,66 @@ fn main() -> Result<()> {
         DkgInputType::SecretKey
     };
 
-    let sample = Sample::generate(
-        &threshold_params,
-        &dkg_params,
-        Some(dkg_input_type.clone()),
-        0,
-        0,
-    )?;
-    let circuit_name = circuit_meta.name();
-    let artifacts = match circuit_name {
-        name if name == <PkCircuit as Circuit>::NAME => {
-            let circuit = PkCircuit;
-            circuit.codegen(
-                preset,
-                &PkCircuitInput {
-                    public_key: sample.dkg_public_key,
-                },
-            )?
-        }
-        name if name == <ShareComputationCircuit as Circuit>::NAME => {
-            let circuit = ShareComputationCircuit;
-            circuit.codegen(
-                preset,
-                &ShareComputationCircuitInput {
-                    dkg_input_type,
-                    secret: sample.secret.as_ref().unwrap().clone(),
-                    secret_sss: sample.secret_sss.clone(),
-                    parity_matrix: sample
-                        .parity_matrix
-                        .iter()
-                        .map(|m| m.to_bigint_rows())
-                        .collect(),
-                    n_parties: sample.committee.n as u32,
-                    threshold: sample.committee.threshold as u32,
-                },
-            )?
-        }
-        name => return Err(anyhow!("circuit {} not yet implemented", name)),
-    };
+    clear_terminal();
+    print_generation_info(
+        &circuit,
+        preset,
+        circuit_meta.dkg_input_type().is_some(),
+        dkg_input_type.clone(),
+        &args.output,
+        args.toml,
+    );
 
-    let toml = if !args.toml {
-        None
-    } else {
-        Some(&artifacts.toml)
-    };
-    write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+    run_with_spinner(|| {
+        let sample = Sample::generate(
+            &threshold_params,
+            &dkg_params,
+            Some(dkg_input_type.clone()),
+            CiphernodesCommitteeSize::Small,
+            preset.search_defaults().unwrap().z,
+            preset.search_defaults().unwrap().lambda,
+        )?;
+        let circuit_name = circuit_meta.name();
+        let artifacts = match circuit_name {
+            name if name == <PkCircuit as Circuit>::NAME => {
+                let circuit = PkCircuit;
+                circuit.codegen(
+                    preset,
+                    &PkCircuitInput {
+                        public_key: sample.dkg_public_key,
+                    },
+                )?
+            }
+            name if name == <ShareComputationCircuit as Circuit>::NAME => {
+                let circuit = ShareComputationCircuit;
+                circuit.codegen(
+                    preset,
+                    &ShareComputationCircuitInput {
+                        dkg_input_type,
+                        secret: sample.secret.as_ref().unwrap().clone(),
+                        secret_sss: sample.secret_sss.clone(),
+                        parity_matrix: sample
+                            .parity_matrix
+                            .iter()
+                            .map(|m| m.to_bigint_rows())
+                            .collect(),
+                        n_parties: sample.committee.n as u32,
+                        threshold: sample.committee.threshold as u32,
+                    },
+                )?
+            }
+            name => return Err(anyhow!("circuit {} not yet implemented", name)),
+        };
 
-    println!("Artifacts written to {}", args.output.display());
+        let toml = if !args.toml {
+            None
+        } else {
+            Some(&artifacts.toml)
+        };
+        write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+        Ok(())
+    })?;
+
+    print_success(&args.output);
     Ok(())
 }
