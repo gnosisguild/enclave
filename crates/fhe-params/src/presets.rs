@@ -234,6 +234,23 @@ impl BfvPreset {
         }
     }
 
+    /// Security config name: `"insecure"` or `"secure"` (e.g. for config paths).
+    pub fn security_config_name(self) -> &'static str {
+        match self {
+            BfvPreset::InsecureThreshold512 | BfvPreset::InsecureDkg512 => "insecure",
+            BfvPreset::SecureThreshold8192 | BfvPreset::SecureDkg8192 => "secure",
+        }
+    }
+
+    /// Parses security preset name `"insecure"` or `"secure"` into the corresponding threshold preset.
+    pub fn from_security_config_name(name: &str) -> Result<Self, PresetError> {
+        match name.trim().to_lowercase().as_str() {
+            "insecure" => Ok(Self::InsecureThreshold512),
+            "secure" => Ok(Self::SecureThreshold8192),
+            _ => Err(PresetError::UnknownPreset(name.to_string())),
+        }
+    }
+
     pub fn list() -> Vec<&'static str> {
         Self::ALL.iter().map(BfvPreset::name).collect()
     }

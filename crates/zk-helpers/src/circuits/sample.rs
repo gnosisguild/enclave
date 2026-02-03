@@ -16,13 +16,17 @@ use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_parity_matrix::build_generator_matrix;
-use e3_parity_matrix::{ParityMatrix, ParityMatrixConfig};
+use e3_parity_matrix::{null_space, ParityMatrix, ParityMatrixConfig};
+use e3_polynomial::CrtPolynomial;
 use fhe::bfv::{BfvParameters, PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
 use rand::thread_rng;
 use std::sync::Arc;
+
+/// Shamir secret shares: one limb per CRT modulus (rows = parties, cols = polynomial coefficients).
+pub type SecretShares = Vec<ndarray::Array2<BigInt>>;
 
 /// A sample BFV public key (and optionally related data) for circuit codegen or tests.
 #[derive(Debug, Clone)]
@@ -31,10 +35,12 @@ pub struct Sample {
     pub committee: CiphernodesCommittee,
     /// DKG BFV public key.
     pub dkg_public_key: PublicKey,
-    /// Secret shares.
-    pub secret_sss: Vec<ndarray::Array2<u64>>,
-    /// Parity matrix.
-    pub parity_matrix: ParityMatrix,
+    /// Secret in CRT form (SK or smudging noise, depending on [`DkgInputType`]).
+    pub secret: Option<CrtPolynomial>,
+    /// Secret shares (one [`ndarray::Array2<BigInt>`] per modulus; empty when [`DkgInputType`] is `None`).
+    pub secret_sss: SecretShares,
+    /// Parity check matrix per modulus (null space of generator), one [`ParityMatrix`] per CRT modulus.
+    pub parity_matrix: Vec<ParityMatrix>,
 }
 
 impl Sample {
@@ -58,17 +64,25 @@ impl Sample {
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
-        // Generate parity matrix for each modulus.
-        let parity_matrix = build_generator_matrix(&ParityMatrixConfig {
-            q: BigUint::from(threshold_params.moduli()[0]),
-            t: committee.threshold,
-            n: committee.n,
-        })
-        .map_err(|e| {
-            CircuitsErrors::Sample(format!("Failed to build generator matrix: {:?}", e))
-        })?;
+        // Parity check matrix (null space of generator) per modulus: [L][N_PARTIES-T][N_PARTIES+1].
+        let mut parity_matrix = Vec::with_capacity(threshold_params.moduli().len());
+        for &qi in threshold_params.moduli() {
+            let q = BigUint::from(qi);
+            let g = build_generator_matrix(&ParityMatrixConfig {
+                q: q.clone(),
+                t: committee.threshold,
+                n: committee.n,
+            })
+            .map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to build generator matrix: {:?}", e))
+            })?;
+            let h = null_space(&g, &q).map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to compute null space: {:?}", e))
+            })?;
+            parity_matrix.push(h);
+        }
 
-        let (_, secret_sss) = match dkg_input_type {
+        let (secret, secret_sss) = match dkg_input_type {
             Some(DkgInputType::SecretKey) => {
                 let threshold_secret_key = SecretKey::random(&threshold_params, &mut rng);
 
@@ -79,27 +93,28 @@ impl Sample {
                             "Failed to convert SK coeffs to poly: {:?}",
                             e
                         ))
-                    })
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!(
-                            "Failed to convert SK coeffs to poly: {:?}",
-                            e
-                        ))
                     })?;
 
-                let sk_sss = share_manager
+                let sk_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(sk_poly.clone(), rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e))
                     })?;
+                let secret_sss: SecretShares = sk_sss_u64
+                    .into_iter()
+                    .map(|arr| arr.mapv(BigInt::from))
+                    .collect();
 
-                let secret_coeffs: Vec<BigInt> = threshold_secret_key
+                let sk_coeffs: Vec<BigInt> = threshold_secret_key
                     .coeffs
                     .iter()
                     .map(|&c| BigInt::from(c))
                     .collect();
+                let mut secret_crt =
+                    CrtPolynomial::from_bigint_coeffs(&sk_coeffs, threshold_params.moduli());
+                secret_crt.center(threshold_params.moduli())?;
 
-                (secret_coeffs, sk_sss)
+                (Some(secret_crt), secret_sss)
             }
             Some(DkgInputType::SmudgingNoise) => {
                 let esi_coeffs = trbfv
@@ -113,22 +128,29 @@ impl Sample {
                 let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
                     CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
                 })?;
-                let esi_sss = share_manager
+                let esi_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(esi_poly.clone(), rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
                     })?;
+                let secret_sss: SecretShares = esi_sss_u64
+                    .into_iter()
+                    .map(|arr| arr.mapv(BigInt::from))
+                    .collect();
 
-                let secret_coeffs = esi_coeffs.clone();
+                let mut secret_crt =
+                    CrtPolynomial::from_bigint_coeffs(&esi_coeffs, threshold_params.moduli());
+                secret_crt.center(threshold_params.moduli())?;
 
-                (secret_coeffs, esi_sss)
+                (Some(secret_crt), secret_sss)
             }
-            None => (Vec::new(), Vec::new()),
+            None => (None, Vec::new()),
         };
 
         Ok(Self {
             committee,
             dkg_public_key,
+            secret,
             secret_sss,
             parity_matrix,
         })
@@ -179,6 +201,8 @@ mod tests {
         assert_eq!(sample.committee.h, committee.h);
         assert_eq!(sample.dkg_public_key.c.c.len(), 2);
         assert_eq!(sample.secret_sss.len(), 2);
+        let secret = sample.secret.as_ref().unwrap();
+        assert_eq!(secret.limbs.len(), 2);
     }
 
     #[test]
@@ -195,5 +219,7 @@ mod tests {
         assert_eq!(sample.committee.threshold, committee.threshold);
         assert_eq!(sample.dkg_public_key.c.c.len(), 2);
         assert_eq!(sample.secret_sss.len(), 2);
+        let secret = sample.secret.as_ref().unwrap();
+        assert_eq!(secret.limbs.len(), 2);
     }
 }

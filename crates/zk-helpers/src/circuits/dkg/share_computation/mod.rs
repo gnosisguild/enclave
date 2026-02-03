@@ -4,5 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! DKG share-computation circuit (SK or smudging noise).
+
 pub mod circuit;
-pub use circuit::*;
+pub mod codegen;
+pub mod computation;
+
+pub use circuit::{ShareComputationCircuit, ShareComputationCircuitInput};
+pub use computation::{Bits, Bounds, Configs, ShareComputationOutput, Witness};

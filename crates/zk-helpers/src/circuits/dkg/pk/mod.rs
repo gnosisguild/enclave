@@ -13,6 +13,7 @@
 pub mod circuit;
 pub mod codegen;
 pub mod computation;
-pub use circuit::*;
-pub use codegen::*;
-pub use computation::*;
+
+pub use circuit::{PkCircuit, PkCircuitInput};
+pub use codegen::{generate_configs, generate_toml, TomlJson};
+pub use computation::{Bits, Bounds, Configs, PkComputationOutput, Witness};
