@@ -8,11 +8,11 @@
 //!
 //! This binary lists available circuits and generates Prover.toml and configs.nr
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
-//! `--circuit <name> --preset <preset>` to generate artifacts.
+//! `--circuit <name> --preset insecure|secure` to generate artifacts.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
-use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
@@ -30,7 +30,7 @@ struct Cli {
     /// Circuit name to generate artifacts for (e.g. pk-bfv).
     #[arg(long, required_unless_present = "list_circuits")]
     circuit: Option<String>,
-    /// BFV preset name (must match circuit's parameter type).
+    /// Preset: "insecure" (512) or "secure" (8192). Drives both threshold and DKG params.
     #[arg(long, required_unless_present = "list_circuits")]
     preset: Option<String>,
     /// Output directory for generated artifacts.
@@ -41,13 +41,31 @@ struct Cli {
     toml: bool,
 }
 
-/// Parses a preset name (e.g. `"default"`) into a [`BfvPreset`].
-/// Returns an error listing available presets if the name is unknown.
-fn parse_preset(name: &str) -> Result<BfvPreset> {
-    BfvPreset::from_name(name).map_err(|_| {
-        let available = BfvPreset::list().join(", ");
-        anyhow!("unknown preset: {name}. Available: {available}")
-    })
+/// Security preset: chooses both threshold and DKG params (insecure = 512, secure = 8192).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SecurityPreset {
+    Insecure,
+    Secure,
+}
+
+impl SecurityPreset {
+    fn threshold_preset(self) -> BfvPreset {
+        match self {
+            SecurityPreset::Insecure => BfvPreset::InsecureThreshold512,
+            SecurityPreset::Secure => BfvPreset::SecureThreshold8192,
+        }
+    }
+}
+
+/// Parses preset name "insecure" or "secure" into a [`SecurityPreset`].
+fn parse_preset(name: &str) -> Result<SecurityPreset> {
+    match name.trim() {
+        s if s.eq_ignore_ascii_case("insecure") => Ok(SecurityPreset::Insecure),
+        s if s.eq_ignore_ascii_case("secure") => Ok(SecurityPreset::Secure),
+        _ => Err(anyhow!(
+            "unknown preset: {name}. Use \"insecure\" or \"secure\""
+        )),
+    }
 }
 
 fn main() -> Result<()> {
@@ -75,7 +93,7 @@ fn main() -> Result<()> {
 
     // Unwrap required arguments (clap ensures they're present when list_circuits is false).
     let circuit = args.circuit.unwrap();
-    let preset = parse_preset(&args.preset.unwrap())?;
+    let security_preset = parse_preset(&args.preset.unwrap())?;
 
     std::fs::create_dir_all(&args.output)
         .with_context(|| format!("failed to create output dir {}", args.output.display()))?;
@@ -86,8 +104,16 @@ fn main() -> Result<()> {
         anyhow!("unknown circuit: {}. Available: {}", circuit, available)
     })?;
 
-    // Validate preset parameter type matches circuit's supported parameter type.
-    let preset_param_type = preset.metadata().parameter_type;
+    // Build threshold and DKG params from the security preset (insecure → 512, secure → 8192).
+    let (threshold_params, dkg_params) = build_pair_for_preset(security_preset.threshold_preset())
+        .map_err(|e| anyhow!("failed to build params: {}", e))?;
+
+    // Validate DKG preset parameter type matches circuit's supported parameter type.
+    let dkg_preset = security_preset
+        .threshold_preset()
+        .dkg_counterpart()
+        .expect("threshold preset has DKG counterpart");
+    let preset_param_type = dkg_preset.metadata().parameter_type;
     let circuit_param_type = circuit_meta.supported_parameter();
     if preset_param_type != circuit_param_type {
         return Err(anyhow!(
@@ -98,17 +124,16 @@ fn main() -> Result<()> {
         ));
     }
 
-    // Generate artifacts based on circuit name from registry.
-    let params = BfvParamSet::from(preset).build_arc();
-    let sample = Sample::generate(&params);
+    // Generate sample and artifacts based on circuit name from registry.
+    let sample = Sample::generate(&threshold_params, &dkg_params, None, 0, 0)?;
     let circuit_name = circuit_meta.name();
     let artifacts = match circuit_name {
         name if name == <PkCircuit as Circuit>::NAME => {
             let circuit = PkCircuit;
             circuit.codegen(
-                &params,
+                &dkg_params,
                 &PkCircuitInput {
-                    public_key: sample.public_key,
+                    public_key: sample.dkg_public_key,
                 },
             )?
         }

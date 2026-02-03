@@ -181,30 +181,37 @@ impl ConvertToJson for Witness {
 mod tests {
     use super::*;
 
+    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+    use crate::sample::prepare_sample_for_test;
     use crate::ConvertToJson;
-    use crate::Sample;
-    use e3_fhe_params::BfvParamSet;
+    use e3_fhe_params::build_pair_for_preset;
+    use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let bounds = Bounds::compute(&params, &()).unwrap();
-        let bits = Bits::compute(&params, &bounds).unwrap();
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let bounds = Bounds::compute(&dkg_params, &()).unwrap();
+        let bits = Bits::compute(&dkg_params, &bounds).unwrap();
         let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
 
-        assert_eq!(bounds.pk_bound, BigUint::from(34359701504u64));
+        assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = Sample::generate(&params);
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let sample = prepare_sample_for_test(
+            BfvPreset::InsecureThreshold512,
+            CiphernodesCommitteeSize::Small,
+            None,
+        )
+        .unwrap();
         let witness = Witness::compute(
-            &params,
+            &dkg_params,
             &PkCircuitInput {
-                public_key: encryption_data.public_key,
+                public_key: sample.dkg_public_key,
             },
         )
         .unwrap();
@@ -217,8 +224,8 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let constants = Configs::compute(&params, &()).unwrap();
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let constants = Configs::compute(&dkg_params, &()).unwrap();
 
         let json = constants.convert_to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

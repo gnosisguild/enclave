@@ -4,5 +4,5 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod pk;
-pub mod share_computation;
+pub mod circuit;
+pub use circuit::*;

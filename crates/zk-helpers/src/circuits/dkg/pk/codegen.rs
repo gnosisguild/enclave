@@ -82,24 +82,30 @@ pub global {}_BIT_PK: u32 = {};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
-    use crate::sample::Sample;
+    use crate::sample::prepare_sample_for_test;
     use crate::Bounds;
-
-    use e3_fhe_params::BfvParamSet;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::build_pair_for_preset;
+    use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let sample = Sample::generate(&params);
+        let (_, params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let sample = prepare_sample_for_test(
+            BfvPreset::InsecureThreshold512,
+            CiphernodesCommitteeSize::Small,
+            None,
+        )
+        .unwrap();
+
         let artifacts = PkCircuit
             .codegen(
                 &params,
                 &PkCircuitInput {
-                    public_key: sample.public_key,
+                    public_key: sample.dkg_public_key,
                 },
             )
             .unwrap();

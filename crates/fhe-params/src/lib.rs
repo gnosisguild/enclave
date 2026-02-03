@@ -15,7 +15,7 @@ pub mod search;
 
 pub use builder::{
     build_bfv_params, build_bfv_params_arc, build_bfv_params_from_set,
-    build_bfv_params_from_set_arc,
+    build_bfv_params_from_set_arc, build_pair_for_preset,
 };
 #[cfg(feature = "abi-encoding")]
 pub use encoding::{decode_bfv_params, decode_bfv_params_arc, encode_bfv_params, EncodingError};
