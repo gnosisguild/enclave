@@ -44,6 +44,10 @@ contract MockEnclave {
     committeePublicKey = publicKeyHash;
   }
 
+  function getE3Stage(uint256) external view returns (IEnclave.E3Stage) {
+    return IEnclave.E3Stage.KeyPublished;
+  }
+
   function getE3(uint256) external view returns (E3 memory) {
     return
       E3({
