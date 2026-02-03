@@ -96,9 +96,6 @@ RUN for d in ./*/ ; do \
         fi \
     done
 
-# Stub binary so first build (dependency cache) succeeds
-RUN mkdir -p ./fhe-params/src/bin && echo 'fn main() {}' > ./fhe-params/src/bin/search_params.rs
-
 RUN cargo build --locked --release
 
 COPY ./crates .
