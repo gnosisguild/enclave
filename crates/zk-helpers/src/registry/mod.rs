@@ -4,14 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod ciphernodes_committee;
-pub mod circuits;
-pub mod packing;
-pub mod registry;
-pub mod utils;
+//! Circuit registry and metadata.
+//!
+//! The registry maps circuit names (e.g. `pk-bfv`) to [`CircuitMetadata`]. Use
+//! [`CircuitRegistry`] to register and look up circuits by name.
 
-pub use ciphernodes_committee::*;
-pub use circuits::*;
-pub use packing::*;
+pub mod registry;
+
 pub use registry::*;
-pub use utils::*;

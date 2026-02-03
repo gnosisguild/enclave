@@ -4,8 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::traits::CircuitMetadata;
-use crate::types::DkgInputType;
+use crate::computation::DkgInputType;
 use e3_fhe_params::ParameterType;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,7 +17,51 @@ pub enum RegistryError {
     UnknownCircuit { name: String },
 }
 
-/// Registry for PVSS circuits.
+/// Trait for circuit metadata.
+pub trait Circuit: Send + Sync {
+    const NAME: &'static str;
+    const PREFIX: &'static str;
+    const SUPPORTED_PARAMETER: ParameterType;
+    const DKG_INPUT_TYPE: Option<DkgInputType>;
+
+    fn name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn prefix(&self) -> &'static str {
+        Self::PREFIX
+    }
+
+    fn supported_parameter(&self) -> ParameterType {
+        Self::SUPPORTED_PARAMETER
+    }
+
+    fn dkg_input_type(&self) -> Option<DkgInputType> {
+        Self::DKG_INPUT_TYPE
+    }
+}
+
+pub trait CircuitMetadata: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn supported_parameter(&self) -> ParameterType;
+    fn dkg_input_type(&self) -> Option<DkgInputType>;
+}
+
+impl<T: Circuit> CircuitMetadata for T {
+    fn name(&self) -> &'static str {
+        T::NAME
+    }
+
+    fn supported_parameter(&self) -> ParameterType {
+        T::SUPPORTED_PARAMETER
+    }
+
+    fn dkg_input_type(&self) -> Option<DkgInputType> {
+        T::DKG_INPUT_TYPE
+    }
+}
+
+/// Registry for ZK circuits.
 pub struct CircuitRegistry {
     circuits: HashMap<String, Arc<dyn CircuitMetadata>>,
 }
@@ -56,18 +99,6 @@ impl CircuitRegistry {
         Ok(self.get(name)?.dkg_input_type())
     }
 
-    /// Get number of recursive proofs for a circuit.
-    /// This is used for determine the number of proofs required for aggregation.
-    pub fn n_recursive_proofs(&self, name: &str) -> Result<usize, RegistryError> {
-        Ok(self.get(name)?.n_recursive_proofs())
-    }
-
-    /// Get number of public inputs for a circuit.
-    /// This is used for determine the number of public inputs required for aggregation.
-    pub fn n_public_inputs(&self, name: &str) -> Result<usize, RegistryError> {
-        Ok(self.get(name)?.n_public_inputs())
-    }
-
     /// List all registered circuit names.
     pub fn list_circuits(&self) -> Vec<String> {
         self.circuits.keys().cloned().collect()
@@ -77,8 +108,15 @@ impl CircuitRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuits::pk_bfv::circuit::PkBfvCircuit;
-    use crate::traits::Circuit;
+
+    pub struct TestCircuit;
+
+    impl Circuit for TestCircuit {
+        const NAME: &'static str = "test";
+        const PREFIX: &'static str = "TEST";
+        const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
+        const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SecretKey);
+    }
 
     #[test]
     /// Unknown circuits should return an error.
@@ -94,19 +132,11 @@ mod tests {
     /// Registry should expose metadata for registered circuits.
     fn registry_reports_expected_metadata() {
         let mut registry = CircuitRegistry::new();
-        registry.register(Arc::new(PkBfvCircuit));
-        let circuit = registry.get(<PkBfvCircuit as Circuit>::NAME).unwrap();
+        registry.register(Arc::new(TestCircuit));
+        let circuit = registry.get(<TestCircuit as Circuit>::NAME).unwrap();
 
-        assert_eq!(circuit.name(), <PkBfvCircuit as Circuit>::NAME);
+        assert_eq!(circuit.name(), <TestCircuit as Circuit>::NAME);
         assert_eq!(circuit.supported_parameter(), ParameterType::DKG);
-        assert!(circuit.dkg_input_type().is_none());
-        assert_eq!(
-            circuit.n_recursive_proofs(),
-            <PkBfvCircuit as Circuit>::N_PROOFS
-        );
-        assert_eq!(
-            circuit.n_public_inputs(),
-            <PkBfvCircuit as Circuit>::N_PUBLIC_INPUTS
-        );
+        assert!(circuit.dkg_input_type().is_some());
     }
 }

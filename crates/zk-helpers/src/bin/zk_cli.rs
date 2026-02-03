@@ -4,21 +4,25 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! ZK CLI — command-line tool for zero-knowledge circuit artifact generation.
+//!
+//! This binary lists available circuits and generates Prover.toml and configs.nr
+//! for use with the Noir prover. Use `--list_circuits` to see circuits and
+//! `--circuit <name> --preset <preset>` to generate artifacts.
+
 use anyhow::{anyhow, Context, Result};
-use clap::Parser;
+use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvParamSet, BfvPreset};
-use e3_pvss::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCodegenInput};
-use e3_pvss::circuits::pk_bfv::codegen::write_artifacts;
-use e3_pvss::registry::CircuitRegistry;
-use e3_pvss::sample;
-use e3_pvss::traits::Circuit;
-use e3_pvss::traits::CircuitCodegen;
+use e3_zk_helpers::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput};
+use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
+use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
+use e3_zk_helpers::sample::Sample;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Minimal PVSS CLI for generating circuit artifacts.
+/// Minimal ZK CLI for generating circuit artifacts.
 #[derive(Debug, Parser)]
-#[command(name = "pvss-cli")]
+#[command(name = "zk-cli")]
 struct Cli {
     /// List all available circuits and exit.
     #[arg(long)]
@@ -32,9 +36,13 @@ struct Cli {
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
+    /// Skip generating Prover.toml (configs.nr is always generated).
+    #[arg(long)]
+    toml: bool,
 }
 
-/// Parse a preset name into a BFV preset.
+/// Parses a preset name (e.g. `"default"`) into a [`BfvPreset`].
+/// Returns an error listing available presets if the name is unknown.
 fn parse_preset(name: &str) -> Result<BfvPreset> {
     BfvPreset::from_name(name).map_err(|_| {
         let available = BfvPreset::list().join(", ");
@@ -56,11 +64,9 @@ fn main() -> Result<()> {
         for circuit_name in circuits {
             if let Ok(circuit_meta) = registry.get(&circuit_name) {
                 println!(
-                    "  {} - params_type: {:?}, n_recursive_proofs: {}, pub_inputs: {}",
+                    "  {} - params_type: {:?}",
                     circuit_name,
                     circuit_meta.supported_parameter(),
-                    circuit_meta.n_recursive_proofs(),
-                    circuit_meta.n_public_inputs()
                 );
             }
         }
@@ -94,26 +100,27 @@ fn main() -> Result<()> {
 
     // Generate artifacts based on circuit name from registry.
     let params = BfvParamSet::from(preset).build_arc();
-    let sample = sample::generate_sample(&params);
+    let sample = Sample::generate(&params);
     let circuit_name = circuit_meta.name();
     let artifacts = match circuit_name {
         name if name == <PkBfvCircuit as Circuit>::NAME => {
             let circuit = PkBfvCircuit;
-            circuit.codegen(PkBfvCodegenInput {
-                preset,
-                public_key: sample.public_key,
-            })?
+            circuit.codegen(
+                &params,
+                &PkBfvCircuitInput {
+                    public_key: sample.public_key,
+                },
+            )?
         }
         name => return Err(anyhow!("circuit {} not yet implemented", name)),
     };
 
-    write_artifacts(
-        &artifacts.toml,
-        &artifacts.template,
-        &artifacts.configs,
-        &artifacts.wrapper,
-        Some(args.output.as_path()),
-    )?;
+    let toml = if !args.toml {
+        None
+    } else {
+        Some(&artifacts.toml)
+    };
+    write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
 
     println!("Artifacts written to {}", args.output.display());
     Ok(())

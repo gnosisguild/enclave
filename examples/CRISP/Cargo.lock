@@ -2568,14 +2568,24 @@ dependencies = [
 name = "e3-zk-helpers"
 version = "0.1.8"
 dependencies = [
+ "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
+ "clap",
+ "e3-fhe-params",
  "e3-polynomial 0.1.8",
  "e3-safe 0.1.8",
  "fhe",
+ "fhe-math",
+ "itertools 0.14.0",
  "num-bigint",
  "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]
@@ -5624,15 +5634,15 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
-version = "3.24.0"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "655da9c7eb6305c55742045d5a8d2037996d61d8de95806335c7c86ce0f82e9c"
+checksum = "e8a64e3985349f2441a1a9ef0b853f869006c3855f2cda6862a94d26ebb9d6a1"
 dependencies = [
  "fastrand",
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

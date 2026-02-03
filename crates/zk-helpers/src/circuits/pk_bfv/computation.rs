@@ -4,15 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::traits::Computation;
-use crate::traits::ConvertToJson;
-use crate::traits::ReduceToZkpModulus;
+//! Computation types for the pk-bfv circuit: constants, bounds, bit widths, and witness.
+//!
+//! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
+//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+
+use crate::circuits::pk_bfv::circuit::PkBfvCircuitInput;
+use crate::computation::CircuitComputation;
+use crate::computation::Computation;
+use crate::computation::ConvertToJson;
+use crate::computation::ReduceToZkpModulus;
+use crate::errors::CircuitsErrors;
+use crate::utils::calculate_bit_width;
+use crate::utils::get_zkp_modulus;
+use crate::PkBfvCircuit;
 use e3_polynomial::center_coefficients_mut;
 use e3_polynomial::reduce_coefficients_2d;
-use e3_zk_helpers::utils::calculate_bit_width;
-use e3_zk_helpers::utils::get_zkp_modulus;
 use fhe::bfv::BfvParameters;
-use fhe::bfv::PublicKey;
 use fhe_math::rq::Representation;
 use itertools::izip;
 use num_bigint::BigInt;
@@ -20,43 +28,95 @@ use num_bigint::BigUint;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Constants {
-    pub n: usize,
-    pub l: usize,
-    pub moduli: Vec<u64>,
+/// Output of [`CircuitComputation::compute`] for [`PkBfvCircuit`]: bounds, bit widths, and witness.
+#[derive(Debug)]
+pub struct PkBfvComputationOutput {
+    /// Coefficient bounds for public key polynomials.
+    pub bounds: Bounds,
+    /// Bit widths for the prover (e.g. pk_bit).
+    pub bits: Bits,
+    /// Witness data (pk0is, pk1is) for the Noir prover.
+    pub witness: Witness,
 }
 
-#[derive(Debug, Clone)]
+/// Implementation of [`CircuitComputation`] for [`PkBfvCircuit`].
+impl CircuitComputation for PkBfvCircuit {
+    type Params = BfvParameters;
+    type Input = PkBfvCircuitInput;
+    type Output = PkBfvComputationOutput;
+    type Error = CircuitsErrors;
+
+    fn compute(
+        &self,
+        params: &Self::Params,
+        input: &Self::Input,
+    ) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(params, &())?;
+        let bits = Bits::compute(params, &bounds)?;
+        let witness = Witness::compute(params, input)?;
+
+        Ok(PkBfvComputationOutput {
+            bounds,
+            bits,
+            witness,
+        })
+    }
+}
+
+/// BFV parameters extracted for the circuit: degree, number of moduli, and modulus values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Configs {
+    /// Polynomial degree (N).
+    pub n: usize,
+    /// Number of CRT moduli (L).
+    pub l: usize,
+    /// CRT moduli q_i.
+    pub moduli: Vec<u64>,
+    /// Bits.
+    pub bits: Bits,
+    /// Bounds.
+    pub bounds: Bounds,
+}
+
+/// Bit widths used by the Noir prover (e.g. for packing coefficients).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bits {
+    /// Bit width for public key coefficients.
     pub pk_bit: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Coefficient bounds for public key polynomials (used to derive bit widths).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bounds {
-    /// Bound for public key polynomials (pk0, pk1)
+    /// Bound for public key polynomials (pk0, pk1).
     pub pk_bound: BigUint,
 }
 
+/// Witness data for the pk-bfv circuit: public key polynomials in CRT form for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
-    /// Public key polynomials (pk0, pk1) for each CRT basis.
+    /// First component of the public key per modulus (coefficients as BigInt).
     pub pk0is: Vec<Vec<BigInt>>,
+    /// Second component of the public key per modulus (coefficients as BigInt).
     pub pk1is: Vec<Vec<BigInt>>,
 }
 
-impl Computation for Constants {
+impl Computation for Configs {
     type Params = BfvParameters;
     type Input = ();
-    type Error = std::convert::Infallible;
+    type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, CircuitsErrors> {
         let moduli = params.moduli().to_vec();
+        let bounds = Bounds::compute(&params, &())?;
+        let bits = Bits::compute(&params, &bounds)?;
 
-        Ok(Constants {
+        Ok(Configs {
             n: params.degree(),
             l: moduli.len(),
             moduli,
+            bits,
+            bounds,
         })
     }
 }
@@ -64,7 +124,7 @@ impl Computation for Constants {
 impl Computation for Bits {
     type Params = BfvParameters;
     type Input = Bounds;
-    type Error = e3_zk_helpers::utils::ZkHelpersUtilsError;
+    type Error = crate::utils::ZkHelpersUtilsError;
 
     fn compute(_: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         Ok(Bits {
@@ -76,7 +136,7 @@ impl Computation for Bits {
 impl Computation for Bounds {
     type Params = BfvParameters;
     type Input = ();
-    type Error = crate::errors::CodegenError;
+    type Error = fhe::Error;
 
     fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
         let mut pk_bound_max = BigUint::from(0u32);
@@ -97,16 +157,16 @@ impl Computation for Bounds {
 
 impl Computation for Witness {
     type Params = BfvParameters;
-    type Input = PublicKey;
+    type Input = PkBfvCircuitInput;
     type Error = fhe::Error;
 
-    fn compute(params: &Self::Params, public_key: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
         let moduli = params.moduli();
 
         // Extract public key components (pk0, pk1) from the ciphertext structure
         // and change representation to Power Basis.
-        let mut pk0 = public_key.c.c[0].clone();
-        let mut pk1 = public_key.c.c[1].clone();
+        let mut pk0 = input.public_key.c.c[0].clone();
+        let mut pk1 = input.public_key.c.c[1].clone();
         pk0.change_representation(Representation::PowerBasis);
         pk1.change_representation(Representation::PowerBasis);
 
@@ -139,7 +199,7 @@ impl Computation for Witness {
     }
 }
 
-impl ConvertToJson for Constants {
+impl ConvertToJson for Configs {
     fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
         serde_json::to_value(self)
     }
@@ -169,9 +229,9 @@ impl ReduceToZkpModulus for Witness {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sample::generate_sample;
-    use crate::traits::ConvertToJson;
-    use crate::traits::ReduceToZkpModulus;
+    use crate::computation::ConvertToJson;
+    use crate::computation::ReduceToZkpModulus;
+    use crate::sample::Sample;
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
@@ -189,8 +249,14 @@ mod tests {
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
         let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = generate_sample(&params);
-        let witness = Witness::compute(&params, &encryption_data.public_key).unwrap();
+        let encryption_data = Sample::generate(&params);
+        let witness = Witness::compute(
+            &params,
+            &PkBfvCircuitInput {
+                public_key: encryption_data.public_key,
+            },
+        )
+        .unwrap();
         let zkp_reduced = witness.reduce_to_zkp_modulus();
         let json = zkp_reduced.convert_to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
@@ -202,13 +268,15 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let constants = Constants::compute(&params, &()).unwrap();
+        let constants = Configs::compute(&params, &()).unwrap();
 
         let json = constants.convert_to_json().unwrap();
-        let decoded: Constants = serde_json::from_value(json).unwrap();
+        let decoded: Configs = serde_json::from_value(json).unwrap();
 
         assert_eq!(decoded.n, constants.n);
         assert_eq!(decoded.l, constants.l);
         assert_eq!(decoded.moduli, constants.moduli);
+        assert_eq!(decoded.bits, constants.bits);
+        assert_eq!(decoded.bounds, constants.bounds);
     }
 }
