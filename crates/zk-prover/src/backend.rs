@@ -368,7 +368,12 @@ mod tests {
     use crate::config::CircuitInfo;
     use crate::utils::sha256_hex;
     use std::collections::HashMap;
+    use std::path::PathBuf;
     use tempfile::tempdir;
+
+    fn versions_json_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
+    }
 
     #[tokio::test]
     async fn test_backend_creates_directories() {

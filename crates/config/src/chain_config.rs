@@ -11,7 +11,7 @@ use crate::{
     rpc::{RpcAuth, RPC},
 };
 use anyhow::*;
-use e3_events::{EvmEventConfig, EvmEventConfigChain};
+use e3_events::EvmEventConfigChain;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 

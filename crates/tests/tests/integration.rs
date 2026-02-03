@@ -707,7 +707,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     use e3_events::{EventBus, EventBusConfig, GetEvents, Shutdown, TakeEvents};
     use e3_test_helpers::{create_random_eth_addrs, get_common_setup, simulate_libp2p_net};
     use fhe::{
-        bfv::{PublicKey, SecretKey},
+        bfv::PublicKey,
         mbfv::{AggregateIter, PublicKeyShare},
     };
     use fhe_traits::Serialize;

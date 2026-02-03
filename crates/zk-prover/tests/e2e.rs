@@ -8,9 +8,9 @@ mod common;
 
 use common::fixtures_dir;
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
-use e3_zk_helpers::circuits::sample::generate_sample;
-use e3_zk_helpers::circuits::{CircuitComputation, ReduceToZkpModulus};
-use e3_zk_helpers::commitments::compute_pk_bfv_commitment;
+use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuitInput;
+use e3_zk_helpers::circuits::sample::Sample;
+use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_prover::{PkBfvCircuit, Provable, ZkBackend, ZkConfig, ZkProver};
 use num_bigint::BigInt;
 use std::path::PathBuf;
@@ -91,7 +91,7 @@ mod local_bb {
 
         let preset = BfvPreset::InsecureDkg512;
         let params = build_bfv_params_from_set_arc(preset.into());
-        let sample = generate_sample(&params);
+        let sample = Sample::generate(&params);
 
         let prover = ZkProver::new(&backend);
         let circuit = PkBfvCircuit;
@@ -107,23 +107,23 @@ mod local_bb {
             "public signals should not be empty"
         );
 
-        let computation_output = circuit
-            .compute(&params, &sample.public_key)
-            .expect("computation should succeed");
-        let reduced_witness = computation_output.witness.reduce_to_zkp_modulus();
-        let commitment_calculated = compute_pk_bfv_commitment(
-            &reduced_witness.pk0is,
-            &reduced_witness.pk1is,
-            computation_output.bits.pk_bit,
-        );
         let commitment_from_proof =
             BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_signals);
 
+        let circuit_input = PkBfvCircuitInput {
+            public_key: sample.public_key.clone(),
+        };
+        let computation_output =
+            PkBfvCircuit::compute(&params, &circuit_input).expect("computation should succeed");
+        let commitment_calculated = compute_dkg_pk_commitment(
+            &computation_output.witness.pk0is,
+            &computation_output.witness.pk1is,
+            computation_output.bits.pk_bit,
+        );
         assert_eq!(
             commitment_calculated, commitment_from_proof,
             "commitment mismatch"
         );
-
         match circuit.verify(&prover, &proof, e3_id) {
             Ok(true) => println!("proof verified successfully"),
             Ok(false) => {
