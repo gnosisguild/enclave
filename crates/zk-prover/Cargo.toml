@@ -48,3 +48,7 @@ e3-utils.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[features]
+default = []
+integration-tests = []

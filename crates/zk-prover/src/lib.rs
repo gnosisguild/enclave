@@ -12,6 +12,9 @@ mod error;
 mod prover;
 mod traits;
 mod witness;
+// lib.rs
+#[cfg(test)]
+mod utils;
 
 pub use actor::ZkActor;
 pub use backend::{SetupStatus, ZkBackend};

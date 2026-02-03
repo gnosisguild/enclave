@@ -365,12 +365,10 @@ fn chrono_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use crate::config::CircuitInfo;
+    use crate::utils::sha256_hex;
+    use std::collections::HashMap;
     use tempfile::tempdir;
-
-    fn versions_json_path() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
-    }
 
     #[tokio::test]
     async fn test_backend_creates_directories() {
@@ -544,61 +542,6 @@ mod tests {
         {
             assert!(version_info.bb_checksum.is_some());
         }
-
-        let temp_path = temp.path().to_path_buf();
-        drop(temp);
-        assert!(!temp_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_download_bb_fails_with_wrong_checksum() {
-        let mut config = ZkConfig::load(&versions_json_path())
-            .await
-            .expect("versions.json should exist");
-
-        for checksum in config.bb_checksums.values_mut() {
-            *checksum = "0".repeat(64);
-        }
-
-        let temp = tempdir().unwrap();
-        let backend = ZkBackend::new(temp.path(), config);
-
-        let result = backend.download_bb().await;
-
-        assert!(
-            matches!(result, Err(ZkError::ChecksumMismatch { .. })),
-            "expected ChecksumMismatch, got {:?}",
-            result
-        );
-
-        assert!(!backend.bb_binary.exists());
-
-        let temp_path = temp.path().to_path_buf();
-        drop(temp);
-        assert!(!temp_path.exists());
-    }
-
-    #[tokio::test]
-    async fn test_ensure_installed_full_flow() {
-        let config = ZkConfig::load(&versions_json_path())
-            .await
-            .expect("versions.json should exist");
-
-        let temp = tempdir().unwrap();
-        let backend = ZkBackend::new(temp.path(), config);
-
-        assert!(matches!(
-            backend.check_status().await,
-            SetupStatus::FullSetupNeeded
-        ));
-
-        let result = backend.ensure_installed().await;
-        assert!(result.is_ok(), "ensure_installed failed: {:?}", result);
-
-        assert!(matches!(backend.check_status().await, SetupStatus::Ready));
-
-        let version = backend.verify_bb().await;
-        assert!(version.is_ok(), "bb --version failed: {:?}", version);
 
         let temp_path = temp.path().to_path_buf();
         drop(temp);
