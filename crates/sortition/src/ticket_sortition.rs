@@ -7,7 +7,69 @@
 use crate::ticket::{calculate_best_ticket_for_node, RegisteredNode, WinnerTicket};
 use alloy::primitives::Address;
 use anyhow::Result;
+use e3_events::{E3id, Seed};
 use std::collections::{hash_map::Entry, HashMap};
+
+/// Calculate the buffer size for committee selection based on the threshold ratio.
+///
+/// This buffer allows backup nodes to submit tickets in case primary committee
+/// members are unavailable or fail to submit.
+///
+/// # Formula
+/// ```text
+/// buffer = (threshold_n - threshold_m) + safety_margin
+/// ```
+///
+/// Where safety_margin is determined by the threshold ratio:
+/// - ratio >= 0.8: safety_margin = 3 (tight threshold, need more backup)
+/// - ratio >= 0.6: safety_margin = 2 (moderate backup)
+/// - ratio < 0.6:  safety_margin = 1 (already fault-tolerant)
+///
+/// # Parameters
+/// - `threshold_m`: Minimum nodes required for decryption
+/// - `threshold_n`: Requested committee size
+///
+/// # Returns
+/// The number of additional nodes that should be selected as backup
+///
+/// # Examples
+/// ```
+/// use e3_sortition::calculate_buffer_size;
+///
+/// // High security requirement (4 of 5)
+/// let buffer = calculate_buffer_size(4, 5);
+/// assert_eq!(buffer, 4); // 1 + 3 safety margin
+///
+/// // Balanced (3 of 5)
+/// let buffer = calculate_buffer_size(3, 5);
+/// assert_eq!(buffer, 4); // 2 + 2 safety margin
+///
+/// // High fault tolerance (3 of 10)
+/// let buffer = calculate_buffer_size(3, 10);
+/// assert_eq!(buffer, 8); // 7 + 1 safety margin
+/// ```
+pub fn calculate_buffer_size(threshold_m: usize, threshold_n: usize) -> usize {
+    if threshold_n == 0 {
+        return 0;
+    }
+
+    // Base buffer is the number of nodes that can fail without breaking threshold
+    let base_buffer = threshold_n.saturating_sub(threshold_m);
+
+    // Calculate threshold ratio to determine safety margin
+    let ratio = threshold_m as f64 / threshold_n as f64;
+
+    // Determine safety margin based on how tight the threshold is
+    let safety_margin = if ratio >= 0.8 {
+        3 // Tight threshold (e.g., 4/5), need more backup
+    } else if ratio >= 0.6 {
+        2 // Moderate threshold (e.g., 3/5), balanced backup
+    } else {
+        1 // Loose threshold (e.g., 3/10), minimal backup needed
+    };
+
+    base_buffer + safety_margin
+}
 
 /// Deterministic committee selection based on ticket scores.
 ///
@@ -30,13 +92,19 @@ impl ScoreSortition {
     /// Determine the top-N committee members from a list of registered nodes.
     ///
     /// # Parameters
+    /// - `e3_id`: The E3 computation ID.
     /// - `seed`: Round seed used for deterministic ticket scoring.
     /// - `nodes`: Snapshot of all registered nodes (each with its tickets).
     ///
     /// # Returns
     /// A sorted vector of `WinnerTicket`s representing the selected committee.
     /// Returns an empty vector if no nodes have tickets or if `size == 0`.
-    pub fn get_committee(&self, seed: u64, nodes: &[RegisteredNode]) -> Result<Vec<WinnerTicket>> {
+    pub fn get_committee(
+        &self,
+        e3_id: E3id,
+        seed: Seed,
+        nodes: &[RegisteredNode],
+    ) -> Result<Vec<WinnerTicket>> {
         if nodes.is_empty() || self.size == 0 {
             return Ok(Vec::new());
         }
@@ -48,7 +116,7 @@ impl ScoreSortition {
                 continue;
             }
 
-            let w = calculate_best_ticket_for_node(seed, n)?;
+            let w = calculate_best_ticket_for_node(e3_id.clone(), seed, n)?;
             match best_map.entry(w.address) {
                 Entry::Vacant(v) => {
                     v.insert(w);
@@ -83,7 +151,8 @@ impl ScoreSortition {
 mod tests {
     use crate::ticket::{RegisteredNode, Ticket, WinnerTicket};
     use crate::ticket_sortition::ScoreSortition;
-    use alloy::primitives::{keccak256, Address};
+    use alloy::primitives::{keccak256, Address, Uint};
+    use e3_events::{E3id, Seed};
     use std::collections::HashSet;
 
     fn ticket_count(i: u64) -> u64 {
@@ -118,8 +187,9 @@ mod tests {
 
     #[test]
     fn test_ticket_sortition() {
-        let seed: u64 = 0xA1B2_C3D4_E5F6_7789;
         let committee_size: usize = 3;
+        let e3_id = E3id::new("42", 42);
+        let seed = Seed::from(Uint::from(0xA1B2_C3D4_E5F6_7789u64));
 
         let nodes = build_nodes();
         assert_eq!(nodes.len(), 10);
@@ -135,15 +205,54 @@ mod tests {
         }
 
         let committee: Vec<WinnerTicket> = ScoreSortition::new(committee_size)
-            .get_committee(seed, &nodes)
+            .get_committee(e3_id, seed, &nodes)
             .expect("score sortition should succeed");
         assert_eq!(committee.len(), committee_size);
 
         // Check winners deterministically for the given seed
         assert_eq!(committee[0].address, nodes[9].address);
-        assert_eq!(committee[1].address, nodes[1].address);
-        assert_eq!(committee[2].address, nodes[0].address);
+        assert_eq!(committee[1].address, nodes[2].address);
+        assert_eq!(committee[2].address, nodes[1].address);
 
         println!("COMMITTEE {:#?}", committee);
+    }
+
+    #[test]
+    fn test_buffer_calculation() {
+        // Edge cases
+        assert_eq!(super::calculate_buffer_size(0, 0), 0);
+        assert_eq!(super::calculate_buffer_size(5, 5), 3); // ratio=1.0, safety=3
+        assert_eq!(super::calculate_buffer_size(1, 1), 3); // ratio=1.0, safety=3
+
+        // Tight threshold (ratio >= 0.8) - safety margin = 3
+        assert_eq!(super::calculate_buffer_size(4, 5), 4); // 80%: base=1, safety=3
+        assert_eq!(super::calculate_buffer_size(8, 10), 5); // 80%: base=2, safety=3
+        assert_eq!(super::calculate_buffer_size(9, 10), 4); // 90%: base=1, safety=3
+
+        // Moderate threshold (0.6 <= ratio < 0.8) - safety margin = 2
+        assert_eq!(super::calculate_buffer_size(3, 5), 4); // 60%: base=2, safety=2
+        assert_eq!(super::calculate_buffer_size(7, 10), 5); // 70%: base=3, safety=2
+
+        // Loose threshold (ratio < 0.6) - safety margin = 1
+        assert_eq!(super::calculate_buffer_size(2, 5), 4); // 40%: base=3, safety=1
+        assert_eq!(super::calculate_buffer_size(3, 10), 8); // 30%: base=7, safety=1
+        assert_eq!(super::calculate_buffer_size(5, 20), 16); // 25%: base=15, safety=1
+
+        // Real-world scenarios
+        let cases = [
+            (4, 5, 9, "Small committee, high security"),
+            (7, 10, 15, "Medium committee, balanced"),
+            (10, 30, 51, "Large committee, high fault tolerance"),
+        ];
+
+        for (threshold_m, threshold_n, expected_total, desc) in cases {
+            let buffer = super::calculate_buffer_size(threshold_m, threshold_n);
+            let total = threshold_n + buffer;
+            assert_eq!(
+                total, expected_total,
+                "{}: Need {}/{} nodes, expected {} total",
+                desc, threshold_m, threshold_n, expected_total
+            );
+        }
     }
 }
