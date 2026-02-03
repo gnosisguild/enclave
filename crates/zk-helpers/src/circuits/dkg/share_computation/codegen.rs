@@ -7,7 +7,6 @@
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
 use crate::bigint_to_field;
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_computation::{
     Bits, ShareComputationCircuit, ShareComputationCircuitInput, ShareComputationOutput, Witness,
@@ -41,7 +40,12 @@ impl CircuitCodegen for ShareComputationCircuit {
             ShareComputationCircuit::compute(preset, input)?;
 
         let toml = generate_toml(&witness, input.dkg_input_type.clone())?;
-        let configs = generate_configs(preset, &bits)?;
+        let configs = generate_configs(
+            preset,
+            &bits,
+            input.n_parties as usize,
+            input.threshold as usize,
+        )?;
 
         Ok(Artifacts { toml, configs })
     }
@@ -142,13 +146,19 @@ fn parity_matrix_constant_string(
 }
 
 /// Builds the configs.nr string (N, L, parity matrix, bit parameters, configs) for the Noir prover.
-pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> Result<Configs, CircuitsErrors> {
+///
+/// `n_parties` and `threshold` are used to build the parity matrix (Reed–Solomon generator null space)
+/// and must match the committee size used for the witness/sample.
+pub fn generate_configs(
+    preset: BfvPreset,
+    bits: &Bits,
+    n_parties: usize,
+    threshold: usize,
+) -> Result<Configs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
     let config_name = preset.security_config_name();
-    let committee = CiphernodesCommitteeSize::Small.values();
-    let parity_matrix_str =
-        parity_matrix_constant_string(&threshold_params, committee.n, committee.threshold)?;
+    let parity_matrix_str = parity_matrix_constant_string(&threshold_params, n_parties, threshold)?;
     let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
     let configs = format!(
         r#"

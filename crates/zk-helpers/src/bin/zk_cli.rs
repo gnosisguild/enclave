@@ -59,7 +59,7 @@ fn print_generation_info(
     has_witness: bool,
     dkg_input_type: DkgInputType,
     output: &std::path::Path,
-    toml_only: bool,
+    write_prover_toml: bool,
 ) {
     let meta = preset.metadata();
     println!("  Circuit:  {}", circuit);
@@ -80,11 +80,11 @@ fn print_generation_info(
     }
     println!("  Output:   {}", output.display());
     println!("  Artifacts:");
-    if !toml_only {
-        println!("    • configs.nr only (--toml: Prover.toml skipped)");
-    } else {
+    if write_prover_toml {
         println!("    • configs.nr");
         println!("    • Prover.toml");
+    } else {
+        println!("    • configs.nr only (pass --toml to also generate Prover.toml)");
     }
     println!();
 }
@@ -137,7 +137,7 @@ struct Cli {
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
-    /// Skip generating Prover.toml (configs.nr is always generated).
+    /// Also write Prover.toml (default: configs.nr only).
     #[arg(long, default_value = "false")]
     toml: bool,
 }
@@ -199,16 +199,21 @@ fn main() -> Result<()> {
         ));
     }
 
+    let write_prover_toml = args.toml;
+    // Circuits that accept runtime witness type (e.g. share-computation with SecretKey or SmudgingNoise) have DKG_INPUT_TYPE == None but still need witness handling.
+    let has_witness_type = circuit_meta.dkg_input_type().is_some()
+        || circuit_meta.name() == ShareComputationCircuit::NAME;
+
     // For share-computation: require --witness only when generating Prover.toml (configs are shared).
-    let dkg_input_type = if circuit_meta.dkg_input_type().is_some() {
-        let witness_str = if args.toml {
-            // Only configs: use default (configs.nr is the same for both witness types).
+    let dkg_input_type = if has_witness_type {
+        let witness_str = if !args.toml {
+            // Configs-only: witness optional (configs.nr is the same for both witness types).
             args.witness.as_deref().unwrap_or("secret-key")
         } else {
-            // Prover.toml will be written: witness type is required.
+            // Generating Prover.toml: witness type is required.
             args.witness.as_deref().ok_or_else(|| {
                 anyhow!(
-                    "circuit {} requires --witness (secret-key or smudging-noise) when generating Prover.toml",
+                    "circuit {} requires --witness (secret-key or smudging-noise) when writing Prover.toml",
                     circuit
                 )
             })?
@@ -226,10 +231,10 @@ fn main() -> Result<()> {
     print_generation_info(
         &circuit,
         preset,
-        circuit_meta.dkg_input_type().is_some(),
+        has_witness_type,
         dkg_input_type.clone(),
         &args.output,
-        args.toml,
+        write_prover_toml,
     );
 
     run_with_spinner(|| {
@@ -273,10 +278,10 @@ fn main() -> Result<()> {
             name => return Err(anyhow!("circuit {} not yet implemented", name)),
         };
 
-        let toml = if !args.toml {
-            None
-        } else {
+        let toml = if write_prover_toml {
             Some(&artifacts.toml)
+        } else {
+            None
         };
         write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
         Ok(())
