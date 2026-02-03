@@ -121,19 +121,17 @@ fn benchmark_cyclotomic_reduction(c: &mut Criterion) {
 fn benchmark_utility_functions(c: &mut Criterion) {
     let mut group = c.benchmark_group("utility_functions");
 
-    // Benchmark reduce_and_center
     let x = BigInt::from(123456789);
     let modulus = BigInt::from(1000000007);
-    let half_modulus = &modulus / 2;
 
-    group.bench_function("reduce_and_center", |b| {
-        b.iter(|| {
-            black_box(e3_polynomial::utils::reduce_and_center(
-                &x,
-                &modulus,
-                &half_modulus,
-            ))
-        })
+    // Benchmark reduce
+    group.bench_function("reduce", |b| {
+        b.iter(|| black_box(e3_polynomial::utils::reduce(&x, &modulus)))
+    });
+
+    // Benchmark center
+    group.bench_function("center", |b| {
+        b.iter(|| black_box(e3_polynomial::utils::center(&x, &modulus)))
     });
 
     // Benchmark range checking
