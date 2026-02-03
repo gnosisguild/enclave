@@ -61,7 +61,7 @@ impl<T: Circuit> CircuitMetadata for T {
     }
 }
 
-/// Registry for PVSS circuits.
+/// Registry for ZK circuits.
 pub struct CircuitRegistry {
     circuits: HashMap<String, Arc<dyn CircuitMetadata>>,
 }
