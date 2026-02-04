@@ -13,9 +13,8 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 // Global configs for threshold insecure preset
 pub global N: u32 = 512;
 pub global L: u32 = 2;
-pub global PLAINTEXT_MODULUS: Field = 10;
+pub global PLAINTEXT_MODULUS: Field = 100;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
-pub global Q_MOD_T_MOD_P: Field = 3;
 pub global Q_MOD_T: Field = 3;
 pub global Q_INVERSE_MOD_T: Field = 7;
 pub global T_INV_MOD_Q: Field = 1416703358393105942938;
@@ -74,22 +73,23 @@ pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 35;
 pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 1;
 pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 5;
 pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 5;
-pub global USER_DATA_ENCRYPTION_BIT_K: u32 = 3;
+pub global USER_DATA_ENCRYPTION_BIT_K: u32 = 6;
 pub global USER_DATA_ENCRYPTION_BIT_R1: u32 = 9;
 pub global USER_DATA_ENCRYPTION_BIT_R2: u32 = 35;
 pub global USER_DATA_ENCRYPTION_BIT_P1: u32 = 9;
 pub global USER_DATA_ENCRYPTION_BIT_P2: u32 = 35;
 
-pub global USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P: Field = 3;
-pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] = [61847462708, 20615769293];
+pub global USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P: Field =
+    21888242871839275222246405745257275088548364400416034343698204186575808495610;
+pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] = [61160268678, 8933500027];
 pub global USER_DATA_ENCRYPTION_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global USER_DATA_ENCRYPTION_E0_BOUND: Field = 20;
 pub global USER_DATA_ENCRYPTION_E1_BOUND: Field = 20;
 pub global USER_DATA_ENCRYPTION_U_BOUND: Field = 1;
-pub global USER_DATA_ENCRYPTION_K1_LOW_BOUND: Field = 5;
-pub global USER_DATA_ENCRYPTION_K1_UP_BOUND: Field = 4;
-pub global USER_DATA_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [261, 258];
-pub global USER_DATA_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [260, 258];
+pub global USER_DATA_ENCRYPTION_K1_LOW_BOUND: Field = 50;
+pub global USER_DATA_ENCRYPTION_K1_UP_BOUND: Field = 49;
+pub global USER_DATA_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [301, 263];
+pub global USER_DATA_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [300, 263];
 pub global USER_DATA_ENCRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
