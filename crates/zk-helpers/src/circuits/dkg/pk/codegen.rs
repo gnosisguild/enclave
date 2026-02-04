@@ -92,7 +92,7 @@ mod tests {
     use crate::circuits::dkg::pk::computation::Bounds;
     use crate::codegen::write_artifacts;
     use crate::sample::Sample;
-    use crate::threshold::compute_pk_bit;
+    use crate::utils::compute_pk_bit;
 
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -147,9 +147,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let pk_bit = compute_pk_bit(&params).unwrap();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let pk_bit = compute_pk_bit(&params);
 
         assert!(configs_content
             .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
