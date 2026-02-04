@@ -11,30 +11,29 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readF
 import { basename, join, resolve } from 'path'
 
 // Types & Constants
-const ENVIRONMENTS = { INSECURE: 'insecure', PRODUCTION: 'production' } as const
-type Environment = (typeof ENVIRONMENTS)[keyof typeof ENVIRONMENTS]
-const ALL_ENVIRONMENTS: Environment[] = [ENVIRONMENTS.INSECURE, ENVIRONMENTS.PRODUCTION]
+const CIRCUIT_GROUPS = { DKG: 'dkg', THRESHOLD: 'threshold' } as const
+type CircuitGroup = (typeof CIRCUIT_GROUPS)[keyof typeof CIRCUIT_GROUPS]
+const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.THRESHOLD]
 
 interface CircuitInfo {
   name: string
-  environment: Environment
+  group: CircuitGroup
   path: string
 }
 interface CompiledCircuit {
   name: string
-  environment: Environment
+  group: CircuitGroup
   artifacts: { json?: string; vk?: string }
   checksums: { json?: string; vk?: string }
 }
 interface BuildOptions {
-  environments?: Environment[]
+  groups?: CircuitGroup[]
   circuits?: string[]
   skipChecksums?: boolean
   skipVk?: boolean
   outputDir?: string
   clean?: boolean
   dryRun?: boolean
-  verbose?: boolean
 }
 interface BuildResult {
   success: boolean
@@ -54,7 +53,7 @@ class NoirCircuitBuilder {
     this.rootDir = rootDir ?? resolve(__dirname, '..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
     this.options = {
-      environments: ALL_ENVIRONMENTS,
+      groups: ALL_GROUPS,
       outputDir: join(this.rootDir, 'dist', 'circuits'),
       clean: true,
       skipVk: false,
@@ -80,7 +79,7 @@ class NoirCircuitBuilder {
       console.log(`   Found ${circuits.length} circuit(s)`)
 
       if (this.options.dryRun) {
-        console.log('\n   Would build:', circuits.map((c) => `${c.environment}/${c.name}`).join(', '))
+        console.log('\n   Would build:', circuits.map((c) => `${c.group}/${c.name}`).join(', '))
         return result
       }
 
@@ -127,15 +126,15 @@ class NoirCircuitBuilder {
     const circuits: CircuitInfo[] = []
     if (!existsSync(this.circuitsDir)) return circuits
 
-    for (const env of this.options.environments ?? ALL_ENVIRONMENTS) {
-      const envDir = join(this.circuitsDir, env)
-      if (!existsSync(envDir)) continue
+    for (const group of this.options.groups ?? ALL_GROUPS) {
+      const groupDir = join(this.circuitsDir, group)
+      if (!existsSync(groupDir)) continue
 
-      for (const entry of readdirSync(envDir)) {
-        const circuitPath = join(envDir, entry)
+      for (const entry of readdirSync(groupDir)) {
+        const circuitPath = join(groupDir, entry)
         if (statSync(circuitPath).isDirectory() && existsSync(join(circuitPath, 'Nargo.toml'))) {
           if (!this.options.circuits || this.options.circuits.includes(entry)) {
-            circuits.push({ name: entry, environment: env, path: circuitPath })
+            circuits.push({ name: entry, group, path: circuitPath })
           }
         }
       }
@@ -147,15 +146,15 @@ class NoirCircuitBuilder {
     const packageName = this.getPackageName(circuit.path)
     const result: CompiledCircuit = {
       name: circuit.name,
-      environment: circuit.environment,
+      group: circuit.group,
       artifacts: {},
       checksums: {},
     }
 
     execSync('nargo compile', { cwd: circuit.path, stdio: 'pipe' })
 
-    const envDir = join(this.circuitsDir, circuit.environment)
-    const targetDirs = [join(envDir, 'target'), join(this.circuitsDir, 'target'), join(circuit.path, 'target')]
+    const groupDir = join(this.circuitsDir, circuit.group)
+    const targetDirs = [join(groupDir, 'target'), join(this.circuitsDir, 'target'), join(circuit.path, 'target')]
 
     let jsonFile: string | null = null
     let targetDir: string | null = null
@@ -170,22 +169,24 @@ class NoirCircuitBuilder {
       }
     }
 
-    if (jsonFile && targetDir) {
-      this.sanitizePaths(jsonFile)
-      result.artifacts.json = jsonFile
-      result.checksums.json = this.checksum(jsonFile)
-
-      if (!this.options.skipVk) {
-        const vkFile = this.generateVk(jsonFile, targetDir, packageName)
-        if (vkFile) {
-          result.artifacts.vk = vkFile
-          result.checksums.vk = this.checksum(vkFile)
-        }
-      }
-      console.log(`   ✓ ${circuit.environment}/${circuit.name}`)
-    } else {
-      console.log(`   ⚠️  ${circuit.environment}/${circuit.name}: no artifact found`)
+    if (!jsonFile || !targetDir) {
+      throw new Error(
+        `${circuit.group}/${circuit.name}: compiled artifact not found. ` + `Searched for ${packageName}.json in: ${targetDirs.join(', ')}`,
+      )
     }
+
+    this.sanitizePaths(jsonFile)
+    result.artifacts.json = jsonFile
+    result.checksums.json = this.checksum(jsonFile)
+
+    if (!this.options.skipVk) {
+      const vkFile = this.generateVk(jsonFile, targetDir, packageName)
+      if (vkFile) {
+        result.artifacts.vk = vkFile
+        result.checksums.vk = this.checksum(vkFile)
+      }
+    }
+    console.log(`   ✓ ${circuit.group}/${circuit.name}`)
 
     return result
   }
@@ -201,7 +202,8 @@ class NoirCircuitBuilder {
         rmSync(defaultVk)
       }
       return existsSync(vkFile) ? vkFile : null
-    } catch {
+    } catch (err) {
+      console.error(`Error generating VK for ${jsonFile}:`, err)
       return null
     }
   }
@@ -238,7 +240,7 @@ class NoirCircuitBuilder {
     const checksums: Record<string, string> = {}
 
     for (const c of compiled) {
-      const prefix = `${c.environment}/${c.name}`
+      const prefix = `${c.group}/${c.name}`
       if (c.checksums.json && c.artifacts.json) {
         const f = `${prefix}/${basename(c.artifacts.json)}`
         checksums[f] = c.checksums.json
@@ -264,7 +266,7 @@ class NoirCircuitBuilder {
     const outputDir = this.options.outputDir!
     for (const c of compiled) {
       if (!c.artifacts.json && !c.artifacts.vk) continue
-      const dir = join(outputDir, c.environment, c.name)
+      const dir = join(outputDir, c.group, c.name)
       mkdirSync(dir, { recursive: true })
       if (c.artifacts.json) copyFileSync(c.artifacts.json, join(dir, basename(c.artifacts.json)))
       if (c.artifacts.vk) copyFileSync(c.artifacts.vk, join(dir, basename(c.artifacts.vk)))
@@ -274,19 +276,22 @@ class NoirCircuitBuilder {
 
   computeSourceHash(): string {
     const hash = createHash('sha256')
-    const circuits = this.discoverCircuits().sort((a, b) => `${a.environment}/${a.name}`.localeCompare(`${b.environment}/${b.name}`))
+    const circuits = this.discoverCircuits().sort((a, b) => `${a.group}/${a.name}`.localeCompare(`${b.group}/${b.name}`))
     for (const c of circuits) this.hashDir(c.path, hash)
     return hash.digest('hex').substring(0, 16)
   }
 
-  private hashDir(dirPath: string, hash: ReturnType<typeof createHash>): void {
+  private hashDir(dirPath: string, hash: ReturnType<typeof createHash>, relativePath = ''): void {
     for (const entry of readdirSync(dirPath).sort()) {
       if (entry === 'target' || entry.startsWith('.')) continue
       const fullPath = join(dirPath, entry)
+      const entryRelativePath = relativePath ? `${relativePath}/${entry}` : entry
       const stat = statSync(fullPath)
-      if (stat.isDirectory()) this.hashDir(fullPath, hash)
-      else if (stat.isFile()) {
-        hash.update(entry)
+      if (stat.isDirectory()) {
+        hash.update(entryRelativePath + '/')
+        this.hashDir(fullPath, hash, entryRelativePath)
+      } else if (stat.isFile()) {
+        hash.update(entryRelativePath)
         hash.update(readFileSync(fullPath))
       }
     }
@@ -304,24 +309,6 @@ class NoirCircuitBuilder {
     if (output) appendFileSync(output, lines.join('\n') + '\n')
     else console.log('\n📋 CI Output:', lines.join(', '))
   }
-
-  generateManifest(version: string): string {
-    const outputDir = this.options.outputDir!
-    mkdirSync(outputDir, { recursive: true })
-    const manifest = {
-      version,
-      generatedAt: new Date().toISOString(),
-      sourceHash: this.computeSourceHash(),
-      circuits: this.discoverCircuits().map((c) => ({
-        name: c.name,
-        environment: c.environment,
-        artifacts: { json: `${c.environment}/${c.name}/${c.name}.json`, vk: `${c.environment}/${c.name}/${c.name}.vk` },
-      })),
-    }
-    const path = join(outputDir, 'manifest.json')
-    writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n')
-    return path
-  }
 }
 
 // CLI
@@ -329,7 +316,6 @@ async function main() {
   const args = process.argv.slice(2)
   const options: BuildOptions = {}
   let command = 'build'
-  let version: string | undefined
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
@@ -337,16 +323,13 @@ async function main() {
       showHelp()
       process.exit(0)
     } else if (arg === '--dry-run') options.dryRun = true
-    else if (arg === '-v' || arg === '--verbose') options.verbose = true
     else if (arg === '--skip-checksums') options.skipChecksums = true
     else if (arg === '--skip-vk') options.skipVk = true
-    else if (arg === '--skip-production') options.environments = [ENVIRONMENTS.INSECURE]
     else if (arg === '--no-clean') options.clean = false
-    else if (arg === '--env') options.environments = args[++i]?.split(',') as Environment[]
+    else if (arg === '--group') options.groups = args[++i]?.split(',') as CircuitGroup[]
     else if (arg === '--circuit') (options.circuits ??= []).push(args[++i])
     else if (arg === '-o' || arg === '--output') options.outputDir = resolve(args[++i])
-    else if (arg === '--version') version = args[++i]
-    else if (['hash', 'manifest', 'build'].includes(arg)) command = arg
+    else if (['hash', 'build'].includes(arg)) command = arg
   }
 
   const builder = new NoirCircuitBuilder(undefined, options)
@@ -355,12 +338,6 @@ async function main() {
     const hash = builder.computeSourceHash()
     console.log(hash)
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `source_hash=${hash}\n`)
-  } else if (command === 'manifest') {
-    if (!version) {
-      console.error('❌ --version required')
-      process.exit(1)
-    }
-    console.log(`✅ Manifest: ${builder.generateManifest(version)}`)
   } else {
     const result = await builder.buildAll()
     builder.writeGitHubOutput(result)
@@ -372,23 +349,20 @@ function showHelp() {
   console.log(`
 Usage: build-circuits [command] [options]
 
-Commands: build (default), hash, manifest
+Commands: build (default), hash
 
 Options:
-  --skip-production   Only build insecure circuits
+  --group <groups>    Circuit groups (comma-separated: dkg,threshold)
+  --circuit <name>    Build specific circuit(s)
   --skip-vk           Skip verification key generation
   --skip-checksums    Skip checksum generation
-  --env <envs>        Environments (comma-separated: insecure,production)
-  --circuit <name>    Build specific circuit(s)
   -o, --output <dir>  Output directory (default: dist/circuits)
-  --version <ver>     Version for manifest
   --dry-run           Show what would be built
   --no-clean          Don't clean output directory
-  -v, --verbose       Verbose output
   -h, --help          Show help
 `)
 }
 
 if (require.main === module) main()
 
-export { NoirCircuitBuilder, BuildOptions, BuildResult, CompiledCircuit, CircuitInfo, Environment, ENVIRONMENTS }
+export { NoirCircuitBuilder, BuildOptions, BuildResult, CompiledCircuit, CircuitInfo, CircuitGroup, CIRCUIT_GROUPS }

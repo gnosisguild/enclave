@@ -169,8 +169,8 @@ artifacts.
 # Build all circuits
 pnpm build:circuits
 
-# Build only insecure circuits (skip heavy production ones)
-pnpm build:circuits --skip-production
+# Build only specific group (dkg or threshold)
+pnpm build:circuits --group dkg
 
 # Skip verification key generation (faster)
 pnpm build:circuits --skip-vk
@@ -180,14 +180,11 @@ pnpm build:circuits --dry-run
 
 # Get source hash for change detection
 pnpm build:circuits hash
-
-# Generate manifest file
-pnpm build:circuits manifest --version 1.0.0
 ```
 
 ### What it does
 
-1. **Discovers circuits** in `circuits/bin/insecure/` and `circuits/bin/production/`
+1. **Discovers circuits** in `circuits/bin/dkg/` and `circuits/bin/threshold/`
 2. **Compiles** each circuit using `nargo compile`
 3. **Generates verification keys** using `bb write_vk`
 4. **Sanitizes paths** in compiled JSON (removes local filesystem paths for opsec)
@@ -196,11 +193,10 @@ pnpm build:circuits manifest --version 1.0.0
 
 ### Options
 
-- `--skip-production` - Only build insecure circuits
+- `--group <groups>` - Circuit groups (comma-separated: dkg,threshold)
+- `--circuit <name>` - Build specific circuit(s)
 - `--skip-vk` - Skip verification key generation
 - `--skip-checksums` - Skip checksum generation
-- `--env <envs>` - Environments (comma-separated: insecure,production)
-- `--circuit <name>` - Build specific circuit(s)
 - `-o, --output <dir>` - Output directory (default: dist/circuits)
 - `--dry-run` - Show what would be built
 - `--no-clean` - Don't clean output directory
@@ -218,7 +214,7 @@ pnpm build:circuits manifest --version 1.0.0
 
 ```bash
 # Build circuits locally, then push to git branch
-pnpm build:circuits --skip-production
+pnpm build:circuits
 pnpm store:circuits push
 
 # Pull circuits from git branch (used by CI)
@@ -232,14 +228,14 @@ pnpm store:circuits pull
 
 ### Workflow
 
-Since production circuits are heavy to compile, they're built locally and stored in a git branch:
+Circuits are built locally and stored in a git branch:
 
 1. **Local**: Build circuits and push to branch
 
-   ```bash
-   pnpm build:circuits --skip-production
+```bash
+   pnpm build:circuits
    pnpm tsx scripts/circuit-artifacts.ts push
-   ```
+```
 
 2. **CI**: Pulls from branch during release, attaches to GitHub release
 

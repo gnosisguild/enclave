@@ -18,7 +18,7 @@ const runV = (cmd: string, cwd = ROOT) => execSync(cmd, { cwd, stdio: 'inherit' 
 
 async function push() {
   if (!existsSync(DIST)) {
-    console.error('❌ No artifacts. Run: pnpm build:circuits --skip-production')
+    console.error('❌ No artifacts. Run: pnpm build:circuits')
     process.exit(1)
   }
 
@@ -40,7 +40,9 @@ async function push() {
     run(`git checkout -b ${BRANCH}`, tmp)
   }
 
-  cpSync(DIST, tmp, { recursive: true })
+  for (const entry of readdirSync(DIST)) {
+    cpSync(join(DIST, entry), join(tmp, entry), { recursive: true })
+  }
   writeFileSync(join(tmp, 'SOURCE_HASH'), hash)
 
   run('git add -A', tmp)
