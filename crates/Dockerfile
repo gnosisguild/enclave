@@ -81,8 +81,6 @@ COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
-COPY crates/pvss/Cargo.toml ./pvss/Cargo.toml
-COPY crates/pvss-cli/Cargo.toml ./pvss-cli/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
@@ -98,7 +96,8 @@ RUN for d in ./*/ ; do \
         fi \
     done
 
-# Stub binary so first build (dependency cache) succeeds
+# Crates with [[bin]] in Cargo.toml need stub binaries so the first build succeeds
+RUN mkdir -p ./zk-helpers/src/bin && echo 'fn main() {}' > ./zk-helpers/src/bin/zk_cli.rs
 RUN mkdir -p ./fhe-params/src/bin && echo 'fn main() {}' > ./fhe-params/src/bin/search_params.rs
 
 RUN cargo build --locked --release

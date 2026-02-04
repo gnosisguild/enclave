@@ -16,6 +16,7 @@
 use ark_bn254::Fr as Field;
 use ark_bn254::Fr as FieldElement;
 use ark_ff::PrimeField;
+use e3_polynomial::CrtPolynomial;
 use e3_safe::SafeSponge;
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -148,6 +149,25 @@ pub fn get_zkp_modulus() -> BigInt {
         "21888242871839275222246405745257275088548364400416034343698204186575808495617",
     )
     .expect("Invalid ZKP modulus")
+}
+
+/// Map a CRT polynomial to a vector of JSON values.
+///
+/// # Arguments
+/// * `crt_polynomial` - CRT polynomial to convert to TOML JSON
+///
+/// # Returns
+/// A vector of JSON values
+pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_json::Value> {
+    crt_polynomial
+        .limbs
+        .iter()
+        .map(|limb| {
+            serde_json::json!({
+                "coefficients": to_string_1d_vec(limb.coefficients())
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
