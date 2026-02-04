@@ -85,8 +85,6 @@ pub struct EventSystem {
     eventbus: OnceCell<Addr<EventBus<EnclaveEvent>>>,
     /// EventSystem BusHandle
     handle: OnceCell<BusHandle>,
-    /// A OnceLock that is used to indicate whether the system is wired to write snapshots
-    wired: OnceCell<()>,
     /// Hlc override
     hlc: OnceCell<Hlc>,
     /// Central configuration for aggregates, including delays and other settings

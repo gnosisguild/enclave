@@ -29,7 +29,7 @@ impl Actor for EvmHub {
 
 impl Handler<EnclaveEvmEvent> for EvmHub {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         let EnclaveEvmEvent::Log { .. } = msg.clone() else {
             return;
         };
