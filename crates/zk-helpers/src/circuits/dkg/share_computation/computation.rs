@@ -10,15 +10,15 @@
 //! and (for witness) secret plus shares. Witness values are normalized to [0, q_j) per modulus
 //! and then to the ZKP field modulus so the Noir circuit's range check and parity check succeed.
 
-use crate::calculate_bit_width;
 use crate::circuits::commitments::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
 };
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuit;
 use crate::dkg::share_computation::ShareComputationCircuitInput;
-use crate::get_zkp_modulus;
 use crate::CircuitsErrors;
+use crate::{bigint_3d_to_json_values, get_zkp_modulus};
+use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -38,15 +38,12 @@ pub struct ShareComputationOutput {
 
 /// Implementation of [`CircuitComputation`] for [`ShareComputationCircuit`].
 impl CircuitComputation for ShareComputationCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ShareComputationCircuitInput;
     type Output = ShareComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
         let witness = Witness::compute(preset, input)?;
@@ -99,14 +96,11 @@ pub struct Witness {
 }
 
 impl Computation for Configs {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ShareComputationCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -126,14 +120,11 @@ impl Computation for Configs {
 }
 
 impl Computation for Bits {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
@@ -153,14 +144,11 @@ impl Computation for Bits {
 }
 
 impl Computation for Bounds {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ShareComputationCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let defaults = preset
@@ -188,14 +176,11 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ShareComputationCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = threshold_params.moduli();
@@ -258,6 +243,21 @@ impl Computation for Witness {
             expected_secret_commitment,
         })
     }
+
+    // Used as witness for Nargo execution.
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        let secret_crt = crt_polynomial_to_toml_json(&self.secret_crt);
+        let y = bigint_3d_to_json_values(&self.y);
+        let expected_secret_commitment = self.expected_secret_commitment.to_string();
+
+        let json = serde_json::json!({
+            "secret_crt": secret_crt,
+            "y": y,
+            "expected_secret_commitment": expected_secret_commitment,
+        });
+
+        Ok(json)
+    }
 }
 
 #[cfg(test)]
@@ -299,29 +299,6 @@ mod tests {
         let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
 
         assert_eq!(bits.bit_sk_secret, expected_sk_bits);
-    }
-
-    #[test]
-    fn test_witness_reduction_and_json_roundtrip() {
-        let sample = prepare_share_computation_sample_for_test(
-            BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
-            DkgInputType::SecretKey,
-        );
-
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let json = witness.to_json().unwrap();
-        let decoded: Witness = serde_json::from_value(json).unwrap();
-
-        assert_eq!(
-            decoded.secret_crt.limbs.len(),
-            witness.secret_crt.limbs.len()
-        );
-        assert_eq!(
-            decoded.expected_secret_commitment,
-            witness.expected_secret_commitment
-        );
     }
 
     #[test]

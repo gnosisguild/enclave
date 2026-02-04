@@ -54,15 +54,12 @@ pub struct UserDataEncryptionComputationOutput {
 
 /// Implementation of [`CircuitComputation`] for [`UserDataEncryptionCircuit`].
 impl CircuitComputation for UserDataEncryptionCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Output = UserDataEncryptionComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
         let witness = Witness::compute(preset, input)?;
@@ -137,14 +134,11 @@ pub struct Witness {
 }
 
 impl Computation for Configs {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        _: &Self::Input,
-    ) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -187,14 +181,11 @@ impl Computation for Configs {
 }
 
 impl Computation for Bits {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(
-        _: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let pk_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
         // We can safely assume that the ct bound is the same as the pk bound.
         let ct_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
@@ -247,14 +238,11 @@ impl Computation for Bits {
 }
 
 impl Computation for Bounds {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        _: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -379,14 +367,11 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -899,6 +884,7 @@ impl Computation for Witness {
         })
     }
 
+    // Used as witness for Nargo execution.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
@@ -942,7 +928,6 @@ impl Computation for Witness {
 mod tests {
     use super::*;
 
-    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
@@ -953,24 +938,6 @@ mod tests {
 
         assert_eq!(bounds.pk_bounds[0], BigUint::from(34359701504u64));
         assert_eq!(bits.pk_bit, expected_bits);
-    }
-
-    #[test]
-    fn test_witness_reduction_and_json_roundtrip() {
-        let encryption_data = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
-        let witness = Witness::compute(
-            DEFAULT_BFV_PRESET,
-            &UserDataEncryptionCircuitInput {
-                public_key: encryption_data.public_key,
-                plaintext: encryption_data.plaintext,
-            },
-        )
-        .unwrap();
-        let json = witness.to_json().unwrap();
-        let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
-
-        assert_eq!(decoded.pk0is, witness.pk0is);
-        assert_eq!(decoded.pk1is, witness.pk1is);
     }
 
     #[test]

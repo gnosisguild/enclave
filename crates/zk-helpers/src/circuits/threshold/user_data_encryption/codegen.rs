@@ -22,15 +22,11 @@ use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`UserDataEncryptionCircuit`].
 impl CircuitCodegen for UserDataEncryptionCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Error = CircuitsErrors;
 
-    fn codegen(
-        &self,
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
         let witness = Witness::compute(preset, input)?;
         let configs = Configs::compute(preset, &())?;
 

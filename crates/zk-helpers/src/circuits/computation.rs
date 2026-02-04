@@ -21,15 +21,12 @@ pub enum DkgInputType {
 
 /// Generic computation from parameters and input to a result.
 pub trait Computation: Sized {
-    type BfvThresholdParametersPreset;
+    type Preset;
     type Input;
     type Error;
 
     /// Computes the result from parameters and input.
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error>;
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error>;
 
     /// Converts the result to a JSON [`serde_json::Value`] for serialization.
     /// Default: `serde_json::to_value(self)` when `Self: serde::Serialize`.
@@ -43,14 +40,11 @@ pub trait Computation: Sized {
 
 /// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
 pub trait CircuitComputation: crate::registry::Circuit {
-    type BfvThresholdParametersPreset;
+    type Preset;
     type Input;
     type Output;
     type Error;
 
     /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error>;
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error>;
 }

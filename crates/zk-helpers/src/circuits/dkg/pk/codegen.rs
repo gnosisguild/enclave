@@ -9,7 +9,6 @@
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
 use crate::circuits::dkg::pk::computation::{Bits, PkComputationOutput, Witness};
-use crate::crt_polynomial_to_toml_json;
 use crate::Artifacts;
 use crate::Circuit;
 use crate::CircuitCodegen;
@@ -17,22 +16,17 @@ use crate::CircuitComputation;
 use crate::CircuitsErrors;
 use crate::CodegenConfigs;
 use crate::CodegenToml;
+use crate::Computation;
 
 use e3_fhe_params::BfvPreset;
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`PkCircuit`].
 impl CircuitCodegen for PkCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
-    fn codegen(
-        &self,
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
         let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(preset, input)?;
 
         let toml = generate_toml(witness)?;
@@ -42,23 +36,13 @@ impl CircuitCodegen for PkCircuit {
     }
 }
 
-/// JSON-serializable structure for Prover.toml (pk0is, pk1is arrays).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TomlJson {
-    /// First component of the public key per modulus (for the prover).
-    pub pk0is: Vec<serde_json::Value>,
-    /// Second component of the public key per modulus (for the prover).
-    pub pk1is: Vec<serde_json::Value>,
-}
-
 /// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
 pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
-    let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
+    let json = witness
+        .to_json()
+        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
-    let toml_json = TomlJson { pk0is, pk1is };
-
-    Ok(toml::to_string(&toml_json)?)
+    Ok(toml::to_string(&json)?)
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
