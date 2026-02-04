@@ -217,8 +217,7 @@ async fn test_pk_bfv_commitment_consistency() {
     println!("Commitment calculated: {}", commitment_calculated);
 
     assert_eq!(
-        commitment_from_proof,
-        commitment_calculated,
+        commitment_from_proof, commitment_calculated,
         "Commitment from proof must match independently calculated commitment"
     );
 

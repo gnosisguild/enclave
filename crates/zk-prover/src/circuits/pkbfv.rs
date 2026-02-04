@@ -35,14 +35,20 @@ impl Provable for PkCircuit {
         let circuit_input = PkCircuitInput {
             public_key: input.clone(),
         };
-        
+
         let witness = Witness::compute(*preset, &circuit_input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
         // Convert the witness to InputMap format for Noir
         let mut inputs = InputMap::new();
-        inputs.insert("pk0is".to_string(), crt_polynomial_to_array(&witness.pk0is)?);
-        inputs.insert("pk1is".to_string(), crt_polynomial_to_array(&witness.pk1is)?);
+        inputs.insert(
+            "pk0is".to_string(),
+            crt_polynomial_to_array(&witness.pk0is)?,
+        );
+        inputs.insert(
+            "pk1is".to_string(),
+            crt_polynomial_to_array(&witness.pk1is)?,
+        );
 
         Ok(inputs)
     }
