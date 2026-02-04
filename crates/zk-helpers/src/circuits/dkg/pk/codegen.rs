@@ -84,7 +84,7 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
-    use crate::sample::prepare_sample_for_test;
+    use crate::prepare_pk_sample_for_test;
     use crate::Bounds;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let sample =
-            prepare_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small, None)
+            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small)
                 .unwrap();
 
         let artifacts = PkCircuit

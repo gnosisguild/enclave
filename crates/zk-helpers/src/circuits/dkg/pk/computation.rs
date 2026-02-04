@@ -206,7 +206,7 @@ mod tests {
     use super::*;
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::sample::prepare_sample_for_test;
+    use crate::prepare_pk_sample_for_test;
     use crate::ConvertToJson;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -223,10 +223,9 @@ mod tests {
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let sample = prepare_sample_for_test(
+        let sample = prepare_pk_sample_for_test(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
-            None,
         )
         .unwrap();
         let witness = Witness::compute(

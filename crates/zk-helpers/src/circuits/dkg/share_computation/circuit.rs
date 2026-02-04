@@ -7,6 +7,7 @@
 use crate::computation::DkgInputType;
 use crate::registry::Circuit;
 use e3_fhe_params::ParameterType;
+use e3_parity_matrix::ParityMatrix;
 use e3_polynomial::CrtPolynomial;
 use ndarray::Array2;
 use num_bigint::BigInt;
@@ -27,7 +28,7 @@ pub struct ShareComputationCircuitInput {
     pub dkg_input_type: DkgInputType,
     pub secret: CrtPolynomial,
     pub secret_sss: Vec<Array2<BigInt>>,
-    pub parity_matrix: Vec<Vec<Vec<BigInt>>>,
+    pub parity_matrix: Vec<ParityMatrix>,
     pub n_parties: u32,
     pub threshold: u32,
 }

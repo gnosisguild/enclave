@@ -8,7 +8,7 @@
 //!
 //! This binary lists available circuits and generates Prover.toml and configs.nr
 //! for use with the Noir prover. Use `--list_circuits` to see circuits and
-//! `--circuit <name> --preset insecure|secure` to generate artifacts.
+//! `--circuit <name> --preset insecure|secure|2|80` to generate artifacts.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
@@ -21,7 +21,7 @@ use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
-use e3_zk_helpers::sample::Sample;
+use e3_zk_helpers::{PkSample, ShareComputationSample};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -65,7 +65,7 @@ fn print_generation_info(
     println!("  Circuit:  {}", circuit);
     println!(
         "  Preset:   {} (degree {}, {} moduli)",
-        preset.security_config_name(),
+        meta.security.as_config_str(),
         meta.degree,
         meta.num_moduli
     );
@@ -128,7 +128,7 @@ struct Cli {
     /// Circuit name to generate artifacts for (e.g. pk, share-computation).
     #[arg(long, required_unless_present = "list_circuits")]
     circuit: Option<String>,
-    /// Preset: "insecure" (512) or "secure" (8192). Drives both threshold and DKG params.
+    /// Preset: "insecure"|"secure" or λ (2|80). Drives both threshold and DKG params.
     #[arg(long, required_unless_present = "list_circuits")]
     preset: Option<String>,
     /// For share-computation: witness type "secret-key" or "smudging-noise". Required when circuit is share-computation.
@@ -168,8 +168,7 @@ fn main() -> Result<()> {
 
     // Unwrap required arguments (clap ensures they're present when list_circuits is false).
     let circuit = args.circuit.unwrap();
-    let preset = BfvPreset::from_security_config_name(&args.preset.unwrap())
-        .map_err(|e| anyhow!("{}", e))?;
+    let preset = BfvPreset::from_security_config_name(&args.preset.unwrap())?;
 
     std::fs::create_dir_all(&args.output)
         .with_context(|| format!("failed to create output dir {}", args.output.display()))?;
@@ -194,7 +193,7 @@ fn main() -> Result<()> {
     };
     if !preset_ok {
         return Err(anyhow!(
-            "preset does not match circuit {} which requires {:?} (use insecure/secure for threshold circuits)",
+            "preset does not match circuit {} which requires {:?} (use insecure or secure)",
             circuit,
             circuit_param_type
         ));
@@ -239,20 +238,14 @@ fn main() -> Result<()> {
     );
 
     run_with_spinner(|| {
-        let sd = preset
-            .search_defaults()
-            .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
-        let sample = Sample::generate(
-            &threshold_params,
-            &dkg_params,
-            Some(dkg_input_type.clone()),
-            CiphernodesCommitteeSize::Small,
-            sd.z,
-            sd.lambda,
-        )?;
         let circuit_name = circuit_meta.name();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
+                let sample = PkSample::generate(
+                    &threshold_params,
+                    &dkg_params,
+                    CiphernodesCommitteeSize::Small,
+                )?;
                 let circuit = PkCircuit;
                 circuit.codegen(
                     preset,
@@ -262,18 +255,25 @@ fn main() -> Result<()> {
                 )?
             }
             name if name == <ShareComputationCircuit as Circuit>::NAME => {
+                let sd = preset
+                    .search_defaults()
+                    .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
+                let sample = ShareComputationSample::generate(
+                    &threshold_params,
+                    &dkg_params,
+                    CiphernodesCommitteeSize::Small,
+                    dkg_input_type,
+                    sd.z,
+                    sd.lambda,
+                )?;
                 let circuit = ShareComputationCircuit;
                 circuit.codegen(
                     preset,
                     &ShareComputationCircuitInput {
                         dkg_input_type,
-                        secret: sample.secret.as_ref().unwrap().clone(),
+                        secret: sample.secret.clone(),
                         secret_sss: sample.secret_sss.clone(),
-                        parity_matrix: sample
-                            .parity_matrix
-                            .iter()
-                            .map(|m| m.to_bigint_rows())
-                            .collect(),
+                        parity_matrix: sample.parity_matrix.clone(),
                         n_parties: sample.committee.n as u32,
                         threshold: sample.committee.threshold as u32,
                     },

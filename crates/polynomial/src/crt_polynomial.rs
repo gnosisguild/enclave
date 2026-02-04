@@ -53,22 +53,18 @@ impl CrtPolynomial {
         Self { limbs }
     }
 
-    /// Builds a CRT polynomial from a single coefficient vector and moduli.
-    ///
-    /// For each modulus `q_i`, the i-th limb is built by reducing each coefficient
-    /// modulo `q_i` into `[0, q_i)`. Call [`center`](Self::center) afterward if
-    /// centered coefficients are required.
+    /// Builds a CRT polynomial from a polynomial mod Q (Q>>128) and moduli.
     ///
     /// # Arguments
     ///
-    /// * `coeffs` - Polynomial coefficients (e.g. secret key or smudging error).
+    /// * `coeffs` - Polynomial coefficients mod Q (Q>>128).
     /// * `moduli` - One modulus per limb.
-    pub fn from_bigint_coeffs(coeffs: &[BigInt], moduli: &[u64]) -> Self {
+    pub fn from_mod_q_polynomial(poly: &Vec<BigInt>, moduli: &[u64]) -> Self {
         let limbs: Vec<Vec<BigInt>> = moduli
             .iter()
             .map(|&qi| {
                 let qi_big = BigInt::from(qi);
-                coeffs.iter().map(|c| reduce(c, &qi_big)).collect()
+                poly.iter().map(|c| reduce(c, &qi_big)).collect()
             })
             .collect();
         Self::from_bigint_vectors(limbs)

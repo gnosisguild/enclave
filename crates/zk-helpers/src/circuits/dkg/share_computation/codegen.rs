@@ -157,7 +157,7 @@ pub fn generate_configs(
 ) -> Result<Configs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-    let config_name = preset.security_config_name();
+    let config_name = preset.metadata().security.as_config_str();
     let parity_matrix_str = parity_matrix_constant_string(&threshold_params, n_parties, threshold)?;
     let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
     let configs = format!(
@@ -218,25 +218,21 @@ mod tests {
     use crate::circuits::dkg::share_computation::{Bits, Bounds};
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
-    use crate::sample::{prepare_sample_for_test, Sample};
+    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 
     fn share_computation_input_from_sample(
-        sample: &Sample,
+        sample: &ShareComputationSample,
         dkg_input_type: DkgInputType,
     ) -> ShareComputationCircuitInput {
         ShareComputationCircuitInput {
             dkg_input_type,
-            secret: sample.secret.as_ref().unwrap().clone(),
+            secret: sample.secret.clone(),
             secret_sss: sample.secret_sss.clone(),
-            parity_matrix: sample
-                .parity_matrix
-                .iter()
-                .map(|m| m.to_bigint_rows())
-                .collect(),
+            parity_matrix: sample.parity_matrix.clone(),
             n_parties: sample.committee.n as u32,
             threshold: sample.committee.threshold as u32,
         }
@@ -244,10 +240,10 @@ mod tests {
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = prepare_sample_for_test(
+        let sample = prepare_share_computation_sample_for_test(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
-            Some(DkgInputType::SecretKey),
+            DkgInputType::SecretKey,
         )
         .unwrap();
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
