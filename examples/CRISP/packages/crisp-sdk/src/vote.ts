@@ -24,7 +24,7 @@ import {
   getZeroVote,
   getMaxVoteValue,
 } from './utils'
-import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
+import { MASK_SIGNATURE, MAX_VOTE_BITS, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
@@ -118,14 +118,17 @@ export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
   }
 
   const segmentSize = Math.floor(numbers.length / numChoices)
+  const effectiveSize = Math.min(segmentSize, MAX_VOTE_BITS)
   const results: Vote = []
 
-  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx += 1) {
-    const start = choiceIdx * segmentSize
-    const segment = numbers.slice(start, start + segmentSize)
+  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
+    const segmentStart = choiceIdx * segmentSize
+    // Read only the last effectiveSize elements (where the value is, MSB first)
+    const readStart = segmentStart + segmentSize - effectiveSize
+    const segment = numbers.slice(readStart, readStart + effectiveSize)
 
     let value = 0n
-    for (let i = 0; i < segment.length; i += 1) {
+    for (let i = 0; i < segment.length; i++) {
       const weight = 2n ** BigInt(segment.length - 1 - i)
       value += BigInt(segment[i]) * weight
     }
@@ -133,7 +136,6 @@ export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
     results.push(value)
   }
 
-  // Trailing bits (remainder) are ignored - they should be zeros
   return results
 }
 

@@ -30,6 +30,8 @@ contract CRISPProgram is IE3Program, Ownable {
   bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
   /// @notice The depth of the input Merkle tree.
   uint8 public constant TREE_DEPTH = 20;
+  /// @notice Maximum number of bits allocated for vote counts in the plaintext output per option.
+  uint256 constant MAX_VOTE_BITS = 50;
 
   // State variables
   IEnclave public enclave;
@@ -168,28 +170,31 @@ contract CRISPProgram is IE3Program, Ownable {
   /// @param e3Id The E3 program ID
   /// @return votes - an array of vote counts for each option
   function decodeTally(uint256 e3Id) public view returns (uint256[] memory votes) {
-    // fetch from enclave
     E3 memory e3 = enclave.getE3(e3Id);
 
     uint256 numOptions = e3Data[e3Id].numOptions;
-
-    // decode it into an array of uint64
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
     uint256 segmentSize = tally.length / numOptions;
+    uint256 effectiveSize = segmentSize > MAX_VOTE_BITS ? MAX_VOTE_BITS : segmentSize;
+
     votes = new uint256[](numOptions);
 
     for (uint256 optIdx = 0; optIdx < numOptions; optIdx++) {
-      uint256 start = optIdx * segmentSize;
+      uint256 segmentStart = optIdx * segmentSize;
+      // Read only the last effectiveSize bits (where the value is, MSB first)
+      uint256 readStart = segmentStart + segmentSize - effectiveSize;
       uint256 value = 0;
 
-      for (uint256 i = 0; i < segmentSize; i++) {
-        uint256 weight = 2 ** (segmentSize - 1 - i);
-        value += uint256(tally[start + i]) * weight;
+      for (uint256 i = 0; i < effectiveSize; i++) {
+        uint256 weight = 2 ** (effectiveSize - 1 - i);
+        value += uint256(tally[readStart + i]) * weight;
       }
 
       votes[optIdx] = value;
     }
+
+    return votes;
   }
 
   /// @notice Get the slot index for a given E3 ID and slot address

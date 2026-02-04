@@ -13,6 +13,12 @@ export const CRISP_SERVER_IS_SLOT_EMPTY_ENDPOINT = 'state/is-slot-empty'
 
 export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
 
+// @note that the following must be changed accordingly to the CRISP circuit
+// Hard limit on the maximum number of vote bits supported for each option.
+export const MAX_VOTE_BITS = 50
+// Hard limit on the maximum number of vote options supported.
+export const MAX_VOTE_OPTIONS = 10
+
 /**
  * Message used by users to prove ownership of their Ethereum account
  * This message is signed by the user's private key to authenticate their identity
