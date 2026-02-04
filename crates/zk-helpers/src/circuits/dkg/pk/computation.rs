@@ -9,10 +9,11 @@
 //! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
 use crate::get_zkp_modulus;
+
+use crate::threshold::compute_pk_bit;
 use crate::CircuitsErrors;
 use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
@@ -44,7 +45,7 @@ impl CircuitComputation for PkCircuit {
         input: &Self::Input,
     ) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
-        let bits = Bits::compute(preset, &bounds)?;
+        let bits = Bits::compute(preset, &())?;
         let witness = Witness::compute(preset, input)?;
 
         Ok(PkComputationOutput {
@@ -99,7 +100,7 @@ impl Computation for Configs {
 
         let moduli = dkg_params.moduli().to_vec();
         let bounds = Bounds::compute(preset, &())?;
-        let bits = Bits::compute(preset, &bounds)?;
+        let bits = Bits::compute(preset, &())?;
 
         Ok(Configs {
             n: dkg_params.degree(),
@@ -113,15 +114,18 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type BfvThresholdParametersPreset = BfvPreset;
-    type Input = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Input = ();
+    type Error = CircuitsErrors;
 
     fn compute(
-        _: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
+        preset: Self::BfvThresholdParametersPreset,
+        _: &Self::Input,
     ) -> Result<Self, Self::Error> {
+        let (_, dkg_params) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
         Ok(Bits {
-            pk_bit: calculate_bit_width(BigInt::from(input.pk_bound.clone())),
+            pk_bit: compute_pk_bit(params)?,
         })
     }
 }
@@ -198,7 +202,7 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &()).unwrap();
         let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));

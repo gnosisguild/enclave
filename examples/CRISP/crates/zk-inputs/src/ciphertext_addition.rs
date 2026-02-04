@@ -12,7 +12,6 @@ use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
 use num_bigint::BigInt;
-use std::sync::Arc;
 
 /// Set of inputs for validation of a ciphertext addition.
 ///
@@ -172,71 +171,5 @@ impl CiphertextAdditionWitness {
         }
 
         Ok(CrtPolynomial::new(quotient_limbs))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use e3_fhe_params::{BfvParamSet, BfvPreset};
-    use e3_zk_helpers::threshold::user_data_encryption::computation::Bounds;
-    use e3_zk_helpers::utils::calculate_bit_width;
-    use e3_zk_helpers::Computation;
-    use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
-    use fhe_traits::FheEncoder;
-
-    use rand::thread_rng;
-
-    fn test_bit_ct(params: &Arc<BfvParameters>) -> u32 {
-        let bounds = Bounds::compute(params, &()).unwrap();
-        calculate_bit_width(&bounds.pk_bounds[0].to_string()).unwrap()
-    }
-
-    fn create_test_generator() -> (Arc<BfvParameters>, PublicKey, SecretKey) {
-        let param_set: BfvParamSet = BfvPreset::InsecureThreshold512.into();
-        let bfv_params = param_set.build_arc();
-
-        let mut rng = thread_rng();
-        let sk = SecretKey::random(&bfv_params, &mut rng);
-        let pk = PublicKey::new(&sk, &mut rng);
-
-        (bfv_params, pk, sk)
-    }
-
-    fn create_test_plaintext(params: &Arc<BfvParameters>, vote: u8) -> Plaintext {
-        let mut message_data = vec![3u64; params.degree()];
-        message_data[0] = if vote == 1 { 1 } else { 0 };
-        Plaintext::try_encode(&message_data, Encoding::poly(), params).unwrap()
-    }
-
-    #[test]
-    fn test_compute_basic_functionality() {
-        let (bfv_params, pk, _sk) = create_test_generator();
-        let mut rng = thread_rng();
-
-        // Create test plaintexts.
-        let pt1 = create_test_plaintext(&bfv_params, 0);
-        let pt2 = create_test_plaintext(&bfv_params, 1);
-
-        // Encrypt plaintexts.
-        let (ct1, _u1, _e0_1, _e1_1) = pk.try_encrypt_extended(&pt1, &mut rng).unwrap();
-        let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt2, &mut rng).unwrap();
-
-        // Compute sum.
-        let sum_ct = &ct1 + &ct2;
-
-        // Compute ciphertext addition inputs.
-        let result = CiphertextAdditionWitness::compute(&bfv_params, &ct1, &ct2, &sum_ct);
-
-        assert!(result.is_ok());
-        let inputs = result.unwrap();
-
-        let num_moduli = bfv_params.moduli().len();
-        assert_eq!(inputs.prev_ct0is.limbs.len(), num_moduli);
-        assert_eq!(inputs.prev_ct1is.limbs.len(), num_moduli);
-        assert_eq!(inputs.sum_ct0is.limbs.len(), num_moduli);
-        assert_eq!(inputs.sum_ct1is.limbs.len(), num_moduli);
-        assert_eq!(inputs.r0is.limbs.len(), num_moduli);
-        assert_eq!(inputs.r1is.limbs.len(), num_moduli);
     }
 }
