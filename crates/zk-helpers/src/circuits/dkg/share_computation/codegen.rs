@@ -6,14 +6,14 @@
 
 //! Code generation for the share-computation BFV circuit: Prover.toml and configs.nr.
 
-use crate::bigint_3d_to_json_values;
 use crate::bigint_to_field;
 use crate::circuits::computation::CircuitComputation;
+use crate::circuits::computation::Computation;
 use crate::circuits::dkg::share_computation::{
     Bits, ShareComputationCircuit, ShareComputationCircuitInput, ShareComputationOutput, Witness,
 };
-use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, Toml};
-use crate::computation::Configs;
+use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
+use crate::codegen::CodegenConfigs;
 use crate::computation::DkgInputType;
 use crate::crt_polynomial_to_toml_json;
 use crate::poly_coefficients_to_toml_json;
@@ -23,20 +23,15 @@ use e3_fhe_params::BfvPreset;
 use e3_parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use serde::{Deserialize, Serialize};
 use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`ShareComputationCircuit`].
 impl CircuitCodegen for ShareComputationCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ShareComputationCircuitInput;
     type Error = CircuitsErrors;
 
-    fn codegen(
-        &self,
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
         let ShareComputationOutput { witness, bits, .. } =
             ShareComputationCircuit::compute(preset, input)?;
 
@@ -52,38 +47,34 @@ impl CircuitCodegen for ShareComputationCircuit {
     }
 }
 
-/// JSON-serializable structure for Prover.toml (sk_secret or e_sm_secret, y, expected_secret_commitment).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TomlJson {
-    expected_secret_commitment: String,
-    /// Either {"sk_secret": {...}} or {"e_sm_secret": [...]}; flattened so the key appears at top level.
-    #[serde(flatten)]
-    secret: serde_json::Value,
-    y: Vec<Vec<Vec<serde_json::Value>>>, // [N][L][N_PARTIES+1]
-}
-
 pub fn generate_toml(
     witness: &Witness,
     dkg_input_type: DkgInputType,
-) -> Result<Toml, CircuitsErrors> {
-    let secret = match dkg_input_type {
-        DkgInputType::SecretKey => serde_json::json!({
-            "sk_secret": poly_coefficients_to_toml_json(witness.secret_crt.limb(0).coefficients())
-        }),
-        DkgInputType::SmudgingNoise => serde_json::json!({
-            "e_sm_secret": crt_polynomial_to_toml_json(&witness.secret_crt)
-        }),
+) -> Result<CodegenToml, CircuitsErrors> {
+    let mut json = witness
+        .to_json()
+        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+
+    let obj = json.as_object_mut().ok_or(CircuitsErrors::Other(
+        "witness json is not an object".to_string(),
+    ))?;
+
+    obj.remove("secret_crt");
+
+    let (key, value) = match dkg_input_type {
+        DkgInputType::SecretKey => (
+            "sk_secret",
+            poly_coefficients_to_toml_json(witness.secret_crt.limb(0).coefficients()),
+        ),
+        DkgInputType::SmudgingNoise => (
+            "e_sm_secret",
+            serde_json::Value::Array(crt_polynomial_to_toml_json(&witness.secret_crt)),
+        ),
     };
 
-    let y = bigint_3d_to_json_values(&witness.y);
+    obj.insert(key.to_string(), value);
 
-    let toml_json = TomlJson {
-        expected_secret_commitment: witness.expected_secret_commitment.to_string(),
-        secret,
-        y,
-    };
-
-    Ok(toml::to_string(&toml_json)?)
+    Ok(toml::to_string(&json)?)
 }
 
 /// Builds the PARITY_MATRIX constant string for Noir (one matrix per modulus via null_space).
@@ -139,7 +130,7 @@ pub fn generate_configs(
     bits: &Bits,
     n_parties: usize,
     threshold: usize,
-) -> Result<Configs, CircuitsErrors> {
+) -> Result<CodegenConfigs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
     let config_name = preset.metadata().security.as_config_str();
@@ -229,8 +220,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
 
         let artifacts = ShareComputationCircuit

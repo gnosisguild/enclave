@@ -16,12 +16,11 @@ use e3_fhe_params::BfvPreset;
 use e3_parity_matrix::build_generator_matrix;
 use e3_parity_matrix::{null_space, ParityMatrix, ParityMatrixConfig};
 use e3_polynomial::CrtPolynomial;
-use fhe::bfv::{BfvParameters, PublicKey, SecretKey};
+use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
 use rand::thread_rng;
-use std::sync::Arc;
 
 /// Shamir secret shares: one limb per CRT modulus (rows = parties, cols = polynomial coefficients).
 pub type SecretShares = Vec<ndarray::Array2<BigInt>>;
@@ -45,21 +44,22 @@ pub struct ShareComputationSample {
 impl ShareComputationSample {
     /// Generates sample data for the share-computation circuit.
     pub fn generate(
-        threshold_params: &Arc<BfvParameters>,
-        dkg_params: &Arc<BfvParameters>,
+        preset: BfvPreset,
         committee_size: CiphernodesCommitteeSize,
         dkg_input_type: DkgInputType,
         num_ciphertexts: u128, // z in the search defaults
         lambda: u32,
-    ) -> Result<Self, CircuitsErrors> {
+    ) -> Self {
+        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
+
         let mut rng = thread_rng();
         let committee = committee_size.values();
 
-        let dkg_secret_key = SecretKey::random(dkg_params, &mut rng);
+        let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
         let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
-            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
+            .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
@@ -72,33 +72,23 @@ impl ShareComputationSample {
                 t: committee.threshold,
                 n: committee.n,
             })
-            .map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to build generator matrix: {:?}", e))
-            })?;
-            let h = null_space(&g, &q).map_err(|e| {
-                CircuitsErrors::Sample(format!("Failed to compute null space: {:?}", e))
-            })?;
+            .unwrap();
+            let h = null_space(&g, &q).unwrap();
             parity_matrix.push(h);
         }
 
         let (secret, secret_sss) = match dkg_input_type {
             DkgInputType::SecretKey => {
-                let threshold_secret_key = SecretKey::random(threshold_params, &mut rng);
+                let threshold_secret_key = SecretKey::random(&threshold_params, &mut rng);
 
                 let sk_poly = share_manager
                     .coeffs_to_poly_level0(threshold_secret_key.coeffs.clone().as_ref())
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!(
-                            "Failed to convert SK coeffs to poly: {:?}",
-                            e
-                        ))
-                    })?;
+                    .unwrap();
 
                 let sk_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(sk_poly.clone(), rng)
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to generate SK shares: {:?}", e))
-                    })?;
+                    .unwrap();
+
                 let secret_sss: SecretShares = sk_sss_u64
                     .into_iter()
                     .map(|arr| arr.mapv(BigInt::from))
@@ -111,7 +101,7 @@ impl ShareComputationSample {
                     .collect();
                 let mut secret_crt =
                     CrtPolynomial::from_mod_q_polynomial(&sk_coeffs, threshold_params.moduli());
-                secret_crt.center(threshold_params.moduli())?;
+                secret_crt.center(threshold_params.moduli()).unwrap();
 
                 (secret_crt, secret_sss)
             }
@@ -123,15 +113,15 @@ impl ShareComputationSample {
                             "Failed to generate smudging error: {:?}",
                             e
                         ))
-                    })?;
-                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
-                    CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
-                })?;
+                    })
+                    .unwrap();
+                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
                 let esi_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(esi_poly.clone(), rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
-                    })?;
+                    })
+                    .unwrap();
                 let secret_sss: SecretShares = esi_sss_u64
                     .into_iter()
                     .map(|arr| arr.mapv(BigInt::from))
@@ -139,42 +129,37 @@ impl ShareComputationSample {
 
                 let mut secret_crt =
                     CrtPolynomial::from_mod_q_polynomial(&esi_coeffs, threshold_params.moduli());
-                secret_crt.center(threshold_params.moduli())?;
+                secret_crt.center(threshold_params.moduli()).unwrap();
 
                 (secret_crt, secret_sss)
             }
         };
 
-        Ok(Self {
+        Self {
             committee,
             dkg_public_key,
             secret,
             secret_sss,
             parity_matrix,
-        })
+        }
     }
 }
 
 /// Prepares a share-computation sample for testing using a threshold preset.
 pub fn prepare_share_computation_sample_for_test(
-    threshold_preset: BfvPreset,
+    preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
     dkg_input_type: DkgInputType,
-) -> Result<ShareComputationSample, CircuitsErrors> {
-    let (threshold_params, dkg_params) = build_pair_for_preset(threshold_preset)
-        .map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-    let defaults = threshold_preset
-        .search_defaults()
-        .ok_or_else(|| CircuitsErrors::Sample("preset has no search defaults".to_string()))?;
+) -> ShareComputationSample {
+    let defaults = preset.search_defaults().unwrap();
+
     ShareComputationSample::generate(
-        &threshold_params,
-        &dkg_params,
+        preset,
         committee,
         dkg_input_type,
         defaults.z,
         defaults.lambda,
     )
-    .map_err(|e| CircuitsErrors::Sample(e.to_string()))
 }
 
 #[cfg(test)]
@@ -191,8 +176,7 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
 
         assert_eq!(sample.committee.n, committee.n);
         assert_eq!(sample.committee.threshold, committee.threshold);
@@ -209,8 +193,7 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SmudgingNoise,
-        )
-        .unwrap();
+        );
 
         assert_eq!(sample.committee.n, committee.n);
         assert_eq!(sample.committee.threshold, committee.threshold);

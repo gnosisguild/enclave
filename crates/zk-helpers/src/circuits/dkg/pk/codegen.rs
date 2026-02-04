@@ -6,27 +6,27 @@
 
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
-use crate::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
-use crate::{
-    crt_polynomial_to_toml_json, Artifacts, Bits, Circuit, CircuitCodegen, CircuitComputation,
-    CircuitsErrors, Configs, PkComputationOutput, Toml, Witness,
-};
+use crate::circuits::dkg::pk::circuit::PkCircuit;
+use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::circuits::dkg::pk::computation::{Bits, PkComputationOutput, Witness};
+use crate::Artifacts;
+use crate::Circuit;
+use crate::CircuitCodegen;
+use crate::CircuitComputation;
+use crate::CircuitsErrors;
+use crate::CodegenConfigs;
+use crate::CodegenToml;
+use crate::Computation;
 
 use e3_fhe_params::BfvPreset;
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`PkCircuit`].
 impl CircuitCodegen for PkCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
-    fn codegen(
-        &self,
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
         let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(preset, input)?;
 
         let toml = generate_toml(witness)?;
@@ -36,27 +36,17 @@ impl CircuitCodegen for PkCircuit {
     }
 }
 
-/// JSON-serializable structure for Prover.toml (pk0is, pk1is arrays).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TomlJson {
-    /// First component of the public key per modulus (for the prover).
-    pub pk0is: Vec<serde_json::Value>,
-    /// Second component of the public key per modulus (for the prover).
-    pub pk1is: Vec<serde_json::Value>,
-}
-
 /// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
-pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
-    let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
-    let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
+pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
+    let json = witness
+        .to_json()
+        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
-    let toml_json = TomlJson { pk0is, pk1is };
-
-    Ok(toml::to_string(&toml_json)?)
+    Ok(toml::to_string(&json)?)
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
-pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> Configs {
+pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> CodegenConfigs {
     format!(
         r#"
 pub global N: u32 = {};
@@ -82,18 +72,18 @@ pub global {}_BIT_PK: u32 = {};
 mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
     use crate::prepare_pk_sample_for_test;
-    use crate::Bounds;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use crate::utils::compute_pk_bit;
+
+    use e3_fhe_params::{build_pair_for_preset, DEFAULT_BFV_PRESET};
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
         let sample =
-            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small)
-                .unwrap();
+            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small);
 
         let artifacts = PkCircuit
             .codegen(
@@ -138,8 +128,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let pk_bit = compute_pk_bit(&dkg_params);
 
         assert!(configs_content
             .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
@@ -149,7 +138,7 @@ mod tests {
             format!(
                 "{}_BIT_PK: u32 = {}",
                 <PkCircuit as Circuit>::PREFIX,
-                bits.pk_bit
+                pk_bit
             )
             .as_str()
         ));

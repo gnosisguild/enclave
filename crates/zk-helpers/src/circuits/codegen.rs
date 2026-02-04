@@ -9,46 +9,45 @@
 //! [`CircuitCodegen`] is implemented by circuits that can produce [`Artifacts`]
 //! (Prover.toml and configs.nr). Use [`write_artifacts`] to write them to disk.
 
-use crate::computation::Configs;
-use crate::computation::Toml;
 use crate::errors::CircuitsErrors;
 use std::path::Path;
+
+/// Prover TOML file content (witness and circuit inputs).
+pub type CodegenToml = String;
+/// Noir configs file content (global constants for the prover).
+pub type CodegenConfigs = String;
 
 /// Generated files for a circuit: Prover TOML and Noir configs.
 #[derive(Debug, Clone)]
 pub struct Artifacts {
     /// Prover.toml content (witness and circuit inputs).
-    pub toml: Toml,
+    pub toml: CodegenToml,
     /// configs.nr content (constants for the Noir prover).
-    pub configs: Configs,
+    pub configs: CodegenConfigs,
 }
 
 /// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific input.
 pub trait CircuitCodegen: crate::registry::Circuit {
     /// Circuit-specific BFV threshold parameters preset.
-    type BfvThresholdParametersPreset;
+    type Preset;
     /// Circuit-specific codegen input (e.g. preset + public key).
     type Input;
     /// Error type for codegen failures.
     type Error;
 
     /// Produces [`Artifacts`] for this circuit from the given input.
-    fn codegen(
-        &self,
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error>;
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error>;
 }
 
 /// Writes the Prover TOML string to `path/Prover.toml`, or `./Prover.toml` if `path` is `None`.
-pub fn write_toml(toml: &Toml, path: Option<&Path>) -> Result<(), CircuitsErrors> {
+pub fn write_toml(toml: &CodegenToml, path: Option<&Path>) -> Result<(), CircuitsErrors> {
     let toml_path = path.unwrap_or_else(|| Path::new("."));
     let toml_path = toml_path.join("Prover.toml");
     Ok(std::fs::write(toml_path, toml)?)
 }
 
 /// Writes the Noir configs string to `path/configs.nr`, or `./configs.nr` if `path` is `None`.
-pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), CircuitsErrors> {
+pub fn write_configs(configs: &CodegenConfigs, path: Option<&Path>) -> Result<(), CircuitsErrors> {
     let configs_path = path.unwrap_or_else(|| Path::new("."));
     let configs_path = configs_path.join("configs.nr");
     Ok(std::fs::write(configs_path, configs)?)
@@ -57,8 +56,8 @@ pub fn write_configs(configs: &Configs, path: Option<&Path>) -> Result<(), Circu
 /// Writes Prover.toml (if `toml` is `Some`) and always configs.nr into the given directory
 /// (or current directory if `path` is `None`).
 pub fn write_artifacts(
-    toml: Option<&Toml>,
-    configs: &Configs,
+    toml: Option<&CodegenToml>,
+    configs: &CodegenConfigs,
     path: Option<&Path>,
 ) -> Result<(), CircuitsErrors> {
     if let Some(t) = toml {

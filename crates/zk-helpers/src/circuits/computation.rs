@@ -19,46 +19,32 @@ pub enum DkgInputType {
     SmudgingNoise,
 }
 
-/// Prover TOML file content (witness and circuit inputs).
-pub type Toml = String;
-/// Noir configs file content (global constants for the prover).
-pub type Configs = String;
-
 /// Generic computation from parameters and input to a result.
 pub trait Computation: Sized {
-    type BfvThresholdParametersPreset;
+    type Preset;
     type Input;
     type Error;
 
     /// Computes the result from parameters and input.
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error>;
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error>;
+
+    /// Converts the result to a JSON [`serde_json::Value`] for serialization.
+    /// Default: `serde_json::to_value(self)` when `Self: serde::Serialize`.
+    fn to_json(&self) -> serde_json::Result<serde_json::Value>
+    where
+        Self: serde::Serialize,
+    {
+        serde_json::to_value(self)
+    }
 }
 
 /// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
 pub trait CircuitComputation: crate::registry::Circuit {
-    type BfvThresholdParametersPreset;
+    type Preset;
     type Input;
     type Output;
     type Error;
 
     /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error>;
-}
-
-/// Converts a value to a JSON [`serde_json::Value`] for serialization.
-pub trait ConvertToJson {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value>;
-}
-
-/// Any `Serialize` type can be converted to JSON for round-trip tests and artifact generation.
-impl<T: serde::Serialize> ConvertToJson for T {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error>;
 }

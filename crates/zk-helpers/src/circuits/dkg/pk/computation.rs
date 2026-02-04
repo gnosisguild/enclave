@@ -9,11 +9,12 @@
 //! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
-use crate::dkg::pk::PkCircuitInput;
+use crate::circuits::dkg::pk::circuit::PkCircuit;
+use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
+use crate::utils::compute_pk_bit;
 use crate::CircuitsErrors;
-use crate::PkCircuit;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -31,17 +32,14 @@ pub struct PkComputationOutput {
 
 /// Implementation of [`CircuitComputation`] for [`PkCircuit`].
 impl CircuitComputation for PkCircuit {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = PkCircuitInput;
     type Output = PkComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
-        let bits = Bits::compute(preset, &bounds)?;
+        let bits = Bits::compute(preset, &())?;
         let witness = Witness::compute(preset, input)?;
 
         Ok(PkComputationOutput {
@@ -83,20 +81,17 @@ pub struct Witness {
 }
 
 impl Computation for Configs {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        _: &Self::Input,
-    ) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = dkg_params.moduli().to_vec();
         let bounds = Bounds::compute(preset, &())?;
-        let bits = Bits::compute(preset, &bounds)?;
+        let bits = Bits::compute(preset, &())?;
 
         Ok(Configs {
             n: dkg_params.degree(),
@@ -109,29 +104,26 @@ impl Computation for Configs {
 }
 
 impl Computation for Bits {
-    type BfvThresholdParametersPreset = BfvPreset;
-    type Input = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Preset = BfvPreset;
+    type Input = ();
+    type Error = CircuitsErrors;
 
-    fn compute(
-        _: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+        let (_, dkg_params) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
         Ok(Bits {
-            pk_bit: calculate_bit_width(&input.pk_bound.to_string())?,
+            pk_bit: compute_pk_bit(&dkg_params),
         })
     }
 }
 
 impl Computation for Bounds {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        _: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -152,14 +144,11 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type BfvThresholdParametersPreset = BfvPreset;
+    type Preset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(
-        preset: Self::BfvThresholdParametersPreset,
-        input: &Self::Input,
-    ) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
@@ -180,54 +169,44 @@ impl Computation for Witness {
 
         Ok(Witness { pk0is, pk1is })
     }
+
+    // Used as witness for Nargo execution.
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
+        let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
+
+        let json = serde_json::json!({
+            "pk0is": pk0is,
+            "pk1is": pk1is,
+        });
+
+        Ok(json)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::prepare_pk_sample_for_test;
-    use crate::ConvertToJson;
-    use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
-        let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let expected_bits = compute_pk_bit(&dkg_params);
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 
     #[test]
-    fn test_witness_reduction_and_json_roundtrip() {
-        let sample = prepare_pk_sample_for_test(
-            BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
-        )
-        .unwrap();
-        let witness = Witness::compute(
-            DEFAULT_BFV_PRESET,
-            &PkCircuitInput {
-                public_key: sample.dkg_public_key,
-            },
-        )
-        .unwrap();
-        let json = witness.convert_to_json().unwrap();
-        let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
-
-        assert_eq!(decoded.pk0is, witness.pk0is);
-        assert_eq!(decoded.pk1is, witness.pk1is);
-    }
-
-    #[test]
     fn test_constants_json_roundtrip() {
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
 
-        let json = constants.convert_to_json().unwrap();
+        let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
 
         assert_eq!(decoded.n, constants.n);

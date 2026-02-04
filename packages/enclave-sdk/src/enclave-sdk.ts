@@ -28,6 +28,7 @@ import type {
 import {
   bfv_encrypt_number,
   bfv_encrypt_vector,
+  generate_public_key,
   bfv_verifiable_encrypt_number,
   bfv_verifiable_encrypt_vector,
   compute_pk_commitment,
@@ -119,6 +120,12 @@ export class EnclaveSDK {
     }
   }
 
+  public async generatePublicKey(): Promise<Uint8Array> {
+    await initializeWasm()
+    const protocolParams = await this.getThresholdBfvParamsSet()
+    return generate_public_key(protocolParams.degree, protocolParams.plaintextModulus, BigUint64Array.from(protocolParams.moduli))
+  }
+
   public async computePublicKeyCommitment(publicKey: Uint8Array): Promise<Uint8Array> {
     await initializeWasm()
     const protocolParams = await this.getThresholdBfvParamsSet()
@@ -188,10 +195,9 @@ export class EnclaveSDK {
       BigUint64Array.from(protocolParams.moduli),
     )
 
-    const publicInputs = JSON.parse(circuitInputs)
     return {
       encryptedData,
-      publicInputs,
+      circuitInputs: JSON.parse(circuitInputs),
     }
   }
 
@@ -207,7 +213,7 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
     circuit: CompiledCircuit,
   ): Promise<VerifiableEncryptionResult> {
-    const { publicInputs, encryptedData } = await this.encryptNumberAndGenInputs(data, publicKey)
+    const { circuitInputs: publicInputs, encryptedData } = await this.encryptNumberAndGenInputs(data, publicKey)
     const proof = await generateProof(publicInputs, circuit)
 
     return {
@@ -234,10 +240,9 @@ export class EnclaveSDK {
       BigUint64Array.from(protocolParams.moduli),
     )
 
-    const publicInputs = JSON.parse(circuitInputs)
     return {
       encryptedData,
-      publicInputs,
+      circuitInputs: JSON.parse(circuitInputs),
     }
   }
 
@@ -253,7 +258,7 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
     circuit: CompiledCircuit,
   ): Promise<VerifiableEncryptionResult> {
-    const { publicInputs, encryptedData } = await this.encryptVectorAndGenInputs(data, publicKey)
+    const { circuitInputs: publicInputs, encryptedData } = await this.encryptVectorAndGenInputs(data, publicKey)
 
     const proof = await generateProof(publicInputs, circuit)
 

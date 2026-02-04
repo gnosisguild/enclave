@@ -12,7 +12,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
-use e3_fhe_params::{build_pair_for_preset, BfvPreset, ParameterType};
+use e3_fhe_params::{BfvPreset, ParameterType};
 use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
@@ -21,6 +21,9 @@ use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
+use e3_zk_helpers::threshold::{
+    UserDataEncryptionCircuit, UserDataEncryptionCircuitInput, UserDataEncryptionSample,
+};
 use e3_zk_helpers::{PkSample, ShareComputationSample};
 use std::io::Write;
 use std::path::PathBuf;
@@ -149,6 +152,7 @@ fn main() -> Result<()> {
     let mut registry = CircuitRegistry::new();
     registry.register(Arc::new(PkCircuit));
     registry.register(Arc::new(ShareComputationCircuit));
+    registry.register(Arc::new(UserDataEncryptionCircuit));
 
     // Handle list circuits flag.
     if args.list_circuits {
@@ -178,10 +182,6 @@ fn main() -> Result<()> {
         let available = registry.list_circuits().join(", ");
         anyhow!("unknown circuit: {}. Available: {}", circuit, available)
     })?;
-
-    // Build threshold and DKG params from the preset (insecure → 512, secure → 8192).
-    let (threshold_params, dkg_params) =
-        build_pair_for_preset(preset).map_err(|e| anyhow!("failed to build params: {}", e))?;
 
     // Validate preset matches circuit's supported parameter type (THRESHOLD or DKG).
     let circuit_param_type = circuit_meta.supported_parameter();
@@ -239,11 +239,7 @@ fn main() -> Result<()> {
         let circuit_name = circuit_meta.name();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
-                let sample = PkSample::generate(
-                    &threshold_params,
-                    &dkg_params,
-                    CiphernodesCommitteeSize::Small,
-                )?;
+                let sample = PkSample::generate(preset, CiphernodesCommitteeSize::Small);
                 let circuit = PkCircuit;
                 circuit.codegen(
                     preset,
@@ -257,13 +253,13 @@ fn main() -> Result<()> {
                     .search_defaults()
                     .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
                 let sample = ShareComputationSample::generate(
-                    &threshold_params,
-                    &dkg_params,
+                    preset,
                     CiphernodesCommitteeSize::Small,
                     dkg_input_type,
                     sd.z,
                     sd.lambda,
-                )?;
+                );
+
                 let circuit = ShareComputationCircuit;
                 circuit.codegen(
                     preset,
@@ -274,6 +270,18 @@ fn main() -> Result<()> {
                         parity_matrix: sample.parity_matrix.clone(),
                         n_parties: sample.committee.n as u32,
                         threshold: sample.committee.threshold as u32,
+                    },
+                )?
+            }
+            name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
+                let sample = UserDataEncryptionSample::generate(preset);
+                let circuit = UserDataEncryptionCircuit;
+
+                circuit.codegen(
+                    preset,
+                    &UserDataEncryptionCircuitInput {
+                        public_key: sample.public_key,
+                        plaintext: sample.plaintext,
                     },
                 )?
             }

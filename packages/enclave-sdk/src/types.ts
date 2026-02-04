@@ -302,5 +302,5 @@ export interface EncryptedValueAndPublicInputs {
   /**
    * The public inputs for the proof
    */
-  publicInputs: CircuitInputs
+  circuitInputs: CircuitInputs
 }

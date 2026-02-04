@@ -9,11 +9,9 @@ repository = "https://github.com/gnosisguild/enclave/crates/bfv-client"
 [dependencies]
 anyhow.workspace = true
 e3-fhe-params = { workspace = true }
-e3-greco-helpers = { workspace = true }
+e3-zk-helpers = { workspace = true }
 fhe.workspace = true
 fhe-traits.workspace = true
-greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
 rand.workspace = true
 thiserror = { workspace = true }
 e3-polynomial = { workspace = true }
-e3-zk-helpers = { workspace = true }

@@ -16,10 +16,12 @@
 use ark_bn254::Fr as Field;
 use ark_bn254::Fr as FieldElement;
 use ark_ff::PrimeField;
-use e3_polynomial::CrtPolynomial;
+use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_safe::SafeSponge;
+use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
 use num_traits::Zero;
+use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error as ThisError;
 
@@ -27,6 +29,12 @@ use thiserror::Error as ThisError;
 pub enum ZkHelpersUtilsError {
     #[error("Failed to parse bound: {0}")]
     ParseBound(String),
+
+    #[error("Conversion error: {0}")]
+    ConversionError(String),
+
+    #[error("Commitment too long: {0}")]
+    CommitmentTooLong(usize),
 }
 
 pub type Result<T> = std::result::Result<T, ZkHelpersUtilsError>;
@@ -62,6 +70,21 @@ pub fn to_string_2d_vec(poly: &[Vec<BigInt>]) -> Vec<Vec<String>> {
 /// A 3D vector of strings
 pub fn to_string_3d_vec(vec: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<String>>> {
     vec.iter().map(|d1| to_string_2d_vec(d1)).collect()
+}
+
+/// Join a vector of values into a string with the given separator.
+///
+/// # Arguments
+/// * `vec` - Slice of values to join
+/// * `sep` - Separator to use between values
+///
+/// # Returns
+/// A string with the values joined by the separator
+pub fn join_display<T: Display>(vec: &[T], sep: &str) -> String {
+    vec.iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join(sep)
 }
 
 /// Compute SAFE sponge hash with the given domain separator and inputs.
@@ -113,25 +136,34 @@ pub fn bigint_to_field(value: &BigInt) -> FieldElement {
     FieldElement::from_le_bytes_mod_order(&bytes)
 }
 
-/// Calculate bit width from a bound string.
+/// Calculate bit width from a bound.
 ///
 /// # Arguments
-/// * `bound_str` - String representation of the bound value
+/// * `bound` - Bound value
 ///
 /// # Returns
-/// The calculated bit width, or an error if the bound cannot be parsed
-///
-/// # Errors
-/// Returns `ZkHelpersUtilsError::ParseBound` if the bound string cannot be parsed as a BigInt
-pub fn calculate_bit_width(bound_str: &str) -> Result<u32> {
-    let bound = BigInt::from_str(bound_str)
-        .map_err(|e| ZkHelpersUtilsError::ParseBound(format!("{bound_str}: {e}")))?;
-
+/// The calculated bit width
+pub fn calculate_bit_width(bound: BigInt) -> u32 {
     if bound <= BigInt::from(0) {
-        return Ok(1); // Minimum 1 bit
+        return 1; // Minimum 1 bit
     }
 
-    Ok(bound.bits() as u32)
+    bound.bits() as u32
+}
+
+/// Computes the bit width of the public key.
+///
+/// # Arguments
+/// * `params` - BFV parameters
+///
+/// # Returns
+/// The bit width of the public key
+pub fn compute_pk_bit(params: &BfvParameters) -> u32 {
+    let moduli = params.moduli();
+    let modulus = BigInt::from(moduli.iter().copied().max().unwrap());
+    let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
+
+    calculate_bit_width(bound)
 }
 
 /// Get the ZKP modulus as a BigInt.
@@ -188,26 +220,35 @@ pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_jso
         .collect()
 }
 
+/// Map a polynomial to a vector of JSON values.
+///
+/// # Arguments
+/// * `polynomial` - Polynomial to convert to TOML JSON
+///
+/// # Returns
+/// A vector of JSON values
+pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> serde_json::Value {
+    poly_coefficients_to_toml_json(polynomial.coefficients())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn calculate_bit_width_handles_zero_and_positive_bounds() {
-        assert_eq!(calculate_bit_width("0").unwrap(), 1);
-        assert_eq!(calculate_bit_width("1").unwrap(), 1);
-        assert_eq!(calculate_bit_width("2").unwrap(), 2);
-        assert_eq!(calculate_bit_width("3").unwrap(), 2);
-        assert_eq!(calculate_bit_width("4").unwrap(), 3);
-        assert_eq!(calculate_bit_width("7").unwrap(), 3);
-        assert_eq!(calculate_bit_width("8").unwrap(), 4);
+        assert_eq!(calculate_bit_width(BigInt::from(0)), 1);
+        assert_eq!(calculate_bit_width(BigInt::from(1)), 1);
+        assert_eq!(calculate_bit_width(BigInt::from(2)), 2);
+        assert_eq!(calculate_bit_width(BigInt::from(3)), 2);
+        assert_eq!(calculate_bit_width(BigInt::from(4)), 3);
+        assert_eq!(calculate_bit_width(BigInt::from(7)), 3);
+        assert_eq!(calculate_bit_width(BigInt::from(8)), 4);
     }
 
     #[test]
-    fn calculate_bit_width_rejects_invalid_input() {
-        let err = calculate_bit_width("nope").unwrap_err();
-        let msg = format!("{err}");
-        assert!(msg.contains("Failed to parse bound"));
+    fn calculate_bit_width_handles_negative_bounds() {
+        assert_eq!(calculate_bit_width(BigInt::from(-1)), 1);
     }
 
     #[test]
