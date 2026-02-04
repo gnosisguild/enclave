@@ -155,11 +155,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     [sdk],
   )
 
-  const getThresholdBfvParamsSet = useCallback(async () => {
-    if (!sdk) throw new Error('SDK not initialized')
-    return sdk.getThresholdBfvParamsSet()
-  }, [sdk])
-
   // Event handling methods
   const onEnclaveEvent = useCallback(
     <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => {
