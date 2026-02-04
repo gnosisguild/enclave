@@ -111,7 +111,6 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
@@ -130,7 +129,6 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
@@ -151,7 +149,6 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            wired: OnceCell::new(),
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
@@ -435,9 +432,6 @@ mod tests {
 
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
-
-        // Wiring happened automatically
-        assert!(system.wired.get().is_some());
     }
 
     #[actix::test]
@@ -447,9 +441,6 @@ mod tests {
 
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
-
-        // Wiring happened automatically
-        assert!(system.wired.get().is_some());
     }
 
     #[actix::test]
