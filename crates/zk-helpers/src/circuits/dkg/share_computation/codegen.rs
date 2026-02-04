@@ -31,11 +31,7 @@ impl CircuitCodegen for ShareComputationCircuit {
     type Input = ShareComputationCircuitInput;
     type Error = CircuitsErrors;
 
-    fn codegen(
-        &self,
-        preset: Self::Preset,
-        input: &Self::Input,
-    ) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
         let ShareComputationOutput { witness, bits, .. } =
             ShareComputationCircuit::compute(preset, input)?;
 
