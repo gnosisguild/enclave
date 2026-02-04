@@ -130,7 +130,8 @@ pub async fn register_e3_requested(
                             etherscan_client
                             .get_token_holders_with_constant_balance(
                                 token_address,
-                                event.e3.requestBlock.to::<u64>(),
+                                // the block is the one before the request
+                                event.e3.requestBlock.to::<u64>() - 1u64,
                                 credits,
                             )
                         } 
@@ -138,7 +139,8 @@ pub async fn register_e3_requested(
                             etherscan_client
                             .get_token_holders_with_voting_power(
                                 token_address,
-                                event.e3.requestBlock.to::<u64>(),
+                                // the block is the one before the request
+                                event.e3.requestBlock.to::<u64>() - 1u64,
                                 &CONFIG.http_rpc_url,
                                 U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
                                     |e| {

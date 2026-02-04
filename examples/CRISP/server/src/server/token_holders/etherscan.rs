@@ -447,7 +447,7 @@ impl EtherscanClient {
         let token = ERC20Votes::new(token_address, provider);
 
         match token
-            .getPastVotes(voter_address, U256::from(block_number - 1))
+            .getPastVotes(voter_address, U256::from(block_number))
             .call()
             .await
         {
