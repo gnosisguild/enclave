@@ -95,7 +95,7 @@ pub fn compute_pk_bit(params: &BfvParameters) -> Result<u32, ZkHelpersUtilsError
     let modulus = BigInt::from(moduli[0]);
     let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
 
-    calculate_bit_width(&bound.to_string())
+    Ok(calculate_bit_width(bound))
 }
 
 /// Computes the commitment of the public key.

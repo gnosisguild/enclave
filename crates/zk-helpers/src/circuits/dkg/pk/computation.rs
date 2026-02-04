@@ -19,7 +19,9 @@ use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
+use fhe::bfv::BfvParameters;
 use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use serde::{Deserialize, Serialize};
 
 /// Output of [`CircuitComputation::compute`] for [`PkCircuit`]: bounds, bit widths, and witness.
@@ -119,7 +121,7 @@ impl Computation for Bits {
         input: &Self::Input,
     ) -> Result<Self, Self::Error> {
         Ok(Bits {
-            pk_bit: calculate_bit_width(&input.pk_bound.to_string())?,
+            pk_bit: calculate_bit_width(BigInt::from(input.pk_bound.clone())),
         })
     }
 }

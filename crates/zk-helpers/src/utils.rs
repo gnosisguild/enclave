@@ -135,25 +135,19 @@ pub fn bigint_to_field(value: &BigInt) -> FieldElement {
     FieldElement::from_le_bytes_mod_order(&bytes)
 }
 
-/// Calculate bit width from a bound string.
+/// Calculate bit width from a bound.
 ///
 /// # Arguments
-/// * `bound_str` - String representation of the bound value
+/// * `bound` - Bound value
 ///
 /// # Returns
-/// The calculated bit width, or an error if the bound cannot be parsed
-///
-/// # Errors
-/// Returns `ZkHelpersUtilsError::ParseBound` if the bound string cannot be parsed as a BigInt
-pub fn calculate_bit_width(bound_str: &str) -> Result<u32> {
-    let bound = BigInt::from_str(bound_str)
-        .map_err(|e| ZkHelpersUtilsError::ParseBound(format!("{bound_str}: {e}")))?;
-
+/// The calculated bit width
+pub fn calculate_bit_width(bound: BigInt) -> u32 {
     if bound <= BigInt::from(0) {
-        return Ok(1); // Minimum 1 bit
+        return 1; // Minimum 1 bit
     }
 
-    Ok(bound.bits() as u32)
+    bound.bits() as u32
 }
 
 /// Get the ZKP modulus as a BigInt.
@@ -231,20 +225,18 @@ mod tests {
 
     #[test]
     fn calculate_bit_width_handles_zero_and_positive_bounds() {
-        assert_eq!(calculate_bit_width("0").unwrap(), 1);
-        assert_eq!(calculate_bit_width("1").unwrap(), 1);
-        assert_eq!(calculate_bit_width("2").unwrap(), 2);
-        assert_eq!(calculate_bit_width("3").unwrap(), 2);
-        assert_eq!(calculate_bit_width("4").unwrap(), 3);
-        assert_eq!(calculate_bit_width("7").unwrap(), 3);
-        assert_eq!(calculate_bit_width("8").unwrap(), 4);
+        assert_eq!(calculate_bit_width(BigInt::from(0)), 1);
+        assert_eq!(calculate_bit_width(BigInt::from(1)), 1);
+        assert_eq!(calculate_bit_width(BigInt::from(2)), 2);
+        assert_eq!(calculate_bit_width(BigInt::from(3)), 2);
+        assert_eq!(calculate_bit_width(BigInt::from(4)), 3);
+        assert_eq!(calculate_bit_width(BigInt::from(7)), 3);
+        assert_eq!(calculate_bit_width(BigInt::from(8)), 4);
     }
 
     #[test]
-    fn calculate_bit_width_rejects_invalid_input() {
-        let err = calculate_bit_width("nope").unwrap_err();
-        let msg = format!("{err}");
-        assert!(msg.contains("Failed to parse bound"));
+    fn calculate_bit_width_handles_negative_bounds() {
+        assert_eq!(calculate_bit_width(BigInt::from(-1)), 1);
     }
 
     #[test]
