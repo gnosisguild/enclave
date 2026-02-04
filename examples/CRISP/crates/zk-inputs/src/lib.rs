@@ -286,10 +286,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("bounds"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -309,10 +309,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("bounds"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -331,10 +331,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("bounds"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -368,9 +368,9 @@ mod tests {
         assert!(result.is_ok());
         let (ciphertext_bytes, json_output) = result.unwrap();
         assert!(!ciphertext_bytes.is_empty());
-        assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("bounds"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     // Error handling tests
@@ -435,8 +435,7 @@ mod tests {
         let parsed: serde_json::Value =
             serde_json::from_str(&json_output).expect("Invalid JSON output");
 
-        // Check required top-level fields.
-        assert!(parsed.get("params").is_some());
+        // Check required top-level fields (ciphertext addition + user data encryption witnesses).
         assert!(parsed.get("prev_ct0is").is_some());
         assert!(parsed.get("prev_ct1is").is_some());
         assert!(parsed.get("sum_ct0is").is_some());

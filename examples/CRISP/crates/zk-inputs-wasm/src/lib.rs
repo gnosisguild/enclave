@@ -281,8 +281,8 @@ mod tests {
             .unwrap()
             .as_string()
             .unwrap();
-        assert!(inputs_str.contains("params"));
         assert!(inputs_str.contains("pk0is"));
+        assert!(inputs_str.contains("prev_ct0is"));
     }
 
     #[wasm_bindgen_test]
@@ -318,7 +318,7 @@ mod tests {
             .unwrap()
             .as_string()
             .unwrap();
-        assert!(inputs_str.contains("params"));
         assert!(inputs_str.contains("pk0is"));
+        assert!(inputs_str.contains("prev_ct0is"));
     }
 }
