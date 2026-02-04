@@ -24,7 +24,6 @@ use e3_events::EType;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::ErrorDispatcher;
-use e3_events::Event;
 use e3_events::EventPublisher;
 use e3_events::EventSubscriber;
 use e3_events::TypedEvent;

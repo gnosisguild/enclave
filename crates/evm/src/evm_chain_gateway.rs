@@ -14,7 +14,7 @@ use anyhow::Result;
 use anyhow::{bail, Context};
 use e3_events::EType;
 use e3_events::{
-    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventFactory, EventSubscriber, EventType,
+    trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
     EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};

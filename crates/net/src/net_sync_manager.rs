@@ -8,7 +8,7 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, Event, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
+    EnclaveEventData, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
     ReceiveEvents, TypedEvent, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake};

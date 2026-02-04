@@ -12,7 +12,6 @@ use std::{
     future::Future,
     pin::Pin,
 };
-use tracing::warn;
 
 use crate::{BusHandle, ErrorDispatcher};
 

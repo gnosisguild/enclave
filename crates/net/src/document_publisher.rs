@@ -31,7 +31,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 const KADEMLIA_PUT_TIMEOUT: Duration = Duration::from_secs(30);
 const KADEMLIA_GET_TIMEOUT: Duration = Duration::from_secs(30);
