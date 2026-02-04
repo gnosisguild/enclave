@@ -144,6 +144,8 @@ pub struct CustomParams {
     pub token_address: String,
     pub balance_threshold: String,
     pub num_options: String,
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +189,9 @@ pub struct E3StateLite {
     pub num_options: String,
 
     pub requester: String,
+
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -242,6 +247,8 @@ pub struct E3Crisp {
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub requester: String,
     pub num_options: String,
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 impl From<E3> for WebResultRequest {
@@ -265,4 +272,13 @@ impl From<E3> for WebResultRequest {
 pub struct TokenHolder {
     pub address: String,
     pub balance: String,
+}
+
+/// Defines the mode of credit assignment for voters.
+/// - `Constant`: All voters receive the same credit regardless of their token balance.
+/// - `Custom`: Voters receive credit proportional to their token balance, with a specified threshold.
+#[derive(Debug, PartialEq)]
+pub enum CreditMode {
+    Constant = 0,
+    Custom = 0
 }

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::models::CreditMode;
 use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
     models::{CurrentRound, CustomParams},
@@ -69,15 +70,30 @@ pub async fn register_e3_requested(
                 // Convert custom params bytes back to token address and balance threshold.
 
                 // Use sol_data types instead of primitives
-                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>);
+                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>);
 
                 let decoded = <CustomParamsTuple as SolType>::abi_decode(&event.e3.customParams)
                     .with_context(|| "Failed to decode custom params from E3 event")?;
+
+                let credit_mode = decoded.3;
+                // If credit mode is constant, use the credits from the event. 
+                let credits = match credit_mode {
+                    Uint256(0) => {
+                        info!("[e3_id={}] Credit mode: Constant", e3_id);
+                        Some(decoded.4.to_string())
+                    }
+                    Uint256(1) => {
+                        info!("[e3_id={}] Credit mode: Custom", e3_id);
+                        None()
+                    }
+                };
 
                 let custom_params = CustomParams {
                     token_address: decoded.0.to_string(),
                     balance_threshold: decoded.1.to_string(),
                     num_options: decoded.2.to_string(),
+                    credit_mode: CreditMode(credit_mode.to::<u64>()?),
+                    credits,
                 };
 
                 let balance_threshold =
@@ -89,7 +105,7 @@ pub async fn register_e3_requested(
                     .with_context(|| "Invalid token address")?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold, custom_params.num_options, e3.requester.to_string())
+                repo.initialize_round(custom_params, e3.requester.to_string())
                     .await?;
 
                 // Get token holders from Etherscan API or mocked data.
@@ -108,23 +124,36 @@ pub async fn register_e3_requested(
 
                     let etherscan_client =
                         EtherscanClient::new(CONFIG.etherscan_api_key.clone(), CONFIG.chain_id);
-                    etherscan_client
-                        .get_token_holders_with_voting_power(
-                            token_address,
-                            event.e3.requestBlock.to::<u64>(),
-                            &CONFIG.http_rpc_url,
-                            U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
-                                |e| {
-                                    eyre::eyre!(
-                                        "[e3_id={}] Failed to convert balance threshold to U256: {}",
-                                        e3_id,
-                                        e
-                                    )
-                                },
-                            )?,
-                        )
-                        .await
+
+                    match custom_params.credit_mode {
+                        CreditMode::Constant => {
+                            etherscan_client
+                            .get_token_holders_with_constant_balance(
+                                token_address,
+                                event.e3.requestBlock.to::<u64>(),
+                                credits,
+                            )
+                        } 
+                        CreditMode::Custom => {
+                            etherscan_client
+                            .get_token_holders_with_voting_power(
+                                token_address,
+                                event.e3.requestBlock.to::<u64>(),
+                                &CONFIG.http_rpc_url,
+                                U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
+                                    |e| {
+                                        eyre::eyre!(
+                                            "[e3_id={}] Failed to convert balance threshold to U256: {}",
+                                            e3_id,
+                                            e
+                                        )
+                                    },
+                                )?,
+                            )
+                            .await
                         .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+                        }
+                    }
                 };
 
                 if token_holders.is_empty() {
