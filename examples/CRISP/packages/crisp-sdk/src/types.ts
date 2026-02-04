@@ -65,18 +65,9 @@ export type MerkleProof = {
 }
 
 /**
- * Type representing a vote with power for 'yes' and 'no'
+ * Type representing a vote
  */
-export type Vote = {
-  /**
-   * The voting power for 'yes' votes
-   */
-  yes: bigint
-  /**
-   * The voting power for 'no' votes
-   */
-  no: bigint
-}
+export type Vote = bigint[]
 
 /**
  * Type representing a vector with coefficients
@@ -165,6 +156,8 @@ export type CircuitInputs = {
   is_first_vote: boolean
   // Whether this is a mask vote.
   is_mask_vote: boolean
+  // The number of options for this vote
+  num_options: string
 }
 
 export type ProofData = {
@@ -196,6 +189,7 @@ export type MaskVoteProofInputs = {
   slotAddress: string
   merkleLeaves: string[] | bigint[]
   previousCiphertext?: Uint8Array
+  numOptions: number
 }
 
 export type MaskVoteProofRequest = {
@@ -204,6 +198,7 @@ export type MaskVoteProofRequest = {
   balance: bigint
   slotAddress: string
   merkleLeaves: string[] | bigint[]
+  numOptions: number
 }
 
 export type VoteProofInputs = {

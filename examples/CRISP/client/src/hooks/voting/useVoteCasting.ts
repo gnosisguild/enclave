@@ -130,7 +130,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       const randomVoterToMask = getRandomVoterToMask(eligibleVoters)
 
       return {
-        vote: { yes: 0n, no: 0n },
+        vote: [0n, 0n],
         slotAddress: randomVoterToMask.address,
         balance: BigInt(randomVoterToMask.balance),
         signature: '',
@@ -138,7 +138,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       }
     } catch (error) {
       return {
-        vote: { yes: 0n, no: 0n },
+        vote: [0n, 0n],
         slotAddress: '',
         balance: 0n,
         signature: '',
@@ -167,7 +167,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
 
       // vote is either 0 or 1, so we need to encode the vote accordingly.
       const balance = 1n
-      const vote = pollSelected.value === 0 ? { yes: balance, no: 0n } : { yes: 0n, no: balance }
+      const vote = pollSelected.value === 0 ? [balance, 0n] : [0n, balance]
 
       let signature: string
       try {
@@ -185,7 +185,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         return {
           signature: '',
           messageHash: '' as `0x${string}`,
-          vote: { yes: 0n, no: 0n },
+          vote: [0n, 0n],
           slotAddress: '',
           balance: 0n,
           error: 'User rejected signature or signing failed',

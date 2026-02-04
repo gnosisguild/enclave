@@ -22,6 +22,7 @@ contract CRISPProgram is IE3Program, Ownable {
     bytes32 paramsHash;
     mapping(address slot => uint40 index) voteSlots;
     LazyIMTData votes;
+    uint256 numOptions;
   }
 
   // Constants
@@ -110,6 +111,13 @@ contract CRISPProgram is IE3Program, Ownable {
     if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
 
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    // decode custom params to get the number of options
+    (, , uint256 numOptions) = abi.decode(e3.customParams, (address, uint256, uint256));
+
+    e3Data[e3Id].numOptions = numOptions;
+
     e3Data[e3Id].paramsHash = keccak256(e3ProgramParams);
 
     // Initialize the votes Merkle tree for this E3 ID.
@@ -139,13 +147,14 @@ contract CRISPProgram is IE3Program, Ownable {
     E3 memory e3 = enclave.getE3(e3Id);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](6);
+    bytes32[] memory noirPublicInputs = new bytes32[](7);
     noirPublicInputs[0] = previousEncryptedVoteCommitment;
     noirPublicInputs[1] = e3.committeePublicKey;
     noirPublicInputs[2] = bytes32(e3Data[e3Id].merkleRoot);
     noirPublicInputs[3] = bytes32(uint256(uint160(slotAddress)));
     noirPublicInputs[4] = bytes32(uint256(previousEncryptedVoteCommitment == bytes32(0) ? 1 : 0));
     noirPublicInputs[5] = encryptedVoteCommitment;
+    noirPublicInputs[6] = bytes32(e3Data[e3Id].numOptions);
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
@@ -157,30 +166,30 @@ contract CRISPProgram is IE3Program, Ownable {
 
   /// @notice Decode the tally from the plaintext output
   /// @param e3Id The E3 program ID
-  /// @return yes The number of yes votes
-  /// @return no The number of no votes
-  function decodeTally(uint256 e3Id) public view returns (uint256 yes, uint256 no) {
+  /// @return votes - an array of vote counts for each option
+  function decodeTally(uint256 e3Id) public view returns (uint256[] memory votes) {
     // fetch from enclave
     E3 memory e3 = enclave.getE3(e3Id);
+
+    uint256 numOptions = e3Data[e3Id].numOptions;
 
     // decode it into an array of uint64
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
-    uint256 halfD = tally.length / 2;
+    uint256 segmentSize = tally.length / numOptions;
+    votes = new uint256[](numOptions);
 
-    // Convert yes votes
-    for (uint256 i = 0; i < halfD; i++) {
-      uint256 weight = 2 ** (halfD - 1 - i);
-      yes += tally[i] * weight;
+    for (uint256 optIdx = 0; optIdx < numOptions; optIdx++) {
+      uint256 start = optIdx * segmentSize;
+      uint256 value = 0;
+
+      for (uint256 i = 0; i < segmentSize; i++) {
+        uint256 weight = 2 ** (segmentSize - 1 - i);
+        value += uint256(tally[start + i]) * weight;
+      }
+
+      votes[optIdx] = value;
     }
-
-    // Convert no votes
-    for (uint256 i = halfD; i < tally.length; i++) {
-      uint256 weight = 2 ** (tally.length - 1 - i);
-      no += tally[i] * weight;
-    }
-
-    return (yes, no);
   }
 
   /// @notice Get the slot index for a given E3 ID and slot address

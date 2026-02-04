@@ -15,8 +15,16 @@ import {
   VoteProofInputs,
   Polynomial,
 } from './types'
-import { generateMerkleProof, toBinary, extractSignatureComponents, getAddressFromSignature, getOptimalThreadCount } from './utils'
-import { MAXIMUM_VOTE_VALUE, MASK_SIGNATURE, ZERO_VOTE, SIGNATURE_MESSAGE_HASH } from './constants'
+import {
+  generateMerkleProof,
+  toBinary,
+  extractSignatureComponents,
+  getAddressFromSignature,
+  getOptimalThreadCount,
+  getZeroVote,
+  getMaxVoteValue,
+} from './utils'
+import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { UltraHonkBackend } from '@aztec/bb.js'
 import circuit from '../../../circuits/target/crisp_circuit.json'
@@ -28,28 +36,38 @@ const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
 const optimalThreadCount = await getOptimalThreadCount()
 
 /**
- * Encode a vote.
- * @param vote The vote to encode.
+ * Encode a vote with n choices.
+ * @param vote Array of vote values, one per choice.
  * @returns The encoded vote as a BigInt64Array.
  */
 export const encodeVote = (vote: Vote): BigInt64Array => {
   const bfvParams = zkInputsGenerator.getBFVParams()
-  const voteArray = []
-  const length = bfvParams.degree
-  const halfLength = length / 2
-  const yesBinary = toBinary(vote.yes).split('')
-  const noBinary = toBinary(vote.no).split('')
+  const degree = bfvParams.degree
+  const n = vote.length
 
-  // Fill first half with 'yes' binary representation (pad with leading 0s if needed)
-  for (let i = 0; i < halfLength; i++) {
-    const offset = halfLength - yesBinary.length
-    voteArray.push(i < offset ? '0' : yesBinary[i - offset])
+  // Each choice gets floor(degree/n) bits; remaining bits stay zero
+  const segmentSize = Math.floor(degree / n)
+  const voteArray: string[] = []
+
+  for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
+    const value = choiceIdx < vote.length ? vote[choiceIdx] : 0n
+    const binary = toBinary(value).split('')
+
+    if (binary.length > segmentSize) {
+      throw new Error(`Vote value for choice ${choiceIdx} exceeds segment size (${segmentSize} bits)`)
+    }
+
+    // Fill segment with binary representation (pad with leading 0s)
+    for (let i = 0; i < segmentSize; i += 1) {
+      const offset = segmentSize - binary.length
+      voteArray.push(i < offset ? '0' : binary[i - offset])
+    }
   }
 
-  // Fill second half with 'no' binary representation (pad with leading 0s if needed)
-  for (let i = 0; i < length - halfLength; i++) {
-    const offset = length - halfLength - noBinary.length
-    voteArray.push(i < offset ? '0' : noBinary[i - offset])
+  // Fill remaining bits with zeros
+  const remainder = degree - segmentSize * n
+  for (let i = 0; i < remainder; i++) {
+    voteArray.push('0')
   }
 
   return BigInt64Array.from(voteArray.map(BigInt))
@@ -85,44 +103,38 @@ const decodeBytesToNumbers = (data: Uint8Array): number[] => {
 }
 
 /**
- * Decode an encoded tally into its decimal representation.
- * @param tallyBytes The encoded tally as a hex string (bytes).
- * @returns The decoded tally as an IVote.
+ * Decode an encoded tally into vote counts for n choices.
+ * @param tallyBytes The encoded tally as a hex string.
+ * @param numChoices Number of choices.
+ * @returns Array of vote counts per choice.
  */
-export const decodeTally = (tallyBytes: string): Vote => {
-  // Convert hex string to bytes, handling both with and without 0x prefix
+export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
   const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
   const bytes = hexToBytes(hexString as Hex)
-
-  // Decode bytes to numbers array
   const numbers = decodeBytesToNumbers(bytes)
 
-  const HALF_D = numbers.length / 2
-
-  // Extract the first half for yes votes and second half for no votes
-  // Votes are right-aligned with leading zeros, so we can use the entire halves
-  const yesBinary = numbers.slice(0, HALF_D)
-  const noBinary = numbers.slice(HALF_D, numbers.length)
-
-  let yes = 0n
-  let no = 0n
-
-  // Convert yes votes (entire first half)
-  for (let i = 0; i < yesBinary.length; i += 1) {
-    const weight = 2n ** BigInt(yesBinary.length - 1 - i)
-    yes += BigInt(yesBinary[i]) * weight
+  if (numChoices <= 0) {
+    throw new Error('Number of choices must be positive')
   }
 
-  // Convert no votes (entire second half)
-  for (let i = 0; i < noBinary.length; i += 1) {
-    const weight = 2n ** BigInt(noBinary.length - 1 - i)
-    no += BigInt(noBinary[i]) * weight
+  const segmentSize = Math.floor(numbers.length / numChoices)
+  const results: Vote = []
+
+  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx += 1) {
+    const start = choiceIdx * segmentSize
+    const segment = numbers.slice(start, start + segmentSize)
+
+    let value = 0n
+    for (let i = 0; i < segment.length; i += 1) {
+      const weight = 2n ** BigInt(segment.length - 1 - i)
+      value += BigInt(segment[i]) * weight
+    }
+
+    results.push(value)
   }
 
-  return {
-    yes,
-    no,
-  }
+  // Trailing bits (remainder) are ignored - they should be zeros
+  return results
 }
 
 /**
@@ -170,6 +182,8 @@ export const computeCiphertextCommitment = (ct0is: Polynomial[], ct1is: Polynomi
 export const generateCircuitInputs = async (
   proofInputs: ProofInputs,
 ): Promise<{ crispInputs: CircuitInputs; encryptedVote: Uint8Array }> => {
+  const numOptions = proofInputs.vote.length
+  const zeroVote = getZeroVote(numOptions)
   const encodedVote = encodeVote(proofInputs.vote)
 
   let crispInputs: CircuitInputs
@@ -180,7 +194,7 @@ export const generateCircuitInputs = async (
       // A placeholder ciphertext vote will be generated.
       // This is safe because the circuit will not check the ciphertext addition if
       // the previous ciphertext is not provided (is_first_vote is true).
-      encryptVote(ZERO_VOTE, proofInputs.publicKey),
+      encryptVote(zeroVote, proofInputs.publicKey),
       proofInputs.publicKey,
       encodedVote,
     )
@@ -208,6 +222,7 @@ export const generateCircuitInputs = async (
   crispInputs.merkle_proof_length = proofInputs.merkleProof.length.toString()
   crispInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
   crispInputs.merkle_proof_siblings = proofInputs.merkleProof.proof.siblings.map((s) => s.toString())
+  crispInputs.num_options = numOptions.toString()
 
   return { crispInputs, encryptedVote }
 }
@@ -242,23 +257,54 @@ export const generateProof = async (crispInputs: CircuitInputs) => {
 }
 
 /**
+ * Validate a vote.
+ * @param vote - The vote to validate.
+ * @param balance - The balance of the voter.
+ */
+export const validateVote = (vote: Vote, balance: bigint): void => {
+  const numChoices = vote.length
+  const maxValue = getMaxVoteValue(numChoices)
+
+  if (vote.length !== numChoices) {
+    throw new Error(`Invalid vote: expected ${numChoices} choices, got ${vote.length}`)
+  }
+
+  for (let i = 0; i < vote.length; i++) {
+    if (vote[i] < 0n) {
+      throw new Error(`Invalid vote: choice ${i} is negative`)
+    }
+    if (vote[i] > maxValue) {
+      throw new Error(`Invalid vote: choice ${i} exceeds maximum encodable value`)
+    }
+  }
+
+  if (numChoices === 2) {
+    // Binary: mutually exclusive
+    const nonZeroCount = vote.filter((v) => v > 0n).length
+    if (nonZeroCount > 1) {
+      throw new Error('Invalid vote: for 2 options, only one choice can be non-zero')
+    }
+    const votedAmount = vote.find((v) => v > 0n) ?? 0n
+    if (votedAmount > balance) {
+      throw new Error('Invalid vote: vote exceeds balance')
+    }
+  } else {
+    // 3+ options: split allowed, total capped
+    const total = vote.reduce((sum, v) => sum + v, 0n)
+    if (total > balance) {
+      throw new Error(`Invalid vote: total votes (${total}) exceed balance (${balance})`)
+    }
+  }
+}
+
+/**
  * Generate a vote proof for the CRISP circuit given the vote proof inputs.
  * @param voteProofInputs - The vote proof inputs.
  * @returns The vote proof.
  */
 export const generateVoteProof = async (voteProofInputs: VoteProofInputs): Promise<ProofData> => {
-  if (voteProofInputs.vote.yes > voteProofInputs.balance || voteProofInputs.vote.no > voteProofInputs.balance) {
-    throw new Error('Invalid vote: vote exceeds balance')
-  }
-
-  const maxVoteValue = BigInt(MAXIMUM_VOTE_VALUE)
-  if (voteProofInputs.vote.yes > maxVoteValue || voteProofInputs.vote.no > maxVoteValue) {
-    throw new Error('Invalid vote: vote exceeds maximum allowed value')
-  }
-
-  if (voteProofInputs.vote.yes < 0n || voteProofInputs.vote.no < 0n) {
-    throw new Error('Invalid vote: vote is negative')
-  }
+  // first validate the vote
+  validateVote(voteProofInputs.vote, voteProofInputs.balance)
 
   const address = await getAddressFromSignature(voteProofInputs.signature, voteProofInputs.messageHash)
 
@@ -289,7 +335,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
     ...maskVoteProofInputs,
     signature: MASK_SIGNATURE,
     messageHash: SIGNATURE_MESSAGE_HASH,
-    vote: ZERO_VOTE,
+    vote: getZeroVote(maskVoteProofInputs.numOptions),
     merkleProof,
     isMaskVote: true,
   })

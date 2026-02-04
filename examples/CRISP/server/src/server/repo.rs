@@ -169,6 +169,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         &mut self,
         token_address: String,
         balance_threshold: String,
+        num_options: String,
         requester: String,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
@@ -184,6 +185,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             balance_threshold,
             ciphertext_inputs: vec![],
             requester,
+            num_options
         })
         .await
     }
@@ -276,6 +278,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             token_address: e3_crisp.token_address,
             balance_threshold: e3_crisp.balance_threshold,
             requester: e3_crisp.requester,
+            num_options: e3_crisp.num_options,
         })
     }
 
