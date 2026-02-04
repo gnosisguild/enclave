@@ -16,7 +16,7 @@ pub mod insecure_512 {
 
     /// Threshold BFV parameters
     pub mod threshold {
-        pub const PLAINTEXT_MODULUS: u64 = 100;
+        pub const PLAINTEXT_MODULUS: u64 = 10;
         pub const MODULI: &[u64] = &[0xffffee001, 0xffffc4001];
         pub const ERROR1_VARIANCE: &str = "3";
         pub const ERROR1_VARIANCE_BIGUINT: u32 = 3;
