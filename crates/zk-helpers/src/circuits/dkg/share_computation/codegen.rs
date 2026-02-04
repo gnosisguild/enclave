@@ -218,8 +218,8 @@ mod tests {
     use crate::circuits::dkg::share_computation::{Bits, Bounds};
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
-    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use crate::Circuit;
+    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;

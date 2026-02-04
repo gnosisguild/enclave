@@ -286,8 +286,8 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitInput;
-    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use crate::ConvertToJson;
+    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
