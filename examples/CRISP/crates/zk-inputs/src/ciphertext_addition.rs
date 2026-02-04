@@ -6,6 +6,7 @@
 
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
+use e3_zk_helpers::crt_polynomial_to_toml_json;
 use e3_zk_helpers::utils::compute_pk_bit;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
@@ -171,5 +172,31 @@ impl CiphertextAdditionWitness {
         }
 
         Ok(CrtPolynomial::new(quotient_limbs))
+    }
+
+    /// Serializes the witness to a JSON string.
+    ///
+    /// # Returns
+    /// The JSON string representation of the witness.
+    pub fn to_json(&self) -> Result<serde_json::Value> {
+        let prev_ct0is = crt_polynomial_to_toml_json(&self.prev_ct0is);
+        let prev_ct1is = crt_polynomial_to_toml_json(&self.prev_ct1is);
+        let sum_ct0is = crt_polynomial_to_toml_json(&self.sum_ct0is);
+        let sum_ct1is = crt_polynomial_to_toml_json(&self.sum_ct1is);
+        let r0is = crt_polynomial_to_toml_json(&self.r0is);
+        let r1is = crt_polynomial_to_toml_json(&self.r1is);
+        let prev_ct_commitment = self.prev_ct_commitment.to_string();
+
+        let json = serde_json::json!({
+            "prev_ct0is": prev_ct0is,
+            "prev_ct1is": prev_ct1is,
+            "sum_ct0is": sum_ct0is,
+            "sum_ct1is": sum_ct1is,
+            "sum_r0is": r0is,
+            "sum_r1is": r1is,
+            "prev_ct_commitment": prev_ct_commitment,
+        });
+
+        Ok(json)
     }
 }

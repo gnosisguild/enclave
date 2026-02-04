@@ -8,6 +8,7 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
+use crate::ciphertext_addition::CiphertextAdditionWitness;
 use e3_fhe_params::build_bfv_params_arc;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
@@ -18,6 +19,7 @@ use e3_zk_helpers::threshold::UserDataEncryptionCircuit;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
 use e3_zk_helpers::utils::compute_pk_bit;
 use e3_zk_helpers::CircuitComputation;
+use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -30,9 +32,7 @@ use num_traits::Zero;
 use rand::thread_rng;
 use std::sync::Arc;
 mod ciphertext_addition;
-use crate::ciphertext_addition::CiphertextAdditionWitness;
-mod serialization;
-use serialization::{construct_inputs, serialize_inputs_to_json};
+mod utils;
 
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
@@ -119,13 +119,14 @@ impl ZKInputsGenerator {
             CiphertextAdditionWitness::compute(&self.bfv_params, &prev_ct, &ct, &sum_ct)
                 .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
-        // Construct Inputs Section.
-        let inputs = construct_inputs(
-            &user_data_encryption_computation_output,
-            &ciphertext_addition_inputs,
-        );
+        let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
+        let user_data_encryption_witness_json =
+            user_data_encryption_computation_output.witness.to_json()?;
+        let inputs_json = utils::merge_json_objects(
+            ciphertext_addition_witness_json,
+            user_data_encryption_witness_json,
+        )?;
 
-        let inputs_json = serialize_inputs_to_json(&inputs)?;
         // For updates, return the sum ciphertext (ct + prev_ct)
         let ciphertext_bytes = sum_ct.to_bytes();
 
@@ -186,13 +187,14 @@ impl ZKInputsGenerator {
         // so the on-chain verifier accepts the proof.
         ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
 
-        // Construct Inputs Section.
-        let inputs = construct_inputs(
-            &user_data_encryption_computation_output,
-            &ciphertext_addition_inputs,
-        );
+        let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
+        let user_data_encryption_witness_json =
+            user_data_encryption_computation_output.witness.to_json()?;
+        let inputs_json = utils::merge_json_objects(
+            ciphertext_addition_witness_json,
+            user_data_encryption_witness_json,
+        )?;
 
-        let inputs_json = serialize_inputs_to_json(&inputs)?;
         let ciphertext_bytes = ct.to_bytes();
 
         Ok((ciphertext_bytes, inputs_json))
