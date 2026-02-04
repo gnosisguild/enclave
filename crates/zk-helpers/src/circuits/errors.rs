@@ -23,6 +23,8 @@ pub enum CircuitsErrors {
     CrtPolynomial(#[from] CrtPolynomialError),
     #[error("ZK helper error: {0}")]
     ZkHelpers(#[from] ZkHelpersUtilsError),
+    #[error("Sample error: {0}")]
+    Sample(String),
     #[error("Unexpected error: {0}")]
     Other(String),
 }

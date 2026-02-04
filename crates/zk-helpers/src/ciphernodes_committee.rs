@@ -20,11 +20,11 @@ pub enum CiphernodesCommitteeSize {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CiphernodesCommittee {
     /// Total number of parties (N_PARTIES).
-    n: usize,
+    pub n: usize,
     /// Number of honest parties (H).
-    h: usize,
+    pub h: usize,
     /// Threshold value (T).
-    threshold: usize,
+    pub threshold: usize,
 }
 
 impl CiphernodesCommitteeSize {

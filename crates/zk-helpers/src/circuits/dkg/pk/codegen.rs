@@ -6,32 +6,31 @@
 
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
-use crate::circuits::pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput};
+use crate::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use crate::{
     crt_polynomial_to_toml_json, Artifacts, Bits, Circuit, CircuitCodegen, CircuitComputation,
-    CircuitsErrors, Configs, PkBfvComputationOutput, Toml, Witness,
+    CircuitsErrors, Configs, PkComputationOutput, Toml, Witness,
 };
 
-use fhe::bfv::BfvParameters;
+use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::sync::Arc;
 
-/// Implementation of [`CircuitCodegen`] for [`PkBfvCircuit`].
-impl CircuitCodegen for PkBfvCircuit {
-    type Params = Arc<BfvParameters>;
-    type Input = PkBfvCircuitInput;
+/// Implementation of [`CircuitCodegen`] for [`PkCircuit`].
+impl CircuitCodegen for PkCircuit {
+    type BfvThresholdParametersPreset = BfvPreset;
+    type Input = PkCircuitInput;
     type Error = CircuitsErrors;
 
     fn codegen(
         &self,
-        params: &Self::Params,
+        preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Artifacts, Self::Error> {
-        let PkBfvComputationOutput { witness, bits, .. } = PkBfvCircuit::compute(params, input)?;
+        let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(preset, input)?;
 
         let toml = generate_toml(witness)?;
-        let configs = generate_configs(&params, &bits);
+        let configs = generate_configs(preset, &bits);
 
         Ok(Artifacts { toml, configs })
     }
@@ -46,7 +45,7 @@ pub struct TomlJson {
     pub pk1is: Vec<serde_json::Value>,
 }
 
-/// Builds the Prover TOML string from the pk-bfv witness (pk0is, pk1is).
+/// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
 pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
     let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
@@ -57,24 +56,24 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
-pub fn generate_configs(params: &Arc<BfvParameters>, bits: &Bits) -> Configs {
+pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> Configs {
     format!(
-        r#"// Global configs for Public Key BFV circuit
+        r#"
 pub global N: u32 = {};
 pub global L: u32 = {};
 
 /************************************
 -------------------------------------
-pk_bfv (CIRCUIT 0 - PUBLIC KEY BFV COMMITMENT)
+pk (CIRCUIT 0 - DKG BFV PUBLIC KEY)
 -------------------------------------
 ************************************/
 
-// pk_bfv - bit parameters
+// pk - bit parameters
 pub global {}_BIT_PK: u32 = {};
 "#,
-        params.degree(),
-        params.moduli().len(),
-        <PkBfvCircuit as Circuit>::PREFIX,
+        preset.metadata().degree,
+        preset.metadata().num_moduli,
+        <PkCircuit as Circuit>::PREFIX,
         bits.pk_bit,
     )
 }
@@ -82,24 +81,25 @@ pub global {}_BIT_PK: u32 = {};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
-    use crate::sample::Sample;
+    use crate::prepare_pk_sample_for_test;
     use crate::Bounds;
-
-    use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let sample = Sample::generate(&params);
-        let artifacts = PkBfvCircuit
+        let sample =
+            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small)
+                .unwrap();
+
+        let artifacts = PkCircuit
             .codegen(
-                &params,
-                &PkBfvCircuitInput {
-                    public_key: sample.public_key,
+                DEFAULT_BFV_PRESET,
+                &PkCircuitInput {
+                    public_key: sample.dkg_public_key,
                 },
             )
             .unwrap();
@@ -138,11 +138,20 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(&params, &()).unwrap();
-        let bits = Bits::compute(&params, &bounds).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
-        assert!(configs_content.contains(format!("N: u32 = {}", params.degree()).as_str()));
-        assert!(configs_content.contains(format!("L: u32 = {}", params.moduli().len()).as_str()));
-        assert!(configs_content.contains(format!("PK_BFV_BIT_PK: u32 = {}", bits.pk_bit).as_str()));
+        assert!(configs_content
+            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
+        assert!(configs_content
+            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "{}_BIT_PK: u32 = {}",
+                <PkCircuit as Circuit>::PREFIX,
+                bits.pk_bit
+            )
+            .as_str()
+        ));
     }
 }

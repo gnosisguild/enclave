@@ -25,6 +25,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 toml = "0.8.23"
 itertools = "0.14.0"
+ndarray = { workspace = true }
+e3-parity-matrix = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

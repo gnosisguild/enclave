@@ -1,26 +1,31 @@
 # zk-helpers
 
-ZK circuit artifact generation for the Noir prover.
+ZK circuit artifact generation for the Noir prover. Produces `configs.nr` and optionally
+`Prover.toml` for the Enclave circuits.
 
 ## zk-cli
 
-Generate `Prover.toml` and `configs.nr` for a circuit.
+Generate `configs.nr` for a circuit; use `--toml` to also generate `Prover.toml`.
 
 ```bash
 # List circuits
 cargo run -p e3-zk-helpers --bin zk_cli -- --list_circuits
 
-# Generate artifacts (default: output/)
-cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-bfv --preset default
+# Generate configs.nr only (default)
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk --preset insecure
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset insecure
 
-# Custom output dir; skip Prover.toml (only configs.nr)
-cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk-bfv --preset default --output ./artifacts --toml
+# Generate configs.nr and Prover.toml (--witness required for share-computation)
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit pk --preset insecure --toml
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset insecure --witness secret-key --toml
+cargo run -p e3-zk-helpers --bin zk_cli -- --circuit share-computation --preset secure --witness smudging-noise --toml
 ```
 
-| Flag               | Description                                        |
-| ------------------ | -------------------------------------------------- |
-| `--list_circuits`  | List circuits and exit                             |
-| `--circuit <name>` | Circuit (e.g. `pk-bfv`)                            |
-| `--preset <name>`  | BFV preset (must match circuit)                    |
-| `--output <path>`  | Output dir (default: `output`)                     |
-| `--toml`           | Skip writing Prover.toml; always writes configs.nr |
+| Flag               | Description                                                                   |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `--list_circuits`  | List circuits and exit                                                        |
+| `--circuit <name>` | Circuit: `pk` or `share-computation`                                          |
+| `--preset <name>`  | Security preset: `insecure` (512) or `secure` (8192)                          |
+| `--witness <type>` | For `share-computation` when using `--toml`: `secret-key` or `smudging-noise` |
+| `--output <path>`  | Output dir (default: `output`)                                                |
+| `--toml`           | Also write Prover.toml (default: configs.nr only)                             |

@@ -151,21 +151,39 @@ pub fn get_zkp_modulus() -> BigInt {
     .expect("Invalid ZKP modulus")
 }
 
-/// Map a CRT polynomial to a vector of JSON values.
+/// Poly-with-coefficients shape for TOML JSON: `{"coefficients": [string, ...]}`.
 ///
-/// # Arguments
-/// * `crt_polynomial` - CRT polynomial to convert to TOML JSON
-///
-/// # Returns
-/// A vector of JSON values
+/// Use for a single limb (e.g. sk_secret) where the circuit expects one "coefficients" array.
+pub fn poly_coefficients_to_toml_json(coefficients: &[BigInt]) -> serde_json::Value {
+    serde_json::json!({
+        "coefficients": to_string_1d_vec(coefficients)
+    })
+}
+
+/// Map a CRT polynomial to a vector of JSON values (one `{"coefficients": [...]}` per limb).
 pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_json::Value> {
     crt_polynomial
         .limbs
         .iter()
-        .map(|limb| {
-            serde_json::json!({
-                "coefficients": to_string_1d_vec(limb.coefficients())
-            })
+        .map(|limb| poly_coefficients_to_toml_json(limb.coefficients()))
+        .collect()
+}
+
+/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
+///
+/// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
+pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_json::Value>>> {
+    y.iter()
+        .map(|coeff| {
+            coeff
+                .iter()
+                .map(|modulus| {
+                    modulus
+                        .iter()
+                        .map(|v| serde_json::Value::String(v.to_string()))
+                        .collect()
+                })
+                .collect()
         })
         .collect()
 }
