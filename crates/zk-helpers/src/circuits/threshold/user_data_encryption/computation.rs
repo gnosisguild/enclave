@@ -23,7 +23,6 @@ use e3_polynomial::reduce;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use fhe::bfv::BfvParameters;
-use fhe::bfv::Ciphertext;
 use fhe::bfv::SecretKey;
 use fhe_math::rq::Poly;
 use fhe_math::rq::Representation;
@@ -149,12 +148,14 @@ impl Computation for Configs {
 
         let mut k0is: Vec<u64> = Vec::new();
 
-        for &qi in moduli.iter() {
-            let qi = BigInt::from(qi);
-            let qi_neg = reduce(&(&qi - &t), &qi);
-            let qi_inv = qi.modinv(&qi_neg).unwrap();
+        for qi in ctx.moduli_operators() {
+            let k0qi = BigInt::from(qi.inv(qi.neg(params.plaintext())).ok_or_else(|| {
+                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
+                    "Failed to calculate modulus inverse for k0qi".into(),
+                )))
+            })?);
 
-            k0is.push(qi_inv.to_u64().unwrap());
+            k0is.push(k0qi.to_u64().unwrap_or(0));
         }
 
         let bounds = Bounds::compute(&params, &())?;
@@ -290,7 +291,9 @@ impl Computation for Bounds {
 
             // Calculate k0qi for bounds
             let k0qi = BigInt::from(qi.inv(qi.neg(params.plaintext())).ok_or_else(|| {
-                CircuitsErrors::Other("Failed to calculate modulus inverse for k0qi".into())
+                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
+                    "Failed to calculate modulus inverse for k0qi".into(),
+                )))
             })?);
             k0is.push(k0qi.to_u64().unwrap_or(0));
 
