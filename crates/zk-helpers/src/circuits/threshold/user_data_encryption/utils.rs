@@ -96,7 +96,7 @@ pub fn compute_public_key_commitment(
     params: &BfvParameters,
     public_key: &PublicKey,
 ) -> Result<[u8; 32], ZkHelpersUtilsError> {
-    use crate::commitments::compute_threshold_pk_commitment;
+    use crate::commitments::compute_pk_aggregation_commitment;
 
     let (pk0is, pk1is) = bfv_public_key_to_greco(&params, &public_key).map_err(|e| {
         ZkHelpersUtilsError::ConversionError(format!(
@@ -106,7 +106,7 @@ pub fn compute_public_key_commitment(
     })?;
 
     let pk_bit = compute_pk_bit(params);
-    let commitment = compute_threshold_pk_commitment(&pk0is, &pk1is, pk_bit);
+    let commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;
 
