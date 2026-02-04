@@ -40,10 +40,10 @@ fn test_event_extractor(
                 return None;
             };
             Some(
-                TestEvent {
-                    msg: event.value,
-                    entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests
-                }
+                TestEvent::new(
+                    &event.value,
+                    event.count.try_into().unwrap(), // This prevents de-duplication in tests
+                )
                 .into(),
             )
         }

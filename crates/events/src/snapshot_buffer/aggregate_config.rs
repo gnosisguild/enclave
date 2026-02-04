@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use crate::AggregateId;
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 /// Central configuration for aggregates in the WriteBuffer
 #[derive(Debug, Clone)]
@@ -13,8 +13,8 @@ pub struct AggregateConfig {
 }
 
 impl AggregateConfig {
-    pub fn get_delay(&self, id: &AggregateId) -> u64 {
-        self.delays.get(id).cloned().unwrap_or(0)
+    pub fn get_delay(&self, id: &AggregateId) -> Duration {
+        Duration::from_secs(self.delays.get(id).cloned().unwrap_or(0))
     }
 }
 

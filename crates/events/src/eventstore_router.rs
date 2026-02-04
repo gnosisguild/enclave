@@ -6,10 +6,10 @@
 
 use crate::eventstore::EventStore;
 use crate::{
-    events::{GetEventsAfter, StoreEventRequested},
+    events::{GetEventsAfterRequest, StoreEventRequested},
     AggregateId, EventContextAccessors, EventLog, SequenceIndex,
 };
-use crate::{CorrelationId, ReceiveEvents};
+use crate::{CorrelationId, GetEventsAfterResponse};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
 use e3_utils::major_issue;
@@ -50,7 +50,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         for (aggregate_id, ts) in msg.ts() {
             if let Some(store_addr) = self.stores.get(&aggregate_id) {
                 let get_events_msg =
-                    GetEventsAfter::new(msg.id(), ts.to_owned(), msg.sender.clone());
+                    GetEventsAfterRequest::new(msg.id(), ts.to_owned(), msg.sender.clone());
                 store_addr.do_send(get_events_msg);
             }
         }
@@ -87,14 +87,14 @@ impl<I: SequenceIndex, L: EventLog> Handler<GetAggregateEventsAfter> for EventSt
 pub struct GetAggregateEventsAfter {
     pub correlation_id: CorrelationId,
     pub ts: HashMap<AggregateId, u128>,
-    pub sender: Recipient<ReceiveEvents>,
+    pub sender: Recipient<GetEventsAfterResponse>,
 }
 
 impl GetAggregateEventsAfter {
     pub fn new(
         correlation_id: CorrelationId,
         ts: HashMap<AggregateId, u128>,
-        sender: Recipient<ReceiveEvents>,
+        sender: Recipient<GetEventsAfterResponse>,
     ) -> Self {
         Self {
             correlation_id,

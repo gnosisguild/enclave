@@ -8,8 +8,8 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, GetAggregateEventsAfter, NetSyncEventsReceived, OutgoingSyncRequested,
-    ReceiveEvents, TypedEvent, Unsequenced,
+    EnclaveEventData, GetAggregateEventsAfter, GetEventsAfterResponse, NetSyncEventsReceived,
+    OutgoingSyncRequested, TypedEvent, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake};
 use futures::TryFutureExt;
@@ -162,9 +162,9 @@ impl Handler<SyncRequestReceived> for NetSyncManager {
 }
 
 /// Receive Events from EventStore
-impl Handler<ReceiveEvents> for NetSyncManager {
+impl Handler<GetEventsAfterResponse> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, msg: ReceiveEvents, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetEventsAfterResponse, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
             let Some(channel) = self.requests.get(&msg.id()) else {
                 bail!("request not found with {}", msg.id());

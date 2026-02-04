@@ -5,9 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use std::mem::replace;
 
-use actix::{Actor, ActorContext, Addr, Handler, Message, Recipient};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, Recipient};
 
-use crate::{trap, EType, Insert, InsertBatch, PanicDispatcher};
+use crate::{trap, Die, EType, Insert, InsertBatch, PanicDispatcher};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -47,8 +47,15 @@ impl Handler<Flush> for Batch {
         let inserts = replace(&mut self.inserts, Vec::new());
         trap(EType::IO, &PanicDispatcher::new(), || {
             self.db.try_send(InsertBatch::new(inserts))?;
-            ctx.stop();
+            ctx.notify(Die);
             Ok(())
         })
+    }
+}
+
+impl Handler<Die> for Batch {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }

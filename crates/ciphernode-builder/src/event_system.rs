@@ -213,7 +213,7 @@ impl EventSystem {
         self.sequencer
             .get_or_try_init(|| {
                 let router = self.eventstore_router()?;
-                Ok(Sequencer::new(&self.eventbus(), router).start())
+                Ok(Sequencer::new(&self.eventbus(), router, self.buffer()?).start())
             })
             .cloned()
     }
@@ -352,7 +352,17 @@ impl EventSystem {
 
 #[cfg(test)]
 mod tests {
+    use e3_data::AutoPersist;
+    use e3_data::Persistable;
+    use e3_data::Repository;
+    use e3_events::EventContext;
+    use e3_events::EventId;
+    use e3_events::StoreKeys;
+    use e3_events::SyncEnd;
+    use e3_events::Tick;
+    use e3_test_helpers::with_tracing;
     use std::time::Duration;
+    use tracing::info;
 
     use super::*;
     use actix::Actor;
@@ -364,7 +374,7 @@ mod tests {
     use e3_events::EnclaveEventData;
 
     use e3_events::EventType;
-    use e3_events::ReceiveEvents;
+    use e3_events::GetEventsAfterResponse;
     use e3_events::TestEvent;
     use tempfile::TempDir;
     use tokio::time::sleep;
@@ -414,9 +424,9 @@ mod tests {
         }
     }
 
-    impl Handler<ReceiveEvents> for Listener {
+    impl Handler<GetEventsAfterResponse> for Listener {
         type Result = ();
-        fn handle(&mut self, msg: ReceiveEvents, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, msg: GetEventsAfterResponse, _: &mut Self::Context) -> Self::Result {
             self.events = msg.events().clone();
         }
     }
@@ -445,56 +455,120 @@ mod tests {
 
     #[actix::test]
     async fn test_event_system() -> Result<()> {
-        let system = EventSystem::in_mem("cn1").with_fresh_bus();
+        let _guard = with_tracing("debug");
+
+        // This sets up the aggregation delays
+        let mut delays = HashMap::new();
+        // Here we delay AggregationId(0) for 1 second
+        delays.insert(AggregateId::new(0), 1); // Ag0 is default
+        let config = AggregateConfig::new(delays);
+
+        let system = EventSystem::in_mem("cn1")
+            .with_fresh_bus()
+            .with_aggregate_config(config);
+
         let handle = system.handle()?;
         let datastore = system.store()?;
+        let buffer = system.buffer()?;
+
         let listener = Listener {
             logs: Vec::new(),
             events: Vec::new(),
         }
         .start();
 
+        // Sequence 1, Aggregate 0
+        let ec =
+            EventContext::new_origin(EventId::hash(1), 10, AggregateId::new(0), None).sequence(1);
+
         // Send all evts to the listener
         handle.subscribe(EventType::All, listener.clone().into());
 
-        // Lets store some data
-        datastore.scope("/foo/name").write("Fred".to_string());
-        datastore.scope("/foo/age").write(21u64);
-        datastore
-            .scope("/foo/occupation")
-            .write("developer".to_string());
-
-        // NOTE: Eventual consistency
-        // Store should not have data set on it until event has been published
-
-        // Let's check the eventual consistency all data points should be none...
-        assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);
-        assert_eq!(datastore.scope("/foo/age").read::<u64>().await?, None);
-        assert_eq!(
-            datastore.scope("/foo/occupation").read::<String>().await?,
-            None
-        );
-
-        // Push an event
+        // Publish an event seq 1
+        info!("Publishing an event seq 1");
         handle.publish_without_context(TestEvent::new("pink", 1))?;
+
+        // Lets store some data on a plain datastore
+        info!("Writing to /foo/name with no context");
+        datastore.scope("/foo/name").write("Fred".to_string());
+        // Note there is some eventual consistency here we have to wait
+        assert_eq!(datastore.scope("/foo/name").read::<String>().await?, None);
+        info!("Wait one tick");
+
+        // Let's wait until all events are settled only takes a tick
         sleep(Duration::from_millis(1)).await;
 
-        // Now we have published an event all data should be written we can get the data from the store
+        // These inserts should not be buffered and should be available
         assert_eq!(
             datastore.scope("/foo/name").read::<String>().await?,
             Some("Fred".to_string())
         );
-        assert_eq!(datastore.scope("/foo/age").read::<u64>().await?, Some(21));
-        assert_eq!(
-            datastore.scope("/foo/occupation").read::<String>().await?,
-            Some("developer".to_string())
-        );
+        info!("Data was written now");
 
-        // Get a timestamp
+        // Ok lets get a persistable
+        let mut persistable: Persistable<String> =
+            Repository::new(datastore.scope("/foo/name")).load().await?;
+
+        // We have the data in our persistable
+        assert_eq!(persistable.get(), Some("Fred".to_string()));
+
+        info!("Data was loaded from persistable now mutating state...");
+
+        persistable.try_mutate(&ec, |_| Ok("Mary".to_string()))?;
+
+        // Local state has changed straight away
+        assert_eq!(persistable.get(), Some("Mary".to_string()));
+
+        // But disk state is still the same because the SnapshotBuffer is not on
+        assert_eq!(
+            datastore.scope("/foo/name").read::<String>().await?,
+            Some("Fred".to_string())
+        );
+        info!("Local state was mutated however disk state was not");
+
+        info!("Publishing SyncEnd event to turn on SnapshotBuffer. This should send the seq=1 batch to the timelock...");
+        // Publishing SyncEnd should turn on the SnapshotBuffer seq 2
+        handle.publish(SyncEnd::new(), ec.clone())?;
+
+        sleep(Duration::from_millis(1)).await;
+
+        info!("Mutating persistable state to create inserts using seq=2");
+
+        let ec =
+            EventContext::new_origin(EventId::hash(1), 10, AggregateId::new(0), None).sequence(2);
+
+        persistable.try_mutate(&ec, |_| Ok("Liz".to_string()))?;
+        sleep(Duration::from_millis(1)).await;
+        info!("Mutation complete");
+        // SnapshotBuffer is not cleared unless new events are published
+
+        // Get a timestamp for the events below
         let ts = handle.ts()?;
 
-        // Push a few other events
+        // Push a few other events seq 3
+        // This sends the previous batch for seq2 to the timelock queue
         handle.publish_without_context(TestEvent::new("yellow", 1))?;
+
+        // Wait a second for the timelock to be checked
+        sleep(Duration::from_secs(2)).await;
+        buffer.try_send(Tick)?;
+
+        // Check now
+        info!("Reading from /foo/name and expecting it to be correct.");
+        assert_eq!(
+            datastore.scope("/foo/name").read::<String>().await?,
+            Some("Liz".to_string())
+        );
+
+        assert_eq!(
+            datastore
+                .scope(&StoreKeys::aggregate_seq(AggregateId::new(0)))
+                .read::<u64>()
+                .await?,
+            Some(2)
+        );
+
+        // Publish a few other events
         handle.publish_without_context(TestEvent::new("red", 1))?;
         handle.publish_without_context(TestEvent::new("white", 1))?;
         sleep(Duration::from_millis(100)).await;

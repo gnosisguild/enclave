@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    events::{EventStored, StoreEventRequested},
-    EventContextAccessors, EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
+    events::{StoreEventRequested, StoreEventResponse},
+    EventContextAccessors, EventLog, GetEventsAfterRequest, GetEventsAfterResponse, SequenceIndex,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
@@ -39,15 +39,15 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
-        sender.try_send(EventStored(event.into_sequenced(seq)))?;
+        sender.try_send(StoreEventResponse(event.into_sequenced(seq)))?;
         Ok(())
     }
 
-    pub fn handle_get_events_after(&mut self, msg: GetEventsAfter) -> Result<()> {
+    pub fn handle_get_events_after(&mut self, msg: GetEventsAfterRequest) -> Result<()> {
         // if there are no events after the timestamp return an empty vector
         let Some(seq) = self.index.seek(msg.ts())? else {
             msg.sender()
-                .try_send(ReceiveEvents::new(msg.id(), vec![]))?;
+                .try_send(GetEventsAfterResponse::new(msg.id(), vec![]))?;
             return Ok(());
         };
         // read and return the events
@@ -57,7 +57,8 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
             .map(|(s, e)| e.into_sequenced(s))
             .collect::<Vec<_>>();
 
-        msg.sender().try_send(ReceiveEvents::new(msg.id(), evts))?;
+        msg.sender()
+            .try_send(GetEventsAfterResponse::new(msg.id(), evts))?;
         Ok(())
     }
 }
@@ -87,9 +88,9 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfter> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfterRequest> for EventStore<I, L> {
     type Result = ();
-    fn handle(&mut self, msg: GetEventsAfter, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetEventsAfterRequest, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_get_events_after(msg) {
             error!("{e}");
         }

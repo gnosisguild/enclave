@@ -13,13 +13,13 @@ use crate::{CorrelationId, EnclaveEvent, Sequenced, Unsequenced};
 #[rtype("()")]
 pub struct StoreEventRequested {
     pub event: EnclaveEvent<Unsequenced>,
-    pub sender: Recipient<EventStored>,
+    pub sender: Recipient<StoreEventResponse>,
 }
 
 impl StoreEventRequested {
     pub fn new(
         event: EnclaveEvent<Unsequenced>,
-        sender: impl Into<Recipient<EventStored>>,
+        sender: impl Into<Recipient<StoreEventResponse>>,
     ) -> Self {
         Self {
             event,
@@ -31,17 +31,17 @@ impl StoreEventRequested {
 /// Get events after timestamp in EventStore
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct GetEventsAfter {
+pub struct GetEventsAfterRequest {
     correlation_id: CorrelationId,
     ts: u128,
-    sender: Recipient<ReceiveEvents>,
+    sender: Recipient<GetEventsAfterResponse>,
 }
 
-impl GetEventsAfter {
+impl GetEventsAfterRequest {
     pub fn new(
         correlation_id: CorrelationId,
         ts: u128,
-        sender: impl Into<Recipient<ReceiveEvents>>,
+        sender: impl Into<Recipient<GetEventsAfterResponse>>,
     ) -> Self {
         Self {
             correlation_id,
@@ -58,19 +58,19 @@ impl GetEventsAfter {
         self.correlation_id
     }
 
-    pub fn sender(&self) -> &Recipient<ReceiveEvents> {
+    pub fn sender(&self) -> &Recipient<GetEventsAfterResponse> {
         &self.sender
     }
 }
 
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct ReceiveEvents {
+pub struct GetEventsAfterResponse {
     id: CorrelationId,
     events: Vec<EnclaveEvent<Sequenced>>,
 }
 
-impl ReceiveEvents {
+impl GetEventsAfterResponse {
     pub fn new(id: CorrelationId, events: Vec<EnclaveEvent>) -> Self {
         Self { id, events }
     }
@@ -85,9 +85,9 @@ impl ReceiveEvents {
 /// Direct event received by the Sequencer once an event has been stored
 #[derive(Message, Debug)]
 #[rtype("()")]
-pub struct EventStored(pub EnclaveEvent<Sequenced>);
+pub struct StoreEventResponse(pub EnclaveEvent<Sequenced>);
 
-impl EventStored {
+impl StoreEventResponse {
     pub fn into_event(self) -> EnclaveEvent<Sequenced> {
         self.0
     }

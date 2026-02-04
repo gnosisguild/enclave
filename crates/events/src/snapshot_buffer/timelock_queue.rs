@@ -11,6 +11,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use tracing::{debug, info, warn};
 
 use super::batch_router::FlushSeq;
 
@@ -18,13 +19,20 @@ use super::batch_router::FlushSeq;
 #[rtype(result = "()")]
 pub struct StartTimelock {
     seq: u64,
-    now: u64,
-    delay: u64,
+    now: Duration,
+    delay: Duration,
 }
 
 impl StartTimelock {
-    pub fn new(seq: u64, now: u64, delay: u64) -> Self {
+    pub fn new(seq: u64, now: Duration, delay: Duration) -> Self {
         Self { seq, now, delay }
+    }
+    pub fn new_micros(seq: u64, now: u64, delay: u64) -> Self {
+        Self::new(
+            seq,
+            Duration::from_micros(now),
+            Duration::from_micros(delay),
+        )
     }
 }
 
@@ -51,12 +59,12 @@ pub struct Tick;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Timelock {
-    expiry: u64,
+    expiry: Duration,
     seq: u64,
 }
 
 impl Timelock {
-    pub fn new(expiry: u64, seq: u64) -> Self {
+    pub fn new(expiry: Duration, seq: u64) -> Self {
         Self { expiry, seq }
     }
 }
@@ -102,7 +110,7 @@ impl TimelockQueue {
         }
     }
 
-    fn next_timelock_lt(&mut self, now: u64) -> bool {
+    fn next_timelock_lt(&mut self, now: Duration) -> bool {
         if let Some(peek) = self.timelocks.peek() {
             peek.0.expiry <= now
         } else {
@@ -129,6 +137,7 @@ impl Actor for TimelockQueue {
 impl Handler<StartTimelock> for TimelockQueue {
     type Result = ();
     fn handle(&mut self, msg: StartTimelock, _: &mut Self::Context) -> Self::Result {
+        debug!("START TIMELOCK: {:?}", msg.delay);
         let expiry = msg.now + msg.delay;
         self.timelocks.push(Reverse(Timelock::new(expiry, msg.seq)));
     }
@@ -138,11 +147,19 @@ impl Handler<Tick> for TimelockQueue {
     type Result = ();
     fn handle(&mut self, _: Tick, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            let now_time = self.clock.now_micros();
+            let now_time = Duration::from_micros(self.clock.now_micros());
+            debug!(
+                "Running timelock tick. waiting times: {:?}.",
+                self.timelocks
+                    .iter()
+                    .map(|t| t.0.expiry.saturating_sub(now_time))
+                    .collect::<Vec<_>>(),
+            );
 
             while self.timelocks.len() > 0 && self.next_timelock_lt(now_time) {
                 if let Some(tl) = self.timelocks.pop() {
                     let seq = tl.0.seq;
+                    debug!("Flushing seq {}", seq);
                     self.batch_router.try_send(FlushSeq(seq))?;
                 }
             }
@@ -235,7 +252,7 @@ mod tests {
 
         // Add timelock expiring at t=2000
         queue
-            .send(StartTimelock::new(42, 1000, 1000))
+            .send(StartTimelock::new_micros(42, 1000, 1000))
             .await
             .unwrap();
 
@@ -258,7 +275,7 @@ mod tests {
 
         // Add timelock expiring at t=2000
         queue
-            .send(StartTimelock::new(42, 1000, 1000))
+            .send(StartTimelock::new_micros(42, 1000, 1000))
             .await
             .unwrap();
 
@@ -286,7 +303,7 @@ mod tests {
 
         // Add timelock expiring at exactly t=2000
         queue
-            .send(StartTimelock::new(42, 1000, 1000))
+            .send(StartTimelock::new_micros(42, 1000, 1000))
             .await
             .unwrap();
 
@@ -314,7 +331,7 @@ mod tests {
 
         // Add timelock expiring at t=2000
         queue
-            .send(StartTimelock::new(42, 1000, 1000))
+            .send(StartTimelock::new_micros(42, 1000, 1000))
             .await
             .unwrap();
 
@@ -339,9 +356,18 @@ mod tests {
                 .start();
 
         // Add timelocks with different expiries
-        queue.send(StartTimelock::new(1, 0, 1000)).await.unwrap(); // expires at 1000
-        queue.send(StartTimelock::new(2, 0, 2000)).await.unwrap(); // expires at 2000
-        queue.send(StartTimelock::new(3, 0, 3000)).await.unwrap(); // expires at 3000
+        queue
+            .send(StartTimelock::new_micros(1, 0, 1000))
+            .await
+            .unwrap(); // expires at 1000
+        queue
+            .send(StartTimelock::new_micros(2, 0, 2000))
+            .await
+            .unwrap(); // expires at 2000
+        queue
+            .send(StartTimelock::new_micros(3, 0, 3000))
+            .await
+            .unwrap(); // expires at 3000
 
         // Advance to 1500 - only first should expire
         clock.set(1500);
@@ -387,7 +413,10 @@ mod tests {
             TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
                 .start();
 
-        queue.send(StartTimelock::new(42, 1000, 500)).await.unwrap();
+        queue
+            .send(StartTimelock::new_micros(42, 1000, 500))
+            .await
+            .unwrap();
 
         // Use advance instead of set
         clock.advance(600); // Now at 1600, expiry is 1500

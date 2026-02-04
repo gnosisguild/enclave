@@ -5,33 +5,47 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use super::{
     batch_router::{BatchRouter, FlushSeq},
-    timelock_queue::{Clock, StartTimelock, SystemClock, TimelockQueue},
+    timelock_queue::{Clock, StartTimelock, SystemClock, Tick, TimelockQueue},
     AggregateConfig,
 };
-use crate::{trap, EType, EnclaveEvent, Insert, InsertBatch, PanicDispatcher};
+use crate::{
+    trap, EType, EnclaveEvent, EnclaveEventData, Event, Insert, InsertBatch, PanicDispatcher,
+};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
 use std::sync::Arc;
+use tracing::{debug, info};
 
 #[derive(Message)]
 #[rtype(result = "()")]
 struct SetDependencies {
     router: Addr<BatchRouter>,
-    timelock: Recipient<StartTimelock>,
+    timelock: Addr<TimelockQueue>,
 }
 
 impl SetDependencies {
-    pub fn new(router: Addr<BatchRouter>, timelock: impl Into<Recipient<StartTimelock>>) -> Self {
+    pub fn new(router: Addr<BatchRouter>, timelock: Addr<TimelockQueue>) -> Self {
         Self {
             router: router.into(),
-            timelock: timelock.into(),
+            timelock,
         }
     }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Start;
+
+enum SnapshotBufferState {
+    Running,
+    Paused,
 }
 
 pub struct SnapshotBuffer {
     router: Option<Addr<BatchRouter>>,
     timelock: Option<Recipient<StartTimelock>>,
+    tickable: Option<Recipient<Tick>>,
+    state: SnapshotBufferState,
 }
 
 impl SnapshotBuffer {
@@ -39,6 +53,8 @@ impl SnapshotBuffer {
         SnapshotBuffer {
             router: None,
             timelock: None,
+            tickable: None,
+            state: SnapshotBufferState::Paused,
         }
     }
 
@@ -46,7 +62,7 @@ impl SnapshotBuffer {
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
     ) -> Result<Addr<Self>> {
-        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock))?;
+        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock), Some(1))?;
         Ok(addr)
     }
 
@@ -54,12 +70,13 @@ impl SnapshotBuffer {
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
         clock: Arc<dyn Clock>,
+        interval: Option<u64>,
     ) -> Result<(Addr<Self>, Addr<TimelockQueue>)> {
         let addr = Self::new().start();
         let store = store.into();
         let router =
             BatchRouter::with_clock(config, addr.clone(), store.clone(), clock.clone()).start();
-        let timelock = TimelockQueue::with_clock(addr.clone(), clock, None).start();
+        let timelock = TimelockQueue::with_clock(addr.clone(), clock, interval).start();
         addr.try_send(SetDependencies::new(router, timelock.clone()))?;
         Ok((addr, timelock))
     }
@@ -73,6 +90,9 @@ impl Handler<FlushSeq> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: FlushSeq, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
+            let SnapshotBufferState::Running = self.state else {
+                return Ok(());
+            };
             if let Some(ref router) = self.router {
                 router.try_send(msg)?;
             }
@@ -85,6 +105,10 @@ impl Handler<StartTimelock> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: StartTimelock, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
+            let SnapshotBufferState::Running = self.state else {
+                return Ok(());
+            };
+
             if let Some(ref timelock) = self.timelock {
                 timelock.try_send(msg)?;
             }
@@ -97,7 +121,8 @@ impl Handler<SetDependencies> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: SetDependencies, _: &mut Self::Context) -> Self::Result {
         let SetDependencies { timelock, router } = msg;
-        self.timelock = Some(timelock);
+        self.timelock = Some(timelock.clone().into());
+        self.tickable = Some(timelock.into());
         self.router = Some(router);
     }
 }
@@ -106,9 +131,20 @@ impl Handler<Insert> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            if let Some(ref router) = self.router {
-                router.try_send(msg)?;
-            }
+            use SnapshotBufferState as S;
+            match (&self.state, msg.ctx(), &self.router) {
+                // Doing this to cover when there are context free
+                // data store manipulations outside of the sync cycle.
+                (S::Paused, None, Some(ref router)) => {
+                    debug!("Paused but received context free Insert. Forwarding to batch router");
+                    router.try_send(msg)?;
+                }
+                (S::Running, _, Some(ref router)) => {
+                    debug!("Forwarding to batch router");
+                    router.try_send(msg)?;
+                }
+                _ => (),
+            };
             Ok(())
         })
     }
@@ -118,8 +154,27 @@ impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
+            if let EnclaveEventData::SyncEnd(_) = msg.get_data() {
+                info!("SnapshotBuffer is now enabled");
+                self.state = SnapshotBufferState::Running;
+            };
+            let SnapshotBufferState::Running = self.state else {
+                return Ok(());
+            };
             if let Some(ref router) = self.router {
                 router.try_send(msg)?;
+            }
+            Ok(())
+        })
+    }
+}
+
+impl Handler<Tick> for SnapshotBuffer {
+    type Result = ();
+    fn handle(&mut self, msg: Tick, _: &mut Self::Context) -> Self::Result {
+        trap(EType::IO, &PanicDispatcher::new(), || {
+            if let Some(ref tickable) = self.tickable {
+                tickable.try_send(msg)?;
             }
             Ok(())
         })
@@ -186,7 +241,8 @@ mod tests {
         let store = mock_store::MockStore::default().start();
 
         let clock = Arc::new(MockClock::new(1000));
-        let (buffer, timelock) = SnapshotBuffer::with_clock(config, store.clone(), clock.clone())?;
+        let (buffer, timelock) =
+            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None)?;
 
         let ec = EventContext::new_origin(EventId::hash(1), 1000, AggregateId::new(0), None)
             .sequence(10);

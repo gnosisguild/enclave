@@ -8,6 +8,7 @@ use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
 use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use std::collections::BTreeMap;
+use tracing::info;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]

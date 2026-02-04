@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    events::{EventStored, StoreEventRequested},
+    events::{StoreEventRequested, StoreEventResponse},
     EnclaveEvent, EventBus, Sequenced, Unsequenced,
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
@@ -16,22 +16,25 @@ use e3_utils::major_issue;
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     eventstore: Recipient<StoreEventRequested>,
+    buffer: Recipient<EnclaveEvent>,
 }
 
 impl Sequencer {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
         eventstore: impl Into<Recipient<StoreEventRequested>>,
+        buffer: impl Into<Recipient<EnclaveEvent>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             eventstore: eventstore.into(),
+            buffer: buffer.into(),
         }
     }
 
-    fn handle_event_stored(&self, msg: EventStored) -> Result<()> {
+    fn handle_store_event_response(&self, msg: StoreEventResponse) -> Result<()> {
         let event = msg.into_event();
-
+        self.buffer.try_send(event.clone())?;
         self.bus.try_send(event)?;
         Ok(())
     }
@@ -53,10 +56,10 @@ impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     }
 }
 
-impl Handler<EventStored> for Sequencer {
+impl Handler<StoreEventResponse> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EventStored, _: &mut Self::Context) -> Self::Result {
-        if let Err(e) = self.handle_event_stored(msg) {
+    fn handle(&mut self, msg: StoreEventResponse, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_store_event_response(msg) {
             panic!(
                 "{}",
                 major_issue("Could not send event to snapshot_buffer or bus.", e)

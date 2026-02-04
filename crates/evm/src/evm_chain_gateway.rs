@@ -261,11 +261,7 @@ mod tests {
         // Send EVM event while forwarding - should reach collector
         let evm_event = EvmEvent::new(
             CorrelationId::new(),
-            TestEvent {
-                msg: "Before Complete".to_string(),
-                entropy: 1,
-            }
-            .into(),
+            TestEvent::new("Before Complete", 1).into(),
             100,
             12345,
             chain_id,
@@ -290,11 +286,7 @@ mod tests {
         // Send EVM event while buffering - should be buffered (not received)
         let buffered_event = EvmEvent::new(
             CorrelationId::new(),
-            TestEvent {
-                msg: "Before SyncEnd".to_string(),
-                entropy: 2,
-            }
-            .into(),
+            TestEvent::new("Before SyncEnd", 2).into(),
             101,
             12346,
             chain_id,
@@ -307,11 +299,7 @@ mod tests {
 
         let after_event = EvmEvent::new(
             CorrelationId::new(),
-            TestEvent {
-                msg: "After SyncEnd".to_string(),
-                entropy: 2,
-            }
-            .into(),
+            TestEvent::new("After SyncEnd", 2).into(),
             101,
             12346,
             chain_id,
