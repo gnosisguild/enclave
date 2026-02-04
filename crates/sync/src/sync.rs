@@ -250,7 +250,6 @@ pub struct Bootstrap;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use actix::io::WriteHandler;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{EnclaveEvent, EventFactory};
     use e3_events::{
@@ -286,7 +285,7 @@ mod tests {
         evm_config.insert(1, EvmEventConfigChain::new(0));
         evm_config.insert(2, EvmEventConfigChain::new(0));
         let repositories = Repositories::in_mem();
-        let snapshot_buffer = WriteBuffer::new().start();
+        let snapshot_buffer = system.buffer()?;
         // Start synchronizer
         let sync_addr = Synchronizer::setup(
             &bus,

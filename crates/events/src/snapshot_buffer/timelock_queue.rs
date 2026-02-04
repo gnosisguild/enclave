@@ -149,6 +149,7 @@ mod tests {
         atomic::{AtomicU64, Ordering as AtomicOrdering},
         Arc, Mutex,
     };
+    use tokio::time::sleep;
 
     // ==================== Mock Clock ====================
 
@@ -205,13 +206,14 @@ mod tests {
 
     // ==================== Tests ====================
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_tick_with_mock_clock_no_expiry() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(1000); // Start at t=1000
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         // Add timelock expiring at t=2000
         queue
@@ -221,18 +223,19 @@ mod tests {
 
         // Tick at t=1000 - nothing should expire
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         assert!(received_seqs.lock().unwrap().is_empty());
     }
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_tick_with_mock_clock_after_expiry() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(1000);
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         // Add timelock expiring at t=2000
         queue
@@ -245,20 +248,21 @@ mod tests {
 
         // Now tick should flush
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         let seqs = received_seqs.lock().unwrap();
         assert_eq!(seqs.len(), 1);
         assert_eq!(seqs[0], 42);
     }
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_tick_exact_expiry_boundary() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(1000);
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         // Add timelock expiring at exactly t=2000
         queue
@@ -270,7 +274,7 @@ mod tests {
         clock.set(2000);
 
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         // Should flush at exact expiry (<=)
         let seqs = received_seqs.lock().unwrap();
@@ -278,13 +282,14 @@ mod tests {
         assert_eq!(seqs[0], 42);
     }
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_tick_one_microsecond_before_expiry() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(1000);
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         // Add timelock expiring at t=2000
         queue
@@ -296,19 +301,20 @@ mod tests {
         clock.set(1999);
 
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         // Should NOT flush
         assert!(received_seqs.lock().unwrap().is_empty());
     }
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_multiple_timelocks_partial_expiry() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(0);
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         // Add timelocks with different expiries
         queue.send(StartTimelock::new(1, 0, 1000)).await.unwrap(); // expires at 1000
@@ -318,7 +324,7 @@ mod tests {
         // Advance to 1500 - only first should expire
         clock.set(1500);
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
@@ -329,7 +335,7 @@ mod tests {
         // Advance to 2500 - second should expire
         clock.set(2500);
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
@@ -340,7 +346,7 @@ mod tests {
         // Advance to 5000 - third should expire
         clock.set(5000);
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
@@ -349,13 +355,14 @@ mod tests {
         }
     }
 
-    #[actix_rt::test]
+    #[actix::test]
     async fn test_clock_advance_helper() {
         let received_seqs = Arc::new(Mutex::new(Vec::new()));
         let mock_router = MockBatchRouter::new(received_seqs.clone()).start();
 
         let clock = MockClock::new(1000);
-        let queue = TimelockQueue::with_clock(mock_router.recipient(), clock.clone()).start();
+        let queue =
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
 
         queue.send(StartTimelock::new(42, 1000, 500)).await.unwrap();
 
@@ -363,7 +370,7 @@ mod tests {
         clock.advance(600); // Now at 1600, expiry is 1500
 
         queue.send(Tick).await.unwrap();
-        actix_rt::time::sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
 
         assert_eq!(received_seqs.lock().unwrap().len(), 1);
     }
