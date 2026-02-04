@@ -13,6 +13,7 @@ use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::computation::{Configs, Witness};
 use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
 use crate::utils::join_display;
+use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
 use crate::{Artifacts, Toml};
@@ -92,6 +93,8 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
 }
 
 pub fn generate_configs(params: &Arc<BfvParameters>, configs: &Configs) -> String {
+    let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
+
     let qis_str = join_display(&configs.moduli, ", ");
     let k0is_str = join_display(&configs.k0is, ", ");
     let pk_bounds_str = join_display(&configs.bounds.pk_bounds, ", ");
@@ -102,93 +105,129 @@ pub fn generate_configs(params: &Arc<BfvParameters>, configs: &Configs) -> Strin
     let p2_bounds_str = join_display(&configs.bounds.p2_bounds, ", ");
 
     format!(
-        r#"use crate::core::greco::Configs as GrecoConfigs;
+        r#"use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
 
-// Global configs for Greco circuit
+// Global configs for User Data Encryption circuit
 pub global N: u32 = {};
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
 
 /************************************
 -------------------------------------
-greco (USED FOR ENCRYPTION TRBFV x PVSS)
+user_data_encryption (USED FOR DATA ENCRYPTION)
 -------------------------------------
 ************************************/
 
-// greco - bit parameters
-pub global GRECO_BIT_PK: u32 = {};
-pub global GRECO_BIT_CT: u32 = {};
-pub global GRECO_BIT_U: u32 = {};
-pub global GRECO_BIT_E0: u32 = {};
-pub global GRECO_BIT_E1: u32 = {};
-pub global GRECO_BIT_K: u32 = {};
-pub global GRECO_BIT_R1: u32 = {};
-pub global GRECO_BIT_R2: u32 = {};
-pub global GRECO_BIT_P1: u32 = {};
-pub global GRECO_BIT_P2: u32 = {};
+pub global {}_BIT_PK: u32 = {};
+pub global {}_BIT_CT: u32 = {};
+pub global {}_BIT_U: u32 = {};
+pub global {}_BIT_E0: u32 = {};
+pub global {}_BIT_E1: u32 = {};
+pub global {}_BIT_K: u32 = {};
+pub global {}_BIT_R1: u32 = {};
+pub global {}_BIT_R2: u32 = {};
+pub global {}_BIT_P1: u32 = {};
+pub global {}_BIT_P2: u32 = {};
 
-// greco - bounds
-pub global GRECO_Q_MOD_T: Field = {};
-pub global GRECO_Q_MOD_T_MOD_P: Field = {};
-pub global GRECO_K0IS: [Field; L] = [{}];
-pub global GRECO_PK_BOUNDS: [Field; L] = [{}];
-pub global GRECO_E0_BOUND: Field = {};
-pub global GRECO_E1_BOUND: Field = {};
-pub global GRECO_U_BOUND: Field = {};
-pub global GRECO_K1_LOW_BOUND: Field = {};
-pub global GRECO_K1_UP_BOUND: Field = {};
-pub global GRECO_R1_LOW_BOUNDS: [Field; L] = [{}];
-pub global GRECO_R1_UP_BOUNDS: [Field; L] = [{}];
-pub global GRECO_R2_BOUNDS: [Field; L] = [{}];
-pub global GRECO_P1_BOUNDS: [Field; L] = [{}];
-pub global GRECO_P2_BOUNDS: [Field; L] = [{}];
+pub global {}_Q_MOD_T: Field = {};
+pub global {}_Q_MOD_T_MOD_P: Field = {};
+pub global {}_K0IS: [Field; L] = [{}];
+pub global {}_PK_BOUNDS: [Field; L] = [{}];
+pub global {}_E0_BOUND: Field = {};
+pub global {}_E1_BOUND: Field = {};
+pub global {}_U_BOUND: Field = {};
+pub global {}_K1_LOW_BOUND: Field = {};
+pub global {}_K1_UP_BOUND: Field = {};
+pub global {}_R1_LOW_BOUNDS: [Field; L] = [{}];
+pub global {}_R1_UP_BOUNDS: [Field; L] = [{}];
+pub global {}_R2_BOUNDS: [Field; L] = [{}];
+pub global {}_P1_BOUNDS: [Field; L] = [{}];
+pub global {}_P2_BOUNDS: [Field; L] = [{}];
 
-// greco - configs
-pub global GRECO_CONFIGS: GrecoConfigs<N, L> = GrecoConfigs::new(
-GRECO_Q_MOD_T,
-GRECO_Q_MOD_T_MOD_P,
+pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
+{}_Q_MOD_T,
+{}_Q_MOD_T_MOD_P,
 QIS,
-GRECO_K0IS,
-GRECO_PK_BOUNDS,
-GRECO_E0_BOUND,
-GRECO_E1_BOUND,
-GRECO_U_BOUND,
-GRECO_R1_LOW_BOUNDS,
-GRECO_R1_UP_BOUNDS,
-GRECO_R2_BOUNDS,
-GRECO_P1_BOUNDS,
-GRECO_P2_BOUNDS,
-GRECO_K1_LOW_BOUND,
-GRECO_K1_UP_BOUND
+{}_K0IS,
+{}_PK_BOUNDS,
+{}_E0_BOUND,
+{}_E1_BOUND,
+{}_U_BOUND,
+{}_R1_LOW_BOUNDS,
+{}_R1_UP_BOUNDS,
+{}_R2_BOUNDS,
+{}_P1_BOUNDS,
+{}_P2_BOUNDS,
+{}_K1_LOW_BOUND,
+{}_K1_UP_BOUND
 );
 "#,
-        params.degree(),             // N
-        params.moduli().len(),       // L
-        qis_str,                     // QIS array
-        configs.bits.pk_bit,         // BIT_PK
-        configs.bits.ct_bit,         // BIT_CT
-        configs.bits.u_bit,          // BIT_U
-        configs.bits.e0_bit,         // BIT_E0
-        configs.bits.e1_bit,         // BIT_E1
-        configs.bits.k_bit,          // BIT_K
-        configs.bits.r1_bit,         // BIT_R1
-        configs.bits.r2_bit,         // BIT_R2
-        configs.bits.p1_bit,         // BIT_P1
-        configs.bits.p2_bit,         // BIT_P2
-        configs.q_mod_t,             // Q_MOD_T
-        configs.q_mod_t_mod_p,       // Q_MOD_T_MOD_P
-        k0is_str,                    // K0IS array
-        pk_bounds_str,               // PK_BOUNDS array
-        configs.bounds.e0_bound,     // E0_BOUND
-        configs.bounds.e1_bound,     // E1_BOUND
-        configs.bounds.u_bound,      // U_BOUND
+        params.degree(),       // N
+        params.moduli().len(), // L
+        qis_str,               // QIS array
+        prefix,
+        configs.bits.pk_bit, // BIT_PK
+        prefix,
+        configs.bits.ct_bit, // BIT_CT
+        prefix,
+        configs.bits.u_bit, // BIT_U
+        prefix,
+        configs.bits.e0_bit, // BIT_E0
+        prefix,
+        configs.bits.e1_bit, // BIT_E1
+        prefix,
+        configs.bits.k_bit, // BIT_K
+        prefix,
+        configs.bits.r1_bit, // BIT_R1
+        prefix,
+        configs.bits.r2_bit, // BIT_R2
+        prefix,
+        configs.bits.p1_bit, // BIT_P1
+        prefix,
+        configs.bits.p2_bit, // BIT_P2
+        prefix,
+        configs.q_mod_t, // Q_MOD_T
+        prefix,
+        configs.q_mod_t_mod_p, // Q_MOD_T_MOD_P
+        prefix,
+        k0is_str, // K0IS array
+        prefix,
+        pk_bounds_str, // PK_BOUNDS array
+        prefix,
+        configs.bounds.e0_bound, // E0_BOUND
+        prefix,
+        configs.bounds.e1_bound, // E1_BOUND
+        prefix,
+        configs.bounds.u_bound, // U_BOUND
+        prefix,
         configs.bounds.k1_low_bound, // K1_LOW_BOUND
-        configs.bounds.k1_up_bound,  // K1_UP_BOUND
-        r1_low_bounds_str,           // R1_LOW_BOUNDS array
-        r1_up_bounds_str,            // R1_UP_BOUNDS array
-        r2_bounds_str,               // R2_BOUNDS array
-        p1_bounds_str,               // P1_BOUNDS array
-        p2_bounds_str,               // P2_BOUNDS array
+        prefix,
+        configs.bounds.k1_up_bound, // K1_UP_BOUND
+        prefix,
+        r1_low_bounds_str, // R1_LOW_BOUNDS array
+        prefix,
+        r1_up_bounds_str, // R1_UP_BOUNDS array
+        prefix,
+        r2_bounds_str, // R2_BOUNDS array
+        prefix,
+        p1_bounds_str, // P1_BOUNDS array
+        prefix,
+        p2_bounds_str, // P2_BOUNDS array
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
+        prefix,
     )
 }
 
@@ -257,6 +296,13 @@ mod tests {
 
         assert!(configs_content.contains(format!("N: u32 = {}", params.degree()).as_str()));
         assert!(configs_content.contains(format!("L: u32 = {}", params.moduli().len()).as_str()));
-        assert!(configs_content.contains(format!("GRECO_BIT_PK: u32 = {}", bits.pk_bit).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "{}_BIT_PK: u32 = {}",
+                <UserDataEncryptionCircuit as Circuit>::PREFIX,
+                bits.pk_bit
+            )
+            .as_str()
+        ));
     }
 }
