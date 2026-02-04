@@ -11,41 +11,37 @@ use actix::{Actor, Addr, Context, Handler};
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyPending, EncryptionKeyReceived, Event, EventPublisher,
-    EventSubscriber, EventType, PkBfvProofRequest, ZkRequest, ZkResponse,
+    EncryptionKeyCreated, EncryptionKeyPending, Event, EventPublisher, EventSubscriber, EventType,
+    PkBfvProofRequest, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
-use crate::{ZkBackend, ZkProver};
-
 #[derive(Clone, Debug)]
-struct PendingEncryptionKey {
+struct PendingProofRequest {
     e3_id: E3id,
     key: Arc<EncryptionKey>,
 }
 
-pub struct ZkActor {
+/// Core actor that handles encryption key proof requests.
+pub struct ProofRequestActor {
     bus: BusHandle,
-    verifier: Option<Arc<ZkProver>>,
     proofs_enabled: bool,
-    pending: HashMap<CorrelationId, PendingEncryptionKey>,
+    pending: HashMap<CorrelationId, PendingProofRequest>,
 }
 
-impl ZkActor {
-    pub fn new(bus: &BusHandle, backend: Option<&ZkBackend>) -> Self {
+impl ProofRequestActor {
+    pub fn new(bus: &BusHandle, proofs_enabled: bool) -> Self {
         Self {
             bus: bus.clone(),
-            verifier: backend.map(|b| Arc::new(ZkProver::new(b))),
-            proofs_enabled: backend.is_some(),
+            proofs_enabled,
             pending: HashMap::new(),
         }
     }
 
-    pub fn setup(bus: &BusHandle, backend: Option<&ZkBackend>) -> Addr<Self> {
-        let addr = Self::new(bus, backend).start();
+    pub fn setup(bus: &BusHandle, proofs_enabled: bool) -> Addr<Self> {
+        let addr = Self::new(bus, proofs_enabled).start();
         bus.subscribe(EventType::EncryptionKeyPending, addr.clone().into());
-        bus.subscribe(EventType::EncryptionKeyReceived, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
         addr
@@ -69,8 +65,8 @@ impl ZkActor {
 
         let correlation_id = CorrelationId::new();
         self.pending.insert(
-            correlation_id.clone(),
-            PendingEncryptionKey {
+            correlation_id,
+            PendingProofRequest {
                 e3_id: msg.e3_id.clone(),
                 key: msg.key.clone(),
             },
@@ -78,7 +74,7 @@ impl ZkActor {
 
         let request = ComputeRequest::zk(
             ZkRequest::PkBfv(PkBfvProofRequest::new(msg.key.pk_bfv.clone(), msg.params)),
-            correlation_id.clone(),
+            correlation_id,
             msg.e3_id,
         );
 
@@ -86,53 +82,6 @@ impl ZkActor {
         if let Err(err) = self.bus.publish(request) {
             error!("Failed to publish ZK proof request: {err}");
             self.pending.remove(&correlation_id);
-        }
-    }
-
-    fn handle_encryption_key_received(&mut self, msg: EncryptionKeyReceived) {
-        if let Some(ref verifier) = self.verifier {
-            let Some(proof) = &msg.key.proof else {
-                warn!(
-                    "External key from party {} is missing T0 proof - rejecting",
-                    msg.key.party_id
-                );
-                return;
-            };
-
-            let e3_id_str = msg.e3_id.to_string();
-            match verifier.verify(proof, &e3_id_str) {
-                Ok(true) => info!(
-                    "T0 proof verified for party {} (circuit: {})",
-                    msg.key.party_id, proof.circuit
-                ),
-                Ok(false) => {
-                    error!(
-                        "T0 proof verification FAILED for party {} - rejecting key",
-                        msg.key.party_id
-                    );
-                    return;
-                }
-                Err(e) => {
-                    error!(
-                        "T0 proof verification error for party {}: {} - rejecting key",
-                        msg.key.party_id, e
-                    );
-                    return;
-                }
-            }
-        } else {
-            warn!(
-                "ZK backend not available - accepting key from party {} without verification",
-                msg.key.party_id
-            );
-        }
-
-        if let Err(err) = self.bus.publish(EncryptionKeyCreated {
-            e3_id: msg.e3_id,
-            key: msg.key,
-            external: true,
-        }) {
-            error!("Failed to publish EncryptionKeyCreated: {err}");
         }
     }
 
@@ -168,17 +117,16 @@ impl ZkActor {
     }
 }
 
-impl Actor for ZkActor {
+impl Actor for ProofRequestActor {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for ZkActor {
+impl Handler<EnclaveEvent> for ProofRequestActor {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::EncryptionKeyPending(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::EncryptionKeyReceived(data) => self.notify_sync(ctx, data),
             EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data),
             EnclaveEventData::ComputeRequestError(data) => self.notify_sync(ctx, data),
             _ => (),
@@ -186,7 +134,7 @@ impl Handler<EnclaveEvent> for ZkActor {
     }
 }
 
-impl Handler<EncryptionKeyPending> for ZkActor {
+impl Handler<EncryptionKeyPending> for ProofRequestActor {
     type Result = ();
 
     fn handle(&mut self, msg: EncryptionKeyPending, _ctx: &mut Self::Context) -> Self::Result {
@@ -194,15 +142,7 @@ impl Handler<EncryptionKeyPending> for ZkActor {
     }
 }
 
-impl Handler<EncryptionKeyReceived> for ZkActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: EncryptionKeyReceived, _ctx: &mut Self::Context) -> Self::Result {
-        self.handle_encryption_key_received(msg)
-    }
-}
-
-impl Handler<ComputeResponse> for ZkActor {
+impl Handler<ComputeResponse> for ProofRequestActor {
     type Result = ();
 
     fn handle(&mut self, msg: ComputeResponse, _ctx: &mut Self::Context) -> Self::Result {
@@ -210,7 +150,7 @@ impl Handler<ComputeResponse> for ZkActor {
     }
 }
 
-impl Handler<ComputeRequestError> for ZkActor {
+impl Handler<ComputeRequestError> for ProofRequestActor {
     type Result = ();
 
     fn handle(&mut self, msg: ComputeRequestError, _ctx: &mut Self::Context) -> Self::Result {

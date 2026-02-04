@@ -28,7 +28,7 @@ use e3_sortition::{
 };
 use e3_sync::Synchronizer;
 use e3_utils::{rand_eth_addr, SharedRng};
-use e3_zk_prover::{ZkActor, ZkBackend};
+use e3_zk_prover::{setup_zk_actors, ZkBackend};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -430,8 +430,8 @@ impl CiphernodeBuilder {
                 share_encryption_params,
             ));
 
-            info!("Setting up ZkActor");
-            ZkActor::setup(&bus, self.zk_backend.as_ref());
+            info!("Setting up ZK actors");
+            setup_zk_actors(&bus, self.zk_backend.as_ref());
         }
 
         if self.pubkey_agg {

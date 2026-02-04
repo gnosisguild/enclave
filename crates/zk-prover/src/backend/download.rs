@@ -83,11 +83,19 @@ impl ZkBackend {
 
         let result = download_with_progress(&url, "Downloading circuits").await;
 
+        let mut version_info = self.load_version_info().await;
+
         match result {
             Ok(bytes) => {
                 let decoder = GzDecoder::new(&bytes[..]);
                 let mut archive = Archive::new(decoder);
                 archive.unpack(&self.circuits_dir)?;
+
+                version_info.circuits_version = Some(version.clone());
+                version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
+                version_info.save(&self.version_file()).await?;
+
+                info!("installed circuits v{}", version);
             }
             Err(e) => {
                 warn!(
@@ -95,15 +103,15 @@ impl ZkBackend {
                     e
                 );
                 create_placeholder_circuits(&self.circuits_dir).await?;
+
+                version_info.circuits_version = Some("0.0.0-placeholder".to_string());
+                version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
+                version_info.save(&self.version_file()).await?;
+
+                info!("created placeholder circuits (will retry download on next setup)");
             }
         }
 
-        let mut version_info = self.load_version_info().await;
-        version_info.circuits_version = Some(version.clone());
-        version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
-        version_info.save(&self.version_file()).await?;
-
-        info!("installed circuits v{}", version);
         Ok(())
     }
 

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-mod actor;
+mod actors;
 mod backend;
 mod circuits;
 mod config;
@@ -13,7 +13,11 @@ mod prover;
 mod traits;
 mod witness;
 
-pub use actor::ZkActor;
+pub use actors::{
+    setup_zk_actors, ProofRequestActor, ProofVerificationActor, ZkActors, ZkVerificationRequest,
+    ZkVerificationResponse,
+};
+
 pub use backend::{SetupStatus, ZkBackend};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuit;

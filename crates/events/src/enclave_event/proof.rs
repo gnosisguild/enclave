@@ -49,7 +49,6 @@ pub enum CircuitName {
 }
 
 impl CircuitName {
-    /// Get the file name for this circuit.
     pub fn as_str(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "pk_bfv",
