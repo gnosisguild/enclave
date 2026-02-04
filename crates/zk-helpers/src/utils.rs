@@ -18,6 +18,7 @@ use ark_bn254::Fr as FieldElement;
 use ark_ff::PrimeField;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_safe::SafeSponge;
+use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use std::fmt::Display;
@@ -148,6 +149,21 @@ pub fn calculate_bit_width(bound: BigInt) -> u32 {
     }
 
     bound.bits() as u32
+}
+
+/// Computes the bit width of the public key.
+///
+/// # Arguments
+/// * `params` - BFV parameters
+///
+/// # Returns
+/// The bit width of the public key
+pub fn compute_pk_bit(params: &BfvParameters) -> u32 {
+    let moduli = params.moduli();
+    let modulus = BigInt::from(moduli[0]);
+    let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
+
+    calculate_bit_width(bound)
 }
 
 /// Get the ZKP modulus as a BigInt.

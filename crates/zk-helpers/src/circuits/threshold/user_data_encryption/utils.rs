@@ -4,10 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::utils::{calculate_bit_width, get_zkp_modulus, ZkHelpersUtilsError};
+use crate::utils::{compute_pk_bit, get_zkp_modulus, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
-use num_bigint::BigInt;
 
 /// Converts a BFV ciphertext to Greco format.
 ///
@@ -81,23 +80,6 @@ pub fn bfv_public_key_to_greco(
     Ok((pk0is, pk1is))
 }
 
-/// Computes the bit width of the public key.
-///
-/// # Arguments
-/// * `params` - BFV parameters
-///
-/// # Returns
-/// The bit width of the public key
-///
-/// # Errors
-pub fn compute_pk_bit(params: &BfvParameters) -> Result<u32, ZkHelpersUtilsError> {
-    let moduli = params.moduli();
-    let modulus = BigInt::from(moduli[0]);
-    let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
-
-    Ok(calculate_bit_width(bound))
-}
-
 /// Computes the commitment of the public key.
 ///
 /// # Arguments
@@ -123,7 +105,7 @@ pub fn compute_public_key_commitment(
         ))
     })?;
 
-    let pk_bit = compute_pk_bit(params)?;
+    let pk_bit = compute_pk_bit(params);
     let commitment = compute_threshold_pk_commitment(&pk0is, &pk1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;
@@ -168,7 +150,7 @@ pub fn compute_ciphertext_commitment(
         ))
     })?;
 
-    let pk_bit = compute_pk_bit(params)?;
+    let pk_bit = compute_pk_bit(params);
     let commitment = compute_ciphertext_commitment(&ct0is, &ct1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;

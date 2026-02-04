@@ -184,10 +184,10 @@ impl ZKInputsGenerator {
         let ct0 = CrtPolynomial::from_bigint_vectors(ct0is_vec);
         let ct1 = CrtPolynomial::from_bigint_vectors(ct1is_vec);
 
-        match self.generator.compute_commitment(&ct0, &ct1) {
-            Ok(commitment) => Ok(commitment.to_string()),
-            Err(e) => Err(JsValue::from_str(&e.to_string())),
-        }
+        Ok(self
+            .generator
+            .compute_ciphertext_commitment(&ct0, &ct1)
+            .to_string())
     }
 
     /// Encrypt a vote from JavaScript.

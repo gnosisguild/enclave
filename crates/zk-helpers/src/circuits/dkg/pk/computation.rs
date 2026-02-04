@@ -12,8 +12,7 @@
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
 use crate::get_zkp_modulus;
-
-use crate::threshold::compute_pk_bit;
+use crate::utils::compute_pk_bit;
 use crate::CircuitsErrors;
 use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
@@ -21,7 +20,6 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::BfvParameters;
-use num_bigint::BigUint;
 use num_bigint::{BigInt, BigUint};
 use serde::{Deserialize, Serialize};
 
@@ -125,7 +123,7 @@ impl Computation for Bits {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         Ok(Bits {
-            pk_bit: compute_pk_bit(params)?,
+            pk_bit: compute_pk_bit(params),
         })
     }
 }
@@ -201,9 +199,12 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET)
+            .map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let expected_bits = calculate_bit_width(&bounds.pk_bound.to_string()).unwrap();
+        let expected_bits = compute_pk_bit(&dkg_params);
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
         assert_eq!(bits.pk_bit, expected_bits);

@@ -13,9 +13,9 @@ use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
 use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::threshold::compute_pk_bit;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuit;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
+use e3_zk_helpers::utils::compute_pk_bit;
 use e3_zk_helpers::CircuitComputation;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
@@ -245,10 +245,14 @@ impl ZKInputsGenerator {
     ///
     /// # Returns
     /// The commitment as a BigInt.
-    pub fn compute_commitment(&self, ct0: &CrtPolynomial, ct1: &CrtPolynomial) -> Result<BigInt> {
-        let pk_bit = compute_pk_bit(&self.bfv_params)?;
+    pub fn compute_ciphertext_commitment(
+        &self,
+        ct0: &CrtPolynomial,
+        ct1: &CrtPolynomial,
+    ) -> BigInt {
+        let pk_bit = compute_pk_bit(&self.bfv_params);
 
-        Ok(compute_ciphertext_commitment(ct0, ct1, pk_bit))
+        compute_ciphertext_commitment(ct0, ct1, pk_bit)
     }
 }
 

@@ -13,9 +13,9 @@ use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
 use crate::compute_ciphertext_commitment;
 use crate::get_zkp_modulus;
-use crate::threshold::compute_pk_bit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use crate::utils::compute_pk_bit;
 use crate::CircuitsErrors;
 use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
@@ -362,7 +362,7 @@ impl Computation for Witness {
     type Error = CircuitsErrors;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
-        let pk_bit = compute_pk_bit(params)?;
+        let pk_bit = compute_pk_bit(params);
 
         let pk = input.public_key.clone();
         let pt = input.plaintext.clone();
