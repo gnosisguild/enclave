@@ -11,9 +11,7 @@ pub mod errors;
 
 pub use codegen::{write_artifacts, Artifacts, CircuitCodegen};
 pub use commitments::*;
-pub use computation::{
-    CircuitComputation, Computation, Configs, ConvertToJson, ReduceToZkpModulus, Toml,
-};
+pub use computation::{CircuitComputation, Computation, Configs, ConvertToJson, Toml};
 pub use errors::CircuitsErrors;
 
 pub mod dkg;

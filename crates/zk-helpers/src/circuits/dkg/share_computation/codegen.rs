@@ -6,6 +6,7 @@
 
 //! Code generation for the share-computation BFV circuit: Prover.toml and configs.nr.
 
+use crate::bigint_3d_to_json_values;
 use crate::bigint_to_field;
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_computation::{
@@ -15,8 +16,8 @@ use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, Toml};
 use crate::computation::Configs;
 use crate::computation::DkgInputType;
 use crate::crt_polynomial_to_toml_json;
+use crate::poly_coefficients_to_toml_json;
 use crate::registry::Circuit;
-use crate::to_string_1d_vec;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
@@ -67,30 +68,14 @@ pub fn generate_toml(
 ) -> Result<Toml, CircuitsErrors> {
     let secret = match dkg_input_type {
         DkgInputType::SecretKey => serde_json::json!({
-            "sk_secret": {
-                "coefficients": to_string_1d_vec(witness.secret_crt.limb(0).coefficients())
-            }
+            "sk_secret": poly_coefficients_to_toml_json(witness.secret_crt.limb(0).coefficients())
         }),
         DkgInputType::SmudgingNoise => serde_json::json!({
             "e_sm_secret": crt_polynomial_to_toml_json(&witness.secret_crt)
         }),
     };
 
-    let y: Vec<Vec<Vec<serde_json::Value>>> = witness
-        .y
-        .iter()
-        .map(|coeff| {
-            coeff
-                .iter()
-                .map(|modulus| {
-                    modulus
-                        .iter()
-                        .map(|share| serde_json::Value::String(share.to_string()))
-                        .collect()
-                })
-                .collect()
-        })
-        .collect();
+    let y = bigint_3d_to_json_values(&witness.y);
 
     let toml_json = TomlJson {
         expected_secret_commitment: witness.expected_secret_commitment.to_string(),

@@ -56,7 +56,9 @@ pub trait ConvertToJson {
     fn convert_to_json(&self) -> serde_json::Result<serde_json::Value>;
 }
 
-/// Reduces coefficients (or similar) to the ZKP field modulus for use in the prover.
-pub trait ReduceToZkpModulus: Sized {
-    fn reduce_to_zkp_modulus(&self) -> Self;
+/// Any `Serialize` type can be converted to JSON for round-trip tests and artifact generation.
+impl<T: serde::Serialize> ConvertToJson for T {
+    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
+        serde_json::to_value(self)
+    }
 }

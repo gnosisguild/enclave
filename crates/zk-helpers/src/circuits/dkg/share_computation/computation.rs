@@ -19,7 +19,6 @@ use crate::dkg::share_computation::ShareComputationCircuit;
 use crate::dkg::share_computation::ShareComputationCircuitInput;
 use crate::get_zkp_modulus;
 use crate::CircuitsErrors;
-use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -258,24 +257,6 @@ impl Computation for Witness {
             y,
             expected_secret_commitment,
         })
-    }
-}
-
-impl ConvertToJson for Configs {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
-}
-
-impl ConvertToJson for Bounds {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
-}
-
-impl ConvertToJson for Witness {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
     }
 }
 

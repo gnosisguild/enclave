@@ -45,7 +45,7 @@ describe('encryptNumber', () => {
       expect(value.proof).to.be.an.instanceOf(Object)
     }, 9999999)
 
-    it('should encrypt a vecor of numbers without crashing in a node environent', async () => {
+    it('should encrypt a vector of numbers without crashing in a node environent', async () => {
       const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
       const value = await sdk.encryptVector(new BigUint64Array([1n, 2n]), Uint8Array.from(buffer))
       expect(value).to.be.an.instanceof(Uint8Array)
