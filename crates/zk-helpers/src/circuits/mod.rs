@@ -9,9 +9,9 @@ pub mod commitments;
 pub mod computation;
 pub mod errors;
 
-pub use codegen::{write_artifacts, Artifacts, CircuitCodegen};
+pub use codegen::{write_artifacts, Artifacts, CircuitCodegen, CodegenConfigs, CodegenToml};
 pub use commitments::*;
-pub use computation::{CircuitComputation, Computation, Configs, ConvertToJson, Toml};
+pub use computation::{CircuitComputation, Computation, ConvertToJson};
 pub use errors::CircuitsErrors;
 
 pub mod dkg;

@@ -12,8 +12,8 @@ use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_computation::{
     Bits, ShareComputationCircuit, ShareComputationCircuitInput, ShareComputationOutput, Witness,
 };
-use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, Toml};
-use crate::computation::Configs;
+use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
+use crate::codegen::CodegenConfigs;
 use crate::computation::DkgInputType;
 use crate::crt_polynomial_to_toml_json;
 use crate::poly_coefficients_to_toml_json;
@@ -65,7 +65,7 @@ pub struct TomlJson {
 pub fn generate_toml(
     witness: &Witness,
     dkg_input_type: DkgInputType,
-) -> Result<Toml, CircuitsErrors> {
+) -> Result<CodegenToml, CircuitsErrors> {
     let secret = match dkg_input_type {
         DkgInputType::SecretKey => serde_json::json!({
             "sk_secret": poly_coefficients_to_toml_json(witness.secret_crt.limb(0).coefficients())
@@ -139,7 +139,7 @@ pub fn generate_configs(
     bits: &Bits,
     n_parties: usize,
     threshold: usize,
-) -> Result<Configs, CircuitsErrors> {
+) -> Result<CodegenConfigs, CircuitsErrors> {
     let (threshold_params, _) =
         build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
     let config_name = preset.metadata().security.as_config_str();

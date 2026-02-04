@@ -19,11 +19,6 @@ pub enum DkgInputType {
     SmudgingNoise,
 }
 
-/// Prover TOML file content (witness and circuit inputs).
-pub type Toml = String;
-/// Noir configs file content (global constants for the prover).
-pub type Configs = String;
-
 /// Generic computation from parameters and input to a result.
 pub trait Computation: Sized {
     type BfvThresholdParametersPreset;

@@ -15,8 +15,8 @@ use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitComputation;
 use crate::CircuitsErrors;
-use crate::Configs;
-use crate::Toml;
+use crate::CodegenConfigs;
+use crate::CodegenToml;
 
 use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub struct TomlJson {
 }
 
 /// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
-pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
+pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
     let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
     let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
 
@@ -62,7 +62,7 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
 }
 
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
-pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> Configs {
+pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> CodegenConfigs {
     format!(
         r#"
 pub global N: u32 = {};

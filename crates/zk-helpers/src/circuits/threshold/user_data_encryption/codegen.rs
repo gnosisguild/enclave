@@ -16,7 +16,7 @@ use crate::utils::join_display;
 use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
-use crate::{Artifacts, Toml};
+use crate::{Artifacts, CodegenConfigs, CodegenToml};
 
 use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,7 @@ pub struct TomlJson {
     pub pk_commitment: String,
 }
 
-pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
+pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
     let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
     let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
     let ct0is = crt_polynomial_to_toml_json(&witness.ct0is);
@@ -100,7 +100,7 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     Ok(toml::to_string(&toml_json)?)
 }
 
-pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> String {
+pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
