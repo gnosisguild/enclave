@@ -5,12 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use super::{
     batch_router::{BatchRouter, FlushSeq},
-    timelock_queue::{StartTimelock, TimelockQueue},
+    timelock_queue::{Clock, StartTimelock, TimelockQueue},
     AggregateConfig,
 };
 use crate::{trap, EType, Insert, InsertBatch, PanicDispatcher};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
+use std::sync::Arc;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -45,14 +46,24 @@ impl SnapshotBuffer {
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
     ) -> Result<Addr<Self>> {
+        Self::with_clock(config, store, Arc::new(super::timelock_queue::SystemClock))
+    }
+
+    pub fn with_clock(
+        config: &AggregateConfig,
+        store: impl Into<Recipient<InsertBatch>>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Addr<Self>> {
         let me = Self::new().start();
         let store = store.into();
-        let router = BatchRouter::new(config, me.clone(), store.clone()).start();
-        let timelock = TimelockQueue::new(me.clone()).start();
+        let router =
+            BatchRouter::with_clock(config, me.clone(), store.clone(), clock.clone()).start();
+        let timelock = TimelockQueue::with_clock(me.clone(), clock).start();
         me.try_send(SetDependencies::new(router, timelock))?;
         Ok(me)
     }
 }
+
 impl Actor for SnapshotBuffer {
     type Context = actix::Context<Self>;
 }

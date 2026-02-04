@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use super::{
     batch::{Batch, Flush},
-    timelock_queue::StartTimelock,
+    timelock_queue::{Clock, StartTimelock},
     AggregateConfig,
 };
 use crate::{
@@ -16,6 +16,7 @@ use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Context;
 use std::{
     collections::HashMap,
+    sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tracing::warn;
@@ -32,7 +33,6 @@ impl FlushSeq {
     }
 }
 
-#[derive(Debug)]
 pub struct BatchRouter {
     config: AggregateConfig,
     aggregates: HashMap<Seq, AggregateId>,
@@ -40,6 +40,7 @@ pub struct BatchRouter {
     block_height_seen: HashMap<AggregateId, u64>,
     timelock_queue: Recipient<StartTimelock>,
     db: Recipient<InsertBatch>,
+    clock: Arc<dyn Clock>,
 }
 
 impl Actor for BatchRouter {
@@ -52,6 +53,20 @@ impl BatchRouter {
         timelock_queue: impl Into<Recipient<StartTimelock>>,
         db: impl Into<Recipient<InsertBatch>>,
     ) -> Self {
+        Self::with_clock(
+            config,
+            timelock_queue,
+            db,
+            Arc::new(super::timelock_queue::SystemClock),
+        )
+    }
+
+    pub fn with_clock(
+        config: &AggregateConfig,
+        timelock_queue: impl Into<Recipient<StartTimelock>>,
+        db: impl Into<Recipient<InsertBatch>>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         Self {
             batches: HashMap::new(),
             aggregates: HashMap::new(),
@@ -59,6 +74,7 @@ impl BatchRouter {
             timelock_queue: timelock_queue.into(),
             block_height_seen: HashMap::new(),
             db: db.into(),
+            clock,
         }
     }
 
@@ -108,10 +124,7 @@ impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
 
                 let delay = self.config.get_delay(prev_agg);
 
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_else(|_| Duration::from_secs(0))
-                    .as_micros() as u64;
+                let now = self.clock.now_micros();
 
                 self.timelock_queue
                     .try_send(StartTimelock::new(prev_seq, now, delay))?;
