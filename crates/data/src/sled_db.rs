@@ -4,14 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::sled_utils::{clear_all_caches, get_or_open_db_tree};
 use anyhow::{Context, Result};
+use e3_events::{Get, Insert, Remove};
 use sled::{transaction::ConflictableTransactionError, Tree};
 use std::path::PathBuf;
-
-use crate::{
-    sled_utils::{clear_all_caches, get_or_open_db_tree},
-    Get, Insert, Remove,
-};
 
 pub struct SledDb {
     db: Tree,

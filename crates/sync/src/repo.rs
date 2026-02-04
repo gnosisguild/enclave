@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
 use e3_events::AggregateId;
+use e3_events::StoreKeys;
 
 pub trait SyncRepositoryFactory {
     fn aggregate_seq(&self, aggregate_id: AggregateId) -> Repository<u64>;

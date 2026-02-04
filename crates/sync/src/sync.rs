@@ -7,13 +7,13 @@
 use crate::SyncRepositoryFactory;
 use actix::{Actor, Addr, AsyncContext, Handler, Message};
 use anyhow::{Context, Result};
-use e3_data::{AggregateConfig, Repositories, WriteBuffer};
+use e3_data::Repositories;
 use e3_events::{
-    trap, trap_fut, AggregateId, BusHandle, EType, EnclaveEvent, EventContextAccessors,
-    EventPublisher, EvmEventConfig, EvmEventConfigChain, EvmSyncEventsReceived, SyncEnd, SyncStart,
-    Unsequenced,
+    trap, trap_fut, AggregateConfig, AggregateId, BusHandle, EType, EnclaveEvent,
+    EventContextAccessors, EventPublisher, EvmEventConfig, EvmEventConfigChain,
+    EvmSyncEventsReceived, SnapshotBuffer, SyncEnd, Unsequenced,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use tracing::info;
 
 // NOTE: This is a WIP. We need to synchronize events from EVM as well as libp2p
@@ -26,7 +26,7 @@ pub struct Synchronizer {
     evm_events: Vec<EnclaveEvent<Unsequenced>>,
     evm_to_sync: HashSet<ChainId>,
     repositories: Repositories,
-    write_buffer: Addr<WriteBuffer>,
+    snapshot_buffer: Addr<SnapshotBuffer>,
     // net_config: NetEventConfig,
     aggregate_config: AggregateConfig,
 }
@@ -37,7 +37,7 @@ impl Synchronizer {
         evm_config: EvmEventConfig,
         repositories: Repositories,
         aggregate_config: AggregateConfig,
-        write_buffer: Addr<WriteBuffer>,
+        snapshot_buffer: Addr<SnapshotBuffer>,
     ) -> Self {
         let evm_to_sync = evm_config.chains();
         Self {
@@ -47,7 +47,7 @@ impl Synchronizer {
             evm_events: Vec::new(),
             repositories,
             aggregate_config,
-            write_buffer,
+            snapshot_buffer,
         }
     }
 
@@ -56,14 +56,14 @@ impl Synchronizer {
         evm_config: &EvmEventConfig,
         repositories: &Repositories,
         aggregate_config: &AggregateConfig,
-        write_buffer: &Addr<WriteBuffer>,
+        snapshot_buffer: &Addr<SnapshotBuffer>,
     ) -> Addr<Self> {
         Self::new(
             bus.clone(),
             evm_config.clone(),
             repositories.clone(),
             aggregate_config.clone(),
-            write_buffer.clone(),
+            snapshot_buffer.clone(),
         )
         .start()
     }
@@ -250,11 +250,13 @@ pub struct Bootstrap;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix::io::WriteHandler;
     use e3_ciphernode_builder::EventSystem;
     use e3_events::{EnclaveEvent, EventFactory};
     use e3_events::{
         EnclaveEventData, Event, EvmEventConfig, EvmEventConfigChain, GetEvents, TestEvent,
     };
+    use std::collections::HashMap;
     use std::time::Duration;
     use tokio::time::sleep;
 
@@ -284,9 +286,15 @@ mod tests {
         evm_config.insert(1, EvmEventConfigChain::new(0));
         evm_config.insert(2, EvmEventConfigChain::new(0));
         let repositories = Repositories::in_mem();
-
+        let snapshot_buffer = WriteBuffer::new().start();
         // Start synchronizer
-        let sync_addr = Synchronizer::setup(&bus, evm_config, &repositories);
+        let sync_addr = Synchronizer::setup(
+            &bus,
+            &evm_config,
+            &repositories,
+            &AggregateConfig::new(HashMap::new()),
+            &snapshot_buffer,
+        );
         settle().await;
 
         // Verify SyncStart was published

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_events::{AggregateId, E3id};
+use crate::{AggregateId, E3id};
 
 pub struct StoreKeys;
 

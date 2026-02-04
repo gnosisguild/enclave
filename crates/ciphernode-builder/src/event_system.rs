@@ -8,13 +8,13 @@ use crate::get_enclave_event_bus;
 use actix::{Actor, Addr, Recipient};
 use anyhow::{anyhow, Result};
 use e3_data::{
-    CommitLogEventLog, DataStore, ForwardTo, InMemEventLog, InMemSequenceIndex, InMemStore,
-    InsertBatch, SledSequenceIndex, SledStore, WriteBuffer,
+    CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore, SledSequenceIndex,
+    SledStore,
 };
 use e3_events::hlc::Hlc;
 use e3_events::{
-    BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore, EventStoreRouter, Sequencer,
-    StoreEventRequested,
+    AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
+    EventStoreRouter, InsertBatch, Sequencer, SnapshotBuffer, StoreEventRequested,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -22,11 +22,17 @@ use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
-pub use e3_data::AggregateConfig;
-
 struct InMemBackend {
     eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
     store: OnceCell<Addr<InMemStore>>,
+}
+
+impl InMemBackend {
+    fn get_or_init_store(&self) -> Addr<InMemStore> {
+        self.store
+            .get_or_init(|| InMemStore::new(true).start())
+            .clone()
+    }
 }
 
 /// Hold the Persistent EventStore instance and SledStore
@@ -35,6 +41,14 @@ struct PersistedBackend {
     sled_path: PathBuf,
     eventstores: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
     store: OnceCell<Addr<SledStore>>,
+}
+
+impl PersistedBackend {
+    fn get_or_init_store(&self, handle: &BusHandle) -> Result<Addr<SledStore>> {
+        self.store
+            .get_or_try_init(|| SledStore::new(handle, &self.sled_path))
+            .cloned()
+    }
 }
 
 /// An EventSystemBackend is holding the potentially persistent structures for the system
@@ -64,7 +78,7 @@ pub struct EventSystem {
     /// EventSystem backend either persisted or in memory
     backend: EventSystemBackend,
     /// WriteBuffer for batching inserts from actors into a snapshot
-    buffer: OnceCell<Addr<WriteBuffer>>,
+    buffer: OnceCell<Addr<SnapshotBuffer>>,
     /// EventSystem Sequencer
     sequencer: OnceCell<Addr<Sequencer>>,
     /// EventSystem eventbus
@@ -185,16 +199,18 @@ impl EventSystem {
     }
 
     /// Get the buffer address
-    pub fn buffer(&self) -> Addr<WriteBuffer> {
-        let buffer = self
-            .buffer
-            .get_or_init(|| {
-                let config = self.aggregate_config();
-                WriteBuffer::with_config(config).start()
+    pub fn buffer(&self) -> Result<Addr<SnapshotBuffer>> {
+        self.buffer
+            .get_or_try_init(|| {
+                let store: Recipient<InsertBatch> = match &self.backend {
+                    EventSystemBackend::InMem(b) => b.get_or_init_store().into(),
+                    EventSystemBackend::Persisted(b) => {
+                        b.get_or_init_store(&self.handle()?)?.into()
+                    }
+                };
+                SnapshotBuffer::spawn(&self.aggregate_config(), store)
             })
-            .clone();
-        self.wire_if_ready();
-        buffer
+            .cloned()
     }
 
     /// Get the sequencer address
@@ -202,7 +218,7 @@ impl EventSystem {
         self.sequencer
             .get_or_try_init(|| {
                 let router = self.eventstore_router()?;
-                Ok(Sequencer::new(&self.eventbus(), router, self.buffer()).start())
+                Ok(Sequencer::new(&self.eventbus(), router).start())
             })
             .cloned()
     }
@@ -320,50 +336,16 @@ impl EventSystem {
 
     /// Get the DataStore
     pub fn store(&self) -> Result<DataStore> {
-        let store = match &self.backend {
-            EventSystemBackend::InMem(b) => {
-                let addr = b
-                    .store
-                    .get_or_init(|| InMemStore::new(true).start())
-                    .clone();
-                DataStore::from_in_mem_with_buffer(&addr, &self.buffer())
-            }
-            EventSystemBackend::Persisted(b) => {
-                let addr = b
-                    .store
-                    .get_or_try_init(|| {
-                        let handle = self.handle()?;
-                        SledStore::new(&handle, &b.sled_path)
-                    })?
-                    .clone();
-                DataStore::from_sled_store_with_buffer(&addr, &self.buffer())
-            }
-        };
-        self.wire_if_ready();
-        Ok(store)
-    }
-
-    // We need to ensure that once the buffer and store are created they are connected so that
-    // inserts are sent between the two actors. This internal function ensures this happens.
-    fn wire_if_ready(&self) {
-        let buffer = match self.buffer.get() {
-            Some(b) => b,
-            None => return,
-        };
-
-        let store: Option<Recipient<InsertBatch>> = match &self.backend {
-            EventSystemBackend::InMem(b) => b.store.get().cloned().map(Into::into),
-            EventSystemBackend::Persisted(b) => b.store.get().cloned().map(Into::into),
-        };
-
-        let Some(store) = store else {
-            return;
-        };
-
-        // Now we know both are ready, so initialization will succeed
-        self.wired.get_or_init(|| {
-            buffer.do_send(ForwardTo::new(store));
-        });
+        match &self.backend {
+            EventSystemBackend::InMem(b) => Ok(DataStore::from_in_mem_with_buffer(
+                &b.get_or_init_store(),
+                self.buffer()?,
+            )),
+            EventSystemBackend::Persisted(b) => Ok(DataStore::from_sled_store_with_buffer(
+                &b.get_or_init_store(&self.handle()?)?,
+                self.buffer()?,
+            )),
+        }
     }
 
     fn node_id(name: &str) -> u32 {

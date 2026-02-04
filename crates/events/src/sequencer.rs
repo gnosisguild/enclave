@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    events::{CommitSnapshot, EventStored, StoreEventRequested},
+    events::{EventStored, StoreEventRequested},
     EnclaveEvent, EventBus, Sequenced, Unsequenced,
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
@@ -16,25 +16,22 @@ use e3_utils::major_issue;
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     eventstore: Recipient<StoreEventRequested>,
-    buffer: Recipient<CommitSnapshot>,
 }
 
 impl Sequencer {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
         eventstore: impl Into<Recipient<StoreEventRequested>>,
-        buffer: impl Into<Recipient<CommitSnapshot>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             eventstore: eventstore.into(),
-            buffer: buffer.into(),
         }
     }
 
     fn handle_event_stored(&self, msg: EventStored) -> Result<()> {
         let event = msg.into_event();
-        self.buffer.try_send(CommitSnapshot::new(&event))?;
+
         self.bus.try_send(event)?;
         Ok(())
     }
@@ -62,7 +59,7 @@ impl Handler<EventStored> for Sequencer {
         if let Err(e) = self.handle_event_stored(msg) {
             panic!(
                 "{}",
-                major_issue("Could not send event to buffer or bus.", e)
+                major_issue("Could not send event to snapshot_buffer or bus.", e)
             )
         }
     }

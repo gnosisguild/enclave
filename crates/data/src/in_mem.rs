@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
+use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use std::collections::BTreeMap;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]

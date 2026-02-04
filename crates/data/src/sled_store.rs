@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertBatch, InsertSync, Remove, SledDb};
+use crate::SledDb;
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, EventType};
+use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use std::path::PathBuf;
 use tracing::{error, info};
 

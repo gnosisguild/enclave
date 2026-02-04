@@ -13,8 +13,8 @@ use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, E3Requested, E3id, EType, EnclaveEvent, EventType,
-    OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated, TypedEvent,
+    ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
+    PlaintextOutputPublished, Seed, TicketBalanceUpdated, TypedEvent,
 };
 use e3_events::{BusHandle, E3id, EnclaveEventData};
 use e3_utils::NotifySync;
@@ -370,7 +370,7 @@ impl Handler<EnclaveEvent> for Sortition {
             EnclaveEventData::TicketBalanceUpdated(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            EnclaveEventData::OpertorActivationChanged(data) => {
+            EnclaveEventData::OperatorActivationChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::ConfigurationUpdated(data) => {

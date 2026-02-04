@@ -3,11 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use crate::{Get, Insert, Remove, Repository};
+use crate::Repository;
 use actix::Recipient;
 use anyhow::*;
 use async_trait::async_trait;
-use e3_events::{EventContext, EventContextManager, Sequenced};
+use e3_events::{EventContext, EventContextManager, Get, Insert, Remove, Sequenced};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub trait PersistableData: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
@@ -279,7 +279,7 @@ impl<T> EventContextManager for Persistable<T> {
 mod tests {
     use actix::{Actor, Addr, Handler, Message};
 
-    use crate::{Get, Insert, Remove};
+    use e3_events::{Get, Insert, Remove};
 
     use super::{Persistable, StoreConnector};
 

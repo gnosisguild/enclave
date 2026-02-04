@@ -6,12 +6,13 @@
 
 use std::borrow::Cow;
 
-use crate::{Get, Insert, InsertSync, Remove, WriteBuffer};
-use crate::{InMemStore, IntoKey, SledStore};
+use crate::{InMemStore, SledStore};
 use actix::{Addr, Recipient};
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
+use e3_events::IntoKey;
+use e3_events::{Get, Insert, InsertSync, Remove};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -173,12 +174,12 @@ impl DataStore {
 
     pub fn from_sled_store_with_buffer(
         addr: &Addr<SledStore>,
-        write_buffer: &Addr<WriteBuffer>,
+        write_buffer: impl Into<Recipient<Insert>>,
     ) -> Self {
         Self {
             addr: StoreAddr::Sled(addr.clone()),
             get: addr.clone().recipient(),
-            insert: write_buffer.clone().recipient(),
+            insert: write_buffer.into(),
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
@@ -187,12 +188,12 @@ impl DataStore {
 
     pub fn from_in_mem_with_buffer(
         addr: &Addr<InMemStore>,
-        write_buffer: &Addr<WriteBuffer>,
+        write_buffer: impl Into<Recipient<Insert>>,
     ) -> Self {
         Self {
             addr: StoreAddr::InMem(addr.clone()),
             get: addr.clone().recipient(),
-            insert: write_buffer.clone().recipient(),
+            insert: write_buffer.into(),
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],

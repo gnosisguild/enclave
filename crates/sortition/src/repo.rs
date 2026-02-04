@@ -6,9 +6,8 @@
 
 use crate::backends::SortitionBackend;
 use crate::sortition::NodeStateStore;
-use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
-use e3_events::E3id;
+use e3_events::{E3id, StoreKeys};
 use e3_request::E3Meta;
 use std::collections::HashMap;
 

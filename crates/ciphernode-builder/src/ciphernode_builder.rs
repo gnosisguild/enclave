@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::event_system::AggregateConfig;
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
 use anyhow::Result;
@@ -14,7 +13,9 @@ use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
-use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig};
+use e3_events::{
+    AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
+};
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
@@ -462,7 +463,9 @@ impl CiphernodeBuilder {
             )
         };
 
-        Synchronizer::setup(&bus, &evm_config, &repositories, &aggregate_config);
+        let buffer = event_system.buffer()?;
+
+        Synchronizer::setup(&bus, &evm_config, &repositories, &aggregate_config, &buffer);
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
