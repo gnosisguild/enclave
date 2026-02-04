@@ -5,8 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, expect, it } from 'vitest'
-import fs from 'fs/promises'
-import path from 'path'
 import { CompiledCircuit } from '@noir-lang/noir_js'
 
 import { EnclaveSDK } from '../src/enclave-sdk'
@@ -29,16 +27,16 @@ describe('encryptNumber', () => {
     })
 
     it('should encrypt a number without crashing in a node environent', async () => {
-      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
-      const value = await sdk.encryptNumber(10n, Uint8Array.from(buffer))
+      const publicKey = await sdk.generatePublicKey()
+      const value = await sdk.encryptNumber(10n, publicKey)
       expect(value).to.be.an.instanceof(Uint8Array)
       expect(value.length).to.equal(9_242)
       // TODO: test the encryption is correct
     })
     it('should encrypt a number and generate a proof without crashing in a node environent', async () => {
-      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
+      const publicKey = await sdk.generatePublicKey()
 
-      const value = await sdk.encryptNumberAndGenProof(1n, Uint8Array.from(buffer), demoCircuit as unknown as CompiledCircuit)
+      const value = await sdk.encryptNumberAndGenProof(1n, publicKey, demoCircuit as unknown as CompiledCircuit)
 
       expect(value).to.be.an.instanceof(Object)
       expect(value.encryptedData).to.be.an.instanceof(Uint8Array)
@@ -46,20 +44,16 @@ describe('encryptNumber', () => {
     }, 9999999)
 
     it('should encrypt a vector of numbers without crashing in a node environent', async () => {
-      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
-      const value = await sdk.encryptVector(new BigUint64Array([1n, 2n]), Uint8Array.from(buffer))
+      const publicKey = await sdk.generatePublicKey()
+      const value = await sdk.encryptVector(new BigUint64Array([1n, 2n]), publicKey)
       expect(value).to.be.an.instanceof(Uint8Array)
       expect(value.length).to.equal(9_242)
     })
 
     it('should encrypt a vector and generate a proof without crashing in a node environent', async () => {
-      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
+      const publicKey = await sdk.generatePublicKey()
 
-      const value = await sdk.encryptVectorAndGenProof(
-        new BigUint64Array([1n, 2n]),
-        Uint8Array.from(buffer),
-        demoCircuit as unknown as CompiledCircuit,
-      )
+      const value = await sdk.encryptVectorAndGenProof(new BigUint64Array([1n, 2n]), publicKey, demoCircuit as unknown as CompiledCircuit)
 
       expect(value).to.be.an.instanceof(Object)
       expect(value.encryptedData).to.be.an.instanceof(Uint8Array)

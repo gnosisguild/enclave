@@ -6,6 +6,7 @@
 
 use e3_bfv_client::client::{
     bfv_encrypt, bfv_verifiable_encrypt, compute_pk_commitment as _compute_pk_commitment,
+    generate_public_key as _generate_public_key,
 };
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,18 @@ pub fn bfv_encrypt_number(
     Ok(encrypted_data)
 }
 
+/// Generate a public key from JavaScript.
 #[wasm_bindgen]
+pub fn generate_public_key(
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<Vec<u8>, JsValue> {
+    let public_key = _generate_public_key(degree, plaintext_modulus, moduli)
+        .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+    Ok(public_key)
+}
+
 /// A function to compute the public key commitment for a given public key.
 ///
 /// # Arguments
@@ -54,6 +66,7 @@ pub fn bfv_encrypt_number(
 /// # Panics
 ///
 /// Panics if the public key cannot be computed
+#[wasm_bindgen]
 pub fn compute_pk_commitment(
     public_key: Vec<u8>,
     degree: usize,

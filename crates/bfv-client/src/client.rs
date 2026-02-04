@@ -9,7 +9,7 @@ use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
 use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::circuits::Computation;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
-use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
+use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::thread_rng;
@@ -116,6 +116,30 @@ where
         encrypted_data,
         circuit_inputs,
     })
+}
+
+/// Generates a new public/secret key pair and returns the public key.
+///
+/// # Arguments
+/// * `degree` - Polynomial degree for BFV parameters
+/// * `plaintext_modulus` - Plaintext modulus for BFV parameters
+/// * `moduli` - Vector of moduli for BFV parameters
+///
+/// # Returns
+/// Raw bytes of the public key
+pub fn generate_public_key(
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<Vec<u8>> {
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+
+    // Generate keys.
+    let mut rng = thread_rng();
+    let sk = SecretKey::random(&params, &mut rng);
+    let pk = PublicKey::new(&sk, &mut rng);
+
+    Ok(pk.to_bytes())
 }
 
 pub fn compute_pk_commitment(
