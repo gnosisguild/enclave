@@ -30,6 +30,15 @@ pub trait Computation: Sized {
         preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Self, Self::Error>;
+
+    /// Converts the result to a JSON [`serde_json::Value`] for serialization.
+    /// Default: `serde_json::to_value(self)` when `Self: serde::Serialize`.
+    fn to_json(&self) -> serde_json::Result<serde_json::Value>
+    where
+        Self: serde::Serialize,
+    {
+        serde_json::to_value(self)
+    }
 }
 
 /// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
@@ -44,16 +53,4 @@ pub trait CircuitComputation: crate::registry::Circuit {
         preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Self::Output, Self::Error>;
-}
-
-/// Converts a value to a JSON [`serde_json::Value`] for serialization.
-pub trait ConvertToJson {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value>;
-}
-
-/// Any `Serialize` type can be converted to JSON for round-trip tests and artifact generation.
-impl<T: serde::Serialize> ConvertToJson for T {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
 }

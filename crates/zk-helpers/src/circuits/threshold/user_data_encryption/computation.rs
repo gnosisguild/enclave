@@ -12,7 +12,9 @@
 use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
 use crate::compute_ciphertext_commitment;
+use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
+use crate::polynomial_to_toml_json;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use crate::utils::compute_pk_bit;
@@ -896,6 +898,44 @@ impl Computation for Witness {
             ciphertext: ct.to_bytes(),
         })
     }
+
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
+        let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
+        let ct0is = crt_polynomial_to_toml_json(&self.ct0is);
+        let ct1is = crt_polynomial_to_toml_json(&self.ct1is);
+        let u = polynomial_to_toml_json(&self.u);
+        let e0 = polynomial_to_toml_json(&self.e0);
+        let e0is = crt_polynomial_to_toml_json(&self.e0is);
+        let e0_quotients = crt_polynomial_to_toml_json(&self.e0_quotients);
+        let e1 = polynomial_to_toml_json(&self.e1);
+        let k1 = polynomial_to_toml_json(&self.k1);
+        let r1is = crt_polynomial_to_toml_json(&self.r1is);
+        let r2is = crt_polynomial_to_toml_json(&self.r2is);
+        let p1is = crt_polynomial_to_toml_json(&self.p1is);
+        let p2is = crt_polynomial_to_toml_json(&self.p2is);
+        let pk_commitment = self.pk_commitment.to_string();
+
+        let json = serde_json::json!({
+            "pk0is": pk0is,
+            "pk1is": pk1is,
+            "ct0is": ct0is,
+            "ct1is": ct1is,
+            "u": u,
+            "e0": e0,
+            "e0is": e0is,
+            "e0_quotients": e0_quotients,
+            "e1": e1,
+            "k1": k1,
+            "r1is": r1is,
+            "r2is": r2is,
+            "p1is": p1is,
+            "p2is": p2is,
+            "pk_commitment": pk_commitment
+        });
+
+        Ok(json)
+    }
 }
 
 #[cfg(test)]
@@ -903,7 +943,6 @@ mod tests {
     use super::*;
 
     use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
-    use crate::ConvertToJson;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
@@ -927,7 +966,7 @@ mod tests {
             },
         )
         .unwrap();
-        let json = witness.convert_to_json().unwrap();
+        let json = witness.to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
 
         assert_eq!(decoded.pk0is, witness.pk0is);
@@ -938,7 +977,7 @@ mod tests {
     fn test_constants_json_roundtrip() {
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
 
-        let json = constants.convert_to_json().unwrap();
+        let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
 
         assert_eq!(decoded.n, constants.n);

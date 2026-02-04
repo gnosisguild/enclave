@@ -267,7 +267,6 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitInput;
-    use crate::ConvertToJson;
     use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
@@ -312,7 +311,7 @@ mod tests {
 
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
         let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let json = witness.convert_to_json().unwrap();
+        let json = witness.to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json).unwrap();
 
         assert_eq!(
@@ -361,7 +360,7 @@ mod tests {
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
 
-        let json = constants.convert_to_json().unwrap();
+        let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
 
         assert_eq!(decoded.n, constants.n);

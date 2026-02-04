@@ -9,7 +9,6 @@ use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
 use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::circuits::Computation;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
-use e3_zk_helpers::ConvertToJson;
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
@@ -111,7 +110,7 @@ where
     )?;
 
     let encrypted_data = witness.ciphertext.clone();
-    let circuit_inputs = witness.convert_to_json()?.to_string();
+    let circuit_inputs = witness.to_json()?.to_string();
 
     Ok(VerifiableEncryptionResult {
         encrypted_data,

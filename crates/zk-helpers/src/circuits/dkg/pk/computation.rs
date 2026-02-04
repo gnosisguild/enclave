@@ -191,7 +191,6 @@ mod tests {
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::prepare_pk_sample_for_test;
-    use crate::ConvertToJson;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
@@ -220,7 +219,7 @@ mod tests {
             },
         )
         .unwrap();
-        let json = witness.convert_to_json().unwrap();
+        let json = witness.to_json().unwrap();
         let decoded: Witness = serde_json::from_value(json.clone()).unwrap();
 
         assert_eq!(decoded.pk0is, witness.pk0is);
@@ -231,7 +230,7 @@ mod tests {
     fn test_constants_json_roundtrip() {
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
 
-        let json = constants.convert_to_json().unwrap();
+        let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
 
         assert_eq!(decoded.n, constants.n);

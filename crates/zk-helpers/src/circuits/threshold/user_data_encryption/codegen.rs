@@ -7,8 +7,6 @@
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
 use crate::circuits::computation::Computation;
-use crate::crt_polynomial_to_toml_json;
-use crate::polynomial_to_toml_json;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::computation::{Configs, Witness};
 use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
@@ -63,41 +61,11 @@ pub struct TomlJson {
 }
 
 pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let pk0is = crt_polynomial_to_toml_json(&witness.pk0is);
-    let pk1is = crt_polynomial_to_toml_json(&witness.pk1is);
-    let ct0is = crt_polynomial_to_toml_json(&witness.ct0is);
-    let ct1is = crt_polynomial_to_toml_json(&witness.ct1is);
-    let u = polynomial_to_toml_json(&witness.u);
-    let e0 = polynomial_to_toml_json(&witness.e0);
-    let e0is = crt_polynomial_to_toml_json(&witness.e0is);
-    let e0_quotients = crt_polynomial_to_toml_json(&witness.e0_quotients);
-    let e1 = polynomial_to_toml_json(&witness.e1);
-    let k1 = polynomial_to_toml_json(&witness.k1);
-    let r1is = crt_polynomial_to_toml_json(&witness.r1is);
-    let r2is = crt_polynomial_to_toml_json(&witness.r2is);
-    let p1is = crt_polynomial_to_toml_json(&witness.p1is);
-    let p2is = crt_polynomial_to_toml_json(&witness.p2is);
-    let pk_commitment = witness.pk_commitment.to_string();
+    let json = witness
+        .to_json()
+        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
-    let toml_json = TomlJson {
-        pk0is,
-        pk1is,
-        ct0is,
-        ct1is,
-        u,
-        e0,
-        e0is,
-        e0_quotients,
-        e1,
-        k1,
-        r1is,
-        r2is,
-        p1is,
-        p2is,
-        pk_commitment,
-    };
-
-    Ok(toml::to_string(&toml_json)?)
+    Ok(toml::to_string(&json)?)
 }
 
 pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs {

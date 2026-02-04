@@ -93,26 +93,6 @@ export const defaultParams: Params = {
 }
 
 /**
- * Convert a string array to a polynomial
- * @param stringArray - The string array
- * @returns The polynomial
- */
-export const convertToPolynomial = (stringArray: string[]): Polynomial => {
-  return {
-    coefficients: stringArray,
-  }
-}
-
-/**
- * Convert an array of string arrays to an array of polynomials
- * @param stringArrays - The array of string arrays
- * @returns The array of polynomials
- */
-export const convertToPolynomialArray = (stringArrays: string[][]): Polynomial[] => {
-  return stringArrays.map(convertToPolynomial)
-}
-
-/**
  * Generate a proof for a given circuit and circuit inputs
  * @dev Defaults to the UltraHonkBackend
  * @param circuitInputs - The circuit inputs
@@ -124,35 +104,21 @@ export const generateProof = async (circuitInputs: CircuitInputs, circuit: Compi
 
   const backend = new UltraHonkBackend(circuit.bytecode, { threads: 4 })
 
-  const pk0is_poly = convertToPolynomialArray(circuitInputs.pk0is)
-  const pk1is_poly = convertToPolynomialArray(circuitInputs.pk1is)
-  const ct0is_poly = convertToPolynomialArray(circuitInputs.ct0is)
-  const ct1is_poly = convertToPolynomialArray(circuitInputs.ct1is)
-  const u_poly = convertToPolynomial(circuitInputs.u)
-  const e0_poly = convertToPolynomial(circuitInputs.e0)
-  const e1_poly = convertToPolynomial(circuitInputs.e1)
-  const e0is_poly = convertToPolynomialArray(circuitInputs.e0is)
-  const k1_poly = convertToPolynomial(circuitInputs.k1)
-  const r1is_poly = convertToPolynomialArray(circuitInputs.r1is)
-  const r2is_poly = convertToPolynomialArray(circuitInputs.r2is)
-  const p1is_poly = convertToPolynomialArray(circuitInputs.p1is)
-  const p2is_poly = convertToPolynomialArray(circuitInputs.p2is)
-
   const { witness } = await noir.execute({
     params: defaultParams as any,
-    pk0is: pk0is_poly,
-    pk1is: pk1is_poly,
-    ct0is: ct0is_poly,
-    ct1is: ct1is_poly,
-    u: u_poly,
-    e0: e0_poly,
-    e1: e1_poly,
-    e0is: e0is_poly,
-    k1: k1_poly,
-    r1is: r1is_poly,
-    r2is: r2is_poly,
-    p1is: p1is_poly,
-    p2is: p2is_poly,
+    pk0is: circuitInputs.pk0is,
+    pk1is: circuitInputs.pk1is,
+    ct0is: circuitInputs.ct0is,
+    ct1is: circuitInputs.ct1is,
+    u: circuitInputs.u,
+    e0: circuitInputs.e0,
+    e1: circuitInputs.e1,
+    e0is: circuitInputs.e0is,
+    k1: circuitInputs.k1,
+    r1is: circuitInputs.r1is,
+    r2is: circuitInputs.r2is,
+    p1is: circuitInputs.p1is,
+    p2is: circuitInputs.p2is,
   })
 
   return await backend.generateProof(witness, { keccakZK: true })

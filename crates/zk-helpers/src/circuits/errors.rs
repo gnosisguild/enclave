@@ -25,6 +25,8 @@ pub enum CircuitsErrors {
     ZkHelpers(#[from] ZkHelpersUtilsError),
     #[error("Sample error: {0}")]
     Sample(String),
+    #[error("Serde JSON error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Unexpected error: {0}")]
     Other(String),
 }
