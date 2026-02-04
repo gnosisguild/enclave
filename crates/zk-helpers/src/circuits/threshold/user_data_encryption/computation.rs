@@ -186,9 +186,11 @@ impl Computation for Bits {
     type Error = CircuitsErrors;
 
     fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
-        let pk_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
+        let max_pk_bound = input.pk_bounds.iter().max().unwrap();
+
+        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
         // We can safely assume that the ct bound is the same as the pk bound.
-        let ct_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
+        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
         let u_bit = calculate_bit_width(BigInt::from(input.u_bound.clone()));
         let e0_bit = calculate_bit_width(BigInt::from(input.e0_bound.clone()));
         let e1_bit = calculate_bit_width(BigInt::from(input.e1_bound.clone()));
@@ -934,9 +936,11 @@ mod tests {
     fn test_bound_and_bits_computation_consistency() {
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(bounds.pk_bounds[0].clone()));
 
-        assert_eq!(bounds.pk_bounds[0], BigUint::from(34359701504u64));
+        let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
+        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+
+        assert_eq!(max_pk_bound.clone(), BigUint::from(34359701504u64));
         assert_eq!(bits.pk_bit, expected_bits);
     }
 

@@ -188,9 +188,6 @@ impl Computation for Witness {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::prepare_pk_sample_for_test;
-    use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]

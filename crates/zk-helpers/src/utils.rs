@@ -160,7 +160,7 @@ pub fn calculate_bit_width(bound: BigInt) -> u32 {
 /// The bit width of the public key
 pub fn compute_pk_bit(params: &BfvParameters) -> u32 {
     let moduli = params.moduli();
-    let modulus = BigInt::from(moduli[0]);
+    let modulus = BigInt::from(moduli.iter().copied().max().unwrap());
     let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
 
     calculate_bit_width(bound)
