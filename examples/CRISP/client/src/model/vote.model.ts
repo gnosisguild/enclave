@@ -54,6 +54,14 @@ export interface VoteStateLite {
 
   committee_public_key: number[]
   emojis: [string, string]
+
+  credit_mode: CreditMode
+  credits?: number 
+}
+
+export enum CreditMode {
+  CONSTANT = "0",
+  CUSTOM = "1"
 }
 
 export type Vote = bigint[]

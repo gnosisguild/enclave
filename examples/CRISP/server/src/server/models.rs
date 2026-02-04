@@ -280,5 +280,5 @@ pub struct TokenHolder {
 #[derive(Debug, PartialEq)]
 pub enum CreditMode {
     Constant = 0,
-    Custom = 0
+    Custom = 1
 }
