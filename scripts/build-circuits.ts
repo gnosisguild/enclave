@@ -11,9 +11,9 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readF
 import { basename, join, resolve } from 'path'
 
 // Types & Constants
-const CIRCUIT_GROUPS = { DKG: 'dkg', THRESHOLD: 'threshold' } as const
+const CIRCUIT_GROUPS = { DKG: 'dkg', THRESHOLD: 'threshold', AGGREGATION: 'recursive_aggregation' } as const
 type CircuitGroup = (typeof CIRCUIT_GROUPS)[keyof typeof CIRCUIT_GROUPS]
-const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.THRESHOLD]
+const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.THRESHOLD, CIRCUIT_GROUPS.AGGREGATION]
 
 interface CircuitInfo {
   name: string
