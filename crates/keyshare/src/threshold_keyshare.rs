@@ -16,6 +16,7 @@ use e3_events::{
     PartyId, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_fhe::create_crp;
+use e3_fhe_params::encode_bfv_params;
 use e3_trbfv::{
     calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
     calculate_decryption_share::{
@@ -451,10 +452,12 @@ impl ThresholdKeyshare {
             ))
         })?;
 
+        let dkg_params_bytes = encode_bfv_params(&self.share_encryption_params);
+
         self.bus.publish(EncryptionKeyPending {
             e3_id,
             key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
-            params: state.params.clone(),
+            params: ArcBytes::from_bytes(&dkg_params_bytes),
         })?;
 
         Ok(())

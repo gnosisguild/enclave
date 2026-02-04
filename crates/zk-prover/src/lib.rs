@@ -20,7 +20,7 @@ pub use actors::{
 
 pub use backend::{SetupStatus, ZkBackend};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
-pub use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuit;
+pub use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 pub use error::ZkError;
 pub use prover::ZkProver;
 pub use traits::Provable;

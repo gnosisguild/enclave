@@ -11,10 +11,12 @@ mod common;
 
 use common::fixtures_dir;
 use e3_fhe_params::{build_bfv_params_from_set_arc, BfvPreset};
-use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuitInput;
-use e3_zk_helpers::circuits::sample::Sample;
+use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
+use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
+use e3_zk_helpers::circuits::dkg::pk::prepare_pk_sample_for_test;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
-use e3_zk_prover::{PkBfvCircuit, Provable, ZkBackend, ZkConfig, ZkProver};
+use e3_zk_helpers::PkCircuit;
+use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::{fs, process::Command};
@@ -87,16 +89,18 @@ async fn test_pk_bfv_proof_generation() {
     .await
     .unwrap();
 
-    let preset = BfvPreset::InsecureDkg512;
-    let params = build_bfv_params_from_set_arc(preset.into());
-    let sample = Sample::generate(&params);
+    let preset = BfvPreset::InsecureThreshold512;
+    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small)
+        .expect("sample generation should succeed");
+    let dkg_preset = preset.dkg_counterpart().expect("has DKG counterpart");
+    let params = build_bfv_params_from_set_arc(dkg_preset.into());
 
     let prover = ZkProver::new(&backend);
-    let circuit = PkBfvCircuit;
+    let circuit = PkCircuit;
     let e3_id = "test-pk-bfv-001";
 
     let proof = circuit
-        .prove(&prover, &params, &sample.public_key, e3_id)
+        .prove(&prover, &params, &sample.dkg_public_key, e3_id)
         .expect("proof generation should succeed");
 
     assert!(!proof.data.is_empty(), "proof data should not be empty");
@@ -134,16 +138,18 @@ async fn test_pk_bfv_proof_verification() {
     .await
     .unwrap();
 
-    let preset = BfvPreset::InsecureDkg512;
-    let params = build_bfv_params_from_set_arc(preset.into());
-    let sample = Sample::generate(&params);
+    let preset = BfvPreset::InsecureThreshold512;
+    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small)
+        .expect("sample generation should succeed");
+    let dkg_preset = preset.dkg_counterpart().expect("has DKG counterpart");
+    let params = build_bfv_params_from_set_arc(dkg_preset.into());
 
     let prover = ZkProver::new(&backend);
-    let circuit = PkBfvCircuit;
+    let circuit = PkCircuit;
     let e3_id = "test-verify-001";
 
     let proof = circuit
-        .prove(&prover, &params, &sample.public_key, e3_id)
+        .prove(&prover, &params, &sample.dkg_public_key, e3_id)
         .expect("proof generation should succeed");
 
     match circuit.verify(&prover, &proof, e3_id) {
@@ -186,16 +192,18 @@ async fn test_pk_bfv_commitment_consistency() {
     .await
     .unwrap();
 
-    let preset = BfvPreset::InsecureDkg512;
-    let params = build_bfv_params_from_set_arc(preset.into());
-    let sample = Sample::generate(&params);
+    let preset = BfvPreset::InsecureThreshold512;
+    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small)
+        .expect("sample generation should succeed");
+    let dkg_preset = preset.dkg_counterpart().expect("has DKG counterpart");
+    let params = build_bfv_params_from_set_arc(dkg_preset.into());
 
     let prover = ZkProver::new(&backend);
-    let circuit = PkBfvCircuit;
+    let circuit = PkCircuit;
     let e3_id = "test-commitment-001";
 
     let proof = circuit
-        .prove(&prover, &params, &sample.public_key, e3_id)
+        .prove(&prover, &params, &sample.dkg_public_key, e3_id)
         .expect("proof generation should succeed");
 
     // Verify the commitment from the proof is a valid field element
@@ -207,11 +215,11 @@ async fn test_pk_bfv_commitment_consistency() {
     );
 
     // Compute the commitment independently to ensure consistency
-    let circuit_input = PkBfvCircuitInput {
-        public_key: sample.public_key.clone(),
+    let circuit_input = PkCircuitInput {
+        public_key: sample.dkg_public_key.clone(),
     };
     let computation_output =
-        PkBfvCircuit::compute(&params, &circuit_input).expect("computation should succeed");
+        PkCircuit::compute(preset, &circuit_input).expect("computation should succeed");
     let commitment_calculated = compute_dkg_pk_commitment(
         &computation_output.witness.pk0is,
         &computation_output.witness.pk1is,

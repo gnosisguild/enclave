@@ -30,9 +30,8 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
-use e3_utils::NotifySync;
 use e3_utils::SharedRng;
-use e3_zk_helpers::circuits::pk_bfv::circuit::PkBfvCircuit;
+use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
@@ -360,7 +359,7 @@ fn handle_pk_bfv_proof(
         )
     })?;
 
-    let circuit = PkBfvCircuit;
+    let circuit = PkCircuit;
     let e3_id_str = request.e3_id.to_string();
 
     let proof = circuit

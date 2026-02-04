@@ -9,16 +9,14 @@ use crate::traits::Provable;
 use acir::FieldElement;
 use e3_events::CircuitName;
 use e3_polynomial::CrtPolynomial;
-use e3_zk_helpers::circuits::{
-    pk_bfv::circuit::{PkBfvCircuit, PkBfvCircuitInput},
-    CircuitComputation,
-};
+use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
+use e3_zk_helpers::get_zkp_modulus;
 use fhe::bfv::{BfvParameters, PublicKey};
 use noirc_abi::{input_parser::InputValue, InputMap};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-impl Provable for PkBfvCircuit {
+impl Provable for PkCircuit {
     type Params = Arc<BfvParameters>;
     type Input = PublicKey;
 
@@ -31,21 +29,27 @@ impl Provable for PkBfvCircuit {
         params: &Self::Params,
         input: &Self::Input,
     ) -> Result<InputMap, ZkError> {
-        let circuit_input = PkBfvCircuitInput {
-            public_key: input.clone(),
-        };
-        let output = PkBfvCircuit::compute(params.as_ref(), &circuit_input)
+        let mut pk0is = CrtPolynomial::from_fhe_polynomial(&input.c.c[0]);
+        let mut pk1is = CrtPolynomial::from_fhe_polynomial(&input.c.c[1]);
+
+        pk0is.reverse();
+        pk1is.reverse();
+
+        let moduli = params.moduli();
+        pk0is
+            .center(&moduli)
+            .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
+        pk1is
+            .center(&moduli)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
+        let zkp_modulus = get_zkp_modulus();
+        pk0is.reduce_uniform(&zkp_modulus);
+        pk1is.reduce_uniform(&zkp_modulus);
+
         let mut inputs = InputMap::new();
-        inputs.insert(
-            "pk0is".to_string(),
-            crt_polynomial_to_array(&output.witness.pk0is)?,
-        );
-        inputs.insert(
-            "pk1is".to_string(),
-            crt_polynomial_to_array(&output.witness.pk1is)?,
-        );
+        inputs.insert("pk0is".to_string(), crt_polynomial_to_array(&pk0is)?);
+        inputs.insert("pk1is".to_string(), crt_polynomial_to_array(&pk1is)?);
 
         Ok(inputs)
     }

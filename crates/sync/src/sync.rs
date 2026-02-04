@@ -81,7 +81,7 @@ impl Actor for Synchronizer {
 
 impl Handler<SyncEvmEvent> for Synchronizer {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: SyncEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
                 // Buffer events as the sync actor receives them
