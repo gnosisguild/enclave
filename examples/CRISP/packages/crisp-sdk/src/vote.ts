@@ -368,7 +368,7 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
  */
 export const encodeSolidityProof = ({ publicInputs, proof, encryptedVote }: ProofData): Hex => {
   const slotAddress = getAddress(numberToHex(BigInt(publicInputs[3]), { size: 20 }))
-  const encryptedVoteCommitment = publicInputs[5] as `0x${string}`
+  const encryptedVoteCommitment = publicInputs[6] as `0x${string}`
 
   return encodeAbiParameters(parseAbiParameters('bytes, address, bytes32, bytes'), [
     bytesToHex(proof),

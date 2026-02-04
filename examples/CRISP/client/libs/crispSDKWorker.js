@@ -6,6 +6,8 @@
 
 import { encodeSolidityProof, CrispSDK } from '@crisp-e3/sdk'
 
+const NUM_OPTIONS = 2
+
 self.onmessage = async function (event) {
   const { type, data } = event.data
   switch (type) {
@@ -24,6 +26,7 @@ self.onmessage = async function (event) {
             balance,
             slotAddress,
             merkleLeaves,
+            numOptions: NUM_OPTIONS,
           })
         } else {
           proof = await sdk.generateVoteProof({

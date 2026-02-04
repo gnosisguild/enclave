@@ -259,6 +259,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.plaintextOutput = hex"";
         e3.requester = msg.sender;
 
+        // we store state before an external call as we can trust the e3 program
+        // as it would have needed to be whitelisted beforehand
+        e3s[e3Id] = e3;
+
         bytes32 encryptionSchemeId = requestParams.e3Program.validate(
             e3Id,
             seed,
@@ -278,7 +282,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.encryptionSchemeId = encryptionSchemeId;
         e3.decryptionVerifier = decryptionVerifier;
 
-        e3s[e3Id] = e3;
         e3Payments[e3Id] = e3Fee;
 
         feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);

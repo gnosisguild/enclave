@@ -14,6 +14,7 @@ import {
   encodeSolidityProof,
   generateMerkleTree,
   SIGNATURE_MESSAGE_HASH,
+  generateMaskVoteProof,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
@@ -62,6 +63,31 @@ describe('CRISP Contracts', function () {
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
         slotAddress: address,
+      })
+
+      const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
+
+      expect(isValid).to.be.true
+    })
+
+    it('should verify the proof for a vote mask', async function () {
+      // It needs some time to generate the proof.
+      this.timeout(60000)
+
+      const honkVerifier = await deployHonkVerifier()
+      const [signer] = await ethers.getSigners()
+
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
+
+      const proof = await generateMaskVoteProof({
+        publicKey,
+        merkleLeaves: leaves,
+        balance,
+        slotAddress: address,
+        numOptions: 2,
       })
 
       const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)

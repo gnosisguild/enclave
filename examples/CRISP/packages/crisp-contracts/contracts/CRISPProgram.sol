@@ -155,8 +155,8 @@ contract CRISPProgram is IE3Program, Ownable {
     noirPublicInputs[2] = bytes32(e3Data[e3Id].merkleRoot);
     noirPublicInputs[3] = bytes32(uint256(uint160(slotAddress)));
     noirPublicInputs[4] = bytes32(uint256(previousEncryptedVoteCommitment == bytes32(0) ? 1 : 0));
-    noirPublicInputs[5] = encryptedVoteCommitment;
-    noirPublicInputs[6] = bytes32(e3Data[e3Id].numOptions);
+    noirPublicInputs[5] = bytes32(e3Data[e3Id].numOptions);
+    noirPublicInputs[6] = encryptedVoteCommitment;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
