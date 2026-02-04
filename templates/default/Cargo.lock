@@ -378,15 +378,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "android_system_properties"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -744,12 +735,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrayref"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -854,20 +839,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blake3"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
- "cpufeatures",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -952,20 +923,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "chrono"
-version = "0.4.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
-dependencies = [
- "iana-time-zone",
- "js-sys",
- "num-traits",
- "serde",
- "wasm-bindgen",
- "windows-link",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1048,12 +1005,6 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
-
-[[package]]
-name = "constant_time_eq"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "convert_case"
@@ -1265,14 +1216,12 @@ version = "0.1.8"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-greco-helpers",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "thiserror",
- "zkfhe-greco",
 ]
 
 [[package]]
@@ -1309,16 +1258,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-greco-helpers"
-version = "0.1.8"
-dependencies = [
- "e3-zk-helpers",
- "fhe",
- "fhe-math",
- "num-bigint",
-]
-
-[[package]]
 name = "e3-parity-matrix"
 version = "0.1.8"
 dependencies = [
@@ -1334,17 +1273,6 @@ version = "0.1.8"
 dependencies = [
  "fhe-math",
  "ndarray",
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "e3-polynomial"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
-dependencies = [
  "num-bigint",
  "num-traits",
  "serde",
@@ -1369,18 +1297,6 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.8"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
-
-[[package]]
-name = "e3-safe"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -1422,8 +1338,8 @@ dependencies = [
  "clap",
  "e3-fhe-params",
  "e3-parity-matrix",
- "e3-polynomial 0.1.8",
- "e3-safe 0.1.8",
+ "e3-polynomial",
+ "e3-safe",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -2036,30 +1952,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "windows-registry",
-]
-
-[[package]]
-name = "iana-time-zone"
-version = "0.1.65"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e31bc9ad994ba00e440a8aa5c9ef0ec67d5cb5e5cb0cc7f8b744a35b389cc470"
-dependencies = [
- "android_system_properties",
- "core-foundation-sys",
- "iana-time-zone-haiku",
- "js-sys",
- "log",
- "wasm-bindgen",
- "windows-core",
-]
-
-[[package]]
-name = "iana-time-zone-haiku"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -4225,41 +4117,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement",
- "windows-interface",
- "windows-link",
- "windows-result",
- "windows-strings",
-]
-
-[[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4605,54 +4462,6 @@ checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
 dependencies = [
  "hex",
  "tiny-keccak",
-]
-
-[[package]]
-name = "zkfhe-greco"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#f93990c3064b636dff0b6efead48a3a4341c90db"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "blake3",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-shared"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#f93990c3064b636dff0b6efead48a3a4341c90db"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "chrono",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "e3-safe 0.1.8 (git+https://github.com/gnosisguild/enclave)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "thiserror",
- "toml",
 ]
 
 [[package]]

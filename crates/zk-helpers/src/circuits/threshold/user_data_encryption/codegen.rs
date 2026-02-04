@@ -18,27 +18,26 @@ use crate::CircuitCodegen;
 use crate::CircuitsErrors;
 use crate::{Artifacts, Toml};
 
-use fhe::bfv::BfvParameters;
+use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::sync::Arc;
 
 /// Implementation of [`CircuitCodegen`] for [`UserDataEncryptionCircuit`].
 impl CircuitCodegen for UserDataEncryptionCircuit {
-    type Params = Arc<BfvParameters>;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Error = CircuitsErrors;
 
     fn codegen(
         &self,
-        params: &Self::Params,
+        preset: Self::BfvThresholdParametersPreset,
         input: &Self::Input,
     ) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(params, input)?;
-        let configs = Configs::compute(params, &())?;
+        let witness = Witness::compute(preset, input)?;
+        let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(witness)?;
-        let configs = generate_configs(&params, &configs);
+        let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
     }
@@ -50,14 +49,17 @@ pub struct TomlJson {
     pub pk1is: Vec<serde_json::Value>,
     pub ct0is: Vec<serde_json::Value>,
     pub ct1is: Vec<serde_json::Value>,
-    pub u: Vec<serde_json::Value>,
-    pub e0: Vec<serde_json::Value>,
-    pub e1: Vec<serde_json::Value>,
-    pub k1: Vec<serde_json::Value>,
+    pub u: serde_json::Value,
+    pub e0: serde_json::Value,
+    pub e0is: Vec<serde_json::Value>,
+    pub e0_quotients: Vec<serde_json::Value>,
+    pub e1: serde_json::Value,
+    pub k1: serde_json::Value,
     pub r1is: Vec<serde_json::Value>,
     pub r2is: Vec<serde_json::Value>,
     pub p1is: Vec<serde_json::Value>,
     pub p2is: Vec<serde_json::Value>,
+    pub pk_commitment: String,
 }
 
 pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
@@ -67,12 +69,15 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
     let ct1is = crt_polynomial_to_toml_json(&witness.ct1is);
     let u = polynomial_to_toml_json(&witness.u);
     let e0 = polynomial_to_toml_json(&witness.e0);
+    let e0is = crt_polynomial_to_toml_json(&witness.e0is);
+    let e0_quotients = crt_polynomial_to_toml_json(&witness.e0_quotients);
     let e1 = polynomial_to_toml_json(&witness.e1);
     let k1 = polynomial_to_toml_json(&witness.k1);
     let r1is = crt_polynomial_to_toml_json(&witness.r1is);
     let r2is = crt_polynomial_to_toml_json(&witness.r2is);
     let p1is = crt_polynomial_to_toml_json(&witness.p1is);
     let p2is = crt_polynomial_to_toml_json(&witness.p2is);
+    let pk_commitment = witness.pk_commitment.to_string();
 
     let toml_json = TomlJson {
         pk0is,
@@ -81,18 +86,21 @@ pub fn generate_toml(witness: Witness) -> Result<Toml, CircuitsErrors> {
         ct1is,
         u,
         e0,
+        e0is,
+        e0_quotients,
         e1,
         k1,
         r1is,
         r2is,
         p1is,
         p2is,
+        pk_commitment,
     };
 
     Ok(toml::to_string(&toml_json)?)
 }
 
-pub fn generate_configs(params: &Arc<BfvParameters>, configs: &Configs) -> String {
+pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> String {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
@@ -129,7 +137,6 @@ pub global {}_BIT_R2: u32 = {};
 pub global {}_BIT_P1: u32 = {};
 pub global {}_BIT_P2: u32 = {};
 
-pub global {}_Q_MOD_T: Field = {};
 pub global {}_Q_MOD_T_MOD_P: Field = {};
 pub global {}_K0IS: [Field; L] = [{}];
 pub global {}_PK_BOUNDS: [Field; L] = [{}];
@@ -145,7 +152,6 @@ pub global {}_P1_BOUNDS: [Field; L] = [{}];
 pub global {}_P2_BOUNDS: [Field; L] = [{}];
 
 pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-{}_Q_MOD_T,
 {}_Q_MOD_T_MOD_P,
 QIS,
 {}_K0IS,
@@ -162,9 +168,9 @@ QIS,
 {}_K1_UP_BOUND
 );
 "#,
-        params.degree(),       // N
-        params.moduli().len(), // L
-        qis_str,               // QIS array
+        preset.metadata().degree,     // N
+        preset.metadata().num_moduli, // L
+        qis_str,                      // QIS array
         prefix,
         configs.bits.pk_bit, // BIT_PK
         prefix,
@@ -185,8 +191,6 @@ QIS,
         configs.bits.p1_bit, // BIT_P1
         prefix,
         configs.bits.p2_bit, // BIT_P2
-        prefix,
-        configs.q_mod_t, // Q_MOD_T
         prefix,
         configs.q_mod_t_mod_p, // Q_MOD_T_MOD_P
         prefix,
@@ -227,7 +231,6 @@ QIS,
         prefix,
         prefix,
         prefix,
-        prefix,
     )
 }
 
@@ -237,19 +240,17 @@ mod tests {
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
     use crate::threshold::user_data_encryption::computation::{Bits, Bounds};
-    use crate::threshold::user_data_encryption::sample::Sample;
+    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
 
-    use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let sample = Sample::generate(&params);
+        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
         let artifacts = UserDataEncryptionCircuit
             .codegen(
-                &params,
+                DEFAULT_BFV_PRESET,
                 &UserDataEncryptionCircuitInput {
                     public_key: sample.public_key,
                     plaintext: sample.plaintext,
@@ -291,11 +292,13 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(&params, &()).unwrap();
-        let bits = Bits::compute(&params, &bounds).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
-        assert!(configs_content.contains(format!("N: u32 = {}", params.degree()).as_str()));
-        assert!(configs_content.contains(format!("L: u32 = {}", params.moduli().len()).as_str()));
+        assert!(configs_content
+            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
+        assert!(configs_content
+            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
         assert!(configs_content.contains(
             format!(
                 "{}_BIT_PK: u32 = {}",

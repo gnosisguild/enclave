@@ -175,18 +175,18 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::threshold::user_data_encryption::computation::Witness;
-    use crate::threshold::user_data_encryption::sample::Sample;
+    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use crate::threshold::UserDataEncryptionCircuitInput;
-    use e3_fhe_params::default_param_set;
+    use e3_fhe_params::{build_pair_for_preset, DEFAULT_BFV_PRESET};
     use fhe_traits::DeserializeParametrized;
 
     #[test]
     fn test_bfv_public_key_to_greco() {
-        let params = default_param_set().build_arc();
-        let sample = Sample::generate(&params);
+        let (threshold_params, _) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
 
         let witness = Witness::compute(
-            &params,
+            DEFAULT_BFV_PRESET,
             &UserDataEncryptionCircuitInput {
                 public_key: sample.public_key.clone(),
                 plaintext: sample.plaintext,
@@ -196,7 +196,7 @@ mod tests {
 
         // Convert using our function
         let (actual_pk0is, actual_pk1is) =
-            bfv_public_key_to_greco(&params, &sample.public_key).unwrap();
+            bfv_public_key_to_greco(&threshold_params, &sample.public_key).unwrap();
 
         // Verify the structure matches
         assert_eq!(actual_pk0is, witness.pk0is);
@@ -205,11 +205,12 @@ mod tests {
 
     #[test]
     fn test_bfv_ciphertext_to_greco() {
-        let params = default_param_set().build_arc();
-        let sample = Sample::generate(&params);
+        let (threshold_params, _) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+
+        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
 
         let witness = Witness::compute(
-            &params,
+            DEFAULT_BFV_PRESET,
             &UserDataEncryptionCircuitInput {
                 public_key: sample.public_key.clone(),
                 plaintext: sample.plaintext,
@@ -217,10 +218,11 @@ mod tests {
         )
         .unwrap();
 
-        let ciphertext = Ciphertext::from_bytes(&witness.ciphertext, &params).unwrap();
+        let ciphertext = Ciphertext::from_bytes(&witness.ciphertext, &threshold_params).unwrap();
 
         // Convert using our function
-        let (actual_ct0is, actual_ct1is) = bfv_ciphertext_to_greco(&params, &ciphertext).unwrap();
+        let (actual_ct0is, actual_ct1is) =
+            bfv_ciphertext_to_greco(&threshold_params, &ciphertext).unwrap();
 
         // Verify the structure matches
         assert_eq!(actual_ct0is, witness.ct0is);

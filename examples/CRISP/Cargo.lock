@@ -1449,12 +1449,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrayref"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1653,20 +1647,6 @@ dependencies = [
  "radium",
  "tap",
  "wyz",
-]
-
-[[package]]
-name = "blake3"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if 1.0.4",
- "constant_time_eq",
- "cpufeatures",
 ]
 
 [[package]]
@@ -1955,12 +1935,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "constant_time_eq"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
-
-[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2099,7 +2073,7 @@ name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
  "e3-fhe-params",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "getrandom 0.2.17",
  "js-sys",
  "num-bigint",
@@ -2373,14 +2347,12 @@ version = "0.1.8"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-greco-helpers",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "thiserror 1.0.69",
- "zkfhe-greco",
 ]
 
 [[package]]
@@ -2433,16 +2405,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-greco-helpers"
-version = "0.1.8"
-dependencies = [
- "e3-zk-helpers",
- "fhe",
- "fhe-math",
- "num-bigint",
-]
-
-[[package]]
 name = "e3-indexer"
 version = "0.1.8"
 dependencies = [
@@ -2480,17 +2442,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-polynomial"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#e29a5a1308e2395fea85cc2f9540ab8c9d16a668"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "e3-program-server"
 version = "0.1.8"
 dependencies = [
@@ -2508,18 +2459,6 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.8"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
-
-[[package]]
-name = "e3-safe"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave#e29a5a1308e2395fea85cc2f9540ab8c9d16a668"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -2584,8 +2523,8 @@ dependencies = [
  "clap",
  "e3-fhe-params",
  "e3-parity-matrix",
- "e3-polynomial 0.1.8",
- "e3-safe 0.1.8",
+ "e3-polynomial",
+ "e3-safe",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -6794,7 +6733,7 @@ dependencies = [
  "ark-ff 0.5.0",
  "e3-bfv-client",
  "e3-fhe-params",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "e3-sdk",
  "e3-zk-helpers",
  "eyre",
@@ -6819,54 +6758,6 @@ checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
 dependencies = [
  "hex",
  "tiny-keccak",
-]
-
-[[package]]
-name = "zkfhe-greco"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#f93990c3064b636dff0b6efead48a3a4341c90db"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "blake3",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-shared"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#f93990c3064b636dff0b6efead48a3a4341c90db"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "chrono",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "e3-safe 0.1.8 (git+https://github.com/gnosisguild/enclave)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "toml",
 ]
 
 [[package]]

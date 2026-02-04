@@ -140,13 +140,13 @@ impl Computation for Bits {
         let mut bit_share = 0;
         for &qi in threshold_params.moduli() {
             let share_bound = BigUint::from(qi - 1);
-            let bit_width = calculate_bit_width(&share_bound.to_string())?;
+            let bit_width = calculate_bit_width(BigInt::from(share_bound));
             bit_share = bit_share.max(bit_width);
         }
 
         Ok(Bits {
-            bit_sk_secret: calculate_bit_width(&input.sk_bound.to_string())?,
-            bit_e_sm_secret: calculate_bit_width(&input.e_sm_bound.to_string())?,
+            bit_sk_secret: calculate_bit_width(BigInt::from(input.sk_bound.clone())),
+            bit_e_sm_secret: calculate_bit_width(BigInt::from(input.e_sm_bound.clone())),
             bit_share,
         })
     }
@@ -292,12 +292,12 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
         let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
-        let expected_sk_bits = calculate_bit_width(&bounds.sk_bound.to_string()).unwrap();
+        let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
 
         assert_eq!(bits.bit_sk_secret, expected_sk_bits);
     }
@@ -308,8 +308,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
         let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
         let json = witness.convert_to_json().unwrap();
@@ -331,8 +331,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SmudgingNoise,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SmudgingNoise);
         let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
         let degree = witness.secret_crt.limb(0).coefficients().len();
@@ -356,8 +356,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
         let constants = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
 

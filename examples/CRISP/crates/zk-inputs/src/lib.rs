@@ -11,6 +11,7 @@
 use e3_fhe_params::build_bfv_params_arc;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuit;
@@ -92,7 +93,7 @@ impl ZKInputsGenerator {
             .with_context(|| "Failed to encode plaintext")?;
 
         let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
-            &self.bfv_params,
+            DEFAULT_BFV_PRESET,
             &UserDataEncryptionCircuitInput {
                 public_key: pk,
                 plaintext: pt,
@@ -155,7 +156,7 @@ impl ZKInputsGenerator {
             .with_context(|| "Failed to encode plaintext")?;
 
         let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
-            &self.bfv_params,
+            DEFAULT_BFV_PRESET,
             &UserDataEncryptionCircuitInput {
                 public_key: pk,
                 plaintext: pt,

@@ -229,8 +229,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        )
-        .unwrap();
+        );
+
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
 
         let artifacts = ShareComputationCircuit

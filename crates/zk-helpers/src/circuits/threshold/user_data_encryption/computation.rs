@@ -17,13 +17,13 @@ use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use crate::utils::compute_pk_bit;
 use crate::CircuitsErrors;
-use crate::ConvertToJson;
 use crate::{CircuitComputation, Computation};
+use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::BfvPreset;
 use e3_polynomial::center;
 use e3_polynomial::reduce;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
-use fhe::bfv::BfvParameters;
 use fhe::bfv::SecretKey;
 use fhe_math::rq::Poly;
 use fhe_math::rq::Representation;
@@ -52,15 +52,18 @@ pub struct UserDataEncryptionComputationOutput {
 
 /// Implementation of [`CircuitComputation`] for [`UserDataEncryptionCircuit`].
 impl CircuitComputation for UserDataEncryptionCircuit {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Output = UserDataEncryptionComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(params, &())?;
-        let bits = Bits::compute(params, &bounds)?;
-        let witness = Witness::compute(params, input)?;
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, &())?;
+        let bits = Bits::compute(preset, &bounds)?;
+        let witness = Witness::compute(preset, input)?;
 
         Ok(UserDataEncryptionComputationOutput {
             bounds,
@@ -75,7 +78,6 @@ pub struct Configs {
     pub n: usize,
     pub l: usize,
     pub moduli: Vec<u64>,
-    pub q_mod_t: BigInt,
     pub q_mod_t_mod_p: BigInt,
     pub k0is: Vec<u64>,
     pub bits: Bits,
@@ -133,15 +135,21 @@ pub struct Witness {
 }
 
 impl Computation for Configs {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, CircuitsErrors> {
-        let moduli = params.moduli().to_vec();
-        let ctx = params.ctx_at_level(0)?;
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        _: &Self::Input,
+    ) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
+        let moduli = threshold_params.moduli().to_vec();
+        let ctx = threshold_params.ctx_at_level(0)?;
         let modulus = BigInt::from(ctx.modulus().clone());
-        let t = BigInt::from(params.plaintext());
+        let t = BigInt::from(threshold_params.plaintext());
         let p = get_zkp_modulus();
 
         let q_mod_t = center(&reduce(&modulus, &t), &t);
@@ -150,22 +158,23 @@ impl Computation for Configs {
         let mut k0is: Vec<u64> = Vec::new();
 
         for qi in ctx.moduli_operators() {
-            let k0qi = BigInt::from(qi.inv(qi.neg(params.plaintext())).ok_or_else(|| {
-                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
-                    "Failed to calculate modulus inverse for k0qi".into(),
-                )))
-            })?);
+            let k0qi = BigInt::from(qi.inv(qi.neg(threshold_params.plaintext())).ok_or_else(
+                || {
+                    CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
+                        "Failed to calculate modulus inverse for k0qi".into(),
+                    )))
+                },
+            )?);
 
             k0is.push(k0qi.to_u64().unwrap_or(0));
         }
 
-        let bounds = Bounds::compute(&params, &())?;
-        let bits = Bits::compute(&params, &bounds)?;
+        let bounds = Bounds::compute(preset, &())?;
+        let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            n: params.degree(),
+            n: threshold_params.degree(),
             l: moduli.len(),
-            q_mod_t,
             q_mod_t_mod_p,
             k0is,
             moduli,
@@ -176,11 +185,14 @@ impl Computation for Configs {
 }
 
 impl Computation for Bits {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Error = CircuitsErrors;
 
-    fn compute(_: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(
+        _: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self, Self::Error> {
         let pk_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
         // We can safely assume that the ct bound is the same as the pk bound.
         let ct_bit = calculate_bit_width(BigInt::from(input.pk_bounds[0].clone()));
@@ -233,20 +245,26 @@ impl Computation for Bits {
 }
 
 impl Computation for Bounds {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = ();
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, _: &Self::Input) -> Result<Self, Self::Error> {
-        let n = BigInt::from(params.degree());
-        let ctx = params.ctx_at_level(0)?;
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        _: &Self::Input,
+    ) -> Result<Self, Self::Error> {
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
-        let t = BigInt::from(params.plaintext());
+        let n = BigInt::from(threshold_params.degree());
+        let ctx = threshold_params.ctx_at_level(0)?;
+
+        let t = BigInt::from(threshold_params.plaintext());
 
         // CBD bound
-        let cbd_bound = (params.variance() * 2) as u64;
+        let cbd_bound = (threshold_params.variance() * 2) as u64;
         // Uniform bound
-        let uniform_bound = (params.get_error1_variance() * BigUint::from(3u32))
+        let uniform_bound = (threshold_params.get_error1_variance() * BigUint::from(3u32))
             .sqrt()
             .to_bigint()
             .ok_or_else(|| {
@@ -256,7 +274,7 @@ impl Computation for Bounds {
         let u_bound = SecretKey::sk_bound() as u128; // u_bound is the same as sk_bound
 
         // e0 = e1 in the fhe.rs
-        let e0_bound: u128 = if params.get_error1_variance() <= &BigUint::from(16u32) {
+        let e0_bound: u128 = if threshold_params.get_error1_variance() <= &BigUint::from(16u32) {
             cbd_bound as u128
         } else {
             uniform_bound.to_u128().unwrap()
@@ -291,11 +309,13 @@ impl Computation for Bounds {
             moduli.push(qi.modulus());
 
             // Calculate k0qi for bounds
-            let k0qi = BigInt::from(qi.inv(qi.neg(params.plaintext())).ok_or_else(|| {
-                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
-                    "Failed to calculate modulus inverse for k0qi".into(),
-                )))
-            })?);
+            let k0qi = BigInt::from(qi.inv(qi.neg(threshold_params.plaintext())).ok_or_else(
+                || {
+                    CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
+                        "Failed to calculate modulus inverse for k0qi".into(),
+                    )))
+                },
+            )?);
             k0is.push(k0qi.to_u64().unwrap_or(0));
 
             // PK and R2 bounds (same as qi_bound)
@@ -357,12 +377,18 @@ impl Computation for Bounds {
 }
 
 impl Computation for Witness {
-    type Params = BfvParameters;
+    type BfvThresholdParametersPreset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Error = CircuitsErrors;
 
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
-        let pk_bit = compute_pk_bit(params);
+    fn compute(
+        preset: Self::BfvThresholdParametersPreset,
+        input: &Self::Input,
+    ) -> Result<Self, Self::Error> {
+        let (threshold_params, _) =
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+
+        let pk_bit = compute_pk_bit(&threshold_params);
 
         let pk = input.public_key.clone();
         let pt = input.plaintext.clone();
@@ -373,7 +399,7 @@ impl Computation for Witness {
             .try_encrypt_extended(&input.plaintext, &mut thread_rng())?;
 
         // Context and plaintext modulus (use same ctx for e0 reconstruction and loop).
-        let ctx = params.ctx_at_level(pt.level())?;
+        let ctx = threshold_params.ctx_at_level(pt.level())?;
 
         // Reconstruct e0 in mod Q so that e0_poly row i matches e0_rns row i (same ctx).
         let mut e0_power = e0_rns.clone();
@@ -384,7 +410,7 @@ impl Computation for Witness {
             .map_err(|e| CircuitsErrors::Other(e.to_string()))?)
         .clone();
 
-        let t = Modulus::new(params.plaintext())
+        let t = Modulus::new(threshold_params.plaintext())
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?;
         let n: u64 = ctx.degree as u64;
 
@@ -872,38 +898,18 @@ impl Computation for Witness {
     }
 }
 
-impl ConvertToJson for Configs {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
-}
-
-impl ConvertToJson for Bounds {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
-}
-
-impl ConvertToJson for Witness {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value> {
-        serde_json::to_value(self)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::threshold::user_data_encryption::sample::Sample;
+    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use crate::ConvertToJson;
-    use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let bounds = Bounds::compute(&params, &()).unwrap();
-        let bits = Bits::compute(&params, &bounds).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
         let expected_bits = calculate_bit_width(BigInt::from(bounds.pk_bounds[0].clone()));
 
         assert_eq!(bounds.pk_bounds[0], BigUint::from(34359701504u64));
@@ -912,10 +918,9 @@ mod tests {
 
     #[test]
     fn test_witness_reduction_and_json_roundtrip() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let encryption_data = Sample::generate(&params);
+        let encryption_data = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
         let witness = Witness::compute(
-            &params,
+            DEFAULT_BFV_PRESET,
             &UserDataEncryptionCircuitInput {
                 public_key: encryption_data.public_key,
                 plaintext: encryption_data.plaintext,
@@ -931,8 +936,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let params = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
-        let constants = Configs::compute(&params, &()).unwrap();
+        let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
 
         let json = constants.convert_to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

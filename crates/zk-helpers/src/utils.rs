@@ -227,12 +227,8 @@ pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_jso
 ///
 /// # Returns
 /// A vector of JSON values
-pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> Vec<serde_json::Value> {
-    polynomial
-        .coefficients()
-        .iter()
-        .map(|c| serde_json::json!({ "coefficient": c.to_string() }))
-        .collect()
+pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> serde_json::Value {
+    poly_coefficients_to_toml_json(polynomial.coefficients())
 }
 
 #[cfg(test)]

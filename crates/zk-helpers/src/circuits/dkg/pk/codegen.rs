@@ -88,21 +88,18 @@ pub global {}_BIT_PK: u32 = {};
 mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::circuits::computation::Computation;
-    use crate::circuits::dkg::pk::computation::Bounds;
     use crate::codegen::write_artifacts;
-    use crate::sample::Sample;
+    use crate::prepare_pk_sample_for_test;
     use crate::utils::compute_pk_bit;
 
-    use e3_fhe_params::BfvParamSet;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::{build_pair_for_preset, DEFAULT_BFV_PRESET};
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
+        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
         let sample =
-            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small)
-                .unwrap();
+            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small);
 
         let artifacts = PkCircuit
             .codegen(
@@ -147,7 +144,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let pk_bit = compute_pk_bit(&params);
+        let pk_bit = compute_pk_bit(&dkg_params);
 
         assert!(configs_content
             .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));

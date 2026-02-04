@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{anyhow, Result};
-use e3_fhe_params::build_bfv_params_arc;
+use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
 use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::circuits::Computation;
 use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
@@ -103,7 +103,7 @@ where
         .map_err(|e: FheError| anyhow!("Error encoding plaintext: {}", e))?;
 
     let witness = UserDataEncryptionWitness::compute(
-        &params,
+        DEFAULT_BFV_PRESET,
         &UserDataEncryptionCircuitInput {
             public_key: pk,
             plaintext: plaintext,

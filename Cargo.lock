@@ -1910,20 +1910,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blake3"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
- "cpufeatures",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2296,12 +2282,6 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
-
-[[package]]
-name = "constant_time_eq"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "convert_case"
@@ -2836,14 +2816,12 @@ version = "0.1.8"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-greco-helpers",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "thiserror 1.0.69",
- "zkfhe-greco",
 ]
 
 [[package]]
@@ -3159,20 +3137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-greco-helpers"
-version = "0.1.8"
-dependencies = [
- "e3-fhe-params",
- "e3-zk-helpers",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "rand 0.8.5",
- "zkfhe-greco",
-]
-
-[[package]]
 name = "e3-indexer"
 version = "0.1.8"
 dependencies = [
@@ -3320,17 +3284,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-polynomial"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "e3-program-server"
 version = "0.1.8"
 dependencies = [
@@ -3364,18 +3317,6 @@ dependencies = [
 [[package]]
 name = "e3-safe"
 version = "0.1.8"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
-
-[[package]]
-name = "e3-safe"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3582,8 +3523,8 @@ dependencies = [
  "clap",
  "e3-fhe-params",
  "e3-parity-matrix",
- "e3-polynomial 0.1.8",
- "e3-safe 0.1.8",
+ "e3-polynomial",
+ "e3-safe",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -9646,54 +9587,6 @@ checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
 dependencies = [
  "hex",
  "tiny-keccak",
-]
-
-[[package]]
-name = "zkfhe-greco"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "blake3",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-shared"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "chrono",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "e3-safe 0.1.8 (git+https://github.com/gnosisguild/enclave)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "toml",
 ]
 
 [[package]]

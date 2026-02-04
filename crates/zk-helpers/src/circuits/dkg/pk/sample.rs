@@ -8,12 +8,10 @@
 
 use crate::ciphernodes_committee::CiphernodesCommittee;
 use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use fhe::bfv::{BfvParameters, PublicKey, SecretKey};
+use fhe::bfv::{PublicKey, SecretKey};
 use rand::thread_rng;
-use std::sync::Arc;
 
 /// Sample data for the **pk** circuit: committee and DKG public key only.
 #[derive(Debug, Clone)]
@@ -26,30 +24,27 @@ pub struct PkSample {
 
 impl PkSample {
     /// Generates sample data for the pk circuit.
-    pub fn generate(
-        _threshold_params: &Arc<BfvParameters>,
-        dkg_params: &Arc<BfvParameters>,
-        committee_size: CiphernodesCommitteeSize,
-    ) -> Result<Self, CircuitsErrors> {
+    pub fn generate(preset: BfvPreset, committee_size: CiphernodesCommitteeSize) -> Self {
+        let (_, dkg_params) = build_pair_for_preset(preset).unwrap();
+
         let mut rng = thread_rng();
         let committee = committee_size.values();
-        let dkg_secret_key = SecretKey::random(dkg_params, &mut rng);
+        let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
-        Ok(Self {
+
+        Self {
             committee,
             dkg_public_key,
-        })
+        }
     }
 }
 
 /// Prepares a pk sample for testing using a threshold preset (DKG params come from its pair).
 pub fn prepare_pk_sample_for_test(
-    threshold_preset: BfvPreset,
+    preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
-) -> Result<PkSample, CircuitsErrors> {
-    let (threshold_params, dkg_params) = build_pair_for_preset(threshold_preset)
-        .map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-    PkSample::generate(&threshold_params, &dkg_params, committee)
+) -> PkSample {
+    PkSample::generate(preset, committee)
 }
 
 #[cfg(test)]
@@ -64,8 +59,7 @@ mod tests {
         let sample = prepare_pk_sample_for_test(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
-        )
-        .unwrap();
+        );
 
         assert_eq!(sample.committee.n, committee.n);
         assert_eq!(sample.committee.threshold, committee.threshold);
