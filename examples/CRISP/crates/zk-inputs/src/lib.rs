@@ -112,9 +112,6 @@ impl ZKInputsGenerator {
         let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
             .with_context(|| "Failed to deserialize previous ciphertext")?;
 
-        let bounds = UserDataEncryptionBounds::compute(&self.bfv_params, &())?;
-        let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
         // Compute the ciphertext addition.
         let sum_ct = &ct + &prev_ct;
 
@@ -124,7 +121,7 @@ impl ZKInputsGenerator {
             &prev_ct,
             &ct,
             &sum_ct,
-            bit_ct,
+            user_data_encryption_computation_output.bits.ct_bit,
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
@@ -183,9 +180,6 @@ impl ZKInputsGenerator {
         let prev_ct = Ciphertext::from_bytes(prev_ciphertext, &self.bfv_params)
             .with_context(|| "Failed to deserialize previous ciphertext")?;
 
-        let bounds = UserDataEncryptionBounds::compute(&self.bfv_params, &())?;
-        let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
         // Compute the ciphertext addition.
         let sum_ct = &ct + &prev_ct;
 
@@ -195,7 +189,7 @@ impl ZKInputsGenerator {
             &prev_ct,
             &ct,
             &sum_ct,
-            bit_ct,
+            user_data_encryption_computation_output.bits.ct_bit,
         )
         .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
