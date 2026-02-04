@@ -119,7 +119,7 @@ pub async fn initialize_crisp_round(
     let mut current_timestamp = get_current_timestamp().await?;
     let input_window: [U256; 2] = [
         // give a little buffer 
-        U256::from(current_timestamp) + U256::from(10),
+        U256::from(current_timestamp) + U256::from(20),
         U256::from(current_timestamp + CONFIG.e3_duration),
     ];
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));

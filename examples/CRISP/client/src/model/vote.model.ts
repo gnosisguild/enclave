@@ -48,8 +48,7 @@ export interface VoteStateLite {
   vote_count: number
 
   start_time: number
-  duration: number
-  expiration: number
+  end_time: number
   start_block: number
 
   committee_public_key: number[]

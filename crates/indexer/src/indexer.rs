@@ -19,9 +19,7 @@ use e3_evm_helpers::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
     },
     event_listener::EventListener,
-    events::{
-        CiphertextOutputPublished, CommitteePublished, PlaintextOutputPublished,
-    },
+    events::{CiphertextOutputPublished, CommitteePublished, PlaintextOutputPublished},
 };
 use eyre::eyre;
 use eyre::Result;
@@ -332,52 +330,50 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
     }
 
     async fn register_committee_published(&mut self) -> Result<()> {
-        self.add_event_handler(move |e: CommitteePublished, ctx| {
-            async move {
-                let contract = ctx.contract();
-                let db = ctx.store();
-                let enclave_address = ctx.enclave_address();
-                let e3_id = u64_try_from(e.e3Id)?;
-    
-                info!(
-                    "CommitteePublished: id={}, public_key_len={}",
-                    e.e3Id,
-                    e.publicKey.len()
-                );
-    
-                let e3 = contract.get_e3(e.e3Id).await?;
-                let seed = e3.seed.to_be_bytes();
-                let request_block = u64_try_from(e3.requestBlock)?;
-                let input_window = [
-                    u64_try_from(e3.inputWindow[0])?,
-                    u64_try_from(e3.inputWindow[1])?,
-                ];
-    
-                let e3_obj = E3 {
-                    chain_id: ctx.chain_id(),
-                    ciphertext_inputs: vec![],
-                    ciphertext_output: vec![],
-                    committee_public_key: e.publicKey.to_vec(),
-                    custom_params: e3.customParams.to_vec(),
-                    e3_params: e3.e3ProgramParams.to_vec(),
-                    enclave_address,
-                    encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                    id: e3_id,
-                    plaintext_output: vec![],
-                    request_block,
-                    seed,
-                    input_window,
-                    threshold: e3.threshold,
-                    requester: e3.requester.to_string(),
-                };
-    
-                let mut repo = E3Repository::new(db, e3_id);
-                repo.set_e3(e3_obj).await?;
-    
-                info!("E3 {} created and stored", e3_id);
-    
-                Ok(())
-            }
+        self.add_event_handler(move |e: CommitteePublished, ctx| async move {
+            let contract = ctx.contract();
+            let db = ctx.store();
+            let enclave_address = ctx.enclave_address();
+            let e3_id = u64_try_from(e.e3Id)?;
+
+            info!(
+                "CommitteePublished: id={}, public_key_len={}",
+                e.e3Id,
+                e.publicKey.len()
+            );
+
+            let e3 = contract.get_e3(e.e3Id).await?;
+            let seed = e3.seed.to_be_bytes();
+            let request_block = u64_try_from(e3.requestBlock)?;
+            let input_window = [
+                u64_try_from(e3.inputWindow[0])?,
+                u64_try_from(e3.inputWindow[1])?,
+            ];
+
+            let e3_obj = E3 {
+                chain_id: ctx.chain_id(),
+                ciphertext_inputs: vec![],
+                ciphertext_output: vec![],
+                committee_public_key: e.publicKey.to_vec(),
+                custom_params: e3.customParams.to_vec(),
+                e3_params: e3.e3ProgramParams.to_vec(),
+                enclave_address,
+                encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
+                id: e3_id,
+                plaintext_output: vec![],
+                request_block,
+                seed,
+                input_window,
+                threshold: e3.threshold,
+                requester: e3.requester.to_string(),
+            };
+
+            let mut repo = E3Repository::new(db, e3_id);
+            repo.set_e3(e3_obj).await?;
+
+            info!("E3 {} created and stored", e3_id);
+
+            Ok(())
         })
         .await;
         Ok(())

@@ -128,10 +128,7 @@ pub trait EnclaveRead {
         compute_provider_params: Bytes,
     ) -> Result<U256>;
 
-    async fn get_e3_stage(
-        &self,
-        e3_id: U256,
-    ) -> Result<E3Stage>;
+    async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage>;
 }
 
 /// Trait for write operations on the Enclave contract
@@ -364,10 +361,7 @@ where
         Ok(fee)
     }
 
-    async fn get_e3_stage(
-        &self,
-        e3_id: U256,
-    ) -> Result<E3Stage> {
+    async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let stage = contract.getE3Stage(e3_id).call().await?;
         Ok(stage)

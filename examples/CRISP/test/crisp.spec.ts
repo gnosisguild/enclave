@@ -49,12 +49,12 @@ async function waitForE3Ready(e3id: number, maxWaitMs: number = 30000): Promise<
   while (Date.now() - startTime < maxWaitMs) {
     const isActivated = await checkE3Ready(e3id)
     if (isActivated) {
-      console.log(`E3 ${e3id} is activated`)
+      console.log(`E3 ${e3id} is ready`)
       return
     }
     await new Promise((resolve) => setTimeout(resolve, 2000))
   }
-  throw new Error(`E3 ${e3id} was not activated within ${maxWaitMs}ms`)
+  throw new Error(`E3 ${e3id} was not ready within ${maxWaitMs}ms`)
 }
 
 const test = testWithSynpress(metaMaskFixtures(basicSetup))

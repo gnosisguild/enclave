@@ -39,7 +39,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime, t
 
       const block = await client.getBlock()
 
-      if (block.timestamp > roundState.expiration) {
+      if (block.timestamp > roundState.end_time) {
         setIsEnded(true)
       }
     })()
