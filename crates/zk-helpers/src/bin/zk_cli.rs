@@ -131,7 +131,7 @@ struct Cli {
     /// Preset: "insecure"|"secure" or λ (2|80). Drives both threshold and DKG params.
     #[arg(long, required_unless_present = "list_circuits")]
     preset: Option<String>,
-    /// For share-computation: witness type "secret-key" or "smudging-noise". Required when circuit is share-computation.
+    /// For share-computation only: witness type "secret-key" or "smudging-noise". Required when writing Prover.toml for share-computation. Ignored for pk (always secret key).
     #[arg(long)]
     witness: Option<String>,
     /// Output directory for generated artifacts.
@@ -200,17 +200,14 @@ fn main() -> Result<()> {
     }
 
     let write_prover_toml = args.toml;
-    // Circuits that accept runtime witness type (e.g. share-computation with SecretKey or SmudgingNoise) have DKG_INPUT_TYPE == None but still need witness handling.
-    let has_witness_type = circuit_meta.dkg_input_type().is_some()
-        || circuit_meta.name() == ShareComputationCircuit::NAME;
+    // Only share-computation has a witness-type choice (secret-key vs smudging-noise). pk always uses secret key.
+    let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME;
 
-    // For share-computation: require --witness only when generating Prover.toml (configs are shared).
     let dkg_input_type = if has_witness_type {
+        // Share-computation: require --witness when generating Prover.toml; default secret-key for configs-only.
         let witness_str = if !args.toml {
-            // Configs-only: witness optional (configs.nr is the same for both witness types).
             args.witness.as_deref().unwrap_or("secret-key")
         } else {
-            // Generating Prover.toml: witness type is required.
             args.witness.as_deref().ok_or_else(|| {
                 anyhow!(
                     "circuit {} requires --witness (secret-key or smudging-noise) when writing Prover.toml",
@@ -224,6 +221,7 @@ fn main() -> Result<()> {
             DkgInputTypeArg::SmudgingNoise => DkgInputType::SmudgingNoise,
         }
     } else {
+        // pk circuit: always secret key (no smudging noise).
         DkgInputType::SecretKey
     };
 
