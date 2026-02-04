@@ -65,4 +65,4 @@ export {
   type ComputeProviderParams,
 } from './utils'
 
-export { generateProof, type Polynomial, convertToPolynomial, convertToPolynomialArray } from './greco'
+export { generateProof, type Polynomial } from './greco'
