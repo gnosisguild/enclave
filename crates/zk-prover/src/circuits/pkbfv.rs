@@ -8,16 +8,17 @@ use crate::error::ZkError;
 use crate::traits::Provable;
 use acir::FieldElement;
 use e3_events::CircuitName;
+use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
-use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
-use e3_zk_helpers::get_zkp_modulus;
-use fhe::bfv::{BfvParameters, PublicKey};
+use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
+use e3_zk_helpers::circuits::dkg::pk::computation::Witness;
+use e3_zk_helpers::Computation;
+use fhe::bfv::PublicKey;
 use noirc_abi::{input_parser::InputValue, InputMap};
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 impl Provable for PkCircuit {
-    type Params = Arc<BfvParameters>;
+    type Params = BfvPreset;
     type Input = PublicKey;
 
     fn circuit(&self) -> CircuitName {
@@ -26,30 +27,22 @@ impl Provable for PkCircuit {
 
     fn build_witness(
         &self,
-        params: &Self::Params,
+        preset: &Self::Params,
         input: &Self::Input,
     ) -> Result<InputMap, ZkError> {
-        let mut pk0is = CrtPolynomial::from_fhe_polynomial(&input.c.c[0]);
-        let mut pk1is = CrtPolynomial::from_fhe_polynomial(&input.c.c[1]);
-
-        pk0is.reverse();
-        pk1is.reverse();
-
-        let moduli = params.moduli();
-        pk0is
-            .center(&moduli)
-            .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
-        pk1is
-            .center(&moduli)
+        // Use the existing Witness::compute implementation from zk-helpers
+        // to ensure consistency between proof generation and verification
+        let circuit_input = PkCircuitInput {
+            public_key: input.clone(),
+        };
+        
+        let witness = Witness::compute(*preset, &circuit_input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
-        let zkp_modulus = get_zkp_modulus();
-        pk0is.reduce_uniform(&zkp_modulus);
-        pk1is.reduce_uniform(&zkp_modulus);
-
+        // Convert the witness to InputMap format for Noir
         let mut inputs = InputMap::new();
-        inputs.insert("pk0is".to_string(), crt_polynomial_to_array(&pk0is)?);
-        inputs.insert("pk1is".to_string(), crt_polynomial_to_array(&pk1is)?);
+        inputs.insert("pk0is".to_string(), crt_polynomial_to_array(&witness.pk0is)?);
+        inputs.insert("pk1is".to_string(), crt_polynomial_to_array(&witness.pk1is)?);
 
         Ok(inputs)
     }
