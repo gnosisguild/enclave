@@ -14,11 +14,7 @@ use crate::{
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Context;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, sync::Arc};
 use tracing::warn;
 
 type Seq = u64;
@@ -122,6 +118,7 @@ impl Handler<EnclaveEvent<Sequenced>> for BatchRouter {
                     .get(&prev_seq)
                     .context("invariant: prev_agg MUST exist if batches has a batch")?;
 
+                println!("PREV AGG = {}", prev_agg);
                 let delay = self.config.get_delay(prev_agg);
 
                 let now = self.clock.now_micros();

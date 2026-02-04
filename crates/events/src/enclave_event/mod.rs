@@ -341,9 +341,15 @@ impl EnclaveEvent<Unsequenced> {
 
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
-    /// test-helpers only utility function to create a new unsequenced event
+    /// test-helpers only utility function to create a new sequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time, None).into_sequenced(seq)
+    }
+
+    /// test-helpers only utility function to create a new sequenced event
+    pub fn from_data_ec(data: EnclaveEventData, ec: EventContext<Sequenced>) -> Self {
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, Some(ec.clone()), ec.ts(), ec.block())
+            .into_sequenced(ec.seq())
     }
 
     /// test-helpers only utility function to remove time information from an event
@@ -430,6 +436,7 @@ impl EnclaveEventData {
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
             _ => None,
         }
     }

@@ -77,22 +77,28 @@ pub struct TimelockQueue {
     timelocks: BinaryHeap<Reverse<Timelock>>,
     batch_router: Recipient<FlushSeq>,
     clock: Arc<dyn Clock>,
+    interval: Option<u64>, // Seconds
 }
 
 impl TimelockQueue {
     pub fn new(batch_router: impl Into<Recipient<FlushSeq>>) -> Self {
-        Self::with_clock(batch_router, Arc::new(SystemClock))
+        Self::with_clock(batch_router, Arc::new(SystemClock), Some(1))
     }
 
     pub fn spawn(batch_router: impl Into<Recipient<FlushSeq>>) -> Addr<Self> {
         Self::new(batch_router).start()
     }
 
-    pub fn with_clock(batch_router: impl Into<Recipient<FlushSeq>>, clock: Arc<dyn Clock>) -> Self {
+    pub fn with_clock(
+        batch_router: impl Into<Recipient<FlushSeq>>,
+        clock: Arc<dyn Clock>,
+        interval: Option<u64>,
+    ) -> Self {
         Self {
             batch_router: batch_router.into(),
             timelocks: BinaryHeap::new(),
             clock,
+            interval,
         }
     }
 
@@ -109,8 +115,12 @@ impl Actor for TimelockQueue {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        let Some(interval) = self.interval else {
+            return;
+        };
+
         // Send Tick to self every second
-        ctx.run_interval(Duration::from_secs(1), |_, ctx| {
+        ctx.run_interval(Duration::from_secs(interval), |_, ctx| {
             ctx.address().do_send(Tick);
         });
     }
@@ -142,16 +152,14 @@ impl Handler<Tick> for TimelockQueue {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use actix::prelude::*;
+pub mod mock_clock {
+
     use std::sync::{
         atomic::{AtomicU64, Ordering as AtomicOrdering},
-        Arc, Mutex,
+        Arc,
     };
-    use tokio::time::sleep;
 
-    // ==================== Mock Clock ====================
+    use super::Clock;
 
     #[derive(Clone)]
     pub struct MockClock {
@@ -179,6 +187,15 @@ mod tests {
             self.current_time.load(AtomicOrdering::SeqCst)
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix::prelude::*;
+    use mock_clock::MockClock;
+    use std::sync::{Arc, Mutex};
+    use tokio::time::sleep;
 
     // ==================== Mock Router ====================
 
@@ -213,7 +230,8 @@ mod tests {
 
         let clock = MockClock::new(1000); // Start at t=1000
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         // Add timelock expiring at t=2000
         queue
@@ -235,7 +253,8 @@ mod tests {
 
         let clock = MockClock::new(1000);
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         // Add timelock expiring at t=2000
         queue
@@ -262,7 +281,8 @@ mod tests {
 
         let clock = MockClock::new(1000);
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         // Add timelock expiring at exactly t=2000
         queue
@@ -289,7 +309,8 @@ mod tests {
 
         let clock = MockClock::new(1000);
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         // Add timelock expiring at t=2000
         queue
@@ -314,7 +335,8 @@ mod tests {
 
         let clock = MockClock::new(0);
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         // Add timelocks with different expiries
         queue.send(StartTimelock::new(1, 0, 1000)).await.unwrap(); // expires at 1000
@@ -362,7 +384,8 @@ mod tests {
 
         let clock = MockClock::new(1000);
         let queue =
-            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone())).start();
+            TimelockQueue::with_clock(mock_router.recipient(), Arc::new(clock.clone()), None)
+                .start();
 
         queue.send(StartTimelock::new(42, 1000, 500)).await.unwrap();
 

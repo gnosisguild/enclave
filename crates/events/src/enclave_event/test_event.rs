@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct TestEvent {
     pub msg: String,
     pub entropy: u64,
+    pub e3_id: Option<E3id>,
 }
 
 impl TestEvent {
@@ -19,12 +20,23 @@ impl TestEvent {
         Self {
             msg: msg.to_owned(),
             entropy,
+            e3_id: None,
+        }
+    }
+
+    pub fn with_e3_id(self, id: E3id) -> Self {
+        Self {
+            msg: self.msg,
+            entropy: self.entropy,
+            e3_id: Some(id),
         }
     }
 }
 
 #[cfg(test)]
 use std::fmt::{self, Display};
+
+use crate::{AggregateId, E3id};
 
 #[cfg(test)]
 impl Display for TestEvent {
