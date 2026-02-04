@@ -197,8 +197,8 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
-    use crate::sample::Sample;
     use crate::threshold::user_data_encryption::computation::{Bits, Bounds};
+    use crate::threshold::user_data_encryption::sample::Sample;
 
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;

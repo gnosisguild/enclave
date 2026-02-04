@@ -6,6 +6,7 @@
 
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
+use e3_zk_helpers::threshold::compute_pk_bit;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
@@ -32,20 +33,18 @@ impl CiphertextAdditionWitness {
     /// Computes the ciphertext addition inputs for zero-knowledge proof validation.
     ///
     /// # Arguments
-    /// * `prev_ct` - The existing ciphertext to add to
-    /// * `ct` - The ciphertext being added (from Greco)
-    /// * `sum_ct` - The result of the ciphertext addition
     /// * `params` - BFV parameters
-    /// * `bit_ct` - Bit width for ciphertext bounds (used for packing)
+    /// * `prev_ct` - The existing ciphertext to add to
+    /// * `ct` - The ciphertext being added
+    /// * `sum_ct` - The result of the ciphertext addition
     ///
     /// # Returns
     /// CiphertextAdditionInputs containing all necessary proof data
     pub fn compute(
-        params: Arc<BfvParameters>,
+        params: &BfvParameters,
         prev_ct: &Ciphertext,
         ct: &Ciphertext,
         sum_ct: &Ciphertext,
-        bit_ct: u32,
     ) -> Result<CiphertextAdditionWitness> {
         let moduli = params.moduli();
 
@@ -98,7 +97,8 @@ impl CiphertextAdditionWitness {
         r0.reduce_uniform(zkp_modulus);
         r1.reduce_uniform(zkp_modulus);
 
-        let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, bit_ct);
+        let pk_bit = compute_pk_bit(params)?;
+        let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, pk_bit);
 
         Ok(CiphertextAdditionWitness {
             prev_ct0is: prev_ct0,
@@ -226,9 +226,7 @@ mod tests {
         let sum_ct = &ct1 + &ct2;
 
         // Compute ciphertext addition inputs.
-        let bit_ct = test_bit_ct(&bfv_params);
-        let result =
-            CiphertextAdditionWitness::compute(bfv_params.clone(), &ct1, &ct2, &sum_ct, bit_ct);
+        let result = CiphertextAdditionWitness::compute(&bfv_params, &ct1, &ct2, &sum_ct);
 
         assert!(result.is_ok());
         let inputs = result.unwrap();

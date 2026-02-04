@@ -28,6 +28,12 @@ use thiserror::Error as ThisError;
 pub enum ZkHelpersUtilsError {
     #[error("Failed to parse bound: {0}")]
     ParseBound(String),
+
+    #[error("Conversion error: {0}")]
+    ConversionError(String),
+
+    #[error("Commitment too long: {0}")]
+    CommitmentTooLong(usize),
 }
 
 pub type Result<T> = std::result::Result<T, ZkHelpersUtilsError>;

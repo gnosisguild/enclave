@@ -116,14 +116,9 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let ciphertext_addition_inputs = CiphertextAdditionWitness::compute(
-            self.bfv_params.clone(),
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            user_data_encryption_computation_output.bits.ct_bit,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let ciphertext_addition_inputs =
+            CiphertextAdditionWitness::compute(&self.bfv_params, &prev_ct, &ct, &sum_ct)
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // Construct Inputs Section.
         let inputs = construct_inputs(
@@ -184,14 +179,9 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs = CiphertextAdditionWitness::compute(
-            self.bfv_params.clone(),
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            user_data_encryption_computation_output.bits.ct_bit,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let mut ciphertext_addition_inputs =
+            CiphertextAdditionWitness::compute(&self.bfv_params, &prev_ct, &ct, &sum_ct)
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // IMPORTANT: First-in-slot votes have no previous ciphertext; set prev_ct_commitment to 0
         // so the on-chain verifier accepts the proof.

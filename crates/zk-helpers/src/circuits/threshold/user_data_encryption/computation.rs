@@ -13,6 +13,7 @@ use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
 use crate::compute_ciphertext_commitment;
 use crate::get_zkp_modulus;
+use crate::threshold::compute_pk_bit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use crate::CircuitsErrors;
@@ -361,9 +362,7 @@ impl Computation for Witness {
     type Error = CircuitsErrors;
 
     fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error> {
-        let bounds = Bounds::compute(params, &())?;
-
-        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+        let pk_bit = compute_pk_bit(params)?;
 
         let pk = input.public_key.clone();
         let pt = input.plaintext.clone();
@@ -848,8 +847,8 @@ impl Computation for Witness {
         e0_vec.reduce(&zkp_modulus);
         k1.reduce(&zkp_modulus);
 
-        let pk_commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, bit_pk);
-        let ct_commitment = compute_ciphertext_commitment(&ct0is, &ct1is, bit_pk);
+        let pk_commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
+        let ct_commitment = compute_ciphertext_commitment(&ct0is, &ct1is, pk_bit);
 
         Ok(Witness {
             pk0is,
@@ -895,8 +894,8 @@ impl ConvertToJson for Witness {
 mod tests {
     use super::*;
 
+    use crate::threshold::user_data_encryption::sample::Sample;
     use crate::ConvertToJson;
-    use crate::Sample;
     use e3_fhe_params::BfvParamSet;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
