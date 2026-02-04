@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
-
 use crate::math::commitments::{
     compute_aggregated_shares_commitment, compute_threshold_share_decryption_challenge,
 };
@@ -31,7 +25,7 @@ impl<let L: u32> Configs<L> {
 /// Verifies:
 /// 1. Commitment to sk matches expected (from DKG decryption circuit)
 /// 2. Commitment to e_sm matches expected (from DKG decryption circuit)
-/// 3. Correct computation: d = c_0 + c_1 * s + e + r_2 * (X^N + 1) + r_1 * q_i
+/// 3. Correct computation: d_i = c_0i + c_1i * s_i + e_i + r_2i * (X^N + 1) + r_1i * q_i
 pub struct ShareDecryption<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_D: u32> {
     /// Circuit parameters including bounds and cryptographic constants
     configs: Configs<L>,
@@ -126,7 +120,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// 6. Quotient polynomials `r_2` for each CRT basis (serialized coefficients)
     /// 7. Decryption shares `d` for each CRT basis (serialized coefficients)
     ///
-    /// Note: Aggregated secret shares `s` and noise shares `e` are represented by their
+    /// Note: Aggregated secret shares `sk` and noise shares `e_sm` are represented by their
     /// commitments rather than serialized coefficients. This saves constraints while
     /// still binding them to the transcript.
     ///
@@ -156,13 +150,15 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
 
     /// Main verification function
     pub fn execute(self) {
-        // Step 1: Verify s commitment matches expected
+        // Step 1: Verify sk commitment matches expected
         self.verify_agg_sk_commitment();
 
-        // Step 2: Verify e commitment matches expected
+        // Step 2: Verify e_sm commitment matches expected
         self.verify_agg_e_sm_commitment();
 
-        // Step 3: Perform range checks on all secret witness values
+        // Step 3: Perform range checks on quotient polynomials
+        // Note: sk and e_sm range checks are handled by commitment verification
+        // (the DKG decryption circuit already performed range checks on these values)
         self.check_range_bounds();
 
         // Step 4: Generate Fiat-Shamir challenge from the transcript
@@ -174,34 +170,22 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         }
     }
 
-    /// Performs range checks on all secret witness values.
+    /// Performs range checks on quotient polynomial witnesses.
     ///
-    /// This function constrains all secret witnesses to be within their expected bounds
+    /// This function constrains quotient polynomials to be within their expected bounds
     /// as specified in the `configs`. This is critical for security because it prevents
     /// attacks where malicious provers provide out-of-range values that could break the
     /// security properties of the Threshold scheme.
     ///
-    /// The function checks:
-    /// - Aggregated secret shares `sk` are within bounds for each CRT basis
-    /// - Aggregated noise shares `e_sm` are within bounds for each CRT basis
-    /// - Quotient polynomials `r_1` and `r_2` are within bounds for each CRT basis
+    /// Note: Range checks on `sk` and `e_sm` are NOT performed here because:
+    /// - Their commitments are verified against expected values from the DKG circuit
+    /// - The DKG decryption circuit already performed range checks on these values
+    /// - Commitment binding ensures the values match what was previously verified
     ///
     /// # Panics
-    /// This function will cause the circuit to fail if any coefficient is outside
-    /// its expected bounds. The bounds are defined per polynomial type in the `configs`.
+    /// This function will cause the circuit to fail if any quotient coefficient is
+    /// outside its expected bounds.
     fn check_range_bounds(self) {
-        // Check aggregated sums are within bounds
-        for basis_idx in 0..L {
-            self.sk[basis_idx].range_check_2bounds::<BIT_SK>(
-                self.configs.r2_bounds[basis_idx],
-                self.configs.r2_bounds[basis_idx],
-            );
-            self.e_sm[basis_idx].range_check_2bounds::<BIT_E_SM>(
-                self.configs.r2_bounds[basis_idx],
-                self.configs.r2_bounds[basis_idx],
-            );
-        }
-
         // Check quotient polynomials are within bounds
         for basis_idx in 0..L {
             // r_1 quotients can be negative (modulus quotients)
@@ -220,7 +204,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// Generates Fiat-Shamir challenge value using the SAFE cryptographic sponge.
     ///
     /// This function implements the Fiat-Shamir transform for the decryption share circuit:
-    /// 1. Flattens all witness data (commitments for s/e, ciphertexts c_0/c_1, quotients r_1/r_2, decryption shares d) into a single array
+    /// 1. Flattens all witness data (commitments for sk/e_sm, ciphertexts c_0/c_1, quotients r_1/r_2, decryption shares d) into a single array
     /// 2. Absorbs the flattened data into the SAFE sponge
     /// 3. Squeezes a single challenge value
     ///
@@ -240,13 +224,13 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
     /// Verifies the lifted decryption share computation formula for a specific CRT basis using the Schwartz-Zippel lemma.
     ///
     /// This function verifies that the decryption share for basis `i` satisfies:
-    /// `d_i(gamma) = c_0i(gamma) + c_1i(gamma) * s(gamma) + e_i(gamma) + r_2_i(gamma) * cyclo(gamma) + r_1_i(gamma) * q_i`
+    /// `d_i(gamma) = c_0i(gamma) + c_1i(gamma) * s_i(gamma) + e_i(gamma) + r_2i(gamma) * cyclo(gamma) + r_1i(gamma) * q_i`
     ///
     /// Where:
     /// - `c_0i`, `c_1i` are ciphertext components for basis i
-    /// - `s` is the aggregated secret key shares
-    /// - `e_i` is the aggregated noise shares
-    /// - `r_1_i`, `r_2_i` are quotient witnesses
+    /// - `s_i` is the aggregated secret key shares for basis i
+    /// - `e_i` is the aggregated noise shares for basis i
+    /// - `r_1i`, `r_2i` are quotient witnesses for basis i
     /// - `cyclo(gamma) = gamma^N + 1` is the cyclotomic polynomial evaluated at gamma
     /// - `q_i` is the CRT modulus for basis i
     ///
@@ -276,7 +260,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_SK: u32, let BIT_E_SM: u32
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
 
         // Compute expected decryption share using the lifted formula:
-        // d_i = c_0i + c_1i * sk + e_sm_i + r_2_i * (X^N + 1) + r_1_i * q_i
+        // d_i = c_0i + c_1i * sk_i + e_sm_i + r_2i * (X^N + 1) + r_1i * q_i
         let expected_decryption_share = c_0_at_gamma
             + c_1_at_gamma * sk_at_gamma
             + e_sm_at_gamma
