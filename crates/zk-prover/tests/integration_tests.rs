@@ -152,14 +152,12 @@ async fn test_download_circuits() {
     // Should have at least the placeholder circuit
     assert!(backend
         .circuits_dir
-        .join("circuits")
         .join("dkg")
         .join("pk")
         .join("pk.json")
         .exists());
     assert!(backend
         .circuits_dir
-        .join("circuits")
         .join("dkg")
         .join("pk")
         .join("pk.vk")

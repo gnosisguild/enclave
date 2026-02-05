@@ -87,9 +87,13 @@ impl ZkBackend {
 
         match result {
             Ok(bytes) => {
+                if self.circuits_dir.exists() {
+                    fs::remove_dir_all(&self.circuits_dir).await?;
+                }
+
                 let decoder = GzDecoder::new(&bytes[..]);
                 let mut archive = Archive::new(decoder);
-                archive.unpack(&self.circuits_dir)?;
+                archive.unpack(&self.base_dir)?;
 
                 version_info.circuits_version = Some(version.clone());
                 version_info.last_updated = Some(chrono::Utc::now().to_rfc3339());
@@ -229,6 +233,11 @@ async fn create_placeholder_circuits(circuits_dir: &Path) -> Result<(), ZkError>
     fs::write(&circuit_path, serde_json::to_string_pretty(&placeholder)?).await?;
 
     fs::create_dir_all(circuits_dir.join("vk")).await?;
+
+    // Create a minimal placeholder VK file so proof generation doesn't fail
+    // This is just for testing when actual circuits can't be downloaded
+    let vk_path = circuits_dir.join("vk").join("pk.vk");
+    fs::write(&vk_path, b"placeholder_vk").await?;
 
     Ok(())
 }
