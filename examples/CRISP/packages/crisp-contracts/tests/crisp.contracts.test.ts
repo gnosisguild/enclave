@@ -131,7 +131,10 @@ describe('CRISP Contracts', function () {
       // Call next functions with fake data for testing.
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
 
-      const encodedCustomParams = AbiCoder.defaultAbiCoder().encode(['address', 'uint256', 'uint256', 'uint256', 'uint256'], [zeroAddress, 0, 2, 0, 1])
+      const encodedCustomParams = AbiCoder.defaultAbiCoder().encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256'],
+        [zeroAddress, 0, 2, 0, 1],
+      )
       await crispProgram.validate(e3Id, 0n, '0x', '0x', encodedCustomParams)
 
       // If it doesn't throw, the test is successful.

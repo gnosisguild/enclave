@@ -222,3 +222,13 @@ export type VoteProofRequest = {
   messageHash: `0x${string}`
   slotAddress: string
 }
+
+/**
+ * Enum representing the credit mode for a round, which can be either constant or custom.
+ * In constant mode, all voters receive the same amount of credits, while in custom mode,
+ * the credits can vary based on certain criteria (e.g., voter balance).
+ */
+export enum CreditMode {
+  CONSTANT = '0',
+  CUSTOM = '1',
+}

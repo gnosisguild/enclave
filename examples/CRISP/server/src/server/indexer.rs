@@ -92,7 +92,7 @@ pub async fn register_e3_requested(
                     token_address: decoded.0.to_string(),
                     balance_threshold: decoded.1.to_string(),
                     num_options: decoded.2.to_string(),
-                    credit_mode: CreditMode(credit_mode.to::<u64>()?),
+                    credit_mode,
                     credits,
                 };
 
