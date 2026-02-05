@@ -6,9 +6,9 @@
 
 use anyhow::{anyhow, Result};
 use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
 use e3_zk_helpers::circuits::Computation;
-use e3_zk_helpers::threshold::UserDataEncryptionCircuitInput;
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
