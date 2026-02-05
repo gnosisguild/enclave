@@ -6,14 +6,24 @@
 
 import { encodeSolidityProof, CrispSDK } from '@crisp-e3/sdk'
 
-const NUM_OPTIONS = 2
-
 self.onmessage = async function (event) {
   const { type, data } = event.data
   switch (type) {
     case 'generate_proof':
       try {
-        const { e3Id, vote, publicKey, balance, address: slotAddress, signature, messageHash, isMasking, crispServer, merkleLeaves } = data
+        const {
+          e3Id,
+          vote,
+          publicKey,
+          balance,
+          address: slotAddress,
+          signature,
+          messageHash,
+          isMasking,
+          crispServer,
+          merkleLeaves,
+          numOptions,
+        } = data
 
         const sdk = new CrispSDK(crispServer)
 
@@ -26,7 +36,7 @@ self.onmessage = async function (event) {
             balance,
             slotAddress,
             merkleLeaves,
-            numOptions: NUM_OPTIONS,
+            numOptions,
           })
         } else {
           proof = await sdk.generateVoteProof({
