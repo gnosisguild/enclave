@@ -15,7 +15,7 @@ fn test_witness_generation_from_fixture() {
     let circuit = CompiledCircuit::from_file(&fixtures.join("dummy.json")).unwrap();
 
     let witness_gen = WitnessGenerator::new();
-    let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
+    let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]).unwrap();
     let witness = witness_gen.generate_witness(&circuit, inputs).unwrap();
 
     assert!(witness.len() > 2);
@@ -29,7 +29,7 @@ fn test_witness_generation_wrong_sum_fails() {
     let circuit = CompiledCircuit::from_file(&fixtures.join("dummy.json")).unwrap();
 
     let witness_gen = WitnessGenerator::new();
-    let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]);
+    let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]).unwrap();
     let result = witness_gen.generate_witness(&circuit, inputs);
 
     assert!(result.is_err());

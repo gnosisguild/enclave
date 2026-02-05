@@ -107,7 +107,7 @@ impl Default for WitnessGenerator {
     }
 }
 
-pub fn input_map<I, K, V>(iter: I) -> InputMap
+pub fn input_map<I, K, V>(iter: I) -> Result<InputMap, ZkError>
 where
     I: IntoIterator<Item = (K, V)>,
     K: Into<String>,
@@ -115,8 +115,15 @@ where
 {
     iter.into_iter()
         .map(|(k, v)| {
-            let field = FieldElement::try_from_str(v.as_ref()).unwrap_or_default();
-            (k.into(), InputValue::Field(field))
+            let key = k.into();
+            let field = FieldElement::try_from_str(v.as_ref()).ok_or_else(|| {
+                ZkError::SerializationError(format!(
+                    "invalid field element for key '{}': {}",
+                    key,
+                    v.as_ref()
+                ))
+            })?;
+            Ok((key, InputValue::Field(field)))
         })
         .collect()
 }
@@ -137,7 +144,7 @@ mod tests {
     fn test_generate_witness() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
-        let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]);
+        let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "8")]).unwrap();
 
         let witness = generator.generate_witness(&circuit, inputs).unwrap();
 
@@ -150,9 +157,20 @@ mod tests {
     fn test_wrong_sum_fails() {
         let circuit = CompiledCircuit::from_json(DUMMY_CIRCUIT).unwrap();
         let generator = WitnessGenerator::new();
-        let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]);
+        let inputs = input_map([("x", "5"), ("y", "3"), ("_sum", "10")]).unwrap();
 
         let result = generator.generate_witness(&circuit, inputs);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_field_element() {
+        let result = input_map([("x", "not_a_number"), ("y", "3")]);
+        assert!(result.is_err());
+        
+        let err = result.unwrap_err();
+        assert!(matches!(err, ZkError::SerializationError(_)));
+        assert!(err.to_string().contains("invalid field element"));
+        assert!(err.to_string().contains("'x'"));
     }
 }
