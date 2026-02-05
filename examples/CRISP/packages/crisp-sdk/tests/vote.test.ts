@@ -91,6 +91,11 @@ describe('Vote', () => {
       return BigInt('0b' + trimmedBinary)
     }
 
+    it('Should fail when the number of choices is less than 2', () => {
+      expect(() => encodeVote([10n])).toThrow('Vote must have at least two choices')
+      expect(() => encodeVote([])).toThrow('Vote must have at least two choices')
+    })
+
     it('Should encode votes correctly with 2 choices', () => {
       const encoded = encodeVote([10n, 2n])
 

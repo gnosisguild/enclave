@@ -41,6 +41,10 @@ const optimalThreadCount = await getOptimalThreadCount()
  * @returns The encoded vote as a BigInt64Array.
  */
 export const encodeVote = (vote: Vote): BigInt64Array => {
+  if (vote.length < 2) {
+    throw new Error('Vote must have at least two choices')
+  }
+
   const bfvParams = zkInputsGenerator.getBFVParams()
   const degree = bfvParams.degree
   const n = vote.length
@@ -266,10 +270,6 @@ export const generateProof = async (crispInputs: CircuitInputs) => {
 export const validateVote = (vote: Vote, balance: bigint): void => {
   const numChoices = vote.length
   const maxValue = getMaxVoteValue(numChoices)
-
-  if (vote.length !== numChoices) {
-    throw new Error(`Invalid vote: expected ${numChoices} choices, got ${vote.length}`)
-  }
 
   for (let i = 0; i < vote.length; i++) {
     if (vote[i] < 0n) {

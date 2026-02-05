@@ -57,6 +57,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidTallyLength();
   error SlotIsEmpty();
   error MerkleRootNotSet();
+  error InvalidNumOptions();
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -109,14 +110,19 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata) external returns (bytes32) {
+  function validate(
+    uint256 e3Id,
+    uint256,
+    bytes calldata e3ProgramParams,
+    bytes calldata,
+    bytes calldata customParams
+  ) external returns (bytes32) {
     if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
 
-    E3 memory e3 = enclave.getE3(e3Id);
-
     // decode custom params to get the number of options
-    (, , uint256 numOptions) = abi.decode(e3.customParams, (address, uint256, uint256));
+    (, , uint256 numOptions) = abi.decode(customParams, (address, uint256, uint256));
+    if (numOptions < 2) revert InvalidNumOptions();
 
     e3Data[e3Id].numOptions = numOptions;
 
@@ -173,6 +179,13 @@ contract CRISPProgram is IE3Program, Ownable {
     E3 memory e3 = enclave.getE3(e3Id);
 
     uint256 numOptions = e3Data[e3Id].numOptions;
+
+    // If num optionsis not configured, return empty array to avoid decoding errors.
+    // Users might be calling this function too early and there's no
+    if (numOptions == 0) {
+      return new uint256[](0);
+    }
+
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
     uint256 segmentSize = tally.length / numOptions;

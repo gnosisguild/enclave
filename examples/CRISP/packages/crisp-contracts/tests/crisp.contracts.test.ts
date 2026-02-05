@@ -104,7 +104,7 @@ describe('CRISP Contracts', function () {
       await mockEnclave.request(await crispProgram.getAddress())
       const [signer] = await ethers.getSigners()
 
-      const e3Id = 1n
+      const e3Id = 0n
 
       const vote = [10n, 0n]
       const balance = 100n
@@ -129,7 +129,6 @@ describe('CRISP Contracts', function () {
 
       // Call next functions with fake data for testing.
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
-      await crispProgram.validate(e3Id, 0n, '0x', '0x')
 
       // If it doesn't throw, the test is successful.
       await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)
