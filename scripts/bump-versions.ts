@@ -322,6 +322,14 @@ class VersionBumper {
         cwd: this.rootDir,
         stdio: 'pipe',
       })
+      execSync('cargo update', {
+        cwd: `${this.rootDir}/examples/CRISP`,
+        stdio: 'pipe',
+      })
+      execSync('cargo update', {
+        cwd: `${this.rootDir}/templates/default`,
+        stdio: 'pipe',
+      })
       console.log('   ✓ Cargo.lock updated')
     } catch {
       console.warn('   ⚠️  Could not update Cargo.lock')

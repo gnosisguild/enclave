@@ -14,6 +14,7 @@ import {
   encodeSolidityProof,
   generateMerkleTree,
   SIGNATURE_MESSAGE_HASH,
+  generateMaskVoteProof,
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
@@ -25,6 +26,8 @@ describe('CRISP Contracts', function () {
     it('should decode a tally correctly', async () => {
       const mockEnclave = await deployMockEnclave()
       const crispProgram = await deployCRISPProgram({ mockEnclave })
+
+      await mockEnclave.request(await crispProgram.getAddress())
 
       const tally =
         '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000300000000000000000000000000000003000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000030000000000000003000000000000000300000000000000030000000000000003000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
@@ -46,7 +49,7 @@ describe('CRISP Contracts', function () {
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
 
-      const vote = { yes: 10n, no: 0n }
+      const vote = [10n, 0n]
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
@@ -67,17 +70,43 @@ describe('CRISP Contracts', function () {
       expect(isValid).to.be.true
     })
 
+    it('should verify the proof for a vote mask', async function () {
+      // It needs some time to generate the proof.
+      this.timeout(60000)
+
+      const honkVerifier = await deployHonkVerifier()
+      const [signer] = await ethers.getSigners()
+
+      const balance = 100n
+      const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
+      const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
+      const leaves = [...[10n, 20n, 30n], hashLeaf(address, balance)]
+
+      const proof = await generateMaskVoteProof({
+        publicKey,
+        merkleLeaves: leaves,
+        balance,
+        slotAddress: address,
+        numOptions: 2,
+      })
+
+      const isValid = await honkVerifier.verify(proof.proof, proof.publicInputs)
+
+      expect(isValid).to.be.true
+    })
+
     it('should validate input correctly', async function () {
       // It needs some time to generate the proof.
       this.timeout(60000)
 
       const mockEnclave = await deployMockEnclave()
       const crispProgram = await deployCRISPProgram({ mockEnclave })
+      await mockEnclave.request(await crispProgram.getAddress())
       const [signer] = await ethers.getSigners()
 
-      const e3Id = 1n
+      const e3Id = 0n
 
-      const vote = { yes: 10n, no: 0n }
+      const vote = [10n, 0n]
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
       const address = await getAddressFromSignature(signature, SIGNATURE_MESSAGE_HASH)
@@ -100,7 +129,6 @@ describe('CRISP Contracts', function () {
 
       // Call next functions with fake data for testing.
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
-      await crispProgram.validate(e3Id, 0n, '0x', '0x')
 
       // If it doesn't throw, the test is successful.
       await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)

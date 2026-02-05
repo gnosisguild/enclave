@@ -69,7 +69,7 @@ pub async fn register_e3_requested(
                 // Convert custom params bytes back to token address and balance threshold.
 
                 // Use sol_data types instead of primitives
-                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>);
+                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>);
 
                 let decoded = <CustomParamsTuple as SolType>::abi_decode(&event.e3.customParams)
                     .with_context(|| "Failed to decode custom params from E3 event")?;
@@ -77,6 +77,7 @@ pub async fn register_e3_requested(
                 let custom_params = CustomParams {
                     token_address: decoded.0.to_string(),
                     balance_threshold: decoded.1.to_string(),
+                    num_options: decoded.2.to_string(),
                 };
 
                 let balance_threshold =
@@ -88,7 +89,7 @@ pub async fn register_e3_requested(
                     .with_context(|| "Invalid token address")?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold, e3.requester.to_string())
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold, custom_params.num_options, e3.requester.to_string())
                     .await?;
 
                 // Get token holders from Etherscan API or mocked data.

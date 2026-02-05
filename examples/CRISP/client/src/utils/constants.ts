@@ -8,3 +8,6 @@ export const ROUND_TOKEN = import.meta.env.VITE_CRISP_TOKEN
 export const ROUND_REQUESTERS = import.meta.env.VITE_E3_REQUESTERS
   ? import.meta.env.VITE_E3_REQUESTERS.split(',').map((s: string) => s.trim())
   : []
+
+// This CRISP app always has 2 options only
+export const NUM_OPTIONS = 2

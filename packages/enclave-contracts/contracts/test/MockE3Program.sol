@@ -21,7 +21,8 @@ contract MockE3Program is IE3Program {
         uint256 e3Id,
         uint256,
         bytes calldata e3ProgramParams,
-        bytes calldata computeProviderParams
+        bytes calldata computeProviderParams,
+        bytes calldata
     ) external returns (bytes32) {
         require(
             computeProviderParams.length == 32,

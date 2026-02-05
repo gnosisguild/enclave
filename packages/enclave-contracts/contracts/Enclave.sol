@@ -263,7 +263,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3Id,
             seed,
             requestParams.e3ProgramParams,
-            requestParams.computeProviderParams
+            requestParams.computeProviderParams,
+            requestParams.customParams
         );
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId

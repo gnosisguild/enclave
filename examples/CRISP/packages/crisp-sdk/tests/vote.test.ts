@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { Vote } from '../src/types'
-import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, ZERO_VOTE, MASK_SIGNATURE } from '../src/constants'
-import { generateMerkleProof } from '../src/utils'
+import { SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE, MASK_SIGNATURE } from '../src/constants'
+import { generateMerkleProof, getZeroVote } from '../src/utils'
 import {
   decodeTally,
   generatePublicKey,
@@ -33,6 +33,8 @@ describe('Vote', () => {
   let e3Id: number
   let sdk: CrispSDK
 
+  const zeroVote = getZeroVote(2)
+
   const mockGetPreviousCiphertextResponse = () =>
     ({
       ok: true,
@@ -55,14 +57,14 @@ describe('Vote', () => {
 
   // Setup the test environment.
   beforeAll(async () => {
-    vote = { yes: 10n, no: 0n }
+    vote = [10n, 0n]
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
     balance = 100n
     address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
     // Address of the last leaf in the Merkle tree, used for mask votes.
     slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
     publicKey = generatePublicKey()
-    previousCiphertext = encryptVote(ZERO_VOTE, publicKey)
+    previousCiphertext = encryptVote(zeroVote, publicKey)
     e3Id = 0
     sdk = new CrispSDK(CRISP_SERVER_URL)
   })
@@ -72,39 +74,82 @@ describe('Vote', () => {
       const tally =
         '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000300000000000000000000000000000003000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000030000000000000003000000000000000300000000000000030000000000000003000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
 
-      const decoded = decodeTally(tally)
+      const decoded = decodeTally(tally, 2)
 
-      expect(decoded.yes).toBe(10000000000n)
-      expect(decoded.no).toBe(30000000000n)
+      expect(decoded[0]).toBe(10000000000n)
+      expect(decoded[1]).toBe(30000000000n)
     })
   })
 
   describe('encodeVote', () => {
-    const decodeHalf = (encoded: BigInt64Array, isFirstHalf: boolean): number => {
-      const halfLength = encoded.length / 2
-      const half = Array.from(isFirstHalf ? encoded.slice(0, halfLength) : encoded.slice(halfLength))
-      const binaryString = half.map((b) => b.toString()).join('')
+    const decodeSegment = (encoded: BigInt64Array, segmentIndex: number, numChoices: number): bigint => {
+      const segmentSize = Math.floor(encoded.length / numChoices)
+      const start = segmentIndex * segmentSize
+      const segment = Array.from(encoded.slice(start, start + segmentSize))
+      const binaryString = segment.map((b) => b.toString()).join('')
       const trimmedBinary = binaryString.replace(/^0+/, '') || '0'
-      return parseInt(trimmedBinary, 2)
+      return BigInt('0b' + trimmedBinary)
     }
 
-    it('Should encode yes vote correctly in the first half', () => {
-      const encoded = encodeVote({ yes: 10n, no: 2n })
-
-      expect(decodeHalf(encoded, true)).toBe(10)
-      expect(decodeHalf(encoded, false)).toBe(2)
+    it('Should fail when the number of choices is less than 2', () => {
+      expect(() => encodeVote([10n])).toThrow('Vote must have at least two choices')
+      expect(() => encodeVote([])).toThrow('Vote must have at least two choices')
     })
 
-    it('Should encode no vote correctly in the second half', () => {
-      const encoded = encodeVote({ yes: 0n, no: 5n })
+    it('Should encode votes correctly with 2 choices', () => {
+      const encoded = encodeVote([10n, 2n])
 
-      expect(decodeHalf(encoded, false)).toBe(5)
+      expect(decodeSegment(encoded, 0, 2)).toBe(10n)
+      expect(decodeSegment(encoded, 1, 2)).toBe(2n)
+    })
+
+    it('Should encode zero votes correctly', () => {
+      const encoded = encodeVote([0n, 5n])
+
+      expect(decodeSegment(encoded, 0, 2)).toBe(0n)
+      expect(decodeSegment(encoded, 1, 2)).toBe(5n)
     })
 
     it('Should only contain binary digits (0 or 1)', () => {
-      const encoded = encodeVote({ yes: 255n, no: 128n })
+      const encoded = encodeVote([255n, 128n])
 
-      expect(Array.from(encoded).every((b) => b >= 0n && b <= 1n)).toBe(true)
+      expect(Array.from(encoded).every((b) => b === 0n || b === 1n)).toBe(true)
+    })
+
+    it('Should encode votes correctly with 3 choices', () => {
+      const encoded = encodeVote([10n, 2n, 3n])
+
+      expect(decodeSegment(encoded, 0, 3)).toBe(10n)
+      expect(decodeSegment(encoded, 1, 3)).toBe(2n)
+      expect(decodeSegment(encoded, 2, 3)).toBe(3n)
+    })
+
+    it('Should encode votes correctly with 5 choices', () => {
+      const encoded = encodeVote([100n, 50n, 25n, 10n, 5n])
+
+      expect(decodeSegment(encoded, 0, 5)).toBe(100n)
+      expect(decodeSegment(encoded, 1, 5)).toBe(50n)
+      expect(decodeSegment(encoded, 2, 5)).toBe(25n)
+      expect(decodeSegment(encoded, 3, 5)).toBe(10n)
+      expect(decodeSegment(encoded, 4, 5)).toBe(5n)
+    })
+
+    it('Should handle remainder bits correctly for odd number of choices', () => {
+      // With 3 choices, there will be remainder bits at the end
+      const encoded = encodeVote([1n, 1n, 1n])
+
+      // All segments should decode correctly
+      expect(decodeSegment(encoded, 0, 3)).toBe(1n)
+      expect(decodeSegment(encoded, 1, 3)).toBe(1n)
+      expect(decodeSegment(encoded, 2, 3)).toBe(1n)
+
+      // Remainder bits (if any) should be zero
+      const segmentSize = Math.floor(encoded.length / 3)
+      const remainder = encoded.length - segmentSize * 3
+      if (remainder > 0) {
+        const remainderBits = Array.from(encoded.slice(segmentSize * 3))
+        expect(remainderBits.every((b) => b === 0n)).toBe(true)
+      }
     })
   })
 
@@ -143,7 +188,7 @@ describe('Vote', () => {
         balance,
         slotAddress,
         merkleProof,
-        vote: ZERO_VOTE,
+        vote: zeroVote,
         signature: MASK_SIGNATURE,
         messageHash: SIGNATURE_MESSAGE_HASH,
         previousCiphertext,
@@ -163,7 +208,7 @@ describe('Vote', () => {
       const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
 
       const { crispInputs } = await generateCircuitInputs({
-        vote: ZERO_VOTE,
+        vote: zeroVote,
         publicKey,
         signature: MASK_SIGNATURE,
         messageHash: SIGNATURE_MESSAGE_HASH,
@@ -215,6 +260,7 @@ describe('Vote', () => {
         publicKey,
         merkleLeaves: LEAVES,
         e3Id: 0,
+        numOptions: 2,
       })
 
       expect(proof).toBeDefined()
@@ -237,6 +283,7 @@ describe('Vote', () => {
         publicKey,
         merkleLeaves: LEAVES,
         e3Id: 0,
+        numOptions: 2,
       })
 
       expect(proof).toBeDefined()

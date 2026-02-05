@@ -56,10 +56,7 @@ export interface VoteStateLite {
   emojis: [string, string]
 }
 
-export interface Vote {
-  yes: bigint
-  no: bigint
-}
+export type Vote = bigint[]
 
 export interface EligibleVoter {
   address: string

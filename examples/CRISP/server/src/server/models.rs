@@ -143,6 +143,7 @@ pub struct ComputeProviderParams {
 pub struct CustomParams {
     pub token_address: String,
     pub balance_threshold: String,
+    pub num_options: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -183,6 +184,7 @@ pub struct E3StateLite {
 
     pub token_address: String,
     pub balance_threshold: String,
+    pub num_options: String,
 
     pub requester: String,
 }
@@ -239,6 +241,7 @@ pub struct E3Crisp {
     pub balance_threshold: String,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub requester: String,
+    pub num_options: String,
 }
 
 impl From<E3> for WebResultRequest {
