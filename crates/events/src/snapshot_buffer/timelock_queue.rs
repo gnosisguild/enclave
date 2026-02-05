@@ -11,7 +11,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 use super::batch_router::FlushSeq;
 
@@ -124,10 +124,12 @@ impl Actor for TimelockQueue {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let Some(interval) = self.interval else {
+            debug!("TimelockQueue in manual mode - will tick when requested.");
             return;
         };
 
         // Send Tick to self every second
+        debug!("TimelockQueue is ticking every {}", interval);
         ctx.run_interval(Duration::from_secs(interval), |_, ctx| {
             ctx.address().do_send(Tick);
         });
@@ -137,7 +139,7 @@ impl Actor for TimelockQueue {
 impl Handler<StartTimelock> for TimelockQueue {
     type Result = ();
     fn handle(&mut self, msg: StartTimelock, _: &mut Self::Context) -> Self::Result {
-        debug!("START TIMELOCK: {:?}", msg.delay);
+        debug!("Start timelock: {:?}", msg.delay);
         let expiry = msg.now + msg.delay;
         self.timelocks.push(Reverse(Timelock::new(expiry, msg.seq)));
     }
@@ -171,9 +173,12 @@ impl Handler<Tick> for TimelockQueue {
 #[cfg(test)]
 pub mod mock_clock {
 
-    use std::sync::{
-        atomic::{AtomicU64, Ordering as AtomicOrdering},
-        Arc,
+    use std::{
+        sync::{
+            atomic::{AtomicU64, Ordering as AtomicOrdering},
+            Arc,
+        },
+        time::Duration,
     };
 
     use super::Clock;
@@ -190,12 +195,14 @@ pub mod mock_clock {
             }
         }
 
-        pub fn set(&self, time: u64) {
-            self.current_time.store(time, AtomicOrdering::SeqCst);
+        pub fn set(&self, time: Duration) {
+            self.current_time
+                .store(time.as_micros() as u64, AtomicOrdering::SeqCst);
         }
 
-        pub fn advance(&self, micros: u64) {
-            self.current_time.fetch_add(micros, AtomicOrdering::SeqCst);
+        pub fn advance(&self, micros: Duration) {
+            self.current_time
+                .fetch_add(micros.as_micros() as u64, AtomicOrdering::SeqCst);
         }
     }
 
@@ -280,7 +287,7 @@ mod tests {
             .unwrap();
 
         // Advance clock past expiry
-        clock.set(2500);
+        clock.set(Duration::from_millis(2500));
 
         // Now tick should flush
         queue.send(Tick).await.unwrap();
@@ -308,7 +315,7 @@ mod tests {
             .unwrap();
 
         // Set clock to exact expiry time
-        clock.set(2000);
+        clock.set(Duration::from_millis(2000));
 
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;
@@ -336,7 +343,7 @@ mod tests {
             .unwrap();
 
         // Set clock to 1 microsecond before expiry
-        clock.set(1999);
+        clock.set(Duration::from_millis(1999));
 
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;
@@ -370,7 +377,7 @@ mod tests {
             .unwrap(); // expires at 3000
 
         // Advance to 1500 - only first should expire
-        clock.set(1500);
+        clock.set(Duration::from_millis(1500));
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;
 
@@ -381,7 +388,7 @@ mod tests {
         }
 
         // Advance to 2500 - second should expire
-        clock.set(2500);
+        clock.set(Duration::from_millis(2500));
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;
 
@@ -392,7 +399,7 @@ mod tests {
         }
 
         // Advance to 5000 - third should expire
-        clock.set(5000);
+        clock.set(Duration::from_millis(5000));
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;
 
@@ -419,7 +426,7 @@ mod tests {
             .unwrap();
 
         // Use advance instead of set
-        clock.advance(600); // Now at 1600, expiry is 1500
+        clock.advance(Duration::from_millis(600)); // Now at 1600, expiry is 1500
 
         queue.send(Tick).await.unwrap();
         sleep(Duration::from_millis(10)).await;

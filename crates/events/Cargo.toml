@@ -38,4 +38,5 @@ test-helpers = [] # ensure test-helpers is available for integration tests
 proptest = { workspace = true }
 e3-events = { workspace = true, features = ["test-helpers"] }
 e3-data = { workspace = true }
+e3-test-helpers = { workspace = true }
 e3-ciphernode-builder = { workspace = true }

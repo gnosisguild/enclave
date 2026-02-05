@@ -9,21 +9,24 @@ use std::{collections::HashMap, time::Duration};
 /// Central configuration for aggregates in the WriteBuffer
 #[derive(Debug, Clone)]
 pub struct AggregateConfig {
-    pub delays: HashMap<AggregateId, u64>,
+    pub delays: HashMap<AggregateId, Duration>,
 }
 
 impl AggregateConfig {
     pub fn get_delay(&self, id: &AggregateId) -> Duration {
-        Duration::from_secs(self.delays.get(id).cloned().unwrap_or(0))
+        self.delays
+            .get(id)
+            .cloned()
+            .unwrap_or(Duration::from_micros(0))
     }
 }
 
 impl AggregateConfig {
     /// Create a new AggregateConfig with the specified delays
-    pub fn new(mut delays: HashMap<AggregateId, u64>) -> Self {
+    pub fn new(mut delays: HashMap<AggregateId, Duration>) -> Self {
         // Always handle AggregatId of 0 with a delay of 0
         if let None = delays.get(&AggregateId::new(0)) {
-            delays.insert(AggregateId::new(0), 0);
+            delays.insert(AggregateId::new(0), Duration::from_micros(0));
         }
         Self { delays }
     }

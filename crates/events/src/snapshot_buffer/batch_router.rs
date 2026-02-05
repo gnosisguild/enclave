@@ -15,7 +15,7 @@ use crate::{
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Context;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 
 type Seq = u64;
 
@@ -101,7 +101,7 @@ impl Handler<Insert> for BatchRouter {
             // Route to existing batch, or fall back to disk
             match self.batches.get(&ctx.seq()) {
                 Some(batch) => {
-                    debug!("Forwarding to batch for seq={}", ctx.seq());
+                    debug!("Forwarding to batch actor for seq={}", ctx.seq());
                     batch.try_send(msg)?;
                 }
                 // This must mean that this insert is late

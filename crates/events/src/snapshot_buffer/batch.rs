@@ -6,6 +6,7 @@
 use std::mem::replace;
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, Recipient};
+use tracing::debug;
 
 use crate::{trap, Die, EType, Insert, InsertBatch, PanicDispatcher};
 
@@ -46,7 +47,9 @@ impl Handler<Flush> for Batch {
     fn handle(&mut self, _: Flush, ctx: &mut Self::Context) -> Self::Result {
         let inserts = replace(&mut self.inserts, Vec::new());
         trap(EType::IO, &PanicDispatcher::new(), || {
-            self.db.try_send(InsertBatch::new(inserts))?;
+            if inserts.len() > 0 {
+                self.db.try_send(InsertBatch::new(inserts))?;
+            }
             ctx.notify(Die);
             Ok(())
         })

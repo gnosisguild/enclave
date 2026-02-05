@@ -29,6 +29,7 @@ use e3_sortition::{
 };
 use e3_sync::Synchronizer;
 use e3_utils::{rand_eth_addr, SharedRng};
+use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -525,17 +526,17 @@ fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
 }
 
 /// Build delay configuration for a specific chain
-fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, u64) {
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, Duration) {
     let aggregate_id = AggregateId::from_chain_id(Some(actual_chain_id));
     let finalization_ms = chain.finalization_ms.unwrap_or(0);
     let delay_us = finalization_ms * 1000; // ms → microseconds
-    (aggregate_id, delay_us)
+    (aggregate_id, Duration::from_micros(delay_us))
 }
 
 /// Build delays configuration from chain providers
 fn create_aggregate_delays(
     chain_providers: &[(ChainConfig, u64)],
-) -> Result<HashMap<AggregateId, u64>> {
+) -> Result<HashMap<AggregateId, Duration>> {
     let mut delays = HashMap::new();
 
     for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
