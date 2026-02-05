@@ -173,16 +173,20 @@ impl Computation for Bounds {
         let n = BigInt::from(threshold_params.degree());
         let ctx = threshold_params.ctx_at_level(0)?;
 
-        // CBD bound
         let cbd_bound = (threshold_params.variance() * 2) as u64;
 
         let sk_bound = SecretKey::sk_bound();
         let eek_bound = cbd_bound;
 
+        let defaults = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("missing search defaults".to_string()))?;
+        let num_ciphertexts = defaults.z;
+
         let smudging_config = SmudgingBoundCalculatorConfig::new(
             threshold_params.clone(),
             input.n,
-            1, // We set it to 1 as we only need one ciphertext for public key generation
+            num_ciphertexts as usize,
             preset.metadata().lambda,
         );
         let smudging_calculator = SmudgingBoundCalculator::new(smudging_config);

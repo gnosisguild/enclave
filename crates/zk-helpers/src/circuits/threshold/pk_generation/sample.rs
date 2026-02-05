@@ -41,14 +41,21 @@ impl PkGenerationCircuitInput {
         let num_parties = committee.n;
         let threshold = committee.threshold;
         let preset_metadata = preset.metadata();
-        let num_ciphertexts = 1; // We only need one ciphertext for public key generation.
+
+        let defaults = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("missing search defaults".to_string()))?;
+        let num_ciphertexts = defaults.z;
 
         let trbfv = TRBFV::new(num_parties, threshold, threshold_params.clone())?;
         let share_manager = ShareManager::new(num_parties, threshold, threshold_params);
 
         // Generate smudging error coefficients
-        let esi_coeffs =
-            trbfv.generate_smudging_error(num_ciphertexts, preset_metadata.lambda, &mut rng)?;
+        let esi_coeffs = trbfv.generate_smudging_error(
+            num_ciphertexts as usize,
+            preset_metadata.lambda,
+            &mut rng,
+        )?;
 
         // Convert to polynomial in RNS representation
         // bigints_to_poly returns Zeroizing<Poly>, we need to clone the inner Poly
