@@ -51,24 +51,25 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
 
   // Each choice gets floor(degree/n) bits; remaining bits stay zero
   const segmentSize = Math.floor(degree / n)
+  const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
+  const maxValue = (1n << BigInt(maxBits)) - 1n
   const voteArray: string[] = []
 
   for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
     const value = choiceIdx < vote.length ? vote[choiceIdx] : 0n
-    const binary = toBinary(value).split('')
 
-    if (binary.length > segmentSize) {
-      throw new Error(`Vote value for choice ${choiceIdx} exceeds segment size (${segmentSize} bits)`)
+    if (value > maxValue) {
+      throw new Error(`Vote value for choice ${choiceIdx} exceeds maximum (${maxValue})`)
     }
 
-    // Fill segment with binary representation (pad with leading 0s)
+    const binary = toBinary(value).split('')
+
     for (let i = 0; i < segmentSize; i += 1) {
       const offset = segmentSize - binary.length
       voteArray.push(i < offset ? '0' : binary[i - offset])
     }
   }
 
-  // Fill remaining bits with zeros
   const remainder = degree - segmentSize * n
   for (let i = 0; i < remainder; i++) {
     voteArray.push('0')
