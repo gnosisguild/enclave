@@ -343,10 +343,10 @@ mod tests {
             .unwrap();
 
         // Set clock to 1 microsecond before expiry
-        clock.set(Duration::from_millis(1999));
+        clock.set(Duration::from_micros(1999));
 
         queue.send(Tick).await.unwrap();
-        sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_micros(10)).await;
 
         // Should NOT flush
         assert!(received_seqs.lock().unwrap().is_empty());
@@ -377,9 +377,9 @@ mod tests {
             .unwrap(); // expires at 3000
 
         // Advance to 1500 - only first should expire
-        clock.set(Duration::from_millis(1500));
+        clock.set(Duration::from_micros(1500));
         queue.send(Tick).await.unwrap();
-        sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_micros(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
@@ -388,9 +388,9 @@ mod tests {
         }
 
         // Advance to 2500 - second should expire
-        clock.set(Duration::from_millis(2500));
+        clock.set(Duration::from_micros(2500));
         queue.send(Tick).await.unwrap();
-        sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_micros(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
@@ -399,9 +399,9 @@ mod tests {
         }
 
         // Advance to 5000 - third should expire
-        clock.set(Duration::from_millis(5000));
+        clock.set(Duration::from_micros(5000));
         queue.send(Tick).await.unwrap();
-        sleep(Duration::from_millis(10)).await;
+        sleep(Duration::from_micros(10)).await;
 
         {
             let seqs = received_seqs.lock().unwrap();
