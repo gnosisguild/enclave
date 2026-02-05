@@ -146,7 +146,7 @@ importers:
   examples/CRISP/client:
     dependencies:
       '@crisp-e3/sdk':
-        specifier: workspace:*
+        specifier: 0.5.9
         version: link:../packages/crisp-sdk
       '@emotion/babel-plugin':
         specifier: ^11.11.0
