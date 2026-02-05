@@ -36,7 +36,7 @@ contract MockEnclave {
       requester: address(0)
     });
 
-    IE3Program(program).validate(nextE3Id, 0, bytes(""), bytes(""), abi.encode(address(0), nextE3Id, 2));
+    IE3Program(program).validate(nextE3Id, 0, bytes(""), bytes(""), abi.encode(address(0), nextE3Id, 2, 0, 0));
 
     nextE3Id++;
   }

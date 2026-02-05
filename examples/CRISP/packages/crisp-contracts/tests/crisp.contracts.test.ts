@@ -18,7 +18,6 @@ import {
 } from '@crisp-e3/sdk'
 import { expect } from 'chai'
 import { deployCRISPProgram, deployHonkVerifier, deployMockEnclave, ethers } from './utils'
-import { AbiCoder } from 'ethers'
 
 let publicKey = generatePublicKey()
 
@@ -130,12 +129,6 @@ describe('CRISP Contracts', function () {
 
       // Call next functions with fake data for testing.
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
-
-      const encodedCustomParams = AbiCoder.defaultAbiCoder().encode(
-        ['address', 'uint256', 'uint256', 'uint256', 'uint256'],
-        [zeroAddress, 0, 2, 0, 1],
-      )
-      await crispProgram.validate(e3Id, 0n, '0x', '0x', encodedCustomParams)
 
       // If it doesn't throw, the test is successful.
       await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)
