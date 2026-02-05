@@ -78,29 +78,22 @@ export const encodeVote = (vote: Vote): BigInt64Array => {
 }
 
 /**
- * Decode bytes to numbers array (little-endian, 8 bytes per value).
+ * Decode bytes to bigint array (little-endian, 8 bytes per value).
+ * Uses BigInt to prevent precision loss for u64 values exceeding 2^53-1.
  * @param data The bytes to decode (must be multiple of 8).
- * @returns Array of numbers.
+ * @returns Array of bigints.
  */
-const decodeBytesToNumbers = (data: Uint8Array): number[] => {
+const decodeBytesToBigInts = (data: Uint8Array): bigint[] => {
   if (data.length % 8 !== 0) {
     throw new Error('Data length must be multiple of 8')
   }
 
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
   const arrayLength = data.length / 8
-  const result: number[] = []
+  const result: bigint[] = []
 
   for (let i = 0; i < arrayLength; i++) {
-    const offset = i * 8
-    let value = 0
-
-    // Read 8 bytes in little-endian order
-    for (let j = 0; j < 8; j++) {
-      const byteValue = data[offset + j]
-      value |= byteValue << (j * 8)
-    }
-
-    result.push(value)
+    result.push(view.getBigUint64(i * 8, true)) // true = little-endian
   }
 
   return result
@@ -115,26 +108,25 @@ const decodeBytesToNumbers = (data: Uint8Array): number[] => {
 export const decodeTally = (tallyBytes: string, numChoices: number): Vote => {
   const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
   const bytes = hexToBytes(hexString as Hex)
-  const numbers = decodeBytesToNumbers(bytes)
+  const values = decodeBytesToBigInts(bytes)
 
   if (numChoices <= 0) {
     throw new Error('Number of choices must be positive')
   }
 
-  const segmentSize = Math.floor(numbers.length / numChoices)
+  const segmentSize = Math.floor(values.length / numChoices)
   const effectiveSize = Math.min(segmentSize, MAX_VOTE_BITS)
   const results: Vote = []
 
   for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
     const segmentStart = choiceIdx * segmentSize
-    // Read only the last effectiveSize elements (where the value is, MSB first)
     const readStart = segmentStart + segmentSize - effectiveSize
-    const segment = numbers.slice(readStart, readStart + effectiveSize)
+    const segment = values.slice(readStart, readStart + effectiveSize)
 
     let value = 0n
     for (let i = 0; i < segment.length; i++) {
-      const weight = 2n ** BigInt(segment.length - 1 - i)
-      value += BigInt(segment[i]) * weight
+      const weight = 1n << BigInt(segment.length - 1 - i)
+      value += segment[i] * weight
     }
 
     results.push(value)
