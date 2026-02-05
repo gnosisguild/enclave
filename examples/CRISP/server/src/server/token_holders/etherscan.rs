@@ -574,75 +574,75 @@ impl EtherscanClient {
 
         Ok(token_holders)
     }
-}
 
-/// Get all token holders with a constant balance
-/// Returns all addresses that either have a token balance or have delegation,
-/// with their balance set to the provided constant value.
-/// No RPC verification - eligibility is based purely on log analysis.
-pub async fn get_token_holders_with_constant_balance(
-    &self,
-    token_address: Address,
-    snapshot_block: u64,
-    balance: U256,
-) -> Result<Vec<TokenHolder>> {
-    log::info!(
-        "Starting token holder discovery (constant balance) for {}",
-        token_address
-    );
+    /// Get all token holders with a constant balance
+    /// Returns all addresses that either have a token balance or have delegation,
+    /// with their balance set to the provided constant value.
+    /// No RPC verification - eligibility is based purely on log analysis.
+    pub async fn get_token_holders_with_constant_balance(
+        &self,
+        token_address: Address,
+        snapshot_block: u64,
+        balance: U256,
+    ) -> Result<Vec<TokenHolder>> {
+        log::info!(
+            "Starting token holder discovery (constant balance) for {}",
+            token_address
+        );
 
-    // Step 1: Determine starting block
-    let start_block = self
-        .get_deployment_block(&token_address.to_string())
-        .await
-        .context("Failed to get deployment block")?;
-    log::info!("Token deployed at block: {}", start_block);
+        // Step 1: Determine starting block
+        let start_block = self
+            .get_deployment_block(&token_address.to_string())
+            .await
+            .context("Failed to get deployment block")?;
+        log::info!("Token deployed at block: {}", start_block);
 
-    // Step 2: Fetch transfer logs
-    log::info!(
-        "Fetching transfer logs from block {} to {}...",
-        start_block,
-        snapshot_block
-    );
-    let transfer_logs = self
-        .get_transfer_logs(&token_address.to_string(), start_block, snapshot_block)
-        .await
-        .context("Failed to fetch transfer logs")?;
-    log::info!("Found {} transfer events", transfer_logs.len());
-
-    // Step 3: Fetch delegation logs
-    log::info!("Fetching delegation logs...");
-    let delegation_logs = self
-        .get_delegate_votes_changed_logs(
-            &token_address.to_string(),
+        // Step 2: Fetch transfer logs
+        log::info!(
+            "Fetching transfer logs from block {} to {}...",
             start_block,
-            snapshot_block,
-        )
-        .await
-        .context("Failed to fetch delegation logs")?;
-    log::info!("Found {} delegation events", delegation_logs.len());
+            snapshot_block
+        );
+        let transfer_logs = self
+            .get_transfer_logs(&token_address.to_string(), start_block, snapshot_block)
+            .await
+            .context("Failed to fetch transfer logs")?;
+        log::info!("Found {} transfer events", transfer_logs.len());
 
-    // Step 4: Identify potential voters
-    log::info!("Identifying potential voters...");
-    let potential_voters = self.get_potential_voters(&transfer_logs, &delegation_logs);
-    log::info!("Found {} potential voters", potential_voters.len());
+        // Step 3: Fetch delegation logs
+        log::info!("Fetching delegation logs...");
+        let delegation_logs = self
+            .get_delegate_votes_changed_logs(
+                &token_address.to_string(),
+                start_block,
+                snapshot_block,
+            )
+            .await
+            .context("Failed to fetch delegation logs")?;
+        log::info!("Found {} delegation events", delegation_logs.len());
 
-    // Step 5: Convert to token holders with constant balance
-    let token_holders: Vec<TokenHolder> = potential_voters
-        .into_iter()
-        .filter(|v| v.token_balance > U256::ZERO || v.has_delegation)
-        .map(|v| TokenHolder {
-            address: v.address.to_string(),
-            balance: balance.to_string(),
-        })
-        .collect();
+        // Step 4: Identify potential voters
+        log::info!("Identifying potential voters...");
+        let potential_voters = self.get_potential_voters(&transfer_logs, &delegation_logs);
+        log::info!("Found {} potential voters", potential_voters.len());
 
-    log::info!(
-        "Discovery complete: {} eligible addresses",
-        token_holders.len()
-    );
+        // Step 5: Convert to token holders with constant balance
+        let token_holders: Vec<TokenHolder> = potential_voters
+            .into_iter()
+            .filter(|v| v.token_balance > U256::ZERO || v.has_delegation)
+            .map(|v| TokenHolder {
+                address: v.address.to_string(),
+                balance: balance.to_string(),
+            })
+            .collect();
 
-    Ok(token_holders)
+        log::info!(
+            "Discovery complete: {} eligible addresses",
+            token_holders.len()
+        );
+
+        Ok(token_holders)
+    }
 }
 
 /// Convenience function to get mocked token holder data for testing.

@@ -103,7 +103,7 @@ pub async fn initialize_crisp_round(
     let num_options = U256::from(2);
     // The credit mode is costant for the CRISP app (everyone gets the same credits)
     let credit_mode = U256::from(0);
-    // everyone gets 1 credit 
+    // everyone gets 1 credit
     let credits = U256::from(1);
 
     // Serialize the custom parameters to bytes.

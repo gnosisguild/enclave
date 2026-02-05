@@ -4,10 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::models::CreditMode;
 use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
-    models::{CurrentRound, CustomParams},
+    models::{CreditMode, CurrentRound, CustomParams},
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     token_holders::{build_tree, compute_token_holder_hashes},
@@ -75,18 +74,19 @@ pub async fn register_e3_requested(
                 let decoded = <CustomParamsTuple as SolType>::abi_decode(&event.e3.customParams)
                     .with_context(|| "Failed to decode custom params from E3 event")?;
 
-                let credit_mode = decoded.3;
-                // If credit mode is constant, use the credits from the event. 
+                let credit_mode = CreditMode::try_from(decoded.3.to::<u64>())?;
                 let credits = match credit_mode {
-                    Uint256(0) => {
+                    CreditMode::Constant => {
                         info!("[e3_id={}] Credit mode: Constant", e3_id);
                         Some(decoded.4.to_string())
                     }
-                    Uint256(1) => {
+                    CreditMode::Custom => {
                         info!("[e3_id={}] Credit mode: Custom", e3_id);
-                        None()
+                        None
                     }
                 };
+
+                let credits_clone = credits.clone();
 
                 let custom_params = CustomParams {
                     token_address: decoded.0.to_string(),
@@ -103,10 +103,6 @@ pub async fn register_e3_requested(
                     .token_address
                     .parse()
                     .with_context(|| "Invalid token address")?;
-
-                // save the e3 details
-                repo.initialize_round(custom_params, e3.requester.to_string())
-                    .await?;
 
                 // Get token holders from Etherscan API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -127,14 +123,20 @@ pub async fn register_e3_requested(
 
                     match custom_params.credit_mode {
                         CreditMode::Constant => {
+                            let credits_str = credits_clone.expect("credits must be set for Constant mode");
+                            let credits_u256: alloy_primitives::Uint<256, 4> = U256::from_str_radix(&credits_str, 10)
+                            .map_err(|e| eyre::eyre!("Failed to parse credits: {}", e))?;
+
                             etherscan_client
                             .get_token_holders_with_constant_balance(
                                 token_address,
                                 // the block is the one before the request
                                 event.e3.requestBlock.to::<u64>() - 1u64,
-                                credits,
+                                credits_u256
                             )
-                        } 
+                            .await
+                            .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+                        }
                         CreditMode::Custom => {
                             etherscan_client
                             .get_token_holders_with_voting_power(
@@ -153,7 +155,7 @@ pub async fn register_e3_requested(
                                 )?,
                             )
                             .await
-                        .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+                            .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
                         }
                     }
                 };
@@ -166,6 +168,10 @@ pub async fn register_e3_requested(
                     )
                     .into());
                 }
+
+                // save the e3 details
+                repo.initialize_round(custom_params, e3.requester.to_string())
+                .await?;
 
                 // Store eligible addresses in the repository.
                 repo.set_eligible_addresses(token_holders.clone())

@@ -277,8 +277,20 @@ pub struct TokenHolder {
 /// Defines the mode of credit assignment for voters.
 /// - `Constant`: All voters receive the same credit regardless of their token balance.
 /// - `Custom`: Voters receive credit proportional to their token balance, with a specified threshold.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum CreditMode {
     Constant = 0,
-    Custom = 1
+    Custom = 1,
+}
+
+impl TryFrom<u64> for CreditMode {
+    type Error = eyre::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(CreditMode::Constant),
+            1 => Ok(CreditMode::Custom),
+            _ => Err(eyre::eyre!("Unknown credit mode: {}", value)),
+        }
+    }
 }
