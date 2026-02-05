@@ -229,6 +229,6 @@ export type VoteProofRequest = {
  * the credits can vary based on certain criteria (e.g., voter balance).
  */
 export enum CreditMode {
-  CONSTANT = '0',
-  CUSTOM = '1',
+  CONSTANT = 0,
+  CUSTOM = 1,
 }
