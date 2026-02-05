@@ -262,7 +262,7 @@ impl Computation for Witness {
         cyclo[n as usize] = BigInt::from(1u64); // x^0 term
 
         // Perform the main computation logic
-        let results: Vec<(
+        let mut results: Vec<(
             usize,
             Polynomial,
             Polynomial,
@@ -370,6 +370,8 @@ impl Computation for Witness {
             },
         )
         .collect();
+
+        results.sort_by_key(|(i, _, _, _, _, _)| *i);
 
         let mut r2 = CrtPolynomial::new(vec![]);
         let mut r1 = CrtPolynomial::new(vec![]);
