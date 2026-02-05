@@ -225,7 +225,7 @@ async fn create_placeholder_circuits(circuits_dir: &Path) -> Result<(), ZkError>
         },"expression_width":{"Bounded":{"width":4}}
     });
 
-    let circuit_path = circuits_dir.join("pk_bfv.json");
+    let circuit_path = circuits_dir.join("pk.json");
     fs::write(&circuit_path, serde_json::to_string_pretty(&placeholder)?).await?;
 
     fs::create_dir_all(circuits_dir.join("vk")).await?;

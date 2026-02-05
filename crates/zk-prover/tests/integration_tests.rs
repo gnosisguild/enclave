@@ -150,7 +150,20 @@ async fn test_download_circuits() {
     assert!(result.is_ok(), "download_circuits failed: {:?}", result);
 
     // Should have at least the placeholder circuit
-    assert!(backend.circuits_dir.join("pk_bfv.json").exists());
+    assert!(backend
+        .circuits_dir
+        .join("circuits")
+        .join("dkg")
+        .join("pk")
+        .join("pk.json")
+        .exists());
+    assert!(backend
+        .circuits_dir
+        .join("circuits")
+        .join("dkg")
+        .join("pk")
+        .join("pk.vk")
+        .exists());
 
     let temp_path = temp.path().to_path_buf();
     drop(temp);

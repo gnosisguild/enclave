@@ -51,7 +51,7 @@ pub enum CircuitName {
 impl CircuitName {
     pub fn as_str(&self) -> &'static str {
         match self {
-            CircuitName::PkBfv => "pk_bfv",
+            CircuitName::PkBfv => "pk",
             CircuitName::PkTrbfv => "pk_trbfv",
             CircuitName::EncShares => "enc_shares",
             CircuitName::DecShares => "dec_shares",

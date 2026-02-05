@@ -77,14 +77,14 @@ async fn test_pk_bfv_proof_generation() {
     let fixtures = fixtures_dir();
 
     fs::copy(
-        fixtures.join("pk_bfv.json"),
-        backend.circuits_dir.join("pk_bfv.json"),
+        fixtures.join("pk.json"),
+        backend.circuits_dir.join("pk.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_bfv.vk"),
-        backend.circuits_dir.join("vk").join("pk_bfv.vk"),
+        fixtures.join("pk.vk"),
+        backend.circuits_dir.join("vk").join("pk.vk"),
     )
     .await
     .unwrap();
@@ -123,14 +123,14 @@ async fn test_pk_bfv_proof_verification() {
     let fixtures = fixtures_dir();
 
     fs::copy(
-        fixtures.join("pk_bfv.json"),
-        backend.circuits_dir.join("pk_bfv.json"),
+        fixtures.join("pk.json"),
+        backend.circuits_dir.join("pk.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_bfv.vk"),
-        backend.circuits_dir.join("vk").join("pk_bfv.vk"),
+        fixtures.join("pk.vk"),
+        backend.circuits_dir.join("vk").join("pk.vk"),
     )
     .await
     .unwrap();
@@ -170,14 +170,14 @@ async fn test_pk_bfv_commitment_consistency() {
     let fixtures = fixtures_dir();
 
     fs::copy(
-        fixtures.join("pk_bfv.json"),
-        backend.circuits_dir.join("pk_bfv.json"),
+        fixtures.join("pk.json"),
+        backend.circuits_dir.join("pk.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_bfv.vk"),
-        backend.circuits_dir.join("vk").join("pk_bfv.vk"),
+        fixtures.join("pk.vk"),
+        backend.circuits_dir.join("vk").join("pk.vk"),
     )
     .await
     .unwrap();

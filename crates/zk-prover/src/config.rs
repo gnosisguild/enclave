@@ -17,7 +17,7 @@ const VERSIONS_MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/zk-prover/versions.json";
 
 const BB_VERSION: &str = "3.0.2";
-const CIRCUITS_VERSION: &str = "0.1.0";
+const CIRCUITS_VERSION: &str = "0.1.9";
 
 /// Supported bb binary targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -82,7 +82,7 @@ impl Default for ZkConfig {
     fn default() -> Self {
         Self {
             bb_download_url: "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz".to_string(),
-            circuits_download_url: "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits.tar.gz".to_string(),
+            circuits_download_url: "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits-{version}.tar.gz".to_string(),
             bb_checksums: HashMap::new(),
             circuits_checksums: HashMap::new(),
             required_bb_version: BB_VERSION.to_string(),
@@ -223,13 +223,6 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-
-    fn sha256_hex(data: &[u8]) -> String {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        hex::encode(hasher.finalize())
-    }
 
     // BbTarget tests
     #[test]

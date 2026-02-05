@@ -38,7 +38,7 @@ fn test_witness_generation_wrong_sum_fails() {
 #[test]
 fn test_compiled_circuit_from_fixture() {
     let fixtures = fixtures_dir();
-    let circuit = CompiledCircuit::from_file(&fixtures.join("pk_bfv.json")).unwrap();
+    let circuit = CompiledCircuit::from_file(&fixtures.join("pk.json")).unwrap();
 
     assert!(
         !circuit.abi.parameters.is_empty(),

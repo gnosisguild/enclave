@@ -1,6 +1,6 @@
 {
   "required_bb_version": "3.0.2",
-  "required_circuits_version": "0.1.0",
+  "required_circuits_version": "0.1.9",
   "bb_download_url": "https://github.com/AztecProtocol/aztec-packages/releases/download/v{version}/barretenberg-{arch}-{os}.tar.gz",
   "bb_checksums": {
     "amd64-linux": "a56257d8edc226180f5a7093393e4adc99447368a65099bb34292bd261408b99",
@@ -8,5 +8,5 @@
     "arm64-linux": "7c8d5f568aca6c10b61f5ed0c4b50e31c9d82dfdf0e19568322900cd6e3bf11e",
     "arm64-darwin": "406d4ab932059c19deeb95bf460c5ef7737af1e768c2c640ce68d9c0c9c7cb04"
   },
-  "circuits_download_url": "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits.tar.gz"
+  "circuits_download_url": "https://github.com/gnosisguild/enclave/releases/download/v{version}/circuits-{version}.tar.gz"
 }
