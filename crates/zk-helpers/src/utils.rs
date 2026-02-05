@@ -166,6 +166,19 @@ pub fn compute_pk_bit(params: &BfvParameters) -> u32 {
     calculate_bit_width(bound)
 }
 
+/// Computes the bit width of the message.
+///
+/// # Arguments
+/// * `params` - BFV parameters
+///
+/// # Returns
+/// The bit width of the message
+pub fn compute_msg_bit(params: &BfvParameters) -> u32 {
+    let t = BigInt::from(params.plaintext());
+    let bound = t.clone() - BigInt::from(1);
+    calculate_bit_width(bound)
+}
+
 /// Get the ZKP modulus as a BigInt.
 ///
 /// The ZKP modulus is the BN254 scalar field modulus:

@@ -76,18 +76,20 @@ mod tests {
     use crate::prepare_pk_sample_for_test;
     use crate::utils::compute_pk_bit;
 
-    use e3_fhe_params::{build_pair_for_preset, DEFAULT_BFV_PRESET};
+    use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
-        let sample =
-            prepare_pk_sample_for_test(DEFAULT_BFV_PRESET, CiphernodesCommitteeSize::Small);
+        let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let sample = prepare_pk_sample_for_test(
+            BfvPreset::InsecureThreshold512,
+            CiphernodesCommitteeSize::Small,
+        );
 
         let artifacts = PkCircuit
             .codegen(
-                DEFAULT_BFV_PRESET,
+                BfvPreset::InsecureThreshold512,
                 &PkCircuitInput {
                     public_key: sample.dkg_public_key,
                 },
@@ -130,10 +132,20 @@ mod tests {
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
         let pk_bit = compute_pk_bit(&dkg_params);
 
-        assert!(configs_content
-            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
-        assert!(configs_content
-            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "N: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().degree
+            )
+            .as_str()
+        ));
+        assert!(configs_content.contains(
+            format!(
+                "L: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().num_moduli
+            )
+            .as_str()
+        ));
         assert!(configs_content.contains(
             format!(
                 "{}_BIT_PK: u32 = {}",

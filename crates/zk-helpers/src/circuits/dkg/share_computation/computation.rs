@@ -269,7 +269,6 @@ mod tests {
     use crate::dkg::share_computation::ShareComputationCircuitInput;
     use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     fn share_computation_input_from_sample(
         sample: &ShareComputationSample,
@@ -294,8 +293,8 @@ mod tests {
         );
 
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
 
         assert_eq!(bits.bit_sk_secret, expected_sk_bits);
@@ -310,7 +309,7 @@ mod tests {
         );
 
         let input = share_computation_input_from_sample(&sample, DkgInputType::SmudgingNoise);
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
         let degree = witness.secret_crt.limb(0).coefficients().len();
         let num_moduli = witness.secret_crt.limbs.len();
         for coeff_idx in 0..degree {
@@ -335,7 +334,7 @@ mod tests {
         );
 
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

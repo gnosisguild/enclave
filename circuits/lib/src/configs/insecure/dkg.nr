@@ -71,22 +71,21 @@ pub global SHARE_COMPUTATION_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> 
 /************************************
 -------------------------------------
 share_encryption_sk (CIRCUIT 3a)
+share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------
 ************************************/
 
-// share_encryption_sk - bit parameters
-pub global SHARE_ENCRYPTION_BIT_PK: u32 = 51;
-pub global SHARE_ENCRYPTION_BIT_CT: u32 = 51;
-pub global SHARE_ENCRYPTION_BIT_U: u32 = 2;
-pub global SHARE_ENCRYPTION_BIT_E0: u32 = 4;
-pub global SHARE_ENCRYPTION_BIT_E1: u32 = 4;
-pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 37;
-pub global SHARE_ENCRYPTION_BIT_R1: u32 = 36;
-pub global SHARE_ENCRYPTION_BIT_R2: u32 = 51;
-pub global SHARE_ENCRYPTION_BIT_P1: u32 = 10;
-pub global SHARE_ENCRYPTION_BIT_P2: u32 = 51;
+pub global SHARE_ENCRYPTION_BIT_PK: u32 = 50;
+pub global SHARE_ENCRYPTION_BIT_CT: u32 = 50;
+pub global SHARE_ENCRYPTION_BIT_U: u32 = 1;
+pub global SHARE_ENCRYPTION_BIT_E0: u32 = 3;
+pub global SHARE_ENCRYPTION_BIT_E1: u32 = 3;
+pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 36;
+pub global SHARE_ENCRYPTION_BIT_R1: u32 = 35;
+pub global SHARE_ENCRYPTION_BIT_R2: u32 = 50;
+pub global SHARE_ENCRYPTION_BIT_P1: u32 = 9;
+pub global SHARE_ENCRYPTION_BIT_P2: u32 = 50;
 
-// share_encryption_sk - bounds
 pub global SHARE_ENCRYPTION_T: Field = 68719403009;
 pub global SHARE_ENCRYPTION_Q_MOD_T: Field = 2415755265;
 pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [1284838520228573];
@@ -101,7 +100,6 @@ pub global SHARE_ENCRYPTION_P1_BOUNDS: [Field; L] = [256];
 pub global SHARE_ENCRYPTION_P2_BOUNDS: [Field; L] = [1125899906777088];
 pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 68719403008;
 
-// share_encryption_sk - configs
 pub global SHARE_ENCRYPTION_CONFIGS_SK: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     SHARE_ENCRYPTION_T,
     SHARE_ENCRYPTION_Q_MOD_T,
@@ -119,14 +117,7 @@ pub global SHARE_ENCRYPTION_CONFIGS_SK: ShareEncryptionConfigs<L> = ShareEncrypt
     SHARE_ENCRYPTION_MSG_BOUND,
 );
 
-/************************************
--------------------------------------
-share_encryption_e_sm (CIRCUIT 3b)
--------------------------------------
-************************************/
-
-// share_encryption_e_sm uses the same bit parameters and bounds as share_encryption_sk
-pub global SHARE_ENCRYPTION_CONFIGS_E_SM: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
+pub global SHARE_ENCRYPTION_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     SHARE_ENCRYPTION_T,
     SHARE_ENCRYPTION_Q_MOD_T,
     QIS,

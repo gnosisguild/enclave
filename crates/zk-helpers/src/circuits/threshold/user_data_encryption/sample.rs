@@ -44,16 +44,16 @@ impl UserDataEncryptionSample {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_sample() {
-        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
+        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
 
         assert_eq!(sample.public_key.c.c.len(), 2);
         assert_eq!(
             sample.plaintext.value.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
     }
 }
