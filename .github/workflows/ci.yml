@@ -389,6 +389,9 @@ jobs:
           chmod +x target/debug/fake_encrypt
           chmod +x target/debug/pack_e3_params
           chmod +x ~/.cargo/bin/enclave
+      - name: 'Setup ZK prover'
+        run: |
+          enclave noir setup
       - name: 'Run ${{ matrix.test-suite }} tests'
         run: 'pnpm test:integration ${{ matrix.test-suite }} --no-prebuild'
       - name: 'Add test summary'
@@ -588,6 +591,10 @@ jobs:
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/enclave
+
+      - name: Setup ZK prover
+        run: |
+          enclave noir setup
 
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
@@ -792,6 +799,9 @@ jobs:
         run: |
           chmod +x ~/.cargo/bin/enclave
           chmod +x templates/default/target/debug/e3-support-scripts-dev
+      - name: Setup ZK prover
+        run: |
+          enclave noir setup
       - name: Verify downloaded artifacts
         run: |
           echo "Checking downloaded artifacts:"
