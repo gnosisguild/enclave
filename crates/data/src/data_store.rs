@@ -174,12 +174,13 @@ impl DataStore {
 
     pub fn from_sled_store_with_buffer(
         addr: &Addr<SledStore>,
-        write_buffer: impl Into<Recipient<Insert>>,
+        snapshot_buffer: impl Into<Recipient<Insert>>,
     ) -> Self {
+        println!("from_sled_store_with_buffer...");
         Self {
             addr: StoreAddr::Sled(addr.clone()),
             get: addr.clone().recipient(),
-            insert: write_buffer.into(),
+            insert: snapshot_buffer.into(),
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
@@ -188,12 +189,12 @@ impl DataStore {
 
     pub fn from_in_mem_with_buffer(
         addr: &Addr<InMemStore>,
-        write_buffer: impl Into<Recipient<Insert>>,
+        snapshot_buffer: impl Into<Recipient<Insert>>,
     ) -> Self {
         Self {
             addr: StoreAddr::InMem(addr.clone()),
             get: addr.clone().recipient(),
-            insert: write_buffer.into(),
+            insert: snapshot_buffer.into(),
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],

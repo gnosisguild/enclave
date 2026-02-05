@@ -35,6 +35,7 @@ use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
+use e3_utils::MAILBOX_LIMIT;
 use rand::Rng;
 use tracing::error;
 use tracing::info;
@@ -93,6 +94,9 @@ impl Multithread {
 
 impl Actor for Multithread {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for Multithread {

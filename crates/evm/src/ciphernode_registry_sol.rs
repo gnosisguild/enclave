@@ -23,7 +23,7 @@ use e3_events::{
     EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, PublicKeyAggregated,
     Seed, Shutdown, TicketGenerated, TicketId,
 };
-use e3_utils::NotifySync;
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use tracing::{error, info, trace};
 
 sol!(
@@ -279,6 +279,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
 
 impl<P: Provider + WalletProvider + Clone + 'static> Actor for CiphernodeRegistrySolWriter<P> {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>

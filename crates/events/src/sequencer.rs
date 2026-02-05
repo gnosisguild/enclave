@@ -10,7 +10,7 @@ use crate::{
 };
 use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
 use anyhow::Result;
-use e3_utils::major_issue;
+use e3_utils::{major_issue, MAILBOX_LIMIT_LARGE};
 
 /// Component to sequence the storage of events
 pub struct Sequencer {
@@ -42,6 +42,9 @@ impl Sequencer {
 
 impl Actor for Sequencer {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {

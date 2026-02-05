@@ -20,9 +20,12 @@ use e3_events::{
     EncryptionKeyCreated, Event, EventContext, EventType, Filter, PartyId,
     PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
 };
-use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
 use e3_utils::NotifySync;
+use e3_utils::{
+    retry::{retry_with_backoff, to_retry},
+    MAILBOX_LIMIT,
+};
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -132,6 +135,9 @@ impl DocumentPublisher {
 
 impl Actor for DocumentPublisher {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvent> for DocumentPublisher {

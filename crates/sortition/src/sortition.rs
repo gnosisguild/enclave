@@ -17,7 +17,7 @@ use e3_events::{
     PlaintextOutputPublished, Seed, TicketBalanceUpdated, TypedEvent,
 };
 use e3_events::{BusHandle, E3id, EnclaveEventData};
-use e3_utils::NotifySync;
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -352,6 +352,9 @@ impl Sortition {
 
 impl Actor for Sortition {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for Sortition {

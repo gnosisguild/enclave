@@ -6,6 +6,7 @@
 
 use actix::{Actor, Handler};
 use e3_events::{hlc::HlcTimestamp, EnclaveEventData};
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 use crate::{
@@ -20,6 +21,9 @@ pub struct EvmParser {
 
 impl Actor for EvmParser {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl EvmParser {

@@ -6,6 +6,7 @@
 
 use actix::prelude::*;
 use anyhow::Result;
+use e3_utils::MAILBOX_LIMIT;
 use std::marker::PhantomData;
 use tracing::error;
 
@@ -40,6 +41,9 @@ where
     M: Message<Result = ()> + 'static + Unpin,
 {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<F, M> Handler<M> for OneShotRunner<F, M>

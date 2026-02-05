@@ -12,9 +12,9 @@ use crate::{
 use crate::{CorrelationId, GetEventsAfterResponse};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
-use e3_utils::major_issue;
+use e3_utils::{major_issue, MAILBOX_LIMIT};
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{error, info};
 
 pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
     stores: HashMap<AggregateId, Addr<EventStore<I, L>>>,
@@ -22,14 +22,17 @@ pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
 
 impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     pub fn new(stores: HashMap<usize, Addr<EventStore<I, L>>>) -> Self {
+        info!("Making eventstore router...");
         let stores = stores
             .into_iter()
             .map(|(index, addr)| (AggregateId::new(index), addr))
             .collect();
+
         Self { stores }
     }
 
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
+        info!("Handling store event requested....");
         let aggregate_id = msg.event.aggregate_id();
 
         let store_addr = self.stores.get(&aggregate_id).unwrap_or_else(|| {
@@ -42,7 +45,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         let sender = msg.sender;
 
         let forwarded_msg = StoreEventRequested::new(event, sender);
-        store_addr.do_send(forwarded_msg);
+        store_addr.try_send(forwarded_msg)?;
         Ok(())
     }
 
@@ -60,6 +63,10 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreRouter<I, L> {

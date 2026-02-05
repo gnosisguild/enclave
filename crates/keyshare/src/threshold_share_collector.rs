@@ -15,6 +15,7 @@ use e3_events::{
     E3id, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_trbfv::PartyId;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
 use crate::{AllThresholdSharesCollected, ThresholdKeyshare};
@@ -65,6 +66,7 @@ impl Actor for ThresholdShareCollector {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
         info!(
             e3_id = %self.e3_id,
             "ThresholdShareCollector started, scheduling timeout in {:?}",

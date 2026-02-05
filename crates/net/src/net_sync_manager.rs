@@ -11,7 +11,7 @@ use e3_events::{
     EnclaveEventData, GetAggregateEventsAfter, GetEventsAfterResponse, NetSyncEventsReceived,
     OutgoingSyncRequested, TypedEvent, Unsequenced,
 };
-use e3_utils::{retry_with_backoff, to_retry, OnceTake};
+use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
 use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -83,6 +83,9 @@ impl NetSyncManager {
 
 impl Actor for NetSyncManager {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 /// Event broadcast from event bus

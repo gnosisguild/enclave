@@ -9,6 +9,7 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::error;
 
 use crate::{
@@ -412,6 +413,9 @@ where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>

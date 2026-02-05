@@ -6,6 +6,7 @@
 
 use actix::{Actor, Addr, Handler, Recipient};
 use e3_events::{EnclaveEvent, EnclaveEventData, Event, SyncStart};
+use e3_utils::MAILBOX_LIMIT;
 
 pub struct SyncStartExtractor {
     dest: Recipient<SyncStart>,
@@ -22,6 +23,9 @@ impl SyncStartExtractor {
 }
 impl Actor for SyncStartExtractor {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvent> for SyncStartExtractor {

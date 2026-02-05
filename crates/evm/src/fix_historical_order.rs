@@ -8,6 +8,7 @@ use crate::{EnclaveEvmEvent, EvmEventProcessor, HistoricalSyncComplete};
 use actix::{Actor, Addr, Handler};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 pub struct FixHistoricalOrder {
@@ -50,6 +51,9 @@ impl FixHistoricalOrder {
 
 impl Actor for FixHistoricalOrder {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::get_enclave_event_bus;
-use actix::{Actor, Addr, Recipient};
+use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::{anyhow, Result};
 use e3_data::{
     CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore, SledSequenceIndex,
@@ -15,12 +15,14 @@ use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
     EventStoreRouter, InsertBatch, Sequencer, SnapshotBuffer, StoreEventRequested,
+    UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
+use tracing::info;
 
 struct InMemBackend {
     eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
@@ -45,6 +47,7 @@ struct PersistedBackend {
 
 impl PersistedBackend {
     fn get_or_init_store(&self, handle: &BusHandle) -> Result<Addr<SledStore>> {
+        println!("get_or_init_store in {:?} ...", self.sled_path);
         self.store
             .get_or_try_init(|| SledStore::new(handle, &self.sled_path))
             .cloned()
@@ -91,6 +94,8 @@ pub struct EventSystem {
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
     eventstore_addrs: OnceCell<EventStoreAddrs>,
+    /// Whether to start the buffer straight away
+    start_buffer: bool,
 }
 
 impl EventSystem {
@@ -114,6 +119,7 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            start_buffer: false,
         }
     }
 
@@ -132,6 +138,7 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            start_buffer: false,
         }
     }
 
@@ -152,6 +159,7 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
+            start_buffer: false,
         }
     }
 
@@ -181,8 +189,14 @@ impl EventSystem {
         self
     }
 
+    pub fn start_buffer_immediately(mut self) -> Self {
+        self.start_buffer = true;
+        self
+    }
+
     /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
+        info!("eventbus...");
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
     }
 
@@ -197,13 +211,11 @@ impl EventSystem {
     pub fn buffer(&self) -> Result<Addr<SnapshotBuffer>> {
         self.buffer
             .get_or_try_init(|| {
-                let store: Recipient<InsertBatch> = match &self.backend {
-                    EventSystemBackend::InMem(b) => b.get_or_init_store().into(),
-                    EventSystemBackend::Persisted(b) => {
-                        b.get_or_init_store(&self.handle()?)?.into()
-                    }
-                };
-                SnapshotBuffer::spawn(&self.aggregate_config(), store)
+                SnapshotBuffer::spawn(
+                    &self.aggregate_config(),
+                    NoopBatchReceiver::new().start(),
+                    self.start_buffer,
+                )
             })
             .cloned()
     }
@@ -291,8 +303,10 @@ impl EventSystem {
     pub fn persisted_eventstore_router(
         &self,
     ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
+        info!("persisted_eventstore_router...");
         let eventstores = self.eventstore_addrs()?;
         if let EventStoreAddrs::Persisted(addrs) = eventstores {
+            info!("creating router...");
             let router = EventStoreRouter::new(addrs);
             Ok(router.start())
         } else {
@@ -302,6 +316,7 @@ impl EventSystem {
 
     /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
+        info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
             EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
@@ -318,6 +333,7 @@ impl EventSystem {
 
     /// Get the BusHandle
     pub fn handle(&self) -> Result<BusHandle> {
+        println!("handle");
         self.handle
             .get_or_try_init(|| {
                 Ok(BusHandle::new(
@@ -331,22 +347,51 @@ impl EventSystem {
 
     /// Get the DataStore
     pub fn store(&self) -> Result<DataStore> {
-        match &self.backend {
-            EventSystemBackend::InMem(b) => Ok(DataStore::from_in_mem_with_buffer(
-                &b.get_or_init_store(),
-                self.buffer()?,
-            )),
-            EventSystemBackend::Persisted(b) => Ok(DataStore::from_sled_store_with_buffer(
-                &b.get_or_init_store(&self.handle()?)?,
-                self.buffer()?,
-            )),
-        }
+        println!("store()...");
+        let store = match &self.backend {
+            EventSystemBackend::InMem(b) => {
+                let base = b.get_or_init_store();
+                let buffer = self.buffer()?;
+                buffer.try_send(UpdateDestination::new(base.clone()))?;
+                DataStore::from_in_mem_with_buffer(&base, self.buffer()?)
+            }
+            EventSystemBackend::Persisted(b) => {
+                let base = b.get_or_init_store(&self.handle()?)?;
+                let buffer = self.buffer()?;
+                buffer.try_send(UpdateDestination::new(base))?;
+
+                DataStore::from_sled_store_with_buffer(
+                    &b.get_or_init_store(&self.handle()?)?,
+                    self.buffer()?,
+                )
+            }
+        };
+
+        Ok(store)
     }
 
     fn node_id(name: &str) -> u32 {
         let mut hasher = DefaultHasher::new();
         name.hash(&mut hasher);
         hasher.finish() as u32
+    }
+}
+
+struct NoopBatchReceiver;
+
+impl NoopBatchReceiver {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+impl Actor for NoopBatchReceiver {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<InsertBatch> for NoopBatchReceiver {
+    type Result = ();
+    fn handle(&mut self, msg: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+        // do nothing
     }
 }
 
@@ -357,6 +402,7 @@ mod tests {
     use e3_data::Repository;
     use e3_events::EventContext;
     use e3_events::EventId;
+    use e3_events::Start;
     use e3_events::StoreKeys;
     use e3_events::SyncEnd;
     use e3_events::Tick;
@@ -436,12 +482,14 @@ mod tests {
     }
 
     #[actix::test]
-    async fn test_persisted() {
+    async fn test_persisted() -> Result<()> {
+        let _guard = with_tracing("debug");
         let tmp = TempDir::new().unwrap();
         let system = EventSystem::persisted("cn2", tmp.path().join("log"), tmp.path().join("sled"));
-
+        system.buffer()?.send(Start).await?;
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
+        Ok(())
     }
 
     #[actix::test]

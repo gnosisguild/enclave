@@ -27,8 +27,8 @@ use e3_trbfv::{
     shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
-use e3_utils::NotifySync;
 use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
@@ -330,6 +330,9 @@ impl ThresholdKeyshare {
 
 impl Actor for ThresholdKeyshare {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl ThresholdKeyshare {

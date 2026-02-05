@@ -15,6 +15,7 @@ use e3_events::{
     E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, TypedEvent,
 };
 use e3_trbfv::PartyId;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
 const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -87,6 +88,7 @@ impl Actor for EncryptionKeyCollector {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
         info!(
             e3_id = %self.e3_id,
             "EncryptionKeyCollector started, scheduling timeout in {:?}",

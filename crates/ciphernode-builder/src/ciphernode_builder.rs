@@ -69,6 +69,7 @@ pub struct CiphernodeBuilder {
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
     net_config: Option<NetConfig>,
+    start_buffer: bool,
 }
 
 // Simple Net Configuration
@@ -133,6 +134,7 @@ impl CiphernodeBuilder {
             threads: None,
             threshold_plaintext_agg: false,
             net_config: None,
+            start_buffer: false,
         }
     }
 
@@ -182,6 +184,12 @@ impl CiphernodeBuilder {
     /// This is conspicuously named so we understand that this should only be used when testing
     pub fn testmode_with_errors(mut self) -> Self {
         self.testmode_errors = true;
+        self
+    }
+    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnd. This is important
+    /// for tests that don't specifically
+    pub fn testmode_start_buffer_immediately(mut self) -> Self {
+        self.start_buffer = true;
         self
     }
 

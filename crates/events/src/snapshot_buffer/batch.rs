@@ -6,6 +6,7 @@
 use std::mem::replace;
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, Recipient};
+use e3_utils::MAILBOX_LIMIT;
 use tracing::debug;
 
 use crate::{trap, Die, EType, Insert, InsertBatch, PanicDispatcher};
@@ -33,6 +34,9 @@ impl Batch {
 
 impl Actor for Batch {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<Insert> for Batch {

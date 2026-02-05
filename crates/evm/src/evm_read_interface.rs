@@ -17,6 +17,7 @@ use alloy_primitives::Address;
 use anyhow::anyhow;
 use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscriber, EventType};
 use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
+use e3_utils::MAILBOX_LIMIT;
 use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
 use tokio::select;
@@ -119,6 +120,8 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+
         // let reader_addr = ctx.address();
         let bus = self.bus.clone();
         let next = self.next.clone();

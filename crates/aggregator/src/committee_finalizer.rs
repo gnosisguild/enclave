@@ -9,7 +9,7 @@ use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
     EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
 };
-use e3_utils::NotifySync;
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
@@ -43,6 +43,9 @@ impl CommitteeFinalizer {
 
 impl Actor for CommitteeFinalizer {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for CommitteeFinalizer {

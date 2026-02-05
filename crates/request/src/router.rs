@@ -27,6 +27,7 @@ use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::{E3id, EnclaveEvent, Event};
+use e3_utils::MAILBOX_LIMIT;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -145,6 +146,9 @@ impl E3Router {
 
 impl Actor for E3Router {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvent> for E3Router {

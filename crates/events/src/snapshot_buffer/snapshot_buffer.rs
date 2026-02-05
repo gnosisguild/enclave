@@ -13,6 +13,7 @@ use crate::{
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::sync::Arc;
 use tracing::{debug, info, trace};
 
@@ -36,6 +37,14 @@ impl SetDependencies {
 #[rtype(result = "()")]
 pub struct Start;
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct UpdateDestination(pub Recipient<InsertBatch>);
+impl UpdateDestination {
+    pub fn new(base: impl Into<Recipient<InsertBatch>>) -> Self {
+        Self(base.into())
+    }
+}
 enum SnapshotBufferState {
     Running,
     Paused,
@@ -49,20 +58,26 @@ pub struct SnapshotBuffer {
 }
 
 impl SnapshotBuffer {
-    pub fn new() -> Self {
+    pub fn new(started: bool) -> Self {
         SnapshotBuffer {
             router: None,
             timelock: None,
             tickable: None,
-            state: SnapshotBufferState::Paused,
+            state: if !started {
+                SnapshotBufferState::Paused
+            } else {
+                SnapshotBufferState::Running
+            },
         }
     }
 
     pub fn spawn(
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
+        started: bool,
     ) -> Result<Addr<Self>> {
-        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock), Some(1))?;
+        info!("spawning SnapshotBuffer...");
+        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock), Some(1), started)?;
         Ok(addr)
     }
 
@@ -71,8 +86,9 @@ impl SnapshotBuffer {
         store: impl Into<Recipient<InsertBatch>>,
         clock: Arc<dyn Clock>,
         interval: Option<u64>,
+        started: bool,
     ) -> Result<(Addr<Self>, Addr<TimelockQueue>)> {
-        let addr = Self::new().start();
+        let addr = Self::new(started).start();
         let store = store.into();
         let router =
             BatchRouter::with_clock(config, addr.clone(), store.clone(), clock.clone()).start();
@@ -84,6 +100,9 @@ impl SnapshotBuffer {
 
 impl Actor for SnapshotBuffer {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<FlushSeq> for SnapshotBuffer {
@@ -154,11 +173,10 @@ impl Handler<Insert> for SnapshotBuffer {
 
 impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
             if let EnclaveEventData::SyncEnd(_) = msg.get_data() {
-                info!("SnapshotBuffer is now enabled");
-                self.state = SnapshotBufferState::Running;
+                self.notify_sync(ctx, Start);
             };
             let SnapshotBufferState::Running = self.state else {
                 return Ok(());
@@ -183,12 +201,36 @@ impl Handler<Tick> for SnapshotBuffer {
     }
 }
 
+impl Handler<Start> for SnapshotBuffer {
+    type Result = ();
+    fn handle(&mut self, _: Start, _: &mut Self::Context) -> Self::Result {
+        trap(EType::IO, &PanicDispatcher::new(), || {
+            info!("SnapshotBuffer is now enabled");
+            self.state = SnapshotBufferState::Running;
+            Ok(())
+        })
+    }
+}
+
+impl Handler<UpdateDestination> for SnapshotBuffer {
+    type Result = ();
+    fn handle(&mut self, msg: UpdateDestination, _: &mut Self::Context) -> Self::Result {
+        trap(EType::IO, &PanicDispatcher::new(), || {
+            if let Some(ref router) = self.router {
+                router.try_send(msg)?;
+            }
+            Ok(())
+        })
+    }
+}
+
 #[cfg(test)]
 mod mock_store {
     use std::mem::replace;
 
     use crate::InsertBatch;
     use actix::{Actor, Handler, Message};
+    use e3_utils::MAILBOX_LIMIT;
 
     #[derive(Message)]
     #[rtype(result = "Vec<InsertBatch>")]
@@ -263,7 +305,7 @@ mod tests {
 
         let clock = Arc::new(MockClock::new(1000));
         let (buffer, timelock) =
-            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None)?;
+            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None, false)?;
 
         buffer
             .send(EnclaveEvent::from_data_ec(

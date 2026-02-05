@@ -17,6 +17,7 @@ use e3_events::{
 };
 use e3_request::E3Meta;
 use e3_utils::NotifySync;
+use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -30,6 +31,9 @@ pub struct CiphernodeSelector {
 
 impl Actor for CiphernodeSelector {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl CiphernodeSelector {

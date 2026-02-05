@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use crate::{trap, EType, PanicDispatcher};
 use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient};
+use e3_utils::MAILBOX_LIMIT;
 use std::{
     cmp::{Ordering, Reverse},
     collections::BinaryHeap,
@@ -123,13 +124,14 @@ impl Actor for TimelockQueue {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
         let Some(interval) = self.interval else {
             debug!("TimelockQueue in manual mode - will tick when requested.");
             return;
         };
 
         // Send Tick to self every second
-        debug!("TimelockQueue is ticking every {}", interval);
+        debug!("TimelockQueue is ticking every {}s", interval);
         ctx.run_interval(Duration::from_secs(interval), |_, ctx| {
             ctx.address().do_send(Tick);
         });

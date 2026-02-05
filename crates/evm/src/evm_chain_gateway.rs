@@ -18,6 +18,7 @@ use e3_events::{
     EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 /// This component sits between the Evm ingestion for a chain and the Sync actor and the Bus.
@@ -181,6 +182,9 @@ impl EvmChainGateway {
 
 impl Actor for EvmChainGateway {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvent> for EvmChainGateway {

@@ -8,7 +8,7 @@ use crate::traits::{ErrorEvent, Event};
 use crate::EventType;
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
-use e3_utils::{colorize, Color};
+use e3_utils::{colorize, Color, MAILBOX_LIMIT, MAILBOX_LIMIT_LARGE};
 use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use tracing::info;
@@ -50,6 +50,9 @@ pub struct EventBus<E: Event> {
 
 impl<E: Event> Actor for EventBus<E> {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl<E: Event> EventBus<E> {
@@ -219,6 +222,9 @@ impl<E: Event> EventFilter<E> {
 
 impl<E: Event> Actor for EventFilter<E> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl<E: Event> Handler<E> for EventFilter<E> {
@@ -401,6 +407,9 @@ impl<E: Event> Handler<TakeEvents<E>> for HistoryCollector<E> {
 
 impl<E: Event> Actor for HistoryCollector<E> {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<E: Event> Handler<E> for HistoryCollector<E> {

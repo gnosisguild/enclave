@@ -22,7 +22,9 @@ use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
+use e3_test_helpers::{
+    create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
+};
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
@@ -179,14 +181,8 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("Running test_trbfv_actor...");
     let mut report: Vec<(&str, Duration)> = vec![];
     let whole_test = Instant::now();
-    use tracing_subscriber::{fmt, EnvFilter};
 
-    let subscriber = fmt()
-        .with_env_filter(EnvFilter::new("info"))
-        .with_test_writer()
-        .finish();
-
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let _guard = with_tracing("info");
 
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
     // avoid over abstracting test helpers and favouring straight forward single descriptive
@@ -261,6 +257,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
+                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
@@ -276,6 +273,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
                 .with_sortition_score()
+                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()

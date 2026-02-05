@@ -10,7 +10,7 @@ use crate::{
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
-use e3_utils::major_issue;
+use e3_utils::{major_issue, MAILBOX_LIMIT};
 use tracing::{error, warn};
 
 const MAX_STORAGE_ERRORS: u64 = 10;
@@ -75,6 +75,9 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStore<I, L> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<I, L> {

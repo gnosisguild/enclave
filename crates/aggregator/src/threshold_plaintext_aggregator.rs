@@ -19,8 +19,8 @@ use e3_trbfv::{
     calculate_threshold_decryption::CalculateThresholdDecryptionRequest, TrBFVConfig, TrBFVRequest,
     TrBFVResponse,
 };
-use e3_utils::utility_types::ArcBytes;
 use e3_utils::NotifySync;
+use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
 use tracing::{debug, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -268,6 +268,9 @@ impl ThresholdPlaintextAggregator {
 
 impl Actor for ThresholdPlaintextAggregator {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for ThresholdPlaintextAggregator {

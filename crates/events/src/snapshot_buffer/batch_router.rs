@@ -6,7 +6,7 @@
 use super::{
     batch::{Batch, Flush},
     timelock_queue::{Clock, StartTimelock},
-    AggregateConfig,
+    AggregateConfig, UpdateDestination,
 };
 use crate::{
     trap, AggregateId, EType, EnclaveEvent, EventContextAccessors, EventContextSeq, Insert,
@@ -14,6 +14,7 @@ use crate::{
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Context;
+use e3_utils::MAILBOX_LIMIT;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::{debug, info, trace, warn};
 
@@ -41,6 +42,9 @@ pub struct BatchRouter {
 
 impl Actor for BatchRouter {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl BatchRouter {
@@ -184,6 +188,16 @@ impl Handler<FlushSeq> for BatchRouter {
                 self.batches.remove(&msg.seq());
                 self.aggregates.remove(&msg.seq());
             }
+            Ok(())
+        })
+    }
+}
+
+impl Handler<UpdateDestination> for BatchRouter {
+    type Result = ();
+    fn handle(&mut self, msg: UpdateDestination, _: &mut Self::Context) -> Self::Result {
+        trap(EType::IO, &PanicDispatcher::new(), || {
+            self.db = msg.0;
             Ok(())
         })
     }

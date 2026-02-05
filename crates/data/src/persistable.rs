@@ -280,6 +280,7 @@ mod tests {
     use actix::{Actor, Addr, Handler, Message};
 
     use e3_events::{Get, Insert, Remove};
+    use e3_utils::MAILBOX_LIMIT;
 
     use super::{Persistable, StoreConnector};
 
@@ -300,6 +301,9 @@ mod tests {
 
     impl Actor for MockConnector {
         type Context = actix::Context<Self>;
+        fn started(&mut self, ctx: &mut Self::Context) {
+            ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+        }
     }
 
     impl Handler<GetEvents> for MockConnector {

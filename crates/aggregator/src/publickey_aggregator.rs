@@ -14,8 +14,8 @@ use e3_events::{
 };
 use e3_events::{trap, EType};
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_utils::ArcBytes;
 use e3_utils::NotifySync;
+use e3_utils::{ArcBytes, MAILBOX_LIMIT};
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -141,6 +141,9 @@ impl PublicKeyAggregator {
 
 impl Actor for PublicKeyAggregator {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for PublicKeyAggregator {

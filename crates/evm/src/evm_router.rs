@@ -7,6 +7,7 @@
 use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
 use actix::{Actor, Handler};
 use alloy_primitives::Address;
+use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
 use tracing::{debug, error, info};
 
@@ -42,6 +43,9 @@ impl EvmRouter {
 
 impl Actor for EvmRouter {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvmEvent> for EvmRouter {

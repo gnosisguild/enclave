@@ -26,6 +26,7 @@ use e3_events::EventType;
 use e3_events::Shutdown;
 use e3_events::{E3id, EType, PlaintextAggregated};
 use e3_utils::NotifySync;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 sol!(
@@ -70,6 +71,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
 
 impl<P: Provider + WalletProvider + Clone + 'static> Actor for EnclaveSolWriter<P> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {

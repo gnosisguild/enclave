@@ -25,6 +25,7 @@ use e3_events::EventContextAccessors;
 use e3_events::EventType;
 use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
+use e3_utils::MAILBOX_LIMIT;
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -47,6 +48,9 @@ pub struct NetEventTranslator {
 
 impl Actor for NetEventTranslator {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 /// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator

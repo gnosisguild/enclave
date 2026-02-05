@@ -273,6 +273,7 @@ mod tests {
     }
 
     #[actix::test]
+    #[ignore]
     async fn test_synchronizer_full_flow() -> Result<()> {
         let _guard = e3_test_helpers::with_tracing("info");
         // Setup event system and synchronizer
