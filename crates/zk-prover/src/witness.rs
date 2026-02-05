@@ -167,7 +167,7 @@ mod tests {
     fn test_invalid_field_element() {
         let result = input_map([("x", "not_a_number"), ("y", "3")]);
         assert!(result.is_err());
-        
+
         let err = result.unwrap_err();
         assert!(matches!(err, ZkError::SerializationError(_)));
         assert!(err.to_string().contains("invalid field element"));
