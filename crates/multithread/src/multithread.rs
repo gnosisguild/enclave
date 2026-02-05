@@ -23,7 +23,7 @@ use e3_events::{
     EventSubscriber, EventType, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError,
     ZkRequest, ZkResponse,
 };
-use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
@@ -339,6 +339,7 @@ fn handle_pk_bfv_proof(
     req: PkBfvProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
+    // I know this sounds confusing, but we use the DKG Param set here because the proof is for the DKG circuit
     let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
     let pk_bfv = PublicKey::from_bytes(&req.pk_bfv, &params).map_err(|e| {
         ComputeRequestError::new(
@@ -352,9 +353,14 @@ fn handle_pk_bfv_proof(
 
     let circuit = PkCircuit;
     let e3_id_str = request.e3_id.to_string();
-
+    let preset_counterpart = req
+        .params_preset
+        .dkg_counterpart()
+        .unwrap_or_else(|| BfvPreset::InsecureThreshold512);
+    // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
+    // builds both params, but will only use the DKG one
     let proof = circuit
-        .prove(prover, &req.params_preset, &pk_bfv, &e3_id_str)
+        .prove(prover, &preset_counterpart, &pk_bfv, &e3_id_str)
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
