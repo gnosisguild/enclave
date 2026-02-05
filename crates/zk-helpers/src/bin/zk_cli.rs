@@ -20,6 +20,9 @@ use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
 };
 use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
+use e3_zk_helpers::dkg::share_decryption::{
+    ShareDecryptionCircuit, ShareDecryptionCircuitInput, ShareDecryptionSample,
+};
 use e3_zk_helpers::dkg::share_encryption::{
     ShareEncryptionCircuit, ShareEncryptionCircuitInput, ShareEncryptionSample,
 };
@@ -157,6 +160,7 @@ fn main() -> Result<()> {
     registry.register(Arc::new(ShareComputationCircuit));
     registry.register(Arc::new(UserDataEncryptionCircuit));
     registry.register(Arc::new(ShareEncryptionCircuit));
+    registry.register(Arc::new(ShareDecryptionCircuit));
 
     // Handle list circuits flag.
     if args.list_circuits {
@@ -206,7 +210,8 @@ fn main() -> Result<()> {
     let write_prover_toml = args.toml;
     // Only share-computation has a witness-type choice (secret-key vs smudging-noise). pk always uses secret key.
     let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
-        || circuit_meta.name() == ShareEncryptionCircuit::NAME;
+        || circuit_meta.name() == ShareEncryptionCircuit::NAME
+        || circuit_meta.name() == ShareDecryptionCircuit::NAME;
 
     let dkg_input_type = if has_witness_type {
         // Share-computation: require --witness when generating Prover.toml; default secret-key for configs-only.
@@ -313,6 +318,26 @@ fn main() -> Result<()> {
                     &UserDataEncryptionCircuitInput {
                         public_key: sample.public_key,
                         plaintext: sample.plaintext,
+                    },
+                )?
+            }
+            name if name == <ShareDecryptionCircuit as Circuit>::NAME => {
+                let sd = preset
+                    .search_defaults()
+                    .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
+                let sample = ShareDecryptionSample::generate(
+                    preset,
+                    CiphernodesCommitteeSize::Small,
+                    dkg_input_type,
+                    sd.z,
+                    sd.lambda,
+                );
+                let circuit = ShareDecryptionCircuit;
+                circuit.codegen(
+                    preset,
+                    &ShareDecryptionCircuitInput {
+                        secret_key: sample.secret_key,
+                        honest_ciphertexts: sample.honest_ciphertexts,
                     },
                 )?
             }

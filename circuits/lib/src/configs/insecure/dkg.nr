@@ -142,18 +142,9 @@ pub global SHARE_ENCRYPTION_CONFIGS_E_SM: ShareEncryptionConfigs<L> = ShareEncry
 
 /************************************
 -------------------------------------
-share_decryption_sk (CIRCUIT 4a)
+share_decryption_sk (CIRCUIT 4a - BFV DECRYPTION SK)
+share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 -------------------------------------
 ************************************/
 
-// share_decryption_sk - bit parameters
-pub global SHARE_DECRYPTION_BIT_MSG_SK: u32 = 37;
-
-/************************************
--------------------------------------
-share_decryption_e_sm (CIRCUIT 4b)
--------------------------------------
-************************************/
-
-// share_decryption_e_sm - bit parameters
-pub global SHARE_DECRYPTION_BIT_MSG_E_SM: u32 = 37;
+pub global SHARE_DECRYPTION_BIT_MSG: u32 = 36;

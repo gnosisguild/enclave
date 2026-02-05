@@ -217,6 +217,20 @@ pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_
 /// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
 ///
 /// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
+pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
+    y.iter()
+        .map(|coeff| {
+            coeff
+                .iter()
+                .map(|v| serde_json::Value::String(v.to_string()))
+                .collect()
+        })
+        .collect()
+}
+
+/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
+///
+/// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
 pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_json::Value>>> {
     y.iter()
         .map(|coeff| {
