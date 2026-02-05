@@ -45,6 +45,7 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 /// Verifies:
 /// 1. Range checks on all secret witnesses (secret key, error, smudging noise, quotients)
 /// 2. Correct public key generation: pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
+///    and pk1_i = a_i
 ///
 /// Outputs:
 /// - commit(threshold_sk)
@@ -79,6 +80,8 @@ pub struct PkGeneration<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u3
     /// Threshold public key components (committed witnesses)
     /// pk0[i] is the first component of the public key for modulus i
     pk0: [Polynomial<N>; L],
+    /// pk1[i] is the second component of the public key for modulus i (should equal a[i])
+    pk1: [Polynomial<N>; L],
 }
 
 impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_PK: u32> PkGeneration<N, L, BIT_EEK, BIT_SK, BIT_E_SM, BIT_R1, BIT_R2, BIT_PK> {
@@ -91,8 +94,9 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         r1: [Polynomial<2 * N - 1>; L],
         r2: [Polynomial<N - 1>; L],
         pk0: [Polynomial<N>; L],
+        pk1: [Polynomial<N>; L],
     ) -> Self {
-        PkGeneration { configs, a, eek, sk, e_sm, r1, r2, pk0 }
+        PkGeneration { configs, a, eek, sk, e_sm, r1, r2, pk0, pk1 }
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
@@ -132,7 +136,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
-        let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.a);
+        let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
         // Step 3: Generate Fiat-Shamir challenges using commitments
         let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);
@@ -198,6 +202,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let r2_at_gamma = self.r2.map(|r2_poly| r2_poly.eval(gamma));
 
         let pk0_at_gamma = self.pk0.map(|pk0_poly| pk0_poly.eval(gamma));
+        let pk1_at_gamma = self.pk1.map(|pk1_poly| pk1_poly.eval(gamma));
 
         // Evaluate the cyclotomic polynomial X^N + 1 at gamma
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
@@ -209,5 +214,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
             + r1_at_gamma[i] * self.configs.qis[i];
 
         assert(pk0_at_gamma[i] == expected_pk0, "Public key equation 1 failed");
+
+        // Equation 2: pk1_i = a_i
+        assert(pk1_at_gamma[i] == a_at_gamma[i], "Public key equation 2 failed");
     }
 }

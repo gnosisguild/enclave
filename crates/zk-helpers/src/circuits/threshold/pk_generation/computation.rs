@@ -99,6 +99,7 @@ pub struct Witness {
     pub r1is: CrtPolynomial,
     pub r2is: CrtPolynomial,
     pub pk0is: CrtPolynomial,
+    pub pk1is: CrtPolynomial,
 }
 
 impl Computation for Configs {
@@ -399,18 +400,20 @@ impl Computation for Witness {
         sk.reduce(zkp_modulus);
 
         Ok(Witness {
-            a: a,
+            a: a.clone(),
             eek,
             sk,
             e_sm,
             r1is: r1,
             r2is: r2,
             pk0is: pk_share,
+            pk1is: a,
         })
     }
 
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
+        let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
         let a = crt_polynomial_to_toml_json(&self.a);
         let e = polynomial_to_toml_json(&self.eek);
         let sk = polynomial_to_toml_json(&self.sk);
@@ -420,6 +423,7 @@ impl Computation for Witness {
 
         let json = serde_json::json!({
             "pk0is": pk0is,
+            "pk1is": pk1is,
             "a": a,
             "eek": e,
             "sk": sk,
