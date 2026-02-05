@@ -258,6 +258,6 @@ mod tests {
         assert!(artifacts
             .configs
             .contains(format!("{}_BIT_MSG: u32 = {}", prefix, bits.msg_bit).as_str()));
-        assert!(artifacts.configs.contains("SHARE_ENCRYPTION_CONFIGS_E_SM"));
+        assert!(artifacts.configs.contains("SHARE_ENCRYPTION_CONFIGS"));
     }
 }
