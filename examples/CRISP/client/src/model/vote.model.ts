@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { CreditMode } from '@crisp-e3/sdk'
+
 export interface VotingRound {
   round_id: number
   pk_bytes: number[]
@@ -57,11 +59,6 @@ export interface VoteStateLite {
 
   credit_mode: CreditMode
   credits?: number
-}
-
-export enum CreditMode {
-  CONSTANT = '0',
-  CUSTOM = '1',
 }
 
 export type Vote = bigint[]
