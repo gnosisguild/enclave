@@ -11,7 +11,19 @@ self.onmessage = async function (event) {
   switch (type) {
     case 'generate_proof':
       try {
-        const { e3Id, vote, publicKey, balance, address: slotAddress, signature, messageHash, isMasking, crispServer, merkleLeaves } = data
+        const {
+          e3Id,
+          vote,
+          publicKey,
+          balance,
+          address: slotAddress,
+          signature,
+          messageHash,
+          isMasking,
+          crispServer,
+          merkleLeaves,
+          numOptions,
+        } = data
 
         const sdk = new CrispSDK(crispServer)
 
@@ -24,6 +36,7 @@ self.onmessage = async function (event) {
             balance,
             slotAddress,
             merkleLeaves,
+            numOptions,
           })
         } else {
           proof = await sdk.generateVoteProof({

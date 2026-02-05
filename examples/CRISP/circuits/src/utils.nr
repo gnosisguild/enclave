@@ -6,218 +6,277 @@
 
 use lib::math::polynomial::Polynomial;
 
-use crate::constants::HALF_LARGEST_MINIMUM_DEGREE;
+use crate::constants::{MAX_OPTIONS, MAX_VOTE_BITS};
 
-/// Validates vote coefficients and ensures the vote amount doesn't exceed balance.
+/// Validates vote coefficients for n-choice voting.
 ///
-/// This function checks that:
-/// 1. All vote coefficients are binary (either 0 or `q_mod_t`)
-/// 2. At most one vote type is non-zero (YES and NO votes are mutually exclusive; both may be zero for no vote)
-/// 3. The decoded vote amount (integer value reconstructed from binary coefficients) doesn't exceed the voter's balance
+/// Rules:
+/// - 2 options: Mutually exclusive (only one can be non-zero)
+/// - 3+ options: Can split votes, but total must not exceed balance
 ///
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
-/// * `q_mod_t` - The field representation of 1 (Q_MOD_T_MOD_P for binary encoding)
+/// * `q_mod_t` - The field representation of 1
 /// * `balance` - The voter's balance/voting power
+/// * `num_options` - Number of voting options
 pub fn check_coefficient_values_with_balance<let D: u32>(
     k1: Polynomial<D>,
     q_mod_t: Field,
     balance: Field,
+    num_options: u32,
 ) {
-    let HALF_D = D / 2;
+    assert(num_options > 1);
+    assert(num_options as u64 <= MAX_OPTIONS as u64);
 
-    // Define the boundaries for YES and NO vote regions in the polynomial
-    // YES votes are stored in the second half: [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
-    let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
-    // NO votes are stored in the first half: [0, HALF_LARGEST_MINIMUM_DEGREE)
-    let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
+    let segment_size: u32 = D / num_options;
 
-    let mut sum_yes: u64 = 0;
-    let mut sum_no: u64 = 0;
+    let mut sums: [u64; MAX_OPTIONS] = [0; MAX_OPTIONS];
+    let mut non_zero_count: u64 = 0;
+    let mut total_votes: u64 = 0;
 
-    // YES votes are encoded in reverse order (LSB at highest index, MSB at lowest index)
-    // We read from END_INDEX_Y-1 down to HALF_D to reconstruct the binary value
-    for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
-        // Access coefficients in reverse order: from (END_INDEX_Y - 1) down to HALF_D
-        let idx = END_INDEX_Y - 1 - i;
-        let coeff = k1.coefficients[idx];
+    // Process each option
+    for opt_idx in 0..MAX_OPTIONS {
+        if (opt_idx as u64) < (num_options as u64) {
+            // Due to reversal, TypeScript option opt_idx is at circuit segment (num_options - 1 - opt_idx)
+            let circuit_segment: u32 = num_options - 1 - opt_idx;
+            let start_idx: u32 = circuit_segment * segment_size;
 
-        assert(0 == coeff * (q_mod_t - coeff));
+            let mut sum: u64 = 0;
 
-        // Convert coefficient to bit: 0 -> 0, q_mod_t -> 1
-        let bit: u64 = if coeff == 0 { 0 } else { 1 };
+            // Bits are reversed (LSB first)
+            for bit_pos in 0..MAX_VOTE_BITS {
+                if (bit_pos as u64) < (segment_size as u64) {
+                    let idx: u32 = start_idx + bit_pos;
+                    let coeff = k1.coefficients[idx];
 
-        // Reconstruct binary value: shift left and add new bit
-        // Reading backwards means we're building: bit_0 * 2^0 + bit_1 * 2^1 + ...
-        sum_yes = sum_yes * 2 + bit;
+                    // Binary constraint: coeff must be 0 or q_mod_t
+                    assert(0 == coeff * (q_mod_t - coeff));
+
+                    let bit: u64 = if coeff == 0 { 0 } else { 1 };
+                    sum += bit * (1 << (bit_pos as u64));
+                }
+            }
+
+            sums[opt_idx] = sum;
+            total_votes += sum;
+
+            if sum != 0 {
+                non_zero_count += 1;
+            }
+        }
     }
 
-    // NO votes are encoded in reverse order: [END_INDEX_N-1, ..., 0]
-    // We read from END_INDEX_N-1 down to 0 to reconstruct the binary value
-    for i in 0..HALF_LARGEST_MINIMUM_DEGREE {
-        // Access coefficients in reverse order: from (END_INDEX_N - 1) down to 0
-        let idx = END_INDEX_N - 1 - i;
-        let coeff = k1.coefficients[idx];
-
-        // Binary constraint check (same as YES votes)
-        assert(0 == coeff * (q_mod_t - coeff));
-
-        // Convert coefficient to bit
-        let bit: u64 = if coeff == 0 { 0 } else { 1 };
-
-        // Reconstruct binary value
-        sum_no = sum_no * 2 + bit;
-    }
-
-    if (sum_yes != 0) {
-        // If YES vote is cast, NO vote must be zero
-        assert(sum_no == 0);
-        // Vote amount must not exceed balance
-        assert(sum_yes <= (balance as u64));
-    }
-
-    if (sum_no != 0) {
-        // If NO vote is cast, YES vote must be zero
-        assert(sum_yes == 0);
-        // Vote amount must not exceed balance
-        assert(sum_no <= (balance as u64));
+    // Voting rules based on number of options
+    if num_options == 2 {
+        // Binary vote: mutually exclusive, only one option can be non-zero
+        assert(non_zero_count <= 1);
+        
+        // Single vote must not exceed balance
+        for opt_idx in 0..MAX_OPTIONS {
+            if ((opt_idx as u64) < (num_options as u64)) & (sums[opt_idx] != 0) {
+                assert(sums[opt_idx] <= (balance as u64));
+            }
+        }
+    } else {
+        // Multi-option vote: can split, but total must not exceed balance
+        assert(total_votes <= (balance as u64));
     }
 }
 
 /// Checks if all vote coefficients are zero.
 ///
-/// This function verifies that both the YES and NO vote regions contain only zeros.
+/// This function verifies that all vote regions contain only zeros.
 /// Used in masking operations to ensure that invalid or unauthorized votes are properly
 /// masked (set to zero) before being added to the tally.
 ///
 /// # Arguments
 /// * `k1` - The plaintext polynomial encoding the vote
 ///
-/// # Vote Regions Checked
-/// - NO votes: coefficients [0, HALF_LARGEST_MINIMUM_DEGREE)
-/// - YES votes: coefficients [HALF_D, HALF_D + HALF_LARGEST_MINIMUM_DEGREE)
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>) {
-    let HALF_D = D / 2;
+pub fn check_coefficient_zero<let D: u32>(
+    k1: Polynomial<D>,
+    num_options: u32,
+) {
+    assert(num_options > 1);
+    assert(num_options as u64 <= MAX_OPTIONS as u64);
 
-    // Define vote region boundaries
-    let START_INDEX_Y = HALF_D;
-    let END_INDEX_Y = HALF_D + HALF_LARGEST_MINIMUM_DEGREE;
+    let segment_size: u32 = D / num_options;
 
-    let START_INDEX_N = 0;
-    let END_INDEX_N = HALF_LARGEST_MINIMUM_DEGREE;
+    for opt_idx in 0..MAX_OPTIONS {
+        if (opt_idx as u64) < (num_options as u64) {
+            let circuit_segment: u32 = num_options - 1 - opt_idx;
+            let start_idx: u32 = circuit_segment * segment_size;
 
-    // Check YES vote region: all coefficients must be zero
-    for i in START_INDEX_Y..END_INDEX_Y {
-        assert(k1.coefficients[i] == 0);
+            for bit_pos in 0..MAX_VOTE_BITS {
+                if (bit_pos as u64) < (segment_size as u64) {
+                    let idx: u32 = start_idx + bit_pos;
+                    assert(k1.coefficients[idx] == 0);
+                }
+            }
+        }
     }
-
-    // Check NO vote region: all coefficients must be zero
-    for i in START_INDEX_N..END_INDEX_N {
-        assert(k1.coefficients[i] == 0);
-    }
 }
 
 #[test]
-fn test_check_vote_is_within_balance_pass() {
-    let pol = Polynomial {
-        coefficients: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // YES votes: bits at indices 50-52 (START of YES window)
-            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
+fn test_2_options_vote_first() {
+    let mut coeffs = [0; 100];
+    // Option 0, value 5, circuit segment 1 [50..99], LSB first
+    coeffs[50] = 1; // 2^0 = 1
+    coeffs[52] = 1; // 2^2 = 4
 
-    check_coefficient_values_with_balance(pol, 1, 1000);
-}
-
-#[test(should_fail)]
-fn test_check_vote_is_within_balance_yes_and_no_not_zero() {
-    let pol = Polynomial {
-        coefficients: [
-            // NO votes: index 0
-            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // YES votes: indices 50-52
-            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
-
-    check_coefficient_values_with_balance(pol, 1, 100);
-}
-
-#[test(should_fail)]
-fn test_check_vote_is_within_balance_fail() {
-    let pol = Polynomial {
-        coefficients: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // YES votes: indices 50-52 (binary 111 = 7, exceeds balance of 1)
-            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
-
-    check_coefficient_values_with_balance(pol, 1, 1);
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 2);
 }
 
 #[test]
-fn test_check_coefficient_values_pass() {
-    let pol = Polynomial {
-        coefficients: [
-            // NO vote: index 0 (binary 1 = 1)
-            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
+fn test_2_options_vote_second() {
+    let mut coeffs = [0; 100];
+    // Option 1, value 3, circuit segment 0 [0..49], LSB first
+    coeffs[0] = 1; // 2^0 = 1
+    coeffs[1] = 1; // 2^1 = 2
 
-    check_coefficient_values_with_balance(pol, 1, 100000000000);
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 2);
 }
 
 #[test(should_fail)]
-fn test_check_coefficient_values_fail() {
-    let pol = Polynomial {
-        coefficients: [
-            // Invalid coefficient value 2 (not 0 or 1)
-            2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
+fn test_2_options_both_voted_fails() {
+    let mut coeffs = [0; 100];
+    coeffs[50] = 1; // Option 0
+    coeffs[0] = 1;  // Option 1
 
-    check_coefficient_values_with_balance(pol, 1, 100);
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 2);
 }
 
 #[test(should_fail)]
-fn test_check_coefficient_zero_fail() {
-    let pol = Polynomial {
-        coefficients: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            // Non-zero at index 50 (YES section)
-            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
+fn test_2_options_exceeds_balance_fails() {
+    let mut coeffs = [0; 100];
+    // Option 0, value 10, balance 5
+    coeffs[51] = 1; // 2^1 = 2
+    coeffs[53] = 1; // 2^3 = 8
 
-    check_coefficient_zero(pol);
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 5, 2);
+}
+
+// --- 3+ Options (Split Voting) ---
+
+#[test]
+fn test_3_options_split_vote() {
+    // D = 99, segment_size = 33
+    // Vote 40 on option 0, 60 on option 2, total = 100, balance = 100
+    let mut coeffs = [0; 99];
+    
+    // Option 0 at circuit segment 2 [66..98], value 40 = 101000, LSB first
+    coeffs[69] = 1; // 2^3 = 8
+    coeffs[71] = 1; // 2^5 = 32
+    // Total: 40
+    
+    // Option 2 at circuit segment 0 [0..32], value 60 = 111100, LSB first
+    coeffs[2] = 1; // 2^2 = 4
+    coeffs[3] = 1; // 2^3 = 8
+    coeffs[4] = 1; // 2^4 = 16
+    coeffs[5] = 1; // 2^5 = 32
+    // Total: 60
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 3);
 }
 
 #[test]
-fn test_check_coefficient_zero() {
-    let pol = Polynomial {
-        coefficients: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ],
-    };
+fn test_3_options_vote_all_three() {
+    // Vote 30 on each, total = 90, balance = 100
+    let mut coeffs = [0; 99];
+    
+    // Option 0 at circuit segment 2 [66..98], value 30 = 11110, LSB first
+    coeffs[67] = 1; // 2^1 = 2
+    coeffs[68] = 1; // 2^2 = 4
+    coeffs[69] = 1; // 2^3 = 8
+    coeffs[70] = 1; // 2^4 = 16
+    // Total: 30
+    
+    // Option 1 at circuit segment 1 [33..65], value 30
+    coeffs[34] = 1; // 2^1 = 2
+    coeffs[35] = 1; // 2^2 = 4
+    coeffs[36] = 1; // 2^3 = 8
+    coeffs[37] = 1; // 2^4 = 16
+    // Total: 30
+    
+    // Option 2 at circuit segment 0 [0..32], value 30
+    coeffs[1] = 1; // 2^1 = 2
+    coeffs[2] = 1; // 2^2 = 4
+    coeffs[3] = 1; // 2^3 = 8
+    coeffs[4] = 1; // 2^4 = 16
+    // Total: 30
 
-    check_coefficient_zero(pol);
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 3);
 }
+
+#[test(should_fail)]
+fn test_3_options_total_exceeds_balance_fails() {
+    // Vote 60 + 60 = 120, balance = 100
+    let mut coeffs = [0; 99];
+    
+    // Option 0, value 60
+    coeffs[68] = 1; // 2^2 = 4
+    coeffs[69] = 1; // 2^3 = 8
+    coeffs[70] = 1; // 2^4 = 16
+    coeffs[71] = 1; // 2^5 = 32
+    
+    // Option 1, value 60
+    coeffs[35] = 1; // 2^2 = 4
+    coeffs[36] = 1; // 2^3 = 8
+    coeffs[37] = 1; // 2^4 = 16
+    coeffs[38] = 1; // 2^5 = 32
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 3);
+}
+
+#[test]
+fn test_5_options_single_vote() {
+    // D = 100, segment_size = 20
+    // Vote only on option 2 with value 50
+    let mut coeffs = [0; 100];
+    
+    // Option 2 at circuit segment 2 [40..59], value 50 = 110010, LSB first
+    coeffs[41] = 1; // 2^1 = 2
+    coeffs[44] = 1; // 2^4 = 16
+    coeffs[45] = 1; // 2^5 = 32
+    // Total: 50
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 5);
+}
+
+#[test]
+fn test_zero_vote_passes() {
+    let pol = Polynomial { coefficients: [0; 100] };
+    check_coefficient_values_with_balance(pol, 1, 100, 3);
+}
+
+#[test(should_fail)]
+fn test_invalid_coefficient_fails() {
+    let mut coeffs = [0; 100];
+    coeffs[50] = 2; // Invalid
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 2);
+}
+
+#[test]
+fn test_check_coefficient_zero_passes() {
+    let pol = Polynomial { coefficients: [0; 100] };
+    check_coefficient_zero(pol, 3);
+}
+
+#[test(should_fail)]
+fn test_check_coefficient_zero_fails() {
+    let mut coeffs = [0; 99];
+    coeffs[33] = 1;
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_zero(pol, 3);
+}
+

@@ -7,9 +7,10 @@
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
 import type { MerkleProof } from './types'
-import { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
+import { MAX_VOTE_BITS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE_HASH } from './constants'
 import { publicKeyToAddress } from 'viem/utils'
 import { hexToBytes, recoverPublicKey } from 'viem'
+import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 
 /**
  * Hash a leaf node for the Merkle tree
@@ -150,4 +151,25 @@ export async function getOptimalThreadCount(): Promise<number> {
 
   // Fallback
   return 5
+}
+
+/**
+ * Get the maximum vote value for a given number of choices.
+ * @param numChoices Number of choices.
+ * @returns Maximum value per choice.
+ */
+export const getMaxVoteValue = (numChoices: number): bigint => {
+  const bfvParams = ZKInputsGenerator.withDefaults().getBFVParams()
+  const segmentSize = Math.floor(bfvParams.degree / numChoices)
+  const effectiveBits = Math.min(segmentSize, MAX_VOTE_BITS)
+  return (1n << BigInt(effectiveBits)) - 1n
+}
+
+/**
+ * Get a zero vote with the given number of choices.
+ * @param numChoices Number of choices.
+ * @returns A zero vote with the given number of choices.
+ */
+export const getZeroVote = (numChoices: number): bigint[] => {
+  return Array(numChoices).fill(0n)
 }

@@ -6,8 +6,8 @@
 
 export * from './token'
 export * from './state'
-export { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, MAXIMUM_VOTE_VALUE, SIGNATURE_MESSAGE_HASH } from './constants'
-export { hashLeaf, generateMerkleProof, generateMerkleTree, getAddressFromSignature } from './utils'
+export { MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, SIGNATURE_MESSAGE_HASH } from './constants'
+export { hashLeaf, generateMerkleProof, generateMerkleTree, getAddressFromSignature, getMaxVoteValue, getZeroVote } from './utils'
 export {
   decodeTally,
   generateVoteProof,
@@ -16,6 +16,7 @@ export {
   generatePublicKey,
   encryptVote,
   encodeSolidityProof,
+  validateVote,
 } from './vote'
 export { CrispSDK } from './sdk'
 

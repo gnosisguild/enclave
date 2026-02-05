@@ -947,5 +947,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-723f70610433e7159eeb1220688bb4d784c9ed3e"
+  "buildInfoId": "solc-0_8_28-c8c469735f72371fb63fb61031c5ba76f9b64baf"
 }
