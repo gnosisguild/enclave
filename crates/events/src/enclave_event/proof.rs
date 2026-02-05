@@ -58,6 +58,20 @@ impl CircuitName {
             CircuitName::PkAgg => "pk_agg",
         }
     }
+
+    pub fn group(&self) -> &'static str {
+        match self {
+            CircuitName::PkBfv => "dkg",
+            CircuitName::PkTrbfv => "threshold",
+            CircuitName::EncShares => "threshold",
+            CircuitName::DecShares => "threshold",
+            CircuitName::PkAgg => "threshold",
+        }
+    }
+
+    pub fn dir_path(&self) -> String {
+        format!("{}/{}", self.group(), self.as_str())
+    }
 }
 
 impl fmt::Display for CircuitName {

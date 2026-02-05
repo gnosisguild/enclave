@@ -46,16 +46,18 @@ impl ZkProver {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let circuit_name = circuit.as_str();
-        let circuit_path = self.circuits_dir.join(format!("{}.json", circuit_name));
-        if !circuit_path.exists() {
-            return Err(ZkError::CircuitNotFound(circuit_name.to_string()));
-        }
+        // Circuits are organized as: circuits/{group}/{name}/{name}.json
+        let circuit_dir = self.circuits_dir.join(circuit.dir_path());
+        let circuit_path = circuit_dir.join(format!("{}.json", circuit.as_str()));
+        let vk_path = circuit_dir.join(format!("{}.vk", circuit.as_str()));
 
-        let vk_path = self
-            .circuits_dir
-            .join("vk")
-            .join(format!("{}.vk", circuit_name));
+        if !circuit_path.exists() {
+            return Err(ZkError::CircuitNotFound(format!(
+                "Circuit not found: {} (expected at {})",
+                circuit.as_str(),
+                circuit_path.display()
+            )));
+        }
         if !vk_path.exists() {
             return Err(ZkError::CircuitNotFound(format!(
                 "VK not found: {}",
@@ -68,12 +70,10 @@ impl ZkProver {
 
         let witness_path = job_dir.join("witness.gz");
         let output_dir = job_dir.join("out");
-        let proof_path = output_dir.join("proof");
-        let public_inputs_path = output_dir.join("public_inputs");
 
         fs::write(&witness_path, witness_data)?;
 
-        debug!("generating proof for circuit: {}", circuit_name);
+        debug!("generating proof for circuit: {}", circuit.as_str());
 
         let output = StdCommand::new(&self.bb_binary)
             .args([
@@ -92,17 +92,18 @@ impl ZkProver {
             .output()?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(ZkError::ProveFailed(stderr.to_string()));
+            return Err(ZkError::ProveFailed(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ));
         }
 
-        let proof_data = fs::read(&proof_path)?;
-        let public_signals = fs::read(&public_inputs_path)?;
+        let proof_data = fs::read(output_dir.join("proof"))?;
+        let public_signals = fs::read(output_dir.join("public_inputs"))?;
 
         info!(
             "generated proof ({} bytes) for {} / {}",
             proof_data.len(),
-            circuit_name,
+            circuit.as_str(),
             e3_id
         );
 
@@ -128,18 +129,18 @@ impl ZkProver {
             return Err(ZkError::BbNotInstalled);
         }
 
-        let circuit_name = circuit.as_str();
         let vk_path = self
             .circuits_dir
-            .join("vk")
-            .join(format!("{}.vk", circuit_name));
+            .join(circuit.dir_path())
+            .join(format!("{}.vk", circuit.as_str()));
         if !vk_path.exists() {
-            return Err(ZkError::CircuitNotFound(format!("{}.vk", circuit_name)));
+            return Err(ZkError::CircuitNotFound(format!(
+                "VK not found: {}",
+                vk_path.display()
+            )));
         }
 
         let job_dir = self.work_dir.join(e3_id);
-        fs::create_dir_all(&job_dir)?;
-
         let out_dir = job_dir.join("out");
         fs::create_dir_all(&out_dir)?;
 
@@ -149,7 +150,7 @@ impl ZkProver {
         fs::write(&proof_path, proof_data)?;
         fs::write(&public_inputs_path, public_signals)?;
 
-        debug!("verifying proof for circuit: {}", circuit_name);
+        debug!("verifying proof for circuit: {}", circuit.as_str());
 
         let output = StdCommand::new(&self.bb_binary)
             .args([

@@ -35,9 +35,11 @@ pub trait Provable: Send + Sync {
     ) -> Result<Proof, ZkError> {
         let inputs = self.build_witness(params, input)?;
 
+        let circuit_name = self.circuit().as_str();
         let circuit_path = prover
             .circuits_dir()
-            .join(format!("{}.json", self.circuit().as_str()));
+            .join(self.circuit().dir_path())
+            .join(format!("{}.json", circuit_name));
         let circuit = CompiledCircuit::from_file(&circuit_path)?;
 
         let witness_gen = WitnessGenerator::new();

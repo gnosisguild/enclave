@@ -76,18 +76,14 @@ async fn test_pk_bfv_proof_generation() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    fs::copy(
-        fixtures.join("pk.json"),
-        backend.circuits_dir.join("pk.json"),
-    )
-    .await
-    .unwrap();
-    fs::copy(
-        fixtures.join("pk.vk"),
-        backend.circuits_dir.join("vk").join("pk.vk"),
-    )
-    .await
-    .unwrap();
+    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
+        .await
+        .unwrap();
+    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
+        .await
+        .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
     let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
@@ -122,18 +118,14 @@ async fn test_pk_bfv_proof_verification() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    fs::copy(
-        fixtures.join("pk.json"),
-        backend.circuits_dir.join("pk.json"),
-    )
-    .await
-    .unwrap();
-    fs::copy(
-        fixtures.join("pk.vk"),
-        backend.circuits_dir.join("vk").join("pk.vk"),
-    )
-    .await
-    .unwrap();
+    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
+        .await
+        .unwrap();
+    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
+        .await
+        .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
     let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
@@ -169,18 +161,14 @@ async fn test_pk_bfv_commitment_consistency() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    fs::copy(
-        fixtures.join("pk.json"),
-        backend.circuits_dir.join("pk.json"),
-    )
-    .await
-    .unwrap();
-    fs::copy(
-        fixtures.join("pk.vk"),
-        backend.circuits_dir.join("vk").join("pk.vk"),
-    )
-    .await
-    .unwrap();
+    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
+        .await
+        .unwrap();
+    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
+        .await
+        .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
     let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
