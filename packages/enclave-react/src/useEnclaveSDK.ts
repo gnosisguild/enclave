@@ -34,7 +34,6 @@ export interface UseEnclaveSDKReturn {
   error: string | null
   // Contract interaction methods (only the ones commonly used)
   requestE3: typeof EnclaveSDK.prototype.requestE3
-  activateE3: typeof EnclaveSDK.prototype.activateE3
   getThresholdBfvParamsSet: typeof EnclaveSDK.prototype.getThresholdBfvParamsSet
   // Event handling
   onEnclaveEvent: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
@@ -117,7 +116,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
       setError(errorMessage)
       console.error('SDK initialization failed:', err)
     }
-  }, [publicClient, walletClient, config.contracts, config.chainId])
+  }, [publicClient, walletClient, config.contracts, config.chainId, config.thresholdBfvParamsPresetName, sdk])
 
   // Initialize SDK when wagmi clients are available
   useEffect(() => {
@@ -131,7 +130,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     if (isInitialized && publicClient && walletClient) {
       initializeSDK()
     }
-  }, [walletClient, initializeSDK])
+  }, [walletClient, initializeSDK, isInitialized, publicClient])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -142,6 +141,11 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     }
   }, [])
 
+  const getThresholdBfvParamsSet = useCallback(async () => {
+    if (!sdk) throw new Error('SDK not initialized')
+    return sdk.getThresholdBfvParamsSet()
+  }, [sdk])
+
   // Contract interaction methods
   const requestE3 = useCallback(
     (...args: Parameters<typeof EnclaveSDK.prototype.requestE3>) => {
@@ -150,19 +154,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     },
     [sdk],
   )
-
-  const activateE3 = useCallback(
-    (...args: Parameters<typeof EnclaveSDK.prototype.activateE3>) => {
-      if (!sdk) throw new Error('SDK not initialized')
-      return sdk.activateE3(...args)
-    },
-    [sdk],
-  )
-
-  const getThresholdBfvParamsSet = useCallback(async () => {
-    if (!sdk) throw new Error('SDK not initialized')
-    return sdk.getThresholdBfvParamsSet()
-  }, [sdk])
 
   // Event handling methods
   const onEnclaveEvent = useCallback(
@@ -186,7 +177,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     isInitialized,
     error,
     requestE3,
-    activateE3,
     getThresholdBfvParamsSet,
     onEnclaveEvent,
     off,

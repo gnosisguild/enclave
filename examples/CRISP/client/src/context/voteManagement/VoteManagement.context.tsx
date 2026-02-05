@@ -147,7 +147,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
       setRoundState({ ...fetchedRoundState, start_block: startBlockNumber })
       setVotingRound({ round_id: fetchedRoundState.id, pk_bytes: fetchedRoundState.committee_public_key })
       setPollOptions(generatePoll({ round_id: fetchedRoundState.id, emojis: fetchedRoundState.emojis }))
-      setRoundEndDate(convertTimestampToDate(fetchedRoundState.start_time, fetchedRoundState.duration))
+      setRoundEndDate(convertTimestampToDate(fetchedRoundState.end_time))
       setCurrentRoundId(fetchedRoundState.id)
     }
   }

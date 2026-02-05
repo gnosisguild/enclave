@@ -244,4 +244,9 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 computation
     /// @return Whether the submission window is open
     function isOpen(uint256 e3Id) external view returns (bool);
+
+    /// @notice Get the committee deadline for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return committeeDeadline The committee deadline timestamp
+    function getCommitteeDeadline(uint256 e3Id) external view returns (uint256);
 }

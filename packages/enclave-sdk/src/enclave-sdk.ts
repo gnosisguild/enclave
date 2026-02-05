@@ -288,9 +288,7 @@ export class EnclaveSDK {
    */
   public async requestE3(params: {
     threshold: [number, number]
-    startWindow: [bigint, bigint]
-    inputDeadline: bigint
-    duration: bigint
+    inputWindow: [bigint, bigint]
     e3Program: `0x${string}`
     e3ProgramParams: `0x${string}`
     computeProviderParams: `0x${string}`
@@ -305,9 +303,7 @@ export class EnclaveSDK {
 
     return this.contractClient.requestE3(
       params.threshold,
-      params.startWindow,
-      params.inputDeadline,
-      params.duration,
+      params.inputWindow,
       params.e3Program,
       params.e3ProgramParams,
       params.computeProviderParams,
@@ -327,17 +323,6 @@ export class EnclaveSDK {
     }
 
     return this.contractClient.getE3PublicKey(e3Id)
-  }
-
-  /**
-   * Activate an E3 computation
-   */
-  public async activateE3(e3Id: bigint, gasLimit?: bigint): Promise<Hash> {
-    if (!this.initialized) {
-      await this.initialize()
-    }
-
-    return this.contractClient.activateE3(e3Id, gasLimit)
   }
 
   /**

@@ -319,6 +319,25 @@
           "type": "uint256"
         }
       ],
+      "name": "getCommitteeDeadline",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
       "name": "getCommitteeNodes",
       "outputs": [
         {
@@ -571,5 +590,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-f60579663c6e7444d5163f3c20aab12b3e57c6df"
+  "buildInfoId": "solc-0_8_28-e32bfa656630091a870060bd36a73fd1308442a8"
 }

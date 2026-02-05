@@ -10,12 +10,11 @@ import { IE3Program } from "../interfaces/IE3Program.sol";
 contract MockE3Program is IE3Program {
     error InvalidParams(bytes e3ProgramParams, bytes computeProviderParams);
     error E3AlreadyInitialized();
+    error InvalidInput();
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
-
-    error InvalidInput();
 
     function validate(
         uint256 e3Id,

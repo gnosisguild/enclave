@@ -91,31 +91,6 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "expiration",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes32",
-          "name": "committeePublicKey",
-          "type": "bytes32"
-        }
-      ],
-      "name": "E3Activated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
           "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
@@ -229,23 +204,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -467,11 +427,6 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "committeeFormationWindow",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
               "name": "dkgWindow",
               "type": "uint256"
             },
@@ -499,25 +454,6 @@
       ],
       "name": "TimeoutConfigUpdated",
       "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        }
-      ],
-      "name": "activate",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
     },
     {
       "inputs": [],
@@ -622,17 +558,7 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "committeeDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
               "name": "dkgDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "activationDeadline",
               "type": "uint256"
             },
             {
@@ -702,23 +628,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -785,18 +696,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -898,11 +799,6 @@
       "outputs": [
         {
           "components": [
-            {
-              "internalType": "uint256",
-              "name": "committeeFormationWindow",
-              "type": "uint256"
-            },
             {
               "internalType": "uint256",
               "name": "dkgWindow",
@@ -1064,18 +960,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -1129,23 +1015,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "inputDeadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -1290,11 +1161,6 @@
           "components": [
             {
               "internalType": "uint256",
-              "name": "committeeFormationWindow",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
               "name": "dkgWindow",
               "type": "uint256"
             },
@@ -1331,5 +1197,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-f60579663c6e7444d5163f3c20aab12b3e57c6df"
+  "buildInfoId": "solc-0_8_28-e32bfa656630091a870060bd36a73fd1308442a8"
 }

@@ -43,10 +43,7 @@ sol! {
         uint256 seed;
         uint32[2] threshold;
         uint256 requestBlock;
-        uint256[2] startWindow;
-        uint256 inputDeadline;
-        uint256 duration;
-        uint256 expiration;
+        uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
         address e3Program;
         bytes e3ProgramParams;
@@ -61,13 +58,22 @@ sol! {
     #[derive(Debug)]
     struct E3RequestParams {
         uint32[2] threshold;
-        uint256[2] startWindow;
-        uint256 inputDeadline;
-        uint256 duration;
+        uint256[2] inputWindow;
         address e3Program;
         bytes e3ProgramParams;
         bytes computeProviderParams;
         bytes customParams;
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum E3Stage {
+        None,
+        Requested,
+        CommitteeFinalized,
+        KeyPublished,
+        CiphertextReady,
+        Complete,
+        Failed
     }
 
     #[derive(Debug)]
@@ -78,13 +84,13 @@ sol! {
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
         function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
-        function activate(uint256 e3Id) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
         function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
         function getInputRoot(uint256 e3Id) public view returns (uint256);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
+        function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
     }
 }
 
@@ -116,13 +122,13 @@ pub trait EnclaveRead {
     async fn get_e3_quote(
         &self,
         threshold: [u32; 2],
-        start_window: [U256; 2],
-        input_deadline: U256,
-        duration: U256,
+        input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
     ) -> Result<U256>;
+
+    async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage>;
 }
 
 /// Trait for write operations on the Enclave contract
@@ -132,17 +138,12 @@ pub trait EnclaveWrite {
     async fn request_e3(
         &self,
         threshold: [u32; 2],
-        start_window: [U256; 2],
-        input_deadline: U256,
-        duration: U256,
+        input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
         custom_params: Bytes,
     ) -> Result<(TransactionReceipt, U256)>;
-
-    /// Activate an E3
-    async fn activate(&self, e3_id: U256) -> Result<TransactionReceipt>;
 
     /// Enable an E3 program
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt>;
@@ -341,18 +342,14 @@ where
     async fn get_e3_quote(
         &self,
         threshold: [u32; 2],
-        start_window: [U256; 2],
-        input_deadline: U256,
-        duration: U256,
+        input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
     ) -> Result<U256> {
         let e3_request = E3RequestParams {
             threshold,
-            startWindow: start_window,
-            inputDeadline: input_deadline,
-            duration,
+            inputWindow: input_window,
             e3Program: e3_program,
             e3ProgramParams: e3_params,
             computeProviderParams: compute_provider_params,
@@ -363,6 +360,12 @@ where
         let fee = contract.getE3Quote(e3_request).call().await?;
         Ok(fee)
     }
+
+    async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let stage = contract.getE3Stage(e3_id).call().await?;
+        Ok(stage)
+    }
 }
 
 // Implement EnclaveWrite only for contracts with ReadWrite marker
@@ -371,9 +374,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
     async fn request_e3(
         &self,
         threshold: [u32; 2],
-        start_window: [U256; 2],
-        input_deadline: U256,
-        duration: U256,
+        input_window: [U256; 2],
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
@@ -390,9 +391,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
         let e3_request = E3RequestParams {
             threshold,
-            startWindow: start_window,
-            inputDeadline: input_deadline,
-            duration,
+            inputWindow: input_window,
             e3Program: e3_program,
             e3ProgramParams: e3_params.clone(),
             computeProviderParams: compute_provider_params.clone(),
@@ -403,20 +402,6 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok((receipt, e3_id))
-    }
-
-    async fn activate(&self, e3_id: U256) -> Result<TransactionReceipt> {
-        let _guard = NONCE_LOCK.lock().await;
-        let wallet_addr = self
-            .wallet_address
-            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
-        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
-
-        let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.activate(e3_id).nonce(nonce);
-        let receipt = builder.send().await?.get_receipt().await?;
-
-        Ok(receipt)
     }
 
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt> {

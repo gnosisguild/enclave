@@ -10,9 +10,6 @@ use alloy::sol;
 
 sol! {
     #[derive(Debug)]
-    event E3Activated(uint256 e3Id, uint256 expiration, bytes32 committeePublicKey);
-
-    #[derive(Debug)]
     event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
 
     #[derive(Debug)]
@@ -30,10 +27,7 @@ sol! {
         uint256 seed;
         uint32[2] threshold;
         uint256 requestBlock;
-        uint256[2] startWindow;
-        uint256 inputDeadline;
-        uint256 duration;
-        uint256 expiration;
+        uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
         IE3Program e3Program;
         bytes e3ProgramParams;

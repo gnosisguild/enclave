@@ -169,7 +169,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         &mut self,
         custom_params: CustomParams,
         requester: String,
-        input_deadline: u64,
+        end_time: u64,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
@@ -188,6 +188,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             credit_mode: custom_params.credit_mode,
             credits: custom_params.credits,
             input_deadline,
+            end_time,
         })
         .await
     }
@@ -256,7 +257,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             option_2_tally: e3_crisp.votes_option_2,
             option_1_emoji: e3_crisp.emojis[0].clone(),
             option_2_emoji: e3_crisp.emojis[1].clone(),
-            end_time: e3.expiration,
+            end_time: e3.input_window[1],
             total_votes: self.get_vote_count().await?,
             requester: e3_crisp.requester,
         })
@@ -267,14 +268,12 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(E3StateLite {
             emojis: e3_crisp.emojis,
-            expiration: e3.expiration,
             id: self.e3_id,
             status: e3_crisp.status,
             chain_id: e3.chain_id,
-            input_deadline: e3.input_deadline,
-            duration: e3.duration,
+            start_time: e3.input_window[0],
+            end_time: e3.input_window[1],
             vote_count: u64::try_from(e3_crisp.has_voted.len())?,
-            start_time: e3_crisp.start_time,
             start_block: e3.request_block,
             enclave_address: e3.enclave_address,
             committee_public_key: e3.committee_public_key,
@@ -290,7 +289,7 @@ impl<S: DataStore> CrispE3Repository<S> {
     /// Get the input deadline for the current round
     pub async fn get_input_deadline(&self) -> Result<u64> {
         let e3_crisp = self.get_crisp().await?;
-        Ok(e3_crisp.input_deadline)
+        Ok(e3_crisp.end_time)
     }
 
     pub async fn get_ciphertext_inputs(&self) -> Result<Vec<(Vec<u8>, u64)>> {

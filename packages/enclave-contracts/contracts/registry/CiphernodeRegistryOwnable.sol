@@ -377,15 +377,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         return true;
     }
 
-    /// @notice Check if submission window is still open for an E3
-    /// @param e3Id ID of the E3 computation
-    /// @return Whether the submission window is open
-    function isOpen(uint256 e3Id) public view returns (bool) {
-        Committee storage c = committees[e3Id];
-        if (!c.initialized || c.finalized) return false;
-        return block.timestamp <= c.committeeDeadline;
-    }
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Set Functions                        //
@@ -425,6 +416,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                   Get Functions                        //
     //                                                        //
     ////////////////////////////////////////////////////////////
+
+    /// @notice Check if submission window is still open for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return Whether the submission window is open
+    function isOpen(uint256 e3Id) public view returns (bool) {
+        Committee storage c = committees[e3Id];
+        if (!c.initialized || c.finalized) return false;
+        return block.timestamp <= c.committeeDeadline;
+    }
 
     /// @inheritdoc ICiphernodeRegistry
     function committeePublicKey(
@@ -482,6 +482,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @return Address of the bonding registry contract
     function getBondingRegistry() external view returns (address) {
         return address(bondingRegistry);
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeDeadline(
+        uint256 e3Id
+    ) external view returns (uint256) {
+        Committee storage c = committees[e3Id];
+        require(c.initialized, CommitteeNotRequested());
+        return c.committeeDeadline;
     }
 
     ////////////////////////////////////////////////////////////

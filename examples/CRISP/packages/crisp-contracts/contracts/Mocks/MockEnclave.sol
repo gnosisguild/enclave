@@ -23,10 +23,7 @@ contract MockEnclave {
       seed: 0,
       threshold: [uint32(1), uint32(2)],
       requestBlock: 0,
-      startWindow: [uint256(0), uint256(0)],
-      duration: 150,
-      expiration: block.timestamp + 350,
-      inputDeadline: block.timestamp + 100,
+      inputWindow: [uint256(0), uint256(0)],
       encryptionSchemeId: bytes32(0),
       e3Program: IE3Program(address(0)),
       e3ProgramParams: bytes(""),
@@ -51,16 +48,17 @@ contract MockEnclave {
     committeePublicKey = publicKeyHash;
   }
 
+  function getE3Stage(uint256) external view returns (IEnclave.E3Stage) {
+    return IEnclave.E3Stage.KeyPublished;
+  }
+
   function getE3(uint256) external view returns (E3 memory) {
     return
       E3({
         seed: 0,
         threshold: [uint32(1), uint32(2)],
         requestBlock: 0,
-        startWindow: [uint256(0), uint256(0)],
-        duration: e3s[e3Id].duration,
-        expiration: e3s[e3Id].expiration,
-        inputDeadline: e3s[e3Id].inputDeadline,
+        inputWindow: [uint256(0), block.timestamp + 100],
         encryptionSchemeId: bytes32(0),
         e3Program: IE3Program(address(0)),
         e3ProgramParams: bytes(""),

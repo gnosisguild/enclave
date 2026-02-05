@@ -209,12 +209,8 @@ pub async fn initialize_crisp_round(
 
     info!("Requesting E3...");
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let start_window: [U256; 2] = [
-        U256::from(Utc::now().timestamp()),
-        U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
-    ];
-    let input_deadline = U256::from(Utc::now().timestamp()) + U256::from(CONFIG.e3_duration);
-    let duration: U256 = U256::from(CONFIG.e3_duration);
+    
+    let input_window = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp()) + U256::from(CONFIG.e3_duration)];
     let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
@@ -225,9 +221,7 @@ pub async fn initialize_crisp_round(
     let (receipt, e3_id) = contract
         .request_e3(
             threshold,
-            start_window,
-            input_deadline,
-            duration,
+            input_window,
             e3_program,
             e3_params,
             compute_provider_params,

@@ -324,11 +324,9 @@ describe("CiphernodeRegistryOwnable", function () {
     const currentTime = await networkHelpers.time.latest();
     const requestParams = {
       threshold: [2, 2] as [number, number],
-      startWindow: [currentTime, currentTime + 100] as [number, number],
-      duration: 60 * 60 * 24 * 30, // 30 days
+      inputWindow: [currentTime + 100, currentTime + 300] as [number, number],
       e3Program: await mockE3Program.mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
-      inputDeadline: currentTime + 500,
       computeProviderParams: abiCoder.encode(
         ["address"],
         [await mockDecryptionVerifier.mockDecryptionVerifier.getAddress()],
