@@ -167,6 +167,15 @@ impl CrtPolynomial {
         }
     }
 
+    /// Adds a limb to the CRT polynomial.
+    ///
+    /// # Arguments
+    ///
+    /// * `limb` - The limb to add.
+    pub fn add_limb(&mut self, limb: Polynomial) {
+        self.limbs.push(limb);
+    }
+
     /// Returns a reference to the limb polynomial at the given index.
     ///
     /// # Arguments

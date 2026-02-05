@@ -176,7 +176,7 @@ mod tests {
     use crate::circuits::computation::Computation;
     use crate::threshold::user_data_encryption::computation::Witness;
     use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
-    use crate::threshold::UserDataEncryptionCircuitInput;
+    use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use fhe_traits::DeserializeParametrized;
 
