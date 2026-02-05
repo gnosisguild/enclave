@@ -86,19 +86,17 @@ share_encryption_sk (CIRCUIT 3a)
 -------------------------------------
 ************************************/
 
-// share_encryption_sk - bit parameters
-pub global SHARE_ENCRYPTION_BIT_PK: u32 = 57;
-pub global SHARE_ENCRYPTION_BIT_CT: u32 = 57;
-pub global SHARE_ENCRYPTION_BIT_U: u32 = 2;
-pub global SHARE_ENCRYPTION_BIT_E0: u32 = 6;
-pub global SHARE_ENCRYPTION_BIT_E1: u32 = 6;
-pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 55;
-pub global SHARE_ENCRYPTION_BIT_R1: u32 = 54;
-pub global SHARE_ENCRYPTION_BIT_R2: u32 = 57;
-pub global SHARE_ENCRYPTION_BIT_P1: u32 = 14;
-pub global SHARE_ENCRYPTION_BIT_P2: u32 = 57;
+pub global SHARE_ENCRYPTION_BIT_PK: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_CT: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_U: u32 = 1;
+pub global SHARE_ENCRYPTION_BIT_E0: u32 = 5;
+pub global SHARE_ENCRYPTION_BIT_E1: u32 = 5;
+pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 54;
+pub global SHARE_ENCRYPTION_BIT_R1: u32 = 53;
+pub global SHARE_ENCRYPTION_BIT_R2: u32 = 56;
+pub global SHARE_ENCRYPTION_BIT_P1: u32 = 13;
+pub global SHARE_ENCRYPTION_BIT_P2: u32 = 56;
 
-// share_encryption_sk - bounds
 pub global SHARE_ENCRYPTION_T: Field = 18014398509481984;
 pub global SHARE_ENCRYPTION_Q_MOD_T: Field = 1082658244788225;
 pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [70854796903366627, 47439047573780733];
@@ -113,7 +111,6 @@ pub global SHARE_ENCRYPTION_P1_BOUNDS: [Field; L] = [4096, 4096];
 pub global SHARE_ENCRYPTION_P2_BOUNDS: [Field; L] = [36028797041049600, 36028797031219200];
 pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 18014398509481983;
 
-// share_encryption_sk - configs
 pub global SHARE_ENCRYPTION_CONFIGS_SK: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     SHARE_ENCRYPTION_T,
     SHARE_ENCRYPTION_Q_MOD_T,
@@ -137,7 +134,7 @@ share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------
 ************************************/
 
-// share_encryption_e_sm uses the same bit parameters and bounds as SK
+// share_encryption_e_sm uses the same bit parameters and bounds as share_encryption_sk
 pub global SHARE_ENCRYPTION_CONFIGS_E_SM: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     SHARE_ENCRYPTION_T,
     SHARE_ENCRYPTION_Q_MOD_T,
