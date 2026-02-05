@@ -18,6 +18,7 @@ use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, 
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
+use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
@@ -421,13 +422,13 @@ impl CiphernodeBuilder {
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let _ = self.ensure_multithread(&bus);
-            let share_encryption_params = e3_trbfv::helpers::get_share_encryption_params();
+            let share_enc_preset = BfvPreset::InsecureDkg512;
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
                 &addr,
-                share_encryption_params,
+                share_enc_preset,
             ));
 
             info!("Setting up ZK actors");

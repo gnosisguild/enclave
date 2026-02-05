@@ -15,6 +15,7 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 alloy-dyn-abi = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, optional = true }
+serde = { workspace = true }
 
 [[bin]]
 name = "search_params"

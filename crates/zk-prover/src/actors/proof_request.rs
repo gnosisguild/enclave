@@ -73,7 +73,10 @@ impl ProofRequestActor {
         );
 
         let request = ComputeRequest::zk(
-            ZkRequest::PkBfv(PkBfvProofRequest::new(msg.key.pk_bfv.clone(), msg.params)),
+            ZkRequest::PkBfv(PkBfvProofRequest::new(
+                msg.key.pk_bfv.clone(),
+                msg.params_preset,
+            )),
             correlation_id,
             msg.e3_id,
         );

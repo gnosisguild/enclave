@@ -30,16 +30,13 @@ impl Provable for PkCircuit {
         preset: &Self::Params,
         input: &Self::Input,
     ) -> Result<InputMap, ZkError> {
-        // Use the existing Witness::compute implementation from zk-helpers
-        // to ensure consistency between proof generation and verification
         let circuit_input = PkCircuitInput {
             public_key: input.clone(),
         };
 
-        let witness = Witness::compute(*preset, &circuit_input)
+        let witness = Witness::compute(preset.clone(), &circuit_input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
-        // Convert the witness to InputMap format for Noir
         let mut inputs = InputMap::new();
         inputs.insert(
             "pk0is".to_string(),

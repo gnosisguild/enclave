@@ -6,7 +6,7 @@
 
 use crate::{E3id, EncryptionKey};
 use actix::Message;
-use e3_utils::utility_types::ArcBytes;
+use e3_fhe_params::BfvPreset;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 use std::sync::Arc;
@@ -19,8 +19,7 @@ use std::sync::Arc;
 pub struct EncryptionKeyPending {
     pub e3_id: E3id,
     pub key: Arc<EncryptionKey>,
-    /// ABI-encoded BFV parameters required to build the witness.
-    pub params: ArcBytes,
+    pub params_preset: BfvPreset,
 }
 
 impl Display for EncryptionKeyPending {

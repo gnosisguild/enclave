@@ -13,6 +13,7 @@ use crate::constants::{
     search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z},
     secure_8192,
 };
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -30,7 +31,7 @@ use fhe::bfv::BfvParameters;
 /// generates a standard (non-threshold) BFV key-pair using these parameters. These keys are
 /// used exclusively for encrypting secret shares during DKG, since the threshold public key
 /// doesn't exist yet. After DKG completes, these keys are no longer needed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum BfvPreset {
     /// Insecure threshold BFV parameters (degree 512) - DO NOT USE IN PRODUCTION
     ///

@@ -11,7 +11,7 @@ use e3_utils::utility_types::ArcBytes;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 pub struct ZkProver {
     bb_binary: PathBuf,
@@ -73,7 +73,12 @@ impl ZkProver {
 
         fs::write(&witness_path, witness_data)?;
 
-        debug!("generating proof for circuit: {}", circuit.as_str());
+        debug!(
+            "generating proof for circuit {} using circuit: {}, vk: {}",
+            circuit.as_str(),
+            circuit_path.display(),
+            vk_path.display()
+        );
 
         let output = StdCommand::new(&self.bb_binary)
             .args([
@@ -92,9 +97,12 @@ impl ZkProver {
             .output()?;
 
         if !output.status.success() {
-            return Err(ZkError::ProveFailed(
-                String::from_utf8_lossy(&output.stderr).to_string(),
-            ));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(ZkError::ProveFailed(format!(
+                "bb prove failed:\nstderr: {}\nstdout: {}",
+                stderr, stdout
+            )));
         }
 
         let proof_data = fs::read(output_dir.join("proof"))?;
@@ -140,6 +148,12 @@ impl ZkProver {
             )));
         }
 
+        debug!(
+            "verifying proof for circuit {} using VK: {}",
+            circuit.as_str(),
+            vk_path.display()
+        );
+
         let job_dir = self.work_dir.join(e3_id);
         let out_dir = job_dir.join("out");
         fs::create_dir_all(&out_dir)?;
@@ -149,8 +163,6 @@ impl ZkProver {
 
         fs::write(&proof_path, proof_data)?;
         fs::write(&public_inputs_path, public_signals)?;
-
-        debug!("verifying proof for circuit: {}", circuit.as_str());
 
         let output = StdCommand::new(&self.bb_binary)
             .args([
@@ -165,6 +177,18 @@ impl ZkProver {
                 &vk_path.to_string_lossy(),
             ])
             .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            warn!(
+                "bb verification failed for {}:\nVK: {}\nstderr: {}\nstdout: {}",
+                circuit.as_str(),
+                vk_path.display(),
+                stderr,
+                stdout
+            );
+        }
 
         Ok(output.status.success())
     }

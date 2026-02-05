@@ -6,6 +6,7 @@
 
 use crate::Proof;
 use derivative::Derivative;
+use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 
@@ -23,16 +24,14 @@ pub struct PkBfvProofRequest {
     /// The BFV public key bytes.
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk_bfv: ArcBytes,
-    /// ABI-encoded BFV parameters.
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub params: ArcBytes,
+    pub params_preset: BfvPreset,
 }
 
 impl PkBfvProofRequest {
-    pub fn new(pk_bfv: impl Into<ArcBytes>, params: impl Into<ArcBytes>) -> Self {
+    pub fn new(pk_bfv: impl Into<ArcBytes>, params_preset: BfvPreset) -> Self {
         Self {
             pk_bfv: pk_bfv.into(),
-            params: params.into(),
+            params_preset,
         }
     }
 }

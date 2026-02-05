@@ -14,16 +14,16 @@ use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
+use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
-use std::sync::Arc;
 
 use crate::KeyshareState;
-
+use std::sync::Arc;
 pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
-    share_encryption_params: Arc<fhe::bfv::BfvParameters>,
+    share_enc_preset: BfvPreset,
 }
 
 impl ThresholdKeyshareExtension {
@@ -31,13 +31,13 @@ impl ThresholdKeyshareExtension {
         bus: &BusHandle,
         cipher: &Arc<Cipher>,
         address: &str,
-        share_encryption_params: Arc<fhe::bfv::BfvParameters>,
+        share_enc_preset: BfvPreset,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             address: address.to_owned(),
-            share_encryption_params,
+            share_enc_preset,
         })
     }
 }
@@ -79,7 +79,7 @@ impl E3Extension for ThresholdKeyshareExtension {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
                     state: container,
-                    share_encryption_params: self.share_encryption_params.clone(),
+                    share_enc_preset: self.share_enc_preset,
                 })
                 .start()
                 .into(),
@@ -109,7 +109,7 @@ impl E3Extension for ThresholdKeyshareExtension {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
             state,
-            share_encryption_params: self.share_encryption_params.clone(),
+            share_enc_preset: self.share_enc_preset,
         })
         .start()
         .into();

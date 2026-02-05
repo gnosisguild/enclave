@@ -3095,6 +3095,7 @@ dependencies = [
  "e3-events",
  "e3-evm",
  "e3-fhe",
+ "e3-fhe-params",
  "e3-keyshare",
  "e3-multithread",
  "e3-net",
@@ -3280,6 +3281,7 @@ dependencies = [
  "e3-crypto",
  "e3-data",
  "e3-events",
+ "e3-fhe-params",
  "e3-trbfv",
  "e3-utils",
  "futures-util",
@@ -3379,6 +3381,7 @@ dependencies = [
  "fhe",
  "num-bigint",
  "num-traits",
+ "serde",
  "thiserror 1.0.69",
 ]
 
