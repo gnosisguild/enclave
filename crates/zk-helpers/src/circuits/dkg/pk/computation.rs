@@ -188,14 +188,14 @@ impl Computation for Witness {
 mod tests {
     use super::*;
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
         let expected_bits = compute_pk_bit(&dkg_params);
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &()).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

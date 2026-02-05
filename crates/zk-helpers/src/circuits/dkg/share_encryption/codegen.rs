@@ -230,7 +230,6 @@ mod tests {
     use crate::dkg::share_encryption::ShareEncryptionSample;
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     fn share_encryption_input_from_sample(
         sample: &ShareEncryptionSample,
@@ -256,7 +255,7 @@ mod tests {
         let input = share_encryption_input_from_sample(&sample);
 
         let artifacts = ShareEncryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &input)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -276,13 +275,15 @@ mod tests {
         let input = share_encryption_input_from_sample(&sample);
 
         let artifacts = ShareEncryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &input)
             .unwrap();
 
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let bits =
-            crate::circuits::dkg::share_encryption::Bits::compute(DEFAULT_BFV_PRESET, &bounds)
-                .unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bits = crate::circuits::dkg::share_encryption::Bits::compute(
+            BfvPreset::InsecureThreshold512,
+            &bounds,
+        )
+        .unwrap();
         let prefix = <ShareEncryptionCircuit as Circuit>::PREFIX;
 
         assert!(artifacts.configs.contains("ShareEncryptionConfigs"));

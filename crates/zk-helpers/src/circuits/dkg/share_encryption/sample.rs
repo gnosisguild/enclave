@@ -130,7 +130,7 @@ mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use e3_fhe_params::{BfvPreset, DEFAULT_BFV_PRESET};
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_secret_key_sample() {
@@ -143,20 +143,20 @@ mod tests {
         assert_eq!(sample.public_key.c.c.len(), 2);
         assert_eq!(
             sample.plaintext.value.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
         assert_eq!(sample.ciphertext.c.len(), 2);
         assert_eq!(
             sample.u_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
         assert_eq!(
             sample.e0_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
         assert_eq!(
             sample.e1_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
     }
 
@@ -172,15 +172,15 @@ mod tests {
         assert_eq!(sample.ciphertext.c.len(), 2);
         assert_eq!(
             sample.u_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
         assert_eq!(
             sample.e0_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
         assert_eq!(
             sample.e1_rns.coefficients().len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
     }
 }

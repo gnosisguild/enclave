@@ -177,16 +177,16 @@ mod tests {
     use crate::threshold::user_data_encryption::computation::Witness;
     use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use crate::threshold::UserDataEncryptionCircuitInput;
-    use e3_fhe_params::{build_pair_for_preset, DEFAULT_BFV_PRESET};
+    use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use fhe_traits::DeserializeParametrized;
 
     #[test]
     fn test_bfv_public_key_to_greco() {
-        let (threshold_params, _) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
-        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
+        let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
 
         let witness = Witness::compute(
-            DEFAULT_BFV_PRESET,
+            BfvPreset::InsecureThreshold512,
             &UserDataEncryptionCircuitInput {
                 public_key: sample.public_key.clone(),
                 plaintext: sample.plaintext,
@@ -205,12 +205,12 @@ mod tests {
 
     #[test]
     fn test_bfv_ciphertext_to_greco() {
-        let (threshold_params, _) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
-        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
+        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
 
         let witness = Witness::compute(
-            DEFAULT_BFV_PRESET,
+            BfvPreset::InsecureThreshold512,
             &UserDataEncryptionCircuitInput {
                 public_key: sample.public_key.clone(),
                 plaintext: sample.plaintext,

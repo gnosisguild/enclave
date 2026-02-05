@@ -921,7 +921,6 @@ mod tests {
     use crate::dkg::share_encryption::sample::prepare_share_encryption_sample_for_test;
     use crate::dkg::share_encryption::ShareEncryptionSample;
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     fn share_encryption_input_from_sample(
         sample: &ShareEncryptionSample,
@@ -945,8 +944,8 @@ mod tests {
             DkgInputType::SecretKey,
         );
         let input = share_encryption_input_from_sample(&sample);
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
         let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
@@ -963,7 +962,7 @@ mod tests {
             DkgInputType::SecretKey,
         );
         let input = share_encryption_input_from_sample(&sample);
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
@@ -984,7 +983,7 @@ mod tests {
             DkgInputType::SecretKey,
         );
         let input = share_encryption_input_from_sample(&sample);
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
 
         // witness.message is plaintext coefficients (reversed, as used in circuit)
         let expected_message = Polynomial::from_u64_vector(sample.plaintext.value.deref().to_vec());
