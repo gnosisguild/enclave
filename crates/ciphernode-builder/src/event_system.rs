@@ -460,7 +460,7 @@ mod tests {
         // This sets up the aggregation delays
         let mut delays = HashMap::new();
         // Here we delay AggregationId(0) for 1 second
-        delays.insert(AggregateId::new(0), 1); // Ag0 is default
+        delays.insert(AggregateId::new(0), Duration::from_secs(1)); // Ag0 is default
         let config = AggregateConfig::new(delays);
 
         let system = EventSystem::in_mem("cn1")
@@ -601,9 +601,9 @@ mod tests {
 
         // Create an AggregateConfig with multiple AggregateIds
         let mut delays = HashMap::new();
-        delays.insert(AggregateId::new(0), 1000); // 1ms delay
-        delays.insert(AggregateId::new(1), 2000); // 2ms delay
-        delays.insert(AggregateId::new(2), 3000); // 3ms delay
+        delays.insert(AggregateId::new(0), Duration::from_micros(1000)); // 1ms delay
+        delays.insert(AggregateId::new(1), Duration::from_micros(2000)); // 2ms delay
+        delays.insert(AggregateId::new(2), Duration::from_micros(3000)); // 3ms delay
         let aggregate_config = AggregateConfig::new(delays);
 
         // Test in-memory eventstores
