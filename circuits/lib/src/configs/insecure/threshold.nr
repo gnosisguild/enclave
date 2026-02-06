@@ -14,9 +14,9 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 pub global N: u32 = 512;
 pub global L: u32 = 2;
 pub global PLAINTEXT_MODULUS: Field = 100;
+pub global Q_INVERSE_MOD_T: Field = 57;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
 pub global Q_MOD_T: Field = 3;
-pub global Q_INVERSE_MOD_T: Field = 7;
 pub global T_INV_MOD_Q: Field = 1416703358393105942938;
 
 /************************************
@@ -132,7 +132,7 @@ decrypted_shares_aggregation (CIRCUIT 7)
 ************************************/
 
 // decrypted_shares_aggregation - bit parameters
-pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 69;
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 65;
 
 // decrypted_shares_aggregation - configs
 pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =

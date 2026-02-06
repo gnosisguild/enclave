@@ -2534,6 +2534,7 @@ dependencies = [
  "itertools 0.14.0",
  "ndarray",
  "num-bigint",
+ "num-integer",
  "num-traits",
  "rand 0.8.5",
  "rayon",
