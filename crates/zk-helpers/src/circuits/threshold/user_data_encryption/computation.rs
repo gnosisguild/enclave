@@ -15,6 +15,7 @@ use crate::compute_ciphertext_commitment;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::polynomial_to_toml_json;
+use crate::ring::{cyclotomic_polynomial, decompose_residue};
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use crate::utils::compute_pk_bit;
@@ -37,7 +38,6 @@ use num_bigint::BigUint;
 use num_bigint::ToBigInt;
 use num_traits::Signed;
 use num_traits::ToPrimitive;
-use num_traits::Zero;
 use rand::thread_rng;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelBridge;
@@ -469,11 +469,7 @@ impl Computation for Witness {
         pk0.change_representation(Representation::PowerBasis);
         pk1.change_representation(Representation::PowerBasis);
 
-        // Create cyclotomic polynomial x^N + 1
-        let mut cyclo = vec![BigInt::from(0u64); (n + 1) as usize];
-
-        cyclo[0] = BigInt::from(1u64); // x^N term
-        cyclo[n as usize] = BigInt::from(1u64); // x^0 term
+        let cyclo = cyclotomic_polynomial(n);
 
         let ct0_coeffs = ct0.coefficients();
         let ct1_coeffs = ct1.coefficients();
@@ -600,88 +596,11 @@ impl Computation for Witness {
                 };
                 assert_eq!((ct0i_hat.len() as u64) - 1, 2 * (n - 1));
 
-                // Check whether ct0i_hat mod R_qi (the ring) is equal to ct0i
-                let mut ct0i_hat_mod_rqi = Polynomial::new(ct0i_hat.clone());
-
-                ct0i_hat_mod_rqi = ct0i_hat_mod_rqi.reduce_by_cyclotomic(&cyclo).unwrap();
-
-                ct0i_hat_mod_rqi.reduce(&qi_bigint);
-                ct0i_hat_mod_rqi.center(&qi_bigint);
-
-                assert_eq!(&ct0i, &ct0i_hat_mod_rqi);
-
-                // Compute r2i numerator = ct0i - ct0i_hat and reduce/center the polynomial
-                let ct0i_poly = ct0i.clone();
                 let ct0i_hat_poly = Polynomial::new(ct0i_hat.clone());
-                let ct0i_minus_ct0i_hat = ct0i_poly.sub(&ct0i_hat_poly).coefficients().to_vec();
-                assert_eq!((ct0i_minus_ct0i_hat.len() as u64) - 1, 2 * (n - 1));
-
-                let mut ct0i_minus_ct0i_hat_mod_zqi = Polynomial::new(ct0i_minus_ct0i_hat.clone());
-
-                ct0i_minus_ct0i_hat_mod_zqi.reduce(&qi_bigint);
-                ct0i_minus_ct0i_hat_mod_zqi.center(&qi_bigint);
-
-                // Compute r2i as the quotient of numerator divided by the cyclotomic polynomial
-                // to produce: (ct0i - ct0i_hat) / (x^N + 1) mod Z_qi. Remainder should be empty.
-                let ct0i_minus_ct0i_hat_poly = ct0i_minus_ct0i_hat_mod_zqi.clone();
-                let cyclo_poly = Polynomial::new(cyclo.clone());
-                let (r2i_poly, r2i_rem_poly) = ct0i_minus_ct0i_hat_poly.div(&cyclo_poly).unwrap();
-                let r2i = r2i_poly.coefficients().to_vec();
-                let r2i_rem = r2i_rem_poly.coefficients().to_vec();
-                assert!(r2i_rem.iter().all(|x| x.is_zero()));
-                assert_eq!((r2i.len() as u64) - 1, n - 2); // Order(r2i) = N - 2
-
-                // Assert that (ct0i - ct0i_hat) = (r2i * cyclo) mod Z_qi
-                let r2i_poly = Polynomial::new(r2i.clone());
-                let r2i_times_cyclo = r2i_poly.mul(&cyclo_poly).coefficients().to_vec();
-
-                let mut r2i_times_cyclo_mod_zqi = Polynomial::new(r2i_times_cyclo.clone());
-
-                r2i_times_cyclo_mod_zqi.reduce(&qi_bigint);
-                r2i_times_cyclo_mod_zqi.center(&qi_bigint);
-
-                assert_eq!(&ct0i_minus_ct0i_hat_mod_zqi, &r2i_times_cyclo_mod_zqi);
-                assert_eq!((r2i_times_cyclo.len() as u64) - 1, 2 * (n - 1));
-
-                // Calculate r1i = (ct0i - ct0i_hat - r2i * cyclo) / qi mod Z_p. Remainder should be empty.
-                let ct0i_minus_ct0i_hat_poly = Polynomial::new(ct0i_minus_ct0i_hat.clone());
-                let r2i_times_cyclo_poly = Polynomial::new(r2i_times_cyclo.clone());
-                let r1i_num = ct0i_minus_ct0i_hat_poly
-                    .sub(&r2i_times_cyclo_poly)
-                    .coefficients()
-                    .to_vec();
-                assert_eq!((r1i_num.len() as u64) - 1, 2 * (n - 1));
-
-                let r1i_num_poly = Polynomial::new(r1i_num.clone());
-                let qi_poly = Polynomial::new(vec![qi_bigint.clone()]);
-                let (r1i_poly, r1i_rem_poly) = r1i_num_poly.div(&qi_poly).unwrap();
+                let (r1i_poly, r2i_poly) =
+                    decompose_residue(&ct0i, &ct0i_hat_poly, &qi_bigint, &cyclo, n);
                 let r1i = r1i_poly.coefficients().to_vec();
-                let r1i_rem = r1i_rem_poly.coefficients().to_vec();
-                assert!(r1i_rem.iter().all(|x| x.is_zero()));
-                assert_eq!((r1i.len() as u64) - 1, 2 * (n - 1)); // Order(r1i) = 2*(N-1)
-                let r1i_poly_check = Polynomial::new(r1i.clone());
-                assert_eq!(
-                    &r1i_num,
-                    &r1i_poly_check.mul(&qi_poly).coefficients().to_vec()
-                );
-
-                // Assert that ct0i = ct0i_hat + r1i * qi + r2i * cyclo mod Z_p
-                let r1i_poly = Polynomial::new(r1i.clone());
-                let r1i_times_qi = r1i_poly.scalar_mul(&qi_bigint).coefficients().to_vec();
-                let ct0i_hat_poly = Polynomial::new(ct0i_hat.clone());
-                let r1i_times_qi_poly = Polynomial::new(r1i_times_qi.clone());
-                let r2i_times_cyclo_poly = Polynomial::new(r2i_times_cyclo.clone());
-                let mut ct0i_calculated = ct0i_hat_poly
-                    .add(&r1i_times_qi_poly)
-                    .add(&r2i_times_cyclo_poly)
-                    .coefficients()
-                    .to_vec();
-
-                while !ct0i_calculated.is_empty() && ct0i_calculated[0].is_zero() {
-                    ct0i_calculated.remove(0);
-                }
-
-                assert_eq!(&ct0i, &Polynomial::new(ct0i_calculated.clone()));
+                let r2i = r2i_poly.coefficients().to_vec();
 
                 // --------------------------------------------------- ct1i ---------------------------------------------------
 
@@ -697,87 +616,12 @@ impl Computation for Witness {
                 };
                 assert_eq!((ct1i_hat.len() as u64) - 1, 2 * (n - 1));
 
-                // Check whether ct1i_hat mod R_qi (the ring) is equal to ct1i
-                let mut ct1i_hat_mod_rqi = Polynomial::new(ct1i_hat.clone());
-
-                ct1i_hat_mod_rqi = ct1i_hat_mod_rqi.reduce_by_cyclotomic(&cyclo).unwrap();
-                ct1i_hat_mod_rqi.reduce(&qi_bigint);
-                ct1i_hat_mod_rqi.center(&qi_bigint);
-
-                assert_eq!(&ct1i, &ct1i_hat_mod_rqi);
-
-                // Compute p2i numerator = ct1i - ct1i_hat
-                let ct1i_poly = ct1i.clone();
                 let ct1i_hat_poly = Polynomial::new(ct1i_hat.clone());
-                let ct1i_minus_ct1i_hat = ct1i_poly.sub(&ct1i_hat_poly).coefficients().to_vec();
-                assert_eq!((ct1i_minus_ct1i_hat.len() as u64) - 1, 2 * (n - 1));
-                let mut ct1i_minus_ct1i_hat_mod_zqi = Polynomial::new(ct1i_minus_ct1i_hat.clone());
-
-                ct1i_minus_ct1i_hat_mod_zqi.reduce(&qi_bigint);
-                ct1i_minus_ct1i_hat_mod_zqi.center(&qi_bigint);
-
-                // Compute p2i as the quotient of numerator divided by the cyclotomic polynomial,
-                // and reduce/center the resulting coefficients to produce:
-                // (ct1i - ct1i_hat) / (x^N + 1) mod Z_qi. Remainder should be empty.
-                let ct1i_minus_ct1i_hat_poly = ct1i_minus_ct1i_hat_mod_zqi.clone();
-                let (p2i_poly, p2i_rem_poly) =
-                    ct1i_minus_ct1i_hat_poly.div(&cyclo_poly.clone()).unwrap();
-                let p2i = p2i_poly.coefficients().to_vec();
-                let p2i_rem = p2i_rem_poly.coefficients().to_vec();
-                assert!(p2i_rem.iter().all(|x| x.is_zero()));
-                assert_eq!((p2i.len() as u64) - 1, n - 2); // Order(p2i) = N - 2
-
-                // Assert that (ct1i - ct1i_hat) = (p2i * cyclo) mod Z_qi
-                let p2i_poly = Polynomial::new(p2i.clone());
-                let p2i_times_cyclo: Vec<BigInt> =
-                    p2i_poly.mul(&cyclo_poly).coefficients().to_vec();
-                let mut p2i_times_cyclo_mod_zqi = Polynomial::new(p2i_times_cyclo.clone());
-
-                p2i_times_cyclo_mod_zqi.reduce(&qi_bigint);
-                p2i_times_cyclo_mod_zqi.center(&qi_bigint);
-
-                assert_eq!(&ct1i_minus_ct1i_hat_mod_zqi, &p2i_times_cyclo_mod_zqi);
-                assert_eq!((p2i_times_cyclo.len() as u64) - 1, 2 * (n - 1));
-
-                // Calculate p1i = (ct1i - ct1i_hat - p2i * cyclo) / qi mod Z_p. Remainder should be empty.
-                let ct1i_minus_ct1i_hat_poly = Polynomial::new(ct1i_minus_ct1i_hat.clone());
-                let p2i_times_cyclo_poly = Polynomial::new(p2i_times_cyclo.clone());
-                let p1i_num = ct1i_minus_ct1i_hat_poly
-                    .sub(&p2i_times_cyclo_poly)
-                    .coefficients()
-                    .to_vec();
-                assert_eq!((p1i_num.len() as u64) - 1, 2 * (n - 1));
-
-                let p1i_num_poly = Polynomial::new(p1i_num.clone());
-                let qi_poly = Polynomial::new(vec![BigInt::from(qi.modulus())]);
-                let (p1i_poly, p1i_rem_poly) = p1i_num_poly.div(&qi_poly).unwrap();
+                let (p1i_poly, p2i_poly) =
+                    decompose_residue(&ct1i, &ct1i_hat_poly, &qi_bigint, &cyclo, n);
                 let p1i = p1i_poly.coefficients().to_vec();
-                let p1i_rem = p1i_rem_poly.coefficients().to_vec();
-                assert!(p1i_rem.iter().all(|x| x.is_zero()));
-                assert_eq!((p1i.len() as u64) - 1, 2 * (n - 1)); // Order(p1i) = 2*(N-1)
-                let p1i_poly_check = Polynomial::new(p1i.clone());
-                assert_eq!(
-                    &p1i_num,
-                    &p1i_poly_check.mul(&qi_poly).coefficients().to_vec()
-                );
+                let p2i = p2i_poly.coefficients().to_vec();
 
-                // Assert that ct1i = ct1i_hat + p1i * qi + p2i * cyclo mod Z_p
-                let p1i_poly = Polynomial::new(p1i.clone());
-                let p1i_times_qi = p1i_poly.scalar_mul(&qi_bigint).coefficients().to_vec();
-                let ct1i_hat_poly = Polynomial::new(ct1i_hat.clone());
-                let p1i_times_qi_poly = Polynomial::new(p1i_times_qi.clone());
-                let p2i_times_cyclo_poly = Polynomial::new(p2i_times_cyclo.clone());
-                let mut ct1i_calculated = ct1i_hat_poly
-                    .add(&p1i_times_qi_poly)
-                    .add(&p2i_times_cyclo_poly)
-                    .coefficients()
-                    .to_vec();
-
-                while !ct1i_calculated.is_empty() && ct1i_calculated[0].is_zero() {
-                    ct1i_calculated.remove(0);
-                }
-
-                assert_eq!(&ct1i, &Polynomial::new(ct1i_calculated.clone()));
                 (
                     i,
                     r2i,

@@ -8,10 +8,12 @@ pub mod ciphernodes_committee;
 pub mod circuits;
 pub mod packing;
 pub mod registry;
+pub mod ring;
 pub mod utils;
 
 pub use ciphernodes_committee::*;
 pub use circuits::*;
 pub use packing::*;
 pub use registry::*;
+pub use ring::*;
 pub use utils::*;
