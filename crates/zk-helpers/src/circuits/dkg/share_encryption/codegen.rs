@@ -71,6 +71,7 @@ pub global QIS: [Field; L] = [{}];
 /************************************
 -------------------------------------
 share_encryption_sk (CIRCUIT 3a)
+share_encryption_e_sm (CIRCUIT 3b)
 -------------------------------------
 ************************************/
 
@@ -99,7 +100,7 @@ pub global {}_P1_BOUNDS: [Field; L] = [{}];
 pub global {}_P2_BOUNDS: [Field; L] = [{}];
 pub global {}_MSG_BOUND: Field = {};
 
-pub global {}_CONFIGS_SK: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
+pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     {}_T,
     {}_Q_MOD_T,
     QIS,
@@ -115,29 +116,6 @@ pub global {}_CONFIGS_SK: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::ne
     {}_P2_BOUNDS,
     {}_MSG_BOUND,
 );
-
-/************************************
--------------------------------------
-share_encryption_e_sm (CIRCUIT 3b)
--------------------------------------
-************************************/
-
-// share_encryption_e_sm uses the same bit parameters and bounds as share_encryption_sk
-pub global SHARE_ENCRYPTION_CONFIGS_E_SM: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
-    {}_T,
-    {}_Q_MOD_T,
-    QIS,
-    {}_K0IS,
-    {}_PK_BOUNDS,
-    {}_E0_BOUND,
-    {}_E1_BOUND,
-    {}_U_BOUND,
-    {}_R1_LOW_BOUNDS,
-    {}_R1_UP_BOUNDS,
-    {}_R2_BOUNDS,
-    {}_P1_BOUNDS,
-    {}_P2_BOUNDS,
-    {}_MSG_BOUND,);
 "#,
         preset.dkg_counterpart().unwrap().metadata().degree,
         preset.dkg_counterpart().unwrap().metadata().num_moduli,
@@ -202,19 +180,6 @@ pub global SHARE_ENCRYPTION_CONFIGS_E_SM: ShareEncryptionConfigs<L> = ShareEncry
         prefix,
         prefix,
         prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
-        prefix,
     )
 }
 
@@ -230,7 +195,6 @@ mod tests {
     use crate::dkg::share_encryption::ShareEncryptionSample;
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     fn share_encryption_input_from_sample(
         sample: &ShareEncryptionSample,
@@ -256,7 +220,7 @@ mod tests {
         let input = share_encryption_input_from_sample(&sample);
 
         let artifacts = ShareEncryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &input)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -276,13 +240,15 @@ mod tests {
         let input = share_encryption_input_from_sample(&sample);
 
         let artifacts = ShareEncryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &input)
             .unwrap();
 
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let bits =
-            crate::circuits::dkg::share_encryption::Bits::compute(DEFAULT_BFV_PRESET, &bounds)
-                .unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bits = crate::circuits::dkg::share_encryption::Bits::compute(
+            BfvPreset::InsecureThreshold512,
+            &bounds,
+        )
+        .unwrap();
         let prefix = <ShareEncryptionCircuit as Circuit>::PREFIX;
 
         assert!(artifacts.configs.contains("ShareEncryptionConfigs"));
@@ -292,6 +258,6 @@ mod tests {
         assert!(artifacts
             .configs
             .contains(format!("{}_BIT_MSG: u32 = {}", prefix, bits.msg_bit).as_str()));
-        assert!(artifacts.configs.contains("SHARE_ENCRYPTION_CONFIGS_E_SM"));
+        assert!(artifacts.configs.contains("SHARE_ENCRYPTION_CONFIGS"));
     }
 }

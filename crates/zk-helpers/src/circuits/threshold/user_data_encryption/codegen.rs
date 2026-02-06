@@ -64,7 +64,7 @@ pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
     Ok(toml::to_string(&json)?)
 }
 
-pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
+pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
@@ -132,9 +132,9 @@ QIS,
 {}_K1_UP_BOUND
 );
 "#,
-        preset.metadata().degree,     // N
-        preset.metadata().num_moduli, // L
-        qis_str,                      // QIS array
+        configs.n, // N
+        configs.l, // L
+        qis_str,   // QIS array
         prefix,
         configs.bits.pk_bit, // BIT_PK
         prefix,
@@ -206,15 +206,15 @@ mod tests {
     use crate::threshold::user_data_encryption::computation::{Bits, Bounds};
     use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = UserDataEncryptionSample::generate(DEFAULT_BFV_PRESET);
+        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
         let artifacts = UserDataEncryptionCircuit
             .codegen(
-                DEFAULT_BFV_PRESET,
+                BfvPreset::InsecureThreshold512,
                 &UserDataEncryptionCircuitInput {
                     public_key: sample.public_key,
                     plaintext: sample.plaintext,
@@ -256,13 +256,23 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &()).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
-        assert!(configs_content
-            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
-        assert!(configs_content
-            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "N: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().degree
+            )
+            .as_str()
+        ));
+        assert!(configs_content.contains(
+            format!(
+                "L: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().num_moduli
+            )
+            .as_str()
+        ));
         assert!(configs_content.contains(
             format!(
                 "{}_BIT_PK: u32 = {}",

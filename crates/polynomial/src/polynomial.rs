@@ -304,6 +304,11 @@ impl Polynomial {
         Polynomial::new(product)
     }
 
+    /// Remove a coefficient from the polynomial.
+    pub fn remove(&mut self, index: usize) {
+        self.coefficients.remove(index);
+    }
+
     /// Divides one polynomial by another, returning the quotient and remainder.
     ///
     /// # Arguments
@@ -396,7 +401,7 @@ impl Polynomial {
     ///
     /// # Returns
     ///
-    /// Mutates the polynomial in place.
+    /// A new polynomial containing the remainder.
     ///
     /// # Errors
     ///

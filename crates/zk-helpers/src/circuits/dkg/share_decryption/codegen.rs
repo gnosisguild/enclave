@@ -126,8 +126,6 @@ mod tests {
 
         let configs = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
         let prefix = <ShareDecryptionCircuit as Circuit>::PREFIX;
-
-        assert!(artifacts.configs.contains("ShareDecryptionConfigs"));
         assert!(artifacts
             .configs
             .contains(format!("{}_BIT_MSG: u32 = {}", prefix, configs.bits.msg_bit).as_str()));

@@ -27,7 +27,8 @@ use e3_zk_helpers::dkg::share_encryption::{
     ShareEncryptionCircuit, ShareEncryptionCircuitInput, ShareEncryptionSample,
 };
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
-use e3_zk_helpers::threshold::{
+use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::threshold::user_data_encryption::{
     UserDataEncryptionCircuit, UserDataEncryptionCircuitInput, UserDataEncryptionSample,
 };
 use e3_zk_helpers::{PkSample, ShareComputationSample};
@@ -159,6 +160,7 @@ fn main() -> Result<()> {
     registry.register(Arc::new(PkCircuit));
     registry.register(Arc::new(ShareComputationCircuit));
     registry.register(Arc::new(UserDataEncryptionCircuit));
+    registry.register(Arc::new(PkGenerationCircuit));
     registry.register(Arc::new(ShareEncryptionCircuit));
     registry.register(Arc::new(ShareDecryptionCircuit));
 
@@ -320,6 +322,14 @@ fn main() -> Result<()> {
                         plaintext: sample.plaintext,
                     },
                 )?
+            }
+            name if name == <PkGenerationCircuit as Circuit>::NAME => {
+                let sample = PkGenerationCircuitInput::generate_sample(
+                    preset,
+                    CiphernodesCommitteeSize::Small.values(),
+                )?;
+                let circuit = PkGenerationCircuit;
+                circuit.codegen(preset, &sample)?
             }
             name if name == <ShareDecryptionCircuit as Circuit>::NAME => {
                 let sd = preset

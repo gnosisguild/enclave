@@ -197,7 +197,6 @@ mod tests {
     use crate::Circuit;
     use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
     use tempfile::TempDir;
 
     fn share_computation_input_from_sample(
@@ -225,7 +224,7 @@ mod tests {
         let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
 
         let artifacts = ShareComputationCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &input)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -258,12 +257,17 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
 
-        assert!(configs_content
-            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "N: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().degree
+            )
+            .as_str()
+        ));
         assert!(configs_content
             .contains(format!("{}_BIT_SHARE: u32 = {}", prefix, bits.bit_share).as_str()));
         assert!(configs_content
