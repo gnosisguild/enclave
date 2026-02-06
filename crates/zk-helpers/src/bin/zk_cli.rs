@@ -306,8 +306,8 @@ fn main() -> Result<()> {
             }
             name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
                 let sample = UserDataEncryptionCircuitInput::generate_sample(preset);
-
                 let circuit = UserDataEncryptionCircuit;
+
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkGenerationCircuit as Circuit>::NAME => {
