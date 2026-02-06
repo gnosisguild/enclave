@@ -101,7 +101,7 @@ pub async fn initialize_crisp_round(
     let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
     // We default to two options for the main CRISP app
     let num_options = U256::from(2);
-    // The credit mode is costant for the CRISP app (everyone gets the same credits)
+    // The credit mode is constant for the CRISP app (everyone gets the same credits)
     let credit_mode = U256::from(0);
     // everyone gets 1 credit
     let credits = U256::from(1);
