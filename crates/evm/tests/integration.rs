@@ -17,7 +17,8 @@ use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
     prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEventConfig,
-    EvmEventConfigChain, EvmSyncEventsReceived, GetEvents, SyncEnd, SyncStart, TestEvent,
+    EvmEventConfigChain, GetEvents, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnd,
+    TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
 use std::{sync::Arc, time::Duration};
@@ -73,9 +74,13 @@ impl FakeSyncActor {
     }
 }
 
-impl Handler<EvmSyncEventsReceived> for FakeSyncActor {
+impl Handler<HistoricalEvmEventsReceived> for FakeSyncActor {
     type Result = ();
-    fn handle(&mut self, mut msg: EvmSyncEventsReceived, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        mut msg: HistoricalEvmEventsReceived,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             for evt in msg.events.drain(..) {
                 self.bus.naked_dispatch(evt);
@@ -117,11 +122,11 @@ async fn evm_reader() -> Result<()> {
         })
         .build();
 
-    // SyncStart holds initialization information such as start block and earliest event
+    // HistoricalEvmSyncStart holds initialization information such as start block and earliest event
     // This should trigger all chains to start to sync
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish_without_context(SyncStart::new(sync, evm_info))?;
+    bus.publish_without_context(HistoricalEvmSyncStart::new(sync, evm_info))?;
 
     sleep(Duration::from_secs(1)).await;
     contract
@@ -199,7 +204,7 @@ async fn ensure_historical_events() -> Result<()> {
         .build();
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish_without_context(SyncStart::new(sync, evm_info))?;
+    bus.publish_without_context(HistoricalEvmSyncStart::new(sync, evm_info))?;
 
     for msg in live_events.clone() {
         contract

@@ -8,8 +8,8 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, GetAggregateEventsAfter, GetEventsAfterResponse, NetSyncEventsReceived,
-    OutgoingSyncRequested, TypedEvent, Unsequenced,
+    EnclaveEventData, EventType, GetEventsAfterResponse, GetEventsAfterTs, HistoricalNetSyncStart,
+    NetSyncEventsReceived, OutgoingSyncRequested, TypedEvent, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
 use futures::TryFutureExt;
@@ -31,7 +31,7 @@ pub struct NetSyncManager {
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
     /// that we do not do excessive resubscribes without actually listening for events.
     rx: Arc<broadcast::Receiver<NetEvent>>,
-    eventstore: Recipient<GetAggregateEventsAfter>,
+    eventstore: Recipient<GetEventsAfterTs>,
     requests: HashMap<CorrelationId, OnceTake<ResponseChannel<SyncResponseValue>>>,
 }
 
@@ -40,7 +40,7 @@ impl NetSyncManager {
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
-        eventstore: Recipient<GetAggregateEventsAfter>,
+        eventstore: Recipient<GetEventsAfterTs>,
     ) -> Self {
         Self {
             bus: bus.clone(),
@@ -56,11 +56,11 @@ impl NetSyncManager {
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
-        eventstore: Recipient<GetAggregateEventsAfter>,
+        eventstore: Recipient<GetEventsAfterTs>,
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
         let addr = Self::new(bus, tx, rx, eventstore).start();
-
+        bus.subscribe(EventType::HistoricalNetSyncStart, addr.clone().recipient());
         // Forward from NetEvent
         tokio::spawn({
             debug!("Spawning event receive loop!");
@@ -95,18 +95,18 @@ impl Handler<EnclaveEvent> for NetSyncManager {
         let (msg, ec) = msg.into_components();
         match msg {
             // We are making a sync request of another node
-            EnclaveEventData::OutgoingSyncRequested(data) => ctx.notify(TypedEvent::new(data, ec)),
+            EnclaveEventData::HistoricalNetSyncStart(data) => ctx.notify(TypedEvent::new(data, ec)),
             _ => (),
         }
     }
 }
 
 /// SyncRequest is called on start up to fetch remote events
-impl Handler<TypedEvent<OutgoingSyncRequested>> for NetSyncManager {
+impl Handler<TypedEvent<HistoricalNetSyncStart>> for NetSyncManager {
     type Result = ResponseFuture<()>;
     fn handle(
         &mut self,
-        msg: TypedEvent<OutgoingSyncRequested>,
+        msg: TypedEvent<HistoricalNetSyncStart>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         trap_fut(
@@ -154,7 +154,7 @@ impl Handler<SyncRequestReceived> for NetSyncManager {
         trap(EType::Net, &self.bus, || {
             let id = CorrelationId::new();
             self.requests.insert(id, msg.channel);
-            self.eventstore.try_send(GetAggregateEventsAfter::new(
+            self.eventstore.try_send(GetEventsAfterTs::new(
                 id,
                 msg.value.since,
                 ctx.address().recipient(),
@@ -176,9 +176,8 @@ impl Handler<GetEventsAfterResponse> for NetSyncManager {
             self.tx.try_send(NetCommand::SyncResponse {
                 value: SyncResponseValue {
                     events: msg
-                        .events()
+                        .into_events()
                         .into_iter()
-                        .cloned()
                         .map(|ev| ev.try_into())
                         .collect::<Result<_>>()?,
                     ts: self.bus.ts()?, // NOTE: We are storing a local timestamp on this response
@@ -219,7 +218,7 @@ async fn sync_request(
 async fn handle_sync_request_event(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    event: TypedEvent<OutgoingSyncRequested>,
+    event: TypedEvent<HistoricalNetSyncStart>,
     address: impl Into<Recipient<TypedEvent<OutgoingSyncRequestSucceeded>>>,
 ) -> Result<()> {
     let (event, ctx) = event.into_components();

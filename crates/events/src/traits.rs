@@ -87,7 +87,11 @@ pub trait EventPublisher<E: Event> {
     /// This method should be used for events that have originated locally.
     ///
     /// The ctx parameter is to pass on the current context to the local event.
-    fn publish(&self, data: impl Into<E::Data>, ctx: EventContext<Sequenced>) -> Result<()>;
+    fn publish(
+        &self,
+        data: impl Into<E::Data>,
+        caused_by: impl Into<EventContext<Sequenced>>,
+    ) -> Result<()>;
     /// This creates a context based on the given data. This should only be used when an event is
     /// the origin event and does not originate remotely. This is also useful in tests.
     fn publish_without_context(&self, data: impl Into<E::Data>) -> Result<()>;
@@ -112,7 +116,7 @@ pub trait EventPublisher<E: Event> {
         &self,
         data: impl Into<E::Data>,
         remote_ts: u128,
-        caused_by: EventContext<Sequenced>,
+        caused_by: impl Into<EventContext<Sequenced>>,
         block: Option<u64>,
     ) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.

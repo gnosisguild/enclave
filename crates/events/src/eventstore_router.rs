@@ -49,7 +49,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         Ok(())
     }
 
-    pub fn handle_get_events_after(&mut self, msg: GetAggregateEventsAfter) -> Result<()> {
+    pub fn handle_get_events_after(&mut self, msg: GetEventsAfterTs) -> Result<()> {
         for (aggregate_id, ts) in msg.ts() {
             if let Some(store_addr) = self.stores.get(&aggregate_id) {
                 let get_events_msg =
@@ -59,6 +59,17 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         }
         Ok(())
     }
+
+    // pub fn handle_get_events_after_seq(&mut self, msg: GetEventsAfterSeq) -> Result<()> {
+    //     for (aggregate_id, seq) in msg.seq() {
+    //         if let Some(store_addr) = self.stores.get(&aggregate_id) {
+    //             let get_events_msg =
+    //                 GetEventsAfterRequest::new(msg.id(), seq.to_owned(), msg.sender.clone());
+    //             store_addr.do_send(get_events_msg);
+    //         }
+    //     }
+    //     Ok(())
+    // }
 }
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {
@@ -79,25 +90,35 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreR
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<GetAggregateEventsAfter> for EventStoreRouter<I, L> {
+impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfterTs> for EventStoreRouter<I, L> {
     type Result = ();
 
-    fn handle(&mut self, msg: GetAggregateEventsAfter, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetEventsAfterTs, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_get_events_after(msg) {
             error!("Failed to route get events after request: {}", e);
         }
     }
 }
 
-#[derive(Message, Debug)]
-#[rtype("()")]
-pub struct GetAggregateEventsAfter {
-    pub correlation_id: CorrelationId,
-    pub ts: HashMap<AggregateId, u128>,
-    pub sender: Recipient<GetEventsAfterResponse>,
+impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfterSeq> for EventStoreRouter<I, L> {
+    type Result = ();
+
+    fn handle(&mut self, msg: GetEventsAfterSeq, _: &mut Self::Context) -> Self::Result {
+        // if let Err(e) = self.handle_get_events_after_seq(msg) {
+        //     error!("Failed to route get events after request: {}", e);
+        // }
+    }
 }
 
-impl GetAggregateEventsAfter {
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct GetEventsAfterTs {
+    correlation_id: CorrelationId,
+    ts: HashMap<AggregateId, u128>,
+    sender: Recipient<GetEventsAfterResponse>,
+}
+
+impl GetEventsAfterTs {
     pub fn new(
         correlation_id: CorrelationId,
         ts: HashMap<AggregateId, u128>,
@@ -116,5 +137,44 @@ impl GetAggregateEventsAfter {
 
     pub fn ts(&self) -> &HashMap<AggregateId, u128> {
         &self.ts
+    }
+
+    pub fn sender(self) -> Recipient<GetEventsAfterResponse> {
+        self.sender
+    }
+}
+
+/// A request to get all events from all aggregates after a specific set of sequences
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct GetEventsAfterSeq {
+    correlation_id: CorrelationId,
+    seq: HashMap<AggregateId, u64>,
+    sender: Recipient<GetEventsAfterResponse>,
+}
+
+impl GetEventsAfterSeq {
+    pub fn new(
+        correlation_id: CorrelationId,
+        seq: HashMap<AggregateId, u64>,
+        sender: impl Into<Recipient<GetEventsAfterResponse>>,
+    ) -> Self {
+        Self {
+            correlation_id,
+            seq,
+            sender: sender.into(),
+        }
+    }
+
+    pub fn id(&self) -> CorrelationId {
+        self.correlation_id
+    }
+
+    pub fn seq(&self) -> &HashMap<AggregateId, u64> {
+        &self.seq
+    }
+
+    pub fn sender(self) -> Recipient<GetEventsAfterResponse> {
+        self.sender
     }
 }

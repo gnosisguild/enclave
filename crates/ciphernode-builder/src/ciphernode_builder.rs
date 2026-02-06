@@ -27,7 +27,7 @@ use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
-use e3_sync::Synchronizer;
+use e3_sync::sync;
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -381,6 +381,7 @@ impl CiphernodeBuilder {
 
         let bus = event_system.handle()?;
         let store = event_system.store()?;
+        let eventstore = event_system.eventstore_getter()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
 
@@ -472,9 +473,15 @@ impl CiphernodeBuilder {
             )
         };
 
-        let buffer = event_system.buffer()?;
-
-        Synchronizer::setup(&bus, &evm_config, &repositories, &aggregate_config, &buffer);
+        // Run the sync routine
+        sync(
+            &bus,
+            &evm_config,
+            &repositories,
+            &aggregate_config,
+            &eventstore,
+        )
+        .await?;
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),

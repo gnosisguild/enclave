@@ -14,8 +14,8 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreRouter, InsertBatch, Sequencer, SnapshotBuffer, StoreEventRequested,
-    UpdateDestination,
+    EventStoreRouter, GetEventsAfterSeq, InsertBatch, Sequencer, SnapshotBuffer,
+    StoreEventRequested, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -324,6 +324,15 @@ impl EventSystem {
         }
     }
 
+    pub fn eventstore_getter(&self) -> Result<Recipient<GetEventsAfterSeq>> {
+        info!("eventstore_reader...");
+        let eventstores = self.eventstore_addrs()?;
+        match &eventstores {
+            EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
+            EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
+        }
+    }
+
     /// Get an instance of the Hlc
     pub fn hlc(&self) -> Result<Hlc> {
         self.hlc
@@ -473,7 +482,7 @@ mod tests {
     impl Handler<GetEventsAfterResponse> for Listener {
         type Result = ();
         fn handle(&mut self, msg: GetEventsAfterResponse, _: &mut Self::Context) -> Self::Result {
-            self.events = msg.events().clone();
+            self.events = msg.into_events();
         }
     }
 
@@ -629,11 +638,11 @@ mod tests {
         let router = system.in_mem_eventstore_router()?;
 
         // Get all events after the given timestamp using the router
-        use e3_events::{AggregateId, GetAggregateEventsAfter};
+        use e3_events::{AggregateId, GetEventsAfterTs};
         let mut ts_map = HashMap::new();
         ts_map.insert(AggregateId::new(0), ts);
         let get_events_msg =
-            GetAggregateEventsAfter::new(CorrelationId::new(), ts_map, listener.clone().into());
+            GetEventsAfterTs::new(CorrelationId::new(), ts_map, listener.clone().into());
         router.do_send(get_events_msg);
         sleep(Duration::from_millis(100)).await;
 

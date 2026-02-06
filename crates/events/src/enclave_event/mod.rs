@@ -18,10 +18,10 @@ mod decryptionshare_created;
 mod die;
 mod e3_request_complete;
 mod e3_requested;
+mod enable_effects;
 mod enclave_error;
 mod encryption_key_collection_failed;
 mod encryption_key_created;
-mod evm_sync_events_received;
 mod keyshare_created;
 mod net_sync_events_received;
 mod operator_activation_changed;
@@ -57,10 +57,10 @@ pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
 use e3_utils::{colorize, colorize_event_ids, Color};
+pub use enable_effects::*;
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
-pub use evm_sync_events_received::*;
 pub use keyshare_created::*;
 pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
@@ -209,12 +209,12 @@ pub enum EnclaveEventData {
     ComputeRequest(ComputeRequest),           // ComputeRequested
     ComputeResponse(ComputeResponse),         // ComputeResponseReceived
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
-    OutgoingSyncRequested(OutgoingSyncRequested),
     NetSyncEventsReceived(NetSyncEventsReceived),
-    EvmSyncEventsReceived(EvmSyncEventsReceived),
-    SyncStart(SyncStart),
+    HistoricalEvmSyncStart(HistoricalEvmSyncStart),
+    HistoricalNetSyncStart(HistoricalNetSyncStart),
     SyncEffect(SyncEffect),
     SyncEnd(SyncEnd),
+    EnableEffects(EnableEffects),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -494,12 +494,12 @@ impl_event_types!(
     ComputeRequest,
     ComputeResponse,
     ComputeRequestError,
-    OutgoingSyncRequested,
     NetSyncEventsReceived,
-    EvmSyncEventsReceived,
-    SyncStart,
+    HistoricalEvmSyncStart,
+    HistoricalNetSyncStart,
     SyncEffect,
-    SyncEnd
+    SyncEnd,
+    EnableEffects
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {

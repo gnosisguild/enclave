@@ -9,10 +9,11 @@ use std::{fmt, ops::Deref};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    E3id, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced, Unsequenced,
+    E3id, EnclaveEventData, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced,
+    Unsequenced,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Ord, PartialOrd, Eq, Hash, Serialize, Deserialize)]
 pub struct AggregateId(usize);
 
 impl AggregateId {
@@ -122,6 +123,16 @@ impl EventContext<Unsequenced> {
         )
     }
 
+    pub fn with_ts(mut self, ts: u128) -> Self {
+        self.ts = ts;
+        self
+    }
+
+    pub fn with_aggregate(mut self, aggregate_id: AggregateId) -> Self {
+        self.aggregate_id = aggregate_id;
+        self
+    }
+
     pub fn sequence(self, value: u64) -> EventContext<Sequenced> {
         EventContext::<Sequenced> {
             seq: value,
@@ -132,6 +143,13 @@ impl EventContext<Unsequenced> {
             aggregate_id: self.aggregate_id,
             block: self.block,
         }
+    }
+}
+
+impl From<EnclaveEventData> for EventContext<Unsequenced> {
+    fn from(value: EnclaveEventData) -> Self {
+        let id = EventId::hash(value);
+        EventContext::<Unsequenced>::new_origin(id, 0, AggregateId::new(0), Some(0))
     }
 }
 

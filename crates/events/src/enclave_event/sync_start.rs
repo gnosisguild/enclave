@@ -4,33 +4,37 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::EvmSyncEventsReceived;
+use crate::AggregateId;
 use crate::{EvmEventConfig, EvmEventConfigChain};
 use actix::{Message, Recipient};
 use anyhow::Context;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt::{self, Display};
+
+use super::EnclaveEvent;
+use super::Unsequenced;
 
 /// Dispatched by the Sync actor when initial data is read and the sync process needs to be started
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct SyncStart {
+pub struct HistoricalEvmSyncStart {
     /// The initial information for reading historical events from chains. This is generated from
     /// from persisted information
     pub evm_config: EvmEventConfig,
 
     #[serde(skip)]
     /// We include the sender here so that the evm can communicate directly with the sync actor
-    pub sender: Option<Recipient<EvmSyncEventsReceived>>, // Must be Option to allow serde deserialize on
-                                                          // EnclaveEvent as Default is required to be
-                                                          // implemented this is fine as this event is never
-                                                          // shared
+    pub sender: Option<Recipient<HistoricalEvmEventsReceived>>, // Must be Option to allow serde deserialize on
+                                                                // EnclaveEvent as Default is required to be
+                                                                // implemented this is fine as this event is never
+                                                                // shared
 }
 
-impl SyncStart {
+impl HistoricalEvmSyncStart {
     pub fn new(
-        sender: impl Into<Recipient<EvmSyncEventsReceived>>,
+        sender: impl Into<Recipient<HistoricalEvmEventsReceived>>,
         evm_config: EvmEventConfig,
     ) -> Self {
         Self {
@@ -48,7 +52,75 @@ impl SyncStart {
     }
 }
 
-impl Display for SyncStart {
+impl Display for HistoricalEvmSyncStart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+/// Dispatched by the Sync actor when initial data is read and the sync process needs to be started
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct HistoricalNetSyncStart {
+    pub since: BTreeMap<AggregateId, u128>,
+    #[serde(skip)]
+    /// We include the sender here so that the evm can communicate directly with the sync actor
+    pub sender: Option<Recipient<HistoricalNetEventsReceived>>, // Must be Option to allow serde deserialize on
+                                                                // EnclaveEvent as Default is required to be
+                                                                // implemented this is fine as this event is never
+                                                                // shared
+}
+
+impl HistoricalNetSyncStart {
+    pub fn new(
+        sender: impl Into<Recipient<HistoricalNetEventsReceived>>,
+        since: BTreeMap<AggregateId, u128>,
+    ) -> Self {
+        Self {
+            since,
+            sender: Some(sender.into()),
+        }
+    }
+}
+
+impl Display for HistoricalNetSyncStart {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct HistoricalEvmEventsReceived {
+    pub events: Vec<EnclaveEvent<Unsequenced>>,
+    pub chain_id: u64,
+}
+
+impl HistoricalEvmEventsReceived {
+    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>, chain_id: u64) -> Self {
+        Self { events, chain_id }
+    }
+}
+
+impl Display for HistoricalEvmEventsReceived {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct HistoricalNetEventsReceived {
+    pub events: Vec<EnclaveEvent<Unsequenced>>,
+}
+
+impl HistoricalNetEventsReceived {
+    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>) -> Self {
+        Self { events }
+    }
+}
+
+impl Display for HistoricalNetEventsReceived {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

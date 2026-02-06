@@ -8,7 +8,7 @@ use std::mem::replace;
 
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
-use e3_events::{BusHandle, EventSubscriber, EventType, SyncStart};
+use e3_events::{BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
     FixHistoricalOrder, OneShotRunner, SyncStartExtractor,
@@ -56,7 +56,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         // Fix the historical order to avoid missing historical events
         let next = FixHistoricalOrder::setup(next);
 
-        // This will run once when the SyncStart event is received
+        // This will run once when the HistoricalEvmSyncStart event is received
         let next = OneShotRunner::setup({
             // Clone self refs for closure
             let bus = self.bus.clone();
@@ -67,7 +67,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             let route_factories = replace(&mut self.route_factories, Vec::new());
 
             // The event is defined here
-            move |msg: SyncStart| {
+            move |msg: HistoricalEvmSyncStart| {
                 // Extract config
                 let deploy_block = msg.get_evm_config(chain_id)?.deploy_block();
 
@@ -83,11 +83,12 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             }
         });
 
-        // We get a SyncStart event and sent to oneShotRunner
+        // We get a HistoricalEvmSyncStart event and sent to oneShotRunner
         let next = SyncStartExtractor::setup(next);
 
-        // Finaly subscribe to the bus and wait for SyncStart
-        self.bus.subscribe(EventType::SyncStart, next.recipient());
+        // Finaly subscribe to the bus and wait for HistoricalEvmSyncStart
+        self.bus
+            .subscribe(EventType::HistoricalEvmSyncStart, next.recipient());
     }
 }
 

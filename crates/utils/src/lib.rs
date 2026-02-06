@@ -13,7 +13,7 @@ pub mod helpers;
 pub mod path;
 pub mod retry;
 pub mod utility_types;
-pub use actix::*;
+pub use actix::NotifySync;
 pub use alloy::*;
 pub use constants::*;
 pub use error::*;

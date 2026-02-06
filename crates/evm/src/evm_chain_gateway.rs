@@ -15,7 +15,7 @@ use anyhow::{bail, Context};
 use e3_events::EType;
 use e3_events::{
     trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
-    EvmSyncEventsReceived, SyncEnd, SyncStart, Unsequenced,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnd, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};
 use e3_utils::MAILBOX_LIMIT;
@@ -30,7 +30,7 @@ pub struct EvmChainGateway {
 
 #[derive(Clone, Default, Debug)]
 struct ForwardToSyncActorData {
-    pub sender: Option<Recipient<EvmSyncEventsReceived>>,
+    pub sender: Option<Recipient<HistoricalEvmEventsReceived>>,
     pub buffer: Vec<EnclaveEvent<Unsequenced>>,
 }
 
@@ -45,7 +45,7 @@ impl ForwardToSyncActorData {
 enum SyncStatus {
     /// Intial State
     Init(Vec<EnclaveEvent<Unsequenced>>), // Include a buffer to hold events that arrive too early
-    /// After SyncStart we forward all events to SyncActor
+    /// After HistoricalEvmSyncStart we forward all events to SyncActor
     ForwardToSyncActor(ForwardToSyncActorData),
     /// Once the chain has completed historical sync then we buffer all "live" events until sync is
     /// complete
@@ -63,7 +63,7 @@ impl Default for SyncStatus {
 impl SyncStatus {
     pub fn forward_to_sync_actor(
         &mut self,
-        sender: Recipient<EvmSyncEventsReceived>,
+        sender: Recipient<HistoricalEvmEventsReceived>,
     ) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
         let Self::Init(buffer) = self else {
             bail!(
@@ -114,16 +114,18 @@ impl EvmChainGateway {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe_all(
-            &[EventType::SyncStart, EventType::SyncEnd],
+            &[EventType::HistoricalEvmSyncStart, EventType::SyncEnd],
             addr.clone().recipient(),
         );
         addr
     }
 
-    fn handle_sync_start(&mut self, msg: SyncStart) -> Result<()> {
-        // Received a SyncStart event from the event bus. Get the sender within that event and forward
+    fn handle_sync_start(&mut self, msg: HistoricalEvmSyncStart) -> Result<()> {
+        // Received a HistoricalEvmSyncStart event from the event bus. Get the sender within that event and forward
         // all events to that actor
-        let sender = msg.sender.context("No sender on SyncStart Message")?;
+        let sender = msg
+            .sender
+            .context("No sender on HistoricalEvmSyncStart Message")?;
         let mut buffer = self.status.forward_to_sync_actor(sender)?;
         // Drain any events that were buffered early
         for evt in buffer.drain(..) {
@@ -164,7 +166,7 @@ impl EvmChainGateway {
         let sender = state
             .sender
             .context("ForwardToSyncActor state must hold a sender")?;
-        let event = EvmSyncEventsReceived::new(state.buffer, event.chain_id);
+        let event = HistoricalEvmEventsReceived::new(state.buffer, event.chain_id);
         sender.try_send(event)?;
         Ok(())
     }
@@ -192,7 +194,7 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         trap(EType::Evm, &self.bus.with_ec(msg.get_ctx()), || {
             match msg.into_data() {
-                EnclaveEventData::SyncStart(e) => self.handle_sync_start(e)?,
+                EnclaveEventData::HistoricalEvmSyncStart(e) => self.handle_sync_start(e)?,
                 EnclaveEventData::SyncEnd(e) => self.handle_sync_end(e)?,
                 _ => (),
             }
@@ -221,16 +223,16 @@ mod tests {
     use tracing_subscriber::{fmt, EnvFilter};
 
     struct SyncEventCollector {
-        tx: mpsc::UnboundedSender<EvmSyncEventsReceived>,
+        tx: mpsc::UnboundedSender<HistoricalEvmEventsReceived>,
     }
 
     impl Actor for SyncEventCollector {
         type Context = actix::Context<Self>;
     }
 
-    impl Handler<EvmSyncEventsReceived> for SyncEventCollector {
+    impl Handler<HistoricalEvmEventsReceived> for SyncEventCollector {
         type Result = ();
-        fn handle(&mut self, msg: EvmSyncEventsReceived, _: &mut Self::Context) {
+        fn handle(&mut self, msg: HistoricalEvmEventsReceived, _: &mut Self::Context) {
             let _ = self.tx.send(msg);
         }
     }
@@ -256,10 +258,10 @@ mod tests {
 
         let chain_id = 1u64;
 
-        // SyncStart: Init -> ForwardToSyncActor
+        // HistoricalEvmSyncStart: Init -> ForwardToSyncActor
         let mut evm_config = EvmEventConfig::new();
         evm_config.insert(chain_id, EvmEventConfigChain::new(0));
-        bus.publish_without_context(SyncStart::new(collector.clone(), evm_config))
+        bus.publish_without_context(HistoricalEvmSyncStart::new(collector.clone(), evm_config))
             .unwrap();
 
         // Send EVM event while forwarding - should reach collector
@@ -271,7 +273,7 @@ mod tests {
             chain_id,
         );
 
-        // This will actually arrive earlier than SyncStart but aught to be buffered
+        // This will actually arrive earlier than HistoricalEvmSyncStart but aught to be buffered
         addr.send(EnclaveEvmEvent::Event(evm_event)).await?;
 
         // HistoricalSyncComplete: ForwardToSyncActor -> BufferUntilLive
@@ -334,7 +336,7 @@ mod tests {
         assert_eq!(
             event_types,
             vec![
-                "SyncStart",
+                "HistoricalEvmSyncStart",
                 "TestEvent",
                 "SyncEnd",
                 "TestEvent",

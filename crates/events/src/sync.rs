@@ -37,11 +37,13 @@ impl EvmEventConfig {
             config: BTreeMap::new(),
         }
     }
+
     pub fn from_config(config: impl Into<BTreeMap<ChainId, EvmEventConfigChain>>) -> Self {
         EvmEventConfig {
             config: config.into(),
         }
     }
+
     pub fn get(&self, chain_id: &ChainId) -> Option<&EvmEventConfigChain> {
         self.config.get(&chain_id)
     }

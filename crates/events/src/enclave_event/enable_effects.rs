@@ -8,22 +8,18 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-use super::{EnclaveEvent, Unsequenced};
-
+/// Dispatched once the sync process is complete and live listening should continue
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct EvmSyncEventsReceived {
-    pub events: Vec<EnclaveEvent<Unsequenced>>,
-    pub chain_id: u64,
-}
+pub struct EnableEffects;
 
-impl EvmSyncEventsReceived {
-    pub fn new(events: Vec<EnclaveEvent<Unsequenced>>, chain_id: u64) -> Self {
-        Self { events, chain_id }
+impl EnableEffects {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-impl Display for EvmSyncEventsReceived {
+impl Display for EnableEffects {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

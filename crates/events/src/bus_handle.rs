@@ -94,9 +94,9 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
     fn publish(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: EventContext<Sequenced>,
+        caused_by: impl Into<EventContext<Sequenced>>,
     ) -> Result<()> {
-        self.publish_local(data, Some(ctx))
+        self.publish_local(data, Some(caused_by.into()))
     }
 
     fn publish_without_context(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
@@ -116,10 +116,10 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         &self,
         data: impl Into<EnclaveEventData>,
         remote_ts: u128,
-        caused_by: EventContext<Sequenced>,
+        caused_by: impl Into<EventContext<Sequenced>>,
         block: Option<u64>,
     ) -> Result<()> {
-        self.publish_from_remote_impl(data, remote_ts, Some(caused_by), block)
+        self.publish_from_remote_impl(data, remote_ts, Some(caused_by.into()), block)
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
@@ -142,9 +142,9 @@ impl BusHandle {
     fn publish_local(
         &self,
         data: impl Into<EnclaveEventData>,
-        ctx: Option<EventContext<Sequenced>>,
+        caused_by: Option<EventContext<Sequenced>>,
     ) -> Result<()> {
-        let evt = self.event_from(data, ctx)?;
+        let evt = self.event_from(data, caused_by)?;
         self.sequencer.do_send(evt);
         Ok(())
     }

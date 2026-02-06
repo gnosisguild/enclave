@@ -63,6 +63,7 @@ impl GetEventsAfterRequest {
     }
 }
 
+/// The response of a request to get all EventStore events by either sequence or timestamp
 #[derive(Message, Debug)]
 #[rtype("()")]
 pub struct GetEventsAfterResponse {
@@ -74,9 +75,11 @@ impl GetEventsAfterResponse {
     pub fn new(id: CorrelationId, events: Vec<EnclaveEvent>) -> Self {
         Self { id, events }
     }
-    pub fn events(&self) -> &Vec<EnclaveEvent> {
-        &self.events
+
+    pub fn into_events(self) -> Vec<EnclaveEvent> {
+        self.events
     }
+
     pub fn id(&self) -> CorrelationId {
         self.id
     }
