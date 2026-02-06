@@ -21,3 +21,4 @@ export {
 export { CrispSDK } from './sdk'
 
 export type { RoundDetails, RoundDetailsResponse, TokenDetails, Vote, MaskVoteProofInputs, VoteProofInputs } from './types'
+export { CreditMode } from './types'

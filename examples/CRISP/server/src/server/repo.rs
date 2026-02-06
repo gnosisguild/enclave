@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::models::TokenHolder;
+use crate::server::models::{CustomParams, TokenHolder};
 
 use super::{
     database::generate_emoji,
@@ -167,9 +167,7 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn initialize_round(
         &mut self,
-        token_address: String,
-        balance_threshold: String,
-        num_options: String,
+        custom_params: CustomParams,
         requester: String,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
@@ -181,11 +179,13 @@ impl<S: DataStore> CrispE3Repository<S> {
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
             eligible_addresses: vec![],
-            token_address,
-            balance_threshold,
+            token_address: custom_params.token_address,
+            balance_threshold: custom_params.balance_threshold,
             ciphertext_inputs: vec![],
             requester,
-            num_options
+            num_options: custom_params.num_options,
+            credit_mode: custom_params.credit_mode,
+            credits: custom_params.credits,
         })
         .await
     }
@@ -279,6 +279,8 @@ impl<S: DataStore> CrispE3Repository<S> {
             balance_threshold: e3_crisp.balance_threshold,
             requester: e3_crisp.requester,
             num_options: e3_crisp.num_options,
+            credit_mode: e3_crisp.credit_mode,
+            credits: e3_crisp.credits,
         })
     }
 
