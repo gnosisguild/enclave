@@ -31,7 +31,7 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitInput;
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
 use e3_zk_helpers::threshold::user_data_encryption::{
-    UserDataEncryptionCircuit, UserDataEncryptionCircuitInput, UserDataEncryptionSample,
+    UserDataEncryptionCircuit, UserDataEncryptionCircuitInput,
 };
 use e3_zk_helpers::{PkSample, ShareComputationSample};
 use std::io::Write;
@@ -315,16 +315,10 @@ fn main() -> Result<()> {
                 )?
             }
             name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
-                let sample = UserDataEncryptionSample::generate(preset);
+                let sample = UserDataEncryptionCircuitInput::generate_sample(preset);
                 let circuit = UserDataEncryptionCircuit;
 
-                circuit.codegen(
-                    preset,
-                    &UserDataEncryptionCircuitInput {
-                        public_key: sample.public_key,
-                        plaintext: sample.plaintext,
-                    },
-                )?
+                circuit.codegen(preset, &sample)?
             }
             name if name == <PkGenerationCircuit as Circuit>::NAME => {
                 let sample = PkGenerationCircuitInput::generate_sample(

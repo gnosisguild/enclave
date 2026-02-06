@@ -164,7 +164,6 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::threshold::user_data_encryption::computation::Witness;
-    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use fhe_traits::DeserializeParametrized;
@@ -172,16 +171,10 @@ mod tests {
     #[test]
     fn test_bfv_public_key_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
+        let sample =
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
 
-        let witness = Witness::compute(
-            BfvPreset::InsecureThreshold512,
-            &UserDataEncryptionCircuitInput {
-                public_key: sample.public_key.clone(),
-                plaintext: sample.plaintext,
-            },
-        )
-        .unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Convert using our function
         let (actual_pk0is, actual_pk1is) =
@@ -196,16 +189,10 @@ mod tests {
     fn test_bfv_ciphertext_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
-        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
+        let sample =
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
 
-        let witness = Witness::compute(
-            BfvPreset::InsecureThreshold512,
-            &UserDataEncryptionCircuitInput {
-                public_key: sample.public_key.clone(),
-                plaintext: sample.plaintext,
-            },
-        )
-        .unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let ciphertext = Ciphertext::from_bytes(&witness.ciphertext, &threshold_params).unwrap();
 
