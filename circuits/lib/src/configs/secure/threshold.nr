@@ -58,10 +58,8 @@ pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-// pk_aggregation - bit parameters
-pub global PK_AGGREGATION_BIT_PK: u32 = 53;
+pub global PK_AGGREGATION_BIT_PK: u32 = 52;
 
-// pk_aggregation - configs
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************

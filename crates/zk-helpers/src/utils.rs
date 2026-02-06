@@ -214,7 +214,7 @@ pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_
         .collect()
 }
 
-/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
+/// Convert a 1D vector of BigInt to a vector of JSON values.
 ///
 /// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
 pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
@@ -228,20 +228,34 @@ pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>
         .collect()
 }
 
-/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
+/// # Arguments
+/// * `bigint_1d` - 1D vector of BigInt values
 ///
-/// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
-pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_json::Value>>> {
-    y.iter()
+/// # Returns
+/// A vector of JSON values
+pub fn bigint_1d_to_json_values(bigint_1d: &[BigInt]) -> Vec<serde_json::Value> {
+    bigint_1d
+        .iter()
+        .map(|v| serde_json::Value::String(v.to_string()))
+        .collect()
+}
+
+/// Convert a 3D vector of BigInt to a vector of vectors of vectors of JSON values.
+///
+/// # Arguments
+/// * `bigint_3d` - 3D vector of BigInt values
+///
+/// # Returns
+/// A vector of vectors of vectors of JSON values
+pub fn bigint_3d_to_json_values(
+    bigint_3d: &[Vec<Vec<BigInt>>],
+) -> Vec<Vec<Vec<serde_json::Value>>> {
+    bigint_3d
+        .iter()
         .map(|coeff| {
             coeff
                 .iter()
-                .map(|modulus| {
-                    modulus
-                        .iter()
-                        .map(|v| serde_json::Value::String(v.to_string()))
-                        .collect()
-                })
+                .map(|modulus| bigint_1d_to_json_values(modulus))
                 .collect()
         })
         .collect()

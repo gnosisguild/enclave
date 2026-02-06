@@ -16,6 +16,14 @@ import { HonkVerifier } from "./CRISPVerifier.sol";
 contract CRISPProgram is IE3Program, Ownable {
   using InternalLazyIMT for LazyIMTData;
 
+  /// @notice Enum to represent credit modes
+  enum CreditMode {
+    /// @notice Everyone has constant credits
+    CONSTANT,
+    /// @notice Credits are custom (can be based on token balance, etc)
+    CUSTOM
+  }
+
   /// @notice Struct to store all data related to a voting round
   struct RoundData {
     uint256 merkleRoot;
@@ -23,6 +31,7 @@ contract CRISPProgram is IE3Program, Ownable {
     mapping(address slot => uint40 index) voteSlots;
     LazyIMTData votes;
     uint256 numOptions;
+    CreditMode creditMode;
   }
 
   // Constants
@@ -121,10 +130,13 @@ contract CRISPProgram is IE3Program, Ownable {
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
 
     // decode custom params to get the number of options
-    (, , uint256 numOptions) = abi.decode(customParams, (address, uint256, uint256));
+    (, , uint256 numOptions, CreditMode creditMode, ) = abi.decode(customParams, (address, uint256, uint256, CreditMode, uint256));
     if (numOptions < 2) revert InvalidNumOptions();
 
+    // we need to know the number of options for decoding the tally
     e3Data[e3Id].numOptions = numOptions;
+    // we want to save the credit mode so it can be verified on chain by everyone
+    e3Data[e3Id].creditMode = creditMode;
 
     e3Data[e3Id].paramsHash = keccak256(e3ProgramParams);
 

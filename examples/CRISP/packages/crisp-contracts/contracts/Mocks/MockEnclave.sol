@@ -28,7 +28,7 @@ contract MockEnclave {
       encryptionSchemeId: bytes32(0),
       e3Program: IE3Program(program),
       e3ProgramParams: bytes(""),
-      customParams: abi.encode(address(0), nextE3Id, 2),
+      customParams: abi.encode(address(0), nextE3Id, 2, 0, 0),
       decryptionVerifier: IDecryptionVerifier(address(0)),
       committeePublicKey: committeePublicKey,
       ciphertextOutput: bytes32(0),
@@ -36,7 +36,7 @@ contract MockEnclave {
       requester: address(0)
     });
 
-    IE3Program(program).validate(nextE3Id, 0, bytes(""), bytes(""), abi.encode(address(0), nextE3Id, 2));
+    IE3Program(program).validate(nextE3Id, 0, bytes(""), bytes(""), abi.encode(address(0), nextE3Id, 2, 0, 0));
 
     nextE3Id++;
   }
@@ -61,7 +61,7 @@ contract MockEnclave {
         encryptionSchemeId: bytes32(0),
         e3Program: IE3Program(address(0)),
         e3ProgramParams: bytes(""),
-        customParams: abi.encode(address(0), 0, 2),
+        customParams: abi.encode(address(0), 0, 2, 0, 0),
         decryptionVerifier: IDecryptionVerifier(address(0)),
         committeePublicKey: committeePublicKey,
         ciphertextOutput: bytes32(0),

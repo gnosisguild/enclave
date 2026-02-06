@@ -7,6 +7,7 @@
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_repr::{Serialize_repr, Deserialize_repr};
 
 #[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]
@@ -144,6 +145,8 @@ pub struct CustomParams {
     pub token_address: String,
     pub balance_threshold: String,
     pub num_options: String,
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +190,9 @@ pub struct E3StateLite {
     pub num_options: String,
 
     pub requester: String,
+
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -242,6 +248,8 @@ pub struct E3Crisp {
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub requester: String,
     pub num_options: String,
+    pub credit_mode: CreditMode,
+    pub credits: Option<String>,
 }
 
 impl From<E3> for WebResultRequest {
@@ -265,4 +273,26 @@ impl From<E3> for WebResultRequest {
 pub struct TokenHolder {
     pub address: String,
     pub balance: String,
+}
+
+/// Defines the mode of credit assignment for voters.
+/// - `Constant`: All voters receive the same credit regardless of their token balance.
+/// - `Custom`: Voters receive credit proportional to their token balance, with a specified threshold.
+#[derive(Debug, PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum CreditMode {
+    Constant = 0,
+    Custom = 1,
+}
+
+impl TryFrom<u64> for CreditMode {
+    type Error = eyre::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(CreditMode::Constant),
+            1 => Ok(CreditMode::Custom),
+            _ => Err(eyre::eyre!("Unknown credit mode: {}", value)),
+        }
+    }
 }

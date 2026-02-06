@@ -12,4 +12,4 @@ pub global N_PARTIES: u32 = 5;
 /// Threshold.
 pub global T: u32 = 2;
 /// Number of honest parties.
-pub global H: u32 = 5;
+pub global H: u32 = 3;
