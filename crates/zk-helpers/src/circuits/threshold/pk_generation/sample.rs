@@ -28,15 +28,20 @@ impl PkGenerationCircuitInput {
         preset: BfvPreset,
         committee: CiphernodesCommittee,
     ) -> Result<Self, CircuitsErrors> {
-        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let (threshold_params, _) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
 
         let mut rng = thread_rng();
 
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
-        let crp = CommonRandomPoly::new(&threshold_params, &mut rng).unwrap();
+        let crp = CommonRandomPoly::new(&threshold_params, &mut rng)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
 
-        let (public_key_share, a, sk, e) =
-            PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).unwrap();
+        let (pk0_share, a, sk, e) =
+            PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e))
+            })?;
 
         let num_parties = committee.n;
         let threshold = committee.threshold;
@@ -65,7 +70,7 @@ impl PkGenerationCircuitInput {
 
         Ok(PkGenerationCircuitInput {
             committee,
-            pk_share: CrtPolynomial::from_fhe_polynomial(&public_key_share),
+            pk0_share: CrtPolynomial::from_fhe_polynomial(&pk0_share),
             a: CrtPolynomial::from_fhe_polynomial(&a),
             eek: CrtPolynomial::from_fhe_polynomial(&e),
             e_sm: CrtPolynomial::from_fhe_polynomial(&e_sm),
