@@ -174,8 +174,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             has_voted: vec![],
             start_time: 0u64,
             status: "Requested".to_string(),
-            votes_option_1: "0".to_string(),
-            votes_option_2: "0".to_string(),
+            tally: vec![],
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
             eligible_addresses: vec![],
@@ -199,6 +198,11 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3)
     }
 
+    pub async fn get_num_options(&self) -> Result<usize> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.num_options.parse::<usize>()?)
+    }
+
     pub async fn get_vote_count(&self) -> Result<u64> {
         let e3_crisp = self.get_crisp().await?;
         Ok(u64::try_from(e3_crisp.has_voted.len())?)
@@ -219,19 +223,25 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn set_votes(&mut self, option_1: BigUint, option_2: BigUint) -> Result<()> {
-        info!("set_votes(option_1:{} option_2:{})", option_1, option_2);
+    pub async fn set_votes(&mut self, votes: Vec<BigUint>) -> Result<()> {
+        info!(
+            "set_votes: [{}]",
+            votes.iter().enumerate()
+                .map(|(i, v)| format!("option_{}: {}", i, v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
         let key = self.crisp_key();
         self.store
-            .modify(&key, |e3_obj: Option<E3Crisp>| {
-                e3_obj.map(|mut e| {
-                    e.votes_option_1 = option_1.to_string();
-                    e.votes_option_2 = option_2.to_string();
-                    e
-                })
+        .modify(&key, |e3_obj: Option<E3Crisp>| {
+            e3_obj.map(|mut e| {
+                e.tally = votes.iter().map(|v| v.to_string()).collect();
+                e
             })
-            .await
-            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+        })
+        .await
+        .map_err(|_| eyre::eyre!("Could not set votes for '{key}'"))?;
         Ok(())
     }
 
@@ -250,8 +260,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(WebResultRequest {
             round_id: e3.id,
-            option_1_tally: e3_crisp.votes_option_1,
-            option_2_tally: e3_crisp.votes_option_2,
+            tally: e3_crisp.tally,
             option_1_emoji: e3_crisp.emojis[0].clone(),
             option_2_emoji: e3_crisp.emojis[1].clone(),
             end_time: e3.expiration,
