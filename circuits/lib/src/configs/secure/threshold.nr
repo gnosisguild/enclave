@@ -28,24 +28,21 @@ pk_generation (CIRCUIT 1)
 -------------------------------------
 ************************************/
 
-// pk_generation - bit parameters
-pub global PK_GENERATION_BIT_EEK: u32 = 6;
-pub global PK_GENERATION_BIT_SK: u32 = 2;
-pub global PK_GENERATION_BIT_E_SM: u32 = 187;
-pub global PK_GENERATION_BIT_R1: u32 = 18;
-pub global PK_GENERATION_BIT_R2: u32 = 53;
-pub global PK_GENERATION_BIT_PK: u32 = 53;
+pub global PK_GENERATION_BIT_EEK: u32 = 5;
+pub global PK_GENERATION_BIT_SK: u32 = 1;
+pub global PK_GENERATION_BIT_E_SM: u32 = 192;
+pub global PK_GENERATION_BIT_R1: u32 = 17;
+pub global PK_GENERATION_BIT_R2: u32 = 52;
+pub global PK_GENERATION_BIT_PK: u32 = 52;
 
-// pk_generation - bounds
 pub global PK_GENERATION_EEK_BOUND: Field = 20;
 pub global PK_GENERATION_SK_BOUND: Field = 1;
 pub global PK_GENERATION_E_SM_BOUND: Field =
-    66359003478811654788063765182202739927396573769378037760;
+    4789048565205902682369834578696752269343944643454802329600;
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [81920, 81920, 81920, 81920];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
-// pk_generation - configs
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
     PK_GENERATION_EEK_BOUND,

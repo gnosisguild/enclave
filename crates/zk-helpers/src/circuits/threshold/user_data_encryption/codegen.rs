@@ -64,7 +64,7 @@ pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
     Ok(toml::to_string(&json)?)
 }
 
-pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
+pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
@@ -132,9 +132,9 @@ QIS,
 {}_K1_UP_BOUND
 );
 "#,
-        preset.metadata().degree,     // N
-        preset.metadata().num_moduli, // L
-        qis_str,                      // QIS array
+        configs.n, // N
+        configs.l, // L
+        qis_str,   // QIS array
         prefix,
         configs.bits.pk_bit, // BIT_PK
         prefix,
