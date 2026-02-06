@@ -51,31 +51,27 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
     format!(
         r#"use crate::core::threshold::pk_aggregation::Configs as PkAggregationConfigs;
 
-// Global configs for Public Key Aggregation TRBFV circuit
+// Global configs
 pub global N: u32 = {};
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
 
 /************************************
 -------------------------------------
-pk_agg_trbfv (CIRCUIT 5 - PUBLIC KEY AGGREGATION TRBFV)
+pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-// pk_agg_trbfv - bit parameters
 pub global {}_BIT_PK: u32 = {};
 
-// pk_agg_trbfv - configs
-pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(
-    QIS,
-);
+pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);
 "#,
         configs.n,           // N
         configs.l,           // L
         qis_str,             // QIS array
-        prefix,              // _BIT_PK
-        configs.bits.pk_bit, // _BIT_PK
-        prefix,              // _CONFIGS
+        prefix,              // BIT_PK
+        configs.bits.pk_bit, // BIT_PK
+        prefix,              // CONFIGS
     )
 }
 
@@ -133,12 +129,11 @@ mod tests {
             .contains(format!("{}_BIT_PK: u32 = {}", prefix, configs.bits.pk_bit).as_str()));
         assert!(codegen_configs.contains(
             format!(
-                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(",
+                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);",
                 prefix
             )
             .as_str()
         ));
-        assert!(codegen_configs.contains("QIS,"));
         assert!(codegen_configs.contains(format!("QIS: [Field; L] = [{}];", qis_str).as_str()));
     }
 }

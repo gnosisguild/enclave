@@ -174,7 +174,7 @@ impl CrtPolynomial {
     /// * `scalar` - The scalar to multiply each coefficient by.
     pub fn scalar_mul(&mut self, scalar: &BigInt) {
         for limb in &mut self.limbs {
-            limb.scalar_mul(scalar);
+            *limb = limb.scalar_mul(scalar);
         }
     }
 

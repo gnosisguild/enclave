@@ -9,6 +9,7 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
 //! and (for witness) public key shares and aggregated public key. They implement [`Computation`] and are used by codegen.
 
+use crate::bigint_1d_to_json_values;
 use crate::compute_pk_aggregation_commitment;
 use crate::compute_pk_bit;
 use crate::crt_polynomial_to_toml_json;
@@ -73,7 +74,7 @@ pub struct Bounds {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Witness {
-    pub expected_pk_commitments: Vec<BigInt>,
+    pub expected_threshold_pk_commitments: Vec<BigInt>,
     pub pk0: Vec<CrtPolynomial>,
     pub pk1: Vec<CrtPolynomial>,
     pub pk0_agg: CrtPolynomial,
@@ -171,9 +172,9 @@ impl Computation for Witness {
         let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[0]);
         let mut pk1_agg = input.a.clone();
 
-        // Compute expected_pk_commitments for each honest party
+        // Compute expected_threshold_pk_commitments for each honest party
         // Each commitment is computed from pk0[i] and pk1[i] for party i
-        let mut expected_pk_commitments = Vec::new();
+        let mut expected_threshold_pk_commitments = Vec::new();
 
         pk0_agg.reverse();
         pk0_agg.reduce(moduli)?;
@@ -196,13 +197,13 @@ impl Computation for Witness {
             let commitment =
                 compute_pk_aggregation_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
 
-            expected_pk_commitments.push(commitment);
+            expected_threshold_pk_commitments.push(commitment);
         }
 
         Ok(Witness {
-            expected_pk_commitments,
+            expected_threshold_pk_commitments,
             pk0,
-            pk1: pk1.clone(),
+            pk1,
             pk0_agg,
             pk1_agg,
         })
@@ -221,9 +222,11 @@ impl Computation for Witness {
             .collect();
         let pk0_agg = crt_polynomial_to_toml_json(&self.pk0_agg);
         let pk1_agg = crt_polynomial_to_toml_json(&self.pk1_agg);
+        let expected_threshold_pk_commitments =
+            bigint_1d_to_json_values(&self.expected_threshold_pk_commitments);
 
         let json = serde_json::json!({
-            "expected_pk_commitments": self.expected_pk_commitments,
+            "expected_threshold_pk_commitments": expected_threshold_pk_commitments,
             "pk0": pk0,
             "pk1": pk1,
             "pk0_agg": pk0_agg,

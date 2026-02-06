@@ -74,23 +74,25 @@ impl PkAggregationCircuitInput {
 mod tests {
     use crate::{
         computation::Computation,
-        threshold::pk_generation::{PkGenerationCircuitInput, Witness},
+        threshold::pk_aggregation::computation::Configs,
+        threshold::pk_aggregation::{PkAggregationCircuitInput, Witness},
         CiphernodesCommitteeSize,
     };
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_sample() {
+        let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample =
-            PkGenerationCircuitInput::generate_sample(DEFAULT_BFV_PRESET, committee).unwrap();
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
+        let configs = Configs::compute(preset, &()).unwrap();
 
-        assert_eq!(witness.pk0is.limbs.len(), 2);
-        assert_eq!(witness.a.limbs.len(), 2);
-        assert_eq!(witness.e_sm.limbs.len(), 2);
-        assert_eq!(witness.r1is.limbs.len(), 2);
-        assert_eq!(witness.r2is.limbs.len(), 2);
+        let sample = PkAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+        let witness = Witness::compute(preset, &sample).unwrap();
+
+        assert_eq!(witness.pk0.len(), sample.committee.h);
+        assert_eq!(witness.pk1.len(), sample.committee.h);
+        assert_eq!(witness.pk0_agg.limbs.len(), configs.l);
+        assert_eq!(witness.pk1_agg.limbs.len(), configs.l);
     }
 }
