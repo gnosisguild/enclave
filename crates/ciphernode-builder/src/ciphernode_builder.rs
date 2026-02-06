@@ -422,6 +422,9 @@ impl CiphernodeBuilder {
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let _ = self.ensure_multithread(&bus);
+            // TODO: Make BfvPreset configurable via builder method (e.g., with_share_enc_preset())
+            // Currently hardcoded to InsecureDkg512 for DKG operations.
+            // Production deployments should use BfvPreset::SecureDkg8192.
             let share_enc_preset = BfvPreset::InsecureDkg512;
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(

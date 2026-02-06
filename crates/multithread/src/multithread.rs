@@ -339,7 +339,8 @@ fn handle_pk_bfv_proof(
     req: PkBfvProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    // I know this sounds confusing, but we use the DKG Param set here because the proof is for the DKG circuit
+    // NOTE: req.params_preset is expected to contain a DKG preset (e.g., InsecureDkg512)
+    // because the proof is for the DKG circuit. This preset is converted to BFV parameters.
     let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
     let pk_bfv = PublicKey::from_bytes(&req.pk_bfv, &params).map_err(|e| {
         ComputeRequestError::new(
@@ -355,7 +356,7 @@ fn handle_pk_bfv_proof(
     let e3_id_str = request.e3_id.to_string();
     let preset_counterpart = req
         .params_preset
-        .dkg_counterpart()
+        .threshold_counterpart()
         .unwrap_or_else(|| BfvPreset::InsecureThreshold512);
     // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
     // builds both params, but will only use the DKG one

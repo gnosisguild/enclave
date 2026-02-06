@@ -46,7 +46,17 @@ async fn find_bb() -> Option<PathBuf> {
 
 async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
     let temp = tempdir().unwrap();
-    let backend = ZkBackend::new(temp.path(), ZkConfig::default());
+    let temp_path = temp.path();
+    let noir_dir = temp_path.join("noir");
+    let bb_binary = noir_dir.join("bin").join("bb");
+    let circuits_dir = noir_dir.join("circuits");
+    let work_dir = noir_dir.join("work").join("test_node");
+    let backend = ZkBackend::new(
+        bb_binary.clone(),
+        circuits_dir.clone(),
+        work_dir.clone(),
+        ZkConfig::default(),
+    );
 
     fs::create_dir_all(&backend.circuits_dir).await.unwrap();
     fs::create_dir_all(backend.circuits_dir.join("vk"))

@@ -23,7 +23,7 @@ pub async fn execute(command: NoirCommands, _config: &AppConfig) -> Result<()> {
 }
 
 pub async fn execute_without_config(command: NoirCommands) -> Result<()> {
-    let backend = ZkBackend::with_default_dir()
+    let backend = ZkBackend::with_default_dir("test_node")
         .await
         .map_err(|e| anyhow!("Failed to initialize ZK backend: {}", e))?;
 
@@ -111,6 +111,17 @@ async fn execute_status(backend: &ZkBackend) -> Result<()> {
 async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
     if force {
         println!("Force reinstalling ZK prover components...\n");
+        println!("Setting up ZK prover...\n");
+
+        // Force reinstall by directly downloading components
+        backend
+            .download_bb()
+            .await
+            .map_err(|e| anyhow!("Failed to download bb: {}", e))?;
+        backend
+            .download_circuits()
+            .await
+            .map_err(|e| anyhow!("Failed to download circuits: {}", e))?;
     } else {
         let status = backend.check_status().await;
         if matches!(status, SetupStatus::Ready) {
@@ -118,14 +129,14 @@ async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
             println!("  Use --force to reinstall.");
             return Ok(());
         }
+
+        println!("Setting up ZK prover...\n");
+
+        backend
+            .ensure_installed()
+            .await
+            .map_err(|e| anyhow!("Setup failed: {}", e))?;
     }
-
-    println!("Setting up ZK prover...\n");
-
-    backend
-        .ensure_installed()
-        .await
-        .map_err(|e| anyhow!("Setup failed: {}", e))?;
 
     println!("\nZK prover setup complete!");
     println!("  bb binary: {}", backend.bb_binary.display());

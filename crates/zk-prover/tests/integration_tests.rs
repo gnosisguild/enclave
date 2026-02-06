@@ -13,6 +13,14 @@ use e3_zk_prover::{BbTarget, SetupStatus, ZkBackend, ZkConfig};
 use std::path::PathBuf;
 use tempfile::tempdir;
 
+fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
+    let noir_dir = temp_path.join("noir");
+    let bb_binary = noir_dir.join("bin").join("bb");
+    let circuits_dir = noir_dir.join("circuits");
+    let work_dir = noir_dir.join("work").join("test_node");
+    ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
+}
+
 fn versions_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
 }
@@ -24,7 +32,7 @@ async fn test_download_bb_and_verify_structure() {
         .expect("versions.json should exist");
 
     let temp = tempdir().unwrap();
-    let backend = ZkBackend::new(temp.path(), config);
+    let backend = test_backend(temp.path(), config);
 
     let result = backend.download_bb().await;
     assert!(result.is_ok(), "download failed: {:?}", result);
@@ -78,7 +86,7 @@ async fn test_download_bb_rejects_wrong_checksum() {
     }
 
     let temp = tempdir().unwrap();
-    let backend = ZkBackend::new(temp.path(), config);
+    let backend = test_backend(temp.path(), config);
 
     let result = backend.download_bb().await;
     assert!(
@@ -101,7 +109,7 @@ async fn test_ensure_installed_full_flow() {
         .expect("versions.json should exist");
 
     let temp = tempdir().unwrap();
-    let backend = ZkBackend::new(temp.path(), config);
+    let backend = test_backend(temp.path(), config);
 
     assert!(matches!(
         backend.check_status().await,
@@ -139,7 +147,7 @@ async fn test_download_circuits() {
         .expect("versions.json should exist");
 
     let temp = tempdir().unwrap();
-    let backend = ZkBackend::new(temp.path(), config);
+    let backend = test_backend(temp.path(), config);
 
     tokio::fs::create_dir_all(&backend.circuits_dir)
         .await

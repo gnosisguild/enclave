@@ -114,8 +114,18 @@ impl ProofRequestActor {
             return;
         };
 
-        if self.pending.remove(msg.correlation_id()).is_some() {
-            warn!("ZK proof request failed: {err}");
+        if let Some(pending) = self.pending.remove(msg.correlation_id()) {
+            warn!("ZK proof request failed for E3 {}: {err}", pending.e3_id);
+
+            // Publish EncryptionKeyCreated without proof to allow the system to continue
+            // Applications can check the has_proof field to determine if validation is required
+            if let Err(err) = self.bus.publish(EncryptionKeyCreated {
+                e3_id: pending.e3_id,
+                key: pending.key,
+                external: false,
+            }) {
+                error!("Failed to publish EncryptionKeyCreated after ZK proof failure: {err}");
+            }
         }
     }
 }

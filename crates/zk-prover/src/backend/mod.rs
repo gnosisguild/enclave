@@ -12,7 +12,7 @@ mod tests;
 
 use crate::config::ZkConfig;
 use crate::error::ZkError;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub enum SetupStatus {
@@ -38,18 +38,27 @@ pub struct ZkBackend {
 }
 
 impl ZkBackend {
-    pub fn new(enclave_dir: &Path, config: ZkConfig) -> Self {
-        let base_dir = enclave_dir.join("noir");
+    pub fn new(
+        bb_binary: PathBuf,
+        circuits_dir: PathBuf,
+        work_dir: PathBuf,
+        config: ZkConfig,
+    ) -> Self {
+        let base_dir = circuits_dir
+            .parent()
+            .expect("circuits_dir should have a parent")
+            .to_path_buf();
+
         Self {
-            bb_binary: base_dir.join("bin").join("bb"),
-            circuits_dir: base_dir.join("circuits"),
-            work_dir: base_dir.join("work"),
+            bb_binary,
+            circuits_dir,
+            work_dir,
             base_dir,
             config,
         }
     }
 
-    pub async fn with_default_dir() -> Result<Self, ZkError> {
+    pub async fn with_default_dir(node_name: &str) -> Result<Self, ZkError> {
         let base_dirs = directories::BaseDirs::new().ok_or_else(|| {
             ZkError::IoError(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -57,16 +66,17 @@ impl ZkBackend {
             ))
         })?;
 
-        let enclave_dir = base_dirs.home_dir().join(".enclave");
+        let home_dir = base_dirs.home_dir();
+        let noir_dir = home_dir.join(".enclave").join("noir");
+        let bb_binary = noir_dir.join("bin").join("bb");
+        let circuits_dir = noir_dir.join("circuits");
+        let work_dir = noir_dir.join("work").join(node_name);
+
         let config = ZkConfig::fetch_or_default().await;
-        Ok(Self::new(&enclave_dir, config))
+        Ok(Self::new(bb_binary, circuits_dir, work_dir, config))
     }
 
-    pub fn work_dir_for(&self, e3_id: &str) -> PathBuf {
-        self.work_dir.join(e3_id)
-    }
-
-    pub async fn cleanup_work_dir(&self, e3_id: &str) -> Result<(), ZkError> {
+    fn sanitize_e3_id(e3_id: &str) -> Result<&str, ZkError> {
         // Sanitize e3_id to prevent path traversal
         if e3_id.contains("..") || e3_id.contains('/') || e3_id.contains('\\') {
             return Err(ZkError::IoError(std::io::Error::new(
@@ -74,8 +84,16 @@ impl ZkBackend {
                 "e3_id contains invalid characters",
             )));
         }
+        Ok(e3_id)
+    }
 
-        let work_dir = self.work_dir_for(e3_id);
+    pub fn work_dir_for(&self, e3_id: &str) -> Result<PathBuf, ZkError> {
+        let sanitized = Self::sanitize_e3_id(e3_id)?;
+        Ok(self.work_dir.join(sanitized))
+    }
+
+    pub async fn cleanup_work_dir(&self, e3_id: &str) -> Result<(), ZkError> {
+        let work_dir = self.work_dir_for(e3_id)?;
         if work_dir.exists() {
             tokio::fs::remove_dir_all(&work_dir).await?;
         }
