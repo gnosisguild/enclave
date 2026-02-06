@@ -135,7 +135,7 @@ contract CRISPProgram is IE3Program, Ownable {
 
     // we need to know the number of options for decoding the tally
     e3Data[e3Id].numOptions = numOptions;
-    // we want to save the credit more so it can be verified on chain by everyone
+    // we want to save the credit mode so it can be verified on chain by everyone
     e3Data[e3Id].creditMode = creditMode;
 
     e3Data[e3Id].paramsHash = keccak256(e3ProgramParams);

@@ -7,6 +7,7 @@
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_repr::{Serialize_repr, Deserialize_repr};
 
 #[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]
@@ -277,7 +278,8 @@ pub struct TokenHolder {
 /// Defines the mode of credit assignment for voters.
 /// - `Constant`: All voters receive the same credit regardless of their token balance.
 /// - `Custom`: Voters receive credit proportional to their token balance, with a specified threshold.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum CreditMode {
     Constant = 0,
     Custom = 1,
