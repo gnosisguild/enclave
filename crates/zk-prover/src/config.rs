@@ -411,19 +411,19 @@ mod tests {
         let checksums: HashMap<&str, &str> = [
             (
                 "amd64-linux",
-                "a56257d8edc226180f5a7093393e4adc99447368a65099bb34292bd261408b99",
+                "9740013d1aa0eb1b0bb2d71484c8b3debc5050a409bd5f12f8454fbfc7cb5419",
             ),
             (
                 "amd64-darwin",
-                "668e85e3053d76861e03717cb6349fe0aac50c2c910ad1d235a73ec106bd7e0a",
+                "7874494dd1238655993a44b85d94e9dcc3589d29980eff8b03a7f167a45c32e4",
             ),
             (
                 "arm64-linux",
-                "7c8d5f568aca6c10b61f5ed0c4b50e31c9d82dfdf0e19568322900cd6e3bf11e",
+                "ae6bf8518998523b4e135cd638f305a802f52e8dfa5ea9b1c210de7d04c55343",
             ),
             (
                 "arm64-darwin",
-                "406d4ab932059c19deeb95bf460c5ef7737af1e768c2c640ce68d9c0c9c7cb04",
+                "6d353c05dbecc573d1b0ca992c8b222db8e873853b7910b792915629347f6789",
             ),
         ]
         .into_iter()
