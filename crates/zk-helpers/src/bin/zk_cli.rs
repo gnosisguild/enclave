@@ -353,6 +353,7 @@ fn main() -> Result<()> {
                         honest_ciphertexts: sample.honest_ciphertexts,
                     },
                 )?
+            }
             name if name == <PkAggregationCircuit as Circuit>::NAME => {
                 let sample = PkAggregationCircuitInput::generate_sample(
                     preset,
