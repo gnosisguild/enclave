@@ -9,23 +9,22 @@ use crate::registry::Circuit;
 use crate::CiphernodesCommittee;
 use e3_fhe_params::ParameterType;
 use e3_polynomial::CrtPolynomial;
+use fhe::bfv::PublicKey;
 
 #[derive(Debug)]
-pub struct PkGenerationCircuit;
+pub struct PkAggregationCircuit;
 
-impl Circuit for PkGenerationCircuit {
-    const NAME: &'static str = "pk-generation";
-    const PREFIX: &'static str = "PK_GENERATION";
+impl Circuit for PkAggregationCircuit {
+    const NAME: &'static str = "pk-aggregation";
+    const PREFIX: &'static str = "PK_AGGREGATION";
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::THRESHOLD;
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
 
 #[derive(Debug, Clone)]
-pub struct PkGenerationCircuitInput {
+pub struct PkAggregationCircuitInput {
     pub committee: CiphernodesCommittee,
-    pub pk0_share: CrtPolynomial,
+    pub public_key: PublicKey,
+    pub pk0_shares: Vec<CrtPolynomial>,
     pub a: CrtPolynomial,
-    pub eek: CrtPolynomial,
-    pub e_sm: CrtPolynomial,
-    pub sk: CrtPolynomial,
 }

@@ -109,7 +109,7 @@ impl Computation for Configs {
 
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
-            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let moduli = threshold_params.moduli().to_vec();
 
@@ -168,7 +168,7 @@ impl Computation for Bounds {
 
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
-            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let n = BigInt::from(threshold_params.degree());
         let ctx = threshold_params.ctx_at_level(0)?;
@@ -180,7 +180,7 @@ impl Computation for Bounds {
 
         let defaults = preset
             .search_defaults()
-            .ok_or_else(|| CircuitsErrors::Sample("missing search defaults".to_string()))?;
+            .ok_or_else(|| CircuitsErrors::Other("missing search defaults".to_string()))?;
         let num_ciphertexts = defaults.z;
 
         let smudging_config = SmudgingBoundCalculatorConfig::new(
@@ -245,7 +245,7 @@ impl Computation for Witness {
 
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
-            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
+            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let moduli: Vec<BigInt> = threshold_params
             .moduli()
@@ -271,7 +271,7 @@ impl Computation for Witness {
             Polynomial,
         )> = izip!(
             moduli.clone(),
-            input.pk_share.limbs.clone(),
+            input.pk0_share.limbs.clone(),
             input.a.limbs.clone(),
             input.eek.limbs.clone(),
             input.e_sm.limbs.clone(),
@@ -280,10 +280,10 @@ impl Computation for Witness {
         .enumerate()
         .par_bridge()
         .map(
-            |(i, (qi, mut pk_share, mut a, mut eek, mut e_sm, mut sk))| {
-                pk_share.reverse();
-                pk_share.reduce(&qi);
-                pk_share.center(&qi);
+            |(i, (qi, mut pk0_share, mut a, mut eek, mut e_sm, mut sk))| {
+                pk0_share.reverse();
+                pk0_share.reduce(&qi);
+                pk0_share.center(&qi);
 
                 a.reverse();
                 a.center(&qi);
@@ -297,8 +297,8 @@ impl Computation for Witness {
                 sk.reverse();
                 sk.center(&qi);
 
-                // Calculate pk_share_hat = -a * sk + e
-                let pk_share_hat = {
+                // Calculate pk0_share_hat = -a * sk + eek
+                let pk0_share_hat = {
                     let mut exp = a.neg();
                     exp = exp.mul(&sk);
 
@@ -307,18 +307,18 @@ impl Computation for Witness {
                     exp.add(&eek)
                 };
 
-                assert_eq!((pk_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
+                assert_eq!((pk0_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                // Check whether pk_share_hat mod R_qi (the ring) is equal to pk_share
-                let mut pk_share_hat_mod_rqi = pk_share_hat.reduce_by_cyclotomic(&cyclo).unwrap();
+                // Check whether pk0_share_hat mod R_qi (the ring) is equal to pk0_share
+                let mut pk0_share_hat_mod_rqi = pk0_share_hat.reduce_by_cyclotomic(&cyclo).unwrap();
 
-                pk_share_hat_mod_rqi.reduce(&qi);
-                pk_share_hat_mod_rqi.center(&qi);
+                pk0_share_hat_mod_rqi.reduce(&qi);
+                pk0_share_hat_mod_rqi.center(&qi);
 
-                assert_eq!(&pk_share, &pk_share_hat_mod_rqi);
+                assert_eq!(&pk0_share, &pk0_share_hat_mod_rqi);
 
-                // Compute r2_numerator = pk_share - pk_share_hat and reduce/center the polynomial
-                let r2_numerator = pk_share.sub(&pk_share_hat);
+                // Compute r2_numerator = pk0_share - pk0_share_hat and reduce/center the polynomial
+                let r2_numerator = pk0_share.sub(&pk0_share_hat);
 
                 assert_eq!((r2_numerator.coefficients().len() as u64) - 1, 2 * (n - 1));
 
@@ -327,14 +327,14 @@ impl Computation for Witness {
                 r2_numerator_centered.center(&qi);
 
                 // Compute r2 as the quotient of numerator divided by the cyclotomic polynomial
-                // to produce: (pk_share - pk_share_hat) / (x^N + 1) mod Z_qi. Remainder should be empty.
+                // to produce: (pk0_share - pk0_share_hat) / (x^N + 1) mod Z_qi. Remainder should be empty.
                 let cyclo_polynomial = Polynomial::new(cyclo.clone());
                 let (r2, r2_rem) = r2_numerator_centered.div(&cyclo_polynomial).unwrap();
 
                 assert!(r2_rem.is_zero());
                 assert_eq!((r2.coefficients().len() as u64) - 1, n - 2); // Order(r2i) = N - 2
 
-                // Assert that (pk_share - pk_share_hat) = (r2 * cyclo) mod Z_qi
+                // Assert that (pk0_share - pk0_share_hat) = (r2 * cyclo) mod Z_qi
                 let r2_cyclo_times = r2.mul(&cyclo_polynomial);
 
                 let mut r2_cyclo_times_centered = r2_cyclo_times.clone();
@@ -347,7 +347,7 @@ impl Computation for Witness {
                     2 * (n - 1)
                 );
 
-                // Calculate r1 = (pk_share - pk_share_hat - r2 * cyclo) / qi mod Z_p. Remainder should be empty.
+                // Calculate r1 = (pk0_share - pk0_share_hat - r2 * cyclo) / qi mod Z_p. Remainder should be empty.
                 let r1_numerator = r2_numerator.sub(&r2_cyclo_times);
 
                 assert_eq!((r2_numerator.coefficients().len() as u64) - 1, 2 * (n - 1));
@@ -360,13 +360,13 @@ impl Computation for Witness {
 
                 assert_eq!(&r1_numerator, &r1.mul(&qi_polynomial));
 
-                // Assert that pk_share = (pk_share_hat + r1 * qi + r2 * cyclo) mod R_qi
+                // Assert that pk0_share = (pk0_share_hat + r1 * qi + r2 * cyclo) mod R_qi
                 let r1_qi_times = r1.scalar_mul(&qi);
-                let pk_share_calculated = pk_share_hat.add(&r1_qi_times).add(&r2_cyclo_times);
+                let pk0_share_calculated = pk0_share_hat.add(&r1_qi_times).add(&r2_cyclo_times);
 
-                assert_eq!(&pk_share, &pk_share_calculated.trim_leading_zeros());
+                assert_eq!(&pk0_share, &pk0_share_calculated.trim_leading_zeros());
 
-                (i, r2, r1, pk_share.clone(), a.clone(), e_sm.clone())
+                (i, r2, r1, pk0_share.clone(), a.clone(), e_sm.clone())
             },
         )
         .collect();
@@ -375,7 +375,7 @@ impl Computation for Witness {
 
         let mut r2 = CrtPolynomial::new(vec![]);
         let mut r1 = CrtPolynomial::new(vec![]);
-        let mut pk_share = CrtPolynomial::new(vec![]);
+        let mut pk0_share = CrtPolynomial::new(vec![]);
         let mut a = CrtPolynomial::new(vec![]);
         let mut e_sm = CrtPolynomial::new(vec![]);
 
@@ -387,17 +387,17 @@ impl Computation for Witness {
         eek.reverse();
         eek.center(&moduli[0]);
 
-        for (_i, r2i, r1i, pk_sharei, ai, e_smi) in results {
+        for (_i, r2i, r1i, pk0_sharei, ai, e_smi) in results {
             r2.add_limb(r2i);
             r1.add_limb(r1i);
-            pk_share.add_limb(pk_sharei);
+            pk0_share.add_limb(pk0_sharei);
             a.add_limb(ai);
             e_sm.add_limb(e_smi);
         }
 
         let zkp_modulus = &get_zkp_modulus();
 
-        pk_share.reduce_uniform(zkp_modulus);
+        pk0_share.reduce_uniform(zkp_modulus);
         a.reduce_uniform(zkp_modulus);
         r1.reduce_uniform(zkp_modulus);
         r2.reduce_uniform(zkp_modulus);
@@ -412,7 +412,7 @@ impl Computation for Witness {
             e_sm,
             r1is: r1,
             r2is: r2,
-            pk0is: pk_share,
+            pk0is: pk0_share,
             pk1is: a,
         })
     }
