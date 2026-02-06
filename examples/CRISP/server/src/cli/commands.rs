@@ -107,7 +107,16 @@ pub async fn initialize_crisp_round(
     let credits = U256::from(1);
 
     // Serialize the custom parameters to bytes.
-    let custom_params_bytes = Bytes::from((token_address, balance_threshold, num_options, credit_mode, credits).abi_encode());
+    let custom_params_bytes = Bytes::from(
+        (
+            token_address,
+            balance_threshold,
+            num_options,
+            credit_mode,
+            credits,
+        )
+            .abi_encode(),
+    );
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let mut current_timestamp = get_current_timestamp().await?;

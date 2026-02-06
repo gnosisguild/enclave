@@ -18,12 +18,29 @@ pub enum NoirCommands {
     },
 }
 
-pub async fn execute(command: NoirCommands, _config: &AppConfig) -> Result<()> {
-    execute_without_config(command).await
+pub async fn execute(command: NoirCommands, config: &AppConfig) -> Result<()> {
+    let zk_config = e3_zk_prover::ZkConfig::fetch_or_default().await;
+    let backend = ZkBackend::new(
+        config.bb_binary(),
+        config.circuits_dir(),
+        config.work_dir(),
+        zk_config,
+    );
+
+    match command {
+        NoirCommands::Status => {
+            execute_status(&backend).await?;
+        }
+        NoirCommands::Setup { force } => {
+            execute_setup(&backend, force).await?;
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn execute_without_config(command: NoirCommands) -> Result<()> {
-    let backend = ZkBackend::with_default_dir("test_node")
+    let backend = ZkBackend::with_default_dir("default")
         .await
         .map_err(|e| anyhow!("Failed to initialize ZK backend: {}", e))?;
 
