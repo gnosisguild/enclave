@@ -15,12 +15,12 @@ use crate::circuits::commitments::{
 };
 use std::ops::Deref;
 
-use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::get_zkp_modulus;
-use crate::polynomial_to_toml_json;
+use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
+use crate::polynomial_to_toml_json;
 use crate::utils::{compute_msg_bit, compute_pk_bit};
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};

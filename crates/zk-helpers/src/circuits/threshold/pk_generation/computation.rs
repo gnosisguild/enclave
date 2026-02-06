@@ -12,8 +12,8 @@
 use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
-use crate::polynomial_to_toml_json;
 use crate::math::{cyclotomic_polynomial, decompose_residue};
+use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitInput;
 use crate::CiphernodesCommittee;

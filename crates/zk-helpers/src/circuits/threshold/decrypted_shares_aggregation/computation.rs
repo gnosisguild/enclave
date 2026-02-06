@@ -18,8 +18,8 @@ use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
-use e3_polynomial::reduce;
 use e3_fhe_params::BfvPreset;
+use e3_polynomial::reduce;
 use fhe_math::rq::Representation;
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;
@@ -314,8 +314,16 @@ impl Witness {
                 .iter()
                 .map(|c| reduce(c, &zkp_modulus))
                 .collect(),
-            message: self.message.iter().map(|c| reduce(c, &zkp_modulus)).collect(),
-            u_global: self.u_global.iter().map(|c| reduce(c, &zkp_modulus)).collect(),
+            message: self
+                .message
+                .iter()
+                .map(|c| reduce(c, &zkp_modulus))
+                .collect(),
+            u_global: self
+                .u_global
+                .iter()
+                .map(|c| reduce(c, &zkp_modulus))
+                .collect(),
             crt_quotients: self
                 .crt_quotients
                 .iter()
