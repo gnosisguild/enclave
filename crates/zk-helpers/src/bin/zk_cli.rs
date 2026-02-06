@@ -264,50 +264,31 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareComputationCircuit as Circuit>::NAME => {
-                let sd = preset
-                    .search_defaults()
-                    .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
                 let sample = ShareComputationCircuitInput::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
-                    sd.z,
-                    sd.lambda,
                 );
                 let circuit = ShareComputationCircuit;
-
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {
-                let sd = preset
-                    .search_defaults()
-                    .ok_or_else(|| anyhow!("missing search_defaults for preset"))?;
-                let sample = ShareEncryptionSample::generate(
+                let sd = preset.search_defaults().unwrap();
+                let sample = ShareEncryptionCircuitInput::generate_sample(
                     preset,
                     CiphernodesCommitteeSize::Small,
                     dkg_input_type,
                     sd.z,
                     sd.lambda,
                 );
-                let circuit = ShareEncryptionCircuit;
 
-                circuit.codegen(
-                    preset,
-                    &ShareEncryptionCircuitInput {
-                        plaintext: sample.plaintext,
-                        ciphertext: sample.ciphertext,
-                        public_key: sample.public_key,
-                        secret_key: sample.secret_key,
-                        u_rns: sample.u_rns,
-                        e0_rns: sample.e0_rns,
-                        e1_rns: sample.e1_rns,
-                    },
-                )?
+                let circuit = ShareEncryptionCircuit;
+                circuit.codegen(preset, &sample)?
             }
             name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
                 let sample = UserDataEncryptionCircuitInput::generate_sample(preset);
-                let circuit = UserDataEncryptionCircuit;
 
+                let circuit = UserDataEncryptionCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkGenerationCircuit as Circuit>::NAME => {
