@@ -167,6 +167,17 @@ impl CrtPolynomial {
         }
     }
 
+    /// Multiplies each limb's coefficients by a scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `scalar` - The scalar to multiply each coefficient by.
+    pub fn scalar_mul(&mut self, scalar: &BigInt) {
+        for limb in &mut self.limbs {
+            limb.scalar_mul(scalar);
+        }
+    }
+
     /// Adds a limb to the CRT polynomial.
     ///
     /// # Arguments
