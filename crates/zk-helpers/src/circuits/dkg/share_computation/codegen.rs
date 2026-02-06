@@ -148,36 +148,19 @@ mod tests {
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
     use crate::Circuit;
-    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
-    fn share_computation_input_from_sample(
-        sample: &ShareComputationSample,
-        dkg_input_type: DkgInputType,
-    ) -> ShareComputationCircuitInput {
-        ShareComputationCircuitInput {
-            dkg_input_type,
-            secret: sample.secret.clone(),
-            secret_sss: sample.secret_sss.clone(),
-            parity_matrix: sample.parity_matrix.clone(),
-            n_parties: sample.committee.n as u32,
-            threshold: sample.committee.threshold as u32,
-        }
-    }
-
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = prepare_share_computation_sample_for_test(
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
 
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-
         let artifacts = ShareComputationCircuit
-            .codegen(BfvPreset::InsecureThreshold512, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -210,7 +193,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
 

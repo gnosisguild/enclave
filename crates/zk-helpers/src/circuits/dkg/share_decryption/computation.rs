@@ -219,29 +219,17 @@ mod tests {
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use crate::dkg::share_decryption::sample::prepare_share_decryption_sample_for_test;
-    use crate::dkg::share_decryption::ShareDecryptionSample;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
-    fn share_decryption_input_from_sample(
-        sample: &ShareDecryptionSample,
-    ) -> ShareDecryptionCircuitInput {
-        ShareDecryptionCircuitInput {
-            secret_key: sample.secret_key.clone(),
-            honest_ciphertexts: sample.honest_ciphertexts.clone(),
-        }
-    }
-
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let input = share_decryption_input_from_sample(&sample);
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
         let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
@@ -251,13 +239,12 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let input = share_decryption_input_from_sample(&sample);
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let constants = Configs::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
@@ -271,22 +258,21 @@ mod tests {
 
     #[test]
     fn test_witness_decryption_consistency() {
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let input = share_decryption_input_from_sample(&sample);
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let witness = Witness::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
 
         // Witness should have one row per honest party
         assert_eq!(
             witness.expected_commitments.len(),
-            input.honest_ciphertexts.len()
+            sample.honest_ciphertexts.len()
         );
         assert_eq!(
             witness.decrypted_shares.len(),
-            input.honest_ciphertexts.len()
+            sample.honest_ciphertexts.len()
         );
     }
 }

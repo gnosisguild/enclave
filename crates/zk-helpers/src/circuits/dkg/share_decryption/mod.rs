@@ -12,4 +12,3 @@ pub mod computation;
 pub mod sample;
 pub use circuit::{ShareDecryptionCircuit, ShareDecryptionCircuitInput};
 pub use computation::{Bits, Bounds, Configs, ShareDecryptionOutput, Witness};
-pub use sample::{prepare_share_decryption_sample_for_test, ShareDecryptionSample};

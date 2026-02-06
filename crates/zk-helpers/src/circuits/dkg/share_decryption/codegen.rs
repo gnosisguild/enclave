@@ -78,32 +78,20 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::dkg::share_decryption::{Configs, ShareDecryptionCircuitInput};
     use crate::computation::{Computation, DkgInputType};
-    use crate::dkg::share_decryption::sample::prepare_share_decryption_sample_for_test;
-    use crate::dkg::share_decryption::ShareDecryptionSample;
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
 
-    fn share_decryption_input_from_sample(
-        sample: &ShareDecryptionSample,
-    ) -> ShareDecryptionCircuitInput {
-        ShareDecryptionCircuitInput {
-            secret_key: sample.secret_key.clone(),
-            honest_ciphertexts: sample.honest_ciphertexts.clone(),
-        }
-    }
-
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let input = share_decryption_input_from_sample(&sample);
 
         let artifacts = ShareDecryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(DEFAULT_BFV_PRESET, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -113,18 +101,17 @@ mod tests {
 
     #[test]
     fn test_configs_generation_contains_expected() {
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let input = share_decryption_input_from_sample(&sample);
 
         let artifacts = ShareDecryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &input)
+            .codegen(DEFAULT_BFV_PRESET, &sample)
             .unwrap();
 
-        let configs = Configs::compute(DEFAULT_BFV_PRESET, &input).unwrap();
+        let configs = Configs::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
         let prefix = <ShareDecryptionCircuit as Circuit>::PREFIX;
         assert!(artifacts
             .configs

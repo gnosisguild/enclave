@@ -7,6 +7,7 @@
 //! Sample data generation for the share-decryption circuit: honest ciphertexts, sum ciphertexts, secret key, and message.
 
 use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+use crate::circuits::dkg::share_decryption::circuit::ShareDecryptionCircuitInput;
 use crate::computation::DkgInputType;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
@@ -16,39 +17,22 @@ use fhe::bfv::Encoding;
 use fhe::bfv::Plaintext;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
-use fhe_traits::FheDecrypter;
 use fhe_traits::FheEncoder;
 use fhe_traits::FheEncrypter;
 use rand::thread_rng;
 
-/// Sample data for the share-decryption circuit: honest ciphertexts, sum ciphertexts, secret key, and message.
-#[derive(Debug, Clone)]
-pub struct ShareDecryptionSample {
-    /// H honest party ciphertexts (multiple encrypted shares from different parties)
-    /// Structure: honest_ciphertexts[party_idx][trbfv_basis]
-    pub honest_ciphertexts: Vec<Vec<Ciphertext>>,
-    /// The sum of all honest ciphertexts per TRBFV basis (what we're actually decrypting)
-    /// Structure: sum_ciphertexts[trbfv_basis]
-    pub sum_ciphertexts: Vec<Ciphertext>,
-    /// BFV secret key used for decryption (private witness)
-    pub secret_key: SecretKey,
-    /// The decrypted message (aggregate share values) - same for all TRBFV bases
-    pub message: Plaintext,
-}
-
-impl ShareDecryptionSample {
+impl ShareDecryptionCircuitInput {
     /// Generates sample data for the share-decryption circuit (decrypts a sum of honest ciphertexts under DKG secret key).
-    pub fn generate(
+    pub fn generate_sample(
         preset: BfvPreset,
-        committee_size: CiphernodesCommitteeSize,
+        committee: CiphernodesCommitteeSize,
         dkg_input_type: DkgInputType,
-        num_ciphertexts: u128, // z in the search defaults
-        lambda: u32,
     ) -> Self {
         let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
+        let sd = preset.search_defaults().unwrap();
 
         let mut rng = thread_rng();
-        let committee = committee_size.values();
+        let committee = committee.values();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
@@ -79,11 +63,7 @@ impl ShareDecryptionSample {
                     }
                     DkgInputType::SmudgingNoise => {
                         let esi_coeffs = trbfv
-                            .generate_smudging_error(
-                                num_ciphertexts as usize,
-                                lambda as usize,
-                                &mut rng,
-                            )
+                            .generate_smudging_error(sd.z as usize, sd.lambda as usize, &mut rng)
                             .map_err(|e| {
                                 CircuitsErrors::Sample(format!(
                                     "Failed to generate smudging error: {:?}",
@@ -126,34 +106,11 @@ impl ShareDecryptionSample {
             sum_ciphertexts.push(sum_ct);
         }
 
-        // Decrypt the sum for the first TRBFV basis to get the aggregate plaintext
-        // (The message should be the same for all TRBFV bases since we're decrypting the same aggregate)
-        let decrypted_pt = dkg_secret_key.try_decrypt(&sum_ciphertexts[0]).unwrap();
-
-        ShareDecryptionSample {
+        ShareDecryptionCircuitInput {
             honest_ciphertexts,
-            sum_ciphertexts,
             secret_key: dkg_secret_key,
-            message: decrypted_pt,
         }
     }
-}
-
-/// Prepares a share-decryption sample for testing using a threshold preset.
-pub fn prepare_share_decryption_sample_for_test(
-    preset: BfvPreset,
-    committee: CiphernodesCommitteeSize,
-    dkg_input_type: DkgInputType,
-) -> ShareDecryptionSample {
-    let defaults = preset.search_defaults().unwrap();
-
-    ShareDecryptionSample::generate(
-        preset,
-        committee,
-        dkg_input_type,
-        defaults.z,
-        defaults.lambda,
-    )
 }
 
 #[cfg(test)]
@@ -166,20 +123,15 @@ mod tests {
     #[test]
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
 
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
-        assert_eq!(sample.sum_ciphertexts.len(), committee.threshold);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
-        );
-        assert_eq!(
-            sample.message.value.len(),
             DEFAULT_BFV_PRESET.metadata().degree
         );
     }
@@ -187,20 +139,15 @@ mod tests {
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = prepare_share_decryption_sample_for_test(
+        let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SmudgingNoise,
         );
 
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
-        assert_eq!(sample.sum_ciphertexts.len(), committee.threshold);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
-        );
-        assert_eq!(
-            sample.message.value.len(),
             DEFAULT_BFV_PRESET.metadata().degree
         );
     }

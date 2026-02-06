@@ -11,7 +11,7 @@
 //! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
 
 /// Variant for input types for DKG.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DkgInputType {
     /// The input type that generates shares of a secret key using secret sharing.
     SecretKey,

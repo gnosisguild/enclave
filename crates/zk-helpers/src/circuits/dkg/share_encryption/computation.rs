@@ -749,33 +749,20 @@ mod tests {
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use crate::dkg::share_encryption::sample::prepare_share_encryption_sample_for_test;
-    use crate::dkg::share_encryption::ShareEncryptionSample;
     use e3_fhe_params::BfvPreset;
-
-    fn share_encryption_input_from_sample(
-        sample: &ShareEncryptionSample,
-    ) -> ShareEncryptionCircuitInput {
-        ShareEncryptionCircuitInput {
-            plaintext: sample.plaintext.clone(),
-            ciphertext: sample.ciphertext.clone(),
-            public_key: sample.public_key.clone(),
-            secret_key: sample.secret_key.clone(),
-            u_rns: sample.u_rns.clone(),
-            e0_rns: sample.e0_rns.clone(),
-            e1_rns: sample.e1_rns.clone(),
-        }
-    }
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
-        let input = share_encryption_input_from_sample(&sample);
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
@@ -787,13 +774,15 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
-        let input = share_encryption_input_from_sample(&sample);
-        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
@@ -808,13 +797,15 @@ mod tests {
 
     #[test]
     fn test_witness_message_consistency() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
-        let input = share_encryption_input_from_sample(&sample);
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // witness.message is plaintext coefficients (reversed, as used in circuit)
         let expected_message = Polynomial::from_u64_vector(sample.plaintext.value.deref().to_vec());
