@@ -78,6 +78,11 @@ async fn test_work_dir_path_traversal_protection() {
         );
     }
 
+    let result = backend.cleanup_work_dir("").await;
+    assert!(result.is_err(), "Should reject empty e3_id");
+    let result = backend.cleanup_work_dir("test\0bad").await;
+    assert!(result.is_err(), "Should reject null byte in e3_id");
+
     let temp_path = temp.path().to_path_buf();
     drop(temp);
     assert!(!temp_path.exists());

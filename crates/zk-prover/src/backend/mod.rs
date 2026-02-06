@@ -78,12 +78,18 @@ impl ZkBackend {
 
     fn sanitize_e3_id(e3_id: &str) -> Result<&str, ZkError> {
         // Sanitize e3_id to prevent path traversal
-        if e3_id.contains("..") || e3_id.contains('/') || e3_id.contains('\\') {
+        if e3_id.is_empty()
+            || e3_id.contains('\0')
+            || e3_id.contains("..")
+            || e3_id.contains('/')
+            || e3_id.contains('\\')
+        {
             return Err(ZkError::IoError(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "e3_id contains invalid characters",
             )));
         }
+
         Ok(e3_id)
     }
 
