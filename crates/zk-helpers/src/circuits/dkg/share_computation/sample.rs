@@ -9,17 +9,16 @@
 
 use crate::ciphernodes_committee::CiphernodesCommittee;
 use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_parity_matrix::build_generator_matrix;
-use e3_parity_matrix::{null_space, ParityMatrix, ParityMatrixConfig};
+use e3_parity_matrix::ParityMatrix;
 use e3_polynomial::CrtPolynomial;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
 use num_bigint::BigInt;
-use num_bigint::BigUint;
 use rand::thread_rng;
 
 /// Shamir secret shares: one limb per CRT modulus (rows = parties, cols = polynomial coefficients).
@@ -63,19 +62,9 @@ impl ShareComputationSample {
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
-        // Parity check matrix (null space of generator) per modulus: [L][N_PARTIES-T][N_PARTIES+1].
-        let mut parity_matrix = Vec::with_capacity(threshold_params.moduli().len());
-        for &qi in threshold_params.moduli() {
-            let q = BigUint::from(qi);
-            let g = build_generator_matrix(&ParityMatrixConfig {
-                q: q.clone(),
-                t: committee.threshold,
-                n: committee.n,
-            })
-            .unwrap();
-            let h = null_space(&g, &q).unwrap();
-            parity_matrix.push(h);
-        }
+        let parity_matrix =
+            compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
+                .unwrap_or_else(|e| panic!("Failed to compute parity matrix: {}", e));
 
         let (secret, secret_sss) = match dkg_input_type {
             DkgInputType::SecretKey => {

@@ -8,6 +8,7 @@ pub mod circuit;
 pub mod codegen;
 pub mod computation;
 pub mod sample;
+pub mod utils;
 
 pub use circuit::{ShareComputationCircuit, ShareComputationCircuitInput};
 pub use computation::{Bits, Bounds, Configs, ShareComputationOutput, Witness};
