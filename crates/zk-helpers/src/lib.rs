@@ -6,6 +6,7 @@
 
 pub mod ciphernodes_committee;
 pub mod circuits;
+pub mod crt;
 pub mod packing;
 pub mod registry;
 pub mod ring;
@@ -13,6 +14,7 @@ pub mod utils;
 
 pub use ciphernodes_committee::*;
 pub use circuits::*;
+pub use crt::*;
 pub use packing::*;
 pub use registry::*;
 pub use ring::*;

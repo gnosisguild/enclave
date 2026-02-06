@@ -305,8 +305,7 @@ impl Computation for Witness {
 
                 assert_eq!((pk0_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                let (r1, r2) =
-                    decompose_residue(&pk0_share, &pk0_share_hat, &qi, &cyclo, n);
+                let (r1, r2) = decompose_residue(&pk0_share, &pk0_share_hat, &qi, &cyclo, n);
 
                 (i, r2, r1, pk0_share.clone(), a.clone(), e_sm.clone())
             },

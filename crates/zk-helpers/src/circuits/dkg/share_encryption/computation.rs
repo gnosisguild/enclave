@@ -15,6 +15,7 @@ use crate::circuits::commitments::{
 };
 use std::ops::Deref;
 
+use crate::crt::compute_k0is;
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::get_zkp_modulus;
@@ -159,17 +160,7 @@ impl Computation for Configs {
         let q_mod_t = center(&reduce(&modulus, &t), &t);
         let q_mod_t_mod_p = reduce(&q_mod_t, &p);
 
-        let mut k0is: Vec<u64> = Vec::new();
-
-        for qi in ctx.moduli_operators() {
-            let k0qi = BigInt::from(qi.inv(qi.neg(dkg_params.plaintext())).ok_or_else(|| {
-                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
-                    "Failed to calculate modulus inverse for k0qi".into(),
-                )))
-            })?);
-
-            k0is.push(k0qi.to_u64().unwrap_or(0));
-        }
+        let k0is = compute_k0is(&moduli, dkg_params.plaintext())?;
 
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
@@ -275,29 +266,25 @@ impl Computation for Bounds {
         };
 
         // Calculate bounds for each CRT basis
-        let _num_moduli = ctx.moduli().len();
+        let moduli: Vec<u64> = ctx
+            .moduli_operators()
+            .into_iter()
+            .map(|q| q.modulus())
+            .collect();
+        let k0is = compute_k0is(&moduli, dkg_params.plaintext())?;
+
         let mut pk_bounds: Vec<BigInt> = Vec::new();
         let mut r1_low_bounds: Vec<BigInt> = Vec::new();
         let mut r1_up_bounds: Vec<BigInt> = Vec::new();
         let mut r2_bounds: Vec<BigInt> = Vec::new();
         let mut p1_bounds: Vec<BigInt> = Vec::new();
         let mut p2_bounds: Vec<BigInt> = Vec::new();
-        let mut moduli: Vec<u64> = Vec::new();
-        let mut k0is: Vec<u64> = Vec::new();
 
-        for qi in ctx.moduli_operators() {
+        for (i, qi) in ctx.moduli_operators().into_iter().enumerate() {
             let qi_bigint = BigInt::from(qi.modulus());
             let qi_bound = (&qi_bigint - BigInt::from(1)) / BigInt::from(2);
 
-            moduli.push(qi.modulus());
-
-            // Calculate k0qi for bounds
-            let k0qi = BigInt::from(qi.inv(qi.neg(dkg_params.plaintext())).ok_or_else(|| {
-                CircuitsErrors::Fhe(fhe::Error::MathError(fhe_math::Error::Default(
-                    "Failed to calculate modulus inverse for k0qi".into(),
-                )))
-            })?);
-            k0is.push(k0qi.to_u64().unwrap_or(0));
+            let k0qi = BigInt::from(k0is[i]);
 
             // PK and R2 bounds (same as qi_bound)
             pk_bounds.push(qi_bound.clone());
