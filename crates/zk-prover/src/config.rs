@@ -17,8 +17,8 @@ use tracing::{debug, warn};
 const VERSIONS_MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/gnosisguild/enclave/feat/noir-prover/crates/zk-prover/versions.json";
 
-const BB_VERSION: &str = "3.0.2";
-const CIRCUITS_VERSION: &str = "0.1.9";
+const BB_VERSION: &str = "3.0.0-nightly.20251104";
+const CIRCUITS_VERSION: &str = "0.1.11";
 
 /// Supported bb binary targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
