@@ -148,7 +148,8 @@ async fn test_pk_bfv_proof_verification() {
         .prove(&prover, &preset, &sample.dkg_public_key, e3_id)
         .expect("proof generation should succeed");
 
-    let verification_result = circuit.verify(&prover, &proof, e3_id);
+    let party_id = 1;
+    let verification_result = circuit.verify(&prover, &proof, e3_id, party_id);
     assert!(
         verification_result.as_ref().is_ok_and(|&v| v),
         "Proof verification failed: {:?}",

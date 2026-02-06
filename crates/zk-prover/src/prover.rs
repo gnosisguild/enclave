@@ -122,8 +122,14 @@ impl ZkProver {
         ))
     }
 
-    pub fn verify(&self, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
-        self.verify_proof(proof.circuit, &proof.data, &proof.public_signals, e3_id)
+    pub fn verify(&self, proof: &Proof, e3_id: &str, party_id: u64) -> Result<bool, ZkError> {
+        self.verify_proof(
+            proof.circuit,
+            &proof.data,
+            &proof.public_signals,
+            e3_id,
+            party_id,
+        )
     }
 
     pub fn verify_proof(
@@ -132,6 +138,7 @@ impl ZkProver {
         proof_data: &[u8],
         public_signals: &[u8],
         e3_id: &str,
+        party_id: u64,
     ) -> Result<bool, ZkError> {
         if !self.bb_binary.exists() {
             return Err(ZkError::BbNotInstalled);
@@ -148,17 +155,20 @@ impl ZkProver {
             )));
         }
 
+        let verification_subdir = format!("verify_party_{}", party_id);
+
         debug!(
-            "verifying proof for circuit {} using VK: {}",
+            "verifying proof for circuit {} (party {}) using VK: {}",
             circuit.as_str(),
+            party_id,
             vk_path.display()
         );
 
-        let job_dir = self.work_dir.join(e3_id);
+        let job_dir = self.work_dir.join(e3_id).join(&verification_subdir);
         let out_dir = job_dir.join("out");
         fs::create_dir_all(&out_dir)?;
 
-        let proof_path = job_dir.join("proof_to_verify");
+        let proof_path = job_dir.join("proof");
         let public_inputs_path = out_dir.join("public_inputs");
 
         fs::write(&proof_path, proof_data)?;

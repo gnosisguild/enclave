@@ -104,6 +104,7 @@ e3-tests = { version = "0.1.11", path = "./crates/tests" }
 e3-trbfv = { version = "0.1.11", path = "./crates/trbfv" }
 e3-utils = { version = "0.1.11", path = "./crates/utils" }
 e3-safe = { version = "0.1.11", path = "./crates/safe" }
+e3-zk-prover = { version = "0.1.11", path = "./crates/zk-prover" }
 e3-zk-helpers = { version = "0.1.11", path = "./crates/zk-helpers" }
 e3-parity-matrix = { version = "0.1.11", path = "./crates/parity-matrix" }
 

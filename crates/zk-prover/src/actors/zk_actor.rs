@@ -37,7 +37,10 @@ impl Handler<ZkVerificationRequest> for ZkActor {
     type Result = ();
 
     fn handle(&mut self, msg: ZkVerificationRequest, _ctx: &mut Self::Context) -> Self::Result {
-        debug!("Verifying proof for circuit: {}", msg.proof.circuit);
+        debug!(
+            "Verifying proof for circuit: {} (party {})",
+            msg.proof.circuit, msg.key.party_id
+        );
 
         let e3_id_str = msg.e3_id.to_string();
         let result = self.prover.verify_proof(
@@ -45,6 +48,7 @@ impl Handler<ZkVerificationRequest> for ZkActor {
             &msg.proof.data,
             &msg.proof.public_signals,
             &e3_id_str,
+            msg.key.party_id,
         );
 
         let response = match result {

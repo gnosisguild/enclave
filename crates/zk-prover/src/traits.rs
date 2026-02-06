@@ -48,7 +48,13 @@ pub trait Provable: Send + Sync {
         prover.generate_proof(self.circuit(), &witness, e3_id)
     }
 
-    fn verify(&self, prover: &ZkProver, proof: &Proof, e3_id: &str) -> Result<bool, ZkError> {
+    fn verify(
+        &self,
+        prover: &ZkProver,
+        proof: &Proof,
+        e3_id: &str,
+        party_id: u64,
+    ) -> Result<bool, ZkError> {
         if proof.circuit != self.circuit() {
             return Err(ZkError::VerifyFailed(format!(
                 "circuit mismatch: expected {}, got {}",
@@ -56,6 +62,6 @@ pub trait Provable: Send + Sync {
                 proof.circuit
             )));
         }
-        prover.verify(proof, e3_id)
+        prover.verify(proof, e3_id, party_id)
     }
 }
