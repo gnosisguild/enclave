@@ -14,7 +14,7 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreRouter, GetEventsAfterSeq, InsertBatch, Sequencer, SnapshotBuffer,
+    EventStoreQueryBy, EventStoreRouter, InsertBatch, SeqAgg, Sequencer, SnapshotBuffer,
     StoreEventRequested, UpdateDestination,
 };
 use e3_utils::enumerate_path;
@@ -324,7 +324,7 @@ impl EventSystem {
         }
     }
 
-    pub fn eventstore_getter(&self) -> Result<Recipient<GetEventsAfterSeq>> {
+    pub fn eventstore_getter(&self) -> Result<Recipient<EventStoreQueryBy<SeqAgg>>> {
         info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
@@ -399,7 +399,7 @@ impl Actor for NoopBatchReceiver {
 
 impl Handler<InsertBatch> for NoopBatchReceiver {
     type Result = ();
-    fn handle(&mut self, msg: InsertBatch, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: InsertBatch, _: &mut Self::Context) -> Self::Result {
         // do nothing
     }
 }
@@ -415,6 +415,7 @@ mod tests {
     use e3_events::StoreKeys;
     use e3_events::SyncEnd;
     use e3_events::Tick;
+    use e3_events::TsAgg;
     use e3_test_helpers::with_tracing;
     use std::time::Duration;
     use tracing::info;
@@ -428,8 +429,8 @@ mod tests {
     use e3_events::CorrelationId;
     use e3_events::EnclaveEventData;
 
+    use e3_events::EventStoreQueryResponse;
     use e3_events::EventType;
-    use e3_events::GetEventsAfterResponse;
     use e3_events::TestEvent;
     use tempfile::TempDir;
     use tokio::time::sleep;
@@ -479,9 +480,9 @@ mod tests {
         }
     }
 
-    impl Handler<GetEventsAfterResponse> for Listener {
+    impl Handler<EventStoreQueryResponse> for Listener {
         type Result = ();
-        fn handle(&mut self, msg: GetEventsAfterResponse, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, msg: EventStoreQueryResponse, _: &mut Self::Context) -> Self::Result {
             self.events = msg.into_events();
         }
     }
@@ -638,11 +639,11 @@ mod tests {
         let router = system.in_mem_eventstore_router()?;
 
         // Get all events after the given timestamp using the router
-        use e3_events::{AggregateId, GetEventsAfterTs};
+        use e3_events::AggregateId;
         let mut ts_map = HashMap::new();
         ts_map.insert(AggregateId::new(0), ts);
-        let get_events_msg =
-            GetEventsAfterTs::new(CorrelationId::new(), ts_map, listener.clone().into());
+        let sender: Recipient<EventStoreQueryResponse> = listener.clone().into();
+        let get_events_msg = EventStoreQueryBy::<TsAgg>::new(CorrelationId::new(), ts_map, sender);
         router.do_send(get_events_msg);
         sleep(Duration::from_millis(100)).await;
 

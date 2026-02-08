@@ -10,9 +10,9 @@ use anyhow::Result;
 use e3_data::Repositories;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CorrelationId, EnableEffects, EnclaveEvent,
-    EventContextAccessors, EventPublisher, EvmEventConfig, EvmEventConfigChain,
-    GetEventsAfterResponse, GetEventsAfterSeq, HistoricalEvmEventsReceived, HistoricalEvmSyncStart,
-    HistoricalNetEventsReceived, HistoricalNetSyncStart, SyncEnd, Unsequenced,
+    EventContextAccessors, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse,
+    EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived, HistoricalEvmSyncStart,
+    HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnd, Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::{
@@ -26,7 +26,7 @@ pub async fn sync(
     default_config: &EvmEventConfig,
     repositories: &Repositories,
     aggregate_config: &AggregateConfig,
-    eventstore: &Recipient<GetEventsAfterSeq>,
+    eventstore: &Recipient<EventStoreQueryBy<SeqAgg>>,
 ) -> Result<()> {
     // 1. Load snapsshot metadata
     let snapshot =
@@ -38,13 +38,16 @@ pub async fn sync(
     let net_config = snapshot.to_net_config();
 
     // 3. Load EventStore events since the sequence number found in the snapshot into memory.
-    let (tx, rx) = actix_toolbox::oneshot::<GetEventsAfterResponse>();
-    eventstore.try_send(GetEventsAfterSeq::new(
+    let (tx, rx) = actix_toolbox::mpsc::<EventStoreQueryResponse>(256);
+    eventstore.try_send(EventStoreQueryBy::<SeqAgg>::new(
         CorrelationId::new(),
         snapshot.to_sequence_map(),
         tx,
     ))?;
-    let events = rx.await?.into_events();
+
+    let events =
+        collect_eventstore_query_response(rx, snapshot.aggregates().len(), Duration::from_secs(5))
+            .await;
 
     // 4. Replay the EventStore events to all listeners (except effects)
     for event in events {
@@ -107,7 +110,6 @@ pub async fn collect_historical_evm_events(
                     results.append(&mut msg.events);
                 }
             } else {
-                // Channel closed before receiving all expected chains
                 break;
             }
         }
@@ -120,6 +122,36 @@ pub async fn collect_historical_evm_events(
                 chain_id
             );
         }
+    }
+
+    results
+}
+
+pub async fn collect_eventstore_query_response(
+    mut receiver: Receiver<EventStoreQueryResponse>,
+    expected: usize,
+    max_dur: Duration,
+) -> Vec<EnclaveEvent> {
+    let mut results = Vec::new();
+    let mut received = 0;
+
+    let collect = async {
+        for _ in 0..expected {
+            match receiver.recv().await {
+                Some(msg) => {
+                    results.extend(msg.into_events());
+                    received += 1;
+                }
+                None => break,
+            }
+        }
+    };
+
+    if timeout(max_dur, collect).await.is_err() {
+        eprintln!(
+            "Error: Timeout waiting for historical events from {} aggregates",
+            expected - received
+        );
     }
 
     results
@@ -202,6 +234,13 @@ impl SnapshotMeta {
                 acc.insert(item.aggregate_id, item.seq);
                 acc
             })
+    }
+
+    pub fn aggregates(&self) -> Vec<AggregateId> {
+        self.aggregate_state
+            .iter()
+            .map(|s| s.aggregate_id)
+            .collect()
     }
 }
 

@@ -6,7 +6,8 @@
 
 use crate::{
     events::{StoreEventRequested, StoreEventResponse},
-    EventContextAccessors, EventLog, GetEventsAfterRequest, GetEventsAfterResponse, SequenceIndex,
+    EventContextAccessors, EventLog, EventStoreQueryBy, EventStoreQueryResponse, Seq,
+    SequenceIndex, Ts,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
@@ -43,11 +44,12 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         Ok(())
     }
 
-    pub fn handle_get_events_after(&mut self, msg: GetEventsAfterRequest) -> Result<()> {
+    pub fn handle_event_store_query_ts(&mut self, msg: EventStoreQueryBy<Ts>) -> Result<()> {
         // if there are no events after the timestamp return an empty vector
-        let Some(seq) = self.index.seek(msg.ts())? else {
+        let id = msg.id();
+        let Some(seq) = self.index.seek(msg.query())? else {
             msg.sender()
-                .try_send(GetEventsAfterResponse::new(msg.id(), vec![]))?;
+                .try_send(EventStoreQueryResponse::new(id, vec![]))?;
             return Ok(());
         };
         // read and return the events
@@ -58,7 +60,23 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
             .collect::<Vec<_>>();
 
         msg.sender()
-            .try_send(GetEventsAfterResponse::new(msg.id(), evts))?;
+            .try_send(EventStoreQueryResponse::new(id, evts))?;
+        Ok(())
+    }
+
+    pub fn handle_event_store_query_seq(&mut self, msg: EventStoreQueryBy<Seq>) -> Result<()> {
+        // if there are no events after the timestamp return an empty vector
+        let id = msg.id();
+
+        // read and return the events
+        let evts = self
+            .log
+            .read_from(msg.query())
+            .map(|(s, e)| e.into_sequenced(s))
+            .collect::<Vec<_>>();
+
+        msg.sender()
+            .try_send(EventStoreQueryResponse::new(id, evts))?;
         Ok(())
     }
 }
@@ -91,10 +109,19 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfterRequest> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Ts>> for EventStore<I, L> {
     type Result = ();
-    fn handle(&mut self, msg: GetEventsAfterRequest, _: &mut Self::Context) -> Self::Result {
-        if let Err(e) = self.handle_get_events_after(msg) {
+    fn handle(&mut self, msg: EventStoreQueryBy<Ts>, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_event_store_query_ts(msg) {
+            error!("{e}");
+        }
+    }
+}
+
+impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Seq>> for EventStore<I, L> {
+    type Result = ();
+    fn handle(&mut self, msg: EventStoreQueryBy<Seq>, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_event_store_query_seq(msg) {
             error!("{e}");
         }
     }

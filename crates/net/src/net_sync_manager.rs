@@ -8,8 +8,8 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, EventType, GetEventsAfterResponse, GetEventsAfterTs, HistoricalNetSyncStart,
-    NetSyncEventsReceived, OutgoingSyncRequested, TypedEvent, Unsequenced,
+    EnclaveEventData, EventStoreQueryBy, EventStoreQueryResponse, EventType,
+    HistoricalNetSyncStart, NetSyncEventsReceived, TsAgg, TypedEvent, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
 use futures::TryFutureExt;
@@ -31,7 +31,7 @@ pub struct NetSyncManager {
     /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
     /// that we do not do excessive resubscribes without actually listening for events.
     rx: Arc<broadcast::Receiver<NetEvent>>,
-    eventstore: Recipient<GetEventsAfterTs>,
+    eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
     requests: HashMap<CorrelationId, OnceTake<ResponseChannel<SyncResponseValue>>>,
 }
 
@@ -40,7 +40,7 @@ impl NetSyncManager {
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
-        eventstore: Recipient<GetEventsAfterTs>,
+        eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
@@ -56,7 +56,7 @@ impl NetSyncManager {
         bus: &BusHandle,
         tx: &mpsc::Sender<NetCommand>,
         rx: &Arc<broadcast::Receiver<NetEvent>>,
-        eventstore: Recipient<GetEventsAfterTs>,
+        eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
     ) -> Addr<Self> {
         let mut events = rx.resubscribe();
         let addr = Self::new(bus, tx, rx, eventstore).start();
@@ -154,7 +154,7 @@ impl Handler<SyncRequestReceived> for NetSyncManager {
         trap(EType::Net, &self.bus, || {
             let id = CorrelationId::new();
             self.requests.insert(id, msg.channel);
-            self.eventstore.try_send(GetEventsAfterTs::new(
+            self.eventstore.try_send(EventStoreQueryBy::<TsAgg>::new(
                 id,
                 msg.value.since,
                 ctx.address().recipient(),
@@ -165,9 +165,9 @@ impl Handler<SyncRequestReceived> for NetSyncManager {
 }
 
 /// Receive Events from EventStore
-impl Handler<GetEventsAfterResponse> for NetSyncManager {
+impl Handler<EventStoreQueryResponse> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, msg: GetEventsAfterResponse, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EventStoreQueryResponse, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
             let Some(channel) = self.requests.get(&msg.id()) else {
                 bail!("request not found with {}", msg.id());
