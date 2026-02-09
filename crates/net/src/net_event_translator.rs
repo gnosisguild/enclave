@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-//
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
@@ -7,6 +6,8 @@
 use crate::events::GossipData;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
+use crate::net_event_buffer::NetEventBuffer;
+use crate::net_sync_manager::NetSyncManager;
 use crate::DocumentPublisher;
 use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
@@ -22,7 +23,9 @@ use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
 use e3_events::EventContextAccessors;
+use e3_events::EventStoreQueryBy;
 use e3_events::EventType;
+use e3_events::TsAgg;
 use e3_events::Unsequenced;
 use e3_events::{CorrelationId, EnclaveEvent, EventId};
 use e3_utils::MAILBOX_LIMIT;
@@ -55,7 +58,7 @@ impl Actor for NetEventTranslator {
 
 /// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "anyhow::Result<()>")]
+#[rtype(result = "()")]
 struct LibP2pEvent(pub GossipData);
 
 impl NetEventTranslator {
@@ -114,97 +117,70 @@ impl NetEventTranslator {
         }
     }
 
-    /// Spawn a Libp2p interface and hook it up to this actor
-    #[instrument(name = "libp2p", skip_all)]
-    pub async fn setup_with_interface(
-        bus: BusHandle,
-        peers: Vec<String>,
-        cipher: &Arc<Cipher>,
-        quic_port: u16,
-        repository: Repository<Vec<u8>>,
-    ) -> Result<(
-        Addr<Self>,
-        Option<Addr<DocumentPublisher>>,
-        tokio::task::JoinHandle<Result<()>>,
-        String,
-    )> {
-        // TODO: We should separate NetInterface from NetEventTranslator
-        let topic = "tmp-enclave-gossip-topic";
-        // Get existing keypair or generate a new one
-        let mut bytes = match repository.read().await? {
-            Some(bytes) => {
-                info!("Found keypair in repository");
-                cipher.decrypt_data(&bytes)?
-            }
-            None => bail!("No network keypair found in repository, please generate a new one using `enclave net generate-key`"),
-        };
+    fn process_gossip_event(&mut self, msg: EnclaveEvent) -> Result<()> {
+        // if we have seen this event before dont rebroadcast
+        let id = msg.event_id();
+        if self.sent_events.contains(&id) {
+            trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
+            return Ok(());
+        }
 
-        // Create peer from keypair
-        let keypair: libp2p::identity::Keypair =
-            ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
+        warn!("GossipPublish event: {}", msg.event_type());
+        let topic = self.topic.clone();
+        let data: GossipData = msg.try_into()?;
 
-        // Setup and start net event translator
-        let rx = &Arc::new(interface.rx());
-        let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
-        let maybe_publisher = Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic));
+        self.tx.try_send(NetCommand::GossipPublish {
+            topic,
+            data,
+            correlation_id: CorrelationId::new(),
+        })?;
 
-        let handle = tokio::spawn(async move { Ok(interface.start().await?) });
-
-        Ok((
-            addr,
-            maybe_publisher,
-            handle,
-            keypair.public().to_peer_id().to_string(),
-        ))
+        Ok(())
     }
-}
 
-impl Handler<LibP2pEvent> for NetEventTranslator {
-    type Result = anyhow::Result<()>;
-    fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
-        let LibP2pEvent(data) = msg;
-        let event: EnclaveEvent<Unsequenced> = data.try_into()?;
+    fn handle_enclave_event(&mut self, msg: EnclaveEvent) -> Result<()> {
+        // Ignore events that should be considered local
+        if !Self::is_forwardable_event(&msg) {
+            let id = msg.event_id();
+            trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
+            return Ok(());
+        }
+
+        self.process_gossip_event(msg)?;
+
+        Ok(())
+    }
+
+    fn publish_event(&mut self, event: EnclaveEvent<Unsequenced>) -> Result<()> {
         let id = event.id();
         let (data, ec) = event.into_components();
         self.bus.publish_from_remote(data, ec.ts(), None)?;
         self.sent_events.insert(id);
         Ok(())
     }
+
+    fn handle_remote_event(&mut self, msg: LibP2pEvent) -> Result<()> {
+        let data = msg.0;
+        let event: EnclaveEvent<Unsequenced> = data.try_into()?;
+        self.publish_event(event)?;
+        Ok(())
+    }
+}
+
+impl Handler<LibP2pEvent> for NetEventTranslator {
+    type Result = ();
+    fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Net, &self.bus.clone(), || {
+            self.handle_remote_event(msg)
+        })
+    }
 }
 
 impl Handler<EnclaveEvent> for NetEventTranslator {
     type Result = ();
-    fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Net, &self.bus.with_ec(event.get_ctx()), || {
-            let sent_events = self.sent_events.clone();
-            let tx = self.tx.clone();
-            let evt = event.clone();
-            let topic = self.topic.clone();
-            let id: EventId = evt.clone().into();
-
-            // Ignore events that should be considered local
-            if !Self::is_forwardable_event(&evt) {
-                trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
-                return Ok(());
-            }
-
-            // if we have seen this event before dont rebroadcast
-            if sent_events.contains(&id) {
-                trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
-                return Ok(());
-            }
-
-            warn!("GossipPublish event: {}", event.event_type());
-            let data: GossipData = evt.try_into()?;
-
-            tx.try_send(NetCommand::GossipPublish {
-                topic,
-                data,
-                correlation_id: CorrelationId::new(),
-            })?;
-
-            Ok(())
+    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+        trap(EType::Net, &self.bus.with_ec(msg.get_ctx()), || {
+            self.handle_enclave_event(msg)
         })
     }
 }

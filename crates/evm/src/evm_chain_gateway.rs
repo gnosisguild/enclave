@@ -15,7 +15,7 @@ use anyhow::{bail, Context};
 use e3_events::EType;
 use e3_events::{
     trap, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
-    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnd, Unsequenced,
+    HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded, Unsequenced,
 };
 use e3_events::{Event, EventPublisher};
 use e3_utils::MAILBOX_LIMIT;
@@ -114,7 +114,7 @@ impl EvmChainGateway {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
         let addr = Self::new(bus).start();
         bus.subscribe_all(
-            &[EventType::HistoricalEvmSyncStart, EventType::SyncEnd],
+            &[EventType::HistoricalEvmSyncStart, EventType::SyncEnded],
             addr.clone().recipient(),
         );
         addr
@@ -134,7 +134,7 @@ impl EvmChainGateway {
         Ok(())
     }
 
-    fn handle_sync_end(&mut self, _: SyncEnd) -> Result<()> {
+    fn handle_sync_ended(&mut self, _: SyncEnded) -> Result<()> {
         let buffer = self.status.live()?;
         for evt in buffer {
             self.publish_evm_event(evt)?;
@@ -195,7 +195,7 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
         trap(EType::Evm, &self.bus.with_ec(msg.get_ctx()), || {
             match msg.into_data() {
                 EnclaveEventData::HistoricalEvmSyncStart(e) => self.handle_sync_start(e)?,
-                EnclaveEventData::SyncEnd(e) => self.handle_sync_end(e)?,
+                EnclaveEventData::SyncEnded(e) => self.handle_sync_ended(e)?,
                 _ => (),
             }
             Ok(())
@@ -292,20 +292,20 @@ mod tests {
         // Send EVM event while buffering - should be buffered (not received)
         let buffered_event = EvmEvent::new(
             CorrelationId::new(),
-            TestEvent::new("Before SyncEnd", 2).into(),
+            TestEvent::new("Before SyncEnded", 2).into(),
             101,
             12346,
             chain_id,
         );
         addr.send(EnclaveEvmEvent::Event(buffered_event)).await?;
 
-        // The Synchronizer will publish the SyncEnd event when it has all the information it needs
+        // The Synchronizer will publish the SyncEnded event when it has all the information it needs
         // and has published everything to the bus
-        bus.publish_without_context(SyncEnd::new())?;
+        bus.publish_without_context(SyncEnded::new())?;
 
         let after_event = EvmEvent::new(
             CorrelationId::new(),
-            TestEvent::new("After SyncEnd", 2).into(),
+            TestEvent::new("After SyncEnded", 2).into(),
             101,
             12346,
             chain_id,
@@ -328,7 +328,7 @@ mod tests {
 
         assert_eq!(
             test_events,
-            vec!["Before Complete", "Before SyncEnd", "After SyncEnd"]
+            vec!["Before Complete", "Before SyncEnded", "After SyncEnded"]
         );
 
         let event_types: Vec<String> = full.iter().map(|e| e.event_type()).collect();
@@ -338,7 +338,7 @@ mod tests {
             vec![
                 "HistoricalEvmSyncStart",
                 "TestEvent",
-                "SyncEnd",
+                "SyncEnded",
                 "TestEvent",
                 "TestEvent"
             ]

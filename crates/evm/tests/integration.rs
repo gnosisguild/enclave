@@ -17,7 +17,7 @@ use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
     prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEventConfig,
-    EvmEventConfigChain, GetEvents, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnd,
+    EvmEventConfigChain, GetEvents, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded,
     TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
@@ -85,7 +85,7 @@ impl Handler<HistoricalEvmEventsReceived> for FakeSyncActor {
             for evt in msg.events.drain(..) {
                 self.bus.naked_dispatch(evt);
             }
-            self.bus.publish_without_context(SyncEnd::new())?;
+            self.bus.publish_without_context(SyncEnded::new())?;
             Ok(())
         })
     }

@@ -21,7 +21,7 @@ use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
-use e3_net::{NetEventTranslator, NetRepositoryFactory};
+use e3_net::{setup_with_interface, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
@@ -186,7 +186,7 @@ impl CiphernodeBuilder {
         self.testmode_errors = true;
         self
     }
-    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnd. This is important
+    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnded. This is important
     /// for tests that don't specifically
     pub fn testmode_start_buffer_immediately(mut self) -> Self {
         self.start_buffer = true;
@@ -381,7 +381,8 @@ impl CiphernodeBuilder {
 
         let bus = event_system.handle()?;
         let store = event_system.store()?;
-        let eventstore = event_system.eventstore_getter()?;
+        let eventstore_ts = event_system.eventstore_getter_ts()?;
+        let eventstore_seq = event_system.eventstore_getter_seq()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
 
@@ -457,12 +458,13 @@ impl CiphernodeBuilder {
 
         let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
             let repositories = store.repositories();
-            let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
+            let (_, _, join_handle, peer_id) = setup_with_interface(
                 bus.clone(),
                 net_config.peers,
                 &self.cipher,
                 net_config.quic_port,
                 repositories.libp2p_keypair(),
+                eventstore_ts,
             )
             .await?;
             (join_handle, peer_id)
@@ -479,7 +481,7 @@ impl CiphernodeBuilder {
             &evm_config,
             &repositories,
             &aggregate_config,
-            &eventstore,
+            &eventstore_seq,
         )
         .await?;
 

@@ -14,8 +14,8 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreQueryBy, EventStoreRouter, InsertBatch, SeqAgg, Sequencer, SnapshotBuffer,
-    StoreEventRequested, UpdateDestination,
+    EventStoreQueryBy, EventStoreRouter, InsertBatch, QueryKind, SeqAgg, Sequencer, SnapshotBuffer,
+    StoreEventRequested, TsAgg, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -324,7 +324,16 @@ impl EventSystem {
         }
     }
 
-    pub fn eventstore_getter(&self) -> Result<Recipient<EventStoreQueryBy<SeqAgg>>> {
+    pub fn eventstore_getter_seq(&self) -> Result<Recipient<EventStoreQueryBy<SeqAgg>>> {
+        info!("eventstore_reader...");
+        let eventstores = self.eventstore_addrs()?;
+        match &eventstores {
+            EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
+            EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
+        }
+    }
+
+    pub fn eventstore_getter_ts(&self) -> Result<Recipient<EventStoreQueryBy<TsAgg>>> {
         info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
@@ -413,7 +422,7 @@ mod tests {
     use e3_events::EventId;
     use e3_events::Start;
     use e3_events::StoreKeys;
-    use e3_events::SyncEnd;
+    use e3_events::SyncEnded;
     use e3_events::Tick;
     use e3_events::TsAgg;
     use e3_test_helpers::with_tracing;
@@ -584,9 +593,9 @@ mod tests {
         );
         info!("Local state was mutated however disk state was not");
 
-        info!("Publishing SyncEnd event to turn on SnapshotBuffer. This should send the seq=1 batch to the timelock...");
-        // Publishing SyncEnd should turn on the SnapshotBuffer seq 2
-        handle.publish(SyncEnd::new(), ec.clone())?;
+        info!("Publishing SyncEnded event to turn on SnapshotBuffer. This should send the seq=1 batch to the timelock...");
+        // Publishing SyncEnded should turn on the SnapshotBuffer seq 2
+        handle.publish(SyncEnded::new(), ec.clone())?;
 
         sleep(Duration::from_millis(1)).await;
 

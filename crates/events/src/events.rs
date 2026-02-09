@@ -65,7 +65,7 @@ impl StoreEventResponse {
 
 /// Trait for various EventStore query types
 pub trait QueryKind {
-    type Shape;
+    type Shape: Send;
 }
 
 /// Query by aggregated sequence

@@ -213,7 +213,7 @@ pub enum EnclaveEventData {
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
     HistoricalNetSyncStart(HistoricalNetSyncStart),
     SyncEffect(SyncEffect),
-    SyncEnd(SyncEnd),
+    SyncEnded(SyncEnded),
     EffectsEnabled(EffectsEnabled),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
@@ -498,7 +498,7 @@ impl_event_types!(
     HistoricalEvmSyncStart,
     HistoricalNetSyncStart,
     SyncEffect,
-    SyncEnd,
+    SyncEnded,
     EffectsEnabled
 );
 

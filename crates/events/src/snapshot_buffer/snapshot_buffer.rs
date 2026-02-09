@@ -175,7 +175,7 @@ impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            if let EnclaveEventData::SyncEnd(_) = msg.get_data() {
+            if let EnclaveEventData::SyncEnded(_) = msg.get_data() {
                 self.notify_sync(ctx, Start);
             };
             let SnapshotBufferState::Running = self.state else {
@@ -269,7 +269,7 @@ mod tests {
     use crate::snapshot_buffer::timelock_queue::Tick;
     use crate::{
         AggregateConfig, AggregateId, E3id, EnclaveEvent, EventContext, EventContextAccessors,
-        EventContextSeq, EventId, Insert, InsertBatch, Sequenced, SyncEnd, TestEvent,
+        EventContextSeq, EventId, Insert, InsertBatch, Sequenced, SyncEnded, TestEvent,
     };
     use actix::Actor;
     use anyhow::Result;
@@ -309,7 +309,7 @@ mod tests {
 
         buffer
             .send(EnclaveEvent::from_data_ec(
-                SyncEnd::new().into(),
+                SyncEnded::new().into(),
                 create_ec(0, 9),
             ))
             .await?;

@@ -12,7 +12,7 @@ use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent,
     EventContextAccessors, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse,
     EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived, HistoricalEvmSyncStart,
-    HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnd, Unsequenced,
+    HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnded, Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::{
@@ -107,7 +107,7 @@ pub async fn sync(
     }
     info!("Historical events published.");
 
-    bus.publish_without_context(SyncEnd::new())?;
+    bus.publish_without_context(SyncEnded::new())?;
     info!("Sync finished.");
     // normal live operations
 
