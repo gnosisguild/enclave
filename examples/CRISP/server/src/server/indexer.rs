@@ -64,7 +64,7 @@ pub async fn register_e3_requested(
                 .await
                 .map_err(|e| eyre::eyre!("{}", e))?;
 
-                // Convert custom params bytes back to token address and balance threshold.
+                let input_window = [e3.inputWindow[0].to::<u64>(), e3.inputWindow[1].to::<u64>()];
 
                 // Use sol_data types instead of primitives
                 type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>);
@@ -104,17 +104,6 @@ pub async fn register_e3_requested(
 
                 let input_window = [e3.inputWindow[0].to::<u64>(), e3.inputWindow[1].to::<u64>()];
 
-<<<<<<< HEAD
-=======
-                // save the e3 details
-                repo.initialize_round(
-                    custom_params.token_address, 
-                    custom_params.balance_threshold, 
-                    e3.requester.to_string(), 
-                    input_window[1])
-                    .await?;
-
->>>>>>> 6267c41b (refactor: remove activate step [skip-line-limit] (#1257))
                 // Get token holders from Etherscan API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
                     info!(
@@ -181,7 +170,7 @@ pub async fn register_e3_requested(
                 }
 
                 // save the e3 details
-                repo.initialize_round(custom_params, e3.requester.to_string(), input_deadline)
+                repo.initialize_round(custom_params, e3.requester.to_string(), input_window[1])
                 .await?;
 
                 // Store eligible addresses in the repository.

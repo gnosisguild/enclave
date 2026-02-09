@@ -105,7 +105,7 @@ describe('CRISP Contracts', function () {
 
       const e3Id = 0n
 
-      await mockEnclave.request()
+      await mockEnclave.request(await crispProgram.getAddress())
 
       const vote = [10n, 0n]
       const balance = 100n

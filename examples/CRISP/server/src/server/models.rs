@@ -249,7 +249,6 @@ pub struct E3Crisp {
     pub num_options: String,
     pub credit_mode: CreditMode,
     pub credits: Option<String>,
-    pub input_deadline: u64,
 }
 
 impl From<E3> for WebResultRequest {

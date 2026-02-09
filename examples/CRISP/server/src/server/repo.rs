@@ -187,7 +187,6 @@ impl<S: DataStore> CrispE3Repository<S> {
             num_options: custom_params.num_options,
             credit_mode: custom_params.credit_mode,
             credits: custom_params.credits,
-            input_deadline,
             end_time,
         })
         .await
