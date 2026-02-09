@@ -35,11 +35,3 @@ impl Circuit for ShareDecryptionCircuit {
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::THRESHOLD;
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
-
-pub struct ShareDecryptionCircuitInput {
-    pub ciphertext: Ciphertext,
-    pub public_key: PublicKey,
-    pub s: CrtPolynomial,
-    pub e: CrtPolynomial,
-    pub d_share: CrtPolynomial,
-}
