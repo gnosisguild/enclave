@@ -26,6 +26,9 @@ use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitInput;
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::threshold::share_decryption::{
+    ShareDecryptionCircuit, ShareDecryptionCircuitInput,
+};
 use e3_zk_helpers::threshold::user_data_encryption::{
     UserDataEncryptionCircuit, UserDataEncryptionCircuitInput,
 };
@@ -161,6 +164,7 @@ fn main() -> Result<()> {
     registry.register(Arc::new(ShareEncryptionCircuit));
     registry.register(Arc::new(ShareDecryptionCircuit));
     registry.register(Arc::new(PkAggregationCircuit));
+    registry.register(Arc::new(ShareDecryptionCircuit));
 
     // Handle list circuits flag.
     if args.list_circuits {
@@ -311,6 +315,14 @@ fn main() -> Result<()> {
                 )?;
 
                 let circuit = PkAggregationCircuit;
+                circuit.codegen(preset, &sample)?
+            }
+            name if name == <ShareDecryptionCircuit as Circuit>::NAME => {
+                let sample = ShareDecryptionCircuitInput::generate_sample(
+                    preset,
+                    CiphernodesCommitteeSize::Small.values(),
+                )?;
+                let circuit = ShareDecryptionCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name => return Err(anyhow!("circuit {} not yet implemented", name)),
