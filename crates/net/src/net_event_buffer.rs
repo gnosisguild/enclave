@@ -1,4 +1,10 @@
-use actix::prelude::*;
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use actix::{Actor, AsyncContext, Handler, Message};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, Event, EventSubscriber, EventType,
@@ -81,7 +87,7 @@ impl NetEventBuffer {
 }
 
 impl Actor for NetEventBuffer {
-    type Context = Context<Self>;
+    type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         // Spawn task to read from broadcast channel
