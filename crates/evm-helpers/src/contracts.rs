@@ -76,6 +76,38 @@ sol! {
         Failed
     }
 
+    #[derive(Debug, PartialEq)]
+    enum FailureReason {
+        None,
+        CommitteeFormationTimeout,
+        InsufficientCommitteeMembers,
+        DKGTimeout,
+        DKGInvalidShares,
+        NoInputsReceived,
+        ComputeTimeout,
+        ComputeProviderExpired,
+        ComputeProviderFailed,
+        RequesterCancelled,
+        DecryptionTimeout,
+        DecryptionInvalidShares,
+        VerificationFailed
+    }
+
+    #[derive(Debug)]
+    struct E3TimeoutConfig {
+        uint256 dkgWindow;
+        uint256 computeWindow;
+        uint256 decryptionWindow;
+        uint256 gracePeriod;
+    }
+
+    #[derive(Debug)]
+    struct E3Deadlines {
+        uint256 dkgDeadline;
+        uint256 computeDeadline;
+        uint256 decryptionDeadline;
+    }
+
     #[derive(Debug)]
     #[sol(rpc)]
     contract Enclave {
@@ -91,6 +123,10 @@ sol! {
         function getInputRoot(uint256 e3Id) public view returns (uint256);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
         function getE3Stage(uint256 e3Id) external view returns (E3Stage stage);
+        function getFailureReason(uint256 e3Id) external view returns (FailureReason reason);
+        function getRequester(uint256 e3Id) external view returns (address requester);
+        function getDeadlines(uint256 e3Id) external view returns (E3Deadlines memory deadlines);
+        function getTimeoutConfig() external view returns (E3TimeoutConfig memory config);
     }
 }
 
@@ -129,6 +165,14 @@ pub trait EnclaveRead {
     ) -> Result<U256>;
 
     async fn get_e3_stage(&self, e3_id: U256) -> Result<E3Stage>;
+
+    async fn get_failure_reason(&self, e3_id: U256) -> Result<FailureReason>;
+
+    async fn get_requester(&self, e3_id: U256) -> Result<Address>;
+
+    async fn get_deadlines(&self, e3_id: U256) -> Result<E3Deadlines>;
+
+    async fn get_timeout_config(&self) -> Result<E3TimeoutConfig>;
 }
 
 /// Trait for write operations on the Enclave contract
@@ -365,6 +409,30 @@ where
         let contract = Enclave::new(self.contract_address, &self.provider);
         let stage = contract.getE3Stage(e3_id).call().await?;
         Ok(stage)
+    }
+
+    async fn get_failure_reason(&self, e3_id: U256) -> Result<FailureReason> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let reason = contract.getFailureReason(e3_id).call().await?;
+        Ok(reason)
+    }
+
+    async fn get_requester(&self, e3_id: U256) -> Result<Address> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let requester = contract.getRequester(e3_id).call().await?;
+        Ok(requester)
+    }
+
+    async fn get_deadlines(&self, e3_id: U256) -> Result<E3Deadlines> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let deadlines = contract.getDeadlines(e3_id).call().await?;
+        Ok(deadlines)
+    }
+
+    async fn get_timeout_config(&self) -> Result<E3TimeoutConfig> {
+        let contract = Enclave::new(self.contract_address, &self.provider);
+        let config = contract.getTimeoutConfig().call().await?;
+        Ok(config)
     }
 }
 

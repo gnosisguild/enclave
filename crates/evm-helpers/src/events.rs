@@ -47,4 +47,41 @@ sol! {
 
     #[derive(Debug)]
     event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
+
+    #[derive(Debug)]
+    enum E3Stage {
+        None,
+        Requested,
+        CommitteeFinalized,
+        KeyPublished,
+        CiphertextReady,
+        Complete,
+        Failed
+    }
+
+    #[derive(Debug)]
+    enum FailureReason {
+        None,
+        CommitteeFormationTimeout,
+        InsufficientCommitteeMembers,
+        DKGTimeout,
+        DKGInvalidShares,
+        NoInputsReceived,
+        ComputeTimeout,
+        ComputeProviderExpired,
+        ComputeProviderFailed,
+        RequesterCancelled,
+        DecryptionTimeout,
+        DecryptionInvalidShares,
+        VerificationFailed
+    }
+
+    #[derive(Debug)]
+    event CommitteeFinalized(uint256 indexed e3Id);
+
+    #[derive(Debug)]
+    event E3StageChanged(uint256 indexed e3Id, E3Stage previousStage, E3Stage newStage);
+
+    #[derive(Debug)]
+    event E3Failed(uint256 indexed e3Id, E3Stage failedAtStage, FailureReason reason);
 }
