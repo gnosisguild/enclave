@@ -168,6 +168,34 @@ impl PathsEngine {
         }
         None
     }
+
+    fn get_noir_base(&self) -> PathBuf {
+        if let Some(root_dir) = self.get_root_dir() {
+            return root_dir;
+        }
+        // Fallback to .enclave relative to default config dir (e.g., ~/.config/enclave/.enclave)
+        self.default_config_dir.join(".enclave")
+    }
+
+    /// Get the noir base directory for ZK circuits and prover
+    pub fn noir_dir(&self) -> PathBuf {
+        clean(self.get_noir_base().join("noir"))
+    }
+
+    /// Get the bb binary path
+    pub fn bb_binary(&self) -> PathBuf {
+        clean(self.noir_dir().join("bin").join("bb"))
+    }
+
+    /// Get the circuits directory (shared across nodes)
+    pub fn circuits_dir(&self) -> PathBuf {
+        clean(self.noir_dir().join("circuits"))
+    }
+
+    /// Get the work directory for a specific node
+    pub fn work_dir(&self, node_name: &str) -> PathBuf {
+        clean(self.noir_dir().join("work").join(node_name))
+    }
 }
 
 #[cfg(test)]

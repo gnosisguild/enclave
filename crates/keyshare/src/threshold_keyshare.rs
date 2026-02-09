@@ -5,31 +5,31 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, CorrelationId, DecryptionshareCreated, Die, E3RequestComplete, E3id, EType,
-    EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed,
-    EncryptionKeyCreated, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, TypedEvent,
+    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
+    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, KeyshareCreated,
+    PartyId, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_fhe::create_crp;
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_trbfv::{
-    calculate_decryption_key::CalculateDecryptionKeyRequest,
+    calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
     calculate_decryption_share::{
         CalculateDecryptionShareRequest, CalculateDecryptionShareResponse,
     },
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
-    gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
+    gen_pk_share_and_sk_sss::{GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse},
     helpers::{deserialize_secret_key, serialize_secret_key},
     shares::{BfvEncryptedShares, EncryptableVec, Encrypted, ShamirShare, SharedSecret},
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
 use e3_utils::NotifySync;
 use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
-use fhe::bfv::BfvParameters;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::{rngs::OsRng, SeedableRng};
@@ -45,20 +45,12 @@ use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyC
 use crate::threshold_share_collector::ThresholdShareCollector;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
-struct StartThresholdShareGeneration(CiphernodeSelected);
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenPkShareAndSkSss(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenEsiSss(CiphernodeSelected);
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
-struct SharesGenerated;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -254,7 +246,7 @@ impl TryInto<CollectingEncryptionKeysData> for ThresholdKeyshareState {
     fn try_into(self) -> std::result::Result<CollectingEncryptionKeysData, Self::Error> {
         match self.state {
             KeyshareState::CollectingEncryptionKeys(s) => Ok(s),
-            _ => Err(anyhow!("Invalid state")),
+            _ => Err(anyhow!("Invalid state: expected CollectingEncryptionKeys")),
         }
     }
 }
@@ -303,7 +295,7 @@ pub struct ThresholdKeyshareParams {
     pub bus: BusHandle,
     pub cipher: Arc<Cipher>,
     pub state: Persistable<ThresholdKeyshareState>,
-    pub share_encryption_params: Arc<BfvParameters>,
+    pub share_enc_preset: BfvPreset,
 }
 
 pub struct ThresholdKeyshare {
@@ -312,7 +304,7 @@ pub struct ThresholdKeyshare {
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     state: Persistable<ThresholdKeyshareState>,
-    share_encryption_params: Arc<BfvParameters>,
+    share_enc_preset: BfvPreset,
 }
 
 impl ThresholdKeyshare {
@@ -323,7 +315,7 @@ impl ThresholdKeyshare {
             decryption_key_collector: None,
             encryption_key_collector: None,
             state: params.state,
-            share_encryption_params: params.share_encryption_params,
+            share_enc_preset: params.share_enc_preset,
         }
     }
 }
@@ -409,32 +401,35 @@ impl ThresholdKeyshare {
 
     pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         match &msg.response {
-            TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
-            TrBFVResponse::GenPkShareAndSkSss(_) => {
-                self.handle_gen_pk_share_and_sk_sss_response(msg)
-            }
-            TrBFVResponse::CalculateDecryptionKey(_) => {
-                self.handle_calculate_decryption_key_response(msg)
-            }
-            TrBFVResponse::CalculateDecryptionShare(_) => {
-                self.handle_calculate_decryption_share_response(msg)
-            }
-            _ => Ok(()),
+            ComputeResponseKind::TrBFV(trbfv) => match trbfv {
+                TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
+                TrBFVResponse::GenPkShareAndSkSss(_) => {
+                    self.handle_gen_pk_share_and_sk_sss_response(msg)
+                }
+                TrBFVResponse::CalculateDecryptionKey(_) => {
+                    self.handle_calculate_decryption_key_response(msg)
+                }
+                TrBFVResponse::CalculateDecryptionShare(_) => {
+                    self.handle_calculate_decryption_share_response(msg)
+                }
+                _ => Ok(()),
+            },
+            ComputeResponseKind::Zk(_) => Ok(()),
         }
     }
 
-    /// 1. CiphernodeSelected - Generate BFV keys and start collecting
+    /// 1. CiphernodeSelected - Generate BFV keys and publish EncryptionKeyPending
     pub fn handle_ciphernode_selected(
         &mut self,
         msg: TypedEvent<CiphernodeSelected>,
         address: Addr<Self>,
     ) -> Result<()> {
         info!("CiphernodeSelected received.");
-        // Ensure the collector is created
+        // Ensure the collectors are created
         let _ = self.ensure_collector(address.clone());
         let _ = self.ensure_encryption_key_collector(address.clone());
 
-        let params = self.share_encryption_params.clone();
+        let params = BfvParamSet::from(self.share_enc_preset.clone()).build_arc();
         let mut rng = OsRng;
         let sk_bfv = SecretKey::random(&params, &mut rng);
         let pk_bfv = PublicKey::new(&sk_bfv, &mut rng);
@@ -442,6 +437,9 @@ impl ThresholdKeyshare {
         let sk_bytes = serialize_secret_key(&sk_bfv)?;
         let sk_bfv_encrypted = SensitiveBytes::new(sk_bytes, &self.cipher)?;
         let pk_bfv_bytes = ArcBytes::from_bytes(&pk_bfv.to_bytes());
+
+        let state = self.state.try_get()?;
+        let e3_id = state.e3_id.clone();
 
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::CollectingEncryptionKeys(
@@ -453,14 +451,10 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        let state = self.state.try_get()?;
-        self.bus.publish(EncryptionKeyCreated {
-            e3_id: state.e3_id.clone(),
-            key: Arc::new(EncryptionKey {
-                party_id: state.party_id,
-                pk_bfv: pk_bfv_bytes,
-            }),
-            external: false,
+        self.bus.publish(EncryptionKeyPending {
+            e3_id,
+            key: Arc::new(EncryptionKey::new(state.party_id, pk_bfv_bytes)),
+            params_preset: self.share_enc_preset,
         })?;
 
         Ok(())
@@ -519,7 +513,7 @@ impl ThresholdKeyshare {
 
         let trbfv_config = state.get_trbfv_config();
 
-        let event = ComputeRequest::new(
+        let event = ComputeRequest::trbfv(
             TrBFVRequest::GenEsiSss(
                 GenEsiSssRequest {
                     trbfv_config,
@@ -603,7 +597,7 @@ impl ThresholdKeyshare {
             )
             .to_bytes(),
         );
-        let event = ComputeRequest::new(
+        let event = ComputeRequest::trbfv(
             TrBFVRequest::GenPkShareAndSkSss(
                 GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
             ),
@@ -620,9 +614,10 @@ impl ThresholdKeyshare {
         &mut self,
         res: TypedEvent<ComputeResponse>,
     ) -> Result<()> {
-        let TrBFVResponse::GenPkShareAndSkSss(output) = res.into_inner().response else {
-            bail!("Error extracting data from compute process")
-        };
+        let output: GenPkShareAndSkSssResponse = res
+            .into_inner()
+            .try_into()
+            .context("Error extracting data from compute process")?;
 
         let (pk_share, sk_sss) = (output.pk_share, output.sk_sss);
 
@@ -686,7 +681,7 @@ impl ThresholdKeyshare {
         let encryption_keys = &collected_encryption_keys;
 
         // Convert to BFV public keys
-        let params = self.share_encryption_params.clone();
+        let params = BfvParamSet::from(self.share_enc_preset.clone()).build_arc();
         let recipient_pks: Vec<PublicKey> = encryption_keys
             .iter()
             .map(|k| {
@@ -762,7 +757,7 @@ impl ThresholdKeyshare {
         // Get our BFV secret key from state
         let current: AggregatingDecryptionKey = state.clone().try_into()?;
         let sk_bytes = current.sk_bfv.access(&cipher)?;
-        let params = self.share_encryption_params.clone();
+        let params = BfvParamSet::from(self.share_enc_preset.clone()).build_arc();
         let sk_bfv = deserialize_secret_key(&sk_bytes, &params)?;
         let degree = params.degree();
 
@@ -808,7 +803,7 @@ impl ThresholdKeyshare {
             sk_sss_collected: sk_sss_collected.encrypt(&cipher)?,
         };
 
-        let event = ComputeRequest::new(
+        let event = ComputeRequest::trbfv(
             TrBFVRequest::CalculateDecryptionKey(request),
             CorrelationId::new(),
             e3_id.clone(),
@@ -823,9 +818,10 @@ impl ThresholdKeyshare {
         &mut self,
         res: TypedEvent<ComputeResponse>,
     ) -> Result<()> {
-        let TrBFVResponse::CalculateDecryptionKey(output) = res.into_inner().response else {
-            bail!("Error extracting data from compute process")
-        };
+        let output: CalculateDecryptionKeyResponse = res
+            .into_inner()
+            .try_into()
+            .context("Error extracting data from compute process")?;
 
         let (sk_poly_sum, es_poly_sum) = (output.sk_poly_sum, output.es_poly_sum);
 
@@ -885,7 +881,7 @@ impl ThresholdKeyshare {
         let e3_id = state.get_e3_id();
         let decrypting: Decrypting = state.clone().try_into()?;
         let trbfv_config = state.get_trbfv_config();
-        let event = ComputeRequest::new(
+        let event = ComputeRequest::trbfv(
             TrBFVRequest::CalculateDecryptionShare(
                 CalculateDecryptionShareRequest {
                     name: format!("party_id({})", state.party_id),

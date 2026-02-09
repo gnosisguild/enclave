@@ -9,19 +9,25 @@ use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
-use e3_data::RepositoriesFactory;
-use e3_events::BusHandle;
-use e3_net::{NetEventTranslator, NetRepositoryFactory};
+use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use std::sync::{Arc, Mutex};
-use tokio::task::JoinHandle;
 use tracing::instrument;
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
+    let zk_config = e3_zk_prover::ZkConfig::fetch_or_default().await;
+    let backend = ZkBackend::new(
+        config.bb_binary(),
+        config.circuits_dir(),
+        config.work_dir(),
+        zk_config,
+    );
+    backend.ensure_installed().await?;
+
     let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_persistence(&config.log_file(), &config.db_file())
@@ -32,6 +38,7 @@ pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeH
         .with_max_threads()
         .with_contract_ciphernode_registry()
         .with_trbfv()
+        .with_zkproof(backend)
         .with_net(config.peers(), config.quic_port())
         .build()
         .await?;

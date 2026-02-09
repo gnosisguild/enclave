@@ -13,6 +13,7 @@ use crate::constants::{
     search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z},
     secure_8192,
 };
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
@@ -30,7 +31,7 @@ use fhe::bfv::BfvParameters;
 /// generates a standard (non-threshold) BFV key-pair using these parameters. These keys are
 /// used exclusively for encrypting secret shares during DKG, since the threshold public key
 /// doesn't exist yet. After DKG completes, these keys are no longer needed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum BfvPreset {
     /// Insecure threshold BFV parameters (degree 512) - DO NOT USE IN PRODUCTION
     ///
@@ -307,6 +308,19 @@ impl BfvPreset {
             BfvPreset::InsecureThreshold512 => Some(BfvPreset::InsecureDkg512),
             BfvPreset::SecureThreshold8192 => Some(BfvPreset::SecureDkg8192),
             BfvPreset::InsecureDkg512 | BfvPreset::SecureDkg8192 => None,
+        }
+    }
+
+    /// Returns the threshold preset that pairs with this DKG preset.
+    ///
+    /// Used when you have a DKG preset (e.g. for share encryption during key generation) and need
+    /// the corresponding threshold parameters (e.g. for encryption/decryption).
+    /// Returns `None` when called on a threshold preset.
+    pub fn threshold_counterpart(self) -> Option<BfvPreset> {
+        match self {
+            BfvPreset::InsecureDkg512 => Some(BfvPreset::InsecureThreshold512),
+            BfvPreset::SecureDkg8192 => Some(BfvPreset::SecureThreshold8192),
+            BfvPreset::InsecureThreshold512 | BfvPreset::SecureThreshold8192 => None,
         }
     }
 

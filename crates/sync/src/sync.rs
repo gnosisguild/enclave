@@ -81,7 +81,7 @@ impl Actor for Synchronizer {
 
 impl Handler<SyncEvmEvent> for Synchronizer {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: SyncEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
             match msg {
                 // Buffer events as the sync actor receives them
@@ -118,11 +118,11 @@ pub struct Bootstrap;
 mod tests {
     use super::*;
     use e3_ciphernode_builder::EventSystem;
+    use e3_events::EnclaveEvent;
     use e3_events::{
         CorrelationId, EnclaveEventData, Event, EvmEventConfig, EvmEventConfigChain, GetEvents,
         TestEvent,
     };
-    use e3_events::{EnclaveEvent, EventContextAccessors};
     use std::time::Duration;
     use tokio::time::sleep;
 

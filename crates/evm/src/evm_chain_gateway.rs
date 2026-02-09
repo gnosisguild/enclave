@@ -198,7 +198,7 @@ impl Handler<EnclaveEvent> for EvmChainGateway {
 
 impl Handler<EnclaveEvmEvent> for EvmChainGateway {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Evm, &self.bus.clone(), || self.handle_evm_event(msg))
     }
 }

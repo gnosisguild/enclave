@@ -8,6 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_events::ThresholdShare;
+use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_trbfv::{
     calculate_decryption_key::{
         calculate_decryption_key, CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse,
@@ -16,7 +17,6 @@ use e3_trbfv::{
     gen_pk_share_and_sk_sss::{
         gen_pk_share_and_sk_sss, GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse,
     },
-    helpers::get_share_encryption_params,
     shares::{BfvEncryptedShares, EncryptableVec, ShamirShare, SharedSecret},
     TrBFVConfig,
 };
@@ -48,7 +48,7 @@ pub fn generate_shares_hash_map(
     let threshold_n = trbfv_config.num_parties() as usize;
 
     // First, generate BFV encryption keys for all parties
-    let bfv_params = get_share_encryption_params();
+    let bfv_params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
     let mut bfv_rng = OsRng;
     let mut bfv_secret_keys = Vec::with_capacity(threshold_n);
     let mut bfv_public_keys = Vec::with_capacity(threshold_n);
@@ -144,7 +144,7 @@ pub fn get_decryption_keys(
     trbfv_config: &TrBFVConfig,
 ) -> Result<HashMap<usize, (Vec<SensitiveBytes>, SensitiveBytes)>> {
     let threshold_n = trbfv_config.num_parties() as usize;
-    let bfv_params = get_share_encryption_params();
+    let bfv_params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
     let degree = bfv_params.degree();
 
     // Individualize based on node - each party decrypts their share from each sender

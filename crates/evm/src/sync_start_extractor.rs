@@ -26,7 +26,7 @@ impl Actor for SyncStartExtractor {
 
 impl Handler<EnclaveEvent> for SyncStartExtractor {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         if let EnclaveEventData::SyncStart(evt) = msg.into_data() {
             self.dest.do_send(evt)
         }
