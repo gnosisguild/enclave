@@ -159,24 +159,30 @@ impl Computation for Witness {
 
         // Decrypt each ciphertext and compute its commitment
         for party_cts in input.honest_ciphertexts.iter() {
-            let mut party_commitments = Vec::new();
-            let mut party_shares = Vec::new();
+            if party_cts.len() < threshold_l {
+                return Err(CircuitsErrors::Other(format!(
+                    "honest_ciphertexts party has {} ciphertexts but threshold_l is {}; \
+                     each party must have at least threshold_l ciphertexts",
+                    party_cts.len(),
+                    threshold_l
+                )));
+            }
+            let mut party_commitments = Vec::with_capacity(threshold_l);
+            let mut party_shares = Vec::with_capacity(threshold_l);
             for mod_idx in 0..threshold_l {
-                if mod_idx < party_cts.len() {
-                    // Decrypt the ciphertext to get the plaintext share
-                    let decrypted_pt = input.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                    let share_coeffs = decrypted_pt.value.deref().to_vec();
-                    party_commitments.push(compute_share_encryption_commitment_from_message(
-                        &Polynomial::from_u64_vector(share_coeffs.clone()),
-                        msg_bit,
-                    ));
-                    party_shares.push(
-                        share_coeffs
-                            .iter()
-                            .map(|c| BigInt::from(*c))
-                            .collect::<Vec<_>>(),
-                    );
-                }
+                // Decrypt the ciphertext to get the plaintext share
+                let decrypted_pt = input.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                let share_coeffs = decrypted_pt.value.deref().to_vec();
+                party_commitments.push(compute_share_encryption_commitment_from_message(
+                    &Polynomial::from_u64_vector(share_coeffs.clone()),
+                    msg_bit,
+                ));
+                party_shares.push(
+                    share_coeffs
+                        .iter()
+                        .map(|c| BigInt::from(*c))
+                        .collect::<Vec<_>>(),
+                );
             }
             expected_commitments.push(party_commitments);
             decrypted_shares.push(party_shares);
@@ -220,7 +226,6 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
@@ -229,10 +234,10 @@ mod tests {
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
-        let (_, dkg_params) = build_pair_for_preset(DEFAULT_BFV_PRESET).unwrap();
+        let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
         let expected_msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
         assert_eq!(bits.msg_bit, expected_msg_bit);
     }
@@ -244,7 +249,7 @@ mod tests {
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
@@ -263,7 +268,7 @@ mod tests {
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Witness should have one row per honest party
         assert_eq!(

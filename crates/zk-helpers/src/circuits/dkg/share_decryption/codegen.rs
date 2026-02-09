@@ -80,7 +80,6 @@ mod tests {
     use crate::computation::{Computation, DkgInputType};
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
 
     #[test]
     fn test_toml_generation_and_structure() {
@@ -91,7 +90,7 @@ mod tests {
         );
 
         let artifacts = ShareDecryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &sample)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -108,10 +107,10 @@ mod tests {
         );
 
         let artifacts = ShareDecryptionCircuit
-            .codegen(DEFAULT_BFV_PRESET, &sample)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
-        let configs = Configs::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
+        let configs = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let prefix = <ShareDecryptionCircuit as Circuit>::PREFIX;
         assert!(artifacts
             .configs

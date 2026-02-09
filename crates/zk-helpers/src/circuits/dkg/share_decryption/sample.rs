@@ -94,18 +94,6 @@ impl ShareDecryptionCircuitInput {
             honest_ciphertexts.push(party_cts);
         }
 
-        // Compute the sum of all honest ciphertexts per TRBFV basis (homomorphic addition)
-        // For each TRBFV basis: sum_ct[l] = ct_1[l] + ct_2[l] + ... + ct_H[l]
-        let mut sum_ciphertexts: Vec<Ciphertext> = Vec::new();
-        let num_moduli = threshold_params.moduli().len();
-        for trbfv_basis_idx in 0..num_moduli {
-            let mut sum_ct = honest_ciphertexts[0][trbfv_basis_idx].clone();
-            for party_idx in 1..honest_ciphertexts.len() {
-                sum_ct = &sum_ct + &honest_ciphertexts[party_idx][trbfv_basis_idx];
-            }
-            sum_ciphertexts.push(sum_ct);
-        }
-
         ShareDecryptionCircuitInput {
             honest_ciphertexts,
             secret_key: dkg_secret_key,
@@ -118,7 +106,7 @@ mod tests {
     use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use e3_fhe_params::{BfvPreset, DEFAULT_BFV_PRESET};
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_secret_key_sample() {
@@ -132,7 +120,7 @@ mod tests {
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
     }
 
@@ -148,7 +136,7 @@ mod tests {
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            DEFAULT_BFV_PRESET.metadata().degree
+            BfvPreset::InsecureThreshold512.metadata().degree
         );
     }
 }

@@ -265,7 +265,9 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {
-                let sd = preset.search_defaults().unwrap();
+                let sd = preset.search_defaults().ok_or_else(|| {
+                    anyhow!("preset does not define search defaults for {}", name)
+                })?;
                 let sample = ShareEncryptionCircuitInput::generate_sample(
                     preset,
                     CiphernodesCommitteeSize::Small,
