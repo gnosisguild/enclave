@@ -389,13 +389,13 @@ mod tests {
 
     use super::*;
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &committee).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let expected_bit = calculate_bit_width(BigInt::from(bounds.pk_bound.clone()));
 
@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &committee).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();
