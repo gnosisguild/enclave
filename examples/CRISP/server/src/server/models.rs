@@ -7,7 +7,7 @@
 use anyhow::Result;
 use derivative::Derivative;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Derivative, Deserialize, Serialize)]
 #[derivative(Debug)]

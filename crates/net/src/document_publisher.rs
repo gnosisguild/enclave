@@ -16,8 +16,8 @@ use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind, DocumentMeta,
     DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, Event, EventType, Filter, PartyId, PublishDocumentRequested,
-    ThresholdShareCreated,
+    EncryptionKeyCreated, EncryptionKeyReceived, Event, EventType, Filter, PartyId,
+    PublishDocumentRequested, ThresholdShareCreated,
 };
 use e3_utils::retry::{retry_with_backoff, to_retry};
 use e3_utils::ArcBytes;
@@ -490,8 +490,7 @@ impl EventConverter {
                     "Received EncryptionKeyCreated from party {}",
                     evt.key.party_id
                 );
-                self.bus.publish(EncryptionKeyCreated {
-                    external: true,
+                self.bus.publish(EncryptionKeyReceived {
                     e3_id: evt.e3_id,
                     key: evt.key,
                 })?;

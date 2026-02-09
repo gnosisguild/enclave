@@ -27,6 +27,9 @@ enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
 enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
 enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
 
+heading "Setup ZK prover"
+$ENCLAVE_BIN noir setup
+
 # start swarm
 enclave_nodes_up
 
