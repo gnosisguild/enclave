@@ -201,6 +201,7 @@ async fn sync_request(
         net_cmds,
         net_events,
         NetCommand::OutgoingSyncRequest {
+            correlation_id: CorrelationId::new(),
             value: SyncRequestValue { since },
         },
         |e| match e.clone() {

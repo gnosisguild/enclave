@@ -86,6 +86,7 @@ pub struct SyncRequestReceived {
 #[rtype("()")]
 pub struct OutgoingSyncRequestSucceeded {
     pub value: SyncResponseValue,
+    pub correlation_id: CorrelationId,
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +119,10 @@ pub enum NetCommand {
     Shutdown,
     /// Called from the syning node to request libp2p events from a random peer node starting
     /// from the given timestamp.
-    OutgoingSyncRequest { value: SyncRequestValue },
+    OutgoingSyncRequest {
+        correlation_id: CorrelationId,
+        value: SyncRequestValue,
+    },
     /// Send libp2p events back to a peer that requested a sync.
     SyncResponse {
         value: SyncResponseValue,
@@ -133,6 +137,7 @@ impl NetCommand {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
             N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingSyncRequest { correlation_id, .. } => Some(*correlation_id),
             _ => None,
         }
     }
