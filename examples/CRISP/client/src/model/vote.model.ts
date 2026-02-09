@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import { CreditMode } from '@crisp-e3/sdk'
+
 export interface VotingRound {
   round_id: number
   pk_bytes: number[]
@@ -54,12 +56,12 @@ export interface VoteStateLite {
 
   committee_public_key: number[]
   emojis: [string, string]
+
+  credit_mode: CreditMode
+  credits?: number
 }
 
-export interface Vote {
-  yes: bigint
-  no: bigint
-}
+export type Vote = bigint[]
 
 export interface EligibleVoter {
   address: string

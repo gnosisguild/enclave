@@ -12,7 +12,7 @@
 use crate::errors::{ConstraintError, MathError, ParityMatrixError, ParityMatrixResult};
 use crate::math::mod_inverse;
 use crate::math::mod_pow;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
@@ -104,6 +104,14 @@ impl ParityMatrix {
     /// Panics if indices are out of bounds.
     pub fn get(&self, row: usize, col: usize) -> &BigUint {
         &self.data[row][col]
+    }
+
+    /// Converts the matrix to rows of [`BigInt`] (non-negative; elements are in `[0, q)`).
+    pub fn to_bigint_rows(&self) -> Vec<Vec<BigInt>> {
+        self.data
+            .iter()
+            .map(|row| row.iter().map(|c| BigInt::from(c.clone())).collect())
+            .collect()
     }
 }
 

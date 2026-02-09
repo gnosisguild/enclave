@@ -5,18 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{anyhow, Result};
-use e3_fhe_params::build_bfv_params_arc;
-use e3_greco_helpers::{bfv_ciphertext_to_greco, bfv_public_key_to_greco};
-use e3_polynomial::CrtPolynomial;
-use e3_zk_helpers::commitments::{
-    compute_ciphertext_commitment, compute_pk_aggregation_commitment,
-};
-use e3_zk_helpers::utils::calculate_bit_width;
-use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey};
+use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
+use e3_zk_helpers::circuits::Computation;
+use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
-use greco::bounds::GrecoBounds;
-use greco::vectors::GrecoVectors;
 use rand::thread_rng;
 
 /// Encrypt some data using BFV homomorphic encryption
@@ -106,33 +101,45 @@ where
     let plaintext = Plaintext::try_encode(&data, Encoding::poly(), &params)
         .map_err(|e: FheError| anyhow!("Error encoding plaintext: {}", e))?;
 
-    let (cipher_text, u_rns, e0_rns, e1_rns) = pk
-        .try_encrypt_extended(&plaintext, &mut thread_rng())
-        .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
+    let witness = UserDataEncryptionWitness::compute(
+        DEFAULT_BFV_PRESET,
+        &UserDataEncryptionCircuitInput {
+            public_key: pk,
+            plaintext: plaintext,
+        },
+    )?;
 
-    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
-
-    let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-    // Create Greco input validation ZK proof
-    let input_val_vectors = GrecoVectors::compute(
-        &plaintext,
-        &u_rns,
-        &e0_rns,
-        &e1_rns,
-        &cipher_text,
-        &pk,
-        &params,
-        bit_pk,
-    )
-    .map_err(|e| anyhow!("Error computing input validation vectors: {}", e))?;
-
-    let standard_input_val = input_val_vectors.standard_form();
+    let encrypted_data = witness.ciphertext.clone();
+    let circuit_inputs = witness.to_json()?.to_string();
 
     Ok(VerifiableEncryptionResult {
-        encrypted_data: cipher_text.to_bytes(),
-        circuit_inputs: standard_input_val.to_json().to_string(),
+        encrypted_data,
+        circuit_inputs,
     })
+}
+
+/// Generates a new public/secret key pair and returns the public key.
+///
+/// # Arguments
+/// * `degree` - Polynomial degree for BFV parameters
+/// * `plaintext_modulus` - Plaintext modulus for BFV parameters
+/// * `moduli` - Vector of moduli for BFV parameters
+///
+/// # Returns
+/// Raw bytes of the public key
+pub fn generate_public_key(
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+) -> Result<Vec<u8>> {
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
+
+    // Generate keys.
+    let mut rng = thread_rng();
+    let sk = SecretKey::random(&params, &mut rng);
+    let pk = PublicKey::new(&sk, &mut rng);
+
+    Ok(pk.to_bytes())
 }
 
 pub fn compute_pk_commitment(
@@ -141,39 +148,17 @@ pub fn compute_pk_commitment(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<[u8; 32]> {
+    use e3_zk_helpers::circuits::threshold::user_data_encryption::utils::compute_public_key_commitment;
+
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
     let public_key = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
 
-    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
-    let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+    let commitment = compute_public_key_commitment(&params, &public_key)
+        .map_err(|e| anyhow!("Error computing public key commitment: {}", e))?;
 
-    let (pk0is, pk1is) = bfv_public_key_to_greco(&public_key, &params);
-
-    let pk0 = CrtPolynomial::from_bigint_vectors(pk0is);
-    let pk1 = CrtPolynomial::from_bigint_vectors(pk1is);
-
-    let commitment_bigint = compute_pk_aggregation_commitment(&pk0, &pk1, bit_pk);
-
-    let bytes = commitment_bigint.to_bytes_be().1;
-
-    if bytes.len() > 32 {
-        return Err(anyhow!(
-            "Commitment must be at most 32 bytes, got {}",
-            bytes.len()
-        ));
-    }
-
-    let mut padded_bytes = vec![0u8; 32];
-    let start_idx = 32 - bytes.len();
-    padded_bytes[start_idx..].copy_from_slice(&bytes);
-
-    let public_key_hash: [u8; 32] = padded_bytes
-        .try_into()
-        .map_err(|_| anyhow!("Failed to convert padded bytes to array"))?;
-
-    Ok(public_key_hash)
+    Ok(commitment)
 }
 
 pub fn compute_ct_commitment(
@@ -182,39 +167,17 @@ pub fn compute_ct_commitment(
     plaintext_modulus: u64,
     moduli: Vec<u64>,
 ) -> Result<[u8; 32]> {
+    use e3_zk_helpers::circuits::threshold::user_data_encryption::utils::compute_ciphertext_commitment;
+
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli, None);
 
     let ct = Ciphertext::from_bytes(&ct, &params)
         .map_err(|e| anyhow!("Error deserializing ciphertext: {}", e))?;
 
-    let (ct0is, ct1is) = bfv_ciphertext_to_greco(&ct, &params);
+    let commitment = compute_ciphertext_commitment(&params, &ct)
+        .map_err(|e| anyhow!("Error computing ciphertext commitment: {}", e))?;
 
-    let (_, bounds) = GrecoBounds::compute(&params, 0)?;
-    let bit_ct = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-    let ct0 = CrtPolynomial::from_bigint_vectors(ct0is);
-    let ct1 = CrtPolynomial::from_bigint_vectors(ct1is);
-
-    let commitment_bigint = compute_ciphertext_commitment(&ct0, &ct1, bit_ct);
-
-    let bytes = commitment_bigint.to_bytes_be().1;
-
-    if bytes.len() > 32 {
-        return Err(anyhow!(
-            "Commitment must be at most 32 bytes, got {}",
-            bytes.len()
-        ));
-    }
-
-    let mut padded_bytes = vec![0u8; 32];
-    let start_idx = 32 - bytes.len();
-    padded_bytes[start_idx..].copy_from_slice(&bytes);
-
-    let ciphertext_hash: [u8; 32] = padded_bytes
-        .try_into()
-        .map_err(|_| anyhow!("Failed to convert padded bytes to array"))?;
-
-    Ok(ciphertext_hash)
+    Ok(commitment)
 }
 
 #[cfg(test)]

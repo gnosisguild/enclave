@@ -11,7 +11,7 @@
 //! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
 
 /// Variant for input types for DKG.
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum DkgInputType {
     /// The input type that generates shares of a secret key using secret sharing.
     SecretKey,
@@ -19,38 +19,32 @@ pub enum DkgInputType {
     SmudgingNoise,
 }
 
-/// Prover TOML file content (witness and circuit inputs).
-pub type Toml = String;
-/// Noir configs file content (global constants for the prover).
-pub type Configs = String;
-
 /// Generic computation from parameters and input to a result.
 pub trait Computation: Sized {
-    type Params;
+    type Preset;
     type Input;
     type Error;
 
     /// Computes the result from parameters and input.
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self, Self::Error>;
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error>;
+
+    /// Converts the result to a JSON [`serde_json::Value`] for serialization.
+    /// Default: `serde_json::to_value(self)` when `Self: serde::Serialize`.
+    fn to_json(&self) -> serde_json::Result<serde_json::Value>
+    where
+        Self: serde::Serialize,
+    {
+        serde_json::to_value(self)
+    }
 }
 
 /// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
 pub trait CircuitComputation: crate::registry::Circuit {
-    type Params;
+    type Preset;
     type Input;
     type Output;
     type Error;
 
     /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
-    fn compute(params: &Self::Params, input: &Self::Input) -> Result<Self::Output, Self::Error>;
-}
-
-/// Converts a value to a JSON [`serde_json::Value`] for serialization.
-pub trait ConvertToJson {
-    fn convert_to_json(&self) -> serde_json::Result<serde_json::Value>;
-}
-
-/// Reduces coefficients (or similar) to the ZKP field modulus for use in the prover.
-pub trait ReduceToZkpModulus: Sized {
-    fn reduce_to_zkp_modulus(&self) -> Self;
+    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error>;
 }

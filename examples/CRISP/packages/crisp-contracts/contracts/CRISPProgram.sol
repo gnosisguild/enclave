@@ -16,12 +16,22 @@ import { HonkVerifier } from "./CRISPVerifier.sol";
 contract CRISPProgram is IE3Program, Ownable {
   using InternalLazyIMT for LazyIMTData;
 
+  /// @notice Enum to represent credit modes
+  enum CreditMode {
+    /// @notice Everyone has constant credits
+    CONSTANT,
+    /// @notice Credits are custom (can be based on token balance, etc)
+    CUSTOM
+  }
+
   /// @notice Struct to store all data related to a voting round
   struct RoundData {
     uint256 merkleRoot;
     bytes32 paramsHash;
     mapping(address slot => uint40 index) voteSlots;
     LazyIMTData votes;
+    uint256 numOptions;
+    CreditMode creditMode;
   }
 
   // Constants
@@ -29,6 +39,8 @@ contract CRISPProgram is IE3Program, Ownable {
   bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
   /// @notice The depth of the input Merkle tree.
   uint8 public constant TREE_DEPTH = 20;
+  /// @notice Maximum number of bits allocated for vote counts in the plaintext output per option.
+  uint256 constant MAX_VOTE_BITS = 50;
 
   // State variables
   IEnclave public enclave;
@@ -54,6 +66,7 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidTallyLength();
   error SlotIsEmpty();
   error MerkleRootNotSet();
+  error InvalidNumOptions();
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -106,9 +119,24 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata) external returns (bytes32) {
+  function validate(
+    uint256 e3Id,
+    uint256,
+    bytes calldata e3ProgramParams,
+    bytes calldata,
+    bytes calldata customParams
+  ) external returns (bytes32) {
     if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
+
+    // decode custom params to get the number of options
+    (, , uint256 numOptions, CreditMode creditMode, ) = abi.decode(customParams, (address, uint256, uint256, CreditMode, uint256));
+    if (numOptions < 2) revert InvalidNumOptions();
+
+    // we need to know the number of options for decoding the tally
+    e3Data[e3Id].numOptions = numOptions;
+    // we want to save the credit mode so it can be verified on chain by everyone
+    e3Data[e3Id].creditMode = creditMode;
 
     e3Data[e3Id].paramsHash = keccak256(e3ProgramParams);
 
@@ -139,13 +167,14 @@ contract CRISPProgram is IE3Program, Ownable {
     E3 memory e3 = enclave.getE3(e3Id);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](6);
+    bytes32[] memory noirPublicInputs = new bytes32[](7);
     noirPublicInputs[0] = previousEncryptedVoteCommitment;
     noirPublicInputs[1] = e3.committeePublicKey;
     noirPublicInputs[2] = bytes32(e3Data[e3Id].merkleRoot);
     noirPublicInputs[3] = bytes32(uint256(uint160(slotAddress)));
     noirPublicInputs[4] = bytes32(uint256(previousEncryptedVoteCommitment == bytes32(0) ? 1 : 0));
-    noirPublicInputs[5] = encryptedVoteCommitment;
+    noirPublicInputs[5] = bytes32(e3Data[e3Id].numOptions);
+    noirPublicInputs[6] = encryptedVoteCommitment;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
@@ -157,30 +186,40 @@ contract CRISPProgram is IE3Program, Ownable {
 
   /// @notice Decode the tally from the plaintext output
   /// @param e3Id The E3 program ID
-  /// @return yes The number of yes votes
-  /// @return no The number of no votes
-  function decodeTally(uint256 e3Id) public view returns (uint256 yes, uint256 no) {
-    // fetch from enclave
+  /// @return votes - an array of vote counts for each option
+  function decodeTally(uint256 e3Id) public view returns (uint256[] memory votes) {
     E3 memory e3 = enclave.getE3(e3Id);
 
-    // decode it into an array of uint64
+    uint256 numOptions = e3Data[e3Id].numOptions;
+
+    // If num optionsis not configured, return empty array to avoid decoding errors.
+    // Users might be calling this function too early and there's no
+    if (numOptions == 0) {
+      return new uint256[](0);
+    }
+
     uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
-    uint256 halfD = tally.length / 2;
+    uint256 segmentSize = tally.length / numOptions;
+    uint256 effectiveSize = segmentSize > MAX_VOTE_BITS ? MAX_VOTE_BITS : segmentSize;
 
-    // Convert yes votes
-    for (uint256 i = 0; i < halfD; i++) {
-      uint256 weight = 2 ** (halfD - 1 - i);
-      yes += tally[i] * weight;
+    votes = new uint256[](numOptions);
+
+    for (uint256 optIdx = 0; optIdx < numOptions; optIdx++) {
+      uint256 segmentStart = optIdx * segmentSize;
+      // Read only the last effectiveSize bits (where the value is, MSB first)
+      uint256 readStart = segmentStart + segmentSize - effectiveSize;
+      uint256 value = 0;
+
+      for (uint256 i = 0; i < effectiveSize; i++) {
+        uint256 weight = 2 ** (effectiveSize - 1 - i);
+        value += uint256(tally[readStart + i]) * weight;
+      }
+
+      votes[optIdx] = value;
     }
 
-    // Convert no votes
-    for (uint256 i = halfD; i < tally.length; i++) {
-      uint256 weight = 2 ** (tally.length - 1 - i);
-      no += tally[i] * weight;
-    }
-
-    return (yes, no);
+    return votes;
   }
 
   /// @notice Get the slot index for a given E3 ID and slot address

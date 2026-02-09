@@ -157,3 +157,86 @@ pnpm clean --help
 - **Provides granular control** over what gets cleaned via skip options
 - **Shows detailed statistics** about what was removed and space freed
 - **Prevents accidental deletion** of important files by using a whitelist approach
+
+## Circuit Builder
+
+`build-circuits.ts` - Compiles Noir circuits, generates verification keys, and prepares release
+artifacts.
+
+### Usage
+
+```bash
+# Build all circuits
+pnpm build:circuits
+
+# Build only specific group (dkg or threshold)
+pnpm build:circuits --group dkg
+
+# Skip verification key generation (faster)
+pnpm build:circuits --skip-vk
+
+# Dry run to see what would be built
+pnpm build:circuits --dry-run
+
+# Get source hash for change detection
+pnpm build:circuits hash
+```
+
+### What it does
+
+1. **Discovers circuits** in `circuits/bin/dkg/` and `circuits/bin/threshold/`
+2. **Compiles** each circuit using `nargo compile`
+3. **Generates verification keys** using `bb write_vk`
+4. **Sanitizes paths** in compiled JSON (removes local filesystem paths for opsec)
+5. **Generates checksums** (`SHA256SUMS` and `checksums.json`)
+6. **Copies artifacts** to `dist/circuits/`
+
+### Options
+
+- `--group <groups>` - Circuit groups (comma-separated: dkg,threshold)
+- `--circuit <name>` - Build specific circuit(s)
+- `--skip-vk` - Skip verification key generation
+- `--skip-checksums` - Skip checksum generation
+- `-o, --output <dir>` - Output directory (default: dist/circuits)
+- `--dry-run` - Show what would be built
+- `--no-clean` - Don't clean output directory
+
+### Prerequisites
+
+- `nargo` - Noir compiler ([install](https://noir-lang.org/docs/getting_started/installation/))
+- `bb` - Barretenberg prover (for verification keys)
+
+## Circuit Artifacts
+
+`circuit-artifacts.ts` - Push/pull pre-built circuit artifacts via git branch.
+
+### Usage
+
+```bash
+# Build circuits locally, then push to git branch
+pnpm build:circuits
+pnpm store:circuits push
+
+# Pull circuits from git branch (used by CI)
+pnpm store:circuits pull
+```
+
+### What it does
+
+- **Push**: Copies `dist/circuits/` to the `circuit-artifacts` orphan branch and pushes to origin
+- **Pull**: Fetches the `circuit-artifacts` branch and extracts to `dist/circuits/`
+
+### Workflow
+
+Circuits are built locally and stored in a git branch:
+
+1. **Local**: Build circuits and push to branch
+
+```bash
+   pnpm build:circuits
+   pnpm tsx scripts/circuit-artifacts.ts push
+```
+
+2. **CI**: Pulls from branch during release, attaches to GitHub release
+
+3. **After release**: Circuits live permanently in release assets

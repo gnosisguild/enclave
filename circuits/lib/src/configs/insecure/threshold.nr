@@ -13,9 +13,8 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 // Global configs for threshold insecure preset
 pub global N: u32 = 512;
 pub global L: u32 = 2;
-pub global PLAINTEXT_MODULUS: Field = 10;
+pub global PLAINTEXT_MODULUS: Field = 100;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
-pub global Q_MOD_T_MOD_P: Field = 3;
 pub global Q_MOD_T: Field = 3;
 pub global Q_INVERSE_MOD_T: Field = 7;
 pub global T_INV_MOD_Q: Field = 1416703358393105942938;
@@ -26,22 +25,19 @@ pk_generation (CIRCUIT 1)
 -------------------------------------
 ************************************/
 
-// pk_generation - bit parameters
-pub global PK_GENERATION_BIT_EEK: u32 = 6;
-pub global PK_GENERATION_BIT_SK: u32 = 2;
-pub global PK_GENERATION_BIT_E_SM: u32 = 18;
-pub global PK_GENERATION_BIT_R1: u32 = 14;
-pub global PK_GENERATION_BIT_R2: u32 = 36;
-pub global PK_GENERATION_BIT_PK: u32 = 36;
+pub global PK_GENERATION_BIT_EEK: u32 = 5;
+pub global PK_GENERATION_BIT_SK: u32 = 1;
+pub global PK_GENERATION_BIT_E_SM: u32 = 17;
+pub global PK_GENERATION_BIT_R1: u32 = 13;
+pub global PK_GENERATION_BIT_R2: u32 = 35;
+pub global PK_GENERATION_BIT_PK: u32 = 35;
 
-// pk_generation - bounds
 pub global PK_GENERATION_EEK_BOUND: Field = 20;
 pub global PK_GENERATION_SK_BOUND: Field = 1;
-pub global PK_GENERATION_E_SM_BOUND: Field = 122892;
+pub global PK_GENERATION_E_SM_BOUND: Field = 123072;
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [5120, 5120];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-// pk_generation - configs
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
     PK_GENERATION_EEK_BOUND,
@@ -57,10 +53,8 @@ pk_aggregation (CIRCUIT 5)
 -------------------------------------
 ************************************/
 
-// pk_aggregation - bit parameters
-pub global PK_AGGREGATION_BIT_PK: u32 = 36;
+pub global PK_AGGREGATION_BIT_PK: u32 = 35;
 
-// pk_aggregation - configs
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************
@@ -69,35 +63,34 @@ user_data_encryption (CIRCUIT 6)
 -------------------------------------
 ************************************/
 
-// user_data_encryption - bit parameters
-pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 36;
-pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 36;
-pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 2;
-pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 6;
-pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 6;
-pub global USER_DATA_ENCRYPTION_BIT_K: u32 = 4;
-pub global USER_DATA_ENCRYPTION_BIT_R1: u32 = 10;
-pub global USER_DATA_ENCRYPTION_BIT_R2: u32 = 36;
-pub global USER_DATA_ENCRYPTION_BIT_P1: u32 = 10;
-pub global USER_DATA_ENCRYPTION_BIT_P2: u32 = 36;
+pub global USER_DATA_ENCRYPTION_BIT_PK: u32 = 35;
+pub global USER_DATA_ENCRYPTION_BIT_CT: u32 = 35;
+pub global USER_DATA_ENCRYPTION_BIT_U: u32 = 1;
+pub global USER_DATA_ENCRYPTION_BIT_E0: u32 = 5;
+pub global USER_DATA_ENCRYPTION_BIT_E1: u32 = 5;
+pub global USER_DATA_ENCRYPTION_BIT_K: u32 = 6;
+pub global USER_DATA_ENCRYPTION_BIT_R1: u32 = 9;
+pub global USER_DATA_ENCRYPTION_BIT_R2: u32 = 35;
+pub global USER_DATA_ENCRYPTION_BIT_P1: u32 = 9;
+pub global USER_DATA_ENCRYPTION_BIT_P2: u32 = 35;
 
-// user_data_encryption - bounds
-pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] = [61847462708, 20615769293];
+pub global USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P: Field =
+    21888242871839275222246405745257275088548364400416034343698204186575808495610;
+pub global USER_DATA_ENCRYPTION_K0IS: [Field; L] = [61160268678, 8933500027];
 pub global USER_DATA_ENCRYPTION_PK_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global USER_DATA_ENCRYPTION_E0_BOUND: Field = 20;
 pub global USER_DATA_ENCRYPTION_E1_BOUND: Field = 20;
 pub global USER_DATA_ENCRYPTION_U_BOUND: Field = 1;
-pub global USER_DATA_ENCRYPTION_K1_LOW_BOUND: Field = 5;
-pub global USER_DATA_ENCRYPTION_K1_UP_BOUND: Field = 4;
-pub global USER_DATA_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [261, 258];
-pub global USER_DATA_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [260, 258];
+pub global USER_DATA_ENCRYPTION_K1_LOW_BOUND: Field = 50;
+pub global USER_DATA_ENCRYPTION_K1_UP_BOUND: Field = 49;
+pub global USER_DATA_ENCRYPTION_R1_LOW_BOUNDS: [Field; L] = [301, 263];
+pub global USER_DATA_ENCRYPTION_R1_UP_BOUNDS: [Field; L] = [300, 263];
 pub global USER_DATA_ENCRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-// greco - configs
 pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-    Q_MOD_T,
+    USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P,
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
     USER_DATA_ENCRYPTION_PK_BOUNDS,

@@ -54,7 +54,7 @@ contract MyProgram is IE3Program, Ownable {
   /// @notice Validate the E3 program parameters
   /// @param e3Id The E3 program ID
   /// @param e3ProgramParams The E3 program parameters
-  function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata) external returns (bytes32) {
+  function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata, bytes calldata) external returns (bytes32) {
     require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
     require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
     paramsHashes[e3Id] = keccak256(e3ProgramParams);

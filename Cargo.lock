@@ -1910,20 +1910,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blake3"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2468ef7d57b3fb7e16b576e8377cdbde2320c60e1491e961d11da40fc4f02a2d"
-dependencies = [
- "arrayref",
- "arrayvec",
- "cc",
- "cfg-if",
- "constant_time_eq",
- "cpufeatures",
-]
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2296,12 +2282,6 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
-
-[[package]]
-name = "constant_time_eq"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "convert_case"
@@ -2809,7 +2789,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-aggregator"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -2832,23 +2812,21 @@ dependencies = [
 
 [[package]]
 name = "e3-bfv-client"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-greco-helpers",
- "e3-polynomial 0.1.8",
+ "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "thiserror 1.0.69",
- "zkfhe-greco",
 ]
 
 [[package]]
 name = "e3-ciphernode-builder"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -2880,7 +2858,7 @@ dependencies = [
 
 [[package]]
 name = "e3-cli"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -2913,7 +2891,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -2932,7 +2910,7 @@ dependencies = [
 
 [[package]]
 name = "e3-config"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -2953,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "e3-crypto"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -2971,7 +2949,7 @@ dependencies = [
 
 [[package]]
 name = "e3-data"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -2990,7 +2968,7 @@ dependencies = [
 
 [[package]]
 name = "e3-entrypoint"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "actix-web",
@@ -3029,7 +3007,7 @@ dependencies = [
 
 [[package]]
 name = "e3-events"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3063,7 +3041,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3096,7 +3074,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "alloy",
  "anyhow",
@@ -3112,7 +3090,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3137,7 +3115,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe-params"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -3151,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fs"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3163,22 +3141,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-greco-helpers"
-version = "0.1.8"
-dependencies = [
- "e3-fhe-params",
- "e3-zk-helpers",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "rand 0.8.5",
- "zkfhe-greco",
-]
-
-[[package]]
 name = "e3-indexer"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "alloy",
  "async-trait",
@@ -3198,7 +3162,7 @@ dependencies = [
 
 [[package]]
 name = "e3-init"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3216,7 +3180,7 @@ dependencies = [
 
 [[package]]
 name = "e3-keyshare"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3243,7 +3207,7 @@ dependencies = [
 
 [[package]]
 name = "e3-logger"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "base64",
@@ -3253,7 +3217,7 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3272,7 +3236,7 @@ dependencies = [
 
 [[package]]
 name = "e3-net"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3301,7 +3265,7 @@ dependencies = [
 
 [[package]]
 name = "e3-parity-matrix"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3312,7 +3276,7 @@ dependencies = [
 
 [[package]]
 name = "e3-polynomial"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "bincode",
  "criterion",
@@ -3325,19 +3289,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-polynomial"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave?branch=main#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "e3-program-server"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -3352,7 +3305,7 @@ dependencies = [
 
 [[package]]
 name = "e3-request"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3368,19 +3321,7 @@ dependencies = [
 
 [[package]]
 name = "e3-safe"
-version = "0.1.8"
-dependencies = [
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "hex",
- "sha3",
- "taceo-poseidon2",
-]
-
-[[package]]
-name = "e3-safe"
-version = "0.1.8"
-source = "git+https://github.com/gnosisguild/enclave#ebf6f386dcefd6ab9c5060d4b8932ed1fa1132b9"
+version = "0.1.11"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -3391,7 +3332,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "e3-bfv-client",
  "e3-evm-helpers",
@@ -3401,7 +3342,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sortition"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3422,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "e3-support-scripts"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3433,7 +3374,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sync"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "anyhow",
@@ -3449,7 +3390,7 @@ dependencies = [
 
 [[package]]
 name = "e3-test-helpers"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3484,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "e3-tests"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3528,7 +3469,7 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3557,7 +3498,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "actix",
  "alloy",
@@ -3573,7 +3514,7 @@ dependencies = [
 
 [[package]]
 name = "e3-wasm"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "e3-bfv-client",
  "e3-fhe-params",
@@ -3585,18 +3526,21 @@ dependencies = [
 
 [[package]]
 name = "e3-zk-helpers"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "clap",
  "e3-fhe-params",
- "e3-polynomial 0.1.8",
- "e3-safe 0.1.8",
+ "e3-parity-matrix",
+ "e3-polynomial",
+ "e3-safe",
  "fhe",
  "fhe-math",
+ "fhe-traits",
  "itertools 0.14.0",
+ "ndarray",
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
@@ -3690,7 +3634,7 @@ dependencies = [
 
 [[package]]
 name = "enclaveup"
-version = "0.1.8"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "clap",
@@ -9654,54 +9598,6 @@ checksum = "76a40d2f9afd345a14a304ad2ced6dbff4c17a0e5c533a3bd5f64fd04dcb2531"
 dependencies = [
  "hex",
  "tiny-keccak",
-]
-
-[[package]]
-name = "zkfhe-greco"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "blake3",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
- "zkfhe-shared",
-]
-
-[[package]]
-name = "zkfhe-shared"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#31e91b2032c12ef0945f74afac0608f711d25501"
-dependencies = [
- "anyhow",
- "ark-bn254 0.5.0",
- "ark-ff 0.5.0",
- "chrono",
- "e3-polynomial 0.1.8 (git+https://github.com/gnosisguild/enclave?branch=main)",
- "e3-safe 0.1.8 (git+https://github.com/gnosisguild/enclave)",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "toml",
 ]
 
 [[package]]

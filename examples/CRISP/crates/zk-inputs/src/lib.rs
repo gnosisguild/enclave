@@ -8,12 +8,18 @@
 //!
 //! This crate contains the main logic for generating CRISP inputs for zero-knowledge proofs.
 
+use crate::ciphertext_addition::CiphertextAdditionWitness;
 use e3_fhe_params::build_bfv_params_arc;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_polynomial::CrtPolynomial;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::utils::calculate_bit_width;
+use e3_zk_helpers::utils::compute_pk_bit;
+use e3_zk_helpers::CircuitComputation;
+use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -21,16 +27,12 @@ use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
 use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
-use greco::bounds::GrecoBounds;
-use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use rand::thread_rng;
 use std::sync::Arc;
 mod ciphertext_addition;
-use crate::ciphertext_addition::CiphertextAdditionInputs;
-mod serialization;
-use serialization::{construct_inputs, serialize_inputs_to_json};
+mod utils;
 
 pub struct ZKInputsGenerator {
     bfv_params: Arc<BfvParameters>,
@@ -90,30 +92,19 @@ impl ZKInputsGenerator {
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
-        // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut thread_rng())
-            .with_context(|| "Failed to encrypt plaintext")?;
+        let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
+            DEFAULT_BFV_PRESET,
+            &UserDataEncryptionCircuitInput {
+                public_key: pk,
+                plaintext: pt,
+            },
+        )?;
 
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-
-        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        // Compute the vectors of the GRECO inputs.
-        let greco_vectors = GrecoVectors::compute(
-            &pt,
-            &u_rns,
-            &e0_rns,
-            &e1_rns,
-            &ct,
-            &pk,
+        let ct = Ciphertext::from_bytes(
+            &user_data_encryption_computation_output.witness.ciphertext,
             &self.bfv_params,
-            bit_pk,
         )
-        .with_context(|| "Failed to compute vectors")?;
-
-        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .with_context(|| "Failed to compute bounds")?;
+        .with_context(|| "Failed to deserialize ciphertext")?;
 
         // Ciphertext Addition Section.
         // Deserialize the previous ciphertext.
@@ -124,25 +115,18 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        // bit_pk
-        let ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            self.bfv_params.clone(),
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let ciphertext_addition_inputs =
+            CiphertextAdditionWitness::compute(&self.bfv_params, &prev_ct, &ct, &sum_ct)
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
-        // Construct Inputs Section.
-        let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs,
-        );
+        let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
+        let user_data_encryption_witness_json =
+            user_data_encryption_computation_output.witness.to_json()?;
+        let inputs_json = utils::merge_json_objects(
+            ciphertext_addition_witness_json,
+            user_data_encryption_witness_json,
+        )?;
 
-        let inputs_json = serialize_inputs_to_json(&inputs)?;
         // For updates, return the sum ciphertext (ct + prev_ct)
         let ciphertext_bytes = sum_ct.to_bytes();
 
@@ -172,30 +156,19 @@ impl ZKInputsGenerator {
         let pt = Plaintext::try_encode(&vote, Encoding::poly(), &self.bfv_params)
             .with_context(|| "Failed to encode plaintext")?;
 
-        // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut thread_rng())
-            .with_context(|| "Failed to encrypt plaintext")?;
+        let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
+            DEFAULT_BFV_PRESET,
+            &UserDataEncryptionCircuitInput {
+                public_key: pk,
+                plaintext: pt,
+            },
+        )?;
 
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-
-        let bit_pk = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
-
-        // Compute the vectors of the GRECO inputs.
-        let greco_vectors = GrecoVectors::compute(
-            &pt,
-            &u_rns,
-            &e0_rns,
-            &e1_rns,
-            &ct,
-            &pk,
+        let ct = Ciphertext::from_bytes(
+            &user_data_encryption_computation_output.witness.ciphertext,
             &self.bfv_params,
-            bit_pk,
         )
-        .with_context(|| "Failed to compute vectors")?;
-
-        let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .with_context(|| "Failed to compute bounds")?;
+        .with_context(|| "Failed to deserialize ciphertext")?;
 
         // Ciphertext Addition Section.
         // Deserialize the previous ciphertext.
@@ -206,28 +179,22 @@ impl ZKInputsGenerator {
         let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
-        let mut ciphertext_addition_inputs = CiphertextAdditionInputs::compute(
-            &prev_ct,
-            &ct,
-            &sum_ct,
-            self.bfv_params.clone(),
-            bit_pk,
-        )
-        .with_context(|| "Failed to compute ciphertext addition inputs")?;
+        let mut ciphertext_addition_inputs =
+            CiphertextAdditionWitness::compute(&self.bfv_params, &prev_ct, &ct, &sum_ct)
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // IMPORTANT: First-in-slot votes have no previous ciphertext; set prev_ct_commitment to 0
         // so the on-chain verifier accepts the proof.
         ciphertext_addition_inputs.prev_ct_commitment = BigInt::zero();
 
-        // Construct Inputs Section.
-        let inputs = construct_inputs(
-            &crypto_params,
-            &bounds,
-            &greco_vectors.standard_form(),
-            &ciphertext_addition_inputs,
-        );
+        let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
+        let user_data_encryption_witness_json =
+            user_data_encryption_computation_output.witness.to_json()?;
+        let inputs_json = utils::merge_json_objects(
+            ciphertext_addition_witness_json,
+            user_data_encryption_witness_json,
+        )?;
 
-        let inputs_json = serialize_inputs_to_json(&inputs)?;
         let ciphertext_bytes = ct.to_bytes();
 
         Ok((ciphertext_bytes, inputs_json))
@@ -281,11 +248,14 @@ impl ZKInputsGenerator {
     ///
     /// # Returns
     /// The commitment as a BigInt.
-    pub fn compute_commitment(&self, ct0: &CrtPolynomial, ct1: &CrtPolynomial) -> Result<BigInt> {
-        let (_, bounds) = GrecoBounds::compute(&self.bfv_params, 0)?;
-        let bit = calculate_bit_width(&bounds.pk_bounds[0].to_string())?;
+    pub fn compute_ciphertext_commitment(
+        &self,
+        ct0: &CrtPolynomial,
+        ct1: &CrtPolynomial,
+    ) -> BigInt {
+        let pk_bit = compute_pk_bit(&self.bfv_params);
 
-        Ok(compute_ciphertext_commitment(ct0, ct1, bit))
+        compute_ciphertext_commitment(ct0, ct1, pk_bit)
     }
 }
 
@@ -316,10 +286,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -339,10 +309,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -361,10 +331,10 @@ mod tests {
         let (ciphertext_bytes, json_output) = result.unwrap();
         // Verify ciphertext is not empty
         assert!(!ciphertext_bytes.is_empty());
-        // Verify it's valid JSON and contains expected fields.
-        assert!(json_output.contains("params"));
+        // Verify it's valid JSON and contains expected fields from both witnesses.
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     #[test]
@@ -398,9 +368,9 @@ mod tests {
         assert!(result.is_ok());
         let (ciphertext_bytes, json_output) = result.unwrap();
         assert!(!ciphertext_bytes.is_empty());
-        assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
-        assert!(json_output.contains("crypto"));
+        assert!(json_output.contains("prev_ct0is"));
+        assert!(json_output.contains("sum_ct0is"));
     }
 
     // Error handling tests
@@ -465,8 +435,7 @@ mod tests {
         let parsed: serde_json::Value =
             serde_json::from_str(&json_output).expect("Invalid JSON output");
 
-        // Check required top-level fields.
-        assert!(parsed.get("params").is_some());
+        // Check required top-level fields (ciphertext addition + user data encryption witnesses).
         assert!(parsed.get("prev_ct0is").is_some());
         assert!(parsed.get("prev_ct1is").is_some());
         assert!(parsed.get("sum_ct0is").is_some());

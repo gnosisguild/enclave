@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
 import { Vote } from '@/model/vote.model'
+import { NUM_OPTIONS } from '@/utils/constants'
 
 const ENCLAVE_API = import.meta.env.VITE_ENCLAVE_API
 
@@ -49,7 +50,19 @@ export const useSDKWorkerHook = () => {
 
       workerRef.current!.postMessage({
         type: 'generate_proof',
-        data: { e3Id, vote, balance, publicKey, address, signature, messageHash, isMasking, crispServer: ENCLAVE_API, merkleLeaves },
+        data: {
+          e3Id,
+          vote,
+          balance,
+          publicKey,
+          address,
+          signature,
+          messageHash,
+          isMasking,
+          crispServer: ENCLAVE_API,
+          merkleLeaves,
+          numOptions: NUM_OPTIONS,
+        },
       })
       workerRef.current!.onmessage = async (event) => {
         const { type, success, encodedProof, error } = event.data

@@ -81,6 +81,37 @@ pub enum ParameterType {
     DKG,
 }
 
+/// Security tier for BFV presets
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SecurityTier {
+    /// Insecure security tier
+    INSECURE,
+    /// Secure security tier
+    SECURE,
+}
+
+impl SecurityTier {
+    /// Config path segment for Noir (e.g. `configs::{}::threshold`).
+    pub fn as_config_str(self) -> &'static str {
+        match self {
+            SecurityTier::INSECURE => "insecure",
+            SecurityTier::SECURE => "secure",
+        }
+    }
+}
+
+impl core::str::FromStr for SecurityTier {
+    type Err = PresetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "insecure" => Ok(Self::INSECURE),
+            "secure" => Ok(Self::SECURE),
+            _ => Err(PresetError::UnknownPreset(s.to_string())),
+        }
+    }
+}
+
 /// Metadata describing a BFV preset configuration
 ///
 /// This struct contains high-level information about a preset, including
@@ -94,6 +125,10 @@ pub struct PresetMetadata {
     /// This determines the size of the polynomial ring R_q = Z_q[X]/(X^d + 1).
     /// Common values are 512, 1024, 2048, 4096, 8192, etc.
     pub degree: usize,
+    /// Number of moduli (l) - the number of moduli used in the ciphertext space
+    ///
+    /// This determines the size of the ciphertext space.
+    pub num_moduli: usize,
     /// Number of parties (n) - the number of ciphernodes in the system supported by
     /// the preset.
     ///
@@ -106,6 +141,8 @@ pub struct PresetMetadata {
     pub lambda: usize,
     /// Parameter type (DKG (BFV) / Threshold (trBFV)).
     pub parameter_type: ParameterType,
+    /// Security tier (e.g. for Noir `configs::{}::threshold`). Use [`SecurityTier::as_config_str`] for the path segment.
+    pub security: SecurityTier,
 }
 
 /// Default search parameters for BFV parameter generation
@@ -230,6 +267,24 @@ impl BfvPreset {
         }
     }
 
+    /// Parses "insecure"|"secure" or λ (e.g. 2|80) into the threshold preset. Uses [`PAIR_PRESETS`] and [`PresetMetadata`].
+    pub fn from_security_config_name(name: &str) -> Result<Self, PresetError> {
+        let s = name.trim();
+        if let Ok(lambda) = s.parse::<usize>() {
+            return Self::PAIR_PRESETS
+                .iter()
+                .copied()
+                .find(|p| p.metadata().lambda == lambda)
+                .ok_or_else(|| PresetError::UnknownPreset(format!("lambda {lambda}")));
+        }
+        let tier: SecurityTier = s.parse()?;
+        Self::PAIR_PRESETS
+            .iter()
+            .copied()
+            .find(|p| p.metadata().security == tier)
+            .ok_or_else(|| PresetError::UnknownPreset(name.to_string()))
+    }
+
     pub fn list() -> Vec<&'static str> {
         Self::ALL.iter().map(BfvPreset::name).collect()
     }
@@ -260,30 +315,38 @@ impl BfvPreset {
             BfvPreset::InsecureThreshold512 => PresetMetadata {
                 name: self.name(),
                 degree: insecure_512::DEGREE,
+                num_moduli: insecure_512::threshold::MODULI.len(),
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
                 parameter_type: ParameterType::THRESHOLD,
+                security: SecurityTier::INSECURE,
             },
             BfvPreset::InsecureDkg512 => PresetMetadata {
                 name: self.name(),
                 degree: insecure_512::DEGREE,
+                num_moduli: insecure_512::dkg::MODULI.len(),
                 num_parties: insecure_512::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
                 parameter_type: ParameterType::DKG,
+                security: SecurityTier::INSECURE,
             },
             BfvPreset::SecureThreshold8192 => PresetMetadata {
                 name: self.name(),
                 degree: secure_8192::DEGREE,
+                num_moduli: secure_8192::threshold::MODULI.len(),
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
                 parameter_type: ParameterType::THRESHOLD,
+                security: SecurityTier::SECURE,
             },
             BfvPreset::SecureDkg8192 => PresetMetadata {
                 name: self.name(),
                 degree: secure_8192::DEGREE,
+                num_moduli: secure_8192::dkg::MODULI.len(),
                 num_parties: secure_8192::NUM_PARTIES,
                 lambda: DEFAULT_SECURE_LAMBDA,
                 parameter_type: ParameterType::DKG,
+                security: SecurityTier::SECURE,
             },
         }
     }

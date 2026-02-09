@@ -7,6 +7,7 @@
 //! CRT (Chinese Remainder Theorem) polynomial representation.
 
 use crate::polynomial::Polynomial;
+use crate::utils::reduce;
 use fhe_math::rq::{Poly, Representation};
 use num_bigint::BigInt;
 #[cfg(feature = "serde")]
@@ -50,6 +51,23 @@ impl CrtPolynomial {
         let limbs = limbs.into_iter().map(Polynomial::new).collect::<Vec<_>>();
 
         Self { limbs }
+    }
+
+    /// Builds a CRT polynomial from a polynomial mod Q (Q>>128) and moduli.
+    ///
+    /// # Arguments
+    ///
+    /// * `coeffs` - Polynomial coefficients mod Q (Q>>128).
+    /// * `moduli` - One modulus per limb.
+    pub fn from_mod_q_polynomial(poly: &Vec<BigInt>, moduli: &[u64]) -> Self {
+        let limbs: Vec<Vec<BigInt>> = moduli
+            .iter()
+            .map(|&qi| {
+                let qi_big = BigInt::from(qi);
+                poly.iter().map(|c| reduce(c, &qi_big)).collect()
+            })
+            .collect();
+        Self::from_bigint_vectors(limbs)
     }
 
     /// Builds a `CrtPolynomial` from an fhe-math `Poly` in PowerBasis representation.
@@ -147,6 +165,26 @@ impl CrtPolynomial {
         for limb in &mut self.limbs {
             limb.reduce(&modulus);
         }
+    }
+
+    /// Multiplies each limb's coefficients by a scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `scalar` - The scalar to multiply each coefficient by.
+    pub fn scalar_mul(&mut self, scalar: &BigInt) {
+        for limb in &mut self.limbs {
+            *limb = limb.scalar_mul(scalar);
+        }
+    }
+
+    /// Adds a limb to the CRT polynomial.
+    ///
+    /// # Arguments
+    ///
+    /// * `limb` - The limb to add.
+    pub fn add_limb(&mut self, limb: Polynomial) {
+        self.limbs.push(limb);
     }
 
     /// Returns a reference to the limb polynomial at the given index.
