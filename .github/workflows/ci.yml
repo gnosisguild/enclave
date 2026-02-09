@@ -6,8 +6,7 @@ concurrency:
 
 on:
   workflow_dispatch:
-  # pull_request: # XXX: temporarily allowing tests to run on PR
-  push:
+  pull_request:
     branches:
       - main
       - dev
@@ -15,6 +14,7 @@ on:
     branches:
       - main
       - dev
+      - '**' # XXX: temporarily allowing tests to run on PR
 env:
   SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
