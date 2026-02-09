@@ -17,10 +17,12 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
+use e3_events::run_once;
 use e3_events::trap_fut;
 use e3_events::BusHandle;
 use e3_events::ComputeRequestErrorKind;
 use e3_events::EType;
+use e3_events::EffectsEnabled;
 use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::ErrorDispatcher;
@@ -83,7 +85,15 @@ impl Multithread {
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
-        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+        run_once::<EffectsEnabled>({
+            let bus = bus.clone();
+            let addr = addr.clone();
+            move |_| {
+                bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                Ok(())
+            }
+        });
+
         addr
     }
 
