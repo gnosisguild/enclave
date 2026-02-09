@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the public key generation circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the threshold share decryption circuit: constants, bounds, bit widths, and witness.
 //!
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+//! and (for witness) ciphertext plus aggregated shares (s, e, d_share). They implement
+//! [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
 use crate::circuits::commitments::compute_aggregated_shares_commitment;
@@ -30,7 +31,7 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`PkGenerationCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and witness.
 #[derive(Debug)]
 pub struct ShareDecryptionComputationOutput {
     pub bounds: Bounds,
@@ -38,7 +39,7 @@ pub struct ShareDecryptionComputationOutput {
     pub witness: Witness,
 }
 
-/// Implementation of [`CircuitComputation`] for [`PkGenerationCircuit`].
+/// Implementation of [`CircuitComputation`] for [`ShareDecryptionCircuit`].
 impl CircuitComputation for ShareDecryptionCircuit {
     type Preset = BfvPreset;
     type Input = ShareDecryptionCircuitInput;

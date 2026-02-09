@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
+//! Code generation for the threshold share decryption circuit: Prover.toml and configs.nr.
 
 use crate::circuits::computation::Computation;
 use crate::threshold::share_decryption::computation::Witness;

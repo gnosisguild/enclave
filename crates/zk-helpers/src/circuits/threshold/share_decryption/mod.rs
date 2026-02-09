@@ -4,11 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! User data encryption circuit.
+//! Threshold share decryption circuit.
 //!
-//! This circuit proves data encryption with a BFV public key (pk0, pk1) and produces
-//! Prover.toml and configs.nr for the Noir prover. See [`UserDataEncryptionCircuit`] and
-//! [`UserDataEncryptionCircuitInput`].
+//! Proves correct computation of a BFV decryption share: the prover shows that their
+//! share `d` satisfies the lifted relation
+//! `d = c_0 + c_1 * s + e + r_2 * (X^N + 1) + r_1 * q_i` with committed `s` and `e`,
+//! and produces Prover.toml and configs.nr for the Noir prover. See [`ShareDecryptionCircuit`]
+//! and [`ShareDecryptionCircuitInput`].
 
 pub mod circuit;
 pub mod codegen;

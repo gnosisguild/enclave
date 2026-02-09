@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Sample data generation for user data encryption circuit.
+//! Sample data generation for the threshold share decryption circuit.
 //!
-//! [`Sample`] produces a random BFV key pair and plaintext; the public key and plaintext are used as input
-//! for codegen and tests.
+//! Produces a random BFV ciphertext, aggregated secret and smudging-error shares (s, e),
+//! and the corresponding decryption share (d_share) for use in codegen and tests.
 
 use std::sync::Arc;
 
