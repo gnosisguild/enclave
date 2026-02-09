@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::MAILBOX_LIMIT;
 use actix::prelude::*;
 use anyhow::Result;
-use e3_utils::MAILBOX_LIMIT;
 use std::marker::PhantomData;
 use tracing::error;
 

@@ -19,9 +19,9 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_events::{
-    prelude::*, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
-    EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet, PublicKeyAggregated,
-    Seed, Shutdown, TicketGenerated, TicketId,
+    prelude::*, run_once, BusHandle, CommitteeFinalizeRequested, CommitteeFinalized, E3id, EType,
+    EffectsEnabled, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType, OrderedSet,
+    PublicKeyAggregated, Seed, Shutdown, TicketGenerated, TicketId,
 };
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use tracing::{error, info, trace};
@@ -231,7 +231,7 @@ pub struct CiphernodeRegistrySolWriter<P> {
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
-    pub async fn new(
+    pub fn new(
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
@@ -243,37 +243,43 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
         })
     }
 
-    pub async fn attach(
+    pub fn attach(
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
         is_aggregator: bool,
-    ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
-        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address)
-            .await?
-            .start();
+    ) {
+        let runner = run_once::<EffectsEnabled>({
+            let bus = bus.clone();
+            move |_| {
+                let addr =
+                    CiphernodeRegistrySolWriter::new(&bus, provider, contract_address)?.start();
 
-        if is_aggregator {
-            bus.subscribe_all(
-                &[
-                    EventType::PublicKeyAggregated,
-                    EventType::CommitteeFinalizeRequested,
-                ],
-                addr.clone().into(),
-            )
-        }
+                if is_aggregator {
+                    bus.subscribe_all(
+                        &[
+                            EventType::PublicKeyAggregated,
+                            EventType::CommitteeFinalizeRequested,
+                        ],
+                        addr.clone().into(),
+                    )
+                }
 
-        bus.subscribe_all(
-            &[
-                // Subscribe to TicketGenerated for ticket submission
-                EventType::TicketGenerated,
-                // Stop gracefully on shutdown
-                EventType::Shutdown,
-            ],
-            addr.clone().into(),
-        );
+                bus.subscribe_all(
+                    &[
+                        // Subscribe to TicketGenerated for ticket submission
+                        EventType::TicketGenerated,
+                        // Stop gracefully on shutdown
+                        EventType::Shutdown,
+                    ],
+                    addr.clone().into(),
+                );
 
-        Ok(addr)
+                Ok(())
+            }
+        });
+
+        bus.subscribe(EventType::EffectsEnabled, runner.recipient());
     }
 }
 
@@ -538,18 +544,14 @@ impl CiphernodeRegistrySol {
         CiphernodeRegistrySolReader::setup(processor)
     }
 
-    pub async fn attach_writer<P>(
+    pub fn attach_writer<P>(
         bus: &BusHandle,
         provider: EthProvider<P>,
         contract_address: Address,
         is_aggregator: bool,
-    ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>
-    where
+    ) where
         P: Provider + WalletProvider + Clone + 'static,
     {
-        let writer =
-            CiphernodeRegistrySolWriter::attach(bus, provider, contract_address, is_aggregator)
-                .await?;
-        Ok(writer)
+        CiphernodeRegistrySolWriter::attach(bus, provider, contract_address, is_aggregator);
     }
 }

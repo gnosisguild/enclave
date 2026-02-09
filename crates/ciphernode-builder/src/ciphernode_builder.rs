@@ -458,7 +458,7 @@ impl CiphernodeBuilder {
 
         let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
             let repositories = store.repositories();
-            let (_, _, join_handle, peer_id) = setup_with_interface(
+            setup_with_interface(
                 bus.clone(),
                 net_config.peers,
                 &self.cipher,
@@ -466,8 +466,7 @@ impl CiphernodeBuilder {
                 repositories.libp2p_keypair(),
                 eventstore_ts,
             )
-            .await?;
-            (join_handle, peer_id)
+            .await?
         } else {
             (
                 tokio::spawn(std::future::ready(Ok(()))),
@@ -585,7 +584,7 @@ async fn setup_evm_system(
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
             let contract = &chain.contracts.enclave;
-            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?).await?;
+            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?);
             system.with_contract(contract.address()?, move |next| {
                 EnclaveSolReader::setup(&next).recipient()
             });
@@ -625,8 +624,7 @@ async fn setup_evm_system(
                             write_provider.clone(),
                             contract.address()?,
                             pubkey_agg,
-                        )
-                        .await?;
+                        );
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
                         if pubkey_agg {

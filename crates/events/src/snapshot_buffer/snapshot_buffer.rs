@@ -230,7 +230,6 @@ mod mock_store {
 
     use crate::InsertBatch;
     use actix::{Actor, Handler, Message};
-    use e3_utils::MAILBOX_LIMIT;
 
     #[derive(Message)]
     #[rtype(result = "Vec<InsertBatch>")]

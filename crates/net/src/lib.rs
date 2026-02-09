@@ -22,7 +22,7 @@ pub use cid::Cid;
 pub use document_publisher::*;
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use e3_events::{BusHandle, EventStoreQueryBy, TsAgg};
+use e3_events::{run_once, BusHandle, EffectsEnabled, EventStoreQueryBy, EventSubscriber, TsAgg};
 use libp2p::identity::ed25519;
 use net_event_buffer::NetEventBuffer;
 pub use net_event_translator::*;
@@ -40,12 +40,7 @@ pub async fn setup_with_interface(
     quic_port: u16,
     repository: Repository<Vec<u8>>,
     eventstore: impl Into<Recipient<EventStoreQueryBy<TsAgg>>>,
-) -> anyhow::Result<(
-    Addr<NetEventTranslator>,
-    Option<Addr<DocumentPublisher>>,
-    tokio::task::JoinHandle<anyhow::Result<()>>,
-    String,
-)> {
+) -> anyhow::Result<(tokio::task::JoinHandle<anyhow::Result<()>>, String)> {
     let topic = "tmp-enclave-gossip-topic";
 
     // Get existing keypair or generate a new one
@@ -74,17 +69,25 @@ pub async fn setup_with_interface(
     );
 
     // Buffer all incoming events until SyncEnded
-    let rx = &Arc::new(NetEventBuffer::setup(&bus, &interface.rx()));
-    let addr = NetEventTranslator::setup(&bus, &interface.tx(), rx, topic);
-    let maybe_publisher = Some(DocumentPublisher::setup(&bus, &interface.tx(), rx, topic));
+    let rx = Arc::new(NetEventBuffer::setup(&bus, &interface.rx()));
+    let tx = interface.tx();
+
+    let runner = run_once::<EffectsEnabled>({
+        let bus = bus.clone();
+        let rx = rx.clone();
+        let topic = topic.to_owned();
+        let tx = tx.clone();
+        move |_| {
+            NetEventTranslator::setup(&bus, &tx, &rx, &topic);
+            DocumentPublisher::setup(&bus, &tx, &rx, &topic);
+            Ok(())
+        }
+    });
+
+    bus.subscribe(e3_events::EventType::EffectsEnabled, runner.recipient());
 
     // TODO: actix::spawn might avoid all the cleanup code
     let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
-    Ok((
-        addr,
-        maybe_publisher,
-        handle,
-        keypair.public().to_peer_id().to_string(),
-    ))
+    Ok((handle, keypair.public().to_peer_id().to_string()))
 }

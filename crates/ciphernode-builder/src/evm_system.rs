@@ -8,11 +8,14 @@ use std::mem::replace;
 
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
-use e3_events::{BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
+use e3_events::{
+    run_once, BusHandle, EventExtractor, EventSubscriber, EventType, HistoricalEvmSyncStart,
+};
 use e3_evm::{
     EthProvider, EvmChainGateway, EvmEventProcessor, EvmReadInterface, EvmRouter, Filters,
-    FixHistoricalOrder, OneShotRunner, SyncStartExtractor,
+    FixHistoricalOrder, SyncStartExtractor,
 };
+use e3_utils::actix::oneshot_runner::OneShotRunner;
 
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
@@ -57,7 +60,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         let next = FixHistoricalOrder::setup(next);
 
         // This will run once when the HistoricalEvmSyncStart event is received
-        let next = OneShotRunner::setup({
+        let next = run_once::<HistoricalEvmSyncStart>({
             // Clone self refs for closure
             let bus = self.bus.clone();
             let provider = self.provider.clone();
@@ -67,7 +70,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
             let route_factories = replace(&mut self.route_factories, Vec::new());
 
             // The event is defined here
-            move |msg: HistoricalEvmSyncStart| {
+            move |msg| {
                 // Extract config
                 let deploy_block = msg.get_evm_config(chain_id)?.deploy_block();
 
@@ -82,9 +85,6 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
                 Ok(())
             }
         });
-
-        // We get a HistoricalEvmSyncStart event and sent to oneShotRunner
-        let next = SyncStartExtractor::setup(next);
 
         // Finaly subscribe to the bus and wait for HistoricalEvmSyncStart
         self.bus

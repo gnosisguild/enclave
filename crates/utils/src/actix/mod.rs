@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod channel;
+pub mod oneshot_runner;
 
 use actix::{Actor, Handler, Message, ResponseActFuture, WrapFuture};
 use anyhow::{anyhow, Result};
