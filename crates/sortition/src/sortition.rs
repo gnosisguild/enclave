@@ -13,8 +13,8 @@ use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     prelude::*, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, E3Requested, EType, EnclaveEvent, EventType, OperatorActivationChanged,
-    PlaintextOutputPublished, Seed, TicketBalanceUpdated,
+    ConfigurationUpdated, E3Failed, E3Requested, E3Stage, E3StageChanged, EType, EnclaveEvent,
+    EventType, OperatorActivationChanged, PlaintextOutputPublished, Seed, TicketBalanceUpdated,
 };
 use e3_events::{BusHandle, E3id, EnclaveEventData};
 use e3_utils::NotifySync;
@@ -246,6 +246,8 @@ impl Sortition {
                 EventType::CommitteePublished,
                 EventType::PlaintextOutputPublished,
                 EventType::CommitteeFinalized,
+                EventType::E3Failed,
+                EventType::E3StageChanged,
             ],
             addr.clone().into(),
         );
@@ -284,6 +286,51 @@ impl Sortition {
                 bus.err(EType::Sortition, err);
                 None
             })
+    }
+
+    /// Helper method to decrement active jobs for an E3's committee
+    fn decrement_jobs_for_e3(&mut self, e3_id: &E3id, reason: &str) {
+        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
+            let chain_id = e3_id.chain_id();
+            let e3_id_str = format!("{}:{}", chain_id, e3_id.e3_id());
+
+            if let Some(chain_state) = state_map.get_mut(&chain_id) {
+                if let Some(committee_nodes) = chain_state.e3_committees.remove(&e3_id_str) {
+                    // Decrement active jobs for each node in the committee
+                    for node_addr in &committee_nodes {
+                        if let Some(node) = chain_state.nodes.get_mut(node_addr) {
+                            node.active_jobs = node.active_jobs.saturating_sub(1);
+
+                            info!(
+                                node = %node_addr,
+                                chain_id = chain_id,
+                                e3_id = ?e3_id,
+                                active_jobs = node.active_jobs,
+                                reason = reason,
+                                "Decremented active jobs for node"
+                            );
+                        }
+                    }
+
+                    info!(
+                        e3_id = ?e3_id,
+                        committee_size = committee_nodes.len(),
+                        reason = reason,
+                        "E3 completed/failed - decremented active jobs for committee"
+                    );
+                } else {
+                    info!(
+                        e3_id = ?e3_id,
+                        reason = reason,
+                        "No committee found (might have been completed already)"
+                    );
+                }
+            }
+
+            Ok(state_map)
+        }) {
+            self.bus.err(EType::Sortition, err);
+        }
     }
 }
 
@@ -526,52 +573,36 @@ impl Handler<CommitteePublished> for Sortition {
         }
     }
 }
-/// PlaintextOutputPublished is currently used as a signal to decrement the active jobs for the nodes in the committee
-/// But in reality, E3 Jobs might not emit that in case there are no votes or the job fails.
-/// We need to find a better way to handle the end of an E3, Reduce the jobs in case of of an Error
-/// so the tickets do not get locked up.
+
 impl Handler<PlaintextOutputPublished> for Sortition {
     type Result = ();
 
     fn handle(&mut self, msg: PlaintextOutputPublished, _ctx: &mut Self::Context) -> Self::Result {
-        if let Err(err) = self.node_state.try_mutate(|mut state_map| {
-            let chain_id = msg.e3_id.chain_id();
-            let e3_id_str = format!("{}:{}", chain_id, msg.e3_id.e3_id());
+        self.decrement_jobs_for_e3(&msg.e3_id, "PlaintextOutputPublished");
+    }
+}
 
-            // Get the committee nodes for this E3
-            if let Some(chain_state) = state_map.get_mut(&chain_id) {
-                if let Some(committee_nodes) = chain_state.e3_committees.remove(&e3_id_str) {
-                    // Decrement active jobs for each node in the committee
-                    for node_addr in &committee_nodes {
-                        if let Some(node) = chain_state.nodes.get_mut(node_addr) {
-                            node.active_jobs = node.active_jobs.saturating_sub(1);
+impl Handler<E3Failed> for Sortition {
+    type Result = ();
 
-                            info!(
-                                node = %node_addr,
-                                chain_id = chain_id,
-                                e3_id = ?msg.e3_id,
-                                active_jobs = node.active_jobs,
-                                "Decremented active jobs for node after E3 completion"
-                            );
-                        }
-                    }
+    fn handle(&mut self, msg: E3Failed, _ctx: &mut Self::Context) -> Self::Result {
+        let reason = format!("E3Failed: {:?}", msg.reason);
+        self.decrement_jobs_for_e3(&msg.e3_id, &reason);
+    }
+}
 
-                    info!(
-                        e3_id = ?msg.e3_id,
-                        committee_size = committee_nodes.len(),
-                        "PlaintextOutputPublished - job completed, decremented active jobs"
-                    );
-                } else {
-                    info!(
-                        e3_id = ?msg.e3_id,
-                        "PlaintextOutputPublished - no committee found (might have been completed already)"
-                    );
-                }
+impl Handler<E3StageChanged> for Sortition {
+    type Result = ();
+
+    fn handle(&mut self, msg: E3StageChanged, _ctx: &mut Self::Context) -> Self::Result {
+        match msg.new_stage {
+            E3Stage::Complete | E3Stage::Failed => {
+                let reason = format!("E3StageChanged to {:?}", msg.new_stage);
+                self.decrement_jobs_for_e3(&msg.e3_id, &reason);
             }
-
-            Ok(state_map)
-        }) {
-            self.bus.err(EType::Sortition, err);
+            _ => {
+                // Non-terminal stages, no action needed
+            }
         }
     }
 }
