@@ -9,7 +9,7 @@ use actix::{Message, Recipient};
 use anyhow::Result;
 use e3_data::Repositories;
 use e3_events::{
-    AggregateConfig, AggregateId, BusHandle, CorrelationId, EnableEffects, EnclaveEvent,
+    AggregateConfig, AggregateId, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent,
     EventContextAccessors, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse,
     EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived, HistoricalEvmSyncStart,
     HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnd, Unsequenced,
@@ -20,6 +20,7 @@ use std::{
     time::Duration,
 };
 use tokio::{sync::mpsc::Receiver, time::timeout};
+use tracing::info;
 
 pub async fn sync(
     bus: &BusHandle,
@@ -29,44 +30,62 @@ pub async fn sync(
     eventstore: &Recipient<EventStoreQueryBy<SeqAgg>>,
 ) -> Result<()> {
     // 1. Load snapsshot metadata
+    info!("Loading snapshot metadata...");
     let snapshot =
         SnapshotMeta::read_from_disk(aggregate_config.aggregates(), default_config, repositories)
             .await?;
+    info!(
+        "Snapshot metadata loaded for {} aggregates.",
+        snapshot.aggregates().len()
+    );
 
     // 2. Determine the evm blocks to read from based on the SnapshotMeta
     let evm_config = snapshot.to_evm_config();
     let net_config = snapshot.to_net_config();
 
     // 3. Load EventStore events since the sequence number found in the snapshot into memory.
+    info!("Loading EventStore events...");
     let (tx, rx) = actix_toolbox::mpsc::<EventStoreQueryResponse>(256);
     eventstore.try_send(EventStoreQueryBy::<SeqAgg>::new(
         CorrelationId::new(),
         snapshot.to_sequence_map(),
         tx,
     ))?;
-
     let events =
         collect_eventstore_query_response(rx, snapshot.aggregates().len(), Duration::from_secs(5))
             .await;
+    info!("{} EventStore events loaded.", events.len());
 
+    info!("Replaying events to actors...");
     // 4. Replay the EventStore events to all listeners (except effects)
     for event in events {
         bus.event_bus().try_send(event)?;
     }
+    info!("Events replayed.");
 
     // TODO: Detect open loops - incase we crashed in the middle of a request we need to play the
     // request event again once effects are on
 
     // 5. Load the historical evm events to memory from all chains
+    info!("Loading historical blockchain events...");
     let (addr, rx) = actix_toolbox::mpsc::<HistoricalEvmEventsReceived>(256);
     bus.publish_without_context(HistoricalEvmSyncStart::new(addr, evm_config.clone()))?;
     let historical_evm_events =
         collect_historical_evm_events(rx, &evm_config, Duration::from_secs(30)).await;
+    info!(
+        "{} historical blockchain events loaded.",
+        historical_evm_events.len()
+    );
 
     // 6. Load the historical libp2p events to memory
+    info!("Loading historical libp2p events...");
     let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetEventsReceived>();
     bus.publish_without_context(HistoricalNetSyncStart::new(addr, net_config.clone()))?;
     let historical_net_events = rx.await?.events;
+    info!(
+        "{} historical libp2p events loaded.",
+        historical_net_events.len()
+    );
 
     // 7. Sort both the evm and libp2p events together by HLC timestamp
     let mut historical = historical_evm_events
@@ -75,17 +94,21 @@ pub async fn sync(
         .collect::<Vec<_>>();
 
     historical.sort_by_key(|event| event.ts());
+    info!("Historical events sorted.");
 
     // 8. Enable effects
-    bus.publish_without_context(EnableEffects::new())?;
+    bus.publish_without_context(EffectsEnabled::new())?;
+    info!("Effects enabled");
 
     // 9. Publish the new sorted events to the eventstore
+    info!("Publishing historical events to actors...");
     for event in historical {
         bus.naked_dispatch(event);
     }
+    info!("Historical events published.");
 
     bus.publish_without_context(SyncEnd::new())?;
-
+    info!("Sync finished.");
     // normal live operations
 
     Ok(())

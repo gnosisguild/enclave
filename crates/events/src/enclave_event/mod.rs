@@ -214,7 +214,7 @@ pub enum EnclaveEventData {
     HistoricalNetSyncStart(HistoricalNetSyncStart),
     SyncEffect(SyncEffect),
     SyncEnd(SyncEnd),
-    EnableEffects(EnableEffects),
+    EffectsEnabled(EffectsEnabled),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -499,7 +499,7 @@ impl_event_types!(
     HistoricalNetSyncStart,
     SyncEffect,
     SyncEnd,
-    EnableEffects
+    EffectsEnabled
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
