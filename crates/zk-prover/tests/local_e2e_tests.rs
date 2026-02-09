@@ -182,7 +182,7 @@ async fn test_pk_trbfv_generation_proof_verification() {
 }
 
 #[tokio::test]
-async fn test_pk_trbfv_committment_consistency() {
+async fn test_pk_trbfv_commitment_consistency() {
     let bb = match find_bb().await {
         Some(p) => p,
         None => {
@@ -225,13 +225,25 @@ async fn test_pk_trbfv_committment_consistency() {
 
     let computation_output = PkGenerationCircuit::compute(preset, &sample).unwrap();
 
-    // Each Noir Field is 32 bytes big-endian
     let signals = &proof.public_signals;
-    assert_eq!(signals.len(), 32 * 3, "expected 3 field elements");
+    // Each commitment is represented as a single field element (32 bytes), and there are 3 commitments at the end of the public signals
+    let field_size: usize = 32;
+    let total_fields = signals.len() / field_size;
+    assert_eq!(total_fields, 1027);
 
-    let sk_commitment_from_proof = BigInt::from_bytes_be(Sign::Plus, &signals[0..32]);
-    let pk_commitment_from_proof = BigInt::from_bytes_be(Sign::Plus, &signals[32..64]);
-    let e_sm_commitment_from_proof = BigInt::from_bytes_be(Sign::Plus, &signals[64..96]);
+    // The 3 commitments are the last 3 field elements
+    let offset = (total_fields - 3) * field_size; // 1024 * 64 = 65536
+
+    let sk_commitment_from_proof =
+        BigInt::from_bytes_be(Sign::Plus, &signals[offset..offset + field_size]);
+    let pk_commitment_from_proof = BigInt::from_bytes_be(
+        Sign::Plus,
+        &signals[offset + field_size..offset + 2 * field_size],
+    );
+    let e_sm_commitment_from_proof = BigInt::from_bytes_be(
+        Sign::Plus,
+        &signals[offset + 2 * field_size..offset + 3 * field_size],
+    );
 
     // Recompute commitments from the witness
     let sk_commitment_expected = compute_share_computation_sk_commitment(
