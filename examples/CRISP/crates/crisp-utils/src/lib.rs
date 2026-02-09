@@ -18,37 +18,108 @@ pub struct VoteCounts {
     pub no: BigUint,
 }
 
-/// Decode an encoded tally into its decimal representation.
+/// Decode an FHE-encrypted tally result into vote counts for each choice.
 ///
-/// The plaintext output from FHE computation contains the result as bytes.
-/// Votes are encoded with yes votes in the first half and no votes in the second half,
-/// right-aligned with leading zeros.
+/// # Encoding scheme
+///
+/// The BFV plaintext polynomial has `degree` coefficients (e.g., 512).
+/// When encoding a vote with `n` choices, the polynomial is divided into
+/// `n` equal segments of `floor(degree / n)` coefficients each.
+///
+/// Each segment represents one choice's vote count in binary (big-endian):
+///
+///   |---- segment 0 ----|---- segment 1 ----|---- segment 2 ----|-- padding --|
+///   |  choice 0 (Yes)   |  choice 1 (No)    |  choice 2 (Abst)  |   zeros    |
+///   |  binary, MSB first|  binary, MSB first |  binary, MSB first|            |
+///
+/// Within each segment, the binary representation is right-aligned:
+///   [0, 0, 0, ..., 0, 1, 0, 1, 1]  ← represents decimal 11
+///    ^-- leading zeros    ^-- MSB     ^-- LSB
+///
+/// Because FHE addition is performed coefficient-wise on the polynomial,
+/// summing N encrypted votes produces the total count per coefficient.
+/// The binary reconstruction then recovers the final tally per choice.
+///
+/// # MAX_VOTE_BITS
+///
+/// To prevent overflow during FHE computation, only the last `MAX_VOTE_BITS`
+/// coefficients of each segment are used (MAX_VOTE_BITS = 50). This caps the
+/// maximum representable vote count at `2^50 - 1` (~1.1 quadrillion).
+///
+/// We read from the right side of each segment (the significant bits)
+/// and ignore leading zeros on the left.
 ///
 /// # Arguments
 ///
-/// * `tally_bytes` - The encoded tally as bytes (little-endian format of u64s)
+/// * `tally_bytes` - Raw bytes from the FHE decryption, encoding u64 values
+///                   in little-endian format (8 bytes per coefficient).
+/// * `num_choices` - Number of voting options (must match what was used to encode).
 ///
 /// # Returns
 ///
-/// A `VoteCounts` struct containing the decoded yes and no vote counts
+/// A `Vec<BigUint>` of length `num_choices`, where `results[i]` is the
+/// total vote weight for choice `i`.
+///
+/// # Example
+///
+/// Given degree=512, MAX_VOTE_BITS=50, num_choices=2:
+///   segment_size   = 512 / 2 = 256 coefficients per choice
+///   effective_size = min(256, 50) = 50
+///
+///   Choice 0 reads coefficients [206..256)   (last 50 of segment 0)
+///   Choice 1 reads coefficients [462..512)   (last 50 of segment 1)
+///
+/// Given degree=512, MAX_VOTE_BITS=50, num_choices=4:
+///   segment_size   = 512 / 4 = 128 coefficients per choice
+///   effective_size = min(128, 50) = 50
+///   remainder      = 512 - (128 * 4) = 0
+///
+///   Choice 0 reads coefficients [ 78..128)   (last 50 of segment 0)
+///   Choice 1 reads coefficients [206..256)   (last 50 of segment 1)
+///   Choice 2 reads coefficients [334..384)   (last 50 of segment 2)
+///   Choice 3 reads coefficients [462..512)   (last 50 of segment 3)
+///
+/// Given degree=512, MAX_VOTE_BITS=50, num_choices=3:
+///   segment_size   = 512 / 3 = 170 coefficients per choice
+///   effective_size = min(170, 50) = 50
+///   remainder      = 512 - (170 * 3) = 2 coefficients (trailing zeros, ignored)
+///
+///   Choice 0 reads coefficients [120..170)
+///   Choice 1 reads coefficients [290..340)
+///   Choice 2 reads coefficients [460..510)
+///
 pub fn decode_tally(tally_bytes: &[u8], num_choices: usize) -> Result<Vec<BigUint>> {
     if num_choices == 0 {
         return Err(eyre::eyre!("Number of choices must be positive"));
     }
 
-    // Decode bytes to u64 array (little-endian, 8 bytes per value)
+    // Each u64 coefficient is stored as 8 little-endian bytes.
+    // This gives us the full polynomial coefficient array.
     let values = decode_bytes_to_vec_u64(tally_bytes)?;
 
+    // Divide the polynomial evenly into num_choices segments.
+    // Any leftover coefficients (degree % num_choices) are trailing
+    // zeros and are ignored.
     let segment_size = values.len() / num_choices;
+
+    // Only read the rightmost MAX_VOTE_BITS (50) coefficients from each
+    // segment to avoid overflow. If the segment is smaller than
+    // MAX_VOTE_BITS (unlikely with degree=512), use the full segment.
     let effective_size = segment_size.min(MAX_VOTE_BITS);
 
     let mut results = Vec::with_capacity(num_choices);
 
     for choice_idx in 0..num_choices {
+        // Find where this choice's segment starts in the array
         let segment_start = choice_idx * segment_size;
+
+        // Right-align: skip leading zeros, read only the significant bits
+        // at the end of the segment
         let read_start = segment_start + segment_size - effective_size;
         let segment = &values[read_start..read_start + effective_size];
 
+        // Reconstruct the vote count from binary (big-endian within segment):
+        //   value = segment[0] * 2^(n-1) + segment[1] * 2^(n-2) + ... + segment[n-1] * 2^0
         let mut value = BigUint::from(0u64);
         for (i, &v) in segment.iter().enumerate() {
             let weight = BigUint::from(2u64).pow((segment.len() - 1 - i) as u32);
