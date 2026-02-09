@@ -33,7 +33,7 @@ use tracing::{info, instrument};
 
 /// Spawn a Libp2p interface and hook it up to this actor
 #[instrument(name = "libp2p", skip_all)]
-pub async fn setup_with_interface(
+pub async fn setup_net(
     bus: BusHandle,
     peers: Vec<String>,
     cipher: &Arc<Cipher>,

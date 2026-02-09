@@ -196,7 +196,6 @@ impl EventSystem {
 
     /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
-        info!("eventbus...");
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
     }
 
@@ -505,7 +504,7 @@ mod tests {
         let _guard = with_tracing("debug");
         let tmp = TempDir::new().unwrap();
         let system = EventSystem::persisted("cn2", tmp.path().join("log"), tmp.path().join("sled"));
-        system.buffer()?.send(Start).await?;
+        // system.buffer()?.send(Start).await?;
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
         Ok(())

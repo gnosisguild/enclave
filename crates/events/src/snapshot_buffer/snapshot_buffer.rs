@@ -9,7 +9,8 @@ use super::{
     AggregateConfig,
 };
 use crate::{
-    trap, EType, EnclaveEvent, EnclaveEventData, Event, Insert, InsertBatch, PanicDispatcher,
+    trap, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData, Event, Insert, InsertBatch,
+    PanicDispatcher,
 };
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
@@ -45,39 +46,46 @@ impl UpdateDestination {
         Self(base.into())
     }
 }
-enum SnapshotBufferState {
-    Running,
-    Paused,
-}
+// enum SnapshotBufferState {
+//     Disabled,   // SnapshotBuffer is completely disabled
+//     Forwarding, // Forwarding to disk
+//     Buffering,  // Buffering
+// }
 
 pub struct SnapshotBuffer {
     router: Option<Addr<BatchRouter>>,
     timelock: Option<Recipient<StartTimelock>>,
     tickable: Option<Recipient<Tick>>,
-    state: SnapshotBufferState,
+    // state: SnapshotBufferState,
 }
 
 impl SnapshotBuffer {
-    pub fn new(started: bool) -> Self {
+    pub fn new(start_buffering: bool) -> Self {
         SnapshotBuffer {
             router: None,
             timelock: None,
             tickable: None,
-            state: if !started {
-                SnapshotBufferState::Paused
-            } else {
-                SnapshotBufferState::Running
-            },
+            // state: if !start_buffering {
+            //     SnapshotBufferState::Buffering
+            // } else {
+            //     SnapshotBufferState::Forwarding
+            // },
         }
     }
 
     pub fn spawn(
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
-        started: bool,
+        start_buffering: bool,
     ) -> Result<Addr<Self>> {
         info!("spawning SnapshotBuffer...");
-        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock), Some(1), started)?;
+        let (addr, _) = Self::with_clock(
+            config,
+            store,
+            Arc::new(SystemClock),
+            Some(1),
+            start_buffering,
+        )?;
         Ok(addr)
     }
 
@@ -86,9 +94,9 @@ impl SnapshotBuffer {
         store: impl Into<Recipient<InsertBatch>>,
         clock: Arc<dyn Clock>,
         interval: Option<u64>,
-        started: bool,
+        start_buffering: bool,
     ) -> Result<(Addr<Self>, Addr<TimelockQueue>)> {
-        let addr = Self::new(started).start();
+        let addr = Self::new(start_buffering).start();
         let store = store.into();
         let router =
             BatchRouter::with_clock(config, addr.clone(), store.clone(), clock.clone()).start();
@@ -109,9 +117,9 @@ impl Handler<FlushSeq> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: FlushSeq, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            let SnapshotBufferState::Running = self.state else {
-                return Ok(());
-            };
+            // let SnapshotBufferState::Forwarding = self.state else {
+            //     return Ok(());
+            // };
             if let Some(ref router) = self.router {
                 router.try_send(msg)?;
             }
@@ -124,9 +132,9 @@ impl Handler<StartTimelock> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: StartTimelock, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            let SnapshotBufferState::Running = self.state else {
-                return Ok(());
-            };
+            // let SnapshotBufferState::Forwarding = self.state else {
+            //     return Ok(());
+            // };
 
             if let Some(ref timelock) = self.timelock {
                 timelock.try_send(msg)?;
@@ -150,22 +158,24 @@ impl Handler<Insert> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: Insert, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            use SnapshotBufferState as S;
-            match (&self.state, msg.ctx(), &self.router) {
-                // Doing this to cover when there are context free
-                // data store manipulations outside of the sync cycle.
-                (S::Paused, None, Some(ref router)) => {
-                    debug!(
-                        "Paused but received context free Insert. Forwarding to batch router..."
-                    );
-                    router.try_send(msg)?;
-                }
-                (S::Running, _, Some(ref router)) => {
-                    trace!("Forwarding Insert message to batch router...");
-                    router.try_send(msg)?;
-                }
-                _ => (),
+            // use SnapshotBufferState as S;
+            // match (&self.state, msg.ctx(), &self.router) {
+            //     // Doing this to cover when there are context free
+            //     // data store manipulations outside of the sync cycle.
+            //     (S::Buffering, None, Some(ref router)) => {
+            //         debug!(
+            //             "Paused but received context free Insert. Forwarding to batch router..."
+            //         );
+            //         router.try_send(msg)?;
+            //     }
+            //     (S::Forwarding, _, Some(ref router)) => {
+            if let Some(ref router) = self.router {
+                trace!("Forwarding Insert message to batch router...");
+                router.try_send(msg)?;
             };
+            //     }
+            //     _ => (),
+            // };
             Ok(())
         })
     }
@@ -175,12 +185,12 @@ impl Handler<EnclaveEvent> for SnapshotBuffer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            if let EnclaveEventData::SyncEnded(_) = msg.get_data() {
-                self.notify_sync(ctx, Start);
-            };
-            let SnapshotBufferState::Running = self.state else {
-                return Ok(());
-            };
+            // if let EnclaveEventData::EffectsEnabled(msg) = msg.get_data() {
+            //     self.notify_sync(ctx, msg.clone());
+            // };
+            // let SnapshotBufferState::Forwarding = self.state else {
+            //     return Ok(());
+            // };
             if let Some(ref router) = self.router {
                 router.try_send(msg)?;
             }
@@ -201,16 +211,16 @@ impl Handler<Tick> for SnapshotBuffer {
     }
 }
 
-impl Handler<Start> for SnapshotBuffer {
-    type Result = ();
-    fn handle(&mut self, _: Start, _: &mut Self::Context) -> Self::Result {
-        trap(EType::IO, &PanicDispatcher::new(), || {
-            info!("SnapshotBuffer is now enabled");
-            self.state = SnapshotBufferState::Running;
-            Ok(())
-        })
-    }
-}
+// impl Handler<EffectsEnabled> for SnapshotBuffer {
+//     type Result = ();
+//     fn handle(&mut self, _: EffectsEnabled, _: &mut Self::Context) -> Self::Result {
+//         trap(EType::IO, &PanicDispatcher::new(), || {
+//             info!("SnapshotBuffer is now enabled");
+//             self.state = SnapshotBufferState::Forwarding;
+//             Ok(())
+//         })
+//     }
+// }
 
 impl Handler<UpdateDestination> for SnapshotBuffer {
     type Result = ();

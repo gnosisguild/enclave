@@ -21,7 +21,7 @@ use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
-use e3_net::{setup_with_interface, NetRepositoryFactory};
+use e3_net::{setup_net, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
@@ -458,7 +458,7 @@ impl CiphernodeBuilder {
 
         let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
             let repositories = store.repositories();
-            setup_with_interface(
+            setup_net(
                 bus.clone(),
                 net_config.peers,
                 &self.cipher,
