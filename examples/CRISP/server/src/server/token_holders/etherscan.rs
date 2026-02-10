@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::{models::TokenHolder, CONFIG};
+use crate::server::{models::TokenHolder};
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
@@ -327,7 +327,7 @@ impl EtherscanClient {
 
         let scale_factor = U256::from(10u128.pow(half_decimals as u32));
 
-        for voter in potential_voters {
+        for voter in potential_voters { 
             match Self::get_past_votes(token_address, voter.address, block_number, rpc_url).await {
                 Ok(votes) => {
                     if votes >= threshold {

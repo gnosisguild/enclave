@@ -462,22 +462,27 @@ pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone
 
     // 0x5e043d1a = SubmissionWindowNotClosed(),
     // 0xd4c1d970 = CommitteeNotRequested()
-    send_tx_with_retry("finalizeCommittee", &["0x5e043d1a", "0xd4c1d970"], || {
-        let provider = provider.clone();
-        async move {
-            info!("Calling: contract.finalizeCommittee(..)");
-            let from_address = provider.provider().default_signer_address();
-            let current_nonce = provider
-                .provider()
-                .get_transaction_count(from_address)
-                .pending()
-                .await?;
-            let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
-            let builder = contract.finalizeCommittee(e3_id_u256).nonce(current_nonce);
-            let receipt = builder.send().await?.get_receipt().await?;
-            Ok(receipt)
-        }
-    })
+    // 0x59fa4a93 = ThresholdNotMet()
+    send_tx_with_retry(
+        "finalizeCommittee",
+        &["0x5e043d1a", "0xd4c1d970", "0x59fa4a93"],
+        || {
+            let provider = provider.clone();
+            async move {
+                info!("Calling: contract.finalizeCommittee(..)");
+                let from_address = provider.provider().default_signer_address();
+                let current_nonce = provider
+                    .provider()
+                    .get_transaction_count(from_address)
+                    .pending()
+                    .await?;
+                let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+                let builder = contract.finalizeCommittee(e3_id_u256).nonce(current_nonce);
+                let receipt = builder.send().await?.get_receipt().await?;
+                Ok(receipt)
+            }
+        },
+    )
     .await
 }
 
