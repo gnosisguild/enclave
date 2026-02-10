@@ -180,6 +180,15 @@ impl Computation for Witness {
             })
             .collect();
 
+        if d_share_polys.len() < threshold + 1 {
+            return Err(CircuitsErrors::Other(format!(
+                "d_share_polys.len() {} < threshold + 1 ({}); need at least {} polynomials",
+                d_share_polys.len(),
+                threshold + 1,
+                threshold + 1
+            )));
+        }
+
         // 1. Extract decryption shares per modulus per party [party][modulus][coeff]
         let mut decryption_shares = Vec::with_capacity(d_share_polys.len());
         for d_share in &d_share_polys {
