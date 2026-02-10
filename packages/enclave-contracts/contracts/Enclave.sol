@@ -730,6 +730,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3Stages[e3Id] = E3Stage.Failed;
         _e3FailureReasons[e3Id] = reason;
 
+        emit E3StageChanged(e3Id, current, E3Stage.Failed);
         emit E3Failed(e3Id, current, reason);
     }
 
@@ -750,6 +751,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         _e3Stages[e3Id] = E3Stage.Failed;
         _e3FailureReasons[e3Id] = reason;
 
+        emit E3StageChanged(e3Id, current, E3Stage.Failed);
         emit E3Failed(e3Id, current, reason);
     }
 
