@@ -7,10 +7,10 @@
 //! Sample data generation for the share-computation circuit: committee, DKG public key,
 //! secret (SK or smudging noise) in CRT form, Shamir shares, and parity matrices.
 
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
 use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuitInput;
+use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -26,13 +26,12 @@ impl ShareComputationCircuitInput {
     /// Generates sample data for the share-computation circuit.
     pub fn generate_sample(
         preset: BfvPreset,
-        committee_size: CiphernodesCommitteeSize,
+        committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
     ) -> Self {
         let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
         let sd = preset.search_defaults().unwrap();
         let mut rng = thread_rng();
-        let committee = committee_size.values();
 
         let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
             .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
@@ -121,14 +120,14 @@ mod tests {
 
     #[test]
     fn test_generate_secret_key_sample() {
-        let committee_size = CiphernodesCommitteeSize::Small;
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            committee_size,
+            committee.clone(),
             DkgInputType::SecretKey,
         );
-        assert_eq!(sample.n_parties, committee_size.values().n as u32);
-        assert_eq!(sample.threshold, committee_size.values().threshold as u32);
+        assert_eq!(sample.n_parties, committee.n as u32);
+        assert_eq!(sample.threshold, committee.threshold as u32);
         assert_eq!(sample.dkg_input_type, DkgInputType::SecretKey);
         assert_eq!(sample.secret_sss.len(), 2);
         assert_eq!(sample.secret.limbs.len(), 2);
@@ -136,14 +135,14 @@ mod tests {
 
     #[test]
     fn test_generate_smudging_noise_sample() {
-        let committee_size = CiphernodesCommitteeSize::Small;
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            committee_size,
+            committee.clone(),
             DkgInputType::SmudgingNoise,
         );
-        assert_eq!(sample.n_parties, committee_size.values().n as u32);
-        assert_eq!(sample.threshold, committee_size.values().threshold as u32);
+        assert_eq!(sample.n_parties, committee.n as u32);
+        assert_eq!(sample.threshold, committee.threshold as u32);
         assert_eq!(sample.dkg_input_type, DkgInputType::SmudgingNoise);
         assert_eq!(sample.secret_sss.len(), 2);
         assert_eq!(sample.secret.limbs.len(), 2);

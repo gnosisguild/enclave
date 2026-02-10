@@ -20,8 +20,8 @@ use fhe_math::rq::Poly;
 pub struct ShareEncryptionCircuit;
 
 impl Circuit for ShareEncryptionCircuit {
-    const NAME: &'static str = "share-encryption";
-    const PREFIX: &'static str = "SHARE_ENCRYPTION";
+    const NAME: &'static str = "dkg-share-encryption";
+    const PREFIX: &'static str = "DKG_SHARE_ENCRYPTION";
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::DKG;
     /// None: circuit accepts runtime-varying input type (SecretKey or SmudgingNoise).
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;

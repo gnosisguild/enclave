@@ -187,19 +187,19 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::dkg::share_encryption::{Bounds, ShareEncryptionCircuitInput};
     use crate::computation::Computation;
     use crate::computation::DkgInputType;
-    use crate::Circuit;
+    use crate::{CiphernodesCommitteeSize, Circuit};
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_toml_generation_and_structure() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
@@ -217,10 +217,11 @@ mod tests {
 
     #[test]
     fn test_configs_generation_contains_expected() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
