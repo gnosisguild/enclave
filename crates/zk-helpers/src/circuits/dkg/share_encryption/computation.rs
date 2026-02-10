@@ -754,9 +754,10 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
@@ -775,9 +776,10 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
@@ -798,9 +800,10 @@ mod tests {
     #[test]
     fn test_witness_message_consistency() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,

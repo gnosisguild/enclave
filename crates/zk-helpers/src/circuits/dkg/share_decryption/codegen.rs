@@ -83,9 +83,10 @@ mod tests {
 
     #[test]
     fn test_toml_generation_and_structure() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         )
         .unwrap();
@@ -101,9 +102,10 @@ mod tests {
 
     #[test]
     fn test_configs_generation_contains_expected() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         )
         .unwrap();
