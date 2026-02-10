@@ -81,7 +81,7 @@ sleep 2
 # relaunch the aggregator
 enclave_nodes_start ag
 
-sleep 2
+sleep 4
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
@@ -89,7 +89,7 @@ $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output
 heading "Mock publish input e3-id"
 pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-sleep 4 # wait for input deadline to pass
+sleep 6 # wait for input deadline to pass
 
 waiton "$SCRIPT_DIR/output/output.bin"
 
