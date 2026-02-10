@@ -8,15 +8,12 @@ use super::{
     timelock_queue::{Clock, StartTimelock, SystemClock, Tick, TimelockQueue},
     AggregateConfig,
 };
-use crate::{
-    trap, EType, EffectsEnabled, EnclaveEvent, EnclaveEventData, Event, Insert, InsertBatch,
-    PanicDispatcher,
-};
+use crate::{trap, EType, EnclaveEvent, Insert, InsertBatch, PanicDispatcher};
 use actix::{Actor, Addr, Handler, Message, Recipient};
 use anyhow::Result;
-use e3_utils::{NotifySync, MAILBOX_LIMIT};
+use e3_utils::MAILBOX_LIMIT;
 use std::sync::Arc;
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -60,7 +57,7 @@ pub struct SnapshotBuffer {
 }
 
 impl SnapshotBuffer {
-    pub fn new(start_buffering: bool) -> Self {
+    pub fn new(_: bool) -> Self {
         SnapshotBuffer {
             router: None,
             timelock: None,
@@ -278,7 +275,8 @@ mod tests {
     use crate::snapshot_buffer::timelock_queue::Tick;
     use crate::{
         AggregateConfig, AggregateId, E3id, EnclaveEvent, EventContext, EventContextAccessors,
-        EventContextSeq, EventId, Insert, InsertBatch, Sequenced, SyncEnded, TestEvent,
+        EventContextSeq, EventId, EventSource, Insert, InsertBatch, Sequenced, SyncEnded,
+        TestEvent,
     };
     use actix::Actor;
     use anyhow::Result;
@@ -289,7 +287,14 @@ mod tests {
     use tracing::info;
 
     fn create_ec(ag: usize, seq: u64) -> EventContext<Sequenced> {
-        EventContext::new_origin(EventId::hash(1), 1000, AggregateId::new(ag), None).sequence(seq)
+        EventContext::new_origin(
+            EventId::hash(1),
+            1000,
+            AggregateId::new(ag),
+            None,
+            EventSource::Local,
+        )
+        .sequence(seq)
     }
 
     fn create_event(ec: &EventContext<Sequenced>) -> EnclaveEvent {

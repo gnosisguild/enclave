@@ -44,8 +44,8 @@ const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
 use crate::events::{
-    GossipData, NetCommand, OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue,
-    SyncResponseValue,
+    estimate_hashmap_size, GossipData, NetCommand, OutgoingSyncRequestFailed,
+    OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue, SyncResponseValue,
 };
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
@@ -194,12 +194,15 @@ fn create_behaviour(
         gossipsub::MessageAuthenticity::Signed(key.clone()),
         gossipsub_config,
     )?;
+    let request_response_config =
+        request_response::Config::default().with_request_timeout(Duration::from_secs(30));
+
     let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
         )],
-        request_response::Config::default(),
+        request_response_config,
     );
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
     config
@@ -421,6 +424,49 @@ async fn process_swarm_event(
             ))?;
         }
 
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(
+            RequestResponseEvent::OutboundFailure {
+                peer,
+                request_id,
+                error,
+            },
+        )) => {
+            info!(
+                "***OUTBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+                peer, request_id, error
+            );
+            let correlation_id = correlator.expire(request_id)?;
+            event_tx.send(NetEvent::OutgoingSyncRequestFailed(
+                OutgoingSyncRequestFailed {
+                    correlation_id,
+                    error: format!("Outbound sync request failed: {:?}", error),
+                },
+            ))?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::InboundFailure {
+            peer,
+            request_id,
+            error,
+        })) => {
+            info!(
+                "***INBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+                peer, request_id, error
+            );
+            // Handle inbound failures - log for now, could add more sophisticated error handling if needed
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::ResponseSent {
+            peer,
+            request_id,
+        })) => {
+            info!(
+                "***SYNC RESPONSE SENT*** peer={}, request_id={}",
+                peer, request_id
+            );
+            // Successfully sent response to inbound request
+        }
+
         unknown => {
             trace!("Unknown event: {:?}", unknown);
         }
@@ -619,6 +665,8 @@ fn handle_outgoing_sync_request(
     else {
         bail!("No peer found on swarm!")
     };
+
+    info!("VALUE SIZE: {:?}", estimate_hashmap_size(&value.since));
 
     // Request events
     let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);

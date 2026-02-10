@@ -250,8 +250,8 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
-        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, EventType,
-        TestEvent,
+        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher,
+        EventSource, EventType, TestEvent,
     };
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
@@ -282,7 +282,7 @@ mod tests {
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
                 let ts = msg.ts();
                 self.dest
-                    .publish_from_remote(msg.into_data(), ts, None)
+                    .publish_from_remote(msg.into_data(), ts, None, EventSource::Local)
                     .unwrap()
             }
         }

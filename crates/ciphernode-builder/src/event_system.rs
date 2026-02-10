@@ -14,7 +14,7 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreQueryBy, EventStoreRouter, InsertBatch, QueryKind, SeqAgg, Sequencer, SnapshotBuffer,
+    EventStoreQueryBy, EventStoreRouter, InsertBatch, SeqAgg, Sequencer, SnapshotBuffer,
     StoreEventRequested, TsAgg, UpdateDestination,
 };
 use e3_utils::enumerate_path;
@@ -419,7 +419,7 @@ mod tests {
     use e3_data::Repository;
     use e3_events::EventContext;
     use e3_events::EventId;
-    use e3_events::Start;
+    use e3_events::EventSource;
     use e3_events::StoreKeys;
     use e3_events::SyncEnded;
     use e3_events::Tick;
@@ -544,8 +544,14 @@ mod tests {
         .start();
 
         // Sequence 1, Aggregate 0
-        let ec =
-            EventContext::new_origin(EventId::hash(1), 10, AggregateId::new(0), None).sequence(1);
+        let ec = EventContext::new_origin(
+            EventId::hash(1),
+            10,
+            AggregateId::new(0),
+            None,
+            EventSource::Local,
+        )
+        .sequence(1);
 
         // Send all evts to the listener
         handle.subscribe(EventType::All, listener.clone().into());
@@ -600,8 +606,14 @@ mod tests {
 
         info!("Mutating persistable state to create inserts using seq=2");
 
-        let ec =
-            EventContext::new_origin(EventId::hash(1), 10, AggregateId::new(0), None).sequence(2);
+        let ec = EventContext::new_origin(
+            EventId::hash(1),
+            10,
+            AggregateId::new(0),
+            None,
+            EventSource::Local,
+        )
+        .sequence(2);
 
         persistable.try_mutate(&ec, |_| Ok("Liz".to_string()))?;
         sleep(Duration::from_millis(1)).await;

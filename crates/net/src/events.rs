@@ -94,7 +94,10 @@ pub struct OutgoingSyncRequestSucceeded {
 }
 
 #[derive(Debug, Clone)]
-pub struct OutgoingSyncRequestFailed;
+pub struct OutgoingSyncRequestFailed {
+    pub correlation_id: CorrelationId,
+    pub error: String,
+}
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
@@ -227,6 +230,8 @@ impl NetEvent {
             N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingSyncRequestSucceeded(msg) => Some(msg.correlation_id),
+            N::OutgoingSyncRequestFailed(msg) => Some(msg.correlation_id),
             _ => None,
         }
     }
@@ -348,6 +353,14 @@ where
     result
 }
 
+pub fn estimate_hashmap_size<K, V>(map: &HashMap<K, V>) -> usize {
+    let entry_size = size_of::<K>() + size_of::<V>();
+    let capacity = map.capacity();
+
+    // HashMap uses ~1 byte of overhead per slot for metadata
+    capacity * (entry_size + 1) + size_of::<HashMap<K, V>>()
+}
+
 #[cfg(test)]
 mod tests {
     use e3_events::{
@@ -364,7 +377,7 @@ mod tests {
             None,
             31415,
             None,
-            EventSource::local,
+            EventSource::Local,
         );
 
         // event is sequenced after bus.publish() adds a sequence number
