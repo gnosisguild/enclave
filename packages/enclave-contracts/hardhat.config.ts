@@ -27,8 +27,8 @@ import {
   publishPlaintext,
   requestCommittee,
 } from "./tasks/enclave";
-import { cleanDeploymentsTask } from "./tasks/utils";
 import { publishInput } from "./tasks/program";
+import { cleanDeploymentsTask } from "./tasks/utils";
 
 dotenv.config();
 
