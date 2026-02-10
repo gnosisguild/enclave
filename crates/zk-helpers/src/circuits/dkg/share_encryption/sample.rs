@@ -7,9 +7,9 @@
 //! Sample data generation for the share-encryption circuit: DKG public key, plaintext,
 //! ciphertext, and encryption randomness (u_rns, e0_rns, e1_rns) for testing and codegen.
 
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
 use crate::circuits::dkg::share_encryption::circuit::ShareEncryptionCircuitInput;
 use crate::computation::DkgInputType;
+use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -24,7 +24,7 @@ impl ShareEncryptionCircuitInput {
     /// Generates sample data for the share-encryption circuit (encrypts a share row under DKG pk).
     pub fn generate_sample(
         preset: BfvPreset,
-        committee_size: CiphernodesCommitteeSize,
+        committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
         num_ciphertexts: u128, // z in the search defaults
         lambda: u32,
@@ -32,7 +32,6 @@ impl ShareEncryptionCircuitInput {
         let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
 
         let mut rng = thread_rng();
-        let committee = committee_size.values();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
@@ -97,16 +96,16 @@ impl ShareEncryptionCircuitInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::computation::DkgInputType;
+    use crate::{computation::DkgInputType, CiphernodesCommitteeSize};
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_secret_key_sample() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
@@ -134,10 +133,11 @@ mod tests {
 
     #[test]
     fn test_generate_smudging_noise_sample() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,

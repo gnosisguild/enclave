@@ -153,9 +153,10 @@ mod tests {
 
     #[test]
     fn test_toml_generation_and_structure() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         );
 

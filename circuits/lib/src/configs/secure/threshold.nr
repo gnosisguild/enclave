@@ -118,25 +118,22 @@ pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserD
 
 /************************************
 -------------------------------------
-share_decryption (CIRCUIT 6)
+share_decryption
 -------------------------------------
 ************************************/
 
-// share_decryption - bit parameters
-pub global SHARE_DECRYPTION_BIT_CT: u32 = 53;
-pub global SHARE_DECRYPTION_BIT_SK: u32 = 53;
-pub global SHARE_DECRYPTION_BIT_E_SM: u32 = 53;
-pub global SHARE_DECRYPTION_BIT_R1: u32 = 65;
-pub global SHARE_DECRYPTION_BIT_R2: u32 = 53;
-pub global SHARE_DECRYPTION_BIT_D: u32 = 53;
+pub global SHARE_DECRYPTION_BIT_CT: u32 = 52;
+pub global SHARE_DECRYPTION_BIT_SK: u32 = 52;
+pub global SHARE_DECRYPTION_BIT_E_SM: u32 = 52;
+pub global SHARE_DECRYPTION_BIT_R1: u32 = 64;
+pub global SHARE_DECRYPTION_BIT_R2: u32 = 52;
+pub global SHARE_DECRYPTION_BIT_D: u32 = 52;
 
-// share_decryption - bounds
 pub global SHARE_DECRYPTION_R1_BOUNDS: [Field; L] =
     [4611686035875690497, 9223372037660080129, 9223372045176272897, 9223372051618723841];
 pub global SHARE_DECRYPTION_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
-// share_decryption - configs
 pub global SHARE_DECRYPTION_CONFIGS: ShareDecryptionConfigs<L> =
     ShareDecryptionConfigs::new(QIS, SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS);
 

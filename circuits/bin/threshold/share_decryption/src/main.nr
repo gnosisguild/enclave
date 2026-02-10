@@ -15,24 +15,24 @@ use lib::math::polynomial::Polynomial;
 fn main(
     expected_sk_commitment: pub Field,
     expected_e_sm_commitment: pub Field,
-    c_0: pub [Polynomial<N>; L],
-    c_1: pub [Polynomial<N>; L],
+    ct0: pub [Polynomial<N>; L],
+    ct1: pub [Polynomial<N>; L],
     sk: [Polynomial<N>; L],
     e_sm: [Polynomial<N>; L],
-    r_1: [Polynomial<(2 * N) - 1>; L],
-    r_2: [Polynomial<N - 1>; L],
+    r1: [Polynomial<(2 * N) - 1>; L],
+    r2: [Polynomial<N - 1>; L],
     d: [Polynomial<N>; L],
 ) {
     let share_decryption: ShareDecryption<N, L, SHARE_DECRYPTION_BIT_CT, SHARE_DECRYPTION_BIT_SK, SHARE_DECRYPTION_BIT_E_SM, SHARE_DECRYPTION_BIT_R1, SHARE_DECRYPTION_BIT_R2, SHARE_DECRYPTION_BIT_D> = ShareDecryption::new(
         SHARE_DECRYPTION_CONFIGS,
         expected_sk_commitment,
         expected_e_sm_commitment,
-        c_0,
-        c_1,
+        ct0,
+        ct1,
         sk,
         e_sm,
-        r_1,
-        r_2,
+        r1,
+        r2,
         d,
     );
     share_decryption.execute()

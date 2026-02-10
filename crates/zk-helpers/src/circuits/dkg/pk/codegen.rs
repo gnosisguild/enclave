@@ -73,7 +73,7 @@ mod tests {
     use super::*;
     use crate::codegen::write_artifacts;
     use crate::dkg::pk::PkCircuitInput;
-    use crate::utils::compute_pk_bit;
+    use crate::utils::compute_modulus_bit;
 
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use tempfile::TempDir;
@@ -121,7 +121,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let pk_bit = compute_pk_bit(&dkg_params);
+        let pk_bit = compute_modulus_bit(&dkg_params);
 
         assert!(configs_content.contains(
             format!(

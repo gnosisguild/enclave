@@ -6,9 +6,9 @@
 
 //! Sample data generation for the share-decryption circuit: honest ciphertexts, sum ciphertexts, secret key, and message.
 
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
 use crate::circuits::dkg::share_decryption::circuit::ShareDecryptionCircuitInput;
 use crate::computation::DkgInputType;
+use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -25,20 +25,23 @@ impl ShareDecryptionCircuitInput {
     /// Generates sample data for the share-decryption circuit (decrypts a sum of honest ciphertexts under DKG secret key).
     pub fn generate_sample(
         preset: BfvPreset,
-        committee: CiphernodesCommitteeSize,
+        committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
-    ) -> Self {
-        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
-        let sd = preset.search_defaults().unwrap();
+    ) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, dkg_params) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
+        let sd = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
 
         let mut rng = thread_rng();
-        let committee = committee.values();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
         let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
-            .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
@@ -53,11 +56,21 @@ impl ShareDecryptionCircuitInput {
 
                         let sk_poly = share_manager
                             .coeffs_to_poly_level0(threshold_secret_key.coeffs.clone().as_ref())
-                            .unwrap();
+                            .map_err(|e| {
+                                CircuitsErrors::Sample(format!(
+                                    "Failed to convert secret key to polynomial: {:?}",
+                                    e
+                                ))
+                            })?;
 
                         let sk_sss_u64 = share_manager
                             .generate_secret_shares_from_poly(sk_poly.clone(), &mut rng)
-                            .unwrap();
+                            .map_err(|e| {
+                                CircuitsErrors::Sample(format!(
+                                    "Failed to generate secret shares: {:?}",
+                                    e
+                                ))
+                            })?;
 
                         sk_sss_u64[0].row(0).to_vec()
                     }
@@ -70,8 +83,18 @@ impl ShareDecryptionCircuitInput {
                                     e
                                 ))
                             })
-                            .unwrap();
-                        let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
+                            .map_err(|e| {
+                                CircuitsErrors::Sample(format!(
+                                    "Failed to generate smudging error: {:?}",
+                                    e
+                                ))
+                            })?;
+                        let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
+                            CircuitsErrors::Sample(format!(
+                                "Failed to convert error to poly: {:?}",
+                                e
+                            ))
+                        })?;
                         let esi_sss_u64 = share_manager
                             .generate_secret_shares_from_poly(esi_poly.clone(), &mut rng.clone())
                             .map_err(|e| {
@@ -80,24 +103,34 @@ impl ShareDecryptionCircuitInput {
                                     e
                                 ))
                             })
-                            .unwrap();
+                            .map_err(|e| {
+                                CircuitsErrors::Sample(format!(
+                                    "Failed to generate error shares: {:?}",
+                                    e
+                                ))
+                            })?;
 
                         esi_sss_u64[0].row(0).to_vec()
                     }
                 };
 
-                let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params).unwrap();
+                let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params).map_err(
+                    |e| CircuitsErrors::Sample(format!("Failed to encode plaintext: {:?}", e)),
+                )?;
 
-                let ct = dkg_public_key.try_encrypt(&pt, &mut rng).unwrap();
+                let ct = dkg_public_key.try_encrypt(&pt, &mut rng).map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to encrypt plaintext: {:?}", e))
+                })?;
+
                 party_cts.push(ct);
             }
             honest_ciphertexts.push(party_cts);
         }
 
-        ShareDecryptionCircuitInput {
+        Ok(ShareDecryptionCircuitInput {
             honest_ciphertexts,
             secret_key: dkg_secret_key,
-        }
+        })
     }
 }
 
@@ -113,9 +146,10 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
 
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
         assert_eq!(
@@ -129,9 +163,10 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SmudgingNoise,
-        );
+        )
+        .unwrap();
 
         assert_eq!(sample.honest_ciphertexts.len(), committee.n);
         assert_eq!(
