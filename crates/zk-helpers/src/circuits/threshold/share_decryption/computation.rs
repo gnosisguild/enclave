@@ -224,8 +224,8 @@ impl Computation for Witness {
 
         // Create cyclotomic polynomial x^N + 1
         let mut cyclo = vec![BigInt::from(0u64); (n + 1) as usize];
-        cyclo[0] = BigInt::from(1u64); // x^N term
-        cyclo[n as usize] = BigInt::from(1u64); // x^0 term
+        cyclo[0] = BigInt::from(1u64); // constant (x^0) term
+        cyclo[n as usize] = BigInt::from(1u64); // x^N term
 
         // Perform the main computation logic
         let mut results: Vec<(
