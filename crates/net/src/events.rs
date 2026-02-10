@@ -26,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
+use tracing::{error, info};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -281,21 +282,36 @@ where
     let debug_cmd = format!("{:?}", command);
 
     // Send the command to NetInterface
+    info!(
+        "call_and_await_response: SENDING command {:?} with timeout {:?}",
+        command, timeout
+    );
     net_cmds.send(command).await?;
 
     let result = tokio::time::timeout(timeout, async {
         loop {
             match rx.recv().await {
                 Ok(event) => {
+                    info!("RECEIVED and event {:?}", event);
                     // Only process events matching our correlation ID
                     if event.correlation_id() == Some(id) {
                         if let Some(result) = matcher(&event) {
                             return result;
                         } // None means unexpected event type, keep waiting
-                    } // Ignore events with non-matching IDs
+                        info!("matcher failed for event {:?}! skipping...", event);
+                    } else {
+                        // Ignore events with non-matching IDs
+                        info!(
+                            "correlation failed for event {:?} against correlation={:?}! skipping...",
+                            event, id
+                        );
+                    }
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(e) => return Err(e.into()),
+                Err(e) => {
+                    error!("RECEIVED an error from rx: {:?} returning error", e);
+                    return Err(e.into());
+                }
             }
         }
     })

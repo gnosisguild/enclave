@@ -390,6 +390,8 @@ async fn process_swarm_event(
                 },
             ..
         })) => {
+            info!("***INCOMING REQUEST RECEIVED {}!!***", request_id);
+
             // received a request for events
             event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
                 request_id,
@@ -407,8 +409,10 @@ async fn process_swarm_event(
                 },
             ..
         })) => {
+            info!("***OUTGOING SYNC REQUEST RESPONSE***{}", request_id);
             // received a response to a request for events
             let correlation_id = correlator.expire(request_id)?;
+            info!("correlation_id = {correlation_id}");
             event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
                 OutgoingSyncRequestSucceeded {
                     value: response,
@@ -598,6 +602,7 @@ fn handle_outgoing_sync_request(
     correlation_id: CorrelationId,
     value: SyncRequestValue,
 ) -> Result<()> {
+    info!("***OUTGOING SYNC REQUEST!! {} ***", correlation_id);
     // TODO:
     // This is a first pass.
     // Lots of stuff to work through here:
@@ -617,6 +622,10 @@ fn handle_outgoing_sync_request(
 
     // Request events
     let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);
+    info!(
+        "QueryId={} correlated with correlation_id={}",
+        query_id, correlation_id
+    );
     correlator.track(query_id, correlation_id);
     Ok(())
 }
@@ -626,11 +635,13 @@ fn handle_sync_response(
     channel: OnceTake<ResponseChannel<SyncResponseValue>>,
     value: SyncResponseValue,
 ) -> Result<()> {
+    info!("Sending response...");
     let channel = channel.try_take()?;
     match swarm.behaviour_mut().sync.send_response(channel, value) {
         Ok(_) => (),
-        Err(_res) => {
+        Err(value) => {
             // TODO: report failure
+            error!("sync sending response failure! {:?}", value);
         }
     }
     Ok(())

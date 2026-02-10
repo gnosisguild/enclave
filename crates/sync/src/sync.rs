@@ -45,15 +45,13 @@ pub async fn sync(
 
     // 3. Load EventStore events since the sequence number found in the snapshot into memory.
     info!("Loading EventStore events...");
-    let (tx, rx) = actix_toolbox::mpsc::<EventStoreQueryResponse>(256);
+    let (addr, rx) = actix_toolbox::oneshot::<EventStoreQueryResponse>();
     eventstore.try_send(EventStoreQueryBy::<SeqAgg>::new(
         CorrelationId::new(),
         snapshot.to_sequence_map(),
-        tx,
+        addr,
     ))?;
-    let events =
-        collect_eventstore_query_response(rx, snapshot.aggregates().len(), Duration::from_secs(5))
-            .await;
+    let events = rx.await?.into_events();
     info!("{} EventStore events loaded.", events.len());
 
     info!("Replaying events to actors...");
@@ -145,36 +143,6 @@ pub async fn collect_historical_evm_events(
                 chain_id
             );
         }
-    }
-
-    results
-}
-
-pub async fn collect_eventstore_query_response(
-    mut receiver: Receiver<EventStoreQueryResponse>,
-    expected: usize,
-    max_dur: Duration,
-) -> Vec<EnclaveEvent> {
-    let mut results = Vec::new();
-    let mut received = 0;
-
-    let collect = async {
-        for _ in 0..expected {
-            match receiver.recv().await {
-                Some(msg) => {
-                    results.extend(msg.into_events());
-                    received += 1;
-                }
-                None => break,
-            }
-        }
-    };
-
-    if timeout(max_dur, collect).await.is_err() {
-        eprintln!(
-            "Error: Timeout waiting for historical events from {} aggregates",
-            expected - received
-        );
     }
 
     results

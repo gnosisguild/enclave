@@ -112,6 +112,7 @@ impl Handler<TypedEvent<HistoricalNetSyncStart>> for NetSyncManager {
         msg: TypedEvent<HistoricalNetSyncStart>,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        info!("HISTORICAL_NET_SYNC_START");
         trap_fut(
             EType::Net,
             &self.bus.with_ec(msg.get_ctx()),
@@ -210,8 +211,8 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
 
 impl Handler<AllPeersDialed> for NetSyncManager {
     type Result = ();
-    fn handle(&mut self, msg: AllPeersDialed, ctx: &mut Self::Context) -> Self::Result {
-        info!("All peers dialed");
+    fn handle(&mut self, _: AllPeersDialed, _: &mut Self::Context) -> Self::Result {
+        info!("Received handler: All peers dialed");
         self.peers_ready = true;
     }
 }
@@ -227,6 +228,7 @@ async fn sync_request(
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     since: HashMap<AggregateId, u128>,
 ) -> Result<OutgoingSyncRequestSucceeded> {
+    info!("RUNNING sync request...");
     let id = CorrelationId::new();
     call_and_await_response(
         net_cmds,
@@ -254,12 +256,15 @@ async fn handle_sync_request_event(
     address: impl Into<Recipient<TypedEvent<OutgoingSyncRequestSucceeded>>>,
     wait_for_event: bool,
 ) -> Result<()> {
+    info!("Sync request event received");
     let (event, ctx) = event.into_components();
+    info!("Waiting for peers to have been contacted...");
     if wait_for_event {
         await_event(
             &net_events,
             |e| {
                 if matches!(e, &NetEvent::AllPeersDialed) {
+                    info!("AllPeersDialed matched!");
                     Some(e.clone())
                 } else {
                     None
@@ -269,11 +274,13 @@ async fn handle_sync_request_event(
         )
         .await?;
     }
+    info!("handle_sync_request_event: All peers have been dialed.");
 
     // Make the sync request
     // value returned includes the timestamp from the remote peer
     let value = retry_with_backoff(
         || {
+            info!("Running SYNC REQUEST!!");
             sync_request(
                 net_cmds.clone(),
                 net_events.clone(),
@@ -282,7 +289,7 @@ async fn handle_sync_request_event(
             .map_err(to_retry)
         },
         4,
-        1000,
+        5000,
     )
     .await?;
 
