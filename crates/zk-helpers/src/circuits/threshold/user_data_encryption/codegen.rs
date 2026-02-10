@@ -212,7 +212,8 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
         let artifacts = UserDataEncryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();

@@ -112,7 +112,8 @@ mod tests {
     fn test_codegen_with_sample() {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
-        let input = DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee);
+        let input =
+            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
         let circuit = DecryptedSharesAggregationCircuit;
 
         let artifacts = circuit.codegen(preset, &input).unwrap();

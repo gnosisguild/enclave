@@ -161,13 +161,13 @@ impl Computation for Configs {
         let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
         let q_mod_t_mod_p = reduce(&q_mod_t, &p);
 
-        let k0is = compute_k0is(&moduli, dkg_params.plaintext())?;
+        let k0is = compute_k0is(&moduli, plaintext)?;
 
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            t: dkg_params.plaintext() as usize,
+            t: plaintext as usize,
             q_mod_t: q_mod_t_mod_p,
             moduli,
             k0is,
@@ -762,7 +762,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
 
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
@@ -784,7 +785,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
@@ -808,7 +810,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // witness.message is plaintext coefficients (reversed, as used in circuit)
