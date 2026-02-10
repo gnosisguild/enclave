@@ -11,11 +11,9 @@ mod common;
 
 use common::fixtures_dir;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
+use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
-use e3_zk_helpers::circuits::dkg::pk::prepare_pk_sample_for_test;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
-use e3_zk_helpers::PkCircuit;
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -96,14 +94,14 @@ async fn test_pk_bfv_proof_generation() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
+    let sample = PkCircuitInput::generate_sample(preset);
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;
     let e3_id = "test-pk-bfv-001";
 
     let proof = circuit
-        .prove(&prover, &preset, &sample.dkg_public_key, e3_id)
+        .prove(&prover, &preset, &sample.public_key, e3_id)
         .expect("proof generation should succeed");
 
     assert!(!proof.data.is_empty(), "proof data should not be empty");
@@ -138,14 +136,14 @@ async fn test_pk_bfv_proof_verification() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
+    let sample = PkCircuitInput::generate_sample(preset);
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;
     let e3_id = "test-verify-001";
 
     let proof = circuit
-        .prove(&prover, &preset, &sample.dkg_public_key, e3_id)
+        .prove(&prover, &preset, &sample.public_key, e3_id)
         .expect("proof generation should succeed");
 
     let party_id = 1;
@@ -182,14 +180,14 @@ async fn test_pk_bfv_commitment_consistency() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = prepare_pk_sample_for_test(preset, CiphernodesCommitteeSize::Small);
+    let sample = PkCircuitInput::generate_sample(preset);
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;
     let e3_id = "test-commitment-001";
 
     let proof = circuit
-        .prove(&prover, &preset, &sample.dkg_public_key, e3_id)
+        .prove(&prover, &preset, &sample.public_key, e3_id)
         .expect("proof generation should succeed");
 
     // Verify the commitment from the proof is a valid field element
@@ -202,7 +200,7 @@ async fn test_pk_bfv_commitment_consistency() {
 
     // Compute the commitment independently to ensure consistency
     let circuit_input = PkCircuitInput {
-        public_key: sample.dkg_public_key.clone(),
+        public_key: sample.public_key.clone(),
     };
     let computation_output =
         PkCircuit::compute(preset, &circuit_input).expect("computation should succeed");
