@@ -41,6 +41,7 @@ pub use proof_verification::{
 pub use zk_actor::ZkActor;
 
 use actix::{Actor, Addr};
+use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use e3_events::BusHandle;
 
 use crate::ZkBackend;
@@ -54,7 +55,15 @@ use crate::ZkBackend;
 /// When `backend` is None:
 /// - Creates core actors without verification capabilities
 /// - Proofs are disabled, keys are accepted without verification
-pub fn setup_zk_actors(bus: &BusHandle, backend: Option<&ZkBackend>) -> ZkActors {
+///
+/// When `signer` is provided:
+/// - Proof request actor will sign proofs enabling fault attribution
+/// - Without a signer, proofs are still generated but unsigned
+pub fn setup_zk_actors(
+    bus: &BusHandle,
+    backend: Option<&ZkBackend>,
+    signer: Option<LocalSigner<SigningKey>>,
+) -> ZkActors {
     let (zk_actor, verifier) = if let Some(backend) = backend {
         let zk_actor = ZkActor::new(backend).start();
         let verifier = Some(zk_actor.clone().recipient());
@@ -63,7 +72,7 @@ pub fn setup_zk_actors(bus: &BusHandle, backend: Option<&ZkBackend>) -> ZkActors
         (None, None)
     };
 
-    let proof_request = ProofRequestActor::setup(bus, backend.is_some());
+    let proof_request = ProofRequestActor::setup(bus, backend.is_some(), signer);
     let proof_verification = ProofVerificationActor::setup(bus, verifier);
 
     ZkActors {

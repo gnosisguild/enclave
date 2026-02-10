@@ -8,11 +8,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Context, Handler};
+use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
     EncryptionKeyCreated, EncryptionKeyPending, Event, EventPublisher, EventSubscriber, EventType,
-    PkBfvProofRequest, ZkRequest, ZkResponse,
+    PkBfvProofRequest, ProofPayload, ProofType, SignedProofPayload, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -24,23 +25,36 @@ struct PendingProofRequest {
 }
 
 /// Core actor that handles encryption key proof requests.
+///
+/// When a signer is provided, proofs are wrapped in a [`SignedProofPayload`]
+/// before being published — enabling fault attribution via the signed proof model.
 pub struct ProofRequestActor {
     bus: BusHandle,
     proofs_enabled: bool,
+    signer: Option<LocalSigner<SigningKey>>,
     pending: HashMap<CorrelationId, PendingProofRequest>,
 }
 
 impl ProofRequestActor {
-    pub fn new(bus: &BusHandle, proofs_enabled: bool) -> Self {
+    pub fn new(
+        bus: &BusHandle,
+        proofs_enabled: bool,
+        signer: Option<LocalSigner<SigningKey>>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             proofs_enabled,
+            signer,
             pending: HashMap::new(),
         }
     }
 
-    pub fn setup(bus: &BusHandle, proofs_enabled: bool) -> Addr<Self> {
-        let addr = Self::new(bus, proofs_enabled).start();
+    pub fn setup(
+        bus: &BusHandle,
+        proofs_enabled: bool,
+        signer: Option<LocalSigner<SigningKey>>,
+    ) -> Addr<Self> {
+        let addr = Self::new(bus, proofs_enabled, signer).start();
         bus.subscribe(EventType::EncryptionKeyPending, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
@@ -98,7 +112,33 @@ impl ProofRequestActor {
         };
 
         let mut key = (*pending.key).clone();
-        key.proof = Some(resp.proof);
+        key.proof = Some(resp.proof.clone());
+
+        // Sign the proof payload if we have a signer
+        if let Some(ref signer) = self.signer {
+            let payload = ProofPayload {
+                e3_id: pending.e3_id.clone(),
+                proof_type: ProofType::T0PkBfv,
+                party_id: key.party_id,
+                data: key.pk_bfv.clone(),
+                proof: resp.proof.clone(),
+            };
+
+            match SignedProofPayload::sign(payload, signer) {
+                Ok(signed) => {
+                    info!(
+                        "Signed T0 proof for party {} (signer: {})",
+                        key.party_id,
+                        signer.address()
+                    );
+                    key.signed_payload = Some(signed);
+                }
+                Err(err) => {
+                    error!("Failed to sign T0 proof payload: {err}");
+                    // Continue without signature — proof still valid, just not attributable
+                }
+            }
+        }
 
         if let Err(err) = self.bus.publish(EncryptionKeyCreated {
             e3_id: pending.e3_id,

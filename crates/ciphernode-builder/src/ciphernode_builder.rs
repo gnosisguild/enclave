@@ -435,7 +435,8 @@ impl CiphernodeBuilder {
             ));
 
             info!("Setting up ZK actors");
-            setup_zk_actors(&bus, self.zk_backend.as_ref());
+            let signer = provider_cache.ensure_signer().await.ok();
+            setup_zk_actors(&bus, self.zk_backend.as_ref(), signer);
         }
 
         if self.pubkey_agg {

@@ -5,17 +5,29 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Core business logic actor for verifying received encryption keys.
-//! This actor verifies EncryptionKeyReceived events and converts them
-//! to EncryptionKeyCreated events after validation.
+//!
+//! This actor verifies `EncryptionKeyReceived` events and converts them
+//! to `EncryptionKeyCreated` events after validation.
+//!
+//! ## Signature Verification
+//!
+//! When the received key carries a [`SignedProofPayload`], this actor:
+//! 1. Recovers the signer address from the ECDSA signature.
+//! 2. Delegates the ZK proof to `ZkActor` for verification.
+//! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
+//!    so the `FaultSubmitter` can submit a slash proposal on-chain.
 //!
 //! This is a CORE actor - it delegates IO operations (verification) to ZkActor.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
+use alloy::primitives::Address;
 use e3_events::{
     BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
     EncryptionKeyReceived, Event, EventPublisher, EventSubscriber, EventType, Proof,
+    SignedProofFailed, SignedProofPayload,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -40,10 +52,23 @@ pub struct ZkVerificationResponse {
     pub key: Arc<EncryptionKey>,
 }
 
+/// Tracks a pending verification including the signed payload for fault evidence.
+#[derive(Clone, Debug)]
+struct PendingVerification {
+    signed_payload: Option<SignedProofPayload>,
+    recovered_signer: Option<Address>,
+}
+
 /// Core actor that handles encryption key verification.
+///
+/// On ZK verification failure, if the key carried a valid [`SignedProofPayload`],
+/// emits a [`SignedProofFailed`] event with the signed evidence bundle.
 pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Option<Recipient<ZkVerificationRequest>>,
+    /// Tracks signed payloads for keys currently being verified,
+    /// keyed by `(e3_id, party_id)`.
+    pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
 impl ProofVerificationActor {
@@ -51,6 +76,7 @@ impl ProofVerificationActor {
         Self {
             bus: bus.clone(),
             verifier,
+            pending: HashMap::new(),
         }
     }
 
@@ -80,6 +106,43 @@ impl ProofVerificationActor {
             );
             return;
         };
+
+        // Validate the signed payload if present
+        let (signed_payload, recovered_signer) = if let Some(ref signed) = msg.key.signed_payload {
+            match signed.recover_signer() {
+                Ok(addr) => {
+                    info!(
+                        "Recovered signer {} for key from party {}",
+                        addr, msg.key.party_id
+                    );
+                    (Some(signed.clone()), Some(addr))
+                }
+                Err(err) => {
+                    warn!(
+                        "Invalid signature on key from party {} - proceeding without \
+                             fault attribution: {err}",
+                        msg.key.party_id
+                    );
+                    (None, None)
+                }
+            }
+        } else {
+            warn!(
+                "Key from party {} has no signed payload - \
+                     proof verification will proceed but fault attribution unavailable",
+                msg.key.party_id
+            );
+            (None, None)
+        };
+
+        // Store the signed payload so we can reference it in the verification response
+        self.pending.insert(
+            (msg.e3_id.clone(), msg.key.party_id),
+            PendingVerification {
+                signed_payload,
+                recovered_signer,
+            },
+        );
 
         let request = ZkVerificationRequest {
             proof: proof.clone(),
@@ -129,6 +192,9 @@ impl Handler<ZkVerificationResponse> for ProofVerificationActor {
     type Result = ();
 
     fn handle(&mut self, msg: ZkVerificationResponse, _ctx: &mut Self::Context) -> Self::Result {
+        let pending_key = (msg.e3_id.clone(), msg.key.party_id);
+        let pending = self.pending.remove(&pending_key);
+
         if msg.verified {
             info!(
                 "T0 proof verified for party {} - accepting key",
@@ -141,6 +207,32 @@ impl Handler<ZkVerificationResponse> for ProofVerificationActor {
                 msg.key.party_id,
                 msg.error.unwrap_or_else(|| "unknown error".to_string())
             );
+
+            // If we have a signed payload, emit SignedProofFailed for fault attribution
+            if let Some(PendingVerification {
+                signed_payload: Some(signed),
+                recovered_signer: Some(signer),
+            }) = pending
+            {
+                warn!(
+                    "Emitting SignedProofFailed for party {} (signer: {signer})",
+                    msg.key.party_id
+                );
+                if let Err(err) = self.bus.publish(SignedProofFailed {
+                    e3_id: msg.e3_id,
+                    faulting_node: signer,
+                    proof_type: signed.payload.proof_type,
+                    signed_payload: signed,
+                }) {
+                    error!("Failed to publish SignedProofFailed: {err}");
+                }
+            } else {
+                warn!(
+                    "No signed payload available for party {} - \
+                     fault cannot be attributed on-chain",
+                    msg.key.party_id
+                );
+            }
         }
     }
 }

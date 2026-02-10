@@ -3817,6 +3817,7 @@ dependencies = [
  "acir",
  "actix",
  "acvm",
+ "alloy",
  "anyhow",
  "async-trait",
  "base64",
