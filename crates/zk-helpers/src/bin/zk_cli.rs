@@ -280,7 +280,7 @@ fn main() -> Result<()> {
                 let sd = preset.search_defaults().unwrap();
                 let sample = ShareEncryptionCircuitInput::generate_sample(
                     preset,
-                    CiphernodesCommitteeSize::Small,
+                    committee,
                     dkg_input_type,
                     sd.z,
                     sd.lambda,

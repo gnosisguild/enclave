@@ -137,7 +137,7 @@ mod tests {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SmudgingNoise,
             sd.z,
             sd.lambda,

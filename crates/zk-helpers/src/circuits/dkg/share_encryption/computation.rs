@@ -21,7 +21,7 @@ use crate::get_zkp_modulus;
 use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
-use crate::utils::{compute_msg_bit, compute_pk_bit};
+use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
