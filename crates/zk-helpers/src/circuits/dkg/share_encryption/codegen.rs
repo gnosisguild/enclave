@@ -203,7 +203,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
         let artifacts = ShareEncryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
@@ -225,7 +226,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
 
         let artifacts = ShareEncryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

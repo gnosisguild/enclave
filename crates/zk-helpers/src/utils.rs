@@ -160,10 +160,21 @@ pub fn calculate_bit_width(bound: BigInt) -> u32 {
 /// The bit width of ring elements (coefficients bounded by the coefficient modulus)
 pub fn compute_modulus_bit(params: &BfvParameters) -> u32 {
     let moduli = params.moduli();
-    let modulus = BigInt::from(moduli.iter().copied().max().unwrap());
+    let modulus = BigInt::from(compute_max_modulus(moduli));
     let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
 
     calculate_bit_width(bound)
+}
+
+/// Computes the maximum modulus from a vector of moduli.
+///
+/// # Arguments
+/// * `moduli` - Vector of moduli
+///
+/// # Returns
+/// The maximum modulus
+pub fn compute_max_modulus(moduli: &[u64]) -> u64 {
+    moduli.iter().copied().max().unwrap()
 }
 
 /// Computes the bit width of the message.

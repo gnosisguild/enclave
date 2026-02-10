@@ -300,7 +300,7 @@ async fn test_pk_bfv_proof_generation() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
+    let sample = PkCircuitInput::generate_sample(preset).unwrap();
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;
@@ -342,7 +342,7 @@ async fn test_pk_bfv_proof_verification() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
+    let sample = PkCircuitInput::generate_sample(preset).unwrap();
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;
@@ -386,7 +386,7 @@ async fn test_pk_bfv_commitment_consistency() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
+    let sample = PkCircuitInput::generate_sample(preset).unwrap();
 
     let prover = ZkProver::new(&backend);
     let circuit = PkCircuit;

@@ -172,7 +172,8 @@ mod tests {
     fn test_bfv_public_key_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
 
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
@@ -190,7 +191,8 @@ mod tests {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
 
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 

@@ -410,7 +410,8 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let input =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee.clone());
+            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee.clone())
+                .unwrap();
 
         let out = DecryptedSharesAggregationCircuit::compute(preset, &input).unwrap();
 

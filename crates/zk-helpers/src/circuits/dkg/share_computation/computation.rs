@@ -276,7 +276,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
@@ -291,7 +292,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SmudgingNoise,
-        );
+        )
+        .unwrap();
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let degree = witness.secret_crt.limb(0).coefficients().len();
         let num_moduli = witness.secret_crt.limbs.len();
@@ -315,7 +317,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
 
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
