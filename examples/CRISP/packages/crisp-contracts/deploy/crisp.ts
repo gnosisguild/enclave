@@ -103,7 +103,7 @@ export const deployCRISPContracts = async () => {
         address: tokenAddress,
         blockNumber: await ethers.provider.getBlockNumber(),
       },
-      'MockCRISPToken',
+      'MockVotingToken',
       chain,
     )
   }
