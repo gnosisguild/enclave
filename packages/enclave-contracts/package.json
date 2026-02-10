@@ -24,6 +24,16 @@
         "default": "./dist/tasks/ciphernode.js"
       }
     },
+    "./tasks/program": {
+      "import": {
+        "types": "./dist/tasks/program.d.ts",
+        "default": "./dist/tasks/program.js"
+      },
+      "require": {
+        "types": "./dist/tasks/program.d.ts",
+        "default": "./dist/tasks/program.js"
+      }
+    },
     "./tasks/enclave": {
       "import": {
         "types": "./dist/tasks/enclave.d.ts",
