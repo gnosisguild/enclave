@@ -16,7 +16,7 @@ use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::events::{
     await_event, call_and_await_response, NetCommand, NetEvent, OutgoingSyncRequestSucceeded,
@@ -162,8 +162,11 @@ impl Handler<SyncRequestReceived> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: SyncRequestReceived, ctx: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus, || {
+            info!("GOT SyncRequestReceived");
             let id = CorrelationId::new();
+            info!("STORING channel in requests map...");
             self.requests.insert(id, msg.channel);
+            info!("QUERYING eventstore...");
             self.eventstore.try_send(EventStoreQueryBy::<TsAgg>::new(
                 id,
                 msg.value.since,
@@ -179,10 +182,14 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: EventStoreQueryResponse, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
+            info!("RECEIVED response from eventstore.");
             let Some(channel) = self.requests.get(&msg.id()) else {
                 bail!("request not found with {}", msg.id());
             };
-
+            info!(
+                "GOT CHANNEL: Got channel from request store. NOW sending SyncResponse with channel={:?}",
+                channel
+            );
             self.tx.try_send(NetCommand::SyncResponse {
                 value: SyncResponseValue {
                     events: msg
@@ -204,6 +211,7 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
 impl Handler<AllPeersDialed> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: AllPeersDialed, ctx: &mut Self::Context) -> Self::Result {
+        info!("All peers dialed");
         self.peers_ready = true;
     }
 }

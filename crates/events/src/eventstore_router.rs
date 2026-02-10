@@ -75,6 +75,17 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         }
         Ok(())
     }
+
+    // TODO:
+    // 1. on each query type store a map of query by id(CorrelationId) to sender and AggregationIds in an
+    //    EventStoreQueryRequest object which should include a field for results
+    // 2. Create a handler for EventStoreQueryResponse that looks up the request by correlation_id
+    //    and keeps trackof the received requests. It should get the aggregation id off an event to
+    //    see which aggregation_id the result is from and it should mark that AggregationId as
+    //    complete.
+    // 3. Once all the requests have been received combine all the events together into a single
+    //    Vec and forward to the original sender.
+    // 4. Don't be afraid of using small simple decomposed components to build this.
 }
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {

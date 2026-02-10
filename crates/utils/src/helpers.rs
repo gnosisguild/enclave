@@ -8,6 +8,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use tracing::info;
+
 pub fn to_ordered_vec<K, T>(source: HashMap<K, T>) -> Vec<T>
 where
     K: Ord + Copy,
@@ -47,6 +49,7 @@ impl<T> OnceTake<T> {
 
     /// Takes the item, returning `None` if already taken.
     pub fn take(&self) -> Option<T> {
+        info!("take has been called!");
         self.0.lock().unwrap().take()
     }
 
