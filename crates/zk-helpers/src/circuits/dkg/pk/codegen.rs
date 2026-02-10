@@ -125,14 +125,22 @@ mod tests {
         assert!(configs_content.contains(
             format!(
                 "N: u32 = {}",
-                BfvPreset::InsecureThreshold512.metadata().degree
+                BfvPreset::InsecureThreshold512
+                    .dkg_counterpart()
+                    .unwrap()
+                    .metadata()
+                    .degree,
             )
             .as_str()
         ));
         assert!(configs_content.contains(
             format!(
                 "L: u32 = {}",
-                BfvPreset::InsecureThreshold512.metadata().num_moduli
+                BfvPreset::InsecureThreshold512
+                    .dkg_counterpart()
+                    .unwrap()
+                    .metadata()
+                    .num_moduli,
             )
             .as_str()
         ));

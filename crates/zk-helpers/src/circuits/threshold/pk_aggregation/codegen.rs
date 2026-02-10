@@ -129,7 +129,7 @@ mod tests {
             .contains(format!("{}_BIT_PK: u32 = {}", prefix, configs.bits.pk_bit).as_str()));
         assert!(codegen_configs.contains(
             format!(
-                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);",
+                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);",
                 prefix
             )
             .as_str()
