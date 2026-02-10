@@ -6,11 +6,11 @@
 
 //! Code generation for the share-computation BFV circuit: Prover.toml and configs.nr.
 
-use crate::bigint_to_field;
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::computation::Computation;
 use crate::circuits::dkg::share_computation::{
-    Bits, ShareComputationCircuit, ShareComputationCircuitInput, ShareComputationOutput, Witness,
+    utils::parity_matrix_constant_string, Bits, ShareComputationCircuit,
+    ShareComputationCircuitInput, ShareComputationOutput, Witness,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
@@ -20,9 +20,6 @@ use crate::poly_coefficients_to_toml_json;
 use crate::registry::Circuit;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_parity_matrix::{build_generator_matrix, null_space, ParityMatrixConfig};
-use num_bigint::BigInt;
-use num_bigint::BigUint;
 use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`ShareComputationCircuit`].
@@ -75,50 +72,6 @@ pub fn generate_toml(
     obj.insert(key.to_string(), value);
 
     Ok(toml::to_string(&json)?)
-}
-
-/// Builds the PARITY_MATRIX constant string for Noir (one matrix per modulus via null_space).
-fn parity_matrix_constant_string(
-    threshold_params: &std::sync::Arc<fhe::bfv::BfvParameters>,
-    n_parties: usize,
-    threshold: usize,
-) -> Result<String, CircuitsErrors> {
-    let moduli = threshold_params.moduli();
-    let mut parity_matrix_strings = Vec::with_capacity(moduli.len());
-
-    for &qi in moduli {
-        let q = BigUint::from(qi);
-        let g = build_generator_matrix(&ParityMatrixConfig {
-            q: q.clone(),
-            t: threshold,
-            n: n_parties,
-        })
-        .map_err(|e| {
-            CircuitsErrors::Sample(format!("Failed to build generator matrix: {:?}", e))
-        })?;
-        let h_mod = null_space(&g, &q).map_err(|e| {
-            CircuitsErrors::Sample(format!("Failed to compute null space: {:?}", e))
-        })?;
-
-        let mut modulus_rows = Vec::new();
-        for row in h_mod.data() {
-            let row_values: Vec<String> = row
-                .iter()
-                .map(|val| {
-                    let bigint_val = BigInt::from(val.clone());
-                    let field_val = bigint_to_field(&bigint_val);
-                    field_val.to_string()
-                })
-                .collect();
-            modulus_rows.push(format!("[{}]", row_values.join(", ")));
-        }
-        parity_matrix_strings.push(format!("[\n        {}]", modulus_rows.join(",\n        ")));
-    }
-
-    Ok(format!(
-        "pub global PARITY_MATRIX: [[[Field; N_PARTIES + 1]; N_PARTIES - T]; L_THRESHOLD] = [\n    {}];",
-        parity_matrix_strings.join(",\n    ")
-    ))
 }
 
 /// Builds the configs.nr string (N, L, parity matrix, bit parameters, configs) for the Noir prover.
@@ -195,36 +148,19 @@ mod tests {
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
     use crate::Circuit;
-    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
-    fn share_computation_input_from_sample(
-        sample: &ShareComputationSample,
-        dkg_input_type: DkgInputType,
-    ) -> ShareComputationCircuitInput {
-        ShareComputationCircuitInput {
-            dkg_input_type,
-            secret: sample.secret.clone(),
-            secret_sss: sample.secret_sss.clone(),
-            parity_matrix: sample.parity_matrix.clone(),
-            n_parties: sample.committee.n as u32,
-            threshold: sample.committee.threshold as u32,
-        }
-    }
-
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = prepare_share_computation_sample_for_test(
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
         );
 
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-
         let artifacts = ShareComputationCircuit
-            .codegen(BfvPreset::InsecureThreshold512, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -257,7 +193,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let prefix = <ShareComputationCircuit as Circuit>::PREFIX;
 

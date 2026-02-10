@@ -216,6 +216,18 @@ pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_
 
 /// Convert a 1D vector of BigInt to a vector of JSON values.
 ///
+/// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
+pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
+    y.iter()
+        .map(|coeff| {
+            coeff
+                .iter()
+                .map(|v| serde_json::Value::String(v.to_string()))
+                .collect()
+        })
+        .collect()
+}
+
 /// # Arguments
 /// * `bigint_1d` - 1D vector of BigInt values
 ///

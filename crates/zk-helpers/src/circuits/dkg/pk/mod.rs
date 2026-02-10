@@ -12,4 +12,3 @@ pub mod sample;
 pub use circuit::{PkCircuit, PkCircuitInput};
 pub use codegen::{generate_configs, generate_toml};
 pub use computation::{Bits, Bounds, Configs, PkComputationOutput, Witness};
-pub use sample::{prepare_pk_sample_for_test, PkSample};
