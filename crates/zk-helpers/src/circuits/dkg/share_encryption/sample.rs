@@ -8,34 +8,21 @@
 //! ciphertext, and encryption randomness (u_rns, e0_rns, e1_rns) for testing and codegen.
 
 use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+use crate::circuits::dkg::share_encryption::circuit::ShareEncryptionCircuitInput;
 use crate::computation::DkgInputType;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use fhe::bfv::Ciphertext;
 use fhe::bfv::Encoding;
 use fhe::bfv::Plaintext;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe::trbfv::{ShareManager, TRBFV};
-use fhe_math::rq::Poly;
 use fhe_traits::FheEncoder;
 use rand::thread_rng;
 
-/// Sample data for the share-encryption circuit: plaintext, ciphertext, keys, and RNS randomness.
-#[derive(Debug, Clone)]
-pub struct ShareEncryptionSample {
-    pub plaintext: Plaintext,
-    pub ciphertext: Ciphertext,
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
-    pub u_rns: Poly,
-    pub e0_rns: Poly,
-    pub e1_rns: Poly,
-}
-
-impl ShareEncryptionSample {
+impl ShareEncryptionCircuitInput {
     /// Generates sample data for the share-encryption circuit (encrypts a share row under DKG pk).
-    pub fn generate(
+    pub fn generate_sample(
         preset: BfvPreset,
         committee_size: CiphernodesCommitteeSize,
         dkg_input_type: DkgInputType,
@@ -50,8 +37,7 @@ impl ShareEncryptionSample {
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
-        let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
-            .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
+        let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).unwrap();
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
@@ -96,7 +82,7 @@ impl ShareEncryptionSample {
         let (_ct, u_rns, e0_rns, e1_rns) =
             dkg_public_key.try_encrypt_extended(&pt, &mut rng).unwrap();
 
-        ShareEncryptionSample {
+        ShareEncryptionCircuitInput {
             plaintext: pt,
             ciphertext: _ct,
             public_key: dkg_public_key,
@@ -108,23 +94,6 @@ impl ShareEncryptionSample {
     }
 }
 
-/// Prepares a share-encryption sample for testing using a threshold preset.
-pub fn prepare_share_encryption_sample_for_test(
-    preset: BfvPreset,
-    committee: CiphernodesCommitteeSize,
-    dkg_input_type: DkgInputType,
-) -> ShareEncryptionSample {
-    let defaults = preset.search_defaults().unwrap();
-
-    ShareEncryptionSample::generate(
-        preset,
-        committee,
-        dkg_input_type,
-        defaults.z,
-        defaults.lambda,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,10 +103,13 @@ mod tests {
 
     #[test]
     fn test_generate_secret_key_sample() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
 
         assert_eq!(sample.public_key.c.c.len(), 2);
@@ -162,10 +134,13 @@ mod tests {
 
     #[test]
     fn test_generate_smudging_noise_sample() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
-            DkgInputType::SmudgingNoise,
+            DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
 
         assert_eq!(sample.public_key.c.c.len(), 2);
