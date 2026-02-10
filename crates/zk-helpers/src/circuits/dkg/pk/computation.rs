@@ -153,8 +153,8 @@ impl Computation for Witness {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
 
-        let mut pk0is = crate::crt::fhe_poly_to_crt_centered(&input.public_key.c.c[0], moduli)?;
-        let mut pk1is = crate::crt::fhe_poly_to_crt_centered(&input.public_key.c.c[1], moduli)?;
+        let mut pk0is = crate::math::fhe_poly_to_crt_centered(&input.public_key.c.c[0], moduli)?;
+        let mut pk1is = crate::math::fhe_poly_to_crt_centered(&input.public_key.c.c[1], moduli)?;
 
         let zkp_modulus = &get_zkp_modulus();
 

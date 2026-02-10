@@ -26,6 +26,9 @@ use e3_zk_helpers::dkg::share_decryption::{
 };
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitInput};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
+use e3_zk_helpers::threshold::decrypted_shares_aggregation::{
+    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitInput,
+};
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitInput;
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
@@ -169,6 +172,7 @@ fn main() -> Result<()> {
     registry.register(Arc::new(DkgShareDecryptionCircuit));
     registry.register(Arc::new(PkAggregationCircuit));
     registry.register(Arc::new(ThresholdShareDecryptionCircuit));
+    registry.register(Arc::new(DecryptedSharesAggregationCircuit));
 
     // Handle list circuits flag.
     if args.list_circuits {
@@ -216,7 +220,7 @@ fn main() -> Result<()> {
     }
 
     let write_prover_toml = args.toml;
-    // Only share-computation has a witness-type choice (secret-key vs smudging-noise). pk always uses secret key.
+    // DKG circuits have a witness-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
     let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
         || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;
@@ -269,14 +273,11 @@ fn main() -> Result<()> {
                     committee,
                     dkg_input_type,
                 );
-
                 let circuit = ShareComputationCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {
-                let sd = preset.search_defaults().ok_or_else(|| {
-                    anyhow!("preset does not define search defaults for {}", name)
-                })?;
+                let sd = preset.search_defaults().unwrap();
                 let sample = ShareEncryptionCircuitInput::generate_sample(
                     preset,
                     committee,
@@ -321,6 +322,15 @@ fn main() -> Result<()> {
                     ThresholdShareDecryptionCircuitInput::generate_sample(preset, committee)?;
 
                 let circuit = ThresholdShareDecryptionCircuit;
+                circuit.codegen(preset, &sample)?
+            }
+            name if name == <DecryptedSharesAggregationCircuit as Circuit>::NAME => {
+                let sample = DecryptedSharesAggregationCircuitInput::generate_sample(
+                    preset,
+                    CiphernodesCommitteeSize::Small.values(),
+                );
+
+                let circuit = DecryptedSharesAggregationCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name => return Err(anyhow!("circuit {} not yet implemented", name)),
