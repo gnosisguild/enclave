@@ -9,6 +9,9 @@ use std::collections::BTreeMap;
 use crate::error::ZkError;
 use acir::FieldElement;
 use noirc_abi::{input_parser::InputValue, InputMap};
+use acvm::AcirField;
+use e3_polynomial::{CrtPolynomial, Polynomial};
+use num_bigint::BigInt;
 
 /// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.
 /// Expects the same structure: CRT fields as arrays of `{coefficients: [...]}`,
@@ -60,4 +63,26 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
     Err(ZkError::SerializationError(
         "unexpected json structure".into(),
     ))
+}
+
+pub fn bigint_to_field_value(b: &BigInt) -> InputValue {
+    InputValue::Field(acvm::FieldElement::from_hex(&b.to_str_radix(16)).unwrap())
+}
+
+pub fn vec3d_to_input_value(v: &Vec<Vec<Vec<BigInt>>>) -> InputValue {
+    InputValue::Vec(
+        v.iter()
+            .map(|v2| {
+                InputValue::Vec(
+                    v2.iter()
+                        .map(|v3| {
+                            InputValue::Vec(
+                                v3.iter().map(bigint_to_field_value).collect(),
+                            )
+                        })
+                        .collect(),
+                )
+            })
+            .collect(),
+    )
 }

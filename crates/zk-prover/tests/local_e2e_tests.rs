@@ -18,6 +18,7 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
+use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
@@ -295,4 +296,120 @@ async fn test_pk_bfv_commitment_consistency() {
     );
 
     prover.cleanup(e3_id).unwrap();
+}
+
+#[tokio::test]
+async fn test_share_computation_sk_commitment_consistency() {
+    let bb = match find_bb().await {
+        Some(p) => p,
+        None => {
+            println!("skipping: bb not found");
+            return;
+        }
+    };
+
+    let (backend, _temp) = setup_test_prover(&bb).await;
+    let fixtures = fixtures_dir();
+
+    let circuit_dir = backend.circuits_dir.join("dkg").join("sk_share_computation");
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(fixtures.join("sk_share_computation.json"), circuit_dir.join("sk_share_computation.json"))
+        .await
+        .unwrap();
+    fs::copy(fixtures.join("sk_share_computation.vk"), circuit_dir.join("sk_share_computation.vk"))
+        .await
+        .unwrap();
+
+    let preset = BfvPreset::InsecureThreshold512;
+    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SecretKey);
+
+    let prover = ZkProver::new(&backend);
+    let circuit = ShareComputationCircuit;
+    let e3_id = "1";
+
+    let proof = circuit
+        .prove(&prover, &preset, &sample, e3_id)
+        .expect("proof generation should succeed");
+
+    // Verify the commitment from the proof is a valid field element
+    let commitment_from_proof =
+        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_signals);
+    assert!(
+        commitment_from_proof > num_bigint::BigInt::from(0),
+        "commitment should be positive"
+    );
+
+    // Compute the commitment independently to ensure consistency
+    let computation_output =
+        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
+    let commitment_calculated = compute_share_computation_sk_commitment(
+        computation_output.witness.secret_crt.limb(0),
+        computation_output.bits.bit_sk_secret,
+    );
+
+    assert_eq!(
+        commitment_from_proof, commitment_calculated,
+        "Commitment from proof must match independently calculated commitment"
+    );
+
+    prover.cleanup(e3_id).unwrap();
+
+}
+
+#[tokio::test]
+async fn test_share_computation_e_sm_commitment_consistency() {
+    let bb = match find_bb().await {
+        Some(p) => p,
+        None => {
+            println!("skipping: bb not found");
+            return;
+        }
+    };
+
+    let (backend, _temp) = setup_test_prover(&bb).await;
+    let fixtures = fixtures_dir();
+
+    let circuit_dir = backend.circuits_dir.join("dkg").join("e_sm_share_computation");
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(fixtures.join("e_sm_share_computation.json"), circuit_dir.join("e_sm_share_computation.json"))
+        .await
+        .unwrap();
+    fs::copy(fixtures.join("e_sm_share_computation.vk"), circuit_dir.join("e_sm_share_computation.vk"))
+        .await
+        .unwrap();
+
+    let preset = BfvPreset::InsecureThreshold512;
+    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SmudgingNoise);
+
+    let prover = ZkProver::new(&backend);
+    let circuit = ShareComputationCircuit;
+    let e3_id = "1";
+
+    let proof = circuit
+        .prove(&prover, &preset, &sample, e3_id)
+        .expect("proof generation should succeed");
+
+    // Verify the commitment from the proof is a valid field element
+    let commitment_from_proof =
+        num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &proof.public_signals);
+    assert!(
+        commitment_from_proof > num_bigint::BigInt::from(0),
+        "commitment should be positive"
+    );
+
+    // Compute the commitment independently to ensure consistency
+    let computation_output =
+        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
+    let commitment_calculated = compute_share_computation_e_sm_commitment(
+        &computation_output.witness.secret_crt,
+        computation_output.bits.bit_e_sm_secret,
+    );
+
+    assert_eq!(
+        commitment_from_proof, commitment_calculated,
+        "Commitment from proof must match independently calculated commitment"
+    );
+
+    prover.cleanup(e3_id).unwrap();
+
 }

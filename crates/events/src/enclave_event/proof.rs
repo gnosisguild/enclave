@@ -38,8 +38,10 @@ impl Proof {
 pub enum CircuitName {
     /// BFV public key proof (T0).
     PkBfv,
-    /// TrBFV public key share proof (T1).
+    /// TrBFV public key share proof (T1a).
     PkGeneration,
+    /// Share computation proof (T1b).
+    ShareComputation,
     /// Encrypted shares proof (T2/T3).
     EncShares,
     /// Decryption share proof (T4/T5).
@@ -53,6 +55,7 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
+            CircuitName::ShareComputation => "share_computation",
             CircuitName::EncShares => "enc_shares",
             CircuitName::DecShares => "dec_shares",
             CircuitName::PkAgg => "pk_agg",
@@ -63,6 +66,7 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "dkg",
             CircuitName::PkGeneration => "threshold",
+            CircuitName::ShareComputation => "dkg",
             CircuitName::EncShares => "threshold",
             CircuitName::DecShares => "threshold",
             CircuitName::PkAgg => "threshold",
