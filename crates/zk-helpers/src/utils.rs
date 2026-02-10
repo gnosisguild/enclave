@@ -258,45 +258,11 @@ pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_jso
         .map(|coeff| {
             coeff
                 .iter()
-                .map(|v| serde_json::Value::String(v.to_string()))
-                .collect()
-        })
-        .collect()
-}
-
-/// Convert a 2D vector of BigInt to a vector of vectors of JSON values.
-///
-/// # Arguments
-/// * `y` - 2D vector of BigInt values
-///
-/// # Returns
-/// A vector of vectors of JSON values
-pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
-    y.iter()
-        .map(|coeff| {
-            coeff
-                .iter()
-                .map(|v| serde_json::Value::String(v.to_string()))
-                .collect()
-        })
-        .collect()
-}
-/// Convert a 3D vector of BigInt to a vector of vectors of vectors of JSON values.
-///
-/// # Arguments
-/// * `bigint_3d` - 3D vector of BigInt values
-///
-/// # Returns
-/// A vector of vectors of vectors of JSON values
-pub fn bigint_3d_to_json_values(
-    bigint_3d: &[Vec<Vec<BigInt>>],
-) -> Vec<Vec<Vec<serde_json::Value>>> {
-    bigint_3d
-        .iter()
-        .map(|coeff| {
-            coeff
-                .iter()
-                .map(|modulus| bigint_1d_to_json_values(modulus))
+                .map(|v| {
+                    v.iter()
+                        .map(|x| serde_json::Value::String(x.to_string()))
+                        .collect()
+                })
                 .collect()
         })
         .collect()
