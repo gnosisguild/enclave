@@ -15,9 +15,10 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
-    compute_threshold_pk_commitment, PkCircuit,
+    compute_threshold_pk_commitment,
 };
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
 use num_bigint::{BigInt, Sign};
