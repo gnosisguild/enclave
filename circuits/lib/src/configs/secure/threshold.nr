@@ -144,7 +144,7 @@ decrypted_shares_aggregation (CIRCUIT 7)
 ************************************/
 
 // decrypted_shares_aggregation - bit parameters
-pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 201;
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 200;
 
 // decrypted_shares_aggregation - configs
 pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =

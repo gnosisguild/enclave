@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::crt::fhe_poly_to_crt_centered;
+use crate::math::fhe_poly_to_crt_centered;
 use crate::utils::{compute_modulus_bit, get_zkp_modulus, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
