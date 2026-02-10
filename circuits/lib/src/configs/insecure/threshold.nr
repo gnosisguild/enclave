@@ -14,9 +14,9 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 pub global N: u32 = 512;
 pub global L: u32 = 2;
 pub global PLAINTEXT_MODULUS: Field = 100;
+pub global Q_INVERSE_MOD_T: Field = 57;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
 pub global Q_MOD_T: Field = 3;
-pub global Q_INVERSE_MOD_T: Field = 7;
 pub global T_INV_MOD_Q: Field = 1416703358393105942938;
 
 /************************************
@@ -27,14 +27,14 @@ pk_generation (CIRCUIT 1)
 
 pub global PK_GENERATION_BIT_EEK: u32 = 5;
 pub global PK_GENERATION_BIT_SK: u32 = 1;
-pub global PK_GENERATION_BIT_E_SM: u32 = 17;
+pub global PK_GENERATION_BIT_E_SM: u32 = 24;
 pub global PK_GENERATION_BIT_R1: u32 = 13;
 pub global PK_GENERATION_BIT_R2: u32 = 35;
 pub global PK_GENERATION_BIT_PK: u32 = 35;
 
 pub global PK_GENERATION_EEK_BOUND: Field = 20;
 pub global PK_GENERATION_SK_BOUND: Field = 1;
-pub global PK_GENERATION_E_SM_BOUND: Field = 123072;
+pub global PK_GENERATION_E_SM_BOUND: Field = 12307200;
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [5120, 5120];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
@@ -132,7 +132,7 @@ decrypted_shares_aggregation (CIRCUIT 7)
 ************************************/
 
 // decrypted_shares_aggregation - bit parameters
-pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 69;
+pub global DECRYPTED_SHARES_AGGREGATION_BIT_NOISE: u32 = 65;
 
 // decrypted_shares_aggregation - configs
 pub global DECRYPTED_SHARES_AGGREGATION_CONFIGS: DecryptedSharesAggregationConfigs<L> =

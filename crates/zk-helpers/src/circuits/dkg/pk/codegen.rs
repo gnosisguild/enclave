@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
 
         let artifacts = PkCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::crt::fhe_poly_to_crt_centered;
+use crate::math::fhe_poly_to_crt_centered;
 use crate::utils::{compute_modulus_bit, get_zkp_modulus, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
@@ -172,7 +172,8 @@ mod tests {
     fn test_bfv_public_key_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
 
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
@@ -190,7 +191,8 @@ mod tests {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
 
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 

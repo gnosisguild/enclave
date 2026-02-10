@@ -39,7 +39,7 @@ pub enum CircuitName {
     /// BFV public key proof (T0).
     PkBfv,
     /// TrBFV public key share proof (T1).
-    PkTrbfv,
+    PkGeneration,
     /// Encrypted shares proof (T2/T3).
     EncShares,
     /// Decryption share proof (T4/T5).
@@ -52,7 +52,7 @@ impl CircuitName {
     pub fn as_str(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "pk",
-            CircuitName::PkTrbfv => "pk_trbfv",
+            CircuitName::PkGeneration => "pk_generation",
             CircuitName::EncShares => "enc_shares",
             CircuitName::DecShares => "dec_shares",
             CircuitName::PkAgg => "pk_agg",
@@ -62,7 +62,7 @@ impl CircuitName {
     pub fn group(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "dkg",
-            CircuitName::PkTrbfv => "threshold",
+            CircuitName::PkGeneration => "threshold",
             CircuitName::EncShares => "threshold",
             CircuitName::DecShares => "threshold",
             CircuitName::PkAgg => "threshold",

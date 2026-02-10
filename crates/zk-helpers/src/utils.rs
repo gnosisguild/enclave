@@ -160,10 +160,21 @@ pub fn calculate_bit_width(bound: BigInt) -> u32 {
 /// The bit width of ring elements (coefficients bounded by the coefficient modulus)
 pub fn compute_modulus_bit(params: &BfvParameters) -> u32 {
     let moduli = params.moduli();
-    let modulus = BigInt::from(moduli.iter().copied().max().unwrap());
+    let modulus = BigInt::from(compute_max_modulus(moduli));
     let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
 
     calculate_bit_width(bound)
+}
+
+/// Computes the maximum modulus from a vector of moduli.
+///
+/// # Arguments
+/// * `moduli` - Vector of moduli
+///
+/// # Returns
+/// The maximum modulus
+pub fn compute_max_modulus(moduli: &[u64]) -> u64 {
+    moduli.iter().copied().max().unwrap()
 }
 
 /// Computes the bit width of the message.
@@ -216,18 +227,6 @@ pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_
 
 /// Convert a 1D vector of BigInt to a vector of JSON values.
 ///
-/// Use for witness arrays (e.g. y) that need to be serialized as nested arrays of string values.
-pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
-    y.iter()
-        .map(|coeff| {
-            coeff
-                .iter()
-                .map(|v| serde_json::Value::String(v.to_string()))
-                .collect()
-        })
-        .collect()
-}
-
 /// # Arguments
 /// * `bigint_1d` - 1D vector of BigInt values
 ///
@@ -240,22 +239,41 @@ pub fn bigint_1d_to_json_values(bigint_1d: &[BigInt]) -> Vec<serde_json::Value> 
         .collect()
 }
 
-/// Convert a 3D vector of BigInt to a vector of vectors of vectors of JSON values.
+/// Convert a 2D vector of BigInt to a vector of vectors of JSON values.
 ///
 /// # Arguments
-/// * `bigint_3d` - 3D vector of BigInt values
+/// * `bigint_2d` - 2D vector of BigInt values
 ///
 /// # Returns
-/// A vector of vectors of vectors of JSON values
-pub fn bigint_3d_to_json_values(
-    bigint_3d: &[Vec<Vec<BigInt>>],
-) -> Vec<Vec<Vec<serde_json::Value>>> {
-    bigint_3d
-        .iter()
+/// A vector of vectors of JSON values
+pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
+    y.iter()
         .map(|coeff| {
             coeff
                 .iter()
-                .map(|modulus| bigint_1d_to_json_values(modulus))
+                .map(|v| serde_json::Value::String(v.to_string()))
+                .collect()
+        })
+        .collect()
+}
+
+/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
+///
+/// # Arguments
+/// * `y` - 3D vector of BigInt values
+///
+/// # Returns
+/// A vector of vectors of vectors of JSON values
+pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_json::Value>>> {
+    y.iter()
+        .map(|coeff| {
+            coeff
+                .iter()
+                .map(|v| {
+                    v.iter()
+                        .map(|x| serde_json::Value::String(x.to_string()))
+                        .collect()
+                })
                 .collect()
         })
         .collect()

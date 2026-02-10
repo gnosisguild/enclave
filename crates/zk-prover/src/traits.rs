@@ -40,6 +40,7 @@ pub trait Provable: Send + Sync {
             .circuits_dir()
             .join(self.circuit().dir_path())
             .join(format!("{}.json", circuit_name));
+
         let circuit = CompiledCircuit::from_file(&circuit_path)?;
 
         let witness_gen = WitnessGenerator::new();

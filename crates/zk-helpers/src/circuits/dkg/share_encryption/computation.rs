@@ -15,12 +15,12 @@ use crate::circuits::commitments::{
 };
 use std::ops::Deref;
 
-use crate::crt::compute_k0is;
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::get_zkp_modulus;
+use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
+use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
-use crate::ring::{cyclotomic_polynomial, decompose_residue};
 use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
@@ -152,21 +152,22 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = dkg_params.moduli().to_vec();
-        let ctx = dkg_params.ctx_at_level(0)?;
-        let modulus = BigInt::from(ctx.modulus().clone());
-        let t = BigInt::from(dkg_params.plaintext());
+        let plaintext = dkg_params.plaintext();
+        let q = compute_q_product(&moduli);
+        let q_mod_t_uint = compute_q_mod_t(&q, plaintext);
+        let t = BigInt::from(plaintext);
         let p = get_zkp_modulus();
 
-        let q_mod_t = center(&reduce(&modulus, &t), &t);
+        let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
         let q_mod_t_mod_p = reduce(&q_mod_t, &p);
 
-        let k0is = compute_k0is(&moduli, dkg_params.plaintext())?;
+        let k0is = compute_k0is(&moduli, plaintext)?;
 
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            t: dkg_params.plaintext() as usize,
+            t: plaintext as usize,
             q_mod_t: q_mod_t_mod_p,
             moduli,
             k0is,
@@ -761,7 +762,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
 
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
@@ -783,7 +785,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
@@ -807,7 +810,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // witness.message is plaintext coefficients (reversed, as used in circuit)
