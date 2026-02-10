@@ -207,6 +207,7 @@ pub enum NetEvent {
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
     OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
     OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
+    AllPeersDialed,
 }
 
 #[derive(Clone, Debug)]
@@ -300,6 +301,34 @@ where
     })
     .await
     .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {}", debug_cmd)))?;
+    result
+}
+
+pub async fn await_event<F, R>(
+    net_events: &Arc<broadcast::Receiver<NetEvent>>,
+    matcher: F,
+    timeout: Duration,
+) -> Result<R>
+where
+    F: Fn(&NetEvent) -> Option<R>,
+{
+    let mut rx = net_events.resubscribe();
+
+    let result = tokio::time::timeout(timeout, async {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    if let Some(result) = matcher(&event) {
+                        return Ok(result);
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for event")))?;
     result
 }
 

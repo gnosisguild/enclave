@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
+use actix::{Actor, Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
@@ -19,7 +19,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing::debug;
 
 use crate::events::{
-    call_and_await_response, NetCommand, NetEvent, OutgoingSyncRequestSucceeded,
+    await_event, call_and_await_response, NetCommand, NetEvent, OutgoingSyncRequestSucceeded,
     SyncRequestReceived, SyncRequestValue, SyncResponseValue,
 };
 
@@ -32,6 +32,7 @@ pub struct NetSyncManager {
     rx: Arc<broadcast::Receiver<NetEvent>>,
     eventstore: Recipient<EventStoreQueryBy<TsAgg>>,
     requests: HashMap<CorrelationId, OnceTake<ResponseChannel<SyncResponseValue>>>,
+    peers_ready: bool,
 }
 
 impl NetSyncManager {
@@ -47,6 +48,7 @@ impl NetSyncManager {
             rx: Arc::clone(rx),
             eventstore,
             requests: HashMap::new(),
+            peers_ready: false,
         }
     }
 
@@ -71,6 +73,7 @@ impl NetSyncManager {
                     match event {
                         // Someone is asking for our sync
                         NetEvent::SyncRequestReceived(value) => addr.do_send(value),
+                        NetEvent::AllPeersDialed => addr.do_send(AllPeersDialed),
                         _ => (),
                     }
                 }
@@ -112,7 +115,13 @@ impl Handler<TypedEvent<HistoricalNetSyncStart>> for NetSyncManager {
         trap_fut(
             EType::Net,
             &self.bus.with_ec(msg.get_ctx()),
-            handle_sync_request_event(self.tx.clone(), self.rx.clone(), msg, ctx.address()),
+            handle_sync_request_event(
+                self.tx.clone(),
+                self.rx.clone(),
+                msg,
+                ctx.address(),
+                !self.peers_ready,
+            ),
         )
     }
 }
@@ -192,6 +201,17 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
     }
 }
 
+impl Handler<AllPeersDialed> for NetSyncManager {
+    type Result = ();
+    fn handle(&mut self, msg: AllPeersDialed, ctx: &mut Self::Context) -> Self::Result {
+        self.peers_ready = true;
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+struct AllPeersDialed;
+
 const SYNC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 async fn sync_request(
@@ -224,8 +244,23 @@ async fn handle_sync_request_event(
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     event: TypedEvent<HistoricalNetSyncStart>,
     address: impl Into<Recipient<TypedEvent<OutgoingSyncRequestSucceeded>>>,
+    wait_for_event: bool,
 ) -> Result<()> {
     let (event, ctx) = event.into_components();
+    if wait_for_event {
+        await_event(
+            &net_events,
+            |e| {
+                if matches!(e, &NetEvent::AllPeersDialed) {
+                    Some(e.clone())
+                } else {
+                    None
+                }
+            },
+            Duration::from_secs(30),
+        )
+        .await?;
+    }
 
     // Make the sync request
     // value returned includes the timestamp from the remote peer

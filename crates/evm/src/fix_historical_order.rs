@@ -86,7 +86,7 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
             }
             EnclaveEvmEvent::Processed(id) => self.track_id(id),
             other => {
-                info!("Forwarding event({})", other.get_id());
+                debug!("Forwarding event({})", other.get_id());
                 self.track_id(other.get_id());
                 self.dest.do_send(other);
             }

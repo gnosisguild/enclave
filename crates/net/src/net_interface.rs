@@ -146,7 +146,7 @@ impl NetInterface {
             let peers = self.peers.clone();
             async move {
                 dial_peers(&cmd_tx, &event_tx, &peers).await?;
-
+                event_tx.send(NetEvent::AllPeersDialed)?;
                 return anyhow::Ok(());
             }
         });
