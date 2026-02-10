@@ -6,4 +6,4 @@
 
 mod dkg;
 mod threshold;
-mod utils;
+pub(crate) mod utils;
