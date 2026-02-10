@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { MockE3Program__factory as E3ProgramFactory } from "../types";
