@@ -18,5 +18,4 @@ pub mod utils;
 pub use circuit::*;
 pub use codegen::*;
 pub use computation::*;
-pub use sample::*;
 pub use utils::*;

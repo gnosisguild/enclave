@@ -13,6 +13,7 @@ use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::polynomial_to_toml_json;
+use crate::ring::{cyclotomic_polynomial, decompose_residue};
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitInput;
 use crate::CiphernodesCommittee;
@@ -254,12 +255,7 @@ impl Computation for Witness {
             .map(BigInt::from)
             .collect();
         let n = threshold_params.degree() as u64;
-
-        // Create cyclotomic polynomial x^N + 1
-        let mut cyclo = vec![BigInt::from(0u64); (n + 1) as usize];
-
-        cyclo[0] = BigInt::from(1u64); // x^N term
-        cyclo[n as usize] = BigInt::from(1u64); // x^0 term
+        let cyclo = cyclotomic_polynomial(n);
 
         // Perform the main computation logic
         let mut results: Vec<(
@@ -309,62 +305,7 @@ impl Computation for Witness {
 
                 assert_eq!((pk0_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                // Check whether pk0_share_hat mod R_qi (the ring) is equal to pk0_share
-                let mut pk0_share_hat_mod_rqi = pk0_share_hat.reduce_by_cyclotomic(&cyclo).unwrap();
-
-                pk0_share_hat_mod_rqi.reduce(&qi);
-                pk0_share_hat_mod_rqi.center(&qi);
-
-                assert_eq!(&pk0_share, &pk0_share_hat_mod_rqi);
-
-                // Compute r2_numerator = pk0_share - pk0_share_hat and reduce/center the polynomial
-                let r2_numerator = pk0_share.sub(&pk0_share_hat);
-
-                assert_eq!((r2_numerator.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-                let mut r2_numerator_centered = r2_numerator.clone();
-                r2_numerator_centered.reduce(&qi);
-                r2_numerator_centered.center(&qi);
-
-                // Compute r2 as the quotient of numerator divided by the cyclotomic polynomial
-                // to produce: (pk0_share - pk0_share_hat) / (x^N + 1) mod Z_qi. Remainder should be empty.
-                let cyclo_polynomial = Polynomial::new(cyclo.clone());
-                let (r2, r2_rem) = r2_numerator_centered.div(&cyclo_polynomial).unwrap();
-
-                assert!(r2_rem.is_zero());
-                assert_eq!((r2.coefficients().len() as u64) - 1, n - 2); // Order(r2i) = N - 2
-
-                // Assert that (pk0_share - pk0_share_hat) = (r2 * cyclo) mod Z_qi
-                let r2_cyclo_times = r2.mul(&cyclo_polynomial);
-
-                let mut r2_cyclo_times_centered = r2_cyclo_times.clone();
-                r2_cyclo_times_centered.reduce(&qi);
-                r2_cyclo_times_centered.center(&qi);
-
-                assert_eq!(&r2_numerator_centered, &r2_cyclo_times_centered);
-                assert_eq!(
-                    (r2_cyclo_times.coefficients().len() as u64) - 1,
-                    2 * (n - 1)
-                );
-
-                // Calculate r1 = (pk0_share - pk0_share_hat - r2 * cyclo) / qi mod Z_p. Remainder should be empty.
-                let r1_numerator = r2_numerator.sub(&r2_cyclo_times);
-
-                assert_eq!((r2_numerator.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-                let qi_polynomial = Polynomial::new(vec![qi.clone()]);
-                let (r1, r1_rem) = r1_numerator.div(&qi_polynomial).unwrap();
-
-                assert!(r1_rem.is_zero());
-                assert_eq!((r1.coefficients().len() as u64) - 1, 2 * (n - 1)); // Order(r1) = 2*(N-1)
-
-                assert_eq!(&r1_numerator, &r1.mul(&qi_polynomial));
-
-                // Assert that pk0_share = (pk0_share_hat + r1 * qi + r2 * cyclo) mod R_qi
-                let r1_qi_times = r1.scalar_mul(&qi);
-                let pk0_share_calculated = pk0_share_hat.add(&r1_qi_times).add(&r2_cyclo_times);
-
-                assert_eq!(&pk0_share, &pk0_share_calculated.trim_leading_zeros());
+                let (r1, r2) = decompose_residue(&pk0_share, &pk0_share_hat, &qi, &cyclo, n);
 
                 (i, r2, r1, pk0_share.clone(), a.clone(), e_sm.clone())
             },
@@ -448,13 +389,13 @@ mod tests {
 
     use super::*;
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &committee).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let expected_bit = calculate_bit_width(BigInt::from(bounds.pk_bound.clone()));
 
@@ -464,7 +405,7 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let constants = Configs::compute(DEFAULT_BFV_PRESET, &committee).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

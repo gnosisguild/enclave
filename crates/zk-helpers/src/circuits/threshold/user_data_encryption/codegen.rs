@@ -203,23 +203,18 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
+    use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
     use crate::threshold::user_data_encryption::computation::{Bits, Bounds};
-    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
 
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
+        let sample =
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
         let artifacts = UserDataEncryptionCircuit
-            .codegen(
-                BfvPreset::InsecureThreshold512,
-                &UserDataEncryptionCircuitInput {
-                    public_key: sample.public_key,
-                    plaintext: sample.plaintext,
-                },
-            )
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();

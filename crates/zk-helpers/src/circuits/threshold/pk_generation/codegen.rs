@@ -130,16 +130,17 @@ mod tests {
     use crate::threshold::pk_generation::PkGenerationCircuitInput;
     use crate::CiphernodesCommitteeSize;
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 
     #[test]
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            PkGenerationCircuitInput::generate_sample(DEFAULT_BFV_PRESET, committee).unwrap();
+            PkGenerationCircuitInput::generate_sample(BfvPreset::InsecureThreshold512, committee)
+                .unwrap();
         let artifacts = PkGenerationCircuit
-            .codegen(DEFAULT_BFV_PRESET, &sample)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -176,13 +177,23 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(DEFAULT_BFV_PRESET, &sample.committee).unwrap();
-        let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample.committee).unwrap();
+        let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
-        assert!(configs_content
-            .contains(format!("N: u32 = {}", DEFAULT_BFV_PRESET.metadata().degree).as_str()));
-        assert!(configs_content
-            .contains(format!("L: u32 = {}", DEFAULT_BFV_PRESET.metadata().num_moduli).as_str()));
+        assert!(configs_content.contains(
+            format!(
+                "N: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().degree
+            )
+            .as_str()
+        ));
+        assert!(configs_content.contains(
+            format!(
+                "L: u32 = {}",
+                BfvPreset::InsecureThreshold512.metadata().num_moduli
+            )
+            .as_str()
+        ));
         assert!(configs_content.contains(
             format!(
                 "{}_BIT_PK: u32 = {}",
