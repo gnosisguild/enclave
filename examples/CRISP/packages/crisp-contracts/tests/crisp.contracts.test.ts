@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { zeroAddress } from 'viem'
 import {
   hashLeaf,
   generatePublicKey,
@@ -106,6 +105,8 @@ describe('CRISP Contracts', function () {
 
       const e3Id = 0n
 
+      await mockEnclave.request(await crispProgram.getAddress())
+
       const vote = [10n, 0n]
       const balance = 100n
       const signature = (await signer.signMessage(SIGNATURE_MESSAGE)) as `0x${string}`
@@ -131,7 +132,7 @@ describe('CRISP Contracts', function () {
       await crispProgram.setMerkleRoot(e3Id, merkleTree.root)
 
       // If it doesn't throw, the test is successful.
-      await crispProgram.validateInput(e3Id, zeroAddress, encodedProof)
+      await crispProgram.publishInput(e3Id, encodedProof)
     })
   })
 })

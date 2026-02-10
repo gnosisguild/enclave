@@ -3,20 +3,20 @@ chains:
     rpc_url: ws://localhost:8545
     contracts:
       e3_program:
-        address: '0x67d269191c92Caf3cD7723F116c85e6E9bf55933'
-        deploy_block: 1
+        address: '0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB'
+        deploy_block: 37
       enclave:
         address: '0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0'
-        deploy_block: 13
+        deploy_block: 15
       ciphernode_registry:
         address: '0x610178dA211FEF7D417bC0e6FeD39F05609AD788'
-        deploy_block: 11
+        deploy_block: 13
       bonding_registry:
         address: '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6'
-        deploy_block: 8
+        deploy_block: 10
       fee_token:
         address: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
-        deploy_block: 4
+        deploy_block: 5
 program:
   dev: true
 nodes:
@@ -52,3 +52,4 @@ nodes:
     autopassword: true
     role:
       type: aggregator
+

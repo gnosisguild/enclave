@@ -6,7 +6,7 @@
 
 import {
   AllEventTypes,
-  calculateStartWindow,
+  calculateInputWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
   E3,
@@ -17,10 +17,13 @@ import {
   encodeComputeProviderParams,
   RegistryEventType,
 } from '@enclave-e3/sdk'
-import { hexToBytes } from 'viem'
+import { createWalletClient, hexToBytes, http } from 'viem'
 import assert from 'assert'
 
 import { describe, expect, it } from 'vitest'
+import { publishInput } from '../server/input'
+import { privateKeyToAccount } from 'viem/accounts'
+import { hardhat } from 'viem/chains'
 
 export function getContractAddresses() {
   return {
@@ -53,18 +56,12 @@ type E3StatePublished = E3Shared & {
   publicKey: `0x${string}`
 }
 
-type E3StateActivated = E3Shared & {
-  type: 'activated'
-  publicKey: `0x${string}`
-  expiration: bigint
-}
-
 type E3StateOutputPublished = E3Shared & {
   type: 'output_published'
   plaintextOutput: string
 }
 
-type E3State = E3StateRequested | E3StatePublished | E3StateActivated | E3StateOutputPublished
+type E3State = E3StateRequested | E3StatePublished | E3StateOutputPublished
 
 async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>) {
   async function waitForEvent<T extends AllEventTypes>(type: T, trigger?: () => Promise<void>): Promise<EnclaveEvent<T>> {
@@ -99,33 +96,13 @@ async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>)
     }
 
     if (state.type !== 'requested') {
-      throw new Error(`State must be in the ${state.type} state`)
+      throw new Error(`State must be in the requested state`)
     }
 
     store.set(id, {
       publicKey: event.data.publicKey as `0x${string}`,
       ...state,
       type: 'committee_published',
-    })
-  })
-
-  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, (event) => {
-    const id = event.data.e3Id
-    const state = store.get(id)
-
-    if (!state) {
-      throw new Error(`State for ID '${id}' not found.`)
-    }
-
-    if (state.type !== 'committee_published') {
-      throw new Error(`State must be in the ${state.type} state`)
-    }
-
-    store.set(id, {
-      ...state,
-      expiration: event.data.expiration,
-      publicKey: event.data.committeePublicKey as `0x${string}`,
-      type: 'activated',
     })
   })
 
@@ -137,8 +114,8 @@ async function setupEventListeners(sdk: EnclaveSDK, store: Map<bigint, E3State>)
       throw new Error(`State for ID '${id}' not found.`)
     }
 
-    if (state.type !== 'activated') {
-      throw new Error(`State must be in the ${state.type} state`)
+    if (state.type !== 'committee_published') {
+      throw new Error(`State must be in the committee_published state`)
     }
 
     store.set(id, {
@@ -156,6 +133,8 @@ describe('Integration', () => {
 
   const contracts = getContractAddresses()
 
+  const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+
   const store = new Map<bigint, E3State>()
   const sdk = EnclaveSDK.create({
     chainId: 31337,
@@ -165,18 +144,29 @@ describe('Integration', () => {
       feeToken: contracts.feeToken,
     },
     rpcUrl: 'ws://localhost:8545',
-    privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+    privateKey: testPrivateKey,
+  })
+
+  const publicClient = sdk.getPublicClient()
+
+  const account = privateKeyToAccount(testPrivateKey)
+
+  const walletClient = createWalletClient({
+    account,
+    chain: hardhat,
+    transport: http('http://localhost:8545'),
   })
 
   it('should run an integration test', async () => {
     const { waitForEvent } = await setupEventListeners(sdk, store)
 
     const threshold: [number, number] = [DEFAULT_E3_CONFIG.threshold_min, DEFAULT_E3_CONFIG.threshold_max]
-    const startWindow = calculateStartWindow(100)
-    const duration = BigInt(20)
+    const duration = 30
+    const inputWindow = await calculateInputWindow(publicClient, duration)
     const thresholdBfvParams = await sdk.getThresholdBfvParamsSet()
     const e3ProgramParams = encodeBfvParams(thresholdBfvParams)
+
     const computeProviderParams = encodeComputeProviderParams(
       DEFAULT_COMPUTE_PROVIDER_PARAMS,
       true, // Mock the compute provider parameters, return 32 bytes of 0x00
@@ -197,8 +187,7 @@ describe('Integration', () => {
       console.log('Requested E3...')
       await sdk.requestE3({
         threshold,
-        startWindow,
-        duration,
+        inputWindow,
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,
@@ -223,15 +212,6 @@ describe('Integration', () => {
 
     let { e3Id } = state
 
-    // ACTIVATION phase
-    event = await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {
-      await sdk.activateE3(e3Id)
-    })
-
-    state = store.get(0n)
-    assert(state, 'store should have activated state but it was falsey')
-    assert.strictEqual(state.type, 'activated')
-
     // INPUT PUBLISHING phase
     console.log('PUBLISHING PRIVATE INPUT')
     const num1 = 1n
@@ -241,9 +221,20 @@ describe('Integration', () => {
     const enc1 = await sdk.encryptNumber(num1, publicKeyBytes)
     const enc2 = await sdk.encryptNumber(num2, publicKeyBytes)
 
-    await sdk.publishInput(e3Id, `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
-    await sdk.publishInput(e3Id, `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
-
+    await publishInput(
+      walletClient,
+      e3Id,
+      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
+      account.address,
+      contracts.e3Program,
+    )
+    await publishInput(
+      walletClient,
+      e3Id,
+      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
+      account.address,
+      contracts.e3Program,
+    )
     const plaintextEvent = await waitForEvent(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED)
 
     const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput)

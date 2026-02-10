@@ -10,7 +10,7 @@ mod commands;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use reqwest::Client;
 
-use commands::{check_e3_activated, initialize_crisp_round};
+use commands::initialize_crisp_round;
 use crisp::logger::init_logger;
 use log::info;
 
@@ -19,6 +19,8 @@ use once_cell::sync::Lazy;
 use sled::Db;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+use crate::commands::check_committee_key_published;
 
 pub static CLI_DB: Lazy<Arc<RwLock<Db>>> = Lazy::new(|| {
     let pathdb = std::env::current_dir().unwrap().join("database/cli");
@@ -49,10 +51,10 @@ enum Commands {
         #[arg(short, long, default_value = "1000000000000000000")]
         balance_threshold: String,
     },
-    CheckActivate {
+    CheckE3Ready {
         #[arg(short, long)]
         e3id: u64,
-    },
+    }
 }
 
 #[tokio::main]
@@ -75,9 +77,9 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let e3_id = initialize_crisp_round(&token_address, &balance_threshold).await?;
             println!("{}", e3_id);
         }
-        Some(Commands::CheckActivate { e3id }) => {
-            let is_activated = check_e3_activated(e3id).await?;
-            println!("{}", is_activated);
+        Some(Commands::CheckE3Ready { e3id }) => {
+            let is_ready = check_committee_key_published(e3id).await?;
+            println!("{}", is_ready);
         }
         None => {
             // Fall back to interactive mode if no command was specified

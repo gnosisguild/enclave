@@ -49,13 +49,11 @@ contract CRISPProgram is IE3Program, Ownable {
   HonkVerifier private immutable honkVerifier;
 
   // Mappings
-  mapping(address => bool) public authorizedContracts;
   mapping(uint256 e3Id => RoundData) e3Data;
 
   // Errors
   error CallerNotAuthorized();
   error E3AlreadyInitialized();
-  error E3DoesNotExist();
   error EnclaveAddressZero();
   error Risc0VerifierAddressZero();
   error InvalidHonkVerifier();
@@ -67,6 +65,9 @@ contract CRISPProgram is IE3Program, Ownable {
   error SlotIsEmpty();
   error MerkleRootNotSet();
   error InvalidNumOptions();
+  error InputDeadlinePassed(uint256 e3Id, uint256 deadline);
+  error KeyNotPublished(uint256 e3Id);
+  error E3NotAcceptingInputs(uint256 e3Id);
 
   // Events
   event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
@@ -84,7 +85,6 @@ contract CRISPProgram is IE3Program, Ownable {
     enclave = _enclave;
     risc0Verifier = _risc0Verifier;
     honkVerifier = _honkVerifier;
-    authorizedContracts[address(_enclave)] = true;
     imageId = _imageId;
   }
 
@@ -126,7 +126,7 @@ contract CRISPProgram is IE3Program, Ownable {
     bytes calldata,
     bytes calldata customParams
   ) external returns (bytes32) {
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+    if (msg.sender != address(enclave) && msg.sender != owner()) revert CallerNotAuthorized();
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
 
     // decode custom params to get the number of options
@@ -147,9 +147,24 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external {
-    // it should only be called via Enclave for now
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+  function publishInput(uint256 e3Id, bytes memory data) external {
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    // check that we are in the correct stage
+    IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
+    if (stage != IEnclave.E3Stage.KeyPublished) {
+      revert KeyNotPublished(e3Id);
+    }
+
+    // check that we are not past the input deadline
+    if (block.timestamp > e3.inputWindow[1]) {
+      revert InputDeadlinePassed(e3Id, e3.inputWindow[1]);
+    }
+
+    // check that we are within the input window
+    if (block.timestamp < e3.inputWindow[0]) {
+      revert E3NotAcceptingInputs(e3Id);
+    }
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
     if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
@@ -162,9 +177,6 @@ contract CRISPProgram is IE3Program, Ownable {
     );
 
     (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
-
-    // Fetch E3 to get committee public key
-    E3 memory e3 = enclave.getE3(e3Id);
 
     // Set the public inputs for the proof. Order must match Noir circuit.
     bytes32[] memory noirPublicInputs = new bytes32[](7);
@@ -244,12 +256,13 @@ contract CRISPProgram is IE3Program, Ownable {
 
   /// @inheritdoc IE3Program
   function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof) external view override returns (bool) {
-    if (e3Data[e3Id].paramsHash == bytes32(0)) revert E3DoesNotExist();
+    bytes32 paramsHash = getParamsHash(e3Id);
+
     bytes32 inputRoot = bytes32(e3Data[e3Id].votes._root(TREE_DEPTH));
     bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
     _encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);
-    _encodeLengthPrefixAndHash(journal, 132, e3Data[e3Id].paramsHash);
+    _encodeLengthPrefixAndHash(journal, 132, paramsHash);
     _encodeLengthPrefixAndHash(journal, 264, inputRoot);
 
     risc0Verifier.verify(proof, imageId, sha256(journal));

@@ -6,6 +6,7 @@
 pragma solidity >=0.8.27;
 
 import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
+import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IDecryptionVerifier } from "@enclave-e3/contracts/contracts/interfaces/IDecryptionVerifier.sol";
 
@@ -22,11 +23,9 @@ contract MockEnclave {
       seed: 0,
       threshold: [uint32(1), uint32(2)],
       requestBlock: 0,
-      startWindow: [uint256(0), uint256(0)],
-      duration: 0,
-      expiration: 0,
+      inputWindow: [uint256(0), uint256(0)],
       encryptionSchemeId: bytes32(0),
-      e3Program: IE3Program(program),
+      e3Program: IE3Program(address(0)),
       e3ProgramParams: bytes(""),
       customParams: abi.encode(address(0), nextE3Id, 2, 0, 0),
       decryptionVerifier: IDecryptionVerifier(address(0)),
@@ -49,15 +48,17 @@ contract MockEnclave {
     committeePublicKey = publicKeyHash;
   }
 
+  function getE3Stage(uint256) external view returns (IEnclave.E3Stage) {
+    return IEnclave.E3Stage.KeyPublished;
+  }
+
   function getE3(uint256) external view returns (E3 memory) {
     return
       E3({
         seed: 0,
         threshold: [uint32(1), uint32(2)],
         requestBlock: 0,
-        startWindow: [uint256(0), uint256(0)],
-        duration: 0,
-        expiration: 0,
+        inputWindow: [uint256(0), block.timestamp + 100],
         encryptionSchemeId: bytes32(0),
         e3Program: IE3Program(address(0)),
         e3ProgramParams: bytes(""),
