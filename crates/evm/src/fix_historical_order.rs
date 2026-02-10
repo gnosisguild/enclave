@@ -9,7 +9,7 @@ use actix::{Actor, Addr, Handler};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
 use e3_utils::MAILBOX_LIMIT;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct FixHistoricalOrder {
     dest: EvmEventProcessor,
@@ -37,7 +37,7 @@ impl FixHistoricalOrder {
         })) = self.pending_sync_complete
         {
             if self.seen_ids.contains(id) {
-                info!("Forwarding historical send complete event");
+                debug!("Forwarding historical send complete event");
                 self.dest
                     .do_send(self.pending_sync_complete.take().unwrap());
             }
@@ -61,13 +61,13 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
 
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
         let id = msg.get_id();
-        info!("Receiving EnclaveEvmEvent event({})", msg.get_id());
+        debug!("Receiving EnclaveEvmEvent event({})", msg.get_id());
         match msg {
             none_hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
                 prev_event: None,
                 ..
             }) => {
-                info!(
+                debug!(
                     "Historical order event({}) has no previous event. Forwarding...",
                     id
                 );
@@ -77,7 +77,7 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
                 prev_event: Some(prev),
                 ..
             }) => {
-                info!(
+                debug!(
                     "Historical order event({}) has previous event({}). Buffering...",
                     id, prev
                 );

@@ -22,7 +22,7 @@ use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
@@ -168,7 +168,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                 let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
                 let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
                 last_id = Some(evt.get_id());
-                info!("Sending event({})", evt.get_id());
+                debug!("Sending event({})", evt.get_id());
                 next.do_send(evt)
             }
         }
@@ -179,7 +179,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         }
     }
     let historical_sync_event = HistoricalSyncComplete::new(chain_id, last_id);
-    warn!(
+    info!(
         "Historical Sync Complete event({})",
         historical_sync_event.get_id()
     );
@@ -205,7 +205,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                         }
                     }
                     _ = &mut shutdown => {
-                        info!("Received shutdown signal, stopping EVM stream");
+                        warn!("Received shutdown signal, stopping EVM stream");
                         match provider_ref.unsubscribe(id).await {
                             Ok(_) => info!("Unsubscribed successfully from EVM event stream"),
                             Err(err) => error!("Cannot unsubscribe from EVM event stream: {}", err),

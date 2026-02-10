@@ -197,11 +197,12 @@ async fn sync_request(
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     since: HashMap<AggregateId, u128>,
 ) -> Result<OutgoingSyncRequestSucceeded> {
+    let id = CorrelationId::new();
     call_and_await_response(
         net_cmds,
         net_events,
         NetCommand::OutgoingSyncRequest {
-            correlation_id: CorrelationId::new(),
+            correlation_id: id,
             value: SyncRequestValue { since },
         },
         |e| match e.clone() {

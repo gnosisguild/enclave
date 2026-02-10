@@ -85,14 +85,20 @@ impl Multithread {
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
-        run_once::<EffectsEnabled>({
-            let bus = bus.clone();
-            let addr = addr.clone();
-            move |_| {
-                bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
-                Ok(())
-            }
-        });
+
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                    info!("Multithread actor listening for events.");
+                    Ok(())
+                }
+            })
+            .recipient(),
+        );
 
         addr
     }

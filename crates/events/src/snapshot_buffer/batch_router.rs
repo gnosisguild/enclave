@@ -182,7 +182,7 @@ impl Handler<FlushSeq> for BatchRouter {
     type Result = ();
     fn handle(&mut self, msg: FlushSeq, _: &mut Self::Context) -> Self::Result {
         trap(EType::IO, &PanicDispatcher::new(), || {
-            info!("Flushing sequence... {}", msg.seq());
+            debug!("Flushing sequence... {}", msg.seq());
             if let Some(batch) = self.batches.get(&msg.seq()) {
                 batch.try_send(Flush)?;
                 self.batches.remove(&msg.seq());

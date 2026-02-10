@@ -78,19 +78,19 @@ pub async fn sync(
     );
 
     // 6. Load the historical libp2p events to memory
-    info!("Loading historical libp2p events...");
-    let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetEventsReceived>();
-    bus.publish_without_context(HistoricalNetSyncStart::new(addr, net_config.clone()))?;
-    let historical_net_events = rx.await?.events;
-    info!(
-        "{} historical libp2p events loaded.",
-        historical_net_events.len()
-    );
+    // info!("Loading historical libp2p events...");
+    // let (addr, rx) = actix_toolbox::oneshot::<HistoricalNetEventsReceived>();
+    // bus.publish_without_context(HistoricalNetSyncStart::new(addr, net_config.clone()))?;
+    // let historical_net_events = rx.await?.events;
+    // info!(
+    //     "{} historical libp2p events loaded.",
+    //     historical_net_events.len()
+    // );
 
     // 7. Sort both the evm and libp2p events together by HLC timestamp
     let mut historical = historical_evm_events
         .into_iter()
-        .chain(historical_net_events)
+        // .chain(historical_net_events)
         .collect::<Vec<_>>();
 
     historical.sort_by_key(|event| event.ts());
