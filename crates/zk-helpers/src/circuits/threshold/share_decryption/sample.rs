@@ -35,12 +35,16 @@ impl ShareDecryptionCircuitInput {
             CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
         })?;
 
+        let sd = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
+
         let mut rng = OsRng;
         let mut thread_rng = thread_rng();
 
         let num_parties = committee.n;
         let threshold = committee.threshold;
-        let num_ciphertexts = 10;
+        let num_ciphertexts = sd.z as usize;
         let lambda = preset.metadata().lambda;
 
         // Create TRBFV instance for share generation
