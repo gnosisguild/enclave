@@ -12,12 +12,11 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::pk::computation::Witness;
 use e3_zk_helpers::Computation;
-use fhe::bfv::PublicKey;
 use noirc_abi::InputMap;
 
 impl Provable for PkCircuit {
     type Params = BfvPreset;
-    type Input = PublicKey;
+    type Input = PkCircuitInput;
 
     fn circuit(&self) -> CircuitName {
         CircuitName::PkBfv
@@ -28,11 +27,7 @@ impl Provable for PkCircuit {
         preset: &Self::Params,
         input: &Self::Input,
     ) -> Result<InputMap, ZkError> {
-        let circuit_input = PkCircuitInput {
-            public_key: input.clone(),
-        };
-
-        let witness = Witness::compute(preset.clone(), &circuit_input)
+        let witness = Witness::compute(preset.clone(), input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
         let mut inputs = InputMap::new();
