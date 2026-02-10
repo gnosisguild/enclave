@@ -16,8 +16,10 @@ mod compute_request;
 mod configuration_updated;
 mod decryptionshare_created;
 mod die;
+mod e3_failed;
 mod e3_request_complete;
 mod e3_requested;
+mod e3_stage_changed;
 mod enable_effects;
 mod enclave_error;
 mod encryption_key_collection_failed;
@@ -57,8 +59,10 @@ pub use compute_request::*;
 pub use configuration_updated::*;
 pub use decryptionshare_created::*;
 pub use die::*;
+pub use e3_failed::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
+pub use e3_stage_changed::*;
 use e3_utils::{colorize, colorize_event_ids, Color};
 pub use enable_effects::*;
 pub use enclave_error::*;
@@ -206,6 +210,8 @@ pub enum EnclaveEventData {
     PlaintextOutputPublished(PlaintextOutputPublished),
     EnclaveError(EnclaveError),
     E3RequestComplete(E3RequestComplete),
+    E3Failed(E3Failed),
+    E3StageChanged(E3StageChanged),
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
@@ -465,6 +471,8 @@ impl EnclaveEventData {
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
+            EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
             _ => None,
         }
     }
@@ -498,6 +506,8 @@ impl_event_types!(
     PlaintextAggregated,
     PublishDocumentRequested,
     E3RequestComplete,
+    E3Failed,
+    E3StageChanged,
     CiphernodeSelected,
     CiphernodeAdded,
     CiphernodeRemoved,

@@ -8,6 +8,7 @@ pragma solidity >=0.8.27;
 import { IRiscZeroVerifier } from "@risc0/ethereum/contracts/IRiscZeroVerifier.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
+import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { LazyIMTData, InternalLazyIMT, PoseidonT3 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 
@@ -35,6 +36,7 @@ contract MyProgram is IE3Program, Ownable {
   error VerifierAddressZero();
   error AlreadyRegistered();
   error EmptyInputData();
+  error InputDeadlineReached();
 
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 index);
 
@@ -65,9 +67,15 @@ contract MyProgram is IE3Program, Ownable {
   }
 
   /// @notice Validates input
-  /// @param sender The account that is submitting the input.
+  /// @param e3Id The e3 id for which to publish input
   /// @param data The input to be verified.
-  function validateInput(uint256 e3Id, address sender, bytes memory data) external {
+  function publishInput(uint256 e3Id, bytes memory data) external {
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    if (block.timestamp > e3.inputWindow[1]) {
+      revert InputDeadlineReached();
+    }
+
     if (data.length == 0) revert EmptyInputData();
 
     // You can add your own validation logic here.

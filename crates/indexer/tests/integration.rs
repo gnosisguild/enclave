@@ -100,7 +100,7 @@ async fn test_indexer() -> Result<()> {
     let sk = SecretKey::random(&params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);
 
-    let public_key_commitment = compute_pk_commitment(
+    _ = compute_pk_commitment(
         pk.to_bytes(),
         params.degree(),
         params.plaintext(),
@@ -114,17 +114,6 @@ async fn test_indexer() -> Result<()> {
     // first publish committee pk
     enclave_contract
         .emitCommitteePublished(Uint::from(E3_ID), Bytes::from(pk.to_bytes()))
-        .send()
-        .await?
-        .watch()
-        .await?;
-
-    enclave_contract
-        .emitE3Activated(
-            Uint::from(E3_ID),
-            Uint::from(THRESHOLD),
-            FixedBytes::from(public_key_commitment),
-        )
         .send()
         .await?
         .watch()

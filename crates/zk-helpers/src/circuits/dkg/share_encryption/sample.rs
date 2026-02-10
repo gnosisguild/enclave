@@ -28,15 +28,18 @@ impl ShareEncryptionCircuitInput {
         dkg_input_type: DkgInputType,
         num_ciphertexts: u128, // z in the search defaults
         lambda: u32,
-    ) -> Self {
-        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
+    ) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, dkg_params) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
 
         let mut rng = thread_rng();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
-        let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).unwrap();
+        let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
@@ -46,11 +49,18 @@ impl ShareEncryptionCircuitInput {
 
                 let sk_poly = share_manager
                     .coeffs_to_poly_level0(threshold_secret_key.coeffs.clone().as_ref())
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to convert secret key to poly: {:?}",
+                            e
+                        ))
+                    })?;
 
                 let sk_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(sk_poly.clone(), &mut rng)
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!("Failed to generate secret shares: {:?}", e))
+                    })?;
 
                 sk_sss_u64[0].row(0).to_vec()
             }
@@ -63,25 +73,33 @@ impl ShareEncryptionCircuitInput {
                             e
                         ))
                     })
-                    .unwrap();
-                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to generate smudging error: {:?}",
+                            e
+                        ))
+                    })?;
+                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
+                })?;
                 let esi_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(esi_poly.clone(), &mut rng.clone())
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
-                    })
-                    .unwrap();
+                    })?;
 
                 esi_sss_u64[0].row(0).to_vec()
             }
         };
 
-        let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params).unwrap();
+        let pt = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to encode plaintext: {:?}", e)))?;
 
-        let (_ct, u_rns, e0_rns, e1_rns) =
-            dkg_public_key.try_encrypt_extended(&pt, &mut rng).unwrap();
+        let (_ct, u_rns, e0_rns, e1_rns) = dkg_public_key
+            .try_encrypt_extended(&pt, &mut rng)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to encrypt extended: {:?}", e)))?;
 
-        ShareEncryptionCircuitInput {
+        Ok(ShareEncryptionCircuitInput {
             plaintext: pt,
             ciphertext: _ct,
             public_key: dkg_public_key,
@@ -89,7 +107,7 @@ impl ShareEncryptionCircuitInput {
             u_rns,
             e0_rns,
             e1_rns,
-        }
+        })
     }
 }
 
@@ -109,7 +127,8 @@ mod tests {
             DkgInputType::SecretKey,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
 
         assert_eq!(sample.public_key.c.c.len(), 2);
         assert_eq!(
@@ -141,7 +160,8 @@ mod tests {
             DkgInputType::SmudgingNoise,
             sd.z,
             sd.lambda,
-        );
+        )
+        .unwrap();
 
         assert_eq!(sample.public_key.c.c.len(), 2);
         assert_eq!(sample.ciphertext.c.len(), 2);

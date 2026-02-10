@@ -4,4 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-mod pkbfv;
+mod dkg;
+mod threshold;
+pub(crate) mod utils;

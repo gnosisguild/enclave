@@ -6,6 +6,8 @@
 pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import { IEnclave } from "../interfaces/IEnclave.sol";
+import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
@@ -14,6 +16,10 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint32[2] calldata
     ) external pure returns (bool success) {
         success = true;
+    }
+
+    function getCommitteeDeadline(uint256) external view returns (uint256) {
+        return block.timestamp + 10;
     }
 
     function isEnabled(address) external pure returns (bool) {
@@ -69,16 +75,18 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     }
 
     // solhint-disable-next-line no-empty-blocks
-    function setEnclave(address) external pure {}
+    function setEnclave(IEnclave) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function setBondingRegistry(address) external pure {}
+    function setBondingRegistry(IBondingRegistry) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
     function submitTicket(uint256, uint256) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function finalizeCommittee(uint256) external pure {}
+    function finalizeCommittee(uint256) external pure returns (bool) {
+        return true;
+    }
 
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}
@@ -97,6 +105,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint32[2] calldata
     ) external pure returns (bool success) {
         success = true;
+    }
+
+    function getCommitteeDeadline(uint256) external view returns (uint256) {
+        return block.timestamp + 10;
     }
 
     function isEnabled(address) external pure returns (bool) {
@@ -148,10 +160,10 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     }
 
     // solhint-disable-next-line no-empty-blocks
-    function setEnclave(address) external pure {}
+    function setEnclave(IEnclave) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function setBondingRegistry(address) external pure {}
+    function setBondingRegistry(IBondingRegistry) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
     function setSortitionSubmissionWindow(uint256) external pure {}
@@ -160,7 +172,9 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function submitTicket(uint256, uint256) external pure {}
 
     // solhint-disable-next-line no-empty-blocks
-    function finalizeCommittee(uint256) external pure {}
+    function finalizeCommittee(uint256) external pure returns (bool) {
+        return true;
+    }
 
     function isOpen(uint256) external pure returns (bool) {
         return false;

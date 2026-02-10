@@ -73,7 +73,7 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
     ) -> Self::Result {
         let ec = msg.get_ctx().clone();
         let e3_id = msg.e3_id.clone();
-        let submission_deadline = msg.submission_deadline;
+        let committee_deadline = msg.committee_deadline;
 
         const FINALIZATION_BUFFER_SECONDS: u64 = 1;
         let e3_id_for_log = e3_id.clone();
@@ -96,12 +96,12 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
             fut.into_actor(self)
                 .then(move |current_timestamp, act, ctx| {
                     if let Some(current_timestamp) = current_timestamp {
-                        let seconds_until_deadline = if submission_deadline > current_timestamp {
-                            (submission_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
+                        let seconds_until_deadline = if committee_deadline > current_timestamp {
+                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
                         } else {
                             info!(
                                 e3_id = %e3_id_for_async,
-                                submission_deadline = submission_deadline,
+                                committee_deadline = committee_deadline,
                                 current_timestamp = current_timestamp,
                                 "Submission deadline already passed, finalizing with buffer"
                             );
@@ -110,7 +110,7 @@ impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
 
                         info!(
                             e3_id = %e3_id_for_async,
-                            submission_deadline = submission_deadline,
+                            committee_deadline = committee_deadline,
                             current_timestamp = current_timestamp,
                             seconds_to_wait = seconds_until_deadline,
                             "Scheduling committee finalization"

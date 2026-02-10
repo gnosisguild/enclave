@@ -6,6 +6,9 @@
 
 //! Local end-to-end tests that require a local bb binary.
 //! These tests will be skipped if bb is not found on the system.
+//!
+//! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`.
+//! Commitment consistency tests are defined separately.
 
 mod common;
 
@@ -14,7 +17,14 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
+use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_helpers::{
+    compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
+    compute_threshold_pk_commitment,
+};
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
+use num_bigint::{BigInt, Sign};
 use std::path::PathBuf;
 use tempfile::tempdir;
 use tokio::{fs, process::Command};
@@ -71,87 +81,178 @@ async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
     (backend, temp)
 }
 
-#[tokio::test]
-async fn test_pk_bfv_proof_generation() {
-    let bb = match find_bb().await {
-        Some(p) => p,
-        None => {
-            println!("skipping: bb not found");
-            return;
-        }
-    };
-
-    let (backend, _temp) = setup_test_prover(&bb).await;
+async fn setup_circuit_fixtures(backend: &ZkBackend, circuit_path: &[&str], fixture_name: &str) {
+    let circuit_dir = circuit_path
+        .iter()
+        .fold(backend.circuits_dir.clone(), |p, seg| p.join(seg));
     let fixtures = fixtures_dir();
-
-    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
     fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
-        .await
-        .unwrap();
-    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
-        .await
-        .unwrap();
+    fs::copy(
+        fixtures.join(format!("{fixture_name}.json")),
+        circuit_dir.join(format!("{fixture_name}.json")),
+    )
+    .await
+    .unwrap();
+    fs::copy(
+        fixtures.join(format!("{fixture_name}.vk")),
+        circuit_dir.join(format!("{fixture_name}.vk")),
+    )
+    .await
+    .unwrap();
+}
 
+async fn setup_pk_generation_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    PkGenerationCircuit,
+    PkGenerationCircuitInput,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
 
+    setup_circuit_fixtures(&backend, &["threshold", "pk_generation"], "pk_generation").await;
+
+    let sample = PkGenerationCircuitInput::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
-    let circuit = PkCircuit;
-    let e3_id = "test-pk-bfv-001";
 
-    let proof = circuit
-        .prove(&prover, &preset, &sample.public_key, e3_id)
-        .expect("proof generation should succeed");
+    Some((
+        backend,
+        temp,
+        prover,
+        PkGenerationCircuit,
+        sample,
+        preset,
+        "0",
+    ))
+}
 
-    assert!(!proof.data.is_empty(), "proof data should not be empty");
-    assert!(
-        !proof.public_signals.is_empty(),
-        "public signals should not be empty"
-    );
+async fn setup_pk_bfv_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    PkCircuit,
+    PkCircuitInput,
+    BfvPreset,
+    &'static str,
+)> {
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
 
-    prover.cleanup(e3_id).unwrap();
+    setup_circuit_fixtures(&backend, &["dkg", "pk"], "pk").await;
+
+    let sample = PkCircuitInput::generate_sample(preset).ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((backend, temp, prover, PkCircuit, sample, preset, "0"))
+}
+
+macro_rules! e2e_proof_tests {
+    ($(($name:ident, $setup:expr)),* $(,)?) => {
+        $(
+            paste::paste! {
+                #[tokio::test]
+                async fn [<test_ $name _proof>]() {
+                    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+                        $setup.await
+                    else {
+                        println!("skipping: bb not found");
+                        return;
+                    };
+
+                    let proof = circuit
+                        .prove(&prover, &preset, &sample, e3_id)
+                        .expect("proof generation should succeed");
+
+                    assert!(!proof.data.is_empty(), "proof data should not be empty");
+                    assert!(!proof.public_signals.is_empty(), "public signals should not be empty");
+
+                    let party_id = 1;
+                    let verification_result = circuit.verify(&prover, &proof, e3_id, party_id);
+                    assert!(
+                        verification_result.as_ref().is_ok_and(|&v| v),
+                        "Proof verification failed: {:?}",
+                        verification_result
+                    );
+
+                    prover.cleanup(e3_id).unwrap();
+                }
+            }
+        )*
+    };
+}
+
+e2e_proof_tests! {
+    (pk_generation, setup_pk_generation_test()),
+    (pk_bfv, setup_pk_bfv_test()),
 }
 
 #[tokio::test]
-async fn test_pk_bfv_proof_verification() {
-    let bb = match find_bb().await {
-        Some(p) => p,
-        None => {
-            println!("skipping: bb not found");
-            return;
-        }
+async fn test_pk_generation_commitment_consistency() {
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+        setup_pk_generation_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
     };
 
-    let (backend, _temp) = setup_test_prover(&bb).await;
-    let fixtures = fixtures_dir();
-
-    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
-    fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
-        .await
-        .unwrap();
-    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
-        .await
-        .unwrap();
-
-    let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
-
-    let prover = ZkProver::new(&backend);
-    let circuit = PkCircuit;
-    let e3_id = "test-verify-001";
-
     let proof = circuit
-        .prove(&prover, &preset, &sample.public_key, e3_id)
+        .prove(&prover, &preset, &sample, e3_id)
         .expect("proof generation should succeed");
 
-    let party_id = 1;
-    let verification_result = circuit.verify(&prover, &proof, e3_id, party_id);
-    assert!(
-        verification_result.as_ref().is_ok_and(|&v| v),
-        "Proof verification failed: {:?}",
-        verification_result
+    let computation_output = PkGenerationCircuit::compute(preset, &sample).unwrap();
+
+    let signals = &proof.public_signals;
+    // Each commitment is represented as a single field element (32 bytes), and there are 3 commitments at the end of the public signals
+    let field_size: usize = 32;
+    let total_fields = signals.len() / field_size;
+    assert_eq!(total_fields, 1027);
+
+    // The 3 commitments are the last 3 field elements
+    let offset = (total_fields - 3) * field_size;
+
+    let sk_commitment_from_proof =
+        BigInt::from_bytes_be(Sign::Plus, &signals[offset..offset + field_size]);
+    let pk_commitment_from_proof = BigInt::from_bytes_be(
+        Sign::Plus,
+        &signals[offset + field_size..offset + 2 * field_size],
+    );
+    let e_sm_commitment_from_proof = BigInt::from_bytes_be(
+        Sign::Plus,
+        &signals[offset + 2 * field_size..offset + 3 * field_size],
+    );
+
+    // Recompute commitments from the witness
+    let sk_commitment_expected = compute_share_computation_sk_commitment(
+        &computation_output.witness.sk,
+        computation_output.bits.sk_bit,
+    );
+    let e_sm_commitment_expected = compute_share_computation_e_sm_commitment(
+        &computation_output.witness.e_sm,
+        computation_output.bits.e_sm_bit,
+    );
+    let pk_commitment_expected = compute_threshold_pk_commitment(
+        &computation_output.witness.pk0is,
+        &computation_output.witness.pk1is,
+        computation_output.bits.pk_bit,
+    );
+
+    assert_eq!(
+        sk_commitment_from_proof, sk_commitment_expected,
+        "sk commitment mismatch"
+    );
+    assert_eq!(
+        pk_commitment_from_proof, pk_commitment_expected,
+        "pk commitment mismatch"
+    );
+    assert_eq!(
+        e_sm_commitment_from_proof, e_sm_commitment_expected,
+        "e_sm commitment mismatch"
     );
 
     prover.cleanup(e3_id).unwrap();
@@ -159,35 +260,14 @@ async fn test_pk_bfv_proof_verification() {
 
 #[tokio::test]
 async fn test_pk_bfv_commitment_consistency() {
-    let bb = match find_bb().await {
-        Some(p) => p,
-        None => {
-            println!("skipping: bb not found");
-            return;
-        }
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) = setup_pk_bfv_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
     };
 
-    let (backend, _temp) = setup_test_prover(&bb).await;
-    let fixtures = fixtures_dir();
-
-    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
-    fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(fixtures.join("pk.json"), circuit_dir.join("pk.json"))
-        .await
-        .unwrap();
-    fs::copy(fixtures.join("pk.vk"), circuit_dir.join("pk.vk"))
-        .await
-        .unwrap();
-
-    let preset = BfvPreset::InsecureThreshold512;
-    let sample = PkCircuitInput::generate_sample(preset);
-
-    let prover = ZkProver::new(&backend);
-    let circuit = PkCircuit;
-    let e3_id = "test-commitment-001";
-
     let proof = circuit
-        .prove(&prover, &preset, &sample.public_key, e3_id)
+        .prove(&prover, &preset, &sample, e3_id)
         .expect("proof generation should succeed");
 
     // Verify the commitment from the proof is a valid field element
@@ -199,19 +279,13 @@ async fn test_pk_bfv_commitment_consistency() {
     );
 
     // Compute the commitment independently to ensure consistency
-    let circuit_input = PkCircuitInput {
-        public_key: sample.public_key.clone(),
-    };
     let computation_output =
-        PkCircuit::compute(preset, &circuit_input).expect("computation should succeed");
+        PkCircuit::compute(preset, &sample).expect("computation should succeed");
     let commitment_calculated = compute_dkg_pk_commitment(
         &computation_output.witness.pk0is,
         &computation_output.witness.pk1is,
         computation_output.bits.pk_bit,
     );
-
-    println!("Commitment from proof: {}", commitment_from_proof);
-    println!("Commitment calculated: {}", commitment_calculated);
 
     assert_eq!(
         commitment_from_proof, commitment_calculated,

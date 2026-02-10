@@ -9,7 +9,9 @@
 //! [`Sample`] produces a random BFV key pair and plaintext; the public key and plaintext are used as input
 //! for codegen and tests.
 
-use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use crate::{
+    threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput, CircuitsErrors,
+};
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::FheEncoder;
@@ -17,21 +19,23 @@ use rand::thread_rng;
 
 impl UserDataEncryptionCircuitInput {
     /// Generates a random secret key, public key, and plaintext for the given BFV parameters.
-    pub fn generate_sample(preset: BfvPreset) -> Self {
-        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+    pub fn generate_sample(preset: BfvPreset) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, _) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
 
         let mut rng = thread_rng();
 
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
         let public_key = PublicKey::new(&secret_key, &mut rng);
 
-        let plaintext =
-            Plaintext::try_encode(&[1u64], Encoding::poly(), &threshold_params).unwrap();
+        let plaintext = Plaintext::try_encode(&[1u64], Encoding::poly(), &threshold_params)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to encode plaintext: {:?}", e)))?;
 
-        Self {
+        Ok(Self {
             public_key,
             plaintext,
-        }
+        })
     }
 }
 
@@ -43,7 +47,8 @@ mod tests {
     #[test]
     fn test_generate_sample() {
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+                .unwrap();
 
         assert_eq!(sample.public_key.c.c.len(), 2);
         assert_eq!(

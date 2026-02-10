@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
+import { IEnclave } from "../interfaces/IEnclave.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -40,10 +41,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     /// @notice Address of the Enclave contract authorized to request committees
-    address public enclave;
+    IEnclave public enclave;
 
     /// @notice Address of the bonding registry for checking node eligibility
-    address public bondingRegistry;
+    IBondingRegistry public bondingRegistry;
 
     /// @notice Current number of registered ciphernodes
     uint256 public numCiphernodes;
@@ -89,8 +90,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Submission Window has been closed for this E3
     error SubmissionWindowClosed();
 
-    /// @notice Submission deadline has been reached for this E3
-    error SubmissionDeadlineReached();
+    /// @notice Committee deadline has been reached for this E3
+    error CommitteeDeadlineReached();
 
     /// @notice Committee has already been finalized for this E3
     error CommitteeAlreadyFinalized();
@@ -142,6 +143,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Caller is not authorized
     error Unauthorized();
 
+    /// @notice Not enough registered ciphernodes to meet threshold
+    /// @param requested The requested committee size (N)
+    /// @param available The number of registered ciphernodes
+    error InsufficientCiphernodes(uint256 requested, uint256 available);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                     Modifiers                          //
@@ -150,20 +156,20 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @dev Restricts function access to only the Enclave contract
     modifier onlyEnclave() {
-        require(msg.sender == enclave, OnlyEnclave());
+        require(msg.sender == address(enclave), OnlyEnclave());
         _;
     }
 
     /// @dev Restricts function access to only the bonding registry
     modifier onlyBondingRegistry() {
-        require(msg.sender == bondingRegistry, OnlyBondingRegistry());
+        require(msg.sender == address(bondingRegistry), OnlyBondingRegistry());
         _;
     }
 
     /// @dev Restricts function access to owner or bonding registry
     modifier onlyOwnerOrBondingVault() {
         require(
-            msg.sender == owner() || msg.sender == bondingRegistry,
+            msg.sender == owner() || msg.sender == address(bondingRegistry),
             NotOwnerOrBondingRegistry()
         );
         _;
@@ -189,11 +195,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param _submissionWindow The submission window for the E3 sortition in seconds
     function initialize(
         address _owner,
-        address _enclave,
+        IEnclave _enclave,
         uint256 _submissionWindow
     ) public initializer {
         require(_owner != address(0), ZeroAddress());
-        require(_enclave != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
@@ -216,11 +221,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         Committee storage c = committees[e3Id];
         require(!c.initialized, CommitteeAlreadyRequested());
 
+        uint256 activeCount = bondingRegistry.numActiveOperators();
+        require(
+            threshold[1] <= activeCount,
+            InsufficientCiphernodes(threshold[1], activeCount)
+        );
+
         c.initialized = true;
         c.finalized = false;
         c.seed = seed;
         c.requestBlock = block.number;
-        c.submissionDeadline = block.timestamp + sortitionSubmissionWindow;
+        c.committeeDeadline = block.timestamp + sortitionSubmissionWindow;
         c.threshold = threshold;
         roots[e3Id] = root();
 
@@ -229,7 +240,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             seed,
             threshold,
             c.requestBlock,
-            c.submissionDeadline
+            c.committeeDeadline
         );
         success = true;
     }
@@ -257,6 +268,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         // TODO: Need a Proof that the public key is generated from the committee
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
+        // Progress E3 to KeyPublished stage
+        enclave.onCommitteePublished(e3Id);
         emit CommitteePublished(e3Id, nodes, publicKey);
     }
 
@@ -306,8 +319,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(c.initialized, CommitteeNotRequested());
         require(!c.finalized, CommitteeAlreadyFinalized());
         require(
-            block.timestamp <= c.submissionDeadline,
-            SubmissionDeadlineReached()
+            block.timestamp <= c.committeeDeadline,
+            CommitteeDeadlineReached()
         );
         require(!c.submitted[msg.sender], NodeAlreadySubmitted());
         require(isCiphernodeEligible(msg.sender), NodeNotEligible());
@@ -333,32 +346,38 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Finalize the committee after submission window closes
-    /// @dev Can be called by anyone after the deadline. Reverts if not enough nodes submitted.
+    /// @dev Can be called by anyone after the deadline. If threshold not met, marks E3 as failed.
     /// @param e3Id ID of the E3 computation
-    function finalizeCommittee(uint256 e3Id) external {
+    /// @return success True if committee formed successfully, false if threshold not met
+    function finalizeCommittee(uint256 e3Id) external returns (bool success) {
         Committee storage c = committees[e3Id];
         require(c.initialized, CommitteeNotRequested());
         require(!c.finalized, CommitteeAlreadyFinalized());
         require(
-            block.timestamp >= c.submissionDeadline,
+            block.timestamp >= c.committeeDeadline,
             SubmissionWindowNotClosed()
         );
-        // TODO: Handle what happens if the threshold is not met.
-        require(c.topNodes.length >= c.threshold[1], ThresholdNotMet());
-
         c.finalized = true;
+        bool thresholdMet = c.topNodes.length >= c.threshold[1];
+
+        if (!thresholdMet) {
+            c.failed = true;
+            emit CommitteeFormationFailed(
+                e3Id,
+                c.topNodes.length,
+                c.threshold[1]
+            );
+            enclave.onE3Failed(
+                e3Id,
+                uint8(IEnclave.FailureReason.InsufficientCommitteeMembers)
+            );
+            return false;
+        }
+
         c.committee = c.topNodes;
-
+        enclave.onCommitteeFinalized(e3Id);
         emit CommitteeFinalized(e3Id, c.topNodes);
-    }
-
-    /// @notice Check if submission window is still open for an E3
-    /// @param e3Id ID of the E3 computation
-    /// @return Whether the submission window is open
-    function isOpen(uint256 e3Id) public view returns (bool) {
-        Committee storage c = committees[e3Id];
-        if (!c.initialized || c.finalized) return false;
-        return block.timestamp <= c.submissionDeadline;
+        return true;
     }
 
     ////////////////////////////////////////////////////////////
@@ -370,19 +389,21 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Sets the Enclave contract address
     /// @dev Only callable by owner
     /// @param _enclave Address of the Enclave contract
-    function setEnclave(address _enclave) public onlyOwner {
-        require(_enclave != address(0), ZeroAddress());
+    function setEnclave(IEnclave _enclave) public onlyOwner {
+        require(address(_enclave) != address(0), ZeroAddress());
         enclave = _enclave;
-        emit EnclaveSet(_enclave);
+        emit EnclaveSet(address(_enclave));
     }
 
     /// @notice Sets the bonding registry contract address
     /// @dev Only callable by owner
     /// @param _bondingRegistry Address of the bonding registry contract
-    function setBondingRegistry(address _bondingRegistry) public onlyOwner {
-        require(_bondingRegistry != address(0), ZeroAddress());
+    function setBondingRegistry(
+        IBondingRegistry _bondingRegistry
+    ) public onlyOwner {
+        require(address(_bondingRegistry) != address(0), ZeroAddress());
         bondingRegistry = _bondingRegistry;
-        emit BondingRegistrySet(_bondingRegistry);
+        emit BondingRegistrySet(address(_bondingRegistry));
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -399,6 +420,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Check if submission window is still open for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return Whether the submission window is open
+    function isOpen(uint256 e3Id) public view returns (bool) {
+        Committee storage c = committees[e3Id];
+        if (!c.initialized || c.finalized) return false;
+        return block.timestamp <= c.committeeDeadline;
+    }
+
     /// @inheritdoc ICiphernodeRegistry
     function committeePublicKey(
         uint256 e3Id
@@ -411,8 +441,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function isCiphernodeEligible(address node) public view returns (bool) {
         if (!isEnabled(node)) return false;
 
-        require(bondingRegistry != address(0), BondingRegistryNotSet());
-        return IBondingRegistry(bondingRegistry).isActive(node);
+        require(
+            address(bondingRegistry) != address(0),
+            BondingRegistryNotSet()
+        );
+        return bondingRegistry.isActive(node);
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -451,7 +484,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Returns the address of the bonding registry
     /// @return Address of the bonding registry contract
     function getBondingRegistry() external view returns (address) {
-        return bondingRegistry;
+        return address(bondingRegistry);
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeDeadline(
+        uint256 e3Id
+    ) external view returns (uint256) {
+        Committee storage c = committees[e3Id];
+        require(c.initialized, CommitteeNotRequested());
+        return c.committeeDeadline;
     }
 
     ////////////////////////////////////////////////////////////
@@ -489,15 +531,20 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256 e3Id
     ) internal view {
         require(ticketNumber > 0, InvalidTicketNumber());
-        require(bondingRegistry != address(0), BondingRegistryNotSet());
+        require(
+            address(bondingRegistry) != address(0),
+            BondingRegistryNotSet()
+        );
 
         Committee storage c = committees[e3Id];
 
         // @todo Ensure we check everywhere that we use the block before the request block
         // to ensure cases where everything is done in the same block are handled correctly.
-        uint256 ticketBalance = IBondingRegistry(bondingRegistry)
-            .getTicketBalanceAtBlock(node, c.requestBlock - 1);
-        uint256 ticketPrice = IBondingRegistry(bondingRegistry).ticketPrice();
+        uint256 ticketBalance = bondingRegistry.getTicketBalanceAtBlock(
+            node,
+            c.requestBlock - 1
+        );
+        uint256 ticketPrice = bondingRegistry.ticketPrice();
 
         require(ticketPrice > 0, InvalidTicketNumber());
         uint256 availableTickets = ticketBalance / ticketPrice;

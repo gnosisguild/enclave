@@ -33,7 +33,7 @@ impl CiphernodesCommitteeSize {
         match self {
             CiphernodesCommitteeSize::Small => CiphernodesCommittee {
                 n: 5,
-                h: 3,
+                h: 5,
                 threshold: 2,
             },
             _ => unreachable!(),
@@ -41,12 +41,12 @@ impl CiphernodesCommitteeSize {
         // @todo add the other committee sizes
         // CiphernodesCommitteeSize::Medium => CiphernodesCommittee {
         //     n: 5,
-        //     h: 3,
+        //     h: 5,
         //     threshold: 2,
         // },
         // CiphernodesCommitteeSize::Large => CiphernodesCommittee {
         //     n: 5,
-        //     h: 3,
+        //     h: 5,
         //     threshold: 2,
         // },
     }

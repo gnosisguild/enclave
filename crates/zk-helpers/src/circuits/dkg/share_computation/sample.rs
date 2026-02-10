@@ -28,19 +28,25 @@ impl ShareComputationCircuitInput {
         preset: BfvPreset,
         committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
-    ) -> Self {
-        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
-        let sd = preset.search_defaults().unwrap();
+    ) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, _) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
+        let sd = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
         let mut rng = thread_rng();
 
         let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
-            .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
         let parity_matrix =
             compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
-                .unwrap_or_else(|e| panic!("Failed to compute parity matrix: {}", e));
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to compute parity matrix: {:?}", e))
+                })?;
 
         let (secret, secret_sss) = match dkg_input_type {
             DkgInputType::SecretKey => {
@@ -48,11 +54,18 @@ impl ShareComputationCircuitInput {
 
                 let sk_poly = share_manager
                     .coeffs_to_poly_level0(threshold_secret_key.coeffs.clone().as_ref())
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to convert secret key to poly: {:?}",
+                            e
+                        ))
+                    })?;
 
                 let sk_sss_u64 = share_manager
                     .generate_secret_shares_from_poly(sk_poly.clone(), rng)
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!("Failed to generate secret shares: {:?}", e))
+                    })?;
 
                 let secret_sss: SecretShares = sk_sss_u64
                     .into_iter()
@@ -66,7 +79,9 @@ impl ShareComputationCircuitInput {
                     .collect();
                 let mut secret_crt =
                     CrtPolynomial::from_mod_q_polynomial(&sk_coeffs, threshold_params.moduli());
-                secret_crt.center(threshold_params.moduli()).unwrap();
+                secret_crt.center(threshold_params.moduli()).map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to center secret CRT: {:?}", e))
+                })?;
 
                 (secret_crt, secret_sss)
             }
@@ -100,14 +115,14 @@ impl ShareComputationCircuitInput {
             }
         };
 
-        Self {
+        Ok(Self {
             dkg_input_type,
             n_parties: committee.n as u32,
             threshold: committee.threshold as u32,
             secret,
             secret_sss,
             parity_matrix,
-        }
+        })
     }
 }
 
@@ -125,7 +140,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         assert_eq!(sample.n_parties, committee.n as u32);
         assert_eq!(sample.threshold, committee.threshold as u32);
         assert_eq!(sample.dkg_input_type, DkgInputType::SecretKey);
@@ -140,7 +156,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SmudgingNoise,
-        );
+        )
+        .unwrap();
         assert_eq!(sample.n_parties, committee.n as u32);
         assert_eq!(sample.threshold, committee.threshold as u32);
         assert_eq!(sample.dkg_input_type, DkgInputType::SmudgingNoise);
