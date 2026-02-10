@@ -8,9 +8,9 @@ use std::collections::BTreeMap;
 
 use crate::error::ZkError;
 use acir::FieldElement;
-use noirc_abi::{input_parser::InputValue, InputMap};
 use acvm::AcirField;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use noirc_abi::{input_parser::InputValue, InputMap};
 use num_bigint::BigInt;
 
 /// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.
@@ -30,6 +30,11 @@ pub fn inputs_json_to_input_map(json: &serde_json::Value) -> Result<InputMap, Zk
 }
 
 fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkError> {
+    if let Some(s) = v.as_str() {
+        return FieldElement::try_from_str(s)
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", s)));
+    }
     if let Some(arr) = v.as_array() {
         let items = arr
             .iter()
@@ -63,26 +68,4 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
     Err(ZkError::SerializationError(
         "unexpected json structure".into(),
     ))
-}
-
-pub fn bigint_to_field_value(b: &BigInt) -> InputValue {
-    InputValue::Field(acvm::FieldElement::from_hex(&b.to_str_radix(16)).unwrap())
-}
-
-pub fn vec3d_to_input_value(v: &Vec<Vec<Vec<BigInt>>>) -> InputValue {
-    InputValue::Vec(
-        v.iter()
-            .map(|v2| {
-                InputValue::Vec(
-                    v2.iter()
-                        .map(|v3| {
-                            InputValue::Vec(
-                                v3.iter().map(bigint_to_field_value).collect(),
-                            )
-                        })
-                        .collect(),
-                )
-            })
-            .collect(),
-    )
 }

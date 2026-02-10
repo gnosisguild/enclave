@@ -19,6 +19,7 @@ use crate::dkg::share_computation::ShareComputationCircuitData;
 use crate::CircuitsErrors;
 use crate::{bigint_3d_to_json_values, get_zkp_modulus};
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
+use crate::{poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -93,6 +94,8 @@ pub struct Inputs {
     pub y: Vec<Vec<Vec<BigInt>>>,
     /// Expected secret commitment (matches C1's compute_secret_commitment).
     pub expected_secret_commitment: BigInt,
+    /// Which secret type this witness is for (determines which circuit to run).
+    pub dkg_input_type: DkgInputType,
 }
 
 impl Computation for Configs {
@@ -241,20 +244,32 @@ impl Computation for Inputs {
             secret_crt,
             y,
             expected_secret_commitment,
+            dkg_input_type: data.dkg_input_type.clone(),
         })
     }
 
     // Used as input for Nargo execution.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        let secret_crt = crt_polynomial_to_toml_json(&self.secret_crt);
         let y = bigint_3d_to_json_values(&self.y);
         let expected_secret_commitment = self.expected_secret_commitment.to_string();
 
-        let json = serde_json::json!({
-            "secret_crt": secret_crt,
+        let (key, value) = match self.dkg_input_type {
+            DkgInputType::SecretKey => (
+                "sk_secret",
+                poly_coefficients_to_toml_json(self.secret_crt.limb(0).coefficients()),
+            ),
+            DkgInputType::SmudgingNoise => (
+                "e_sm_secret",
+                serde_json::Value::Array(crt_polynomial_to_toml_json(&self.secret_crt)),
+            ),
+        };
+
+        let mut json = serde_json::json!({
             "y": y,
             "expected_secret_commitment": expected_secret_commitment,
         });
+
+        json.as_object_mut().unwrap().insert(key.to_string(), value);
 
         Ok(json)
     }

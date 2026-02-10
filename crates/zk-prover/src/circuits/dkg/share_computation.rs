@@ -4,12 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE
 
-use crate::circuits::utils::{bigint_to_field_value, crt_polynomial_to_array, vec3d_to_input_value};
-use crate::error::ZkError;
 use crate::traits::Provable;
 use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::Computation;
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData, Inputs};
 use noirc_abi::InputMap;
@@ -17,49 +14,12 @@ use noirc_abi::InputMap;
 impl Provable for ShareComputationCircuit {
     type Params = BfvPreset;
     type Input = ShareComputationCircuitData;
+    type Inputs = Inputs;
 
     fn circuit(&self) -> CircuitName {
         match self.dkg_input_type {
             DkgInputType::SecretKey => CircuitName::SkShareComputation,
             DkgInputType::SmudgingNoise => CircuitName::ESmShareComputation,
         }
-    }
-
-    fn build_witness(
-        &self,
-        preset: &Self::Params,
-        input: &Self::Input,
-    ) -> Result<InputMap, ZkError> {
-        let witness = Witness::compute(preset.clone(), input)
-            .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
-
-        let mut inputs = InputMap::new();
-
-        // Secret: SK is a single Polynomial<N>, E_SM is [Polynomial<N>; L]
-        match self.dkg_input_type {
-            DkgInputType::SecretKey => {
-                inputs.insert(
-                    "sk_secret".to_string(),
-                    polynomial_to_array(witness.secret_crt.limb(0))?,
-                );
-            }
-            DkgInputType::SmudgingNoise => {
-                inputs.insert(
-                    "e_sm_secret".to_string(),
-                    crt_polynomial_to_array(&witness.secret_crt)?,
-                );
-            }
-        }
-    
-        inputs.insert(
-            "y".to_string(),
-            vec3d_to_input_value(&witness.y),
-        );
-        inputs.insert(
-            "expected_secret_commitment".to_string(),
-            bigint_to_field_value(&witness.expected_secret_commitment),
-        );
-
-        Ok(inputs)
     }
 }

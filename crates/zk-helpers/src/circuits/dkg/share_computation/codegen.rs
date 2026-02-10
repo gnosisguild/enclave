@@ -14,13 +14,9 @@ use crate::circuits::dkg::share_computation::{
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
-use crate::computation::DkgInputType;
-use crate::crt_polynomial_to_toml_json;
-use crate::poly_coefficients_to_toml_json;
 use crate::registry::Circuit;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use serde_json;
 
 /// Implementation of [`CircuitCodegen`] for [`ShareComputationCircuit`].
 impl CircuitCodegen for ShareComputationCircuit {
@@ -32,7 +28,7 @@ impl CircuitCodegen for ShareComputationCircuit {
         let ShareComputationOutput { inputs, bits, .. } =
             ShareComputationCircuit::compute(preset, data)?;
 
-        let toml = generate_toml(&inputs, data.dkg_input_type.clone())?;
+        let toml = generate_toml(&inputs)?;
         let configs = generate_configs(
             preset,
             &bits,
@@ -44,30 +40,10 @@ impl CircuitCodegen for ShareComputationCircuit {
     }
 }
 
-pub fn generate_toml(
-    inputs: &Inputs,
-    dkg_input_type: DkgInputType,
-) -> Result<CodegenToml, CircuitsErrors> {
-    let mut json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
-
-    let obj = json.as_object_mut().ok_or(CircuitsErrors::Other(
-        "input json is not an object".to_string(),
-    ))?;
-
-    obj.remove("secret_crt");
-
-    let (key, value) = match dkg_input_type {
-        DkgInputType::SecretKey => (
-            "sk_secret",
-            poly_coefficients_to_toml_json(inputs.secret_crt.limb(0).coefficients()),
-        ),
-        DkgInputType::SmudgingNoise => (
-            "e_sm_secret",
-            serde_json::Value::Array(crt_polynomial_to_toml_json(&inputs.secret_crt)),
-        ),
-    };
-
-    obj.insert(key.to_string(), value);
+pub fn generate_toml(witness: &Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = witness
+        .to_json()
+        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }

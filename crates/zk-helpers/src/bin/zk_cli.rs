@@ -172,7 +172,9 @@ fn main() -> Result<()> {
     let mut registry = CircuitRegistry::new();
     registry.register(Arc::new(PkCircuit));
     // Registration — dkg_input_type doesn't matter here, registry only reads const metadata
-    registry.register(Arc::new(ShareComputationCircuit::new(DkgInputType::SecretKey)));
+    registry.register(Arc::new(ShareComputationCircuit::new(
+        DkgInputType::SecretKey,
+    )));
     registry.register(Arc::new(UserDataEncryptionCircuit));
     registry.register(Arc::new(PkGenerationCircuit));
     registry.register(Arc::new(ShareEncryptionCircuit));
@@ -282,7 +284,7 @@ fn main() -> Result<()> {
                     committee,
                     dkg_input_type,
                 )?;
-            
+
                 let circuit = ShareComputationCircuit::new(dkg_input_type);
                 circuit.codegen(preset, &sample)?
             }

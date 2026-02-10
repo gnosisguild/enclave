@@ -10,8 +10,10 @@
 //! [`CircuitComputation`] extends it for circuits that produce inputs/bounds/bits.
 //! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
 
+use serde::{Deserialize, Serialize};
+
 /// Variant for input types for DKG.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub enum DkgInputType {
     /// The input type that generates shares of a secret key using secret sharing.
     SecretKey,
