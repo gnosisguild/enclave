@@ -357,9 +357,7 @@ fn handle_pk_bfv_proof(
     })?;
 
     let circuit = PkCircuit;
-    let circuit_input = PkCircuitInput {
-        public_key: pk_bfv,
-    };
+    let circuit_input = PkCircuitInput { public_key: pk_bfv };
     let e3_id_str = request.e3_id.to_string();
     let preset_counterpart = req
         .params_preset
