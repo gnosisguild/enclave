@@ -22,7 +22,7 @@ impl Provable for PkGenerationCircuit {
     type Input = PkGenerationCircuitInput;
 
     fn circuit(&self) -> CircuitName {
-        CircuitName::PkTrbfv
+        CircuitName::PkGeneration
     }
 
     fn build_witness(

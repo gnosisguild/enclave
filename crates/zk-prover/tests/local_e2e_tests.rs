@@ -78,7 +78,7 @@ async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
 }
 
 #[tokio::test]
-async fn test_pk_trbfv_generation_proof_generation() {
+async fn test_pk_generation_proof_generation() {
     let bb = match find_bb().await {
         Some(p) => p,
         None => {
@@ -90,17 +90,17 @@ async fn test_pk_trbfv_generation_proof_generation() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_trbfv");
+    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_generation");
     fs::create_dir_all(&circuit_dir).await.unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.json"),
-        circuit_dir.join("pk_trbfv.json"),
+        fixtures.join("pk_generation.json"),
+        circuit_dir.join("pk_generation.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.vk"),
-        circuit_dir.join("pk_trbfv.vk"),
+        fixtures.join("pk_generation.vk"),
+        circuit_dir.join("pk_generation.vk"),
     )
     .await
     .unwrap();
@@ -129,7 +129,7 @@ async fn test_pk_trbfv_generation_proof_generation() {
 }
 
 #[tokio::test]
-async fn test_pk_trbfv_generation_proof_verification() {
+async fn test_pk_generation_proof_verification() {
     let bb = match find_bb().await {
         Some(p) => p,
         None => {
@@ -141,17 +141,17 @@ async fn test_pk_trbfv_generation_proof_verification() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_trbfv");
+    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_generation");
     fs::create_dir_all(&circuit_dir).await.unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.json"),
-        circuit_dir.join("pk_trbfv.json"),
+        fixtures.join("pk_generation.json"),
+        circuit_dir.join("pk_generation.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.vk"),
-        circuit_dir.join("pk_trbfv.vk"),
+        fixtures.join("pk_generation.vk"),
+        circuit_dir.join("pk_generation.vk"),
     )
     .await
     .unwrap();
@@ -182,7 +182,7 @@ async fn test_pk_trbfv_generation_proof_verification() {
 }
 
 #[tokio::test]
-async fn test_pk_trbfv_commitment_consistency() {
+async fn test_pk_generation_commitment_consistency() {
     let bb = match find_bb().await {
         Some(p) => p,
         None => {
@@ -194,17 +194,17 @@ async fn test_pk_trbfv_commitment_consistency() {
     let (backend, _temp) = setup_test_prover(&bb).await;
     let fixtures = fixtures_dir();
 
-    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_trbfv");
+    let circuit_dir = backend.circuits_dir.join("threshold").join("pk_generation");
     fs::create_dir_all(&circuit_dir).await.unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.json"),
-        circuit_dir.join("pk_trbfv.json"),
+        fixtures.join("pk_generation.json"),
+        circuit_dir.join("pk_generation.json"),
     )
     .await
     .unwrap();
     fs::copy(
-        fixtures.join("pk_trbfv.vk"),
-        circuit_dir.join("pk_trbfv.vk"),
+        fixtures.join("pk_generation.vk"),
+        circuit_dir.join("pk_generation.vk"),
     )
     .await
     .unwrap();

@@ -171,8 +171,6 @@ impl ZkProver {
         let proof_path = job_dir.join("proof");
         let public_inputs_path = out_dir.join("public_inputs");
 
-        // println!("public_signals {:?}", public_signals);
-
         fs::write(&proof_path, proof_data)?;
         fs::write(&public_inputs_path, public_signals)?;
 
