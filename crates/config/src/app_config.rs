@@ -256,6 +256,21 @@ impl AppConfig {
         self.paths.log_file()
     }
 
+    /// Get the bb binary path
+    pub fn bb_binary(&self) -> PathBuf {
+        self.paths.bb_binary()
+    }
+
+    /// Get the circuits directory
+    pub fn circuits_dir(&self) -> PathBuf {
+        self.paths.circuits_dir()
+    }
+
+    /// Get the work directory for this node
+    pub fn work_dir(&self) -> PathBuf {
+        self.paths.work_dir(&self.name)
+    }
+
     fn node_def(&self) -> &NodeDefinition {
         // NOTE: on creation an invariant we have is that our node name is an extant key in our
         // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition

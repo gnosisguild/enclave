@@ -22,12 +22,15 @@ mod enable_effects;
 mod enclave_error;
 mod encryption_key_collection_failed;
 mod encryption_key_created;
+mod encryption_key_pending;
+mod encryption_key_received;
 mod keyshare_created;
 mod net_sync_events_received;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
 mod plaintext_aggregated;
 mod plaintext_output_published;
+mod proof;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
@@ -61,12 +64,15 @@ pub use enable_effects::*;
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
+pub use encryption_key_pending::*;
+pub use encryption_key_received::*;
 pub use keyshare_created::*;
 pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
+pub use proof::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
@@ -203,6 +209,8 @@ pub enum EnclaveEventData {
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
+    EncryptionKeyPending(EncryptionKeyPending),
+    EncryptionKeyReceived(EncryptionKeyReceived),
     EncryptionKeyCreated(EncryptionKeyCreated),
     EncryptionKeyCollectionFailed(EncryptionKeyCollectionFailed),
     ThresholdShareCollectionFailed(ThresholdShareCollectionFailed),
@@ -445,6 +453,8 @@ impl EnclaveEventData {
             EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::EncryptionKeyPending(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::EncryptionKeyReceived(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteeRequested(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteeFinalizeRequested(ref data) => Some(data.e3_id.clone()),
@@ -506,6 +516,8 @@ impl_event_types!(
     TestEvent,
     DocumentReceived,
     ThresholdShareCreated,
+    EncryptionKeyPending,
+    EncryptionKeyReceived,
     EncryptionKeyCreated,
     EncryptionKeyCollectionFailed,
     ThresholdShareCollectionFailed,

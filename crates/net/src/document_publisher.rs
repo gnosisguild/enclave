@@ -17,8 +17,8 @@ use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind,
     DocumentMeta, DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, Event, EventContext, EventSource, EventType, Filter, PartyId,
-    PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
+    EncryptionKeyCreated, EncryptionKeyReceived, Event, EventContext, EventSource, EventType,
+    Filter, PartyId, PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
 };
 use e3_utils::ArcBytes;
 use e3_utils::NotifySync;
@@ -525,8 +525,7 @@ impl EventConverter {
                     evt.key.party_id
                 );
                 self.bus.publish(
-                    EncryptionKeyCreated {
-                        external: true,
+                    EncryptionKeyReceived {
                         e3_id: evt.e3_id,
                         key: evt.key,
                     },

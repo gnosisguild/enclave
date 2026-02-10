@@ -19,6 +19,7 @@ use e3_events::{
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
+use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
 use e3_net::{setup_net, NetRepositoryFactory};
@@ -29,6 +30,7 @@ use e3_sortition::{
 };
 use e3_sync::sync;
 use e3_utils::{rand_eth_addr, SharedRng};
+use e3_zk_prover::{setup_zk_actors, ZkBackend};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
@@ -68,6 +70,7 @@ pub struct CiphernodeBuilder {
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
+    zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
     start_buffer: bool,
 }
@@ -135,6 +138,7 @@ impl CiphernodeBuilder {
             threshold_plaintext_agg: false,
             net_config: None,
             start_buffer: false,
+            zk_backend: None,
         }
     }
 
@@ -258,6 +262,12 @@ impl CiphernodeBuilder {
     /// Setup a ThresholdPlaintextAggregator
     pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
         self.threshold_plaintext_agg = true;
+        self
+    }
+
+    /// Enable ZK proof generation with the given backend.
+    pub fn with_zkproof(mut self, backend: ZkBackend) -> Self {
+        self.zk_backend = Some(backend);
         self
     }
 
@@ -424,14 +434,20 @@ impl CiphernodeBuilder {
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
             let _ = self.ensure_multithread(&bus);
-            let share_encryption_params = e3_trbfv::helpers::get_share_encryption_params();
+            // TODO: Make BfvPreset configurable via builder method (e.g., with_share_enc_preset())
+            // Currently hardcoded to InsecureDkg512 for DKG operations.
+            // Production deployments should use BfvPreset::SecureDkg8192.
+            let share_enc_preset = BfvPreset::InsecureDkg512;
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
                 &addr,
-                share_encryption_params,
-            ))
+                share_enc_preset,
+            ));
+
+            info!("Setting up ZK actors");
+            setup_zk_actors(&bus, self.zk_backend.as_ref());
         }
 
         if self.pubkey_agg {
@@ -511,14 +527,26 @@ impl CiphernodeBuilder {
             )
         });
 
-        // Create it
-        let addr = Multithread::attach(
-            bus,
-            self.rng.clone(),
-            self.cipher.clone(),
-            task_pool,
-            self.multithread_report.clone(),
-        );
+        // Create it with or without ZK prover
+        let addr = if let Some(ref backend) = self.zk_backend {
+            info!("Multithread actor with ZK prover");
+            Multithread::attach_with_zk(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+                backend,
+            )
+        } else {
+            Multithread::attach(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+            )
+        };
 
         // Set the cache
         self.multithread_cache = Some(addr.clone());

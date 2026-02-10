@@ -71,10 +71,9 @@ pub global {}_BIT_PK: u32 = {};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::codegen::write_artifacts;
-    use crate::prepare_pk_sample_for_test;
-    use crate::utils::compute_pk_bit;
+    use crate::dkg::pk::PkCircuitInput;
+    use crate::utils::compute_modulus_bit;
 
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use tempfile::TempDir;
@@ -82,18 +81,10 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = prepare_pk_sample_for_test(
-            BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
-        );
+        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
 
         let artifacts = PkCircuit
-            .codegen(
-                BfvPreset::InsecureThreshold512,
-                &PkCircuitInput {
-                    public_key: sample.dkg_public_key,
-                },
-            )
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -130,7 +121,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let pk_bit = compute_pk_bit(&dkg_params);
+        let pk_bit = compute_modulus_bit(&dkg_params);
 
         assert!(configs_content.contains(
             format!(

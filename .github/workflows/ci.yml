@@ -119,6 +119,35 @@ jobs:
       - name: Run Integration Tests
         run: 'cargo test --test integration -- --nocapture'
 
+  zk_prover_integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
+      - name: 'Setup node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: 'Install the dependencies'
+        run: 'pnpm install --frozen-lockfile'
+
+      - name: Run ZK Prover Integration Tests (with network downloads)
+        run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
+
   build_e3_support_risc0:
     runs-on: ubuntu-latest
     steps:
@@ -361,6 +390,9 @@ jobs:
           chmod +x target/debug/fake_encrypt
           chmod +x target/debug/pack_e3_params
           chmod +x ~/.cargo/bin/enclave
+      - name: 'Setup ZK prover'
+        run: |
+          enclave noir setup
       - name: 'Run ${{ matrix.test-suite }} tests'
         run: 'pnpm test:integration ${{ matrix.test-suite }} --no-prebuild'
       - name: 'Add test summary'
@@ -560,6 +592,10 @@ jobs:
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/enclave
+
+      - name: Setup ZK prover
+        run: |
+          enclave noir setup
 
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
@@ -764,6 +800,9 @@ jobs:
         run: |
           chmod +x ~/.cargo/bin/enclave
           chmod +x templates/default/target/debug/e3-support-scripts-dev
+      - name: Setup ZK prover
+        run: |
+          enclave noir setup
       - name: Verify downloaded artifacts
         run: |
           echo "Checking downloaded artifacts:"

@@ -187,40 +187,25 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::dkg::share_encryption::{Bounds, ShareEncryptionCircuitInput};
     use crate::computation::Computation;
     use crate::computation::DkgInputType;
-    use crate::dkg::share_encryption::sample::prepare_share_encryption_sample_for_test;
-    use crate::dkg::share_encryption::ShareEncryptionSample;
-    use crate::Circuit;
+    use crate::{CiphernodesCommitteeSize, Circuit};
     use e3_fhe_params::BfvPreset;
-
-    fn share_encryption_input_from_sample(
-        sample: &ShareEncryptionSample,
-    ) -> ShareEncryptionCircuitInput {
-        ShareEncryptionCircuitInput {
-            plaintext: sample.plaintext.clone(),
-            ciphertext: sample.ciphertext.clone(),
-            public_key: sample.public_key.clone(),
-            secret_key: sample.secret_key.clone(),
-            u_rns: sample.u_rns.clone(),
-            e0_rns: sample.e0_rns.clone(),
-            e1_rns: sample.e1_rns.clone(),
-        }
-    }
 
     #[test]
     fn test_toml_generation_and_structure() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
-        let input = share_encryption_input_from_sample(&sample);
-
         let artifacts = ShareEncryptionCircuit
-            .codegen(BfvPreset::InsecureThreshold512, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
         let parsed: toml::Value = artifacts.toml.parse().unwrap();
@@ -232,18 +217,21 @@ mod tests {
 
     #[test]
     fn test_configs_generation_contains_expected() {
-        let sample = prepare_share_encryption_sample_for_test(
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+        let sample = ShareEncryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
+            sd.z,
+            sd.lambda,
         );
-        let input = share_encryption_input_from_sample(&sample);
 
         let artifacts = ShareEncryptionCircuit
-            .codegen(BfvPreset::InsecureThreshold512, &input)
+            .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = crate::circuits::dkg::share_encryption::Bits::compute(
             BfvPreset::InsecureThreshold512,
             &bounds,

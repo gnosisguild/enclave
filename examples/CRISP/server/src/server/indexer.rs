@@ -348,20 +348,17 @@ pub async fn register_plaintext_output_published(
             async move {
                 info!("[e3_id={}] Handling PlaintextOutputPublished", e3_id);
 
+                let num_options = repo.get_num_options().await?;
+
                 // The plaintextOutput from the event contains the result of the FHE computation.
                 // Decode the tally using the utility function.
-                let vote_counts = decode_tally(&event.plaintextOutput)?;
+                let vote_counts = decode_tally(&event.plaintextOutput, num_options)?;
+                
+                for (i, count) in vote_counts.iter().enumerate() {
+                    info!("[e3_id={}] Option index: {} votes: {:?}", e3_id, i, count);
+                }
 
-                info!(
-                    "[e3_id={}] Votes Option 1 (Yes): {:?}",
-                    e3_id, vote_counts.yes
-                );
-                info!(
-                    "[e3_id={}] Votes Option 2 (No): {:?}",
-                    e3_id, vote_counts.no
-                );
-
-                repo.set_votes(vote_counts.yes, vote_counts.no).await?;
+                repo.set_votes(vote_counts).await?;
                 repo.update_status("Finished").await?;
                 Ok(())
             }

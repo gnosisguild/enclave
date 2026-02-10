@@ -13,7 +13,7 @@ use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
-use crate::utils::compute_pk_bit;
+use crate::utils::compute_modulus_bit;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -113,7 +113,7 @@ impl Computation for Bits {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         Ok(Bits {
-            pk_bit: compute_pk_bit(&dkg_params),
+            pk_bit: compute_modulus_bit(&dkg_params),
         })
     }
 }
@@ -153,14 +153,8 @@ impl Computation for Witness {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
 
-        let mut pk0is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[0]);
-        let mut pk1is = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[1]);
-
-        pk0is.reverse();
-        pk1is.reverse();
-
-        pk0is.center(&moduli)?;
-        pk1is.center(&moduli)?;
+        let mut pk0is = crate::crt::fhe_poly_to_crt_centered(&input.public_key.c.c[0], moduli)?;
+        let mut pk1is = crate::crt::fhe_poly_to_crt_centered(&input.public_key.c.c[1], moduli)?;
 
         let zkp_modulus = &get_zkp_modulus();
 
@@ -196,7 +190,7 @@ mod tests {
 
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
-        let expected_bits = compute_pk_bit(&dkg_params);
+        let expected_bits = compute_modulus_bit(&dkg_params);
 
         assert_eq!(bounds.pk_bound, BigUint::from(1125899906777088u128));
         assert_eq!(bits.pk_bit, expected_bits);

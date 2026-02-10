@@ -267,33 +267,17 @@ mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitInput;
-    use crate::{prepare_share_computation_sample_for_test, ShareComputationSample};
     use e3_fhe_params::BfvPreset;
-
-    fn share_computation_input_from_sample(
-        sample: &ShareComputationSample,
-        dkg_input_type: DkgInputType,
-    ) -> ShareComputationCircuitInput {
-        ShareComputationCircuitInput {
-            dkg_input_type,
-            secret: sample.secret.clone(),
-            secret_sss: sample.secret_sss.clone(),
-            parity_matrix: sample.parity_matrix.clone(),
-            n_parties: sample.committee.n as u32,
-            threshold: sample.committee.threshold as u32,
-        }
-    }
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let sample = prepare_share_computation_sample_for_test(
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         );
-
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
         let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
 
@@ -302,14 +286,13 @@ mod tests {
 
     #[test]
     fn test_witness_smudging_noise_secret_consistency() {
-        let sample = prepare_share_computation_sample_for_test(
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SmudgingNoise,
         );
-
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SmudgingNoise);
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let degree = witness.secret_crt.limb(0).coefficients().len();
         let num_moduli = witness.secret_crt.limbs.len();
         for coeff_idx in 0..degree {
@@ -327,14 +310,14 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let sample = prepare_share_computation_sample_for_test(
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         );
 
-        let input = share_computation_input_from_sample(&sample, DkgInputType::SecretKey);
-        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &input).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

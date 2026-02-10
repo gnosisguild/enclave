@@ -15,11 +15,4 @@ pub use computation::{CircuitComputation, Computation};
 pub use errors::CircuitsErrors;
 
 pub mod dkg;
-pub use dkg::pk::codegen::{generate_configs, generate_toml};
-pub use dkg::pk::computation::{Bits, Bounds, PkComputationOutput, Witness};
-pub use dkg::pk::{prepare_pk_sample_for_test, PkCircuit, PkSample};
-pub use dkg::share_computation::{
-    prepare_share_computation_sample_for_test, SecretShares, ShareComputationSample,
-};
-
 pub mod threshold;

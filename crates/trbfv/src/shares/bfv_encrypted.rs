@@ -21,9 +21,7 @@ use std::sync::Arc;
 use super::{ShamirShare, SharedSecret};
 
 // Re-export helper functions from helpers module
-pub use crate::helpers::{
-    deserialize_secret_key, get_share_encryption_params, serialize_secret_key,
-};
+pub use crate::helpers::{deserialize_secret_key, serialize_secret_key};
 
 /// A BFV-encrypted Shamir share for secure transmission.
 ///
@@ -212,11 +210,12 @@ impl Default for BfvEncryptedShares {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use e3_fhe_params::{BfvParamSet, BfvPreset};
     use rand::rngs::OsRng;
 
     #[test]
     fn test_encrypt_decrypt_share() {
-        let params = get_share_encryption_params();
+        let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
         let mut rng = OsRng;
 
         // Generate key pair
@@ -247,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_secret_key_serialization() {
-        let params = get_share_encryption_params();
+        let params = BfvParamSet::from(BfvPreset::InsecureDkg512).build_arc();
         let mut rng = OsRng;
 
         // Generate a secret key

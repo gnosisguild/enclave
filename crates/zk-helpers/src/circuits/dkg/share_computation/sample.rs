@@ -7,75 +7,40 @@
 //! Sample data generation for the share-computation circuit: committee, DKG public key,
 //! secret (SK or smudging noise) in CRT form, Shamir shares, and parity matrices.
 
-use crate::ciphernodes_committee::CiphernodesCommittee;
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
+use crate::dkg::share_computation::ShareComputationCircuitInput;
+use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_parity_matrix::build_generator_matrix;
-use e3_parity_matrix::{null_space, ParityMatrix, ParityMatrixConfig};
 use e3_polynomial::CrtPolynomial;
-use fhe::bfv::{PublicKey, SecretKey};
+use fhe::bfv::SecretKey;
 use fhe::trbfv::{ShareManager, TRBFV};
 use num_bigint::BigInt;
-use num_bigint::BigUint;
 use rand::thread_rng;
 
-/// Shamir secret shares: one limb per CRT modulus (rows = parties, cols = polynomial coefficients).
 pub type SecretShares = Vec<ndarray::Array2<BigInt>>;
 
-/// Sample data for the **share-computation** circuit: committee, DKG public key, secret in CRT form,
-/// Shamir shares, and parity matrices (secret-key or smudging-noise).
-#[derive(Debug, Clone)]
-pub struct ShareComputationSample {
-    /// Committee information.
-    pub committee: CiphernodesCommittee,
-    /// DKG BFV public key.
-    pub dkg_public_key: PublicKey,
-    /// Secret in CRT form (SK or smudging noise).
-    pub secret: CrtPolynomial,
-    /// Secret shares (one [`ndarray::Array2<BigInt>`] per modulus).
-    pub secret_sss: SecretShares,
-    /// Parity check matrix per modulus (null space of generator).
-    pub parity_matrix: Vec<ParityMatrix>,
-}
-
-impl ShareComputationSample {
+impl ShareComputationCircuitInput {
     /// Generates sample data for the share-computation circuit.
-    pub fn generate(
+    pub fn generate_sample(
         preset: BfvPreset,
-        committee_size: CiphernodesCommitteeSize,
+        committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
-        num_ciphertexts: u128, // z in the search defaults
-        lambda: u32,
     ) -> Self {
-        let (threshold_params, dkg_params) = build_pair_for_preset(preset).unwrap();
-
+        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let sd = preset.search_defaults().unwrap();
         let mut rng = thread_rng();
-        let committee = committee_size.values();
-
-        let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
-        let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
 
         let trbfv = TRBFV::new(committee.n, committee.threshold, threshold_params.clone())
             .unwrap_or_else(|e| panic!("Failed to create TRBFV: {:?}", e));
         let mut share_manager =
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
-        // Parity check matrix (null space of generator) per modulus: [L][N_PARTIES-T][N_PARTIES+1].
-        let mut parity_matrix = Vec::with_capacity(threshold_params.moduli().len());
-        for &qi in threshold_params.moduli() {
-            let q = BigUint::from(qi);
-            let g = build_generator_matrix(&ParityMatrixConfig {
-                q: q.clone(),
-                t: committee.threshold,
-                n: committee.n,
-            })
-            .unwrap();
-            let h = null_space(&g, &q).unwrap();
-            parity_matrix.push(h);
-        }
+        let parity_matrix =
+            compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
+                .unwrap_or_else(|e| panic!("Failed to compute parity matrix: {}", e));
 
         let (secret, secret_sss) = match dkg_input_type {
             DkgInputType::SecretKey => {
@@ -107,7 +72,7 @@ impl ShareComputationSample {
             }
             DkgInputType::SmudgingNoise => {
                 let esi_coeffs = trbfv
-                    .generate_smudging_error(num_ciphertexts as usize, lambda as usize, &mut rng)
+                    .generate_smudging_error(committee.n as usize, sd.lambda as usize, &mut rng)
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!(
                             "Failed to generate smudging error: {:?}",
@@ -136,8 +101,9 @@ impl ShareComputationSample {
         };
 
         Self {
-            committee,
-            dkg_public_key,
+            dkg_input_type,
+            n_parties: committee.n as u32,
+            threshold: committee.threshold as u32,
             secret,
             secret_sss,
             parity_matrix,
@@ -145,43 +111,24 @@ impl ShareComputationSample {
     }
 }
 
-/// Prepares a share-computation sample for testing using a threshold preset.
-pub fn prepare_share_computation_sample_for_test(
-    preset: BfvPreset,
-    committee: CiphernodesCommitteeSize,
-    dkg_input_type: DkgInputType,
-) -> ShareComputationSample {
-    let defaults = preset.search_defaults().unwrap();
-
-    ShareComputationSample::generate(
-        preset,
-        committee,
-        dkg_input_type,
-        defaults.z,
-        defaults.lambda,
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
+    use crate::dkg::share_computation::ShareComputationCircuitInput;
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = prepare_share_computation_sample_for_test(
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
         );
-
-        assert_eq!(sample.committee.n, committee.n);
-        assert_eq!(sample.committee.threshold, committee.threshold);
-        assert_eq!(sample.committee.h, committee.h);
-        assert_eq!(sample.dkg_public_key.c.c.len(), 2);
+        assert_eq!(sample.n_parties, committee.n as u32);
+        assert_eq!(sample.threshold, committee.threshold as u32);
+        assert_eq!(sample.dkg_input_type, DkgInputType::SecretKey);
         assert_eq!(sample.secret_sss.len(), 2);
         assert_eq!(sample.secret.limbs.len(), 2);
     }
@@ -189,15 +136,14 @@ mod tests {
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = prepare_share_computation_sample_for_test(
+        let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SmudgingNoise,
         );
-
-        assert_eq!(sample.committee.n, committee.n);
-        assert_eq!(sample.committee.threshold, committee.threshold);
-        assert_eq!(sample.dkg_public_key.c.c.len(), 2);
+        assert_eq!(sample.n_parties, committee.n as u32);
+        assert_eq!(sample.threshold, committee.threshold as u32);
+        assert_eq!(sample.dkg_input_type, DkgInputType::SmudgingNoise);
         assert_eq!(sample.secret_sss.len(), 2);
         assert_eq!(sample.secret.limbs.len(), 2);
     }
