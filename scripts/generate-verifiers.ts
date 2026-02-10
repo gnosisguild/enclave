@@ -180,7 +180,7 @@ class VerifierGenerator {
   // -------------------------------------------------------------------------
 
   private generateVerifier(circuit: CircuitInfo): string {
-    const { name, group, path: circuitPath, packageName } = circuit
+    const { name, group, packageName } = circuit
 
     // 1. Compile if needed
     const jsonFile = this.ensureCompiled(circuit)
@@ -307,7 +307,7 @@ class VerifierGenerator {
   private toContractName(group: CircuitGroup, name: string): string {
     const pascal = (s: string) =>
       s
-        .split(/[_\-]+/)
+        .split(/[_-]+/)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join('')
     return `${pascal(group)}${pascal(name)}Verifier`
