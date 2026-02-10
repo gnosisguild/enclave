@@ -177,9 +177,9 @@ impl Computation for Bounds {
             // r_2j bounds: [- (q_j-1)/2 , (q_j-1)/2] (cyclotomic quotients)
             r2_bounds.push(qi_bound.clone());
 
-            // r_1j bounds: based on the formula from the notes
-            // r_1j: [(-(q_j-1)/2 * (BS.N+3) - Be) / q_j , ((q_j-1)/2 * (BS.N+3) + Be) / q_j]
-            // Where BS = s_bound, Be = e_bound, N = n (degree)
+            // r_1j upper bound: (qi_bound * (qi_bound * n + 3) - qi_bound) / qi_bigint
+            // Symmetric lower bound used by range_check_2bounds. Variables: qi_bound = (q_j-1)/2,
+            // qi_bigint = q_j, n = degree.
             r1_bounds.push(
                 (&qi_bound * (&qi_bound.clone() * &n + BigInt::from(3)) - &qi_bound.clone())
                     / &qi_bigint,
