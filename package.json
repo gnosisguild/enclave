@@ -15,6 +15,7 @@
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
     "build:circuits": "tsx scripts/build-circuits.ts",
+    "generate:verifiers": "tsx scripts/generate-verifiers.ts",
     "store:circuits": "tsx scripts/circuit-artifacts.ts",
     "clean": "tsx scripts/clean.ts",
     "compile": "pnpm build:ts && pnpm rust:build",
