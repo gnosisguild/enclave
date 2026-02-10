@@ -127,7 +127,7 @@ impl ProofRequestActor {
             warn!("ZK proof request failed for E3 {}: {err}", pending.e3_id);
 
             // Publish EncryptionKeyCreated without proof to allow the system to continue
-            // Applications can check the has_proof field to determine if validation is required
+            // Applications can check the proof field to determine if validation occurred
             if let Err(err) = self.bus.publish(
                 EncryptionKeyCreated {
                     e3_id: pending.e3_id,

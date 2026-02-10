@@ -203,7 +203,11 @@ async fn handle_compute_request_event(
 
     match result {
         Ok(val) => bus.publish(val, ctx)?,
-        Err(e) => bus.err(EType::Computation, e),
+        Err(e) => {
+            // Publish ComputeRequestError so ProofRequestActor can handle it
+            // and continue without proof if needed
+            bus.publish(e, ctx)?
+        }
     };
     Ok(())
 }
