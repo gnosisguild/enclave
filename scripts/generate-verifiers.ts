@@ -342,11 +342,26 @@ async function main() {
     } else if (arg === '--no-compile') {
       options.compile = false
     } else if (arg === '--group') {
-      options.groups = args[++i]?.split(',') as CircuitGroup[]
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --group requires a value')
+        process.exit(1)
+      }
+      options.groups = value.split(',') as CircuitGroup[]
     } else if (arg === '--circuit') {
-      ;(options.circuits ??= []).push(args[++i])
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --circuit requires a value')
+        process.exit(1)
+      }
+      ;(options.circuits ??= []).push(value)
     } else if (arg === '--oracle-hash') {
-      options.oracleHash = args[++i]
+      const value = args[++i]
+      if (!value || value.startsWith('--')) {
+        console.error('Error: --oracle-hash requires a value')
+        process.exit(1)
+      }
+      options.oracleHash = value
     }
   }
 

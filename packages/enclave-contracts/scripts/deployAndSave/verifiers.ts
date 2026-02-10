@@ -58,7 +58,8 @@ export const deployAndSaveVerifier = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<{ address: string }> => {
   const { ethers } = await hre.network.connect();
-  const chain = hre.globalOptions.network;
+  const [signer] = await ethers.getSigners();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
   // Check if already deployed
   const existing = readDeploymentArgs(contractName, chain);
@@ -142,6 +143,10 @@ export const deployAndSaveAllVerifiers = async (
   hre: HardhatRuntimeEnvironment,
 ): Promise<VerifierDeployments> => {
   const contractNames = discoverVerifierContracts();
+  const { ethers } = await hre.network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  console.log(`   Deploying to network: ${chain}`);
 
   if (contractNames.length === 0) {
     console.log(

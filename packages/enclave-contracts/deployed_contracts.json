@@ -107,12 +107,6 @@
       "address": "0xC39b101f2FB4ea677c1EA18f92C15CDD54Af40c2"
     }
   },
-  "undefined": {
-    "PoseidonT3": {
-      "blockNumber": 3,
-      "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
-    }
-  },
   "localhost": {
     "PoseidonT3": {
       "blockNumber": 338,
