@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    EventContextAccessors, EventContextSeq, EventId,
+    EventContextAccessors, EventContextSeq, EventId, EventSource,
 };
 
 use super::Sequenced;
@@ -74,6 +74,14 @@ impl<T> EventContextAccessors for TypedEvent<T> {
 
     fn block(&self) -> Option<u64> {
         self.ctx.block()
+    }
+
+    fn source(&self) -> EventSource {
+        self.ctx.source()
+    }
+    fn with_source(mut self, source: EventSource) -> Self {
+        self.ctx = self.ctx.with_source(source);
+        self
     }
 }
 

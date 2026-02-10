@@ -7,7 +7,10 @@
 use crate::Cid;
 use actix::Message;
 use anyhow::{bail, Context, Result};
-use e3_events::{AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
+use e3_events::{
+    AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource,
+    Sequenced, Unsequenced,
+};
 use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
@@ -59,7 +62,7 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
             bail!("GossipData was not the GossipBytes variant");
         };
 
-        Ok(EnclaveEvent::from_bytes(&bytes)?)
+        Ok(EnclaveEvent::from_bytes(&bytes)?.with_source(EventSource::Net))
     }
 }
 
@@ -303,7 +306,7 @@ where
 #[cfg(test)]
 mod tests {
     use e3_events::{
-        EnclaveEvent, EventConstructorWithTimestamp, Sequenced, TestEvent, Unsequenced,
+        EnclaveEvent, EventConstructorWithTimestamp, EventSource, Sequenced, TestEvent, Unsequenced,
     };
 
     use super::GossipData;
@@ -311,8 +314,13 @@ mod tests {
     #[test]
     fn test_enclave_event_gossip_lifecycle() -> anyhow::Result<()> {
         // event is created locally
-        let event: EnclaveEvent<Unsequenced> =
-            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), None, 31415, None);
+        let event: EnclaveEvent<Unsequenced> = EnclaveEvent::new_with_timestamp(
+            TestEvent::new("fish", 42).into(),
+            None,
+            31415,
+            None,
+            EventSource::local,
+        );
 
         // event is sequenced after bus.publish() adds a sequence number
         let event: EnclaveEvent<Sequenced> = event.into_sequenced(90210);

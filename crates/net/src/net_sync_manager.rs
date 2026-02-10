@@ -8,7 +8,7 @@ use actix::{Actor, Addr, AsyncContext, Handler, Recipient, ResponseFuture};
 use anyhow::{anyhow, bail, Result};
 use e3_events::{
     prelude::*, trap, trap_fut, AggregateId, BusHandle, CorrelationId, EType, EnclaveEvent,
-    EnclaveEventData, EventStoreQueryBy, EventStoreQueryResponse, EventType,
+    EnclaveEventData, EventSource, EventStoreQueryBy, EventStoreQueryResponse, EventType,
     HistoricalNetSyncStart, NetSyncEventsReceived, TsAgg, TypedEvent, Unsequenced,
 };
 use e3_utils::{retry_with_backoff, to_retry, OnceTake, MAILBOX_LIMIT};
@@ -140,6 +140,7 @@ impl Handler<TypedEvent<OutgoingSyncRequestSucceeded>> for NetSyncManager {
                 msg.value.ts,
                 ctx,
                 None,
+                EventSource::Net,
             )?;
 
             Ok(())
@@ -178,6 +179,7 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                     events: msg
                         .into_events()
                         .into_iter()
+                        .filter(|e| e.source() == EventSource::Net)
                         .map(|ev| ev.try_into())
                         .collect::<Result<_>>()?,
                     ts: self.bus.ts()?, // NOTE: We are storing a local timestamp on this response

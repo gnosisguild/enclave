@@ -23,6 +23,7 @@ use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::Event;
 use e3_events::EventContextAccessors;
+use e3_events::EventSource;
 use e3_events::EventStoreQueryBy;
 use e3_events::EventType;
 use e3_events::TsAgg;
@@ -154,7 +155,8 @@ impl NetEventTranslator {
     fn publish_event(&mut self, event: EnclaveEvent<Unsequenced>) -> Result<()> {
         let id = event.id();
         let (data, ec) = event.into_components();
-        self.bus.publish_from_remote(data, ec.ts(), None)?;
+        self.bus
+            .publish_from_remote(data, ec.ts(), None, EventSource::Net)?;
         self.sent_events.insert(id);
         Ok(())
     }

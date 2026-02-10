@@ -85,7 +85,7 @@ pub use typed_event::*;
 use crate::{
     event_context::{AggregateId, EventContext},
     traits::{ErrorEvent, Event, EventConstructorWithTimestamp, EventContextAccessors},
-    E3id, EventContextSeq, EventId, WithAggregateId,
+    E3id, EventContextSeq, EventId, EventSource, WithAggregateId,
 };
 use actix::Message;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -308,6 +308,13 @@ impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
     fn block(&self) -> Option<u64> {
         self.ctx.block()
     }
+    fn source(&self) -> EventSource {
+        self.ctx.source()
+    }
+    fn with_source(mut self, source: EventSource) -> Self {
+        self.ctx = self.ctx.with_source(source);
+        self
+    }
 }
 
 impl EventContextSeq for EnclaveEvent<Sequenced> {
@@ -321,7 +328,7 @@ impl EnclaveEvent<Sequenced> {
         let ts = self.ts();
         let block = self.block();
         let data = self.clone().into_data();
-        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts, block)
+        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts, block, self.source())
     }
 
     pub fn to_typed_event<T>(&self, data: T) -> TypedEvent<T> {
@@ -343,13 +350,20 @@ impl EnclaveEvent<Unsequenced> {
 impl EnclaveEvent<Sequenced> {
     /// test-helpers only utility function to create a new sequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time, None).into_sequenced(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time, None, EventSource::Local)
+            .into_sequenced(seq)
     }
 
     /// test-helpers only utility function to create a new sequenced event
     pub fn from_data_ec(data: EnclaveEventData, ec: EventContext<Sequenced>) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, Some(ec.clone()), ec.ts(), ec.block())
-            .into_sequenced(ec.seq())
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            data,
+            Some(ec.clone()),
+            ec.ts(),
+            ec.block(),
+            EventSource::Local,
+        )
+        .into_sequenced(ec.seq())
     }
 
     /// test-helpers only utility function to remove time information from an event
@@ -394,8 +408,12 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         let aggregate_id = AggregateId::new(0); // Error events use default aggregate_id
 
         let ctx = caused_by
-            .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, None))
-            .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, None));
+            .map(|cause| {
+                EventContext::from_cause(id, cause, ts, aggregate_id, None, EventSource::Local)
+            })
+            .unwrap_or_else(|| {
+                EventContext::new_origin(id, ts, aggregate_id, None, EventSource::Local)
+            });
 
         Ok(EnclaveEvent {
             payload: payload.into(),
@@ -557,6 +575,7 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Self {
         let payload: EnclaveEventData = data.into();
         let id = EventId::hash(&payload);
@@ -564,8 +583,8 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         EnclaveEvent {
             payload,
             ctx: caused_by
-                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, block))
-                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, block)),
+                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, block, source))
+                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, block, source)),
         }
     }
 }

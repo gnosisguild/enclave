@@ -19,7 +19,6 @@ use e3_events::{
 };
 use e3_events::{Event, EventPublisher};
 use e3_utils::MAILBOX_LIMIT;
-use tracing::info;
 
 /// This component sits between the Evm ingestion for a chain and the Sync actor and the Bus.
 /// It coordinates event flow between these components.

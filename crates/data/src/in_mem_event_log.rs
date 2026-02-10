@@ -46,10 +46,16 @@ impl EventLog for InMemEventLog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, TestEvent};
+    use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, EventSource, TestEvent};
 
     fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data.into().into(), None, 123, None)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            data.into().into(),
+            None,
+            123,
+            None,
+            EventSource::Local,
+        )
     }
 
     #[test]

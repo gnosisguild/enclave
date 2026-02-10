@@ -17,7 +17,7 @@ use chrono::{DateTime, Utc};
 use e3_events::{
     prelude::*, trap, trap_fut, BusHandle, CiphernodeSelected, CorrelationId, DocumentKind,
     DocumentMeta, DocumentReceived, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
-    EncryptionKeyCreated, Event, EventContext, EventType, Filter, PartyId,
+    EncryptionKeyCreated, Event, EventContext, EventSource, EventType, Filter, PartyId,
     PublishDocumentRequested, Sequenced, ThresholdShareCreated, TypedEvent,
 };
 use e3_utils::ArcBytes;
@@ -305,6 +305,7 @@ pub async fn handle_document_published_notification(
         },
         event.ts,
         None,
+        EventSource::Net,
     )?;
 
     Ok(())

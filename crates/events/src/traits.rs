@@ -11,7 +11,7 @@ use std::hash::Hash;
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    EnclaveEvent, EventId, EventType, Sequenced, Unsequenced,
+    EnclaveEvent, EventId, EventSource, EventType, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus
@@ -65,6 +65,7 @@ pub trait EventFactory<E: Event> {
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<E>;
 }
 
@@ -104,6 +105,7 @@ pub trait EventPublisher<E: Event> {
         data: impl Into<E::Data>,
         remote_ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
@@ -118,6 +120,7 @@ pub trait EventPublisher<E: Event> {
         remote_ts: u128,
         caused_by: impl Into<EventContext<Sequenced>>,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
@@ -147,6 +150,7 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Self;
 }
 
@@ -186,6 +190,10 @@ pub trait EventContextAccessors {
     fn aggregate_id(&self) -> AggregateId;
     /// The highest block watermark we have seen
     fn block(&self) -> Option<u64>;
+    /// The event source
+    fn source(&self) -> EventSource;
+    /// Apply a new source fluently
+    fn with_source(self, source: EventSource) -> Self;
 }
 
 pub trait EventContextSeq {

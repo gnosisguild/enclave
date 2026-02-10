@@ -17,11 +17,11 @@ use crate::{
     hlc::Hlc,
     sequencer::Sequencer,
     traits::{
-        ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
-        EventSubscriber,
+        ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventContextAccessors,
+        EventFactory, EventPublisher, EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventType,
-    HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventSource,
+    EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
 #[derive(Clone, Derivative)]
@@ -108,8 +108,9 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         data: impl Into<EnclaveEventData>,
         remote_ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<()> {
-        self.publish_from_remote_impl(data, remote_ts, None, block)
+        self.publish_from_remote_impl(data, remote_ts, None, block, source)
     }
 
     fn publish_from_remote_as_response(
@@ -118,8 +119,9 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
         remote_ts: u128,
         caused_by: impl Into<EventContext<Sequenced>>,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<()> {
-        self.publish_from_remote_impl(data, remote_ts, Some(caused_by.into()), block)
+        self.publish_from_remote_impl(data, remote_ts, Some(caused_by.into()), block, source)
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
@@ -134,8 +136,9 @@ impl BusHandle {
         remote_ts: u128,
         caused_by: Option<EventContext<Sequenced>>,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<()> {
-        let evt = self.event_from_remote_source(data, caused_by, remote_ts, block)?;
+        let evt = self.event_from_remote_source(data, caused_by, remote_ts, block, source)?;
         self.sequencer.do_send(evt);
         Ok(())
     }
@@ -171,6 +174,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
             caused_by,
             ts.into(),
             None,
+            EventSource::Local,
         ))
     }
 
@@ -180,6 +184,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
         block: Option<u64>,
+        source: EventSource,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
@@ -187,6 +192,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
             caused_by,
             ts.into(),
             block,
+            source,
         ))
     }
 }
@@ -425,9 +431,11 @@ where
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         if (self.predicate)(&msg) {
+            let source = msg.source();
             let (data, ts) = msg.split();
-            let _ = self.handle.publish_from_remote(data, ts, None); // TODO: check if this is fine
-                                                                     // to erase block data
+            let _ = self.handle.publish_from_remote(data, ts, None, source);
+            // TODO: check if this is fine
+            // to erase block data
         }
     }
 }
