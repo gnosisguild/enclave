@@ -58,16 +58,16 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
     format!(
         r#"use crate::core::threshold::decrypted_shares_aggregation::Configs as DecryptedSharesAggregationConfigs;
 
+pub global L: u32 = {};
+pub global QIS: [Field; L] = [{}];
+pub global PLAINTEXT_MODULUS: Field = {};
+pub global Q_INVERSE_MOD_T: Field = {};
+        
 /************************************
 -------------------------------------
 decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
-
-pub global L: u32 = {};
-pub global QIS: [Field; L] = [{}];
-pub global PLAINTEXT_MODULUS: Field = {};
-pub global Q_INVERSE_MOD_T: Field = {};
 
 pub global {}_BIT_NOISE: u32 = {};
 

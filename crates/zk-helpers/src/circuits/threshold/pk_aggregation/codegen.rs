@@ -64,7 +64,7 @@ pk_aggregation (CIRCUIT 5)
 
 pub global {}_BIT_PK: u32 = {};
 
-pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);
+pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 "#,
         configs.n,           // N
         configs.l,           // L

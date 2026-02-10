@@ -48,8 +48,7 @@ pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
 pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> CodegenConfigs {
     format!(
-        r#"
-pub global N: u32 = {};
+        r#"pub global N: u32 = {};
 pub global L: u32 = {};
 
 /************************************
@@ -61,8 +60,8 @@ pk (CIRCUIT 0 - DKG BFV PUBLIC KEY)
 // pk - bit parameters
 pub global {}_BIT_PK: u32 = {};
 "#,
-        preset.metadata().degree,
-        preset.metadata().num_moduli,
+        preset.dkg_counterpart().unwrap().metadata().degree,
+        preset.dkg_counterpart().unwrap().metadata().num_moduli,
         <PkCircuit as Circuit>::PREFIX,
         bits.pk_bit,
     )
