@@ -86,9 +86,6 @@ impl ShareEncryptionCircuitInput {
                     .generate_secret_shares_from_poly(esi_poly.clone(), &mut rng.clone())
                     .map_err(|e| {
                         CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
-                    })
-                    .map_err(|e| {
-                        CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
                     })?;
 
                 esi_sss_u64[0].row(0).to_vec()
