@@ -90,8 +90,8 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
         throw new Error('Public client not available')
       }
 
-      if (sdk) {
-        sdk.cleanup()
+      if (sdkRef.current) {
+        sdkRef.current.cleanup()
       }
 
       const sdkConfig: SDKConfig = {
@@ -116,7 +116,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
       setError(errorMessage)
       console.error('SDK initialization failed:', err)
     }
-  }, [publicClient, walletClient, config.contracts, config.chainId, config.thresholdBfvParamsPresetName, sdk])
+  }, [publicClient, walletClient, config.contracts, config.chainId, config.thresholdBfvParamsPresetName])
 
   // Initialize SDK when wagmi clients are available
   useEffect(() => {

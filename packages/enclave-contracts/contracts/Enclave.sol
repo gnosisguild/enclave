@@ -699,6 +699,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         uint8 reason
     ) external onlyCiphernodeRegistry {
+        require(reason > 0 && reason <= 12, "Invalid failure reason");
         // Mark E3 as failed with the given reason
         _markE3FailedWithReason(e3Id, FailureReason(reason));
     }

@@ -149,15 +149,15 @@ export function encodeCustomParams(params: Record<string, unknown>): `0x${string
   return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
-// inputWindow[0] is always larger then now and dkg deadline
+// inputWindow[0] is always larger than now and dkg deadline
 export const inputWindowStartBuffer = 15n
 
 /**
  * Calculate start window for E3 request
  * @dev This function can be used for testing purposes, or for E3s which need to start as soon as possible.
  * @param publicClient - The public client to use
- * @param startTime - The desired start time for the input window
  * @param duration - The duration of the input window in seconds
+ * @param startBuffer - Buffer in seconds added to current timestamp for input window start
  */
 export async function calculateInputWindow(
   publicClient: PublicClient,

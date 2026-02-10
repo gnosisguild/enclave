@@ -367,7 +367,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
                 c.topNodes.length,
                 c.threshold[1]
             );
-            enclave.onE3Failed(e3Id, 2); // FailureReason.InsufficientCommitteeMembers
+            enclave.onE3Failed(
+                e3Id,
+                uint8(IEnclave.FailureReason.InsufficientCommitteeMembers)
+            );
             return false;
         }
 

@@ -396,7 +396,7 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("requestCommittee()", function () {
-    it("reverts if committee has already been requested for given e3Id", async function () {
+    it("stores rootAt for the requested e3Id after a successful request", async function () {
       const {
         registry,
         enclave,
@@ -404,17 +404,13 @@ describe("CiphernodeRegistryOwnable", function () {
         mockE3Program,
         mockDecryptionVerifier,
       } = await loadFixture(setup);
-      // First request through Enclave
+      // Request through Enclave
       await makeRequest(
         enclave,
         usdcToken,
         mockE3Program,
         mockDecryptionVerifier,
       );
-      // Second request will have a different e3Id, so we can't test this the same way
-      // The test should verify that duplicate e3Id is rejected
-      // Since each request increments e3Id, this test now checks that the first request succeeds
-      // and rootAt is set for e3Id=0
       expect(await registry.rootAt(0)).to.equal(await registry.root());
     });
     it("stores the root of the ciphernode registry at the time of the request", async function () {

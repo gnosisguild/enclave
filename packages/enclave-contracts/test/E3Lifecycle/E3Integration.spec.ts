@@ -967,7 +967,7 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       const failureReason = await enclave.getFailureReason(0);
       expect(failureReason).to.equal(10); // DecryptionTimeout
 
-      // 7. Process failure and claim refund
+      // 6. Process failure and claim refund
       await enclave.processE3Failure(0);
 
       const balanceBefore = await usdcToken.balanceOf(

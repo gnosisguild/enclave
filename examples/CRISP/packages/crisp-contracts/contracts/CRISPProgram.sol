@@ -54,7 +54,6 @@ contract CRISPProgram is IE3Program, Ownable {
   // Errors
   error CallerNotAuthorized();
   error E3AlreadyInitialized();
-  error E3Expired(uint256 e3Id);
   error EnclaveAddressZero();
   error Risc0VerifierAddressZero();
   error InvalidHonkVerifier();

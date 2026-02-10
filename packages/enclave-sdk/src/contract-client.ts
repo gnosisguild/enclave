@@ -102,7 +102,7 @@ export class ContractClient {
 
   /**
    * Request a new E3 computation
-   * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 inputDeadline, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
+   * request(uint32[2] threshold, uint256[2] inputWindow, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
     threshold: [number, number],

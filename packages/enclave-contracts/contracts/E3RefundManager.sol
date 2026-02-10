@@ -288,6 +288,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(dist.calculated, "Not calculated");
 
         // Add slashed funds to distribution
+        // Note: slashing should be finalized before claims are made.
         // 50% to requester, 50% to honest nodes for non-participation
         uint256 toRequester = amount / 2;
         uint256 toHonestNodes = amount - toRequester;
