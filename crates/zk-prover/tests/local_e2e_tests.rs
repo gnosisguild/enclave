@@ -16,7 +16,7 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
 use std::path::PathBuf;
-use tempfile::tempdir;
+use tempfile::TempDir;
 use tokio::{fs, process::Command};
 
 async fn find_bb() -> Option<PathBuf> {
@@ -43,7 +43,9 @@ async fn find_bb() -> Option<PathBuf> {
 }
 
 async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
-    let temp = tempdir().unwrap();
+    let target_tmp = env!("CARGO_TARGET_TMPDIR");
+    let temp = TempDir::new_in(target_tmp).unwrap();
+
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
     let bb_binary = noir_dir.join("bin").join("bb");
