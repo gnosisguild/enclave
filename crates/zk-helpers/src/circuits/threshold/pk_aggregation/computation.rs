@@ -11,7 +11,7 @@
 
 use crate::bigint_1d_to_json_values;
 use crate::compute_pk_aggregation_commitment;
-use crate::compute_pk_bit;
+use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
@@ -114,7 +114,7 @@ impl Computation for Bits {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let pk_bit = compute_pk_bit(&threshold_params);
+        let pk_bit = compute_modulus_bit(&threshold_params);
 
         Ok(Bits { pk_bit })
     }
@@ -156,7 +156,7 @@ impl Computation for Witness {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let bit_pk = compute_pk_bit(&threshold_params);
+        let bit_pk = compute_modulus_bit(&threshold_params);
         let moduli = threshold_params.moduli();
         let zkp_modulus = &get_zkp_modulus();
 
@@ -249,7 +249,7 @@ mod tests {
         let bounds = Bounds::compute(preset, &()).unwrap();
         let bits = Bits::compute(preset, &()).unwrap();
 
-        let expected_bits = compute_pk_bit(&threshold_params);
+        let expected_bits = compute_modulus_bit(&threshold_params);
 
         assert_eq!(bounds.pk_bound, BigUint::from(34359701504u128));
         assert_eq!(bits.pk_bit, expected_bits);

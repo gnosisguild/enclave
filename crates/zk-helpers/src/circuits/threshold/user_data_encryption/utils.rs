@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::crt::fhe_poly_to_crt_centered;
-use crate::utils::{compute_pk_bit, get_zkp_modulus, ZkHelpersUtilsError};
+use crate::utils::{compute_modulus_bit, get_zkp_modulus, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 
@@ -94,7 +94,7 @@ pub fn compute_public_key_commitment(
         ))
     })?;
 
-    let pk_bit = compute_pk_bit(params);
+    let pk_bit = compute_modulus_bit(params);
     let commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;
@@ -139,7 +139,7 @@ pub fn compute_ciphertext_commitment(
         ))
     })?;
 
-    let pk_bit = compute_pk_bit(params);
+    let pk_bit = compute_modulus_bit(params);
     let commitment = compute_ciphertext_commitment(&ct0is, &ct1is, pk_bit);
 
     let bytes = commitment.to_bytes_be().1;

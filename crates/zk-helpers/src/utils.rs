@@ -151,14 +151,14 @@ pub fn calculate_bit_width(bound: BigInt) -> u32 {
     bound.bits() as u32
 }
 
-/// Computes the bit width of the public key.
+/// Computes the bit width of ring elements (coefficients bounded by the coefficient modulus).
 ///
 /// # Arguments
 /// * `params` - BFV parameters
 ///
 /// # Returns
-/// The bit width of the public key
-pub fn compute_pk_bit(params: &BfvParameters) -> u32 {
+/// The bit width of ring elements (coefficients bounded by the coefficient modulus)
+pub fn compute_modulus_bit(params: &BfvParameters) -> u32 {
     let moduli = params.moduli();
     let modulus = BigInt::from(moduli.iter().copied().max().unwrap());
     let bound = (modulus - BigInt::from(1)) / BigInt::from(2);

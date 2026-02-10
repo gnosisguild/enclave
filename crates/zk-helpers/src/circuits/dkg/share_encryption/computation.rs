@@ -21,7 +21,7 @@ use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::get_zkp_modulus;
 use crate::polynomial_to_toml_json;
 use crate::ring::{cyclotomic_polynomial, decompose_residue};
-use crate::utils::{compute_msg_bit, compute_pk_bit};
+use crate::utils::{compute_msg_bit, compute_modulus_bit};
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
@@ -353,7 +353,7 @@ impl Computation for Witness {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let ctx = dkg_params.ctx_at_level(input.plaintext.level())?;
 
-        let pk_bit = compute_pk_bit(&dkg_params);
+        let pk_bit = compute_modulus_bit(&dkg_params);
         let msg_bit = compute_msg_bit(&dkg_params);
 
         let pk = input.public_key.clone();

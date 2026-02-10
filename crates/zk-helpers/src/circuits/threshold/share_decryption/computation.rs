@@ -12,7 +12,7 @@
 
 use crate::calculate_bit_width;
 use crate::circuits::commitments::compute_aggregated_shares_commitment;
-use crate::compute_pk_bit;
+use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
 use crate::get_zkp_modulus;
@@ -318,9 +318,9 @@ impl Computation for Witness {
         d.reduce_uniform(zkp_modulus);
 
         // Compute commitments to s and e (matches circuit's commitment functions)
-        let pk_bit = compute_pk_bit(&threshold_params);
-        let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, pk_bit);
-        let expected_e_sm_commitment = compute_aggregated_shares_commitment(&e_sm, pk_bit);
+        let modulus_bit = compute_modulus_bit(&threshold_params);
+        let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, modulus_bit);
+        let expected_e_sm_commitment = compute_aggregated_shares_commitment(&e_sm, modulus_bit);
 
         Ok(Witness {
             ct0,

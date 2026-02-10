@@ -7,7 +7,7 @@
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::crt_polynomial_to_toml_json;
-use e3_zk_helpers::utils::compute_pk_bit;
+use e3_zk_helpers::utils::compute_modulus_bit;
 use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
@@ -97,7 +97,7 @@ impl CiphertextAdditionWitness {
         r0.reduce_uniform(zkp_modulus);
         r1.reduce_uniform(zkp_modulus);
 
-        let pk_bit = compute_pk_bit(params);
+        let pk_bit = compute_modulus_bit(params);
         let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, pk_bit);
 
         Ok(CiphertextAdditionWitness {

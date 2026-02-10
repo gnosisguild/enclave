@@ -19,7 +19,7 @@ use crate::polynomial_to_toml_json;
 use crate::ring::{cyclotomic_polynomial, decompose_residue};
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
-use crate::utils::compute_pk_bit;
+use crate::utils::compute_modulus_bit;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -360,7 +360,7 @@ impl Computation for Witness {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
-        let pk_bit = compute_pk_bit(&threshold_params);
+        let pk_bit = compute_modulus_bit(&threshold_params);
 
         let pk = input.public_key.clone();
         let pt = input.plaintext.clone();
