@@ -87,14 +87,15 @@ mod tests {
         CiphernodesCommitteeSize,
     };
 
-    use e3_fhe_params::DEFAULT_BFV_PRESET;
+    use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            PkGenerationCircuitInput::generate_sample(DEFAULT_BFV_PRESET, committee).unwrap();
-        let witness = Witness::compute(DEFAULT_BFV_PRESET, &sample).unwrap();
+            PkGenerationCircuitInput::generate_sample(BfvPreset::InsecureThreshold512, committee)
+                .unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         assert_eq!(witness.pk0is.limbs.len(), 2);
         assert_eq!(witness.a.limbs.len(), 2);

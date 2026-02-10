@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::crt::fhe_poly_to_crt_centered;
 use crate::utils::{compute_pk_bit, get_zkp_modulus, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
@@ -29,14 +30,8 @@ pub fn bfv_ciphertext_to_greco(
     let moduli = params.moduli();
     let zkp_modulus = get_zkp_modulus();
 
-    let mut ct0is = CrtPolynomial::from_fhe_polynomial(&ciphertext.c[0]);
-    let mut ct1is = CrtPolynomial::from_fhe_polynomial(&ciphertext.c[1]);
-
-    ct0is.reverse();
-    ct1is.reverse();
-
-    ct0is.center(&moduli)?;
-    ct1is.center(&moduli)?;
+    let mut ct0is = fhe_poly_to_crt_centered(&ciphertext.c[0], moduli)?;
+    let mut ct1is = fhe_poly_to_crt_centered(&ciphertext.c[1], moduli)?;
 
     ct0is.reduce_uniform(&zkp_modulus);
     ct1is.reduce_uniform(&zkp_modulus);
@@ -65,14 +60,8 @@ pub fn bfv_public_key_to_greco(
     let moduli = params.moduli();
     let zkp_modulus = get_zkp_modulus();
 
-    let mut pk0is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[0]);
-    let mut pk1is = CrtPolynomial::from_fhe_polynomial(&public_key.c.c[1]);
-
-    pk0is.reverse();
-    pk1is.reverse();
-
-    pk0is.center(&moduli)?;
-    pk1is.center(&moduli)?;
+    let mut pk0is = fhe_poly_to_crt_centered(&public_key.c.c[0], moduli)?;
+    let mut pk1is = fhe_poly_to_crt_centered(&public_key.c.c[1], moduli)?;
 
     pk0is.reduce_uniform(&zkp_modulus);
     pk1is.reduce_uniform(&zkp_modulus);
@@ -175,7 +164,6 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::threshold::user_data_encryption::computation::Witness;
-    use crate::threshold::user_data_encryption::sample::UserDataEncryptionSample;
     use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use fhe_traits::DeserializeParametrized;
@@ -183,16 +171,10 @@ mod tests {
     #[test]
     fn test_bfv_public_key_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
+        let sample =
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
 
-        let witness = Witness::compute(
-            BfvPreset::InsecureThreshold512,
-            &UserDataEncryptionCircuitInput {
-                public_key: sample.public_key.clone(),
-                plaintext: sample.plaintext,
-            },
-        )
-        .unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Convert using our function
         let (actual_pk0is, actual_pk1is) =
@@ -207,16 +189,10 @@ mod tests {
     fn test_bfv_ciphertext_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
-        let sample = UserDataEncryptionSample::generate(BfvPreset::InsecureThreshold512);
+        let sample =
+            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
 
-        let witness = Witness::compute(
-            BfvPreset::InsecureThreshold512,
-            &UserDataEncryptionCircuitInput {
-                public_key: sample.public_key.clone(),
-                plaintext: sample.plaintext,
-            },
-        )
-        .unwrap();
+        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let ciphertext = Ciphertext::from_bytes(&witness.ciphertext, &threshold_params).unwrap();
 
