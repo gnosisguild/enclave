@@ -19,7 +19,10 @@ impl Provable for ShareComputationCircuit {
     type Input = ShareComputationCircuitData;
 
     fn circuit(&self) -> CircuitName {
-        CircuitName::ShareComputation
+        match self.dkg_input_type {
+            DkgInputType::SecretKey => CircuitName::SkShareComputation,
+            DkgInputType::SmudgingNoise => CircuitName::ESmShareComputation,
+        }
     }
 
     fn build_witness(
@@ -30,16 +33,24 @@ impl Provable for ShareComputationCircuit {
         let witness = Witness::compute(preset.clone(), input)
             .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
 
-        let secret_key_name = match input.dkg_input_type {
-            DkgInputType::SecretKey => "sk_secret",
-            DkgInputType::SmudgingNoise => "e_sm_secret",
-        };
-    
         let mut inputs = InputMap::new();
-        inputs.insert(
-            secret_key_name.to_string(),
-            crt_polynomial_to_array(&witness.secret_crt)?,
-        );
+
+        // Secret: SK is a single Polynomial<N>, E_SM is [Polynomial<N>; L]
+        match self.dkg_input_type {
+            DkgInputType::SecretKey => {
+                inputs.insert(
+                    "sk_secret".to_string(),
+                    polynomial_to_array(witness.secret_crt.limb(0))?,
+                );
+            }
+            DkgInputType::SmudgingNoise => {
+                inputs.insert(
+                    "e_sm_secret".to_string(),
+                    crt_polynomial_to_array(&witness.secret_crt)?,
+                );
+            }
+        }
+    
         inputs.insert(
             "y".to_string(),
             vec3d_to_input_value(&witness.y),

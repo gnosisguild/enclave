@@ -321,7 +321,7 @@ async fn test_share_computation_sk_commitment_consistency() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SecretKey);
+    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SecretKey).unwrap();
 
     let prover = ZkProver::new(&backend);
     let circuit = ShareComputationCircuit;
@@ -379,7 +379,7 @@ async fn test_share_computation_e_sm_commitment_consistency() {
         .unwrap();
 
     let preset = BfvPreset::InsecureThreshold512;
-    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SmudgingNoise);
+    let sample = ShareComputationCircuitInput::generate_sample(preset, CiphernodesCommitteeSize::Small.values(), e3_zk_helpers::computation::DkgInputType::SmudgingNoise).unwrap();
 
     let prover = ZkProver::new(&backend);
     let circuit = ShareComputationCircuit;

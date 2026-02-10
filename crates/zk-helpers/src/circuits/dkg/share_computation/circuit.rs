@@ -13,7 +13,15 @@ use ndarray::Array2;
 use num_bigint::BigInt;
 
 #[derive(Debug)]
-pub struct ShareComputationCircuit;
+pub struct ShareComputationCircuit {
+    pub dkg_input_type: DkgInputType,
+}
+
+impl ShareComputationCircuit {
+    pub fn new(dkg_input_type: DkgInputType) -> Self {
+        Self { dkg_input_type }
+    }
+}
 
 impl Circuit for ShareComputationCircuit {
     const NAME: &'static str = "share-computation";
