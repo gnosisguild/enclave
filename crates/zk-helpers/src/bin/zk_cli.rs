@@ -256,6 +256,7 @@ fn main() -> Result<()> {
 
     run_with_spinner(|| {
         let circuit_name = circuit_meta.name();
+        let committee = CiphernodesCommitteeSize::Small.values();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
                 let sample = PkCircuitInput::generate_sample(preset);
@@ -266,7 +267,7 @@ fn main() -> Result<()> {
             name if name == <ShareComputationCircuit as Circuit>::NAME => {
                 let sample = ShareComputationCircuitInput::generate_sample(
                     preset,
-                    CiphernodesCommitteeSize::Small,
+                    committee,
                     dkg_input_type,
                 );
 
@@ -279,7 +280,7 @@ fn main() -> Result<()> {
                 })?;
                 let sample = ShareEncryptionCircuitInput::generate_sample(
                     preset,
-                    CiphernodesCommitteeSize::Small,
+                    committee,
                     dkg_input_type,
                     sd.z,
                     sd.lambda,
@@ -295,10 +296,7 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkGenerationCircuit as Circuit>::NAME => {
-                let sample = PkGenerationCircuitInput::generate_sample(
-                    preset,
-                    CiphernodesCommitteeSize::Small.values(),
-                )?;
+                let sample = PkGenerationCircuitInput::generate_sample(preset, committee)?;
 
                 let circuit = PkGenerationCircuit;
                 circuit.codegen(preset, &sample)?
@@ -306,7 +304,7 @@ fn main() -> Result<()> {
             name if name == <DkgShareDecryptionCircuit as Circuit>::NAME => {
                 let sample = DkgShareDecryptionCircuitInput::generate_sample(
                     preset,
-                    CiphernodesCommitteeSize::Small,
+                    committee,
                     dkg_input_type,
                 )?;
 
@@ -314,19 +312,14 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkAggregationCircuit as Circuit>::NAME => {
-                let sample = PkAggregationCircuitInput::generate_sample(
-                    preset,
-                    CiphernodesCommitteeSize::Small.values(),
-                )?;
+                let sample = PkAggregationCircuitInput::generate_sample(preset, committee)?;
 
                 let circuit = PkAggregationCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ThresholdShareDecryptionCircuit as Circuit>::NAME => {
-                let sample = ThresholdShareDecryptionCircuitInput::generate_sample(
-                    preset,
-                    CiphernodesCommitteeSize::Small.values(),
-                )?;
+                let sample =
+                    ThresholdShareDecryptionCircuitInput::generate_sample(preset, committee)?;
 
                 let circuit = ThresholdShareDecryptionCircuit;
                 circuit.codegen(preset, &sample)?

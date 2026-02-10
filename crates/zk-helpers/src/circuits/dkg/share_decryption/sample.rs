@@ -6,9 +6,9 @@
 
 //! Sample data generation for the share-decryption circuit: honest ciphertexts, sum ciphertexts, secret key, and message.
 
-use crate::ciphernodes_committee::CiphernodesCommitteeSize;
 use crate::circuits::dkg::share_decryption::circuit::ShareDecryptionCircuitInput;
 use crate::computation::DkgInputType;
+use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -25,7 +25,7 @@ impl ShareDecryptionCircuitInput {
     /// Generates sample data for the share-decryption circuit (decrypts a sum of honest ciphertexts under DKG secret key).
     pub fn generate_sample(
         preset: BfvPreset,
-        committee: CiphernodesCommitteeSize,
+        committee: CiphernodesCommittee,
         dkg_input_type: DkgInputType,
     ) -> Result<Self, CircuitsErrors> {
         let (threshold_params, dkg_params) = build_pair_for_preset(preset).map_err(|e| {
@@ -36,7 +36,6 @@ impl ShareDecryptionCircuitInput {
             .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
 
         let mut rng = thread_rng();
-        let committee = committee.values();
 
         let dkg_secret_key = SecretKey::random(&dkg_params, &mut rng);
         let dkg_public_key = PublicKey::new(&dkg_secret_key, &mut rng);
@@ -147,7 +146,7 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SecretKey,
         )
         .unwrap();
@@ -164,7 +163,7 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee.clone(),
             DkgInputType::SmudgingNoise,
         )
         .unwrap();
