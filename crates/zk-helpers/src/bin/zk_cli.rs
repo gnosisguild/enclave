@@ -220,7 +220,7 @@ fn main() -> Result<()> {
     }
 
     let write_prover_toml = args.toml;
-    // Only share-computation has a witness-type choice (secret-key vs smudging-noise). pk always uses secret key.
+    // DKG circuits have a witness-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
     let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
         || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;

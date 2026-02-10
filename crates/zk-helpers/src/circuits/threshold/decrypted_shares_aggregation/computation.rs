@@ -410,7 +410,6 @@ mod tests {
         assert_eq!(out.witness.party_ids.len(), committee.threshold + 1);
         assert_eq!(out.witness.message.len(), configs.max_msg_non_zero_coeffs);
         assert_eq!(out.witness.u_global.len(), configs.max_msg_non_zero_coeffs);
-        assert_eq!(out.bounds.delta, out.bounds.delta); // sanity
         assert!(out.bits.noise_bit > 0);
     }
 }

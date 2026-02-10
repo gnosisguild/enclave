@@ -30,6 +30,13 @@ pub fn lagrange_recover_at_zero(
     shares: &[BigInt],
     modulus: u64,
 ) -> Result<u64, CircuitsErrors> {
+    if party_ids.len() != shares.len() {
+        return Err(CircuitsErrors::Other(format!(
+            "lagrange_recover_at_zero: party_ids.len() {} != shares.len() {}",
+            party_ids.len(),
+            shares.len()
+        )));
+    }
     let m = BigInt::from(modulus);
     let mut secret = BigInt::zero();
     for (i, &x_i) in party_ids.iter().enumerate() {
