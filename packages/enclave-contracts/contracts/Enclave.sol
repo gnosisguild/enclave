@@ -856,6 +856,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(config.dkgWindow > 0, "Invalid DKG window");
         require(config.computeWindow > 0, "Invalid compute window");
         require(config.decryptionWindow > 0, "Invalid decryption window");
+        require(config.gracePeriod > 0, "Invalid grace period");
 
         _timeoutConfig = config;
 
