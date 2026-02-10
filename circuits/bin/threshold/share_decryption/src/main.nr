@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use lib::configs::secure::threshold::{
+use lib::configs::default::threshold::{
     L, N, SHARE_DECRYPTION_BIT_CT, SHARE_DECRYPTION_BIT_D, SHARE_DECRYPTION_BIT_E_SM,
     SHARE_DECRYPTION_BIT_R1, SHARE_DECRYPTION_BIT_R2, SHARE_DECRYPTION_BIT_SK,
     SHARE_DECRYPTION_CONFIGS,

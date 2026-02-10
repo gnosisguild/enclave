@@ -219,8 +219,7 @@ fn main() -> Result<()> {
     // Only share-computation has a witness-type choice (secret-key vs smudging-noise). pk always uses secret key.
     let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
-        || circuit_meta.name() == DkgShareDecryptionCircuit::NAME
-        || circuit_meta.name() == ThresholdShareDecryptionCircuit::NAME;
+        || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;
 
     let dkg_input_type = if has_witness_type {
         // Share-computation: require --witness when generating Prover.toml; default secret-key for configs-only.

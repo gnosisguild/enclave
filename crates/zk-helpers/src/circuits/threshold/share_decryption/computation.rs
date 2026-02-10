@@ -14,6 +14,7 @@ use crate::calculate_bit_width;
 use crate::circuits::commitments::compute_aggregated_shares_commitment;
 use crate::compute_pk_bit;
 use crate::crt_polynomial_to_toml_json;
+use crate::decompose_residue;
 use crate::get_zkp_modulus;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitInput;
@@ -280,61 +281,7 @@ impl Computation for Witness {
             };
             assert_eq!((d_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-            // Check whether d_share_hat mod R_qi (the ring) is equal to d_share
-            let mut d_share_hat_mod_rqi = d_share_hat.reduce_by_cyclotomic(&cyclo).unwrap();
-
-            d_share_hat_mod_rqi.reduce(&qi);
-            d_share_hat_mod_rqi.center(&qi);
-
-            assert_eq!(&d_share, &d_share_hat_mod_rqi);
-
-            // Compute r2_numerator = d_share - d_share_hat (in Z)
-            // This should be divisible by (X^N + 1) and q_i
-            let r2_numerator = d_share.sub(&d_share_hat);
-
-            let mut r2_numerator_centered = r2_numerator.clone();
-            r2_numerator_centered.reduce(&qi);
-            r2_numerator_centered.center(&qi);
-
-            // First, compute r2 = (d_share - d_share_hat) / (X^N + 1) mod Z_qi
-            let cyclo_polynomial = Polynomial::new(cyclo.clone());
-            let (r2, r2_rem) = r2_numerator_centered.div(&cyclo_polynomial).unwrap();
-
-            assert!(r2_rem.is_zero());
-            assert_eq!((r2.coefficients().len() as u64) - 1, n - 2); // Order(r2) = N - 2
-
-            // Assert that (d_share - d_share_hat) = (r2 * cyclo) mod Z_qi
-            let r2_cyclo_times = r2.mul(&cyclo_polynomial);
-
-            let mut r2_cyclo_times_centered = r2_cyclo_times.clone();
-            r2_cyclo_times_centered.reduce(&qi);
-            r2_cyclo_times_centered.center(&qi);
-
-            assert_eq!(&r2_numerator_centered, &r2_cyclo_times_centered);
-            assert_eq!(
-                (r2_cyclo_times.coefficients().len() as u64) - 1,
-                2 * (n - 1)
-            );
-
-            // Now compute r1 = (d_share - d_share_hat - r2 * cyclo) / q_i mod Z_p
-            let r1_numerator = r2_numerator.sub(&r2_cyclo_times);
-
-            assert_eq!((r1_numerator.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-            let qi_polynomial = Polynomial::new(vec![qi.clone()]);
-            let (r1, r1_rem) = r1_numerator.div(&qi_polynomial).unwrap();
-
-            assert!(r1_rem.is_zero());
-            assert_eq!((r1.coefficients().len() as u64) - 1, 2 * (n - 1)); // Order(r1) = 2*(N-1)
-
-            assert_eq!(&r1_numerator, &r1.mul(&qi_polynomial));
-
-            // Assert that d_share = ct0 + ct1 * s + e + r2 * cyclo + r1 * q_i mod Z_p
-
-            let r1_qi_times = r1.scalar_mul(&qi);
-            let d_share_calculated = d_share_hat.add(&r1_qi_times).add(&r2_cyclo_times);
-
-            assert_eq!(&d_share, &d_share_calculated.trim_leading_zeros());
+            let (r1, r2) = decompose_residue(&d_share, &d_share_hat, &qi, &cyclo, n);
 
             (i, ct0, ct1, s, e, d_share, r2, r1)
         })

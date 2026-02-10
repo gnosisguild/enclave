@@ -30,8 +30,8 @@ pub struct ShareDecryptionCircuitInput {
 }
 
 impl Circuit for ShareDecryptionCircuit {
-    const NAME: &'static str = "share-decryption";
-    const PREFIX: &'static str = "SHARE_DECRYPTION";
+    const NAME: &'static str = "threshold-share-decryption";
+    const PREFIX: &'static str = "THRESHOLD_SHARE_DECRYPTION";
     const SUPPORTED_PARAMETER: ParameterType = ParameterType::THRESHOLD;
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
