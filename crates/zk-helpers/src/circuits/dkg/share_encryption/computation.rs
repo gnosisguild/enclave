@@ -21,7 +21,7 @@ use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::get_zkp_modulus;
 use crate::polynomial_to_toml_json;
 use crate::ring::{cyclotomic_polynomial, decompose_residue};
-use crate::utils::{compute_msg_bit, compute_modulus_bit};
+use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
