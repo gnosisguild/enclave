@@ -17,7 +17,7 @@ use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::utils::compute_pk_bit;
+use e3_zk_helpers::utils::compute_modulus_bit;
 use e3_zk_helpers::CircuitComputation;
 use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
@@ -253,7 +253,7 @@ impl ZKInputsGenerator {
         ct0: &CrtPolynomial,
         ct1: &CrtPolynomial,
     ) -> BigInt {
-        let pk_bit = compute_pk_bit(&self.bfv_params);
+        let pk_bit = compute_modulus_bit(&self.bfv_params);
 
         compute_ciphertext_commitment(ct0, ct1, pk_bit)
     }

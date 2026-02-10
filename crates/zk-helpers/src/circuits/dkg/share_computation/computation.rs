@@ -271,9 +271,10 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         );
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
@@ -285,9 +286,10 @@ mod tests {
 
     #[test]
     fn test_witness_smudging_noise_secret_consistency() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SmudgingNoise,
         );
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
@@ -308,9 +310,10 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareComputationCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
         );
 

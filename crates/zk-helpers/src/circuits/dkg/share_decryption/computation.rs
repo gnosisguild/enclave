@@ -229,11 +229,13 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
@@ -244,11 +246,13 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
@@ -263,11 +267,13 @@ mod tests {
 
     #[test]
     fn test_witness_decryption_consistency() {
+        let committee = CiphernodesCommitteeSize::Small.values();
         let sample = ShareDecryptionCircuitInput::generate_sample(
             BfvPreset::InsecureThreshold512,
-            CiphernodesCommitteeSize::Small,
+            committee,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Witness should have one row per honest party

@@ -108,23 +108,20 @@ pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserD
 
 /************************************
 -------------------------------------
-share_decryption (GRECO)
+share_decryption
 -------------------------------------
 ************************************/
 
-// share_decryption - bit parameters
-pub global SHARE_DECRYPTION_BIT_CT: u32 = 36;
-pub global SHARE_DECRYPTION_BIT_SK: u32 = 36;
-pub global SHARE_DECRYPTION_BIT_E_SM: u32 = 36;
-pub global SHARE_DECRYPTION_BIT_R1: u32 = 44;
-pub global SHARE_DECRYPTION_BIT_R2: u32 = 36;
-pub global SHARE_DECRYPTION_BIT_D: u32 = 36;
+pub global SHARE_DECRYPTION_BIT_CT: u32 = 35;
+pub global SHARE_DECRYPTION_BIT_SK: u32 = 35;
+pub global SHARE_DECRYPTION_BIT_E_SM: u32 = 35;
+pub global SHARE_DECRYPTION_BIT_R1: u32 = 43;
+pub global SHARE_DECRYPTION_BIT_R2: u32 = 35;
+pub global SHARE_DECRYPTION_BIT_D: u32 = 35;
 
-// share_decryption - bounds
 pub global SHARE_DECRYPTION_R1_BOUNDS: [Field; L] = [8796083584897, 8796061564801];
 pub global SHARE_DECRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-// share_decryption - configs
 pub global SHARE_DECRYPTION_CONFIGS: ShareDecryptionConfigs<L> =
     ShareDecryptionConfigs::new(QIS, SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS);
 
