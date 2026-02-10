@@ -87,7 +87,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
 
         let artifacts = ShareDecryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
@@ -104,7 +105,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
 
         let artifacts = ShareDecryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

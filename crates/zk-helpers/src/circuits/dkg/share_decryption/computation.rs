@@ -233,7 +233,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
@@ -248,7 +249,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let constants = Configs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         let json = constants.to_json().unwrap();
@@ -267,7 +269,8 @@ mod tests {
             BfvPreset::InsecureThreshold512,
             CiphernodesCommitteeSize::Small,
             DkgInputType::SecretKey,
-        );
+        )
+        .unwrap();
         let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Witness should have one row per honest party
