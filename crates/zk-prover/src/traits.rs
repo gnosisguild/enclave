@@ -27,11 +27,7 @@ pub trait Provable: Send + Sync {
 
     fn circuit(&self) -> CircuitName;
 
-    fn build_witness(
-        &self,
-        params: &Self::Params,
-        input: &Self::Input,
-    ) -> Result<InputMap, ZkError>
+    fn build_witness(&self, params: &Self::Params, input: &Self::Input) -> Result<InputMap, ZkError>
     where
         Self::Witness: Computation<Preset = Self::Params, Input = Self::Input> + serde::Serialize,
         <Self::Witness as Computation>::Error: Display,
