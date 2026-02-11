@@ -10,14 +10,14 @@
 //! for codegen and tests.
 
 use crate::{
-    threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput, CircuitsErrors,
+    threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData, CircuitsErrors,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::FheEncoder;
 use rand::thread_rng;
 
-impl UserDataEncryptionCircuitInput {
+impl UserDataEncryptionCircuitData {
     /// Generates a random secret key, public key, and plaintext for the given BFV parameters.
     pub fn generate_sample(preset: BfvPreset) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) = build_pair_for_preset(preset).map_err(|e| {
@@ -41,13 +41,13 @@ impl UserDataEncryptionCircuitInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+    use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_sample() {
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+            UserDataEncryptionCircuitData::generate_sample(BfvPreset::InsecureThreshold512)
                 .unwrap();
 
         assert_eq!(sample.public_key.c.c.len(), 2);

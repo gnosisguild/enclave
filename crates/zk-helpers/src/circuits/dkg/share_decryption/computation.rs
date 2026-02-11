@@ -4,15 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the share-decryption circuit: configs, bounds, bit widths, and witness.
+//! Computation types for the share-decryption circuit: configs, bounds, bit widths, and input.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) honest ciphertexts and secret key. Witness values are normalized for the ZKP
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) honest ciphertexts and secret key. Input values are normalized for the ZKP
 //! field so the Noir circuit's range checks and commitment checks succeed.
 
 use crate::circuits::commitments::compute_share_encryption_commitment_from_message;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
-use crate::dkg::share_decryption::ShareDecryptionCircuitInput;
+use crate::dkg::share_decryption::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{bigint_2d_to_json_values, calculate_bit_width, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
@@ -24,33 +24,33 @@ use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
 pub struct ShareDecryptionOutput {
     /// Coefficient bounds used to derive bit widths.
     pub bounds: Bounds,
     /// Bit widths used by the Noir prover for packing.
     pub bits: Bits,
-    /// Witness data for the share-decryption circuit.
-    pub witness: Witness,
+    /// Input for the share-decryption circuit.
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`ShareDecryptionCircuit`].
 impl CircuitComputation for ShareDecryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Output = ShareDecryptionOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, input)?;
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(ShareDecryptionOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -79,12 +79,12 @@ pub struct Bits {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bounds {}
 
-/// Witness data for the share-decryption circuit: expected commitments and decrypted shares.
+/// Input for the share-decryption circuit: expected commitments and decrypted shares.
 ///
 /// Coefficients are reduced to the ZKP field modulus for serialization. The circuit verifies
 /// that decrypted shares match the expected commitments from the share-encryption circuit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     /// Expected message commitments from share-encryption (CIRCUIT 3) for H honest parties: [party_idx][mod_idx].
     pub expected_commitments: Vec<Vec<BigInt>>, // [H][L]
     /// Decrypted share coefficients per party and modulus: [party_idx][mod_idx][coeff_idx].
@@ -93,18 +93,18 @@ pub struct Witness {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         let n = dkg_params.degree() as usize;
         let l = dkg_params.moduli().len();
-        let h = input.honest_ciphertexts.len();
+        let h = data.honest_ciphertexts.len();
 
-        let bounds = Bounds::compute(preset, &input)?;
+        let bounds = Bounds::compute(preset, &data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -119,10 +119,10 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
@@ -134,20 +134,20 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(_: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         Ok(Bounds {})
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let threshold_l = threshold_params.moduli().len();
@@ -158,7 +158,7 @@ impl Computation for Witness {
         let msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
 
         // Decrypt each ciphertext and compute its commitment
-        for party_cts in input.honest_ciphertexts.iter() {
+        for party_cts in data.honest_ciphertexts.iter() {
             if party_cts.len() < threshold_l {
                 return Err(CircuitsErrors::Other(format!(
                     "honest_ciphertexts party has {} ciphertexts but threshold_l is {}; \
@@ -171,7 +171,7 @@ impl Computation for Witness {
             let mut party_shares = Vec::with_capacity(threshold_l);
             for mod_idx in 0..threshold_l {
                 // Decrypt the ciphertext to get the plaintext share
-                let decrypted_pt = input.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                let decrypted_pt = data.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
                 let share_coeffs = decrypted_pt.value.deref().to_vec();
                 party_commitments.push(compute_share_encryption_commitment_from_message(
                     &Polynomial::from_u64_vector(share_coeffs.clone()),
@@ -188,14 +188,14 @@ impl Computation for Witness {
             decrypted_shares.push(party_shares);
         }
 
-        Ok(Witness {
+        Ok(Inputs {
             expected_commitments,
             decrypted_shares,
         })
     }
 
-    // Used as witness for Nargo execution.
-    /// Serializes witness so that `decrypted_shares` matches Noir's `[[Polynomial<N>; L]; H]`:
+    // Used as input for Nargo execution.
+    /// Serializes input so that `decrypted_shares` matches Noir's `[[Polynomial<N>; L]; H]`:
     /// each polynomial is `{ "coefficients": [string, ...] }`.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let expected_commitments = bigint_2d_to_json_values(&self.expected_commitments);
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -266,23 +266,23 @@ mod tests {
     }
 
     #[test]
-    fn test_witness_decryption_consistency() {
+    fn test_input_decryption_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
         )
         .unwrap();
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
-        // Witness should have one row per honest party
+        // Inputs should have one row per honest party
         assert_eq!(
-            witness.expected_commitments.len(),
+            inputs.expected_commitments.len(),
             sample.honest_ciphertexts.len()
         );
         assert_eq!(
-            witness.decrypted_shares.len(),
+            inputs.decrypted_shares.len(),
             sample.honest_ciphertexts.len()
         );
     }

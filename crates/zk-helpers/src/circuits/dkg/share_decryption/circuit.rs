@@ -24,9 +24,9 @@ impl Circuit for ShareDecryptionCircuit {
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
 
-/// Input to the share-decryption circuit: secret key and honest parties' ciphertexts.
-pub struct ShareDecryptionCircuitInput {
-    /// DKG secret key used to decrypt (private witness).
+/// Data for the share-decryption circuit: secret key and honest parties' ciphertexts.
+pub struct ShareDecryptionCircuitData {
+    /// DKG secret key used to decrypt (private input).
     pub secret_key: SecretKey,
     /// Ciphertexts from H honest parties: [party_idx][mod_idx] (one ciphertext per party per TRBFV modulus).
     pub honest_ciphertexts: Vec<Vec<Ciphertext>>,

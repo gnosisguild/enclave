@@ -10,8 +10,8 @@ use e3_fhe_params::BfvPreset;
 
 use crate::circuits::computation::Computation;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
-use crate::threshold::pk_generation::computation::{Configs, Witness};
-use crate::threshold::pk_generation::PkGenerationCircuitInput;
+use crate::threshold::pk_generation::computation::{Configs, Inputs};
+use crate::threshold::pk_generation::PkGenerationCircuitData;
 use crate::utils::join_display;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
@@ -21,24 +21,22 @@ use crate::{Circuit, CodegenConfigs};
 /// Implementation of [`CircuitCodegen`] for [`PkGenerationCircuit`].
 impl CircuitCodegen for PkGenerationCircuit {
     type Preset = BfvPreset;
-    type Input = PkGenerationCircuitInput;
+    type Data = PkGenerationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
-        let configs = Configs::compute(preset, &input.committee)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
+        let configs = Configs::compute(preset, &data.committee)?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
     }
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }
@@ -127,7 +125,7 @@ mod tests {
 
     use crate::codegen::write_artifacts;
     use crate::threshold::pk_generation::computation::{Bits, Bounds};
-    use crate::threshold::pk_generation::PkGenerationCircuitInput;
+    use crate::threshold::pk_generation::PkGenerationCircuitData;
     use crate::CiphernodesCommitteeSize;
 
     use e3_fhe_params::BfvPreset;
@@ -137,7 +135,7 @@ mod tests {
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            PkGenerationCircuitInput::generate_sample(BfvPreset::InsecureThreshold512, committee)
+            PkGenerationCircuitData::generate_sample(BfvPreset::InsecureThreshold512, committee)
                 .unwrap();
         let artifacts = PkGenerationCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

@@ -159,6 +159,7 @@
     "coverage": "pnpm test --coverage",
     "deploy": "hardhat run scripts/run.ts",
     "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
+    "deploy:verifiers": "hardhat run scripts/deployVerifiers.ts",
     "upgrade:enclave": "hardhat run scripts/upgrade/enclave.ts",
     "upgrade:bondingRegistry": "hardhat run scripts/upgrade/bondingRegistry.ts",
     "upgrade:ciphernodeRegistryOwnable": "hardhat run scripts/upgrade/ciphernodeRegistryOwnable.ts",

@@ -23,8 +23,8 @@ impl Circuit for ShareComputationCircuit {
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
 
-pub struct ShareComputationCircuitInput {
-    /// Which secret type this input is for (determines which branch to use in witness).
+pub struct ShareComputationCircuitData {
+    /// Which secret type this data is for (determines which branch to use in data).
     pub dkg_input_type: DkgInputType,
     pub secret: CrtPolynomial,
     pub secret_sss: Vec<Array2<BigInt>>,

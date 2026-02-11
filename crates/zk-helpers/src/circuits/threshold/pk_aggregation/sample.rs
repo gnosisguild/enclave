@@ -10,7 +10,7 @@
 //! the public key shares and aggregated public key are used as input for codegen and tests.
 
 use crate::{
-    threshold::pk_aggregation::PkAggregationCircuitInput, CiphernodesCommittee, CircuitsErrors,
+    threshold::pk_aggregation::PkAggregationCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::CrtPolynomial;
@@ -22,7 +22,7 @@ use fhe::{
 use rand::rngs::OsRng;
 use rand::thread_rng;
 
-impl PkAggregationCircuitInput {
+impl PkAggregationCircuitData {
     pub fn generate_sample(
         preset: BfvPreset,
         committee: CiphernodesCommittee,
@@ -61,7 +61,7 @@ impl PkAggregationCircuitInput {
             CircuitsErrors::Sample(format!("Failed to aggregate public key: {:?}", e))
         })?;
 
-        Ok(PkAggregationCircuitInput {
+        Ok(PkAggregationCircuitData {
             committee,
             public_key,
             pk0_shares,
@@ -75,7 +75,7 @@ mod tests {
     use crate::{
         computation::Computation,
         threshold::pk_aggregation::computation::Configs,
-        threshold::pk_aggregation::{PkAggregationCircuitInput, Witness},
+        threshold::pk_aggregation::{Inputs, PkAggregationCircuitData},
         CiphernodesCommitteeSize,
     };
 
@@ -87,12 +87,12 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let configs = Configs::compute(preset, &()).unwrap();
 
-        let sample = PkAggregationCircuitInput::generate_sample(preset, committee).unwrap();
-        let witness = Witness::compute(preset, &sample).unwrap();
+        let sample = PkAggregationCircuitData::generate_sample(preset, committee).unwrap();
+        let inputs = Inputs::compute(preset, &sample).unwrap();
 
-        assert_eq!(witness.pk0.len(), sample.committee.h);
-        assert_eq!(witness.pk1.len(), sample.committee.h);
-        assert_eq!(witness.pk0_agg.limbs.len(), configs.l);
-        assert_eq!(witness.pk1_agg.limbs.len(), configs.l);
+        assert_eq!(inputs.pk0.len(), sample.committee.h);
+        assert_eq!(inputs.pk1.len(), sample.committee.h);
+        assert_eq!(inputs.pk0_agg.limbs.len(), configs.l);
+        assert_eq!(inputs.pk1_agg.limbs.len(), configs.l);
     }
 }

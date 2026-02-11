@@ -163,8 +163,8 @@ pub fn compute_ciphertext_commitment(
 mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
-    use crate::threshold::user_data_encryption::computation::Witness;
-    use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
+    use crate::threshold::user_data_encryption::computation::Inputs;
+    use crate::threshold::user_data_encryption::UserDataEncryptionCircuitData;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
     use fhe_traits::DeserializeParametrized;
 
@@ -172,18 +172,18 @@ mod tests {
     fn test_bfv_public_key_to_greco() {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+            UserDataEncryptionCircuitData::generate_sample(BfvPreset::InsecureThreshold512)
                 .unwrap();
 
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // Convert using our function
         let (actual_pk0is, actual_pk1is) =
             bfv_public_key_to_greco(&threshold_params, &sample.public_key).unwrap();
 
         // Verify the structure matches
-        assert_eq!(actual_pk0is, witness.pk0is);
-        assert_eq!(actual_pk1is, witness.pk1is);
+        assert_eq!(actual_pk0is, inputs.pk0is);
+        assert_eq!(actual_pk1is, inputs.pk1is);
     }
 
     #[test]
@@ -191,19 +191,19 @@ mod tests {
         let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
 
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+            UserDataEncryptionCircuitData::generate_sample(BfvPreset::InsecureThreshold512)
                 .unwrap();
 
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
-        let ciphertext = Ciphertext::from_bytes(&witness.ciphertext, &threshold_params).unwrap();
+        let ciphertext = Ciphertext::from_bytes(&inputs.ciphertext, &threshold_params).unwrap();
 
         // Convert using our function
         let (actual_ct0is, actual_ct1is) =
             bfv_ciphertext_to_greco(&threshold_params, &ciphertext).unwrap();
 
         // Verify the structure matches
-        assert_eq!(actual_ct0is, witness.ct0is);
-        assert_eq!(actual_ct1is, witness.ct1is);
+        assert_eq!(actual_ct0is, inputs.ct0is);
+        assert_eq!(actual_ct1is, inputs.ct1is);
     }
 }

@@ -6,7 +6,7 @@
 
 //! Sample data generation for the share-decryption circuit: honest ciphertexts, sum ciphertexts, secret key, and message.
 
-use crate::circuits::dkg::share_decryption::circuit::ShareDecryptionCircuitInput;
+use crate::circuits::dkg::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::computation::DkgInputType;
 use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
@@ -21,7 +21,7 @@ use fhe_traits::FheEncoder;
 use fhe_traits::FheEncrypter;
 use rand::thread_rng;
 
-impl ShareDecryptionCircuitInput {
+impl ShareDecryptionCircuitData {
     /// Generates sample data for the share-decryption circuit (decrypts a sum of honest ciphertexts under DKG secret key).
     pub fn generate_sample(
         preset: BfvPreset,
@@ -46,7 +46,7 @@ impl ShareDecryptionCircuitInput {
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
         let mut honest_ciphertexts: Vec<Vec<Ciphertext>> = Vec::new();
-        let num_honest = committee.n;
+        let num_honest = committee.h;
         for _ in 0..num_honest {
             let mut party_cts = Vec::new();
             for _ in 0..threshold_params.moduli().len() {
@@ -127,7 +127,7 @@ impl ShareDecryptionCircuitInput {
             honest_ciphertexts.push(party_cts);
         }
 
-        Ok(ShareDecryptionCircuitInput {
+        Ok(ShareDecryptionCircuitData {
             honest_ciphertexts,
             secret_key: dkg_secret_key,
         })
@@ -144,14 +144,14 @@ mod tests {
     #[test]
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,
         )
         .unwrap();
 
-        assert_eq!(sample.honest_ciphertexts.len(), committee.n);
+        assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
             BfvPreset::InsecureThreshold512.metadata().degree
@@ -161,14 +161,14 @@ mod tests {
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SmudgingNoise,
         )
         .unwrap();
 
-        assert_eq!(sample.honest_ciphertexts.len(), committee.n);
+        assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
             BfvPreset::InsecureThreshold512.metadata().degree

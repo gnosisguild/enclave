@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use crate::{
-    threshold::share_decryption::ShareDecryptionCircuitInput, CiphernodesCommittee, CircuitsErrors,
+    threshold::share_decryption::ShareDecryptionCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::CrtPolynomial;
@@ -25,7 +25,7 @@ use fhe_traits::{FheEncoder, FheEncrypter};
 use ndarray::ArrayView;
 use rand::{rngs::OsRng, thread_rng};
 
-impl ShareDecryptionCircuitInput {
+impl ShareDecryptionCircuitData {
     /// Generates a random secret key, public key, and plaintext for the given BFV parameters.
     pub fn generate_sample(
         preset: BfvPreset,
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn test_generate_template_succeeds_and_has_correct_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(PRESET, committee).unwrap();
+        let sample = ShareDecryptionCircuitData::generate_sample(PRESET, committee).unwrap();
 
         let degree = PRESET.metadata().degree;
         let num_moduli = PRESET.metadata().num_moduli;
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_generate_template_polynomials_consistent() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(PRESET, committee).unwrap();
+        let sample = ShareDecryptionCircuitData::generate_sample(PRESET, committee).unwrap();
 
         let n = sample.s.limbs.len();
         assert_eq!(sample.e.limbs.len(), n, "e must have same limb count as s");
@@ -312,8 +312,8 @@ mod tests {
     fn test_generate_template_repeatable() {
         let committee = CiphernodesCommitteeSize::Small.values();
 
-        let a = ShareDecryptionCircuitInput::generate_sample(PRESET, committee.clone()).unwrap();
-        let b = ShareDecryptionCircuitInput::generate_sample(PRESET, committee).unwrap();
+        let a = ShareDecryptionCircuitData::generate_sample(PRESET, committee.clone()).unwrap();
+        let b = ShareDecryptionCircuitData::generate_sample(PRESET, committee).unwrap();
 
         assert_eq!(a.public_key.c.c.len(), b.public_key.c.c.len());
         assert_eq!(a.s.limbs.len(), b.s.limbs.len());
