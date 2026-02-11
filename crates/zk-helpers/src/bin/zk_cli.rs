@@ -171,7 +171,6 @@ fn main() -> Result<()> {
     // Register all circuits in the registry (metadata only).
     let mut registry = CircuitRegistry::new();
     registry.register(Arc::new(PkCircuit));
-    // Registration — dkg_input_type doesn't matter here, registry only reads const metadata
     registry.register(Arc::new(ShareComputationCircuit));
     registry.register(Arc::new(UserDataEncryptionCircuit));
     registry.register(Arc::new(PkGenerationCircuit));
