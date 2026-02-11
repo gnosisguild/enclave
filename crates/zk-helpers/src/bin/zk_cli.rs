@@ -18,7 +18,7 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
     ShareComputationCircuit, ShareComputationCircuitInput,
 };
-use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
+use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_decryption::{
     ShareDecryptionCircuit as DkgShareDecryptionCircuit,
@@ -77,6 +77,7 @@ fn print_generation_info(
     dkg_input_type: DkgInputType,
     output: &std::path::Path,
     write_prover_toml: bool,
+    no_configs: bool,
 ) {
     let meta = preset.metadata();
     println!("  Circuit:  {}", circuit);
@@ -97,7 +98,9 @@ fn print_generation_info(
     }
     println!("  Output:   {}", output.display());
     println!("  Artifacts:");
-    if write_prover_toml {
+    if no_configs {
+        println!("    • Prover.toml only (--toml --no-configs)");
+    } else if write_prover_toml {
         println!("    • configs.nr");
         println!("    • Prover.toml");
     } else {
@@ -157,6 +160,9 @@ struct Cli {
     /// Also write Prover.toml (default: configs.nr only).
     #[arg(long, default_value = "false")]
     toml: bool,
+    /// When used with --toml: do not write configs.nr (e.g. for benchmarks where circuits use lib configs).
+    #[arg(long, default_value = "false")]
+    no_configs: bool,
 }
 
 fn main() -> Result<()> {
@@ -220,6 +226,7 @@ fn main() -> Result<()> {
     }
 
     let write_prover_toml = args.toml;
+    let no_configs = args.no_configs && args.toml;
     // DKG circuits have a witness-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
     let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
@@ -255,6 +262,7 @@ fn main() -> Result<()> {
         dkg_input_type.clone(),
         &args.output,
         write_prover_toml,
+        no_configs,
     );
 
     run_with_spinner(|| {
@@ -262,7 +270,7 @@ fn main() -> Result<()> {
         let committee = CiphernodesCommitteeSize::Small.values();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
-                let sample = PkCircuitInput::generate_sample(preset);
+                let sample = PkCircuitInput::generate_sample(preset)?;
 
                 let circuit = PkCircuit;
                 circuit.codegen(preset, &sample)?
@@ -272,7 +280,8 @@ fn main() -> Result<()> {
                     preset,
                     committee,
                     dkg_input_type,
-                );
+                )?;
+
                 let circuit = ShareComputationCircuit;
                 circuit.codegen(preset, &sample)?
             }
@@ -284,13 +293,13 @@ fn main() -> Result<()> {
                     dkg_input_type,
                     sd.z,
                     sd.lambda,
-                );
+                )?;
 
                 let circuit = ShareEncryptionCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
-                let sample = UserDataEncryptionCircuitInput::generate_sample(preset);
+                let sample = UserDataEncryptionCircuitInput::generate_sample(preset)?;
 
                 let circuit = UserDataEncryptionCircuit;
                 circuit.codegen(preset, &sample)?
@@ -328,7 +337,7 @@ fn main() -> Result<()> {
                 let sample = DecryptedSharesAggregationCircuitInput::generate_sample(
                     preset,
                     CiphernodesCommitteeSize::Small.values(),
-                );
+                )?;
 
                 let circuit = DecryptedSharesAggregationCircuit;
                 circuit.codegen(preset, &sample)?
@@ -336,12 +345,16 @@ fn main() -> Result<()> {
             name => return Err(anyhow!("circuit {} not yet implemented", name)),
         };
 
-        let toml = if write_prover_toml {
-            Some(&artifacts.toml)
+        if no_configs {
+            write_toml(&artifacts.toml, Some(args.output.as_path()))?;
         } else {
-            None
-        };
-        write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+            let toml = if write_prover_toml {
+                Some(&artifacts.toml)
+            } else {
+                None
+            };
+            write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+        }
         Ok(())
     })?;
 

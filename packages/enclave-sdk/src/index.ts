@@ -60,7 +60,7 @@ export {
   encodeBfvParams,
   encodeComputeProviderParams,
   encodeCustomParams,
-  calculateStartWindow,
+  calculateInputWindow,
   decodePlaintextOutput,
   type ComputeProviderParams,
 } from './utils'

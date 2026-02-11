@@ -61,7 +61,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
     fn handle(&mut self, msg: CommitteeRequested, ctx: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
-        let submission_deadline = msg.submission_deadline;
+        let committee_deadline = msg.committee_deadline;
 
         const FINALIZATION_BUFFER_SECONDS: u64 = 1;
 
@@ -85,12 +85,12 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
             fut.into_actor(self)
                 .then(move |current_timestamp, act, ctx| {
                     if let Some(current_timestamp) = current_timestamp {
-                        let seconds_until_deadline = if submission_deadline > current_timestamp {
-                            (submission_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
+                        let seconds_until_deadline = if committee_deadline > current_timestamp {
+                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
                         } else {
                             info!(
                                 e3_id = %e3_id_for_async,
-                                submission_deadline = submission_deadline,
+                                committee_deadline = committee_deadline,
                                 current_timestamp = current_timestamp,
                                 "Submission deadline already passed, finalizing with buffer"
                             );
@@ -99,7 +99,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
                         info!(
                             e3_id = %e3_id_for_async,
-                            submission_deadline = submission_deadline,
+                            committee_deadline = committee_deadline,
                             current_timestamp = current_timestamp,
                             seconds_to_wait = seconds_until_deadline,
                             "Scheduling committee finalization"

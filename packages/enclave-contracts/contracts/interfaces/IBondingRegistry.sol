@@ -174,6 +174,12 @@ interface IBondingRegistry {
     function isActive(address operator) external view returns (bool);
 
     /**
+     * @notice Get the number of currently active operators
+     * @return Number of active operators
+     */
+    function numActiveOperators() external view returns (uint256);
+
+    /**
      * @notice Check if operator has deregistration in progress
      * @param operator Address of the operator
      * @return True if exit requested but not finalized

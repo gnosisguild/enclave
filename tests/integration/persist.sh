@@ -7,6 +7,7 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Source the file from the same directory
 source "$THIS_DIR/fns.sh"
+source "$THIS_DIR/lib/utils.sh"
 
 heading "Start the EVM node"
 
@@ -56,11 +57,16 @@ ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh \
   --moduli 0xffffee001 \
   --moduli 0xffffc4001 \
   --degree 512 \
-  --plaintext-modulus 10)
+  --plaintext-modulus 100)
+
+CURRENT_TIMESTAMP=$(get_evm_timestamp)
+INPUT_WINDOW_START=$((CURRENT_TIMESTAMP + 20))
+INPUT_WINDOW_END=$((CURRENT_TIMESTAMP + 30))
 
 pnpm committee:new \
   --network localhost \
-  --duration 4 \
+  --input-window-start "$INPUT_WINDOW_START" \
+  --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
   --threshold-quorum 2 \
   --threshold-total 5
@@ -75,19 +81,15 @@ sleep 2
 # relaunch the aggregator
 enclave_nodes_start ag
 
-sleep 2
+sleep 4
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
-heading "Mock activate e3-id"
-
-pnpm -s e3:activate --e3-id 0 --network localhost
-
 heading "Mock publish input e3-id"
-pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
+pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-sleep 4 # wait for input deadline to pass
+sleep 6 # wait for input deadline to pass
 
 waiton "$SCRIPT_DIR/output/output.bin"
 

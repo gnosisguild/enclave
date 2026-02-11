@@ -15,6 +15,7 @@
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
     "build:circuits": "tsx scripts/build-circuits.ts",
+    "generate:verifiers": "tsx scripts/generate-verifiers.ts",
     "store:circuits": "tsx scripts/circuit-artifacts.ts",
     "clean": "tsx scripts/clean.ts",
     "compile": "pnpm build:ts && pnpm rust:build",
@@ -40,7 +41,7 @@
     "committee:new": "cd packages/enclave-contracts && pnpm committee:new",
     "committee:publish": "cd packages/enclave-contracts && pnpm hardhat committee:publish",
     "e3:activate": "cd packages/enclave-contracts && pnpm e3:activate",
-    "e3:publishInput": "cd packages/enclave-contracts && pnpm hardhat e3:publishInput",
+    "e3-program:publishInput": "cd packages/enclave-contracts && pnpm hardhat e3-program:publishInput",
     "e3:publishCiphertext": "cd packages/enclave-contracts && pnpm hardhat e3:publishCiphertext",
     "evm:install": "cd packages/enclave-contracts && pnpm install",
     "evm:node": "cd packages/enclave-contracts && pnpm hardhat node",
@@ -90,6 +91,9 @@
       "typescript": "5.8.3",
       "undici-types": "6.19.8",
       "viem": "2.38.6"
+    },
+    "patchedDependencies": {
+      "@aztec/bb.js@3.0.0-nightly.20251104": "examples/CRISP/patches/@aztec__bb.js@3.0.0-nightly.20251104.patch"
     }
   },
   "lint-staged": {

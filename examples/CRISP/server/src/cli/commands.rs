@@ -6,13 +6,15 @@
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use e3_fhe_params::default_param_set;
+use e3_sdk::evm_helpers::contracts::E3Stage;
+use evm_helpers::CRISPContract;
 use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::approve;
 use super::CLI_DB;
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::SolValue;
 use crisp::config::CONFIG;
@@ -61,6 +63,16 @@ pub async fn get_current_timestamp() -> Result<u64, Box<dyn std::error::Error + 
         .ok_or_else(|| anyhow::anyhow!("Latest block not found"))?;
 
     Ok(block.header.timestamp)
+}
+
+pub async fn check_committee_key_published(
+    e3_id: u64,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let contract =
+        EnclaveContract::read_only(&CONFIG.http_rpc_url, &CONFIG.enclave_address).await?;
+    let e3_stage: E3Stage = contract.get_e3_stage(U256::from(e3_id)).await?;
+
+    Ok(e3_stage == E3Stage::KeyPublished)
 }
 
 pub async fn initialize_crisp_round(
@@ -120,11 +132,11 @@ pub async fn initialize_crisp_round(
 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let mut current_timestamp = get_current_timestamp().await?;
-    let mut start_window: [U256; 2] = [
-        U256::from(current_timestamp),
-        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
+    let input_window: [U256; 2] = [
+        // give a little buffer 
+        U256::from(current_timestamp) + U256::from(20),
+        U256::from(current_timestamp + CONFIG.e3_duration),
     ];
-    let duration: U256 = U256::from(CONFIG.e3_duration);
     let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
@@ -133,7 +145,6 @@ pub async fn initialize_crisp_round(
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
-    info!("Debug Before Fee Quote - start_window: {:?}", start_window);
     info!(
         "Debug Before Fee Quote - current timestamp: {:?}",
         current_timestamp
@@ -142,8 +153,7 @@ pub async fn initialize_crisp_round(
     let fee_amount = contract
         .get_e3_quote(
             threshold,
-            start_window,
-            duration,
+            input_window,
             e3_program,
             e3_params.clone(),
             compute_provider_params_bytes.clone(),
@@ -162,17 +172,12 @@ pub async fn initialize_crisp_round(
     .await?;
 
     current_timestamp = get_current_timestamp().await?;
-    start_window = [
-        U256::from(current_timestamp),
-        U256::from(current_timestamp + CONFIG.e3_window_size as u64),
-    ];
 
     info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
 
     info!("Debug - threshold: {:?}", threshold);
-    info!("Debug - start_window: {:?}", start_window);
+    info!("Debug - input_window: {:?}", input_window);
     info!("Debug - current timestamp: {:?}", current_timestamp);
-    info!("Debug - duration: {}", duration);
     info!("Debug - e3_program: {}", e3_program);
 
     info!(
@@ -183,8 +188,7 @@ pub async fn initialize_crisp_round(
     let (res, e3_id) = contract
         .request_e3(
             threshold,
-            start_window,
-            duration,
+            input_window,
             e3_program,
             e3_params,
             compute_provider_params_bytes,
@@ -196,48 +200,6 @@ pub async fn initialize_crisp_round(
     info!("E3 ID: {}", e3_id_u64);
 
     Ok(e3_id_u64)
-}
-
-pub async fn check_e3_activated(
-    e3_id: u64,
-) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let contract =
-        EnclaveContract::read_only(&CONFIG.http_rpc_url, &CONFIG.enclave_address).await?;
-    let e3: E3 = contract.get_e3(U256::from(e3_id)).await?;
-    Ok(u64::try_from(e3.expiration)? > 0)
-}
-
-pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let input_e3_id: u64 = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter CRISP round ID.")
-        .interact_text()?;
-
-    let params = generate_bfv_parameters();
-    let (sk, pk) = generate_keys(&params);
-    let contract = EnclaveContract::new(
-        &CONFIG.http_rpc_url,
-        &CONFIG.private_key,
-        &CONFIG.enclave_address,
-    )
-    .await?;
-    let e3_id = U256::from(input_e3_id);
-
-    let res = contract.activate(e3_id).await?;
-    info!("E3 activated. TxHash: {:?}", res.transaction_hash);
-
-    let e3_params = FHEParams {
-        params: encode_bfv_params(&params),
-        pk: pk.to_bytes(),
-        sk: sk.coeffs.into_vec(),
-    };
-
-    let db = CLI_DB.write().await;
-    let key = format!("_e3:{}", input_e3_id);
-    db.insert(key, serde_json::to_vec(&e3_params)?)?;
-    db.flush()?;
-    info!("E3 parameters stored in database.");
-
-    Ok(())
 }
 
 pub async fn participate_in_existing_round(
@@ -264,7 +226,7 @@ pub async fn participate_in_existing_round(
     let vote_choice = get_user_vote()?;
     if let Some(vote) = vote_choice {
         let ct = encrypt_vote(vote, &pk_deserialized, &params)?;
-        let contract = EnclaveContract::new(
+        let contract = CRISPContract::new(
             &CONFIG.http_rpc_url,
             &CONFIG.private_key,
             &CONFIG.enclave_address,

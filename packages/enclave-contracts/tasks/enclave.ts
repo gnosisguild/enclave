@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { ZeroAddress, zeroPadValue } from "ethers";
+import { BigNumberish, ZeroAddress, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
@@ -33,21 +33,15 @@ export const requestCommittee = task(
     type: ArgumentType.INT,
   })
   .addOption({
-    name: "windowStart",
-    description: "timestamp start of window for the E3 (default: now)",
-    defaultValue: Math.floor(Date.now() / 1000),
+    name: "inputWindowStart",
+    description: "start of input submission window (default: now + 300)",
+    defaultValue: Math.floor(Date.now() / 1000) + 300,
     type: ArgumentType.INT,
   })
   .addOption({
-    name: "windowEnd",
-    description: "timestamp end of window for the E3 (default: now + 1 day)",
-    defaultValue: Math.floor(Date.now() / 1000) + 86400,
-    type: ArgumentType.INT,
-  })
-  .addOption({
-    name: "duration",
-    description: "duration in seconds of the E3 (default: 1 day)",
-    defaultValue: 86400,
+    name: "inputWindowEnd",
+    description: "deadline for input submission (default: now + 2 days)",
+    defaultValue: Math.floor(Date.now() / 1000) + 86400 * 2,
     type: ArgumentType.INT,
   })
   .addOption({
@@ -79,9 +73,8 @@ export const requestCommittee = task(
       {
         thresholdQuorum,
         thresholdTotal,
-        windowStart,
-        windowEnd,
-        duration,
+        inputWindowStart,
+        inputWindowEnd,
         e3Address,
         e3Params,
         computeParams,
@@ -92,12 +85,10 @@ export const requestCommittee = task(
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
-      const { deployAndSaveMockStableToken } = await import(
-        "../scripts/deployAndSave/mockStableToken"
-      );
+      const { deployAndSaveEnclave } =
+        await import("../scripts/deployAndSave/enclave");
+      const { deployAndSaveMockStableToken } =
+        await import("../scripts/deployAndSave/mockStableToken");
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -163,8 +154,10 @@ export const requestCommittee = task(
 
       const requestParams = {
         threshold: [thresholdQuorum, thresholdTotal] as [number, number],
-        startWindow: [windowStart, windowEnd] as [number, number],
-        duration: duration,
+        inputWindow: [inputWindowStart, inputWindowEnd] as [
+          BigNumberish,
+          BigNumberish,
+        ],
         e3Program:
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
@@ -215,9 +208,8 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
   })
   .setAction(async () => ({
     default: async ({ e3Address }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
+      const { deployAndSaveEnclave } =
+        await import("../scripts/deployAndSave/enclave");
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -263,13 +255,11 @@ export const publishCommittee = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, nodes, publicKey, publicKeyHash }, hre) => {
-      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
-        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
-      );
+      const { deployAndSaveCiphernodeRegistryOwnable } =
+        await import("../scripts/deployAndSave/ciphernodeRegistryOwnable");
 
-      const { deployAndSavePoseidonT3 } = await import(
-        "../scripts/deployAndSave/poseidonT3"
-      );
+      const { deployAndSavePoseidonT3 } =
+        await import("../scripts/deployAndSave/poseidonT3");
       const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
       const { ciphernodeRegistry } =
@@ -301,82 +291,6 @@ export const publishCommittee = task(
       console.log("Publishing committee... ", tx.hash);
       await tx.wait();
       console.log(`Committee public key published`);
-    },
-  }))
-  .build();
-
-export const activateE3 = task("e3:activate", "Activate an E3 program")
-  .addOption({
-    name: "e3Id",
-    description: "Id of the E3 program",
-    defaultValue: 0,
-    type: ArgumentType.INT,
-  })
-  .setAction(async () => ({
-    default: async ({ e3Id }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
-
-      const { enclave } = await deployAndSaveEnclave({
-        hre,
-      });
-
-      const tx = await enclave.activate(e3Id);
-
-      console.log("Activating E3 program... ", tx.hash);
-      await tx.wait();
-
-      console.log(`E3 program activated`);
-    },
-  }))
-  .build();
-
-export const publishInput = task(
-  "e3:publishInput",
-  "Publish input for an E3 program",
-)
-  .addOption({
-    name: "e3Id",
-    description: "Id of the E3 program",
-    defaultValue: 0,
-    type: ArgumentType.INT,
-  })
-  .addOption({
-    name: "data",
-    description: "data to publish",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .addOption({
-    name: "dataFile",
-    description: "file containing data to publish",
-    defaultValue: "",
-    type: ArgumentType.STRING,
-  })
-  .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
-
-      const { enclave } = await deployAndSaveEnclave({
-        hre,
-      });
-
-      let dataToSend = data;
-
-      if (dataFile) {
-        const file = fs.readFileSync(dataFile);
-        dataToSend = file.toString();
-      }
-
-      const tx = await enclave.publishInput(e3Id, dataToSend);
-
-      console.log("Publishing input... ", tx.hash);
-      await tx.wait();
-
-      console.log(`Input published`);
     },
   }))
   .build();
@@ -417,9 +331,8 @@ export const publishCiphertext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
+      const { deployAndSaveEnclave } =
+        await import("../scripts/deployAndSave/enclave");
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -489,9 +402,8 @@ export const publishPlaintext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
-      const { deployAndSaveEnclave } = await import(
-        "../scripts/deployAndSave/enclave"
-      );
+      const { deployAndSaveEnclave } =
+        await import("../scripts/deployAndSave/enclave");
 
       const { enclave } = await deployAndSaveEnclave({
         hre,

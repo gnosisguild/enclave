@@ -7,16 +7,10 @@
 pragma solidity >=0.4.24;
 
 contract FakeEnclave {
-  event E3Activated(uint256 e3Id, uint256 expiration, bytes32 committeePublicKey);
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
   event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
   event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
   event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
-
-  // Emit E3Activated event with passed test data
-  function emitE3Activated(uint256 e3Id, uint256 expiration, bytes32 committeePublicKey) public {
-    emit E3Activated(e3Id, expiration, committeePublicKey);
-  }
 
   // Emit InputPublished event with passed test data
   function emitInputPublished(uint256 e3Id, bytes memory data, uint256 inputHash, uint256 index) public {
@@ -44,9 +38,7 @@ contract FakeEnclave {
       seed: 123456789012,
       threshold: [uint32(2), uint32(3)],
       requestBlock: 18750000,
-      startWindow: [uint256(18750100), uint256(18750200)],
-      duration: 100,
-      expiration: block.timestamp + 1 days,
+      inputWindow: [uint256(18750100), uint256(18750200)],
       encryptionSchemeId: bytes32(keccak256("AES-256-GCM")),
       e3Program: 0x7F3E4df648B8Cb96C1D343be976b91B97CaD5c21,
       decryptionVerifier: 0x4B0D8c2E5f7a6c832f8b16d3aB0e7F5d9E9B24b1,
@@ -63,9 +55,7 @@ struct E3 {
   uint256 seed;
   uint32[2] threshold;
   uint256 requestBlock;
-  uint256[2] startWindow;
-  uint256 duration;
-  uint256 expiration;
+  uint256[2] inputWindow;
   bytes32 encryptionSchemeId;
   address e3Program;
   bytes e3ProgramParams;

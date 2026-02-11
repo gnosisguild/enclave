@@ -47,6 +47,7 @@ e3-data.workspace = true
 e3-utils.workspace = true
 
 [dev-dependencies]
+paste = "1"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [features]

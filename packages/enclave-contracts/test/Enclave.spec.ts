@@ -11,10 +11,10 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
+import E3RefundManagerModule from "../ignition/modules/e3RefundManager";
 import EnclaveModule from "../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../ignition/modules/enclaveToken";
-import MockCiphernodeRegistryEmptyKeyModule from "../ignition/modules/mockCiphernodeRegistryEmptyKey";
 import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
 import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
@@ -37,6 +37,16 @@ describe("Enclave", function () {
   const SORTITION_SUBMISSION_WINDOW = 10;
   const addressOne = "0x0000000000000000000000000000000000000001";
   const AddressTwo = "0x0000000000000000000000000000000000000002";
+
+  const timeoutConfig = {
+    committeeFormationWindow: 3600, // 1 hour
+    dkgWindow: 3600, // 1 hour
+    computeWindow: 3600, // 1 hour
+    decryptionWindow: 3600, // 1 hour
+    gracePeriod: 300, // 5 minutes
+  };
+
+  const inputWindowDuration = 300;
 
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
@@ -209,12 +219,33 @@ describe("Enclave", function () {
           registry: addressOne,
           bondingRegistry:
             await bondingRegistryContract.bondingRegistry.getAddress(),
+          e3RefundManager: addressOne, // placeholder, will be updated
           feeToken: await usdcToken.getAddress(),
+          timeoutConfig,
         },
       },
     });
 
     const enclaveAddress = await enclaveContract.enclave.getAddress();
+
+    const e3RefundManagerContract = await ignition.deploy(
+      E3RefundManagerModule,
+      {
+        parameters: {
+          E3RefundManager: {
+            owner: ownerAddress,
+            enclave: enclaveAddress,
+            treasury: ownerAddress,
+          },
+        },
+      },
+    );
+
+    const e3RefundManagerAddress =
+      await e3RefundManagerContract.e3RefundManager.getAddress();
+
+    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+    await enclave.setE3RefundManager(e3RefundManagerAddress);
 
     const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
       parameters: {
@@ -229,7 +260,6 @@ describe("Enclave", function () {
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
 
-    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
       ciphernodeRegistryAddress,
       owner,
@@ -311,11 +341,10 @@ describe("Enclave", function () {
 
     const request = {
       threshold: [2, 2] as [number, number],
-      startWindow: [await time.latest(), (await time.latest()) + 100] as [
-        number,
-        number,
-      ],
-      duration: time.duration.days(30),
+      inputWindow: [
+        (await time.latest()) + 10,
+        (await time.latest()) + inputWindowDuration,
+      ] as [number, number],
       e3Program: await e3Program.mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
       computeProviderParams: abiCoder.encode(
@@ -392,11 +421,6 @@ describe("Enclave", function () {
       await enclave.setMaxDuration(1);
       expect(await enclave.maxDuration()).to.equal(1);
     });
-    it("returns true if max duration is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.setMaxDuration.staticCall(1);
-      expect(result).to.be.true;
-    });
     it("emits MaxDurationSet event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setMaxDuration(1))
@@ -442,13 +466,6 @@ describe("Enclave", function () {
       expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
 
-    it("returns true if ciphernodeRegistry is set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
-
     it("emits CiphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -479,15 +496,6 @@ describe("Enclave", function () {
       await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
       expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0]!)).to.be
         .true;
-    });
-
-    it("returns true if parameters are set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setE3ProgramsParams.staticCall(
-        encodedE3ProgramsParams,
-      );
-      expect(result).to.be.true;
     });
 
     it("emits AllowedE3ProgramsParamsSet event", async function () {
@@ -526,8 +534,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
+        inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -537,7 +544,8 @@ describe("Enclave", function () {
       const e3 = await enclave.getE3(0);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
-      expect(e3.expiration).to.equal(0n);
+      expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
+      expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
       expect(e3.decryptionVerifier).to.equal(
@@ -608,16 +616,6 @@ describe("Enclave", function () {
       ).to.equal(await mocks.decryptionVerifier.getAddress());
     });
 
-    it("returns true if decryption verifier is enabled successfully", async function () {
-      const { enclave, mocks } = await loadFixture(setup);
-
-      const result = await enclave.setDecryptionVerifier.staticCall(
-        newEncryptionSchemeId,
-        await mocks.decryptionVerifier.getAddress(),
-      );
-      expect(result).to.be.true;
-    });
-
     it("emits EncryptionSchemeEnabled", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -659,13 +657,6 @@ describe("Enclave", function () {
         ethers.ZeroAddress,
       );
     });
-    it("returns true if encryption scheme is disabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result =
-        await enclave.disableEncryptionScheme.staticCall(encryptionSchemeId);
-      expect(result).to.be.true;
-    });
     it("emits EncryptionSchemeDisabled", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -705,11 +696,6 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
-    it("returns true if E3 Program is enabled successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-      const result = await enclave.enableE3Program.staticCall(AddressTwo);
-      expect(result).to.be.true;
-    });
     it("emits E3ProgramEnabled event", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.enableE3Program(AddressTwo))
@@ -745,15 +731,6 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
     });
-    it("returns true if E3 Program is disabled successfully", async function () {
-      const {
-        enclave,
-        mocks: { e3Program },
-      } = await loadFixture(setup);
-      const result = await enclave.disableE3Program.staticCall(e3Program);
-
-      expect(result).to.be.true;
-    });
     it("emits E3ProgramDisabled event", async function () {
       const {
         enclave,
@@ -771,8 +748,7 @@ describe("Enclave", function () {
       await expect(
         enclave.request({
           threshold: request.threshold,
-          startWindow: request.startWindow,
-          duration: request.duration,
+          inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
@@ -784,8 +760,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       const fee = await enclave.getE3Quote({
         threshold: [0, 2],
-        startWindow: request.startWindow,
-        duration: request.duration,
+        inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -795,8 +770,7 @@ describe("Enclave", function () {
       await expect(
         enclave.request({
           threshold: [0, 2],
-          startWindow: request.startWindow,
-          duration: request.duration,
+          inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
@@ -812,8 +786,7 @@ describe("Enclave", function () {
       await expect(
         makeRequest(enclave, usdcToken, {
           threshold: [3, 2],
-          startWindow: request.startWindow,
-          duration: request.duration,
+          inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
@@ -823,48 +796,30 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
         .withArgs([3, 2]);
     });
-    it("reverts if duration is 0", async function () {
+    it("reverts if total duration is greater than maxDuration", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: request.threshold,
-          startWindow: request.startWindow,
-          duration: 0,
+          threshold: [2, 3],
+          inputWindow: [
+            request.inputWindow[0],
+            request.inputWindow[1] + time.duration.days(31),
+          ],
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
           customParams: request.customParams,
         }),
-      )
-        .to.be.revertedWithCustomError(enclave, "InvalidDuration")
-        .withArgs(0);
-    });
-    it("reverts if duration is greater than maxDuration", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-
-      await expect(
-        makeRequest(enclave, usdcToken, {
-          threshold: request.threshold,
-          startWindow: request.startWindow,
-          duration: time.duration.days(31),
-          e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
-          computeProviderParams: request.computeProviderParams,
-          customParams: request.customParams,
-        }),
-      )
-        .to.be.revertedWithCustomError(enclave, "InvalidDuration")
-        .withArgs(time.duration.days(31));
+      ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
     it("reverts if E3 Program is not enabled", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          threshold: request.threshold,
-          startWindow: request.startWindow,
-          duration: request.duration,
+          threshold: [2, 3],
+          inputWindow: request.inputWindow,
           e3Program: ethers.ZeroAddress,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
@@ -880,8 +835,7 @@ describe("Enclave", function () {
       await expect(
         makeRequest(enclave, usdcToken, {
           threshold: request.threshold,
-          startWindow: request.startWindow,
-          duration: request.duration,
+          inputWindow: request.inputWindow,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
@@ -896,8 +850,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
+        inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -908,7 +861,8 @@ describe("Enclave", function () {
       const block = await ethers.provider.getBlock("latest").catch((e) => e);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
-      expect(e3.expiration).to.equal(0n);
+      expect(e3.inputWindow[0]).to.equal(request.inputWindow[0]);
+      expect(e3.inputWindow[1]).to.equal(request.inputWindow[1]);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.requestBlock).to.equal(block.number);
       expect(e3.decryptionVerifier).to.equal(
@@ -922,8 +876,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       const tx = await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
+        inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -937,488 +890,6 @@ describe("Enclave", function () {
     });
   });
 
-  describe("activate()", function () {
-    it("reverts if E3 does not exist", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      await expect(enclave.activate(0))
-        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
-        .withArgs(0);
-    });
-    it("reverts if E3 has already been activated", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      await expect(enclave.getE3(0)).to.not.be.revert(ethers);
-      await expect(enclave.activate(0)).to.not.be.revert(ethers);
-      await expect(enclave.activate(0))
-        .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
-        .withArgs(0);
-    });
-    it("reverts if E3 is not yet ready to start", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const startTime = [
-        (await time.latest()) + 1000,
-        (await time.latest()) + 2000,
-      ] as [number, number];
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: startTime,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
-        enclave,
-        "E3NotReady",
-      );
-    });
-    it("reverts if E3 start has expired", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const e3Id = 0;
-      const currentTime = await time.latest();
-      const startTime = [currentTime + 10, currentTime + 100] as [
-        number,
-        number,
-      ];
-
-      await makeRequest(enclave, usdcToken, {
-        ...request,
-        startWindow: startTime,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      await mine(2, { interval: 2000 });
-
-      await expect(enclave.activate(e3Id)).to.be.revertedWithCustomError(
-        enclave,
-        "E3Expired",
-      );
-    });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const startTime = [
-        (await time.latest()) + 1000,
-        (await time.latest()) + 2000,
-      ] as [number, number];
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: startTime,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
-        enclave,
-        "E3NotReady",
-      );
-    });
-    it("reverts if E3 start has expired", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const e3Id = 0;
-      const currentTime = await time.latest();
-      const startTime = [currentTime + 5, currentTime + 50] as [number, number];
-
-      await makeRequest(enclave, usdcToken, {
-        ...request,
-        startWindow: startTime,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      await time.increaseTo(currentTime + request.duration + 100);
-
-      await expect(enclave.activate(e3Id)).to.be.revertedWithCustomError(
-        enclave,
-        "E3Expired",
-      );
-    });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, request);
-
-      const prevRegistry = await enclave.ciphernodeRegistry();
-
-      const reg = await ignition.deploy(MockCiphernodeRegistryEmptyKeyModule);
-      const nextRegistry =
-        await reg.mockCiphernodeRegistryEmptyKey.getAddress();
-
-      await enclave.setCiphernodeRegistry(nextRegistry);
-
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
-        reg.mockCiphernodeRegistryEmptyKey,
-        "CommitteeNotPublished",
-      );
-
-      await enclave.setCiphernodeRegistry(prevRegistry);
-    });
-
-    it("sets committeePublicKey correctly", async () => {
-      const {
-        enclave,
-        request,
-        ciphernodeRegistryContract,
-        usdcToken,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const e3Id = 0;
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      const publicKey =
-        await ciphernodeRegistryContract.committeePublicKey(e3Id);
-
-      let e3 = await enclave.getE3(e3Id);
-      expect(e3.committeePublicKey).to.not.equal(publicKey);
-
-      await enclave.activate(e3Id);
-
-      e3 = await enclave.getE3(e3Id);
-      expect(e3.committeePublicKey).to.equal(publicKey);
-    });
-    it("returns true if E3 is activated successfully", async () => {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const e3Id = 0;
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      expect(await enclave.activate.staticCall(e3Id)).to.be.equal(true);
-    });
-    it("emits E3Activated event", async () => {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const e3Id = 0;
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-
-      await expect(enclave.activate(e3Id)).to.emit(enclave, "E3Activated");
-    });
-  });
-
-  describe("publishInput()", function () {
-    it("reverts if E3 does not exist", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      await expect(enclave.publishInput(0, "0x"))
-        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
-        .withArgs(0);
-    });
-
-    it("reverts if E3 has not been activated", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      const inputData = abiCoder.encode(["bytes32"], [ethers.ZeroHash]);
-
-      await expect(enclave.getE3(0)).to.not.be.revert(ethers);
-      await expect(enclave.publishInput(0, inputData))
-        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
-        .withArgs(0);
-    });
-
-    it("reverts if input is not valid", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(0);
-      await expect(
-        enclave.publishInput(0, "0xaabbcc"),
-      ).to.be.revertedWithCustomError(enclave, "InvalidInput");
-    });
-
-    it("reverts if outside of input window", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(0);
-
-      await mine(2, { interval: request.duration });
-
-      await expect(
-        enclave.publishInput(0, ethers.ZeroHash),
-      ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
-    });
-
-    it("it allows publishing input to different requests", async function () {
-      const fixtureSetup = () => setup();
-
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(fixtureSetup);
-      const inputData = "0x12345678";
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(0);
-      await enclave.publishInput(0, inputData);
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        1,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(1);
-      await enclave.publishInput(1, inputData);
-    });
-    it("returns true if input is published successfully", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const inputData = "0x12345678";
-
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        0,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(0);
-
-      expect(await enclave.publishInput.staticCall(0, inputData)).to.equal(
-        true,
-      );
-    });
-  });
-
   describe("publishCiphertextOutput()", function () {
     it("reverts if E3 does not exist", async function () {
       const { enclave } = await loadFixture(setup);
@@ -1427,53 +898,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(0);
     });
-    it("reverts if E3 has not been activated", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const e3Id = 0;
 
-      await makeRequest(enclave, usdcToken, {
-        threshold: request.threshold,
-        startWindow: request.startWindow,
-        duration: request.duration,
-        e3Program: request.e3Program,
-        e3ProgramParams: request.e3ProgramParams,
-        computeProviderParams: request.computeProviderParams,
-        customParams: request.customParams,
-      });
-      await expect(enclave.publishCiphertextOutput(e3Id, "0x", "0x"))
-        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
-        .withArgs(e3Id);
-    });
-    it("reverts if input deadline has not passed", async function () {
-      const {
-        enclave,
-        request,
-        usdcToken,
-        ciphernodeRegistryContract,
-        operator1,
-        operator2,
-      } = await loadFixture(setup);
-      const currentTime = await time.latest();
-      await makeRequest(enclave, usdcToken, {
-        ...request,
-        startWindow: [currentTime, currentTime + 100],
-      });
-      const e3Id = 0;
-
-      await setupAndPublishCommittee(
-        ciphernodeRegistryContract,
-        e3Id,
-        [await operator1.getAddress(), await operator2.getAddress()],
-        data,
-        operator1,
-        operator2,
-      );
-      await enclave.activate(e3Id);
-
-      await expect(
-        enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
-      ).to.be.revertedWithCustomError(enclave, "InputDeadlineNotPassed");
-    });
     it("reverts if output has already been published", async function () {
       const {
         enclave,
@@ -1487,8 +912,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
-        duration: request.duration,
+        inputWindow: request.inputWindow,
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -1503,15 +927,46 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
-      expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
+      await mine(2, { interval: inputWindowDuration });
+
+      await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
         .to.be.revertedWithCustomError(
           enclave,
           "CiphertextOutputAlreadyPublished",
         )
         .withArgs(e3Id);
+    });
+    it("reverts if committee duties are over", async function () {
+      const {
+        enclave,
+        request,
+        usdcToken,
+        ciphernodeRegistryContract,
+        operator1,
+        operator2,
+      } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await makeRequest(enclave, usdcToken, {
+        ...request,
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
+      });
+
+      await setupAndPublishCommittee(
+        ciphernodeRegistryContract,
+        e3Id,
+        [await operator1.getAddress(), await operator2.getAddress()],
+        data,
+        operator1,
+        operator2,
+      );
+      await mine(2, {
+        interval: inputWindowDuration + timeoutConfig.computeWindow,
+      });
+      await expect(
+        enclave.publishCiphertextOutput(e3Id, data, proof),
+      ).to.be.revertedWithCustomError(enclave, "CommitteeDutiesCompleted");
     });
     it("reverts if output is not valid", async function () {
       const {
@@ -1526,8 +981,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
-        duration: request.duration,
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
@@ -1542,8 +996,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await expect(
         enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
       ).to.be.revertedWithCustomError(enclave, "InvalidOutput");
@@ -1561,7 +1014,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1572,8 +1025,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       expect(await enclave.publishCiphertextOutput(e3Id, data, proof));
       const e3 = await enclave.getE3(e3Id);
       expect(e3.ciphertextOutput).to.equal(ethers.keccak256(data));
@@ -1591,7 +1043,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1602,8 +1054,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       expect(
         await enclave.publishCiphertextOutput.staticCall(e3Id, data, proof),
       ).to.equal(true);
@@ -1621,7 +1072,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1632,8 +1083,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
         .to.emit(enclave, "CiphertextOutputPublished")
         .withArgs(e3Id, data);
@@ -1650,18 +1100,6 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
 
-    it("reverts if E3 has not been activated", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-      const e3Id = 0;
-
-      await makeRequest(enclave, usdcToken, {
-        ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
-      });
-      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
-        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
-        .withArgs(e3Id);
-    });
     it("reverts if ciphertextOutput has not been published", async function () {
       const {
         enclave,
@@ -1675,7 +1113,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1686,10 +1124,9 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
-        .to.be.revertedWithCustomError(enclave, "CiphertextOutputNotPublished")
-        .withArgs(e3Id);
+      await expect(
+        enclave.publishPlaintextOutput(e3Id, data, "0x"),
+      ).to.be.revertedWithCustomError(enclave, "InvalidStage");
     });
     it("reverts if plaintextOutput has already been published", async function () {
       const {
@@ -1704,7 +1141,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1715,16 +1152,12 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await enclave.publishPlaintextOutput(e3Id, data, proof);
-      await expect(enclave.publishPlaintextOutput(e3Id, data, proof))
-        .to.be.revertedWithCustomError(
-          enclave,
-          "PlaintextOutputAlreadyPublished",
-        )
-        .withArgs(e3Id);
+      await expect(
+        enclave.publishPlaintextOutput(e3Id, data, proof),
+      ).to.be.revertedWithCustomError(enclave, "InvalidStage");
     });
     it("reverts if output is not valid", async function () {
       const {
@@ -1739,7 +1172,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1750,8 +1183,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
         .to.be.revertedWithCustomError(enclave, "InvalidOutput")
@@ -1770,7 +1202,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1781,8 +1213,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(await enclave.publishPlaintextOutput(e3Id, data, proof));
 
@@ -1802,7 +1233,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1813,8 +1244,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       expect(
         await enclave.publishPlaintextOutput.staticCall(e3Id, data, proof),
@@ -1833,7 +1263,7 @@ describe("Enclave", function () {
 
       await makeRequest(enclave, usdcToken, {
         ...request,
-        startWindow: [await time.latest(), (await time.latest()) + 100],
+        inputWindow: [(await time.latest()) + 20, (await time.latest()) + 100],
       });
 
       await setupAndPublishCommittee(
@@ -1844,8 +1274,7 @@ describe("Enclave", function () {
         operator1,
         operator2,
       );
-      await enclave.activate(e3Id);
-      await mine(2, { interval: request.duration });
+      await mine(2, { interval: inputWindowDuration });
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(await enclave.publishPlaintextOutput(e3Id, data, proof))
         .to.emit(enclave, "PlaintextOutputPublished")

@@ -11,7 +11,7 @@ import { convertTimestampToDate } from '@/utils/methods'
 
 const DailyPoll: React.FC = () => {
   const { roundState, isLoading } = useVoteManagementContext()
-  const endTime = useMemo(() => (roundState ? convertTimestampToDate(roundState.start_time, roundState.duration) : null), [roundState])
+  const endTime = useMemo(() => (roundState ? convertTimestampToDate(roundState.end_time) : null), [roundState])
 
   const loading = isLoading || !roundState
 

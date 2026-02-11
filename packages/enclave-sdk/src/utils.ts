@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Address, type Hash, type Log, encodeAbiParameters } from 'viem'
+import { type Address, type Hash, type Log, PublicClient, encodeAbiParameters } from 'viem'
 import type { BfvParams } from './types'
 
 export class SDKError extends Error {
@@ -54,9 +54,12 @@ export function generateEventId(log: Log): string {
 
 /**
  * Get the current timestamp in seconds
+ * from onchain
+ * @param publicClient - The public client to use
  */
-export function getCurrentTimestamp(): number {
-  return Math.floor(Date.now() / 1000)
+export async function getCurrentTimestamp(publicClient: PublicClient): Promise<bigint> {
+  const block = await publicClient.getBlock()
+  return block.timestamp
 }
 
 // Compute provider parameters structure
@@ -77,7 +80,6 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
 export const DEFAULT_E3_CONFIG = {
   threshold_min: 2,
   threshold_max: 5,
-  window_size: 120, // 2 minutes in seconds
   duration: 1800, // 30 minutes in seconds
   payment_amount: '0', // 0 ETH in wei
 } as const
@@ -147,12 +149,23 @@ export function encodeCustomParams(params: Record<string, unknown>): `0x${string
   return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
+// inputWindow[0] is always larger than now and dkg deadline
+export const inputWindowStartBuffer = 15n
+
 /**
  * Calculate start window for E3 request
+ * @dev This function can be used for testing purposes, or for E3s which need to start as soon as possible.
+ * @param publicClient - The public client to use
+ * @param duration - The duration of the input window in seconds
+ * @param startBuffer - Buffer in seconds added to current timestamp for input window start
  */
-export function calculateStartWindow(windowSize: number = DEFAULT_E3_CONFIG.window_size): [bigint, bigint] {
-  const now = getCurrentTimestamp()
-  return [BigInt(now), BigInt(now + windowSize)]
+export async function calculateInputWindow(
+  publicClient: PublicClient,
+  duration: number = DEFAULT_E3_CONFIG.duration,
+  startBuffer: bigint = inputWindowStartBuffer,
+): Promise<[bigint, bigint]> {
+  const now = await getCurrentTimestamp(publicClient)
+  return [BigInt(now) + startBuffer, BigInt(now) + startBuffer + BigInt(duration)]
 }
 
 /**

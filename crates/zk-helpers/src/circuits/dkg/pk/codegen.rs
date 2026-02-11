@@ -48,8 +48,7 @@ pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
 /// Builds the configs.nr string (N, L, bit parameters) for the Noir prover.
 pub fn generate_configs(preset: BfvPreset, bits: &Bits) -> CodegenConfigs {
     format!(
-        r#"
-pub global N: u32 = {};
+        r#"pub global N: u32 = {};
 pub global L: u32 = {};
 
 /************************************
@@ -61,8 +60,8 @@ pk (CIRCUIT 0 - DKG BFV PUBLIC KEY)
 // pk - bit parameters
 pub global {}_BIT_PK: u32 = {};
 "#,
-        preset.metadata().degree,
-        preset.metadata().num_moduli,
+        preset.dkg_counterpart().unwrap().metadata().degree,
+        preset.dkg_counterpart().unwrap().metadata().num_moduli,
         <PkCircuit as Circuit>::PREFIX,
         bits.pk_bit,
     )
@@ -81,7 +80,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512);
+        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
 
         let artifacts = PkCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
@@ -126,14 +125,22 @@ mod tests {
         assert!(configs_content.contains(
             format!(
                 "N: u32 = {}",
-                BfvPreset::InsecureThreshold512.metadata().degree
+                BfvPreset::InsecureThreshold512
+                    .dkg_counterpart()
+                    .unwrap()
+                    .metadata()
+                    .degree,
             )
             .as_str()
         ));
         assert!(configs_content.contains(
             format!(
                 "L: u32 = {}",
-                BfvPreset::InsecureThreshold512.metadata().num_moduli
+                BfvPreset::InsecureThreshold512
+                    .dkg_counterpart()
+                    .unwrap()
+                    .metadata()
+                    .num_moduli,
             )
             .as_str()
         ));

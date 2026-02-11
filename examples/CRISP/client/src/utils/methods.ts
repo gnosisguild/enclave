@@ -80,7 +80,7 @@ export const convertPollData = (request: PollRequestResult[]): PollResult[] => {
 }
 
 export const convertVoteStateLite = (voteState: VoteStateLite): PollResult => {
-  const endTime = voteState.expiration
+  const endTime = voteState.end_time
   const date = new Date(endTime * 1000).toISOString()
 
   const options: PollOption[] = [

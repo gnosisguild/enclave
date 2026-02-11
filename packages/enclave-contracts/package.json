@@ -24,6 +24,16 @@
         "default": "./dist/tasks/ciphernode.js"
       }
     },
+    "./tasks/program": {
+      "import": {
+        "types": "./dist/tasks/program.d.ts",
+        "default": "./dist/tasks/program.js"
+      },
+      "require": {
+        "types": "./dist/tasks/program.d.ts",
+        "default": "./dist/tasks/program.js"
+      }
+    },
     "./tasks/enclave": {
       "import": {
         "types": "./dist/tasks/enclave.d.ts",
@@ -149,6 +159,7 @@
     "coverage": "pnpm test --coverage",
     "deploy": "hardhat run scripts/run.ts",
     "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
+    "deploy:verifiers": "hardhat run scripts/deployVerifiers.ts",
     "upgrade:enclave": "hardhat run scripts/upgrade/enclave.ts",
     "upgrade:bondingRegistry": "hardhat run scripts/upgrade/bondingRegistry.ts",
     "upgrade:ciphernodeRegistryOwnable": "hardhat run scripts/upgrade/ciphernodeRegistryOwnable.ts",
@@ -166,7 +177,10 @@
     "test": "hardhat test mocha",
     "test:report-gas": "REPORT_GAS=true hardhat test mocha",
     "test:enclave": "pnpm run test test/Enclave.spec.ts",
-    "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
+    "test:ciphernodeRegistry": "pnpm run test test/Registry/CiphernodeRegistryOwnable.spec.ts",
+    "test:bondingRegistry": "pnpm run test test/Registry/BondingRegistry.spec.ts",
+    "test:integration": "pnpm run test test/E3Lifecycle/E3Integration.spec.ts",
+    "test:slashing": "pnpm run test test/Slashing/SlashingManager.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish",
     "verify:contracts": "hardhat run scripts/runVerification.ts",

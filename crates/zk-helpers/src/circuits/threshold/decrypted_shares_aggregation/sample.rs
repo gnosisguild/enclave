@@ -12,6 +12,7 @@
 
 use crate::circuits::computation::Computation;
 use crate::threshold::decrypted_shares_aggregation::computation::Configs;
+use crate::CircuitsErrors;
 use crate::{
     threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput,
     CiphernodesCommittee,
@@ -41,54 +42,84 @@ impl DecryptedSharesAggregationCircuitInput {
     /// Generates sample data for the decrypted shares aggregation circuit:
     /// TRBFV setup, parties with sk/pk shares and smudging error shares, share collection
     /// and aggregation, encryption of a message, T+1 decryption shares, and threshold decrypt.
-    pub fn generate_sample(preset: BfvPreset, committee: CiphernodesCommittee) -> Self {
-        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+    pub fn generate_sample(
+        preset: BfvPreset,
+        committee: CiphernodesCommittee,
+    ) -> Result<Self, CircuitsErrors> {
+        let (threshold_params, _) = build_pair_for_preset(preset).map_err(|e| {
+            CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e))
+        })?;
 
-        let sd = preset.search_defaults().unwrap();
+        let sd = preset
+            .search_defaults()
+            .ok_or_else(|| CircuitsErrors::Sample("Preset has no search defaults".into()))?;
 
         let num_parties = committee.n;
         let threshold = committee.threshold;
         let degree = threshold_params.degree();
         let num_moduli = threshold_params.moduli().len();
 
-        let trbfv = TRBFV::new(num_parties, threshold, threshold_params.clone()).unwrap();
+        let trbfv = TRBFV::new(num_parties, threshold, threshold_params.clone())
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
         let mut rng = OsRng;
         let mut thread_rng = rand::thread_rng();
 
-        let crp = CommonRandomPoly::new(&threshold_params, &mut rng).unwrap();
+        let crp = CommonRandomPoly::new(&threshold_params, &mut rng)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
 
         let ctx = threshold_params.ctx_at_level(0).unwrap();
 
         let mut parties: Vec<Party> = (0..num_parties)
-            .map(|_| {
+            .map(|_| -> Result<Party, CircuitsErrors> {
                 let sk_share = SecretKey::random(&threshold_params, &mut rng);
-                let pk_share =
-                    PublicKeyShare::new(&sk_share, crp.clone(), &mut thread_rng).unwrap();
+                let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut thread_rng)
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to create public key share: {:?}",
+                            e
+                        ))
+                    })?;
 
                 let mut share_manager =
                     ShareManager::new(num_parties, threshold, threshold_params.clone());
                 let sk_poly = share_manager
                     .coeffs_to_poly_level0(sk_share.coeffs.as_ref())
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to convert secret key to poly: {:?}",
+                            e
+                        ))
+                    })?;
 
                 let sk_sss = share_manager
                     .generate_secret_shares_from_poly(sk_poly, &mut rng)
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!("Failed to generate secret shares: {:?}", e))
+                    })?;
 
                 let esi_coeffs = trbfv
                     .generate_smudging_error(sd.z as usize, sd.lambda as usize, &mut rng)
-                    .unwrap();
-                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!(
+                            "Failed to generate smudging error: {:?}",
+                            e
+                        ))
+                    })?;
+                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to convert error to poly: {:?}", e))
+                })?;
                 let esi_sss = share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut rng)
-                    .unwrap();
+                    .map_err(|e| {
+                        CircuitsErrors::Sample(format!("Failed to generate error shares: {:?}", e))
+                    })?;
 
                 let sk_sss_collected = Vec::with_capacity(num_parties);
                 let es_sss_collected = Vec::with_capacity(num_parties);
                 let sk_poly_sum = Poly::zero(&ctx, Representation::PowerBasis);
                 let es_poly_sum = Poly::zero(&ctx, Representation::PowerBasis);
 
-                Party {
+                Ok(Party {
                     pk_share,
                     sk_sss,
                     esi_sss,
@@ -96,9 +127,9 @@ impl DecryptedSharesAggregationCircuitInput {
                     es_sss_collected,
                     sk_poly_sum,
                     es_poly_sum,
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         // Collect shares: for each party i, sk_sss_collected is one Array2 per sender j
         // (same as Vec<ShamirShare>). Each Array2 has shape (num_moduli, degree): row m = share from j for modulus m.
@@ -114,11 +145,14 @@ impl DecryptedSharesAggregationCircuitInput {
                                 .collect::<Vec<_>>()
                         })
                         .collect();
-                    Array2::from_shape_vec((num_moduli, degree), data)
-                        .map_err(|e| format!("sk_sss_collected shape: {:?}", e))
+                    Array2::from_shape_vec((num_moduli, degree), data).map_err(|e| {
+                        CircuitsErrors::Sample(format!("sk_sss_collected shape: {:?}", e))
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to collect sk_sss_collected: {:?}", e))
+                })?;
             parties[i].es_sss_collected = (0..num_parties)
                 .map(|j| {
                     let data: Vec<u64> = (0..num_moduli)
@@ -130,11 +164,14 @@ impl DecryptedSharesAggregationCircuitInput {
                                 .collect::<Vec<_>>()
                         })
                         .collect();
-                    Array2::from_shape_vec((num_moduli, degree), data)
-                        .map_err(|e| format!("es_sss_collected shape: {:?}", e))
+                    Array2::from_shape_vec((num_moduli, degree), data).map_err(|e| {
+                        CircuitsErrors::Sample(format!("es_sss_collected shape: {:?}", e))
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to collect es_sss_collected: {:?}", e))
+                })?;
         }
 
         // Aggregate collected shares to get sk_poly_sum and es_poly_sum per party
@@ -142,10 +179,14 @@ impl DecryptedSharesAggregationCircuitInput {
             let share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone());
             party.sk_poly_sum = share_manager
                 .aggregate_collected_shares(&party.sk_sss_collected)
-                .unwrap();
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to aggregate collected shares: {:?}", e))
+                })?;
             party.es_poly_sum = share_manager
                 .aggregate_collected_shares(&party.es_sss_collected)
-                .unwrap();
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to aggregate collected shares: {:?}", e))
+                })?;
         }
 
         // Aggregate public key
@@ -156,10 +197,13 @@ impl DecryptedSharesAggregationCircuitInput {
             .iter()
             .cloned()
             .aggregate()
-            .unwrap();
+            .map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to aggregate public key: {:?}", e))
+            })?;
 
         // Build message: max_msg_non_zero_coeffs from config, tiled from CRISP-style pattern, pad to degree
-        let configs = Configs::compute(preset, &()).unwrap();
+        let configs = Configs::compute(preset, &())
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to compute configs: {:?}", e)))?;
         let n = configs.max_msg_non_zero_coeffs;
         let pattern: Vec<u64> = vec![
             2, 1, 5, 2, 1, 2, 3, 2, 4, 3, 3, 3, 2, 3, 3, 1, 2, 3, 4, 6, 1, 5, 1, 1, 2, 1, 2,
@@ -167,8 +211,11 @@ impl DecryptedSharesAggregationCircuitInput {
         let mut message: Vec<u64> = (0..n).map(|i| pattern[i % pattern.len()]).collect();
         message.resize(degree, 0);
 
-        let pt = Plaintext::try_encode(&message, Encoding::poly(), &threshold_params).unwrap();
-        let ciphertext = public_key.try_encrypt(&pt, &mut thread_rng).unwrap();
+        let pt = Plaintext::try_encode(&message, Encoding::poly(), &threshold_params)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to encode plaintext: {:?}", e)))?;
+        let ciphertext = public_key
+            .try_encrypt(&pt, &mut thread_rng)
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to encrypt: {:?}", e)))?;
 
         let ciphertext = Arc::new(ciphertext);
 
@@ -185,7 +232,9 @@ impl DecryptedSharesAggregationCircuitInput {
                     party.sk_poly_sum.clone(),
                     party.es_poly_sum.clone(),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    CircuitsErrors::Sample(format!("Failed to compute decryption share: {:?}", e))
+                })?;
             d_share_polys.push(d_share);
         }
 
@@ -199,16 +248,19 @@ impl DecryptedSharesAggregationCircuitInput {
                 reconstructing_parties.clone(),
                 Arc::clone(&ciphertext),
             )
-            .unwrap();
+            .map_err(|e| {
+                CircuitsErrors::Sample(format!("Failed to decrypt from shares: {:?}", e))
+            })?;
 
-        let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly()).unwrap();
+        let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly())
+            .map_err(|e| CircuitsErrors::Sample(format!("Failed to decode plaintext: {:?}", e)))?;
 
-        DecryptedSharesAggregationCircuitInput {
+        Ok(DecryptedSharesAggregationCircuitInput {
             committee,
             d_share_polys,
             reconstructing_parties,
             message_vec,
-        }
+        })
     }
 }
 
@@ -230,7 +282,8 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
 
-        let sample = DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee);
+        let sample =
+            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
         let witness = Witness::compute(preset, &sample).unwrap();
 
         assert_eq!(
@@ -253,7 +306,8 @@ mod tests {
         use crate::threshold::decrypted_shares_aggregation::computation::Configs;
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee);
+        let sample =
+            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
         let witness = Witness::compute(preset, &sample).unwrap();
         let configs = Configs::compute(preset, &()).unwrap();
         let n = configs.max_msg_non_zero_coeffs;

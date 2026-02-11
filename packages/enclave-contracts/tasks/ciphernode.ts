@@ -33,18 +33,14 @@ export const ciphernodeAdd = task(
       const [signer] = await ethers.getSigners();
       console.log(`Registering ciphernode: ${signer.address}`);
 
-      const { deployAndSaveBondingRegistry } = await import(
-        "../scripts/deployAndSave/bondingRegistry"
-      );
-      const { deployAndSaveEnclaveTicketToken } = await import(
-        "../scripts/deployAndSave/enclaveTicketToken"
-      );
-      const { deployAndSaveEnclaveToken } = await import(
-        "../scripts/deployAndSave/enclaveToken"
-      );
-      const { deployAndSaveMockStableToken } = await import(
-        "../scripts/deployAndSave/mockStableToken"
-      );
+      const { deployAndSaveBondingRegistry } =
+        await import("../scripts/deployAndSave/bondingRegistry");
+      const { deployAndSaveEnclaveTicketToken } =
+        await import("../scripts/deployAndSave/enclaveTicketToken");
+      const { deployAndSaveEnclaveToken } =
+        await import("../scripts/deployAndSave/enclaveToken");
+      const { deployAndSaveMockStableToken } =
+        await import("../scripts/deployAndSave/mockStableToken");
       const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
       const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
       const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
@@ -166,9 +162,8 @@ export const ciphernodeRemove = task(
       const [signer] = await ethers.getSigners();
       console.log(`Deregistering ciphernode: ${signer.address}`);
 
-      const { deployAndSaveBondingRegistry } = await import(
-        "../scripts/deployAndSave/bondingRegistry"
-      );
+      const { deployAndSaveBondingRegistry } =
+        await import("../scripts/deployAndSave/bondingRegistry");
       const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
 
       const bondingRegistryConnected = bondingRegistry.connect(signer);
@@ -227,14 +222,12 @@ export const ciphernodeMintTokens = task(
         );
       }
 
-      const { deployAndSaveEnclaveToken } = await import(
-        "../scripts/deployAndSave/enclaveToken"
-      );
+      const { deployAndSaveEnclaveToken } =
+        await import("../scripts/deployAndSave/enclaveToken");
       const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
 
-      const { deployAndSaveMockStableToken } = await import(
-        "../scripts/deployAndSave/mockStableToken"
-      );
+      const { deployAndSaveMockStableToken } =
+        await import("../scripts/deployAndSave/mockStableToken");
       const { mockStableToken } = await deployAndSaveMockStableToken({
         hre,
       });
@@ -341,19 +334,16 @@ export const ciphernodeAdminAdd = task(
       console.log(`Admin wallet: ${adminWallet.address}`);
       console.log(`Registering ciphernode: ${ciphernodeAddress}`);
 
-      const { deployAndSaveBondingRegistry } = await import(
-        "../scripts/deployAndSave/bondingRegistry"
-      );
+      const { deployAndSaveBondingRegistry } =
+        await import("../scripts/deployAndSave/bondingRegistry");
       const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
 
-      const { deployAndSaveEnclaveToken } = await import(
-        "../scripts/deployAndSave/enclaveToken"
-      );
+      const { deployAndSaveEnclaveToken } =
+        await import("../scripts/deployAndSave/enclaveToken");
       const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
 
-      const { deployAndSaveMockStableToken } = await import(
-        "../scripts/deployAndSave/mockStableToken"
-      );
+      const { deployAndSaveMockStableToken } =
+        await import("../scripts/deployAndSave/mockStableToken");
       const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
         hre,
       });
@@ -546,13 +536,11 @@ export const updateSubmissionWindow = task(
   })
   .setAction(async () => ({
     default: async ({ newWindow }, hre) => {
-      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
-        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
-      );
+      const { deployAndSaveCiphernodeRegistryOwnable } =
+        await import("../scripts/deployAndSave/ciphernodeRegistryOwnable");
 
-      const { deployAndSavePoseidonT3 } = await import(
-        "../scripts/deployAndSave/poseidonT3"
-      );
+      const { deployAndSavePoseidonT3 } =
+        await import("../scripts/deployAndSave/poseidonT3");
       const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
       const { ciphernodeRegistry } =

@@ -11,6 +11,7 @@
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::compute_max_modulus;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::utils::compute_modulus_bit;
@@ -90,12 +91,13 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = dkg_params.moduli().to_vec();
+        let l = moduli.len();
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
 
         Ok(Configs {
             n: dkg_params.degree(),
-            l: moduli.len(),
+            l,
             moduli,
             bits,
             bounds,
@@ -127,19 +129,11 @@ impl Computation for Bounds {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
-        let mut pk_bound_max = BigUint::from(0u32);
+        let moduli = dkg_params.moduli();
+        let max_mod = compute_max_modulus(moduli);
+        let pk_bound = (BigUint::from(max_mod) - 1u32) / 2u32;
 
-        for &qi in dkg_params.moduli() {
-            let qi_bound: BigUint = (&BigUint::from(qi) - 1u32) / 2u32;
-
-            if qi_bound > pk_bound_max {
-                pk_bound_max = qi_bound;
-            }
-        }
-
-        Ok(Bounds {
-            pk_bound: pk_bound_max,
-        })
+        Ok(Bounds { pk_bound })
     }
 }
 
