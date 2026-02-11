@@ -26,26 +26,27 @@ use std::fmt::{self, Display};
 ///
 /// Aggregation proofs (Proofs 5 and 7) are excluded — they are published on-chain
 /// directly and verified by the contract at submission time.
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProofType {
     /// T0 — BFV public key proof (Proof 0).
-    T0PkBfv,
+    T0PkBfv = 0,
     /// T1 — TrBFV public key generation proof (Proof 1).
-    T1PkGeneration,
+    T1PkGeneration = 1,
     /// T1 — Secret key share computation proof (Proof 2a).
-    T1SkShareComputation,
+    T1SkShareComputation = 2,
     /// T1 — Smudging noise share computation proof (Proof 2b).
-    T1ESmShareComputation,
+    T1ESmShareComputation = 3,
     /// T1 — Secret key share encryption proof (Proof 3a).
-    T1SkShareEncryption,
+    T1SkShareEncryption = 4,
     /// T1 — Smudging noise share encryption proof (Proof 3b).
-    T1ESmShareEncryption,
+    T1ESmShareEncryption = 5,
     /// T2 — Secret key share decryption proof (Proof 4a).
-    T2SkShareDecryption,
+    T2SkShareDecryption = 6,
     /// T2 — Smudging noise share decryption proof (Proof 4b).
-    T2ESmShareDecryption,
+    T2ESmShareDecryption = 7,
     /// T5 — Share decryption proof (Proof 6).
-    T5ShareDecryption,
+    T5ShareDecryption = 8,
 }
 
 impl ProofType {
@@ -110,12 +111,12 @@ impl ProofPayload {
     /// The encoding concatenates all fields as length-prefixed byte arrays
     /// preceded by fixed-size scalars, matching the structure the on-chain
     /// verifier will reconstruct.
-    pub fn digest(&self) -> [u8; 32] {
+    pub fn digest(&self) -> Result<[u8; 32]> {
         let e3_id_u256: U256 = self
             .e3_id
             .clone()
             .try_into()
-            .expect("E3id should be valid U256");
+            .map_err(|_| anyhow!("E3id cannot be converted to U256"))?;
 
         // keccak256(abi.encodePacked(chainId, e3Id, proofType, proof, publicSignals))
         let encoded = (
@@ -127,7 +128,7 @@ impl ProofPayload {
         )
             .abi_encode_packed();
 
-        keccak256(&encoded).into()
+        Ok(keccak256(&encoded).into())
     }
 }
 
@@ -149,7 +150,7 @@ pub struct SignedProofPayload {
 impl SignedProofPayload {
     /// Sign a [`ProofPayload`] with the node's ECDSA key.
     pub fn sign(payload: ProofPayload, signer: &PrivateKeySigner) -> Result<Self> {
-        let digest = payload.digest();
+        let digest = payload.digest()?;
         let sig = signer
             .sign_message_sync(&digest)
             .map_err(|e| anyhow!("Failed to sign proof payload: {e}"))?;
@@ -165,7 +166,7 @@ impl SignedProofPayload {
         let sig = Signature::try_from(&self.signature[..])
             .map_err(|e| anyhow!("Invalid signature: {e}"))?;
 
-        let digest = self.payload.digest();
+        let digest = self.payload.digest()?;
         sig.recover_address_from_msg(&digest)
             .map_err(|e| anyhow!("Failed to recover signer address: {e}"))
     }
@@ -274,7 +275,10 @@ mod tests {
         let mut p2 = test_payload();
         p2.proof_type = ProofType::T1PkGeneration;
 
-        assert_ne!(p1.digest(), p2.digest());
+        assert_ne!(
+            p1.digest().expect("digest should succeed"),
+            p2.digest().expect("digest should succeed")
+        );
     }
 
     #[test]
