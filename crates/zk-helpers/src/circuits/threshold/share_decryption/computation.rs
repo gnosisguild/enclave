@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the threshold share decryption circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the threshold share decryption circuit: constants, bounds, bit widths, and inputs.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) ciphertext plus aggregated shares (s, e, d_share). They implement
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) ciphertext plus aggregated shares (s, e, d_share). They implement
 //! [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
@@ -32,12 +32,12 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and inputs.
 #[derive(Debug)]
 pub struct ShareDecryptionComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`ShareDecryptionCircuit`].
@@ -50,12 +50,12 @@ impl CircuitComputation for ShareDecryptionCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
 
         Ok(ShareDecryptionComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -86,7 +86,7 @@ pub struct Bounds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     pub ct0: CrtPolynomial,
     pub ct1: CrtPolynomial,
     pub sk: CrtPolynomial,
@@ -202,7 +202,7 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = ShareDecryptionCircuitInput;
     type Error = CircuitsErrors;
@@ -322,7 +322,7 @@ impl Computation for Witness {
         let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, modulus_bit);
         let expected_e_sm_commitment = compute_aggregated_shares_commitment(&e_sm, modulus_bit);
 
-        Ok(Witness {
+        Ok(Inputs {
             ct0,
             ct1,
             sk,

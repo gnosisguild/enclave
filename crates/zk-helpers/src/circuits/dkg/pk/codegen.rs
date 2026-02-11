@@ -8,7 +8,7 @@
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
-use crate::circuits::dkg::pk::computation::{Bits, PkComputationOutput, Witness};
+use crate::circuits::dkg::pk::computation::{Bits, Inputs, PkComputationOutput};
 use crate::Artifacts;
 use crate::Circuit;
 use crate::CircuitCodegen;
@@ -27,20 +27,18 @@ impl CircuitCodegen for PkCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let PkComputationOutput { witness, bits, .. } = PkCircuit::compute(preset, input)?;
+        let PkComputationOutput { inputs, bits, .. } = PkCircuit::compute(preset, input)?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &bits);
 
         Ok(Artifacts { toml, configs })
     }
 }
 
-/// Builds the Prover TOML string from the pk witness (pk0is, pk1is).
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+/// Builds the Prover TOML string from the pk input (pk0is, pk1is).
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }

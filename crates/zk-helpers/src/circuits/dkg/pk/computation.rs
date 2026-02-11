@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the pk circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the pk circuit: constants, bounds, bit widths, and input.
 //!
-//! [`Constants`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+//! [`Constants`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitInput;
@@ -23,12 +23,12 @@ use e3_polynomial::CrtPolynomial;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`PkCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`PkCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
 pub struct PkComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`PkCircuit`].
@@ -41,12 +41,12 @@ impl CircuitComputation for PkCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
 
         Ok(PkComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -73,9 +73,9 @@ pub struct Bounds {
     pub pk_bound: BigUint,
 }
 
-/// Witness data for the pk circuit: public key polynomials in CRT form for the prover.
+/// Input for the pk circuit: public key polynomials in CRT form for the prover.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     /// Public key polynomials (pk0, pk1) for each CRT basis.
     pub pk0is: CrtPolynomial,
     pub pk1is: CrtPolynomial,
@@ -137,7 +137,7 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = PkCircuitInput;
     type Error = CircuitsErrors;
@@ -155,10 +155,10 @@ impl Computation for Witness {
         pk0is.reduce_uniform(zkp_modulus);
         pk1is.reduce_uniform(zkp_modulus);
 
-        Ok(Witness { pk0is, pk1is })
+        Ok(Inputs { pk0is, pk1is })
     }
 
-    // Used as witness for Nargo execution.
+    // Used as inputs for Nargo execution.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
