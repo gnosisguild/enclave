@@ -8,10 +8,10 @@
 
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_encryption::Configs;
+use crate::circuits::dkg::share_encryption::Inputs;
 use crate::circuits::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::circuits::dkg::share_encryption::ShareEncryptionCircuitInput;
 use crate::circuits::dkg::share_encryption::ShareEncryptionOutput;
-use crate::circuits::dkg::share_encryption::Inputs;
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::computation::Computation;
@@ -41,9 +41,7 @@ impl CircuitCodegen for ShareEncryptionCircuit {
 
 /// Serializes the input to TOML string for the Noir prover (Prover.toml).
 pub fn generate_toml(inputs: &Inputs) -> Result<CodegenToml, CircuitsErrors> {
-    let json = inputs
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+    let json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }

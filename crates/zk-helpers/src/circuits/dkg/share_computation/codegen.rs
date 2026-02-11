@@ -9,8 +9,8 @@
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::computation::Computation;
 use crate::circuits::dkg::share_computation::{
-    utils::parity_matrix_constant_string, Bits, ShareComputationCircuit,
-    Inputs, ShareComputationCircuitInput, ShareComputationOutput,
+    utils::parity_matrix_constant_string, Bits, Inputs, ShareComputationCircuit,
+    ShareComputationCircuitInput, ShareComputationOutput,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
@@ -48,9 +48,7 @@ pub fn generate_toml(
     inputs: &Inputs,
     dkg_input_type: DkgInputType,
 ) -> Result<CodegenToml, CircuitsErrors> {
-    let mut json = inputs
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+    let mut json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     let obj = json.as_object_mut().ok_or(CircuitsErrors::Other(
         "input json is not an object".to_string(),
