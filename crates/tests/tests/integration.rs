@@ -69,10 +69,9 @@ async fn find_bb() -> Option<PathBuf> {
 }
 
 /// Create a ZkBackend for integration tests.
-/// Uses the system-installed bb binary (symlinked into a temp dir) and
-/// the circuit fixtures from the enclave installation.
-async fn setup_test_zk_backend() -> Option<(ZkBackend, tempfile::TempDir)> {
-    let bb = find_bb().await?;
+/// If a local bb binary is found, uses it with fixture files (fast path).
+/// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
+async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
     let temp = tempfile::tempdir().unwrap();
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
@@ -80,34 +79,42 @@ async fn setup_test_zk_backend() -> Option<(ZkBackend, tempfile::TempDir)> {
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
 
-    // Create directories
-    tokio::fs::create_dir_all(bb_binary.parent().unwrap())
-        .await
-        .unwrap();
-    tokio::fs::create_dir_all(&circuits_dir).await.unwrap();
-    tokio::fs::create_dir_all(&work_dir).await.unwrap();
+    if let Some(bb) = find_bb().await {
+        tokio::fs::create_dir_all(bb_binary.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::create_dir_all(&circuits_dir).await.unwrap();
+        tokio::fs::create_dir_all(&work_dir).await.unwrap();
 
-    // Symlink the real bb binary
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(&bb, &bb_binary).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&bb, &bb_binary).unwrap();
 
-    // Copy circuit fixtures from the zk-prover crate's test fixtures
-    let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("zk-prover")
-        .join("tests")
-        .join("fixtures");
-    let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
-    tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
-    tokio::fs::copy(fixtures_dir.join("pk.json"), pk_circuit_dir.join("pk.json"))
-        .await
-        .unwrap();
-    tokio::fs::copy(fixtures_dir.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
-        .await
-        .unwrap();
+        // Copy circuit fixtures from the zk-prover crate's test fixtures
+        let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("zk-prover")
+            .join("tests")
+            .join("fixtures");
+        let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
+        tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
+        tokio::fs::copy(fixtures_dir.join("pk.json"), pk_circuit_dir.join("pk.json"))
+            .await
+            .unwrap();
+        tokio::fs::copy(fixtures_dir.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
+            .await
+            .unwrap();
 
-    let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
-    Some((backend, temp))
+        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        (backend, temp)
+    } else {
+        println!("bb binary not found locally, downloading via ensure_installed()...");
+        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        backend
+            .ensure_installed()
+            .await
+            .expect("Failed to download and install ZK backend");
+        (backend, temp)
+    }
 }
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
@@ -319,9 +326,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
     // Setup ZK backend for proof generation/verification
-    let (zk_backend, _zk_temp) = setup_test_zk_backend()
-        .await
-        .expect("bb binary is required for integration tests");
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
 
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 20 total nodes: 5 for committee + 4 buffer = 9 selected, 11 unselected
