@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
-use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::Inputs as UserDataEncryptionInputs;
 use e3_zk_helpers::circuits::Computation;
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -103,7 +103,7 @@ where
 
     let inputs = UserDataEncryptionInputs::compute(
         DEFAULT_BFV_PRESET,
-        &UserDataEncryptionCircuitInput {
+        &UserDataEncryptionCircuitData {
             public_key: pk,
             plaintext: plaintext,
         },

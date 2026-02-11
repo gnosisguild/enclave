@@ -11,7 +11,7 @@ use e3_fhe_params::BfvPreset;
 use crate::circuits::computation::Computation;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
 use crate::threshold::pk_aggregation::computation::{Configs, Inputs};
-use crate::threshold::pk_aggregation::PkAggregationCircuitInput;
+use crate::threshold::pk_aggregation::PkAggregationCircuitData;
 use crate::utils::join_display;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
@@ -21,11 +21,11 @@ use crate::{Circuit, CodegenConfigs};
 /// Implementation of [`CircuitCodegen`] for [`PkAggregationCircuit`].
 impl CircuitCodegen for PkAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = PkAggregationCircuitInput;
+    type Data = PkAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let inputs = Inputs::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(inputs)?;
@@ -85,7 +85,7 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let prefix: &str = <PkAggregationCircuit as Circuit>::PREFIX;
 
-        let sample = PkAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+        let sample = PkAggregationCircuitData::generate_sample(preset, committee).unwrap();
         let inputs = Inputs::compute(preset, &sample).unwrap();
         let configs = Configs::compute(preset, &()).unwrap();
 

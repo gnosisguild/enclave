@@ -28,7 +28,7 @@ impl Circuit for ShareEncryptionCircuit {
 }
 
 /// Input to the share-encryption circuit: plaintext, ciphertext, keys, and encryption randomness.
-pub struct ShareEncryptionCircuitInput {
+pub struct ShareEncryptionCircuitData {
     /// Plaintext (encoded share row).
     pub plaintext: Plaintext,
     /// Ciphertext (encryption under public_key).

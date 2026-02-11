@@ -21,7 +21,7 @@ pub struct ShareDecryptionCircuit;
 
 /// Input to the share decryption circuit: ciphertext, public key, and the party's
 /// aggregated secret share (s), smudging error (e), and computed decryption share (d_share).
-pub struct ShareDecryptionCircuitInput {
+pub struct ShareDecryptionCircuitData {
     pub ciphertext: Ciphertext,
     pub public_key: PublicKey,
     pub s: CrtPolynomial,

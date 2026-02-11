@@ -10,6 +10,6 @@ pub mod computation;
 pub mod sample;
 pub mod utils;
 
-pub use circuit::{ShareComputationCircuit, ShareComputationCircuitInput};
+pub use circuit::{ShareComputationCircuit, ShareComputationCircuitData};
 pub use computation::{Bits, Bounds, Configs, Inputs, ShareComputationOutput};
 pub use sample::SecretShares;

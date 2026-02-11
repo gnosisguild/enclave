@@ -15,9 +15,9 @@ mod common;
 use common::fixtures_dir;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
-use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitInput;
+use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
-use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
@@ -108,7 +108,7 @@ async fn setup_pk_generation_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     PkGenerationCircuit,
-    PkGenerationCircuitInput,
+    PkGenerationCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -119,7 +119,7 @@ async fn setup_pk_generation_test() -> Option<(
 
     setup_circuit_fixtures(&backend, &["threshold", "pk_generation"], "pk_generation").await;
 
-    let sample = PkGenerationCircuitInput::generate_sample(preset, committee).ok()?;
+    let sample = PkGenerationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -138,7 +138,7 @@ async fn setup_pk_bfv_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     PkCircuit,
-    PkCircuitInput,
+    PkCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -148,7 +148,7 @@ async fn setup_pk_bfv_test() -> Option<(
 
     setup_circuit_fixtures(&backend, &["dkg", "pk"], "pk").await;
 
-    let sample = PkCircuitInput::generate_sample(preset).ok()?;
+    let sample = PkCircuitData::generate_sample(preset).ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((backend, temp, prover, PkCircuit, sample, preset, "0"))

@@ -9,7 +9,7 @@
 use crate::circuits::computation::Computation;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::computation::{Configs, Inputs};
-use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
+use crate::threshold::user_data_encryption::UserDataEncryptionCircuitData;
 use crate::utils::join_display;
 use crate::Circuit;
 use crate::CircuitCodegen;
@@ -23,11 +23,11 @@ use serde_json;
 /// Implementation of [`CircuitCodegen`] for [`UserDataEncryptionCircuit`].
 impl CircuitCodegen for UserDataEncryptionCircuit {
     type Preset = BfvPreset;
-    type Input = UserDataEncryptionCircuitInput;
+    type Data = UserDataEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let inputs = Inputs::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(inputs)?;
@@ -201,7 +201,7 @@ mod tests {
     use super::*;
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
-    use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+    use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
     use crate::threshold::user_data_encryption::computation::{Bits, Bounds};
 
     use e3_fhe_params::BfvPreset;
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let sample =
-            UserDataEncryptionCircuitInput::generate_sample(BfvPreset::InsecureThreshold512)
+            UserDataEncryptionCircuitData::generate_sample(BfvPreset::InsecureThreshold512)
                 .unwrap();
         let artifacts = UserDataEncryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

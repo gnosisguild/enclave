@@ -7,7 +7,7 @@
 //! Code generation for the public-key BFV circuit: Prover.toml and configs.nr.
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
-use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::circuits::dkg::pk::circuit::PkCircuitData;
 use crate::circuits::dkg::pk::computation::{Bits, Inputs, PkComputationOutput};
 use crate::Artifacts;
 use crate::Circuit;
@@ -23,11 +23,11 @@ use e3_fhe_params::BfvPreset;
 /// Implementation of [`CircuitCodegen`] for [`PkCircuit`].
 impl CircuitCodegen for PkCircuit {
     type Preset = BfvPreset;
-    type Input = PkCircuitInput;
+    type Data = PkCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let PkComputationOutput { inputs, bits, .. } = PkCircuit::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let PkComputationOutput { inputs, bits, .. } = PkCircuit::compute(preset, data)?;
 
         let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &bits);
@@ -69,7 +69,7 @@ pub global {}_BIT_PK: u32 = {};
 mod tests {
     use super::*;
     use crate::codegen::write_artifacts;
-    use crate::dkg::pk::PkCircuitInput;
+    use crate::dkg::pk::PkCircuitData;
     use crate::utils::compute_modulus_bit;
 
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
-        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
+        let sample = PkCircuitData::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
 
         let artifacts = PkCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)

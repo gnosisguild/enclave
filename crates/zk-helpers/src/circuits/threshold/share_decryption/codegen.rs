@@ -9,7 +9,7 @@
 use crate::circuits::computation::Computation;
 use crate::threshold::share_decryption::computation::Inputs;
 use crate::threshold::share_decryption::{
-    Configs, ShareDecryptionCircuit, ShareDecryptionCircuitInput,
+    Configs, ShareDecryptionCircuit, ShareDecryptionCircuitData,
 };
 use crate::utils::join_display;
 use crate::Circuit;
@@ -22,11 +22,11 @@ use e3_fhe_params::BfvPreset;
 /// Implementation of [`CircuitCodegen`] for [`ShareDecryptionCircuit`].
 impl CircuitCodegen for ShareDecryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let inputs = Inputs::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(inputs)?;
@@ -110,7 +110,7 @@ mod tests {
     use crate::circuits::computation::Computation;
     use crate::codegen::write_artifacts;
     use crate::threshold::share_decryption::computation::{Bits, Bounds};
-    use crate::threshold::share_decryption::ShareDecryptionCircuitInput;
+    use crate::threshold::share_decryption::ShareDecryptionCircuitData;
     use crate::CiphernodesCommitteeSize;
 
     use e3_fhe_params::BfvPreset;
@@ -120,11 +120,9 @@ mod tests {
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
 
-        let sample = ShareDecryptionCircuitInput::generate_sample(
-            BfvPreset::InsecureThreshold512,
-            committee,
-        )
-        .unwrap();
+        let sample =
+            ShareDecryptionCircuitData::generate_sample(BfvPreset::InsecureThreshold512, committee)
+                .unwrap();
         let artifacts = ShareDecryptionCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();

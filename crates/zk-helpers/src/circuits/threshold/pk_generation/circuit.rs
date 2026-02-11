@@ -21,7 +21,7 @@ impl Circuit for PkGenerationCircuit {
 }
 
 #[derive(Debug, Clone)]
-pub struct PkGenerationCircuitInput {
+pub struct PkGenerationCircuitData {
     pub committee: CiphernodesCommittee,
     pub pk0_share: CrtPolynomial,
     pub a: CrtPolynomial,

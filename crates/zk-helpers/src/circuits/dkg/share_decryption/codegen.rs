@@ -10,7 +10,7 @@ use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_decryption::Configs;
 use crate::circuits::dkg::share_decryption::Inputs;
 use crate::circuits::dkg::share_decryption::ShareDecryptionCircuit;
-use crate::circuits::dkg::share_decryption::ShareDecryptionCircuitInput;
+use crate::circuits::dkg::share_decryption::ShareDecryptionCircuitData;
 use crate::circuits::dkg::share_decryption::ShareDecryptionOutput;
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
@@ -21,14 +21,14 @@ use e3_fhe_params::BfvPreset;
 /// Implementation of [`CircuitCodegen`] for [`ShareDecryptionCircuit`].
 impl CircuitCodegen for ShareDecryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let ShareDecryptionOutput { inputs, .. } = ShareDecryptionCircuit::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let ShareDecryptionOutput { inputs, .. } = ShareDecryptionCircuit::compute(preset, data)?;
 
         let toml = generate_toml(&inputs)?;
-        let configs = Configs::compute(preset, input)?;
+        let configs = Configs::compute(preset, data)?;
         let configs_str = generate_configs(preset, &configs);
 
         Ok(Artifacts {
@@ -74,7 +74,7 @@ mod tests {
     use super::*;
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
-    use crate::circuits::dkg::share_decryption::{Configs, ShareDecryptionCircuitInput};
+    use crate::circuits::dkg::share_decryption::{Configs, ShareDecryptionCircuitData};
     use crate::computation::{Computation, DkgInputType};
     use crate::Circuit;
     use e3_fhe_params::BfvPreset;
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_configs_generation_contains_expected() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,

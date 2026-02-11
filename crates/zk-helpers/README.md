@@ -1,8 +1,8 @@
 # zk-helpers
 
 ZK circuit artifact generation for the Noir prover. Produces `configs.nr` and optionally
-`Prover.toml` for the Enclave circuits. The Prover.toml contains circuit inputs for Nargo,
-which executes them to produce witnesses for proof generation.
+`Prover.toml` for the Enclave circuits. The Prover.toml contains circuit inputs for Nargo, which
+executes them to produce witnesses for proof generation.
 
 ## zk-cli
 

@@ -15,7 +15,7 @@ use crate::get_zkp_modulus;
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
-use crate::threshold::pk_generation::circuit::PkGenerationCircuitInput;
+use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
 use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
@@ -45,14 +45,14 @@ pub struct PkGenerationComputationOutput {
 /// Implementation of [`CircuitComputation`] for [`PkGenerationCircuit`].
 impl CircuitComputation for PkGenerationCircuit {
     type Preset = BfvPreset;
-    type Input = PkGenerationCircuitInput;
+    type Data = PkGenerationCircuitData;
     type Output = PkGenerationComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, &input.committee)?;
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, &data.committee)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(PkGenerationComputationOutput {
             bounds,
@@ -105,16 +105,16 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = CiphernodesCommittee;
+    type Data = CiphernodesCommittee;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let moduli = threshold_params.moduli().to_vec();
 
-        let bounds = Bounds::compute(preset, input)?;
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -129,25 +129,25 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
-        let eek_bit = calculate_bit_width(BigInt::from(input.eek_bound.clone()));
-        let sk_bit = calculate_bit_width(BigInt::from(input.sk_bound.clone()));
-        let e_sm_bit = calculate_bit_width(BigInt::from(input.e_sm_bound.clone()));
-        let pk_bit = calculate_bit_width(BigInt::from(input.pk_bound.clone()));
+        let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
+        let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
+        let e_sm_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
+        let pk_bit = calculate_bit_width(BigInt::from(data.pk_bound.clone()));
 
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
-        for bound in &input.r1_bounds {
+        for bound in &data.r1_bounds {
             r1_bit = r1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
         // For r2, use the maximum of all bounds
         let mut r2_bit = 0;
-        for bound in &input.r2_bounds {
+        for bound in &data.r2_bounds {
             r2_bit = r2_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
@@ -164,10 +164,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = CiphernodesCommittee;
+    type Data = CiphernodesCommittee;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -186,7 +186,7 @@ impl Computation for Bounds {
 
         let smudging_config = SmudgingBoundCalculatorConfig::new(
             threshold_params.clone(),
-            input.n,
+            data.n,
             num_ciphertexts as usize,
             preset.metadata().lambda,
         );
@@ -241,10 +241,10 @@ impl Computation for Bounds {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = PkGenerationCircuitInput;
+    type Data = PkGenerationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -267,11 +267,11 @@ impl Computation for Inputs {
             Polynomial,
         )> = izip!(
             moduli.clone(),
-            input.pk0_share.limbs.clone(),
-            input.a.limbs.clone(),
-            input.eek.limbs.clone(),
-            input.e_sm.limbs.clone(),
-            input.sk.limbs.clone(),
+            data.pk0_share.limbs.clone(),
+            data.a.limbs.clone(),
+            data.eek.limbs.clone(),
+            data.e_sm.limbs.clone(),
+            data.sk.limbs.clone(),
         )
         .enumerate()
         .par_bridge()
@@ -320,8 +320,8 @@ impl Computation for Inputs {
         let mut a = CrtPolynomial::new(vec![]);
         let mut e_sm = CrtPolynomial::new(vec![]);
 
-        let mut sk = input.sk.limbs[0].clone();
-        let mut eek = input.eek.limbs[0].clone();
+        let mut sk = data.sk.limbs[0].clone();
+        let mut eek = data.eek.limbs[0].clone();
 
         sk.reverse();
         sk.center(&moduli[0]);

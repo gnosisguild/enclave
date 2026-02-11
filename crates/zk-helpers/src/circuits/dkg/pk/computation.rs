@@ -10,7 +10,7 @@
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::circuits::dkg::pk::circuit::PkCircuit;
-use crate::circuits::dkg::pk::circuit::PkCircuitInput;
+use crate::circuits::dkg::pk::circuit::PkCircuitData;
 use crate::compute_max_modulus;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
@@ -34,14 +34,14 @@ pub struct PkComputationOutput {
 /// Implementation of [`CircuitComputation`] for [`PkCircuit`].
 impl CircuitComputation for PkCircuit {
     type Preset = BfvPreset;
-    type Input = PkCircuitInput;
+    type Data = PkCircuitData;
     type Output = PkComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(PkComputationOutput {
             bounds,
@@ -83,10 +83,10 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -107,10 +107,10 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -122,10 +122,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -139,16 +139,16 @@ impl Computation for Bounds {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = PkCircuitInput;
+    type Data = PkCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
 
-        let mut pk0is = crate::math::fhe_poly_to_crt_centered(&input.public_key.c.c[0], moduli)?;
-        let mut pk1is = crate::math::fhe_poly_to_crt_centered(&input.public_key.c.c[1], moduli)?;
+        let mut pk0is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[0], moduli)?;
+        let mut pk1is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[1], moduli)?;
 
         let zkp_modulus = &get_zkp_modulus();
 

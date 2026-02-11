@@ -15,7 +15,7 @@ use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
-use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::utils::compute_modulus_bit;
 use e3_zk_helpers::CircuitComputation;
@@ -94,7 +94,7 @@ impl ZKInputsGenerator {
 
         let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
             DEFAULT_BFV_PRESET,
-            &UserDataEncryptionCircuitInput {
+            &UserDataEncryptionCircuitData {
                 public_key: pk,
                 plaintext: pt,
             },
@@ -158,7 +158,7 @@ impl ZKInputsGenerator {
 
         let user_data_encryption_computation_output = UserDataEncryptionCircuit::compute(
             DEFAULT_BFV_PRESET,
-            &UserDataEncryptionCircuitInput {
+            &UserDataEncryptionCircuitData {
                 public_key: pk,
                 plaintext: pt,
             },
