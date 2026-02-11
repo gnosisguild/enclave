@@ -44,6 +44,11 @@ impl ProviderCache<ReadOnly> {
         }
     }
 
+    pub fn with_signer(mut self, signer: LocalSigner<SigningKey>) -> Self {
+        self.signer_cache = Some(signer);
+        self
+    }
+
     pub fn from_single_read_provider(
         chain: ChainConfig,
         provider: EthProvider<ConcreteReadProvider>,
