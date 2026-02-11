@@ -9,11 +9,7 @@ import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, resolve } from 'path'
-
-// Types & Constants
-const CIRCUIT_GROUPS = { DKG: 'dkg', THRESHOLD: 'threshold', AGGREGATION: 'recursive_aggregation' } as const
-type CircuitGroup = (typeof CIRCUIT_GROUPS)[keyof typeof CIRCUIT_GROUPS]
-const ALL_GROUPS: CircuitGroup[] = [CIRCUIT_GROUPS.DKG, CIRCUIT_GROUPS.THRESHOLD, CIRCUIT_GROUPS.AGGREGATION]
+import { ALL_GROUPS, CIRCUIT_GROUPS, type CircuitGroup } from './circuit-constants'
 
 interface CircuitInfo {
   name: string

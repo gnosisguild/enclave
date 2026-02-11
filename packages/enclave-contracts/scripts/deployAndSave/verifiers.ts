@@ -26,36 +26,51 @@ export const discoverVerifierContracts = (): string[] => {
 };
 
 /**
- * Reads a compiled artifact to extract unlinked library references.
- * Returns a map of fully-qualified library name → library name.
+ * Deploys ZKTranscriptLib library required by BB-generated verifiers.
+ * Reuses existing deployment if already deployed on the chain.
  */
-const getRequiredLibraries = async (
-  contractName: string,
+const deployZKTranscriptLib = async (
   hre: HardhatRuntimeEnvironment,
-): Promise<string[]> => {
-  const artifact = await hre.artifacts.readArtifact(contractName);
-  const linkRefs = artifact.bytecode.match(/__\$[a-f0-9]{34}\$__/g);
-  if (!linkRefs || linkRefs.length === 0) return [];
+  chain: string,
+): Promise<string> => {
+  const libName = "ZKTranscriptLib";
 
-  // Extract library names from linkReferences in the artifact
-  const libraries: string[] = [];
-  const linkReferences = (artifact as any).linkReferences ?? {};
-  for (const source of Object.keys(linkReferences)) {
-    for (const libName of Object.keys(linkReferences[source])) {
-      libraries.push(`${source}:${libName}`);
-    }
+  // Check if library is already deployed
+  const existing = readDeploymentArgs(libName, chain);
+  if (existing?.address) {
+    console.log(`   ${libName} already deployed at ${existing.address}`);
+    return existing.address;
   }
-  return libraries;
+
+  // Deploy the library
+  console.log(`   Deploying ${libName}...`);
+  const { ethers } = await hre.network.connect();
+  const factory = await ethers.getContractFactory(libName);
+  const contract = await factory.deploy();
+  await contract.waitForDeployment();
+
+  const address = await contract.getAddress();
+  const blockNumber = await ethers.provider.getBlockNumber();
+
+  storeDeploymentArgs({ blockNumber, address }, libName, chain);
+
+  console.log(`   ${libName} deployed to: ${address}`);
+  return address;
 };
 
 /**
  * Deploys a single verifier contract and saves the deployment record.
- * Automatically detects and deploys any libraries the verifier depends on.
+ * BB-generated verifiers require ZKTranscriptLib to be linked.
  * Skips deployment if the contract is already deployed on the target chain.
+ *
+ * Note: The library FQN (fully-qualified name) uses the pattern:
+ * "contracts/verifier/<ContractName>.sol:ZKTranscriptLib"
+ * If you get linking errors, check the contract's compiled artifact for the exact FQN.
  */
 export const deployAndSaveVerifier = async (
   contractName: string,
   hre: HardhatRuntimeEnvironment,
+  zkTranscriptLibAddress: string,
 ): Promise<{ address: string }> => {
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
@@ -68,48 +83,14 @@ export const deployAndSaveVerifier = async (
     return { address: existing.address };
   }
 
-  // Detect and deploy required libraries
-  const requiredLibs = await getRequiredLibraries(contractName, hre);
-  const libraries: Record<string, string> = {};
+  // Link ZKTranscriptLib - FQN pattern: "contracts/verifier/<ContractName>.sol:ZKTranscriptLib"
+  const libraryFQN = `project/contracts/verifier/${contractName}.sol:ZKTranscriptLib`;
+  const libraries = {
+    [libraryFQN]: zkTranscriptLibAddress,
+  };
 
-  for (const fqn of requiredLibs) {
-    const libName = fqn.split(":").pop()!;
-    const libStorageKey = `${contractName}_${libName}`;
-
-    // Check if library is already deployed
-    const existingLib = readDeploymentArgs(libStorageKey, chain);
-    if (existingLib?.address) {
-      console.log(
-        `   ${libName} library already deployed at ${existingLib.address}`,
-      );
-      libraries[fqn] = existingLib.address;
-      continue;
-    }
-
-    // Deploy the library
-    console.log(`   Deploying library ${libName}...`);
-    const libFactory = await ethers.getContractFactory(libName);
-    const libContract = await libFactory.deploy();
-    await libContract.waitForDeployment();
-    const libAddress = await libContract.getAddress();
-    const libBlockNumber = await ethers.provider.getBlockNumber();
-
-    storeDeploymentArgs(
-      { blockNumber: libBlockNumber, address: libAddress },
-      libStorageKey,
-      chain,
-    );
-
-    console.log(`   ${libName} library deployed to: ${libAddress}`);
-    libraries[fqn] = libAddress;
-  }
-
-  // Deploy the verifier contract with linked libraries
-  const factory =
-    Object.keys(libraries).length > 0
-      ? await ethers.getContractFactory(contractName, { libraries })
-      : await ethers.getContractFactory(contractName);
-
+  // Deploy the verifier contract with linked library
+  const factory = await ethers.getContractFactory(contractName, { libraries });
   const contract = await factory.deploy();
   await contract.waitForDeployment();
 
@@ -157,10 +138,17 @@ export const deployAndSaveAllVerifiers = async (
 
   console.log(`   Found ${contractNames.length} verifier contract(s)`);
 
+  // Deploy ZKTranscriptLib once, reused by all verifiers
+  const zkTranscriptLibAddress = await deployZKTranscriptLib(hre, chain);
+
   const deployments: VerifierDeployments = {};
 
   for (const name of contractNames) {
-    const { address } = await deployAndSaveVerifier(name, hre);
+    const { address } = await deployAndSaveVerifier(
+      name,
+      hre,
+      zkTranscriptLibAddress,
+    );
     deployments[name] = address;
   }
 
