@@ -108,9 +108,9 @@ pub struct ProofPayload {
 impl ProofPayload {
     /// Compute the keccak256 digest of the canonical encoding.
     ///
-    /// The encoding concatenates all fields as length-prefixed byte arrays
-    /// preceded by fixed-size scalars, matching the structure the on-chain
-    /// verifier will reconstruct.
+    /// Uses standard ABI encoding (`abi.encode`) which includes offsets and
+    /// lengths for dynamic types, avoiding collision between the two
+    /// variable-length `Bytes` fields (`proof` and `publicSignals`).
     pub fn digest(&self) -> Result<[u8; 32]> {
         let e3_id_u256: U256 = self
             .e3_id
@@ -118,7 +118,7 @@ impl ProofPayload {
             .try_into()
             .map_err(|_| anyhow!("E3id cannot be converted to U256"))?;
 
-        // keccak256(abi.encodePacked(chainId, e3Id, proofType, proof, publicSignals))
+        // keccak256(abi.encode(chainId, e3Id, proofType, proof, publicSignals))
         let encoded = (
             U256::from(self.e3_id.chain_id()),
             e3_id_u256,
@@ -126,7 +126,7 @@ impl ProofPayload {
             Bytes::copy_from_slice(&self.proof.data),
             Bytes::copy_from_slice(&self.proof.public_signals),
         )
-            .abi_encode_packed();
+            .abi_encode();
 
         Ok(keccak256(&encoded).into())
     }
