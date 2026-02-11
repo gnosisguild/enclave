@@ -13,7 +13,7 @@
 use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
-use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitInput;
+use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitData;
 use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
@@ -35,14 +35,14 @@ pub struct DecryptedSharesAggregationComputationOutput {
 
 impl CircuitComputation for DecryptedSharesAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = DecryptedSharesAggregationCircuitInput;
+    type Data = DecryptedSharesAggregationCircuitData;
     type Output = DecryptedSharesAggregationComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(DecryptedSharesAggregationComputationOutput {
             bounds,
@@ -97,10 +97,10 @@ pub struct Inputs {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli();
@@ -114,21 +114,21 @@ impl Computation for Bounds {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, bounds: &Self::Input) -> Result<Self, Self::Error> {
-        let noise_bit = calculate_bit_width(BigInt::from(bounds.delta_half.clone()));
+    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+        let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
         Ok(Bits { noise_bit })
     }
 }
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli().to_vec();
@@ -154,10 +154,10 @@ impl Computation for Configs {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = DecryptedSharesAggregationCircuitInput;
+    type Data = DecryptedSharesAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let configs = Configs::compute(preset, &())?;
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
@@ -166,11 +166,11 @@ impl Computation for Inputs {
             .map_err(|e| CircuitsErrors::Other(format!("ctx_at_level: {:?}", e)))?;
         let num_moduli = ctx.moduli().len();
         let degree = ctx.degree;
-        let threshold = input.committee.threshold;
+        let threshold = data.committee.threshold;
         let max_msg_non_zero_coeffs = configs.max_msg_non_zero_coeffs;
 
         // Copy to PowerBasis for coefficient extraction
-        let d_share_polys: Vec<_> = input
+        let d_share_polys: Vec<_> = data
             .d_share_polys
             .iter()
             .map(|p| {
@@ -214,18 +214,18 @@ impl Computation for Inputs {
         }
 
         // 2. Party IDs (1-based)
-        let party_ids: Vec<BigInt> = input
+        let party_ids: Vec<BigInt> = data
             .reconstructing_parties
             .iter()
             .map(|&x| BigInt::from(x))
             .collect();
 
         // 3. Message (pad to degree for computation, then truncate to MAX_MSG_NON_ZERO_COEFFS for input)
-        let mut message: Vec<BigInt> = input.message_vec.iter().map(|&x| BigInt::from(x)).collect();
+        let mut message: Vec<BigInt> = data.message_vec.iter().map(|&x| BigInt::from(x)).collect();
         message.resize(degree, BigInt::zero());
 
         // 4. u^{(l)} via Lagrange per modulus
-        let reconstructing_parties = &input.reconstructing_parties;
+        let reconstructing_parties = &data.reconstructing_parties;
         let mut u_per_modulus: Vec<Vec<u64>> = Vec::new();
         for m in 0..num_moduli {
             let modulus = ctx.moduli()[m];
@@ -299,6 +299,7 @@ impl Computation for Inputs {
             u_global,
             crt_quotients,
         };
+
         Ok(inputs.standard_form())
     }
 }
@@ -381,7 +382,7 @@ impl Inputs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput;
+    use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
     use crate::CiphernodesCommitteeSize;
 
     #[test]
@@ -410,7 +411,7 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let input =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee.clone())
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee.clone())
                 .unwrap();
 
         let out = DecryptedSharesAggregationCircuit::compute(preset, &input).unwrap();

@@ -29,7 +29,7 @@ pub trait Provable: Send + Sync {
 
     fn build_inputs(&self, params: &Self::Params, input: &Self::Input) -> Result<InputMap, ZkError>
     where
-        Self::Inputs: Computation<Preset = Self::Params, Input = Self::Input> + serde::Serialize,
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
         <Self::Inputs as Computation>::Error: Display,
     {
         let inputs = Self::Inputs::compute(params.clone(), input)
@@ -49,7 +49,7 @@ pub trait Provable: Send + Sync {
         e3_id: &str,
     ) -> Result<Proof, ZkError>
     where
-        Self::Inputs: Computation<Preset = Self::Params, Input = Self::Input> + serde::Serialize,
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
         <Self::Inputs as Computation>::Error: Display,
     {
         let inputs = self.build_inputs(params, input)?;

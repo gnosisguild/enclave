@@ -14,7 +14,7 @@ use crate::circuits::computation::Computation;
 use crate::threshold::decrypted_shares_aggregation::computation::Configs;
 use crate::CircuitsErrors;
 use crate::{
-    threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput,
+    threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData,
     CiphernodesCommittee,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
@@ -38,7 +38,7 @@ struct Party {
     es_poly_sum: Poly,
 }
 
-impl DecryptedSharesAggregationCircuitInput {
+impl DecryptedSharesAggregationCircuitData {
     /// Generates sample data for the decrypted shares aggregation circuit:
     /// TRBFV setup, parties with sk/pk shares and smudging error shares, share collection
     /// and aggregation, encryption of a message, T+1 decryption shares, and threshold decrypt.
@@ -255,7 +255,7 @@ impl DecryptedSharesAggregationCircuitInput {
         let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly())
             .map_err(|e| CircuitsErrors::Sample(format!("Failed to decode plaintext: {:?}", e)))?;
 
-        Ok(DecryptedSharesAggregationCircuitInput {
+        Ok(DecryptedSharesAggregationCircuitData {
             committee,
             d_share_polys,
             reconstructing_parties,
@@ -268,7 +268,7 @@ impl DecryptedSharesAggregationCircuitInput {
 mod tests {
     use crate::{
         computation::Computation,
-        threshold::decrypted_shares_aggregation::{DecryptedSharesAggregationCircuitInput, Inputs},
+        threshold::decrypted_shares_aggregation::{DecryptedSharesAggregationCircuitData, Inputs},
         CiphernodesCommitteeSize,
     };
     use e3_fhe_params::BfvPreset;
@@ -281,7 +281,7 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
 
         let sample =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
         let inputs = Inputs::compute(preset, &sample).unwrap();
 
         assert_eq!(
@@ -305,7 +305,7 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
         let inputs = Inputs::compute(preset, &sample).unwrap();
         let configs = Configs::compute(preset, &()).unwrap();
         let n = configs.max_msg_non_zero_coeffs;

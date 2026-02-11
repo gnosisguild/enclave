@@ -10,7 +10,7 @@ use crate::circuits::computation::CircuitComputation;
 use crate::circuits::computation::Computation;
 use crate::circuits::dkg::share_computation::{
     utils::parity_matrix_constant_string, Bits, Inputs, ShareComputationCircuit,
-    ShareComputationCircuitInput, ShareComputationOutput,
+    ShareComputationCircuitData, ShareComputationOutput,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
@@ -25,19 +25,19 @@ use serde_json;
 /// Implementation of [`CircuitCodegen`] for [`ShareComputationCircuit`].
 impl CircuitCodegen for ShareComputationCircuit {
     type Preset = BfvPreset;
-    type Input = ShareComputationCircuitInput;
+    type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
         let ShareComputationOutput { inputs, bits, .. } =
-            ShareComputationCircuit::compute(preset, input)?;
+            ShareComputationCircuit::compute(preset, data)?;
 
-        let toml = generate_toml(&inputs, input.dkg_input_type.clone())?;
+        let toml = generate_toml(&inputs, data.dkg_input_type.clone())?;
         let configs = generate_configs(
             preset,
             &bits,
-            input.n_parties as usize,
-            input.threshold as usize,
+            data.n_parties as usize,
+            data.threshold as usize,
         )?;
 
         Ok(Artifacts { toml, configs })
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,

@@ -26,17 +26,17 @@ pub struct Artifacts {
     pub configs: CodegenConfigs,
 }
 
-/// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific input.
+/// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific data.
 pub trait CircuitCodegen: crate::registry::Circuit {
     /// Circuit-specific BFV threshold parameters preset.
     type Preset;
-    /// Circuit-specific codegen input (e.g. preset + public key).
-    type Input;
+    /// Circuit-specific codegen data (e.g. preset + public key).
+    type Data;
     /// Error type for codegen failures.
     type Error;
 
     /// Produces [`Artifacts`] for this circuit from the given input.
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error>;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error>;
 }
 
 /// Writes the Prover TOML string to `path/Prover.toml`, or `./Prover.toml` if `path` is `None`.

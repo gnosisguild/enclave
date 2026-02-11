@@ -7,7 +7,7 @@
 //! Sample data generation for the share-encryption circuit: DKG public key, plaintext,
 //! ciphertext, and encryption randomness (u_rns, e0_rns, e1_rns) for testing and codegen.
 
-use crate::circuits::dkg::share_encryption::circuit::ShareEncryptionCircuitInput;
+use crate::circuits::dkg::share_encryption::circuit::ShareEncryptionCircuitData;
 use crate::computation::DkgInputType;
 use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
@@ -20,7 +20,7 @@ use fhe::trbfv::{ShareManager, TRBFV};
 use fhe_traits::FheEncoder;
 use rand::thread_rng;
 
-impl ShareEncryptionCircuitInput {
+impl ShareEncryptionCircuitData {
     /// Generates sample data for the share-encryption circuit (encrypts a share row under DKG pk).
     pub fn generate_sample(
         preset: BfvPreset,
@@ -99,7 +99,7 @@ impl ShareEncryptionCircuitInput {
             .try_encrypt_extended(&pt, &mut rng)
             .map_err(|e| CircuitsErrors::Sample(format!("Failed to encrypt extended: {:?}", e)))?;
 
-        Ok(ShareEncryptionCircuitInput {
+        Ok(ShareEncryptionCircuitData {
             plaintext: pt,
             ciphertext: _ct,
             public_key: dkg_public_key,
@@ -121,7 +121,7 @@ mod tests {
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,
@@ -154,7 +154,7 @@ mod tests {
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SmudgingNoise,

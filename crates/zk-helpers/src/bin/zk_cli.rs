@@ -14,30 +14,30 @@ use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, Parser};
 use e3_fhe_params::{BfvPreset, ParameterType};
 use e3_zk_helpers::ciphernodes_committee::CiphernodesCommitteeSize;
-use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
+use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
-    ShareComputationCircuit, ShareComputationCircuitInput,
+    ShareComputationCircuit, ShareComputationCircuitData,
 };
 use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_decryption::{
     ShareDecryptionCircuit as DkgShareDecryptionCircuit,
-    ShareDecryptionCircuitInput as DkgShareDecryptionCircuitInput,
+    ShareDecryptionCircuitData as DkgShareDecryptionCircuitInput,
 };
-use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitInput};
+use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
 use e3_zk_helpers::threshold::decrypted_shares_aggregation::{
-    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitInput,
+    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
 };
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
-use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitInput;
-use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
+use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::threshold::share_decryption::{
     ShareDecryptionCircuit as ThresholdShareDecryptionCircuit,
-    ShareDecryptionCircuitInput as ThresholdShareDecryptionCircuitInput,
+    ShareDecryptionCircuitData as ThresholdShareDecryptionCircuitInput,
 };
 use e3_zk_helpers::threshold::user_data_encryption::{
-    UserDataEncryptionCircuit, UserDataEncryptionCircuitInput,
+    UserDataEncryptionCircuit, UserDataEncryptionCircuitData,
 };
 use std::io::Write;
 use std::path::PathBuf;
@@ -270,13 +270,13 @@ fn main() -> Result<()> {
         let committee = CiphernodesCommitteeSize::Small.values();
         let artifacts = match circuit_name {
             name if name == <PkCircuit as Circuit>::NAME => {
-                let sample = PkCircuitInput::generate_sample(preset)?;
+                let sample = PkCircuitData::generate_sample(preset)?;
 
                 let circuit = PkCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <ShareComputationCircuit as Circuit>::NAME => {
-                let sample = ShareComputationCircuitInput::generate_sample(
+                let sample = ShareComputationCircuitData::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
@@ -287,7 +287,7 @@ fn main() -> Result<()> {
             }
             name if name == <ShareEncryptionCircuit as Circuit>::NAME => {
                 let sd = preset.search_defaults().unwrap();
-                let sample = ShareEncryptionCircuitInput::generate_sample(
+                let sample = ShareEncryptionCircuitData::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
@@ -299,13 +299,13 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <UserDataEncryptionCircuit as Circuit>::NAME => {
-                let sample = UserDataEncryptionCircuitInput::generate_sample(preset)?;
+                let sample = UserDataEncryptionCircuitData::generate_sample(preset)?;
 
                 let circuit = UserDataEncryptionCircuit;
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkGenerationCircuit as Circuit>::NAME => {
-                let sample = PkGenerationCircuitInput::generate_sample(preset, committee)?;
+                let sample = PkGenerationCircuitData::generate_sample(preset, committee)?;
 
                 let circuit = PkGenerationCircuit;
                 circuit.codegen(preset, &sample)?
@@ -321,7 +321,7 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <PkAggregationCircuit as Circuit>::NAME => {
-                let sample = PkAggregationCircuitInput::generate_sample(preset, committee)?;
+                let sample = PkAggregationCircuitData::generate_sample(preset, committee)?;
 
                 let circuit = PkAggregationCircuit;
                 circuit.codegen(preset, &sample)?
@@ -334,7 +334,7 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <DecryptedSharesAggregationCircuit as Circuit>::NAME => {
-                let sample = DecryptedSharesAggregationCircuitInput::generate_sample(
+                let sample = DecryptedSharesAggregationCircuitData::generate_sample(
                     preset,
                     CiphernodesCommitteeSize::Small.values(),
                 )?;

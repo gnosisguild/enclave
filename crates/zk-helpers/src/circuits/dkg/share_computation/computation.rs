@@ -15,7 +15,7 @@ use crate::circuits::commitments::{
 };
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuit;
-use crate::dkg::share_computation::ShareComputationCircuitInput;
+use crate::dkg::share_computation::ShareComputationCircuitData;
 use crate::CircuitsErrors;
 use crate::{bigint_3d_to_json_values, get_zkp_modulus};
 use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
@@ -39,14 +39,14 @@ pub struct ShareComputationOutput {
 /// Implementation of [`CircuitComputation`] for [`ShareComputationCircuit`].
 impl CircuitComputation for ShareComputationCircuit {
     type Preset = BfvPreset;
-    type Input = ShareComputationCircuitInput;
+    type Data = ShareComputationCircuitData;
     type Output = ShareComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, input)?;
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(ShareComputationOutput {
             bounds,
@@ -97,16 +97,16 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ShareComputationCircuitInput;
+    type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = threshold_params.moduli().to_vec();
         let l = moduli.len();
-        let bounds = Bounds::compute(preset, input)?;
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -121,10 +121,10 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
@@ -136,8 +136,8 @@ impl Computation for Bits {
         }
 
         Ok(Bits {
-            bit_sk_secret: calculate_bit_width(BigInt::from(input.sk_bound.clone())),
-            bit_e_sm_secret: calculate_bit_width(BigInt::from(input.e_sm_bound.clone())),
+            bit_sk_secret: calculate_bit_width(BigInt::from(data.sk_bound.clone())),
+            bit_e_sm_secret: calculate_bit_width(BigInt::from(data.e_sm_bound.clone())),
             bit_share,
         })
     }
@@ -145,10 +145,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ShareComputationCircuitInput;
+    type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let defaults = preset
@@ -159,7 +159,7 @@ impl Computation for Bounds {
 
         let e_sm_config = SmudgingBoundCalculatorConfig::new(
             threshold_params,
-            input.n_parties as usize,
+            data.n_parties as usize,
             num_ciphertexts as usize,
             lambda as usize,
         );
@@ -177,21 +177,21 @@ impl Computation for Bounds {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = ShareComputationCircuitInput;
+    type Data = ShareComputationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = threshold_params.moduli();
         let degree = threshold_params.degree();
         let num_moduli = moduli.len();
-        let n_parties = input.n_parties as usize;
+        let n_parties = data.n_parties as usize;
 
-        let mut secret_crt = input.secret.clone();
-        let sss = &input.secret_sss;
+        let mut secret_crt = data.secret.clone();
+        let sss = &data.secret_sss;
 
-        if input.dkg_input_type == DkgInputType::SmudgingNoise {
+        if data.dkg_input_type == DkgInputType::SmudgingNoise {
             // Normalize secret_crt to [0, q_j) per limb so it matches what we put in y and what the circuit expects (e_sm_secret[j][i] == y[i][j][0]).
             secret_crt
                 .reduce(moduli)
@@ -215,9 +215,9 @@ impl Computation for Inputs {
             y.push(y_coeff);
         }
 
-        let bounds = Bounds::compute(preset, input)?;
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let expected_secret_commitment = match input.dkg_input_type {
+        let expected_secret_commitment = match data.dkg_input_type {
             DkgInputType::SecretKey => {
                 compute_share_computation_sk_commitment(secret_crt.limb(0), bits.bit_sk_secret)
             }
@@ -266,13 +266,13 @@ mod tests {
 
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use crate::dkg::share_computation::ShareComputationCircuitInput;
+    use crate::dkg::share_computation::ShareComputationCircuitData;
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_input_smudging_noise_secret_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SmudgingNoise,
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,

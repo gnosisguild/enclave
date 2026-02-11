@@ -19,6 +19,6 @@ impl Circuit for PkCircuit {
     const DKG_INPUT_TYPE: Option<DkgInputType> = Some(DkgInputType::SecretKey);
 }
 
-pub struct PkCircuitInput {
+pub struct PkCircuitData {
     pub public_key: PublicKey,
 }

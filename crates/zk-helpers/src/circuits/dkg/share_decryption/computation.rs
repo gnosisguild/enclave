@@ -12,7 +12,7 @@
 
 use crate::circuits::commitments::compute_share_encryption_commitment_from_message;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
-use crate::dkg::share_decryption::ShareDecryptionCircuitInput;
+use crate::dkg::share_decryption::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{bigint_2d_to_json_values, calculate_bit_width, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
@@ -38,11 +38,11 @@ pub struct ShareDecryptionOutput {
 /// Implementation of [`CircuitComputation`] for [`ShareDecryptionCircuit`].
 impl CircuitComputation for ShareDecryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Output = ShareDecryptionOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, input: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, input)?;
         let bits = Bits::compute(preset, &bounds)?;
         let inputs = Inputs::compute(preset, input)?;
@@ -93,18 +93,18 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         let n = dkg_params.degree() as usize;
         let l = dkg_params.moduli().len();
-        let h = input.honest_ciphertexts.len();
+        let h = data.honest_ciphertexts.len();
 
-        let bounds = Bounds::compute(preset, &input)?;
+        let bounds = Bounds::compute(preset, &data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -119,10 +119,10 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) = build_pair_for_preset(preset)
             .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
@@ -134,20 +134,20 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(_: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         Ok(Bounds {})
     }
 }
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let threshold_l = threshold_params.moduli().len();
@@ -158,7 +158,7 @@ impl Computation for Inputs {
         let msg_bit = calculate_bit_width(BigInt::from(dkg_params.plaintext()));
 
         // Decrypt each ciphertext and compute its commitment
-        for party_cts in input.honest_ciphertexts.iter() {
+        for party_cts in data.honest_ciphertexts.iter() {
             if party_cts.len() < threshold_l {
                 return Err(CircuitsErrors::Other(format!(
                     "honest_ciphertexts party has {} ciphertexts but threshold_l is {}; \
@@ -171,7 +171,7 @@ impl Computation for Inputs {
             let mut party_shares = Vec::with_capacity(threshold_l);
             for mod_idx in 0..threshold_l {
                 // Decrypt the ciphertext to get the plaintext share
-                let decrypted_pt = input.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
+                let decrypted_pt = data.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
                 let share_coeffs = decrypted_pt.value.deref().to_vec();
                 party_commitments.push(compute_share_encryption_commitment_from_message(
                     &Polynomial::from_u64_vector(share_coeffs.clone()),
@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_constants_json_roundtrip() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_input_decryption_consistency() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareDecryptionCircuitInput::generate_sample(
+        let sample = ShareDecryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,

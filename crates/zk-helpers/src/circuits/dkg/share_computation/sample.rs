@@ -9,7 +9,7 @@
 
 use crate::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use crate::computation::DkgInputType;
-use crate::dkg::share_computation::ShareComputationCircuitInput;
+use crate::dkg::share_computation::ShareComputationCircuitData;
 use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
@@ -22,7 +22,7 @@ use rand::thread_rng;
 
 pub type SecretShares = Vec<ndarray::Array2<BigInt>>;
 
-impl ShareComputationCircuitInput {
+impl ShareComputationCircuitData {
     /// Generates sample data for the share-computation circuit.
     pub fn generate_sample(
         preset: BfvPreset,
@@ -130,13 +130,13 @@ impl ShareComputationCircuitInput {
 mod tests {
     use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
-    use crate::dkg::share_computation::ShareComputationCircuitInput;
+    use crate::dkg::share_computation::ShareComputationCircuitData;
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareComputationCircuitInput::generate_sample(
+        let sample = ShareComputationCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SmudgingNoise,
