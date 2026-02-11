@@ -61,7 +61,7 @@ pub global QIS: [Field; L] = [{}];
 
 /************************************
 -------------------------------------
-share_decryption
+share_decryption (CIRCUIT 6 - THRESHOLD BFV SHARE DECRYPTION)
 -------------------------------------
 ************************************/
 
