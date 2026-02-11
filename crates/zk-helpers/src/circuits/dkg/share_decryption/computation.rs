@@ -42,10 +42,10 @@ impl CircuitComputation for ShareDecryptionCircuit {
     type Output = ShareDecryptionOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Data) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, input)?;
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(ShareDecryptionOutput {
             bounds,

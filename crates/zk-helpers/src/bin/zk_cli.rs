@@ -22,7 +22,7 @@ use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_decryption::{
     ShareDecryptionCircuit as DkgShareDecryptionCircuit,
-    ShareDecryptionCircuitData as DkgShareDecryptionCircuitInput,
+    ShareDecryptionCircuitData as DkgShareDecryptionCircuitData,
 };
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::registry::{Circuit, CircuitRegistry};
@@ -34,7 +34,7 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::threshold::share_decryption::{
     ShareDecryptionCircuit as ThresholdShareDecryptionCircuit,
-    ShareDecryptionCircuitData as ThresholdShareDecryptionCircuitInput,
+    ShareDecryptionCircuitData as ThresholdShareDecryptionCircuitData,
 };
 use e3_zk_helpers::threshold::user_data_encryption::{
     UserDataEncryptionCircuit, UserDataEncryptionCircuitData,
@@ -311,7 +311,7 @@ fn main() -> Result<()> {
                 circuit.codegen(preset, &sample)?
             }
             name if name == <DkgShareDecryptionCircuit as Circuit>::NAME => {
-                let sample = DkgShareDecryptionCircuitInput::generate_sample(
+                let sample = DkgShareDecryptionCircuitData::generate_sample(
                     preset,
                     committee,
                     dkg_input_type,
@@ -328,7 +328,7 @@ fn main() -> Result<()> {
             }
             name if name == <ThresholdShareDecryptionCircuit as Circuit>::NAME => {
                 let sample =
-                    ThresholdShareDecryptionCircuitInput::generate_sample(preset, committee)?;
+                    ThresholdShareDecryptionCircuitData::generate_sample(preset, committee)?;
 
                 let circuit = ThresholdShareDecryptionCircuit;
                 circuit.codegen(preset, &sample)?
