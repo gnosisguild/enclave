@@ -30,8 +30,8 @@ PRESET="insecure"
 
 OUTPUT_DIR="${REPO_ROOT}/circuits/bin/${CIRCUIT_PATH}"
 
-# Map circuit path to zk_cli --circuit and optional --witness
-# DKG circuits that need --witness: share-computation, dkg-share-encryption, share-decryption
+# Map circuit path to zk_cli --circuit and optional --inputs
+# DKG circuits that need --inputs: share-computation, share-encryption, share-decryption
 get_zk_args() {
     local path="$1"
     case "$path" in
@@ -48,11 +48,11 @@ get_zk_args() {
             return
             ;;
         dkg/sk_share_encryption)
-            echo "dkg-share-encryption secret-key"
+            echo "share-encryption secret-key"
             return
             ;;
         dkg/e_sm_share_encryption)
-            echo "dkg-share-encryption smudging-noise"
+            echo "share-encryption smudging-noise"
             return
             ;;
         dkg/sk_share_decryption)
@@ -92,16 +92,16 @@ get_zk_args() {
 
 ZK_ARGS=($(get_zk_args "$CIRCUIT_PATH"))
 ZK_CIRCUIT="${ZK_ARGS[0]}"
-ZK_WITNESS="${ZK_ARGS[1]:-}"
+ZK_INPUTS="${ZK_ARGS[1]:-}"
 
 cd "$REPO_ROOT"
 
 CMD=(cargo run -p e3-zk-helpers --bin zk_cli -- --circuit "$ZK_CIRCUIT" --preset "$PRESET" --output "$OUTPUT_DIR" --toml --no-configs)
-if [ -n "$ZK_WITNESS" ]; then
-    CMD+=(--witness "$ZK_WITNESS")
+if [ -n "$ZK_INPUTS" ]; then
+    CMD+=(--inputs "$ZK_INPUTS")
 fi
 
-echo "  Generating Prover.toml: zk_cli --circuit $ZK_CIRCUIT --preset $PRESET ${ZK_WITNESS:+--witness $ZK_WITNESS}"
+echo "  Generating Prover.toml: zk_cli --circuit $ZK_CIRCUIT --preset $PRESET ${ZK_INPUTS:+--inputs $ZK_INPUTS}"
 if ! "${CMD[@]}" 2>&1; then
     echo "Error: zk_cli failed for $CIRCUIT_PATH"
     exit 1
