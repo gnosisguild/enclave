@@ -24,7 +24,7 @@ impl Circuit for ShareComputationCircuit {
 }
 
 pub struct ShareComputationCircuitInput {
-    /// Which secret type this input is for (determines which branch to use in witness).
+    /// Which secret type this input is for (determines which branch to use in input).
     pub dkg_input_type: DkgInputType,
     pub secret: CrtPolynomial,
     pub secret_sss: Vec<Array2<BigInt>>,

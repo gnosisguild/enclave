@@ -11,5 +11,5 @@ pub mod sample;
 pub mod utils;
 
 pub use circuit::{ShareComputationCircuit, ShareComputationCircuitInput};
-pub use computation::{Bits, Bounds, Configs, ShareComputationOutput, Witness};
+pub use computation::{Bits, Bounds, Configs, Inputs, ShareComputationOutput};
 pub use sample::SecretShares;

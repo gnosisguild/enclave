@@ -101,7 +101,7 @@ impl ZKInputsGenerator {
         )?;
 
         let ct = Ciphertext::from_bytes(
-            &user_data_encryption_computation_output.witness.ciphertext,
+            &user_data_encryption_computation_output.inputs.ciphertext,
             &self.bfv_params,
         )
         .with_context(|| "Failed to deserialize ciphertext")?;
@@ -121,7 +121,7 @@ impl ZKInputsGenerator {
 
         let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
         let user_data_encryption_witness_json =
-            user_data_encryption_computation_output.witness.to_json()?;
+            user_data_encryption_computation_output.inputs.to_json()?;
         let inputs_json = utils::merge_json_objects(
             ciphertext_addition_witness_json,
             user_data_encryption_witness_json,
@@ -165,7 +165,7 @@ impl ZKInputsGenerator {
         )?;
 
         let ct = Ciphertext::from_bytes(
-            &user_data_encryption_computation_output.witness.ciphertext,
+            &user_data_encryption_computation_output.inputs.ciphertext,
             &self.bfv_params,
         )
         .with_context(|| "Failed to deserialize ciphertext")?;
@@ -189,7 +189,7 @@ impl ZKInputsGenerator {
 
         let ciphertext_addition_witness_json = ciphertext_addition_inputs.to_json()?;
         let user_data_encryption_witness_json =
-            user_data_encryption_computation_output.witness.to_json()?;
+            user_data_encryption_computation_output.inputs.to_json()?;
         let inputs_json = utils::merge_json_objects(
             ciphertext_addition_witness_json,
             user_data_encryption_witness_json,

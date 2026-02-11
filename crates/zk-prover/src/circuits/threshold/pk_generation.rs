@@ -10,12 +10,12 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitInput,
 };
-use e3_zk_helpers::circuits::threshold::pk_generation::computation::Witness;
+use e3_zk_helpers::circuits::threshold::pk_generation::computation::Inputs;
 
 impl Provable for PkGenerationCircuit {
     type Params = BfvPreset;
     type Input = PkGenerationCircuitInput;
-    type Witness = Witness;
+    type Inputs = Inputs;
 
     fn circuit(&self) -> CircuitName {
         CircuitName::PkGeneration

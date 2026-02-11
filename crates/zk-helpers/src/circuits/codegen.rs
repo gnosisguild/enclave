@@ -12,7 +12,7 @@
 use crate::errors::CircuitsErrors;
 use std::path::Path;
 
-/// Prover TOML file content (witness and circuit inputs).
+/// Prover TOML file content (circuit inputs).
 pub type CodegenToml = String;
 /// Noir configs file content (global constants for the prover).
 pub type CodegenConfigs = String;
@@ -20,7 +20,7 @@ pub type CodegenConfigs = String;
 /// Generated files for a circuit: Prover TOML and Noir configs.
 #[derive(Debug, Clone)]
 pub struct Artifacts {
-    /// Prover.toml content (witness and circuit inputs).
+    /// Prover.toml content (circuit inputs).
     pub toml: CodegenToml,
     /// configs.nr content (constants for the Noir prover).
     pub configs: CodegenConfigs,
