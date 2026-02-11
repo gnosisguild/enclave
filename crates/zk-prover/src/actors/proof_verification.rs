@@ -11,13 +11,13 @@
 //!
 //! ## Signature Verification
 //!
-//! When the received key carries a [`SignedProofPayload`], this actor:
-//! 1. Recovers the signer address from the ECDSA signature.
+//! Every received key must carry a [`SignedProofPayload`]. This actor:
+//! 1. Recovers the address from the ECDSA signature.
 //! 2. Delegates the ZK proof to `ZkActor` for verification.
 //! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
-//!    so the `FaultSubmitter` can submit a slash proposal on-chain.
+//!    and [`E3Failed`] to stop the E3 computation.
 //!
-//! This is a CORE actor - it delegates IO operations (verification) to ZkActor.
+//! Keys without a signed proof are rejected outright.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,9 +25,9 @@ use std::sync::Arc;
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::Address;
 use e3_events::{
-    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
-    EncryptionKeyReceived, Event, EventPublisher, EventSubscriber, EventType, Proof,
-    SignedProofFailed, SignedProofPayload,
+    BusHandle, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCreated, EncryptionKeyReceived, Event, EventPublisher, EventSubscriber, EventType,
+    FailureReason, Proof, SignedProofFailed, SignedProofPayload,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -55,24 +55,25 @@ pub struct ZkVerificationResponse {
 /// Tracks a pending verification including the signed payload for fault evidence.
 #[derive(Clone, Debug)]
 struct PendingVerification {
-    signed_payload: Option<SignedProofPayload>,
-    recovered_signer: Option<Address>,
+    signed_payload: SignedProofPayload,
+    recovered_signer: Address,
 }
 
 /// Core actor that handles encryption key verification.
 ///
-/// On ZK verification failure, if the key carried a valid [`SignedProofPayload`],
-/// emits a [`SignedProofFailed`] event with the signed evidence bundle.
+/// Requires every received key to carry a [`SignedProofPayload`].
+/// On ZK verification failure, emits both [`SignedProofFailed`] (for fault
+/// attribution) and [`E3Failed`] (to stop the E3 computation).
 pub struct ProofVerificationActor {
     bus: BusHandle,
-    verifier: Option<Recipient<ZkVerificationRequest>>,
+    verifier: Recipient<ZkVerificationRequest>,
     /// Tracks signed payloads for keys currently being verified,
     /// keyed by `(e3_id, party_id)`.
     pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
 impl ProofVerificationActor {
-    pub fn new(bus: &BusHandle, verifier: Option<Recipient<ZkVerificationRequest>>) -> Self {
+    pub fn new(bus: &BusHandle, verifier: Recipient<ZkVerificationRequest>) -> Self {
         Self {
             bus: bus.clone(),
             verifier,
@@ -80,67 +81,57 @@ impl ProofVerificationActor {
         }
     }
 
-    pub fn setup(
-        bus: &BusHandle,
-        verifier: Option<Recipient<ZkVerificationRequest>>,
-    ) -> Addr<Self> {
+    pub fn setup(bus: &BusHandle, verifier: Recipient<ZkVerificationRequest>) -> Addr<Self> {
         let addr = Self::new(bus, verifier).start();
         bus.subscribe(EventType::EncryptionKeyReceived, addr.clone().into());
         addr
     }
 
     fn handle_encryption_key_received(&mut self, msg: EncryptionKeyReceived, ctx: &Context<Self>) {
-        let Some(ref verifier) = self.verifier else {
-            warn!(
-                "ZK verifier not available - accepting key from party {} without verification",
-                msg.key.party_id
-            );
-            self.publish_key_created(msg.e3_id, msg.key);
-            return;
-        };
-
         let Some(ref proof) = msg.key.proof else {
-            warn!(
+            error!(
                 "External key from party {} is missing T0 proof - rejecting",
                 msg.key.party_id
             );
             return;
         };
 
-        // Validate the signed payload if present
-        let (signed_payload, recovered_signer) = if let Some(ref signed) = msg.key.signed_payload {
-            match signed.recover_signer() {
-                Ok(addr) => {
-                    info!(
-                        "Recovered signer {} for key from party {}",
-                        addr, msg.key.party_id
-                    );
-                    (Some(signed.clone()), Some(addr))
-                }
-                Err(err) => {
-                    warn!(
-                        "Invalid signature on key from party {} - proceeding without \
-                             fault attribution: {err}",
-                        msg.key.party_id
-                    );
-                    (None, None)
-                }
+        // Signed proofs are mandatory — reject keys without a signed payload
+        let signed = match &msg.key.signed_payload {
+            Some(signed) => signed.clone(),
+            None => {
+                error!(
+                    "Key from party {} has no signed payload - rejecting (signed proofs are required)",
+                    msg.key.party_id
+                );
+                return;
             }
-        } else {
-            warn!(
-                "Key from party {} has no signed payload - \
-                     proof verification will proceed but fault attribution unavailable",
-                msg.key.party_id
-            );
-            (None, None)
+        };
+
+        // Recover the address from the signature
+        let recovered_address = match signed.recover_address() {
+            Ok(addr) => {
+                info!(
+                    "Recovered address {} for key from party {}",
+                    addr, msg.key.party_id
+                );
+                addr
+            }
+            Err(err) => {
+                error!(
+                    "Invalid signature on key from party {} - rejecting: {err}",
+                    msg.key.party_id
+                );
+                return;
+            }
         };
 
         // Store the signed payload so we can reference it in the verification response
         self.pending.insert(
             (msg.e3_id.clone(), msg.key.party_id),
             PendingVerification {
-                signed_payload,
-                recovered_signer,
+                signed_payload: signed,
+                recovered_signer: recovered_address,
             },
         );
 
@@ -151,7 +142,7 @@ impl ProofVerificationActor {
             sender: ctx.address().recipient(),
         };
 
-        verifier.do_send(request);
+        self.verifier.do_send(request);
     }
 
     fn publish_key_created(&self, e3_id: E3id, key: Arc<EncryptionKey>) {
@@ -202,36 +193,39 @@ impl Handler<ZkVerificationResponse> for ProofVerificationActor {
             );
             self.publish_key_created(msg.e3_id, msg.key);
         } else {
+            let error_msg = msg.error.unwrap_or_else(|| "unknown error".to_string());
             error!(
-                "T0 proof verification FAILED for party {} - rejecting key: {}",
-                msg.key.party_id,
-                msg.error.unwrap_or_else(|| "unknown error".to_string())
+                "T0 proof verification FAILED for party {} - rejecting key and stopping E3: {}",
+                msg.key.party_id, error_msg
             );
 
-            // If we have a signed payload, emit SignedProofFailed for fault attribution
+            // Emit SignedProofFailed for fault attribution
             if let Some(PendingVerification {
-                signed_payload: Some(signed),
-                recovered_signer: Some(signer),
+                signed_payload,
+                recovered_signer,
             }) = pending
             {
                 warn!(
-                    "Emitting SignedProofFailed for party {} (signer: {signer})",
+                    "Emitting SignedProofFailed for party {} (address: {recovered_signer})",
                     msg.key.party_id
                 );
                 if let Err(err) = self.bus.publish(SignedProofFailed {
-                    e3_id: msg.e3_id,
-                    faulting_node: signer,
-                    proof_type: signed.payload.proof_type,
-                    signed_payload: signed,
+                    e3_id: msg.e3_id.clone(),
+                    faulting_node: recovered_signer,
+                    proof_type: signed_payload.payload.proof_type,
+                    signed_payload,
                 }) {
                     error!("Failed to publish SignedProofFailed: {err}");
                 }
-            } else {
-                warn!(
-                    "No signed payload available for party {} - \
-                     fault cannot be attributed on-chain",
-                    msg.key.party_id
-                );
+            }
+
+            // Stop the E3 computation — proof verification failure is fatal
+            if let Err(err) = self.bus.publish(E3Failed {
+                e3_id: msg.e3_id,
+                failed_at_stage: E3Stage::CommitteeFinalized,
+                reason: FailureReason::VerificationFailed,
+            }) {
+                error!("Failed to publish E3Failed: {err}");
             }
         }
     }

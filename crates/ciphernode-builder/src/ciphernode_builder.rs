@@ -434,9 +434,11 @@ impl CiphernodeBuilder {
                 share_enc_preset,
             ));
 
-            info!("Setting up ZK actors");
-            let signer = provider_cache.ensure_signer().await.ok();
-            setup_zk_actors(&bus, self.zk_backend.as_ref(), signer);
+            if let Some(ref backend) = self.zk_backend {
+                info!("Setting up ZK actors");
+                let signer = provider_cache.ensure_signer().await?;
+                setup_zk_actors(&bus, backend, signer);
+            }
         }
 
         if self.pubkey_agg {

@@ -162,18 +162,18 @@ impl SignedProofPayload {
     }
 
     /// Recover the Ethereum address that produced this signature.
-    pub fn recover_signer(&self) -> Result<Address> {
+    pub fn recover_address(&self) -> Result<Address> {
         let sig = Signature::try_from(&self.signature[..])
             .map_err(|e| anyhow!("Invalid signature: {e}"))?;
 
         let digest = self.payload.digest()?;
         sig.recover_address_from_msg(&digest)
-            .map_err(|e| anyhow!("Failed to recover signer address: {e}"))
+            .map_err(|e| anyhow!("Failed to recover address: {e}"))
     }
 
-    /// Verify that the recovered signer matches the expected address.
-    pub fn verify_signer(&self, expected: &Address) -> Result<bool> {
-        let recovered = self.recover_signer()?;
+    /// Verify that the recovered address matches the expected address.
+    pub fn verify_address(&self, expected: &Address) -> Result<bool> {
+        let recovered = self.recover_address()?;
         Ok(recovered == *expected)
     }
 }
@@ -239,23 +239,23 @@ mod tests {
         let signed =
             SignedProofPayload::sign(payload.clone(), &signer).expect("signing should succeed");
 
-        let recovered = signed.recover_signer().expect("recovery should succeed");
+        let recovered = signed.recover_address().expect("recovery should succeed");
         assert_eq!(recovered, signer.address());
     }
 
     #[test]
-    fn verify_signer_correct_address() {
+    fn verify_address_correct() {
         let signer = test_signer();
         let payload = test_payload();
 
         let signed = SignedProofPayload::sign(payload, &signer).expect("signing should succeed");
         assert!(signed
-            .verify_signer(&signer.address())
+            .verify_address(&signer.address())
             .expect("verify should succeed"));
     }
 
     #[test]
-    fn verify_signer_wrong_address() {
+    fn verify_address_wrong() {
         let signer = test_signer();
         let payload = test_payload();
 
@@ -265,7 +265,7 @@ mod tests {
             .parse()
             .unwrap();
         assert!(!signed
-            .verify_signer(&wrong_addr)
+            .verify_address(&wrong_addr)
             .expect("verify should succeed"));
     }
 
@@ -291,7 +291,7 @@ mod tests {
         // Tamper with the payload after signing
         signed.payload.proof_type = ProofType::T1PkGeneration;
 
-        let recovered = signed.recover_signer().expect("recovery should succeed");
+        let recovered = signed.recover_address().expect("recovery should succeed");
         // Recovered address won't match the signer because payload was tampered
         assert_ne!(recovered, signer.address());
     }

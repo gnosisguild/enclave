@@ -27,7 +27,7 @@
 //! let backend = ZkBackend::with_default_dir().await?;
 //!
 //! // Setup all actors with proper separation of concerns
-//! setup_zk_actors(&bus, Some(&backend));
+//! setup_zk_actors(&bus, &backend);
 //! ```
 
 pub mod proof_request;
@@ -48,31 +48,13 @@ use crate::ZkBackend;
 
 /// Setup all ZK-related actors with proper separation of concerns.
 ///
-/// When `backend` is provided:
-/// - Creates IO actor (ZkActor) for proof generation/verification
-/// - Creates core actors that delegate to IO actor
-///
-/// When `backend` is None:
-/// - Creates core actors without verification capabilities
-/// - Proofs are disabled, keys are accepted without verification
-///
-/// When `signer` is provided:
-/// - Proof request actor will sign proofs enabling fault attribution
-/// - Without a signer, proofs are still generated but unsigned
-pub fn setup_zk_actors(
-    bus: &BusHandle,
-    backend: Option<&ZkBackend>,
-    signer: Option<PrivateKeySigner>,
-) -> ZkActors {
-    let (zk_actor, verifier) = if let Some(backend) = backend {
-        let zk_actor = ZkActor::new(backend).start();
-        let verifier = Some(zk_actor.clone().recipient());
-        (Some(zk_actor), verifier)
-    } else {
-        (None, None)
-    };
+/// Requires a `ZkBackend` for proof generation/verification and a
+/// `PrivateKeySigner` for signing proofs (fault attribution).
+pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeySigner) -> ZkActors {
+    let zk_actor = ZkActor::new(backend).start();
+    let verifier = zk_actor.clone().recipient();
 
-    let proof_request = ProofRequestActor::setup(bus, backend.is_some(), signer);
+    let proof_request = ProofRequestActor::setup(bus, signer);
     let proof_verification = ProofVerificationActor::setup(bus, verifier);
 
     ZkActors {
@@ -84,7 +66,7 @@ pub fn setup_zk_actors(
 
 /// Container for all ZK-related actor addresses.
 pub struct ZkActors {
-    pub zk_actor: Option<Addr<ZkActor>>,
+    pub zk_actor: Addr<ZkActor>,
     pub proof_request: Addr<ProofRequestActor>,
     pub proof_verification: Addr<ProofVerificationActor>,
 }
