@@ -7,7 +7,7 @@
 //! Code generation for the threshold share decryption circuit: Prover.toml and configs.nr.
 
 use crate::circuits::computation::Computation;
-use crate::threshold::share_decryption::computation::Witness;
+use crate::threshold::share_decryption::computation::Inputs;
 use crate::threshold::share_decryption::{
     Configs, ShareDecryptionCircuit, ShareDecryptionCircuitInput,
 };
@@ -26,18 +26,18 @@ impl CircuitCodegen for ShareDecryptionCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
         let configs = Configs::compute(preset, &())?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
     }
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs
         .to_json()
         .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 

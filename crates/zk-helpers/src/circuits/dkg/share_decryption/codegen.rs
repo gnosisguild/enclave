@@ -11,7 +11,7 @@ use crate::circuits::dkg::share_decryption::Configs;
 use crate::circuits::dkg::share_decryption::ShareDecryptionCircuit;
 use crate::circuits::dkg::share_decryption::ShareDecryptionCircuitInput;
 use crate::circuits::dkg::share_decryption::ShareDecryptionOutput;
-use crate::circuits::dkg::share_decryption::Witness;
+use crate::circuits::dkg::share_decryption::Inputs;
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::computation::Computation;
@@ -25,9 +25,9 @@ impl CircuitCodegen for ShareDecryptionCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let ShareDecryptionOutput { witness, .. } = ShareDecryptionCircuit::compute(preset, input)?;
+        let ShareDecryptionOutput { inputs, .. } = ShareDecryptionCircuit::compute(preset, input)?;
 
-        let toml = generate_toml(&witness)?;
+        let toml = generate_toml(&inputs)?;
         let configs = Configs::compute(preset, input)?;
         let configs_str = generate_configs(preset, &configs);
 
@@ -38,9 +38,9 @@ impl CircuitCodegen for ShareDecryptionCircuit {
     }
 }
 
-/// Serializes the witness to TOML string for the Noir prover (Prover.toml).
-pub fn generate_toml(witness: &Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
+/// Serializes the input to TOML string for the Noir prover (Prover.toml).
+pub fn generate_toml(inputs: &Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs
         .to_json()
         .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 

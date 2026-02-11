@@ -8,7 +8,7 @@
 
 use crate::circuits::computation::Computation;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
-use crate::threshold::user_data_encryption::computation::{Configs, Witness};
+use crate::threshold::user_data_encryption::computation::{Configs, Inputs};
 use crate::threshold::user_data_encryption::UserDataEncryptionCircuitInput;
 use crate::utils::join_display;
 use crate::Circuit;
@@ -27,10 +27,10 @@ impl CircuitCodegen for UserDataEncryptionCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
         let configs = Configs::compute(preset, &())?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
@@ -56,8 +56,8 @@ pub struct TomlJson {
     pub pk_commitment: String,
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs
         .to_json()
         .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 

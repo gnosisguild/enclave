@@ -4,11 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Bounds, configs, bits, and witness computation for the Decryption Share Aggregation TRBFV circuit.
+//! Bounds, configs, bits, and input computation for the Decryption Share Aggregation TRBFV circuit.
 //!
 //! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
-//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Witness coefficients are normalized
-//! with [`e3_polynomial::reduce`] in [`Witness::standard_form`], consistent with other circuits.
+//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Input coefficients are normalized
+//! with [`e3_polynomial::reduce`] in [`Input::standard_form`], consistent with other circuits.
 
 use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 pub struct DecryptedSharesAggregationComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 impl CircuitComputation for DecryptedSharesAggregationCircuit {
@@ -42,12 +42,12 @@ impl CircuitComputation for DecryptedSharesAggregationCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
 
         Ok(DecryptedSharesAggregationComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -79,10 +79,10 @@ pub struct Configs {
     pub max_msg_non_zero_coeffs: usize,
 }
 
-/// Witness for decrypted shares aggregation (same shape as old DecSharesAggTrBfvVectors).
+/// Input for decrypted shares aggregation (same shape as old DecSharesAggTrBfvVectors).
 /// All coefficients reduced to [0, zkp_modulus) in standard_form.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     /// [party][modulus][coeff]
     pub decryption_shares: Vec<Vec<Vec<BigInt>>>,
     /// Party IDs (1-based: 1, 2, ..., T+1)
@@ -152,7 +152,7 @@ impl Computation for Configs {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = DecryptedSharesAggregationCircuitInput;
     type Error = CircuitsErrors;
@@ -220,7 +220,7 @@ impl Computation for Witness {
             .map(|&x| BigInt::from(x))
             .collect();
 
-        // 3. Message (pad to degree for computation, then truncate to MAX_MSG_NON_ZERO_COEFFS for witness)
+        // 3. Message (pad to degree for computation, then truncate to MAX_MSG_NON_ZERO_COEFFS for input)
         let mut message: Vec<BigInt> = input.message_vec.iter().map(|&x| BigInt::from(x)).collect();
         message.resize(degree, BigInt::zero());
 
@@ -292,22 +292,22 @@ impl Computation for Witness {
             .map(|row| truncate(&row))
             .collect();
 
-        let witness = Witness {
+        let inputs = Inputs {
             decryption_shares,
             party_ids,
             message,
             u_global,
             crt_quotients,
         };
-        Ok(witness.standard_form())
+        Ok(inputs.standard_form())
     }
 }
 
-impl Witness {
+impl Inputs {
     /// Reduce all coefficients to [0, zkp_modulus). Uses `e3_polynomial::reduce` like other circuits.
     pub fn standard_form(&self) -> Self {
         let zkp_modulus = get_zkp_modulus();
-        Witness {
+        Inputs {
             decryption_shares: self
                 .decryption_shares
                 .iter()
@@ -341,7 +341,7 @@ impl Witness {
         }
     }
 
-    /// Serializes the witness to JSON for Prover.toml. Each polynomial is emitted as
+    /// Serializes the input to JSON for Prover.toml. Each polynomial is emitted as
     /// `{ "coefficients": [string, ...] }` to match Noir's `Polynomial` struct.
     pub fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         use crate::bigint_1d_to_json_values;
@@ -416,10 +416,10 @@ mod tests {
         let out = DecryptedSharesAggregationCircuit::compute(preset, &input).unwrap();
 
         let configs = Configs::compute(preset, &()).unwrap();
-        assert_eq!(out.witness.decryption_shares.len(), committee.threshold + 1);
-        assert_eq!(out.witness.party_ids.len(), committee.threshold + 1);
-        assert_eq!(out.witness.message.len(), configs.max_msg_non_zero_coeffs);
-        assert_eq!(out.witness.u_global.len(), configs.max_msg_non_zero_coeffs);
+        assert_eq!(out.inputs.decryption_shares.len(), committee.threshold + 1);
+        assert_eq!(out.inputs.party_ids.len(), committee.threshold + 1);
+        assert_eq!(out.inputs.message.len(), configs.max_msg_non_zero_coeffs);
+        assert_eq!(out.inputs.u_global.len(), configs.max_msg_non_zero_coeffs);
         assert!(out.bits.noise_bit > 0);
     }
 }

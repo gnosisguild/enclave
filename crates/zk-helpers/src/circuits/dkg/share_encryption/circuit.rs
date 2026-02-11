@@ -35,7 +35,7 @@ pub struct ShareEncryptionCircuitInput {
     pub ciphertext: Ciphertext,
     /// DKG public key used to encrypt.
     pub public_key: PublicKey,
-    /// Secret key (for witness; not revealed in proof).
+    /// Secret key (for input; not revealed in proof).
     pub secret_key: SecretKey,
     /// Encryption randomness u in RNS form (from try_encrypt_extended).
     pub u_rns: Poly,

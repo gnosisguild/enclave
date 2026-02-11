@@ -10,7 +10,7 @@ use crate::circuits::computation::CircuitComputation;
 use crate::circuits::computation::Computation;
 use crate::circuits::dkg::share_computation::{
     utils::parity_matrix_constant_string, Bits, ShareComputationCircuit,
-    ShareComputationCircuitInput, ShareComputationOutput, Witness,
+    Inputs, ShareComputationCircuitInput, ShareComputationOutput,
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
@@ -29,10 +29,10 @@ impl CircuitCodegen for ShareComputationCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let ShareComputationOutput { witness, bits, .. } =
+        let ShareComputationOutput { inputs, bits, .. } =
             ShareComputationCircuit::compute(preset, input)?;
 
-        let toml = generate_toml(&witness, input.dkg_input_type.clone())?;
+        let toml = generate_toml(&inputs, input.dkg_input_type.clone())?;
         let configs = generate_configs(
             preset,
             &bits,
@@ -45,15 +45,15 @@ impl CircuitCodegen for ShareComputationCircuit {
 }
 
 pub fn generate_toml(
-    witness: &Witness,
+    inputs: &Inputs,
     dkg_input_type: DkgInputType,
 ) -> Result<CodegenToml, CircuitsErrors> {
-    let mut json = witness
+    let mut json = inputs
         .to_json()
         .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     let obj = json.as_object_mut().ok_or(CircuitsErrors::Other(
-        "witness json is not an object".to_string(),
+        "input json is not an object".to_string(),
     ))?;
 
     obj.remove("secret_crt");
@@ -61,11 +61,11 @@ pub fn generate_toml(
     let (key, value) = match dkg_input_type {
         DkgInputType::SecretKey => (
             "sk_secret",
-            poly_coefficients_to_toml_json(witness.secret_crt.limb(0).coefficients()),
+            poly_coefficients_to_toml_json(inputs.secret_crt.limb(0).coefficients()),
         ),
         DkgInputType::SmudgingNoise => (
             "e_sm_secret",
-            serde_json::Value::Array(crt_polynomial_to_toml_json(&witness.secret_crt)),
+            serde_json::Value::Array(crt_polynomial_to_toml_json(&inputs.secret_crt)),
         ),
     };
 
@@ -77,7 +77,7 @@ pub fn generate_toml(
 /// Builds the configs.nr string (N, L, parity matrix, bit parameters, configs) for the Noir prover.
 ///
 /// `n_parties` and `threshold` are used to build the parity matrix (Reed–Solomon generator null space)
-/// and must match the committee size used for the witness/sample.
+/// and must match the committee size used for the input/sample.
 pub fn generate_configs(
     preset: BfvPreset,
     bits: &Bits,

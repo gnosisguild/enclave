@@ -10,7 +10,7 @@ use e3_fhe_params::BfvPreset;
 
 use crate::circuits::computation::Computation;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
-use crate::threshold::pk_generation::computation::{Configs, Witness};
+use crate::threshold::pk_generation::computation::{Configs, Inputs};
 use crate::threshold::pk_generation::PkGenerationCircuitInput;
 use crate::utils::join_display;
 use crate::CircuitCodegen;
@@ -25,18 +25,18 @@ impl CircuitCodegen for PkGenerationCircuit {
     type Error = CircuitsErrors;
 
     fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
         let configs = Configs::compute(preset, &input.committee)?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
     }
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs
         .to_json()
         .map_err(|e| CircuitsErrors::SerdeJson(e))?;
 

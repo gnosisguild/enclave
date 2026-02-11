@@ -7,7 +7,7 @@
 //! Computation traits and artifact types.
 //!
 //! [`Computation`] is a generic trait for computing values from parameters and input.
-//! [`CircuitComputation`] extends it for circuits that produce witness/bounds/bits.
+//! [`CircuitComputation`] extends it for circuits that produce inputs/bounds/bits.
 //! [`Toml`] and [`Configs`] are the string types used for Prover.toml and configs.nr.
 
 /// Variant for input types for DKG.
@@ -38,13 +38,13 @@ pub trait Computation: Sized {
     }
 }
 
-/// Circuit-specific computation: parameters and input produce bounds, bits, witness, etc.
+/// Circuit-specific computation: parameters and input produce bounds, bits, circuit inputs, etc.
 pub trait CircuitComputation: crate::registry::Circuit {
     type Preset;
     type Input;
     type Output;
     type Error;
 
-    /// Computes circuit-specific data (bounds, bits, witness) from parameters and input.
+    /// Computes circuit-specific data (bounds, bits, inputs) from parameters and input.
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error>;
 }

@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the user data encryption circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the user data encryption circuit: constants, bounds, bit widths, and inputs.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
@@ -45,12 +45,12 @@ use rayon::prelude::ParallelBridge;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-/// Output of [`CircuitComputation::compute`] for [`UserDataEncryptionCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`UserDataEncryptionCircuit`]: bounds, bit widths, and inputs.
 #[derive(Debug)]
 pub struct UserDataEncryptionComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`UserDataEncryptionCircuit`].
@@ -63,12 +63,12 @@ impl CircuitComputation for UserDataEncryptionCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
 
         Ok(UserDataEncryptionComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -114,7 +114,7 @@ pub struct Bounds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     pub pk0is: CrtPolynomial,
     pub pk1is: CrtPolynomial,
     pub ct0is: CrtPolynomial,
@@ -352,7 +352,7 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = UserDataEncryptionCircuitInput;
     type Error = CircuitsErrors;
@@ -693,7 +693,7 @@ impl Computation for Witness {
         let pk_commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
         let ct_commitment = compute_ciphertext_commitment(&ct0is, &ct1is, pk_bit);
 
-        Ok(Witness {
+        Ok(Inputs {
             pk0is,
             pk1is,
             ct0is,
@@ -714,7 +714,7 @@ impl Computation for Witness {
         })
     }
 
-    // Used as witness for Nargo execution.
+    // Used as input for Nargo execution.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
