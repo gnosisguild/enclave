@@ -44,6 +44,7 @@ pub trait Provable: Send + Sync {
     {
         let inputs = Self::Inputs::compute(params.clone(), input)
             .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
+
         let json = inputs
             .to_json()
             .map_err(|e| ZkError::SerializationError(e.to_string()))?;
@@ -92,6 +93,12 @@ pub trait Provable: Send + Sync {
                 proof.circuit
             )));
         }
+
+        println!(
+            "Verifying proof for circuit {} with e3_id {} and party_id {}",
+            proof.circuit, e3_id, party_id
+        );
+        println!("Proof details: {:?}", proof);
         prover.verify(proof, e3_id, party_id)
     }
 }

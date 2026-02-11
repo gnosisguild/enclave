@@ -126,7 +126,8 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    let sd: e3_fhe_params::PresetSearchDefaults = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+    let sd: e3_fhe_params::PresetSearchDefaults =
+        BfvPreset::InsecureThreshold512.search_defaults().unwrap();
 
     setup_circuit_fixtures(
         &backend,
@@ -135,9 +136,14 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     )
     .await;
 
-    let sample =
-        ShareEncryptionCircuitInput::generate_sample(preset, committee, DkgInputType::SmudgingNoise, sd.z, sd.lambda)
-            .ok()?;
+    let sample = ShareEncryptionCircuitInput::generate_sample(
+        preset,
+        committee,
+        DkgInputType::SmudgingNoise,
+        sd.z,
+        sd.lambda,
+    )
+    .ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -149,8 +155,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
         preset,
         "1",
     ))
-} 
-
+}
 
 async fn setup_share_encryption_sk_test() -> Option<(
     ZkBackend,
@@ -166,7 +171,8 @@ async fn setup_share_encryption_sk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    let sd: e3_fhe_params::PresetSearchDefaults = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+    let sd: e3_fhe_params::PresetSearchDefaults =
+        BfvPreset::InsecureThreshold512.search_defaults().unwrap();
 
     setup_circuit_fixtures(
         &backend,
@@ -175,9 +181,14 @@ async fn setup_share_encryption_sk_test() -> Option<(
     )
     .await;
 
-    let sample =
-        ShareEncryptionCircuitInput::generate_sample(preset, committee, DkgInputType::SecretKey, sd.z, sd.lambda)
-            .ok()?;
+    let sample = ShareEncryptionCircuitInput::generate_sample(
+        preset,
+        committee,
+        DkgInputType::SecretKey,
+        sd.z,
+        sd.lambda,
+    )
+    .ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -189,7 +200,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
         preset,
         "1",
     ))
-} 
+}
 
 async fn setup_share_computation_sk_test() -> Option<(
     ZkBackend,
@@ -470,10 +481,7 @@ async fn test_share_computation_sk_commitment_consistency() {
     // Compute the commitment independently to ensure consistency
     let computation_output =
         ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
-    let commitment_calculated = computation_output
-        .witness
-        .expected_secret_commitment
-        .clone();
+    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
 
     assert_eq!(
         commitment_from_proof, commitment_calculated,
@@ -502,10 +510,7 @@ async fn test_share_computation_e_sm_commitment_consistency() {
     // Compute the commitment independently to ensure consistency
     let computation_output =
         ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
-    let commitment_calculated = computation_output
-        .witness
-        .expected_secret_commitment
-        .clone();
+    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
 
     assert_eq!(
         commitment_from_proof, commitment_calculated,
