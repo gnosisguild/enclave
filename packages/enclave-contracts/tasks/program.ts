@@ -38,8 +38,9 @@ export const publishInput = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, programAddress }, hre) => {
-      const { deployAndSaveMockProgram } =
-        await import("../scripts/deployAndSave/mockProgram");
+      const { deployAndSaveMockProgram } = await import(
+        "../scripts/deployAndSave/mockProgram"
+      );
       const { MockE3Program__factory } = await import("../types");
 
       const { ethers } = await hre.network.connect();
