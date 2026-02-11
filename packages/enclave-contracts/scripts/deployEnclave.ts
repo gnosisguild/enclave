@@ -15,6 +15,7 @@ import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
 import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
+import { deployAndSaveAllVerifiers } from "./deployAndSave/verifiers";
 import { deployMocks } from "./deployMocks";
 
 /**
@@ -225,6 +226,16 @@ export const deployEnclave = async (withMocks?: boolean) => {
     console.log(`Successfully enabled E3 Program in Enclave contract`);
   }
 
+  // Deploy circuit verifiers (if any exist in contracts/verifier/)
+  console.log("Deploying circuit verifiers...");
+  const verifierDeployments = await deployAndSaveAllVerifiers(hre);
+  const verifierEntries = Object.entries(verifierDeployments);
+
+  const verifierLines =
+    verifierEntries.length > 0
+      ? verifierEntries.map(([name, addr]) => `    ${name}: ${addr}`).join("\n")
+      : "    (none)";
+
   console.log(`
     ============================================
     Deployment Complete!
@@ -237,6 +248,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}
+    Circuit Verifiers:
+${verifierLines}
     ============================================
   `);
 };

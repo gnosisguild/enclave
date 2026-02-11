@@ -15,6 +15,7 @@
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
     "build:circuits": "tsx scripts/build-circuits.ts",
+    "generate:verifiers": "tsx scripts/generate-verifiers.ts",
     "store:circuits": "tsx scripts/circuit-artifacts.ts",
     "clean": "tsx scripts/clean.ts",
     "compile": "pnpm build:ts && pnpm rust:build",
@@ -90,6 +91,9 @@
       "typescript": "5.8.3",
       "undici-types": "6.19.8",
       "viem": "2.38.6"
+    },
+    "patchedDependencies": {
+      "@aztec/bb.js@3.0.0-nightly.20251104": "examples/CRISP/patches/@aztec__bb.js@3.0.0-nightly.20251104.patch"
     }
   },
   "lint-staged": {

@@ -866,6 +866,11 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "committeePublicKeyHash",
+          "type": "bytes32"
         }
       ],
       "name": "onCommitteePublished",
@@ -1197,5 +1202,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-1274269bf8b5435b6fb6eba99e4eb3854e5d9864"
+  "buildInfoId": "solc-0_8_28-d7b7e823e5eb177cd42a96206dc5c5f8387609a9"
 }
