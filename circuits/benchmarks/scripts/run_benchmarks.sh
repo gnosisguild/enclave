@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run_benchmarks.sh - Main orchestration script for benchmarking circuits
-# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--skip-compile] [--clean]
+# Usage: ./run_benchmarks.sh [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean]
 
 set -e
 
@@ -11,6 +11,7 @@ CONFIG_FILE="${BENCHMARKS_DIR}/config.json"
 CLEAN_ARTIFACTS=false
 MODE_OVERRIDE=""
 SKIP_COMPILE=false
+CIRCUIT_FILTER=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
             fi
             shift 2
             ;;
+        --circuit)
+            CIRCUIT_FILTER="$2"
+            shift 2
+            ;;
         --skip-compile|--no-compile)
             SKIP_COMPILE=true
             shift
@@ -37,7 +42,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--skip-compile] [--clean]"
+            echo "Usage: $0 [--config <config_file>] [--mode insecure|secure] [--circuit <path>] [--skip-compile] [--clean]"
             exit 1
             ;;
     esac
@@ -54,11 +59,21 @@ echo "╚═══════════════════════�
 echo ""
 
 # Read configuration
-CIRCUITS=$(jq -r '.circuits[]' "$CONFIG_FILE")
+ALL_CIRCUITS=$(jq -r '.circuits[]' "$CONFIG_FILE")
 ORACLES=$(jq -r '.oracles[]' "$CONFIG_FILE")
 OUTPUT_DIR_BASE=$(jq -r '.output_dir // "results"' "$CONFIG_FILE")
 BIN_DIR=$(jq -r '.bin_dir // "../bin"' "$CONFIG_FILE")
 MODE=$(jq -r '.mode // "insecure"' "$CONFIG_FILE")
+
+# Restrict to one circuit if --circuit was given
+if [ -n "$CIRCUIT_FILTER" ]; then
+    CIRCUITS="$CIRCUIT_FILTER"
+    if ! echo "$ALL_CIRCUITS" | grep -qx "$CIRCUIT_FILTER" 2>/dev/null; then
+        echo "Note: --circuit $CIRCUIT_FILTER is not in config.json; running anyway if path exists."
+    fi
+else
+    CIRCUITS="$ALL_CIRCUITS"
+fi
 
 # Override mode if provided via command line
 if [ -n "$MODE_OVERRIDE" ]; then
@@ -100,6 +115,9 @@ GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
 echo "Configuration:"
 echo "  Mode: $MODE"
+if [ -n "$CIRCUIT_FILTER" ]; then
+    echo "  Circuit: $CIRCUIT_FILTER (single)"
+fi
 if [ "$SKIP_COMPILE" = true ]; then
     echo "  Skip Compilation: Yes (using existing artifacts)"
 fi
@@ -111,7 +129,23 @@ echo "  Base Directory: $CIRCUITS_BASE_DIR"
 echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
 
-TOTAL_BENCHMARKS=$(($(echo $CIRCUITS | wc -w | tr -d ' ') * $(echo $ORACLES | wc -w | tr -d ' ')))
+# decrypted_shares_aggregation_mod is for insecure only (Q < 128bit); _bn is for secure (large Q)
+RUN_CIRCUITS=""
+for c in $CIRCUITS; do
+    if [ "$MODE" = "secure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_mod" ]; then
+        echo "  Skipping $c (modular variant is insecure-only, Q < 128bit)"
+        continue
+    fi
+    if [ "$MODE" = "insecure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_bn" ]; then
+        echo "  Skipping $c (BigNum variant is for secure/large Q only)"
+        continue
+    fi
+    RUN_CIRCUITS="${RUN_CIRCUITS} ${c}"
+done
+RUN_CIRCUITS=$(echo "$RUN_CIRCUITS" | xargs)
+echo ""
+
+TOTAL_BENCHMARKS=$(($(echo $RUN_CIRCUITS | wc -w | tr -d ' ') * $(echo $ORACLES | wc -w | tr -d ' ')))
 CURRENT=0
 
 # Restore lib config on exit (if we patched for secure)
@@ -125,7 +159,7 @@ restore_default_mod() {
 trap restore_default_mod EXIT
 
 # Run benchmarks
-for CIRCUIT in $CIRCUITS; do
+for CIRCUIT in $RUN_CIRCUITS; do
     CIRCUIT_PATH="${CIRCUITS_BASE_DIR}/${CIRCUIT}"
     
     if [ ! -d "$CIRCUIT_PATH" ]; then
@@ -182,7 +216,7 @@ echo ""
 # Clean artifacts if requested
 if [ "$CLEAN_ARTIFACTS" = true ]; then
     echo "Cleaning circuit artifacts..."
-    for CIRCUIT in $CIRCUITS; do
+    for CIRCUIT in $RUN_CIRCUITS; do
         CIRCUIT_PATH="${CIRCUITS_BASE_DIR}/${CIRCUIT}"
         if [ -d "$CIRCUIT_PATH/target" ]; then
             rm -rf "$CIRCUIT_PATH/target"

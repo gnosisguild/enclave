@@ -1,9 +1,9 @@
 # Enclave ZK Circuit Benchmarks
 
-**Generated:** 2026-02-10 15:46:56 UTC
+**Generated:** 2026-02-11 09:44:15 UTC
 
 **Git Branch:** `circuits/configs-benches`  
-**Git Commit:** `a59e54c02ae531cb9579c2fae86caab28c7e9efa`
+**Git Commit:** `eb62e90b8e36fedfd255a2dc8e6867296c2dc379`
 
 ---
 
@@ -39,25 +39,23 @@
 
 #### Timing Metrics
 
-| Circuit                          | Compile  | Execute | Prove   | Verify |
-| -------------------------------- | -------- | ------- | ------- | ------ |
-| decrypted_shares_aggregation_bn  | 1.15 s   | 0.61 s  | 0.80 s  | 0.03 s |
-| decrypted_shares_aggregation_mod | 0.70 s   | 0.33 s  | 0.00 s  | 0.00 s |
-| pk_aggregation                   | 116.13 s | 6.22 s  | 20.25 s | 0.02 s |
-| pk_generation                    | 388.08 s | 4.88 s  | 12.30 s | 0.09 s |
-| share_decryption                 | 430.14 s | 5.55 s  | 12.41 s | 0.16 s |
-| user_data_encryption             | 409.30 s | 7.78 s  | 13.37 s | 0.02 s |
+| Circuit                         | Compile  | Execute | Prove   | Verify |
+| ------------------------------- | -------- | ------- | ------- | ------ |
+| decrypted_shares_aggregation_bn | 0.30 s   | 0.58 s  | 0.80 s  | 0.02 s |
+| pk_aggregation                  | 116.13 s | 6.22 s  | 20.25 s | 0.02 s |
+| pk_generation                   | 388.08 s | 4.88 s  | 12.30 s | 0.09 s |
+| share_decryption                | 430.14 s | 5.55 s  | 12.41 s | 0.16 s |
+| user_data_encryption            | 409.30 s | 7.78 s  | 13.37 s | 0.02 s |
 
 #### Size & Circuit Metrics
 
-| Circuit                          | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
-| -------------------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
-| decrypted_shares_aggregation_bn  | 61568   | 154.96K | 1.29 MB      | 193.99 KB | 3.59 KB | 15.88 KB   |
-| decrypted_shares_aggregation_mod | 0       | 0       | 793.45 KB    | 0 B       | 0 B     | 0 B        |
-| pk_aggregation                   | 1529181 | 5.27M   | 21.69 MB     | 11.06 MB  | 3.59 KB | 15.88 KB   |
-| pk_generation                    | 948955  | 3.49M   | 12.31 MB     | 16.86 MB  | 3.59 KB | 15.88 KB   |
-| share_decryption                 | 1012104 | 3.54M   | 12.98 MB     | 19.20 MB  | 3.59 KB | 15.88 KB   |
-| user_data_encryption             | 1684299 | 4.02M   | 20.75 MB     | 23.82 MB  | 3.59 KB | 15.88 KB   |
+| Circuit                         | Opcodes | Gates   | Circuit Size | Witness   | VK Size | Proof Size |
+| ------------------------------- | ------- | ------- | ------------ | --------- | ------- | ---------- |
+| decrypted_shares_aggregation_bn | 61568   | 154.96K | 1.29 MB      | 194.35 KB | 3.59 KB | 15.88 KB   |
+| pk_aggregation                  | 1529181 | 5.27M   | 21.69 MB     | 11.06 MB  | 3.59 KB | 15.88 KB   |
+| pk_generation                   | 948955  | 3.49M   | 12.31 MB     | 16.86 MB  | 3.59 KB | 15.88 KB   |
+| share_decryption                | 1012104 | 3.54M   | 12.98 MB     | 19.20 MB  | 3.59 KB | 15.88 KB   |
+| user_data_encryption            | 1684299 | 4.02M   | 20.75 MB     | 23.82 MB  | 3.59 KB | 15.88 KB   |
 
 ## Circuit Details
 
@@ -181,33 +179,17 @@
 
 | Metric               | Value     |
 | -------------------- | --------- |
-| **Compilation**      | 1.15 s    |
-| **Execution**        | 0.61 s    |
-| **VK Generation**    | 0.31 s    |
+| **Compilation**      | 0.30 s    |
+| **Execution**        | 0.58 s    |
+| **VK Generation**    | 0.32 s    |
 | **Proof Generation** | 0.80 s    |
-| **Verification**     | 0.03 s    |
+| **Verification**     | 0.02 s    |
 | **ACIR Opcodes**     | 61568     |
 | **Total Gates**      | 154955    |
 | **Circuit Size**     | 1.29 MB   |
-| **Witness Size**     | 193.99 KB |
+| **Witness Size**     | 194.35 KB |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
-
-#### decrypted_shares_aggregation_mod
-
-| Metric               | Value     |
-| -------------------- | --------- |
-| **Compilation**      | 0.70 s    |
-| **Execution**        | 0.33 s    |
-| **VK Generation**    | 0.00 s    |
-| **Proof Generation** | 0.00 s    |
-| **Verification**     | 0.00 s    |
-| **ACIR Opcodes**     | 0         |
-| **Total Gates**      | 0         |
-| **Circuit Size**     | 793.45 KB |
-| **Witness Size**     | 0 B       |
-| **VK Size**          | 0 B       |
-| **Proof Size**       | 0 B       |
 
 #### pk_aggregation
 

@@ -250,17 +250,17 @@ for category in dkg threshold; do
         cat >> "$OUTPUT_FILE" << INNER
 | Metric | Value |
 |--------|-------|
-| **Compilation** | $(format_time $compile) |
-| **Execution** | $(format_time $execute) |
-| **VK Generation** | $(format_time $vk_gen) |
-| **Proof Generation** | $(format_time $prove) |
-| **Verification** | $(format_time $verify) |
-| **ACIR Opcodes** | $opcodes |
-| **Total Gates** | $gates |
-| **Circuit Size** | $(format_bytes $circuit_size) |
-| **Witness Size** | $(format_bytes $witness_size) |
-| **VK Size** | $(format_bytes $vk_size) |
-| **Proof Size** | $(format_bytes $proof_size) |
+| **Compilation** | $(format_time "$compile") |
+| **Execution** | $(format_time "$execute") |
+| **VK Generation** | $(format_time "$vk_gen") |
+| **Proof Generation** | $(format_time "$prove") |
+| **Verification** | $(format_time "$verify") |
+| **ACIR Opcodes** | "${opcodes}" |
+| **Total Gates** | "${gates}" |
+| **Circuit Size** | $(format_bytes "$circuit_size") |
+| **Witness Size** | $(format_bytes "$witness_size") |
+| **VK Size** | $(format_bytes "$vk_size") |
+| **Proof Size** | $(format_bytes "$proof_size") |
 
 INNER
     done

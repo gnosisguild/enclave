@@ -51,6 +51,44 @@ else
     CIRCUIT_PATH_CLEAN="circuits/bin/${MODE}/$(basename "$CIRCUIT_PATH")"
 fi
 
+# Portable high-resolution timestamp (fractional seconds) for timing.
+# macOS date does not support %N; use gdate, Python, or Perl fallback.
+get_timestamp() {
+    local t
+    # GNU date (Linux): date +%s.%N
+    t=$(date +%s.%N 2>/dev/null)
+    if [[ -n "$t" && "$t" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "$t"
+        return
+    fi
+    # GNU date on macOS (e.g. brew install coreutils -> gdate)
+    if command -v gdate >/dev/null 2>&1; then
+        t=$(gdate +%s.%N 2>/dev/null)
+        if [[ -n "$t" && "$t" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "$t"
+            return
+        fi
+    fi
+    # Python (python3 or python) - high resolution
+    if command -v python3 >/dev/null 2>&1; then
+        t=$(python3 -c 'import time; print("%.9f" % time.time())' 2>/dev/null)
+        [[ -n "$t" ]] && echo "$t" && return
+    fi
+    if command -v python >/dev/null 2>&1; then
+        t=$(python -c 'import time; print("%.9f" % time.time())' 2>/dev/null)
+        [[ -n "$t" ]] && echo "$t" && return
+    fi
+    # Perl with Time::HiRes
+    if t=$(perl -MTime::HiRes -e 'printf "%.9f\n", Time::HiRes::time()' 2>/dev/null); then
+        if [[ "$t" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "$t"
+            return
+        fi
+    fi
+    # Fallback: integer seconds (POSIX)
+    echo "$(date +%s).000000000"
+}
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "=================================================="
@@ -139,9 +177,9 @@ if [ "$SKIP_COMPILE" = true ]; then
 else
     echo ""
     echo "[1/6] Compiling circuit..."
-    START=$(date +%s.%N)
+    START=$(get_timestamp)
     if $NARGO_COMPILE_CMD > /tmp/compile_output.txt 2>&1; then
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         COMPILE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         COMPILE_SUCCESS="true"
         echo "✓ Compilation successful (${COMPILE_TIME}s)"
@@ -151,7 +189,7 @@ else
             CIRCUIT_SIZE=$(wc -c < "${TARGET_DIR}/${CIRCUIT_NAME}.json" | tr -d ' ')
         fi
     else
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         COMPILE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         ERROR_MSG="Compilation failed. Check compilation logs."
         echo "✗ Compilation failed"
@@ -163,9 +201,9 @@ fi
 if [ "$COMPILE_SUCCESS" = "true" ]; then
     echo ""
     echo "[2/6] Executing circuit..."
-    START=$(date +%s.%N)
+    START=$(get_timestamp)
     if $NARGO_EXECUTE_CMD > /tmp/execute_output.txt 2>&1; then
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         EXECUTE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         EXECUTE_SUCCESS="true"
         echo "✓ Execution successful (${EXECUTE_TIME}s)"
@@ -175,7 +213,7 @@ if [ "$COMPILE_SUCCESS" = "true" ]; then
             WITNESS_SIZE=$(wc -c < "${TARGET_DIR}/${CIRCUIT_NAME}.gz" | tr -d ' ')
         fi
     else
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         EXECUTE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         ERROR_MSG="Execution failed. Check execution logs."
         echo "✗ Execution failed"
@@ -211,9 +249,9 @@ fi
 if [ "$EXECUTE_SUCCESS" = "true" ]; then
     echo ""
     echo "[4/6] Generating verification key..."
-    START=$(date +%s.%N)
+    START=$(get_timestamp)
     if $BB_WRITE_VK_CMD -b "${TARGET_DIR}/${CIRCUIT_NAME}.json" -o "${TARGET_DIR}" > /tmp/vk_output.txt 2>&1; then
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         VK_GEN_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         VK_GEN_SUCCESS="true"
         echo "✓ VK generation successful (${VK_GEN_TIME}s)"
@@ -223,7 +261,7 @@ if [ "$EXECUTE_SUCCESS" = "true" ]; then
             VK_SIZE=$(wc -c < "${TARGET_DIR}/vk" | tr -d ' ')
         fi
     else
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         VK_GEN_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         echo "✗ VK generation failed"
         cat /tmp/vk_output.txt
@@ -234,9 +272,9 @@ fi
 if [ "$VK_GEN_SUCCESS" = "true" ]; then
     echo ""
     echo "[5/6] Generating proof..."
-    START=$(date +%s.%N)
+    START=$(get_timestamp)
     if $BB_PROVE_CMD -b "${TARGET_DIR}/${CIRCUIT_NAME}.json" -w "${TARGET_DIR}/${CIRCUIT_NAME}.gz" -k "${TARGET_DIR}/vk" -o "${TARGET_DIR}" > /tmp/prove_output.txt 2>&1; then
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         PROVE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         PROVE_SUCCESS="true"
         echo "✓ Proof generation successful (${PROVE_TIME}s)"
@@ -246,7 +284,7 @@ if [ "$VK_GEN_SUCCESS" = "true" ]; then
             PROOF_SIZE=$(wc -c < "${TARGET_DIR}/proof" | tr -d ' ')
         fi
     else
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         PROVE_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         echo "✗ Proof generation failed"
         cat /tmp/prove_output.txt
@@ -257,15 +295,15 @@ fi
 if [ "$PROVE_SUCCESS" = "true" ]; then
     echo ""
     echo "[6/6] Verifying proof..."
-    START=$(date +%s.%N)
+    START=$(get_timestamp)
     # bb verify expects paths to vk, proof, and public inputs (all directly in target directory)
     if $BB_VERIFY_CMD -k "${TARGET_DIR}/vk" -p "${TARGET_DIR}/proof" -i "${TARGET_DIR}/public_inputs" > /tmp/verify_output.txt 2>&1; then
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         VERIFY_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         VERIFY_SUCCESS="true"
         echo "✓ Verification successful (${VERIFY_TIME}s)"
     else
-        END=$(date +%s.%N)
+        END=$(get_timestamp)
         VERIFY_TIME=$(echo "$END - $START" | bc | awk '{printf "%.9f", $0}')
         echo "✗ Verification failed"
         cat /tmp/verify_output.txt
@@ -298,22 +336,36 @@ else
     RAM_GB="unknown"
 fi
 
+# JSON-escape string fields to ensure valid output
+CIRCUIT_NAME_JSON=$(printf '%s' "$CIRCUIT_NAME" | jq -Rs .)
+CIRCUIT_PATH_CLEAN_JSON=$(printf '%s' "$CIRCUIT_PATH_CLEAN" | jq -Rs .)
+MODE_JSON=$(printf '%s' "$MODE" | jq -Rs .)
+ORACLE_TYPE_JSON=$(printf '%s' "$ORACLE_TYPE" | jq -Rs .)
+TIMESTAMP_JSON=$(printf '%s' "$TIMESTAMP" | jq -Rs .)
+OS_INFO_JSON=$(printf '%s' "$OS_INFO" | jq -Rs .)
+ARCH_INFO_JSON=$(printf '%s' "$ARCH_INFO" | jq -Rs .)
+CPU_MODEL_JSON=$(printf '%s' "$CPU_MODEL" | jq -Rs .)
+CPU_CORES_JSON=$(printf '%s' "$CPU_CORES" | jq -Rs .)
+RAM_GB_JSON=$(printf '%s' "$RAM_GB" | jq -Rs .)
+NARGO_VERSION_JSON=$(printf '%s' "$NARGO_VERSION" | jq -Rs .)
+BB_VERSION_JSON=$(printf '%s' "$BB_VERSION" | jq -Rs .)
+
 # Create JSON output
 cat > "$OUTPUT_JSON" <<EOF
 {
-  "circuit_name": "$CIRCUIT_NAME",
-  "circuit_path": "$CIRCUIT_PATH_CLEAN",
-  "mode": "$MODE",
-  "oracle_type": "$ORACLE_TYPE",
-  "timestamp": "$TIMESTAMP",
+  "circuit_name": $CIRCUIT_NAME_JSON,
+  "circuit_path": $CIRCUIT_PATH_CLEAN_JSON,
+  "mode": $MODE_JSON,
+  "oracle_type": $ORACLE_TYPE_JSON,
+  "timestamp": $TIMESTAMP_JSON,
   "system_info": {
-    "os": "$OS_INFO",
-    "arch": "$ARCH_INFO",
-    "cpu_model": "$CPU_MODEL",
-    "cpu_cores": "$CPU_CORES",
-    "ram_gb": "$RAM_GB",
-    "nargo_version": "$NARGO_VERSION",
-    "bb_version": "$BB_VERSION"
+    "os": $OS_INFO_JSON,
+    "arch": $ARCH_INFO_JSON,
+    "cpu_model": $CPU_MODEL_JSON,
+    "cpu_cores": $CPU_CORES_JSON,
+    "ram_gb": $RAM_GB_JSON,
+    "nargo_version": $NARGO_VERSION_JSON,
+    "bb_version": $BB_VERSION_JSON
   },
   "compilation": {
     "time_seconds": ${COMPILE_TIME:-0},
