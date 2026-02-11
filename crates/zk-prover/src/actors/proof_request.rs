@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Context, Handler};
-use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
+use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
@@ -31,16 +31,12 @@ struct PendingProofRequest {
 pub struct ProofRequestActor {
     bus: BusHandle,
     proofs_enabled: bool,
-    signer: Option<LocalSigner<SigningKey>>,
+    signer: Option<PrivateKeySigner>,
     pending: HashMap<CorrelationId, PendingProofRequest>,
 }
 
 impl ProofRequestActor {
-    pub fn new(
-        bus: &BusHandle,
-        proofs_enabled: bool,
-        signer: Option<LocalSigner<SigningKey>>,
-    ) -> Self {
+    pub fn new(bus: &BusHandle, proofs_enabled: bool, signer: Option<PrivateKeySigner>) -> Self {
         Self {
             bus: bus.clone(),
             proofs_enabled,
@@ -52,7 +48,7 @@ impl ProofRequestActor {
     pub fn setup(
         bus: &BusHandle,
         proofs_enabled: bool,
-        signer: Option<LocalSigner<SigningKey>>,
+        signer: Option<PrivateKeySigner>,
     ) -> Addr<Self> {
         let addr = Self::new(bus, proofs_enabled, signer).start();
         bus.subscribe(EventType::EncryptionKeyPending, addr.clone().into());
@@ -119,8 +115,6 @@ impl ProofRequestActor {
             let payload = ProofPayload {
                 e3_id: pending.e3_id.clone(),
                 proof_type: ProofType::T0PkBfv,
-                party_id: key.party_id,
-                data: key.pk_bfv.clone(),
                 proof: resp.proof.clone(),
             };
 

@@ -13,8 +13,9 @@
 
 use crate::{CircuitName, E3id, Proof};
 use actix::Message;
-use alloy::primitives::{keccak256, Address, Signature};
-use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner, SignerSync};
+use alloy::primitives::{keccak256, Address, Bytes, Signature, U256};
+use alloy::signers::{local::PrivateKeySigner, SignerSync};
+use alloy::sol_types::SolValue;
 use anyhow::{anyhow, Result};
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
@@ -88,8 +89,10 @@ impl fmt::Display for ProofType {
 
 /// Data payload that a node signs before broadcasting.
 ///
-/// The canonical encoding matches Solidity's `abi.encode` layout so that
-/// on-chain `ecrecover` can reconstruct the same digest.
+/// Only contains data needed for on-chain fault verification:
+/// the E3 identifier, proof type, and the ZK proof itself.
+/// Encoded via `abi.encodePacked(chainId, e3Id, proofType, proof, publicSignals)`
+/// so on-chain `ecrecover` can reconstruct the same digest.
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ProofPayload {
@@ -97,12 +100,7 @@ pub struct ProofPayload {
     pub e3_id: E3id,
     /// Which proof this payload carries.
     pub proof_type: ProofType,
-    /// The sender's party ID within the committee (0-indexed).
-    pub party_id: u64,
-    /// The actual data being proven (e.g. `pk_bfv` bytes, share bytes).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub data: ArcBytes,
-    /// The ZK proof that attests to `data`.
+    /// The ZK proof that attests to the data.
     pub proof: Proof,
 }
 
@@ -113,27 +111,23 @@ impl ProofPayload {
     /// preceded by fixed-size scalars, matching the structure the on-chain
     /// verifier will reconstruct.
     pub fn digest(&self) -> [u8; 32] {
-        // Encode: e3_id chain_id (u64) | e3_id id (u64) | proof_type (u8) | party_id (u64)
-        //       | len(data) (u32) | data | len(proof) (u32) | proof
-        //       | len(public_signals) (u32) | public_signals
-        let mut buf = Vec::new();
-        buf.extend_from_slice(&self.e3_id.chain_id().to_be_bytes());
-        let id_bytes = self.e3_id.e3_id().as_bytes();
-        buf.extend_from_slice(&(id_bytes.len() as u32).to_be_bytes());
-        buf.extend_from_slice(id_bytes);
-        buf.push(self.proof_type as u8);
-        buf.extend_from_slice(&self.party_id.to_be_bytes());
-        // data
-        buf.extend_from_slice(&(self.data.len() as u32).to_be_bytes());
-        buf.extend_from_slice(&self.data);
-        // proof bytes
-        buf.extend_from_slice(&(self.proof.data.len() as u32).to_be_bytes());
-        buf.extend_from_slice(&self.proof.data);
-        // public_signals
-        buf.extend_from_slice(&(self.proof.public_signals.len() as u32).to_be_bytes());
-        buf.extend_from_slice(&self.proof.public_signals);
+        let e3_id_u256: U256 = self
+            .e3_id
+            .clone()
+            .try_into()
+            .expect("E3id should be valid U256");
 
-        keccak256(&buf).into()
+        // keccak256(abi.encodePacked(chainId, e3Id, proofType, proof, publicSignals))
+        let encoded = (
+            U256::from(self.e3_id.chain_id()),
+            e3_id_u256,
+            U256::from(self.proof_type as u8),
+            Bytes::copy_from_slice(&self.proof.data),
+            Bytes::copy_from_slice(&self.proof.public_signals),
+        )
+            .abi_encode_packed();
+
+        keccak256(&encoded).into()
     }
 }
 
@@ -154,43 +148,25 @@ pub struct SignedProofPayload {
 
 impl SignedProofPayload {
     /// Sign a [`ProofPayload`] with the node's ECDSA key.
-    pub fn sign(payload: ProofPayload, signer: &LocalSigner<SigningKey>) -> Result<Self> {
+    pub fn sign(payload: ProofPayload, signer: &PrivateKeySigner) -> Result<Self> {
         let digest = payload.digest();
-        let sig: Signature = signer
+        let sig = signer
             .sign_message_sync(&digest)
             .map_err(|e| anyhow!("Failed to sign proof payload: {e}"))?;
 
-        // Encode as 65-byte r ‖ s ‖ v
-        let mut sig_bytes = Vec::with_capacity(65);
-        sig_bytes.extend_from_slice(&sig.r().to_be_bytes::<32>());
-        sig_bytes.extend_from_slice(&sig.s().to_be_bytes::<32>());
-        sig_bytes.push(sig.v() as u8);
-
         Ok(Self {
             payload,
-            signature: ArcBytes::from_bytes(&sig_bytes),
+            signature: ArcBytes::from_bytes(&sig.as_bytes()),
         })
     }
 
     /// Recover the Ethereum address that produced this signature.
     pub fn recover_signer(&self) -> Result<Address> {
-        if self.signature.len() != 65 {
-            return Err(anyhow!(
-                "Invalid signature length: expected 65, got {}",
-                self.signature.len()
-            ));
-        }
-
-        let r = alloy::primitives::U256::from_be_slice(&self.signature[..32]);
-        let s = alloy::primitives::U256::from_be_slice(&self.signature[32..64]);
-        let v = self.signature[64] != 0;
-        let sig = Signature::new(r, s, v);
+        let sig = Signature::try_from(&self.signature[..])
+            .map_err(|e| anyhow!("Invalid signature: {e}"))?;
 
         let digest = self.payload.digest();
-        // EIP-191 personal message hash: "\x19Ethereum Signed Message:\n32" ++ digest
-        let prefixed = alloy::primitives::eip191_hash_message(digest);
-
-        sig.recover_address_from_prehash(&prefixed)
+        sig.recover_address_from_msg(&digest)
             .map_err(|e| anyhow!("Failed to recover signer address: {e}"))
     }
 
@@ -234,7 +210,6 @@ impl Display for SignedProofFailed {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::signers::local::PrivateKeySigner;
 
     fn test_signer() -> PrivateKeySigner {
         // Deterministic test key
@@ -247,8 +222,6 @@ mod tests {
         ProofPayload {
             e3_id: E3id::new("1", 42),
             proof_type: ProofType::T0PkBfv,
-            party_id: 3,
-            data: ArcBytes::from_bytes(&[1, 2, 3, 4]),
             proof: Proof::new(
                 CircuitName::PkBfv,
                 ArcBytes::from_bytes(&[10, 20, 30]),
@@ -299,7 +272,7 @@ mod tests {
     fn different_payloads_produce_different_digests() {
         let p1 = test_payload();
         let mut p2 = test_payload();
-        p2.party_id = 99;
+        p2.proof_type = ProofType::T1PkGeneration;
 
         assert_ne!(p1.digest(), p2.digest());
     }
@@ -312,7 +285,7 @@ mod tests {
         let mut signed =
             SignedProofPayload::sign(payload, &signer).expect("signing should succeed");
         // Tamper with the payload after signing
-        signed.payload.party_id = 999;
+        signed.payload.proof_type = ProofType::T1PkGeneration;
 
         let recovered = signed.recover_signer().expect("recovery should succeed");
         // Recovered address won't match the signer because payload was tampered

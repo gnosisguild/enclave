@@ -41,7 +41,7 @@ pub use proof_verification::{
 pub use zk_actor::ZkActor;
 
 use actix::{Actor, Addr};
-use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
+use alloy::signers::local::PrivateKeySigner;
 use e3_events::BusHandle;
 
 use crate::ZkBackend;
@@ -62,7 +62,7 @@ use crate::ZkBackend;
 pub fn setup_zk_actors(
     bus: &BusHandle,
     backend: Option<&ZkBackend>,
-    signer: Option<LocalSigner<SigningKey>>,
+    signer: Option<PrivateKeySigner>,
 ) -> ZkActors {
     let (zk_actor, verifier) = if let Some(backend) = backend {
         let zk_actor = ZkActor::new(backend).start();
