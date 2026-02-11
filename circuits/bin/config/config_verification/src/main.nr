@@ -27,9 +27,15 @@ use lib::configs::secure::threshold::{
     Q_INVERSE_MOD_T as THRESHOLD_Q_INVERSE_MOD_T,
     // pk_generation bounds
     PK_GENERATION_EEK_BOUND, PK_GENERATION_SK_BOUND, PK_GENERATION_E_SM_BOUND,
-    PK_GENERATION_R1_BOUNDS, PK_GENERATION_R2_BOUNDS,
+    PK_GENERATION_R1_BOUNDS, PK_GENERATION_R2_BOUNDS, PK_GENERATION_B_ENC,
     // share_decryption bounds
-    SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS, PK_GENERATION_B_ENC,
+    SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS,
+    // user_data_encryption (Greco) bounds
+    USER_DATA_ENCRYPTION_K0IS, USER_DATA_ENCRYPTION_PK_BOUNDS, USER_DATA_ENCRYPTION_E0_BOUND,
+    USER_DATA_ENCRYPTION_E1_BOUND, USER_DATA_ENCRYPTION_U_BOUND, USER_DATA_ENCRYPTION_K1_LOW_BOUND,
+    USER_DATA_ENCRYPTION_K1_UP_BOUND, USER_DATA_ENCRYPTION_R1_LOW_BOUNDS,
+    USER_DATA_ENCRYPTION_R1_UP_BOUNDS, USER_DATA_ENCRYPTION_R2_BOUNDS,
+    USER_DATA_ENCRYPTION_P1_BOUNDS, USER_DATA_ENCRYPTION_P2_BOUNDS,
 };
 
 use lib::math::modulo::U128::ModU128;
@@ -43,10 +49,15 @@ fn main() {
     verify_threshold_derived_values();
     verify_threshold_bounds();
 
+    // user_data_encryption Verification
+    verify_greco_bounds();
+
     // Cross-Config Consistency
     verify_cross_config_consistency();
 }
-//DKG values
+
+//DKG Derived Values
+
 fn verify_dkg_derived_values() {
     verify_dkg_q_mod_t();
 }
@@ -152,7 +163,7 @@ fn verify_dkg_bounds() {
     }
 }
 
-// Threshold (trBFV) Derived Values
+//Threshold Derived Values
 
 fn verify_threshold_derived_values() {
     verify_threshold_q_mod_t();
@@ -219,6 +230,29 @@ fn verify_pk_generation_bounds() {
     verify_e_sm_bound();
 }
 
+// Verifies e_sm_bound (smudging noise bound)
+fn verify_e_sm_bound() {
+    let n: Field = THRESHOLD_N as Field;
+    let e_norm: Field = 20;
+    let b_e: Field = 20;
+    let sk_norm: Field = N_PARTIES as Field;
+    let num_ciphertexts: Field = N_CIPHERTEXTS as Field;
+
+    // b_fresh = N * e_norm + b_enc + N * b_e * sk_norm
+    let b_fresh = n * e_norm + PK_GENERATION_B_ENC + n * b_e * sk_norm;
+
+    // b_c = N_CIPHERTEXTS * (b_fresh + Q_MOD_T)
+    let b_c = num_ciphertexts * (b_fresh + THRESHOLD_Q_MOD_T);
+
+    // 2^80
+    let two_pow_80: Field = 0x100000000000000000000;
+
+    // e_sm_bound = 2^80 * b_c
+    let expected_e_sm_bound = two_pow_80 * b_c;
+
+    assert(expected_e_sm_bound == PK_GENERATION_E_SM_BOUND, "PK_GENERATION_E_SM_BOUND mismatch");
+}
+
 // Verifies share_decryption bounds (Circuit 6)
 fn verify_share_decryption_bounds() {
     let n: u128 = THRESHOLD_N as u128;
@@ -242,6 +276,111 @@ fn verify_share_decryption_bounds() {
     }
 }
 
+//user_data_encryption Bounds
+
+// Verifies user_data_encryption (Greco) bounds
+// Uses THRESHOLD parameters (L=4 moduli, t=100)
+fn verify_greco_bounds() {
+    let n: u128 = THRESHOLD_N as u128;
+    let t: u128 = THRESHOLD_PLAINTEXT_MODULUS as u128;
+    let u_bound: u128 = USER_DATA_ENCRYPTION_U_BOUND as u128;
+    let e1_bound: u128 = USER_DATA_ENCRYPTION_E1_BOUND as u128;
+
+    // u_bound = 1 (ternary)
+    assert(USER_DATA_ENCRYPTION_U_BOUND == 1, "USER_DATA_ENCRYPTION_U_BOUND should be 1");
+
+    // e1_bound = 20 (variance * 2)
+    assert(USER_DATA_ENCRYPTION_E1_BOUND == 20, "USER_DATA_ENCRYPTION_E1_BOUND should be 20");
+
+    // e0_bound = sqrt(3 * error1_variance) = PK_GENERATION_B_ENC (same parameter set)
+    assert(
+        USER_DATA_ENCRYPTION_E0_BOUND == PK_GENERATION_B_ENC,
+        "USER_DATA_ENCRYPTION_E0_BOUND should equal PK_GENERATION_B_ENC",
+    );
+
+    // k1_up_bound = (t - 1) / 2 = 49
+    let expected_k1_up: u128 = (t - 1) / 2;
+    assert(
+        USER_DATA_ENCRYPTION_K1_UP_BOUND as u128 == expected_k1_up,
+        "USER_DATA_ENCRYPTION_K1_UP_BOUND mismatch",
+    );
+
+    // k1_low_bound = (t - 1) / 2 + 1 = 50 (for even t)
+    let t_is_even: bool = (t % 2) == 0;
+    let expected_k1_low: u128 = if t_is_even {
+        expected_k1_up + 1
+    } else {
+        expected_k1_up
+    };
+    assert(
+        USER_DATA_ENCRYPTION_K1_LOW_BOUND as u128 == expected_k1_low,
+        "USER_DATA_ENCRYPTION_K1_LOW_BOUND mismatch",
+    );
+
+    // ptxt_up_bound for r1 calculations
+    let ptxt_up_bound: u128 = (t - 1) / 2;
+
+    for i in 0..THRESHOLD_L {
+        let qi: u128 = THRESHOLD_QIS[i] as u128;
+        let qi_bound: u128 = (qi - 1) / 2;
+        let k0i: u128 = USER_DATA_ENCRYPTION_K0IS[i] as u128;
+
+        // pk_bounds[i] = (q_i - 1) / 2
+        assert(
+            USER_DATA_ENCRYPTION_PK_BOUNDS[i] as u128 == qi_bound,
+            "USER_DATA_ENCRYPTION_PK_BOUNDS mismatch",
+        );
+
+        // r2_bounds[i] = (q_i - 1) / 2
+        assert(
+            USER_DATA_ENCRYPTION_R2_BOUNDS[i] as u128 == qi_bound,
+            "USER_DATA_ENCRYPTION_R2_BOUNDS mismatch",
+        );
+
+        // p2_bounds[i] = (q_i - 1) / 2
+        assert(
+            USER_DATA_ENCRYPTION_P2_BOUNDS[i] as u128 == qi_bound,
+            "USER_DATA_ENCRYPTION_P2_BOUNDS mismatch",
+        );
+
+        // p1_bounds[i] = ((n * u_bound + 2) * qi_bound + e1_bound) / q_i
+        let expected_p1: u128 = ((n * u_bound + 2) * qi_bound + e1_bound) / qi;
+        assert(
+            USER_DATA_ENCRYPTION_P1_BOUNDS[i] as u128 == expected_p1,
+            "USER_DATA_ENCRYPTION_P1_BOUNDS mismatch",
+        );
+
+        // k0is[i] verification: k0i * t = -1 mod q_i
+        let m = ModU128::new(THRESHOLD_QIS[i]);
+        let product = m.mul_mod(USER_DATA_ENCRYPTION_K0IS[i], THRESHOLD_PLAINTEXT_MODULUS);
+        let neg_one = THRESHOLD_QIS[i] - 1;
+        assert(product == neg_one, "USER_DATA_ENCRYPTION_K0IS mismatch");
+
+        // e0_bound mod qi for r1 calculation
+        // Use Field arithmetic since e0_bound is ~107 bits
+        let e0_bound_i: u128 = (USER_DATA_ENCRYPTION_E0_BOUND as u128) % qi;
+
+        // r1_up_bounds[i] = (ptxt_up * k0i + ((n * u + 2) * qi_bound + e0_i)) / q_i
+        let expected_r1_up: u128 =
+            (ptxt_up_bound * k0i + ((n * u_bound + 2) * qi_bound + e0_bound_i)) / qi;
+        assert(
+            USER_DATA_ENCRYPTION_R1_UP_BOUNDS[i] as u128 == expected_r1_up,
+            "USER_DATA_ENCRYPTION_R1_UP_BOUNDS mismatch",
+        );
+
+        // r1_low_bounds[i] for even t
+        let expected_r1_low: u128 = if t_is_even {
+            ((ptxt_up_bound + 1) * k0i + ((n * u_bound + 2) * qi_bound + e0_bound_i)) / qi
+        } else {
+            expected_r1_up
+        };
+        assert(
+            USER_DATA_ENCRYPTION_R1_LOW_BOUNDS[i] as u128 == expected_r1_low,
+            "USER_DATA_ENCRYPTION_R1_LOW_BOUNDS mismatch",
+        );
+    }
+}
+
 //Cross-Config Consistency
 
 fn verify_cross_config_consistency() {
@@ -258,34 +397,4 @@ fn verify_cross_config_consistency() {
             "QIS_THRESHOLD mismatch between dkg.nr and threshold.nr",
         );
     }
-}
-// Verifies e_sm_bound (smudging noise bound)
-//
-// Formula from SmudgingBoundCalculator:
-//   e_norm = 20 (2 * variance)
-//   b_e = 20 (2 * variance)
-//   sk_norm = N_PARTIES
-//   b_fresh = N * e_norm + b_enc + N * b_e * sk_norm
-//   b_c = N_CIPHERTEXTS * (b_fresh + Q_MOD_T)
-//   e_sm_bound = 2^80 * b_c
-fn verify_e_sm_bound() {
-    let n: Field = THRESHOLD_N as Field;
-    let e_norm: Field = 20;
-    let b_e: Field = 20;
-    let sk_norm: Field = N_PARTIES as Field;
-    let num_ciphertexts: Field = N_CIPHERTEXTS as Field;
-
-    // b_fresh = N * e_norm + b_enc + N * b_e * sk_norm
-    let b_fresh = n * e_norm + PK_GENERATION_B_ENC + n * b_e * sk_norm;
-
-    // b_c = N_CIPHERTEXTS * (b_fresh + Q_MOD_T)
-    let b_c = num_ciphertexts * (b_fresh + THRESHOLD_Q_MOD_T);
-
-    // 2^80
-    let two_pow_80: Field = 0x100000000000000000000;
-
-    // e_sm_bound = 2^80 * b_c
-    let expected_e_sm_bound = two_pow_80 * b_c;
-
-    assert(expected_e_sm_bound == PK_GENERATION_E_SM_BOUND, "PK_GENERATION_E_SM_BOUND mismatch");
 }
