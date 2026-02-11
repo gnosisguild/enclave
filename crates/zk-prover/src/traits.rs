@@ -27,6 +27,16 @@ pub trait Provable: Send + Sync {
 
     fn circuit(&self) -> CircuitName;
 
+    /// Override this to select a circuit variant based on input.
+    /// Default just returns the standard circuit name.
+    fn resolve_circuit_name(&self, _input: &Self::Input) -> CircuitName {
+        self.circuit()
+    }
+
+    fn valid_circuits(&self) -> Vec<CircuitName> {
+        vec![self.circuit()]
+    }
+
     fn build_inputs(&self, params: &Self::Params, input: &Self::Input) -> Result<InputMap, ZkError>
     where
         Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
@@ -54,18 +64,18 @@ pub trait Provable: Send + Sync {
     {
         let inputs = self.build_inputs(params, input)?;
 
-        let circuit_name = self.circuit().as_str();
+        let resolved_name = self.resolve_circuit_name(input);
         let circuit_path = prover
             .circuits_dir()
-            .join(self.circuit().dir_path())
-            .join(format!("{}.json", circuit_name));
+            .join(resolved_name.dir_path())
+            .join(format!("{}.json", resolved_name.as_str()));
 
         let circuit = CompiledCircuit::from_file(&circuit_path)?;
 
         let witness_gen = WitnessGenerator::new();
         let witness = witness_gen.generate_witness(&circuit, inputs)?;
 
-        prover.generate_proof(self.circuit(), &witness, e3_id)
+        prover.generate_proof(resolved_name, &witness, e3_id)
     }
 
     fn verify(
@@ -75,10 +85,10 @@ pub trait Provable: Send + Sync {
         e3_id: &str,
         party_id: u64,
     ) -> Result<bool, ZkError> {
-        if proof.circuit != self.circuit() {
+        if !self.valid_circuits().contains(&proof.circuit) {
             return Err(ZkError::VerifyFailed(format!(
-                "circuit mismatch: expected {}, got {}",
-                self.circuit(),
+                "circuit mismatch: expected on of {:?}, got {}",
+                self.valid_circuits(),
                 proof.circuit
             )));
         }

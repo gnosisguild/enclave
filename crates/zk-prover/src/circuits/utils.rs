@@ -8,10 +8,7 @@ use std::collections::BTreeMap;
 
 use crate::error::ZkError;
 use acir::FieldElement;
-use acvm::AcirField;
-use e3_polynomial::{CrtPolynomial, Polynomial};
 use noirc_abi::{input_parser::InputValue, InputMap};
-use num_bigint::BigInt;
 
 /// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.
 /// Expects the same structure: CRT fields as arrays of `{coefficients: [...]}`,

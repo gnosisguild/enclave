@@ -29,7 +29,6 @@ use e3_zk_helpers::{
     compute_threshold_pk_commitment,
 };
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
-use num_bigint::{BigInt, Sign};
 use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::{fs, process::Command};
@@ -141,7 +140,7 @@ async fn setup_share_computation_sk_test() -> Option<(
         backend,
         temp,
         prover,
-        ShareComputationCircuit::new(DkgInputType::SecretKey),
+        ShareComputationCircuit,
         sample,
         preset,
         "1",
@@ -181,7 +180,7 @@ async fn setup_share_computation_e_sm_test() -> Option<(
         backend,
         temp,
         prover,
-        ShareComputationCircuit::new(DkgInputType::SmudgingNoise),
+        ShareComputationCircuit,
         sample,
         preset,
         "2",
@@ -277,6 +276,8 @@ macro_rules! e2e_proof_tests {
 e2e_proof_tests! {
     (pk_generation, setup_pk_generation_test()),
     (pk_bfv, setup_pk_bfv_test()),
+    (share_computation_sk, setup_share_computation_sk_test()),
+    (share_computation_e_sm, setup_share_computation_e_sm_test()),
 }
 
 #[tokio::test]

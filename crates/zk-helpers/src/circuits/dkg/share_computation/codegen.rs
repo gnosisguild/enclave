@@ -135,7 +135,7 @@ mod tests {
         )
         .unwrap();
 
-        let artifacts = ShareComputationCircuit::new(DkgInputType::SecretKey)
+        let artifacts = ShareComputationCircuit
             .codegen(BfvPreset::InsecureThreshold512, &sample)
             .unwrap();
 
