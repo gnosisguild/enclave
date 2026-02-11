@@ -269,7 +269,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
         // Progress E3 to KeyPublished stage
-        enclave.onCommitteePublished(e3Id);
+        enclave.onCommitteePublished(e3Id, publicKeyHash);
         emit CommitteePublished(e3Id, nodes, publicKey);
     }
 
