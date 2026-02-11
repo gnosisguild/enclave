@@ -87,7 +87,7 @@ pub trait Provable: Send + Sync {
     ) -> Result<bool, ZkError> {
         if !self.valid_circuits().contains(&proof.circuit) {
             return Err(ZkError::VerifyFailed(format!(
-                "circuit mismatch: expected on of {:?}, got {}",
+                "circuit mismatch: expected one of {:?}, got {}",
                 self.valid_circuits(),
                 proof.circuit
             )));
