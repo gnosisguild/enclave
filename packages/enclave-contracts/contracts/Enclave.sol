@@ -677,7 +677,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @inheritdoc IEnclave
     function onCommitteePublished(
-        uint256 e3Id
+        uint256 e3Id,
+        bytes32 committeePublicKeyHash
     ) external onlyCiphernodeRegistry {
         // DKG complete, key published
         E3Stage current = _e3Stages[e3Id];
@@ -685,6 +686,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             revert InvalidStage(e3Id, E3Stage.CommitteeFinalized, current);
         }
         _e3Stages[e3Id] = E3Stage.KeyPublished;
+
+        e3s[e3Id].committeePublicKey = committeePublicKeyHash;
 
         emit CommitteeFormed(e3Id);
         emit E3StageChanged(
