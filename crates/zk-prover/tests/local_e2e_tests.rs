@@ -22,6 +22,8 @@ use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComput
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::ShareComputationCircuit;
 use e3_zk_helpers::dkg::share_computation::ShareComputationCircuitInput;
+use e3_zk_helpers::dkg::share_encryption::ShareEncryptionCircuit;
+use e3_zk_helpers::dkg::share_encryption::ShareEncryptionCircuitInput;
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
@@ -109,6 +111,85 @@ async fn setup_circuit_fixtures(backend: &ZkBackend, circuit_path: &[&str], fixt
     .await
     .unwrap();
 }
+
+async fn setup_share_encryption_e_sm_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareEncryptionCircuit,
+    ShareEncryptionCircuitInput,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    let sd: e3_fhe_params::PresetSearchDefaults = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "e_sm_share_encryption"],
+        "e_sm_share_encryption",
+    )
+    .await;
+
+    let sample =
+        ShareEncryptionCircuitInput::generate_sample(preset, committee, DkgInputType::SmudgingNoise, sd.z, sd.lambda)
+            .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareEncryptionCircuit,
+        sample,
+        preset,
+        "1",
+    ))
+} 
+
+
+async fn setup_share_encryption_sk_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareEncryptionCircuit,
+    ShareEncryptionCircuitInput,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    let sd: e3_fhe_params::PresetSearchDefaults = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "sk_share_encryption"],
+        "sk_share_encryption",
+    )
+    .await;
+
+    let sample =
+        ShareEncryptionCircuitInput::generate_sample(preset, committee, DkgInputType::SecretKey, sd.z, sd.lambda)
+            .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareEncryptionCircuit,
+        sample,
+        preset,
+        "1",
+    ))
+} 
 
 async fn setup_share_computation_sk_test() -> Option<(
     ZkBackend,
@@ -278,6 +359,8 @@ e2e_proof_tests! {
     (pk_bfv, setup_pk_bfv_test()),
     (share_computation_sk, setup_share_computation_sk_test()),
     (share_computation_e_sm, setup_share_computation_e_sm_test()),
+    (share_encryption_sk, setup_share_encryption_sk_test()),
+    (share_encryption_e_sm, setup_share_encryption_e_sm_test()),
 }
 
 #[tokio::test]

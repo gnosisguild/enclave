@@ -55,10 +55,10 @@ impl ProofType {
         match self {
             ProofType::T0PkBfv => CircuitName::PkBfv,
             ProofType::T1PkGeneration => CircuitName::PkGeneration,
-            ProofType::T1SkShareComputation
-            | ProofType::T1ESmShareComputation
-            | ProofType::T1SkShareEncryption
-            | ProofType::T1ESmShareEncryption => CircuitName::EncShares,
+            ProofType::T1SkShareComputation => CircuitName::SkShareComputation,
+            ProofType::T1ESmShareComputation => CircuitName::ESmShareComputation,
+            ProofType::T1SkShareEncryption => CircuitName::SkShareEncryption,
+            ProofType::T1ESmShareEncryption => CircuitName::ESmShareEncryption,
             ProofType::T2SkShareDecryption | ProofType::T2ESmShareDecryption => {
                 CircuitName::DecShares
             }

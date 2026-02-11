@@ -44,8 +44,10 @@ pub enum CircuitName {
     SkShareComputation,
     /// E_SM share computation proof (T1c).
     ESmShareComputation,
-    /// Encrypted shares proof (T2/T3).
-    EncShares,
+    /// Encrypted sk share proof (T1d).
+    SkShareEncryption,
+    /// Encrypted E_SM share proof (T1e).
+    ESmShareEncryption,
     /// Decryption share proof (T4/T5).
     DecShares,
     /// Public key aggregation proof (T6).
@@ -59,7 +61,8 @@ impl CircuitName {
             CircuitName::PkGeneration => "pk_generation",
             CircuitName::SkShareComputation => "sk_share_computation",
             CircuitName::ESmShareComputation => "e_sm_share_computation",
-            CircuitName::EncShares => "enc_shares",
+            CircuitName::SkShareEncryption => "sk_share_encryption",
+            CircuitName::ESmShareEncryption => "e_sm_share_encryption",
             CircuitName::DecShares => "dec_shares",
             CircuitName::PkAgg => "pk_agg",
         }
@@ -71,7 +74,8 @@ impl CircuitName {
             CircuitName::PkGeneration => "threshold",
             CircuitName::SkShareComputation => "dkg",
             CircuitName::ESmShareComputation => "dkg",
-            CircuitName::EncShares => "threshold",
+            CircuitName::SkShareEncryption => "dkg",
+            CircuitName::ESmShareEncryption => "dkg",
             CircuitName::DecShares => "threshold",
             CircuitName::PkAgg => "threshold",
         }
