@@ -229,16 +229,16 @@ async fn test_pk_generation_commitment_consistency() {
 
     // Recompute commitments from the witness
     let sk_commitment_expected = compute_share_computation_sk_commitment(
-        &computation_output.witness.sk,
+        &computation_output.inputs.sk,
         computation_output.bits.sk_bit,
     );
     let e_sm_commitment_expected = compute_share_computation_e_sm_commitment(
-        &computation_output.witness.e_sm,
+        &computation_output.inputs.e_sm,
         computation_output.bits.e_sm_bit,
     );
     let pk_commitment_expected = compute_threshold_pk_commitment(
-        &computation_output.witness.pk0is,
-        &computation_output.witness.pk1is,
+        &computation_output.inputs.pk0is,
+        &computation_output.inputs.pk1is,
         computation_output.bits.pk_bit,
     );
 
@@ -282,8 +282,8 @@ async fn test_pk_bfv_commitment_consistency() {
     let computation_output =
         PkCircuit::compute(preset, &sample).expect("computation should succeed");
     let commitment_calculated = compute_dkg_pk_commitment(
-        &computation_output.witness.pk0is,
-        &computation_output.witness.pk1is,
+        &computation_output.inputs.pk0is,
+        &computation_output.inputs.pk1is,
         computation_output.bits.pk_bit,
     );
 

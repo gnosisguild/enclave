@@ -11,4 +11,4 @@ pub mod codegen;
 pub mod computation;
 pub mod sample;
 pub use circuit::{ShareEncryptionCircuit, ShareEncryptionCircuitInput};
-pub use computation::{Bits, Bounds, Configs, ShareEncryptionOutput, Witness};
+pub use computation::{Bits, Bounds, Configs, Inputs, ShareEncryptionOutput};

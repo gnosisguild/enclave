@@ -75,7 +75,7 @@ mod tests {
     use crate::{
         computation::Computation,
         threshold::pk_aggregation::computation::Configs,
-        threshold::pk_aggregation::{PkAggregationCircuitInput, Witness},
+        threshold::pk_aggregation::{Inputs, PkAggregationCircuitInput},
         CiphernodesCommitteeSize,
     };
 
@@ -88,11 +88,11 @@ mod tests {
         let configs = Configs::compute(preset, &()).unwrap();
 
         let sample = PkAggregationCircuitInput::generate_sample(preset, committee).unwrap();
-        let witness = Witness::compute(preset, &sample).unwrap();
+        let inputs = Inputs::compute(preset, &sample).unwrap();
 
-        assert_eq!(witness.pk0.len(), sample.committee.h);
-        assert_eq!(witness.pk1.len(), sample.committee.h);
-        assert_eq!(witness.pk0_agg.limbs.len(), configs.l);
-        assert_eq!(witness.pk1_agg.limbs.len(), configs.l);
+        assert_eq!(inputs.pk0.len(), sample.committee.h);
+        assert_eq!(inputs.pk1.len(), sample.committee.h);
+        assert_eq!(inputs.pk0_agg.limbs.len(), configs.l);
+        assert_eq!(inputs.pk1_agg.limbs.len(), configs.l);
     }
 }

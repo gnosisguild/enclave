@@ -46,7 +46,7 @@ impl ShareDecryptionCircuitInput {
             ShareManager::new(committee.n, committee.threshold, threshold_params.clone());
 
         let mut honest_ciphertexts: Vec<Vec<Ciphertext>> = Vec::new();
-        let num_honest = committee.n;
+        let num_honest = committee.h;
         for _ in 0..num_honest {
             let mut party_cts = Vec::new();
             for _ in 0..threshold_params.moduli().len() {
@@ -151,7 +151,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(sample.honest_ciphertexts.len(), committee.n);
+        assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
             BfvPreset::InsecureThreshold512.metadata().degree
@@ -168,7 +168,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(sample.honest_ciphertexts.len(), committee.n);
+        assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
             BfvPreset::InsecureThreshold512.metadata().degree

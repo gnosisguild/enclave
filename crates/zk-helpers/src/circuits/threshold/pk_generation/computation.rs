@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the public key generation circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the public key generation circuit: constants, bounds, bit widths, and inputs.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) a public key. They implement [`Computation`] and are used by codegen.
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
@@ -34,12 +34,12 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`PkGenerationCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`PkGenerationCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
 pub struct PkGenerationComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`PkGenerationCircuit`].
@@ -52,12 +52,12 @@ impl CircuitComputation for PkGenerationCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &input.committee)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, input)?;
 
         Ok(PkGenerationComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -92,7 +92,7 @@ pub struct Bounds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     pub a: CrtPolynomial,
     pub eek: Polynomial,
     pub sk: Polynomial,
@@ -239,7 +239,7 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = PkGenerationCircuitInput;
     type Error = CircuitsErrors;
@@ -346,7 +346,7 @@ impl Computation for Witness {
         eek.reduce(zkp_modulus);
         sk.reduce(zkp_modulus);
 
-        Ok(Witness {
+        Ok(Inputs {
             a: a.clone(),
             eek,
             sk,

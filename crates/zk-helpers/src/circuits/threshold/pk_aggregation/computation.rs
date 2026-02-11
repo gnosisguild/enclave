@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the public key aggregation circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the public key aggregation circuit: constants, bounds, bit widths, and input.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) public key shares and aggregated public key. They implement [`Computation`] and are used by codegen.
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) public key shares and aggregated public key. They implement [`Computation`] and are used by codegen.
 
 use crate::bigint_1d_to_json_values;
 use crate::compute_modulus_bit;
@@ -25,12 +25,12 @@ use num_bigint::BigInt;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`PkAggregationCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`PkAggregationCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
 pub struct PkAggregationComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`PkAggregationCircuit`].
@@ -43,12 +43,12 @@ impl CircuitComputation for PkAggregationCircuit {
     fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
-        let witness = Witness::compute(preset, &input)?;
+        let inputs = Inputs::compute(preset, &input)?;
 
         Ok(PkAggregationComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -73,7 +73,7 @@ pub struct Bounds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     pub expected_threshold_pk_commitments: Vec<BigInt>,
     pub pk0: Vec<CrtPolynomial>,
     pub pk1: Vec<CrtPolynomial>,
@@ -147,7 +147,7 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
     type Input = PkAggregationCircuitInput;
     type Error = CircuitsErrors;
@@ -200,7 +200,7 @@ impl Computation for Witness {
             expected_threshold_pk_commitments.push(commitment);
         }
 
-        Ok(Witness {
+        Ok(Inputs {
             expected_threshold_pk_commitments,
             pk0,
             pk1,

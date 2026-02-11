@@ -57,6 +57,9 @@ pub enum ZkError {
     #[error("Unsupported platform: {os}-{arch}")]
     UnsupportedPlatform { os: String, arch: String },
 
+    #[error("Inputs generation failed: {0}")]
+    InputsGenerationFailed(String),
+
     #[error("Witness generation failed: {0}")]
     WitnessGenerationFailed(String),
 

@@ -18,7 +18,7 @@ use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
 use e3_zk_helpers::circuits::dkg::share_computation::circuit::{
     ShareComputationCircuit, ShareComputationCircuitInput,
 };
-use e3_zk_helpers::codegen::{write_artifacts, CircuitCodegen};
+use e3_zk_helpers::codegen::{write_artifacts, write_toml, CircuitCodegen};
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_decryption::{
     ShareDecryptionCircuit as DkgShareDecryptionCircuit,
@@ -69,14 +69,15 @@ fn clear_terminal() {
     let _ = std::io::stdout().flush();
 }
 
-/// Print a summary of what will be generated (circuit, preset, witness, output, artifacts).
+/// Print a summary of what will be generated (circuit, preset, inputs, output, artifacts).
 fn print_generation_info(
     circuit: &str,
     preset: BfvPreset,
-    has_witness: bool,
+    has_inputs: bool,
     dkg_input_type: DkgInputType,
     output: &std::path::Path,
     write_prover_toml: bool,
+    no_configs: bool,
 ) {
     let meta = preset.metadata();
     println!("  Circuit:  {}", circuit);
@@ -86,9 +87,9 @@ fn print_generation_info(
         meta.degree,
         meta.num_moduli
     );
-    if has_witness {
+    if has_inputs {
         println!(
-            "  Witness:  {}",
+            "  Inputs:  {}",
             match dkg_input_type {
                 DkgInputType::SecretKey => "secret-key",
                 DkgInputType::SmudgingNoise => "smudging-noise",
@@ -97,7 +98,9 @@ fn print_generation_info(
     }
     println!("  Output:   {}", output.display());
     println!("  Artifacts:");
-    if write_prover_toml {
+    if no_configs {
+        println!("    • Prover.toml only (--toml --no-configs)");
+    } else if write_prover_toml {
         println!("    • configs.nr");
         println!("    • Prover.toml");
     } else {
@@ -148,15 +151,18 @@ struct Cli {
     /// Preset: "insecure"|"secure" or λ (2|80). Drives both threshold and DKG params.
     #[arg(long, required_unless_present = "list_circuits")]
     preset: Option<String>,
-    /// For share-computation only: witness type "secret-key" or "smudging-noise". Required when writing Prover.toml for share-computation. Ignored for pk (always secret key).
+    /// For share-computation only: inputs type "secret-key" or "smudging-noise". Required when writing Prover.toml for share-computation. Ignored for pk (always secret key).
     #[arg(long)]
-    witness: Option<String>,
+    inputs: Option<String>,
     /// Output directory for generated artifacts.
     #[arg(long, default_value = "output")]
     output: PathBuf,
     /// Also write Prover.toml (default: configs.nr only).
     #[arg(long, default_value = "false")]
     toml: bool,
+    /// When used with --toml: do not write configs.nr (e.g. for benchmarks where circuits use lib configs).
+    #[arg(long, default_value = "false")]
+    no_configs: bool,
 }
 
 fn main() -> Result<()> {
@@ -220,24 +226,25 @@ fn main() -> Result<()> {
     }
 
     let write_prover_toml = args.toml;
-    // DKG circuits have a witness-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
-    let has_witness_type = circuit_meta.name() == ShareComputationCircuit::NAME
+    let no_configs = args.no_configs && args.toml;
+    // DKG circuits have a inputs-type choice (secret-key vs smudging-noise) excluding `pk` or C0 circuit.
+    let has_inputs_type = circuit_meta.name() == ShareComputationCircuit::NAME
         || circuit_meta.name() == ShareEncryptionCircuit::NAME
         || circuit_meta.name() == DkgShareDecryptionCircuit::NAME;
 
-    let dkg_input_type = if has_witness_type {
-        // Share-computation: require --witness when generating Prover.toml; default secret-key for configs-only.
-        let witness_str = if !args.toml {
-            args.witness.as_deref().unwrap_or("secret-key")
+    let dkg_input_type = if has_inputs_type {
+        // Share-computation: require --inputs when generating Prover.toml; default secret-key for configs-only.
+        let inputs_str = if !args.toml {
+            args.inputs.as_deref().unwrap_or("secret-key")
         } else {
-            args.witness.as_deref().ok_or_else(|| {
+            args.inputs.as_deref().ok_or_else(|| {
                 anyhow!(
-                    "circuit {} requires --witness (secret-key or smudging-noise) when writing Prover.toml",
+                    "circuit {} requires --inputs (secret-key or smudging-noise) when writing Prover.toml",
                     circuit
                 )
             })?
         };
-        let arg = parse_input_type(witness_str)?;
+        let arg = parse_input_type(inputs_str)?;
         match arg {
             DkgInputTypeArg::SecretKey => DkgInputType::SecretKey,
             DkgInputTypeArg::SmudgingNoise => DkgInputType::SmudgingNoise,
@@ -251,10 +258,11 @@ fn main() -> Result<()> {
     print_generation_info(
         &circuit,
         preset,
-        has_witness_type,
+        has_inputs_type,
         dkg_input_type.clone(),
         &args.output,
         write_prover_toml,
+        no_configs,
     );
 
     run_with_spinner(|| {
@@ -337,12 +345,16 @@ fn main() -> Result<()> {
             name => return Err(anyhow!("circuit {} not yet implemented", name)),
         };
 
-        let toml = if write_prover_toml {
-            Some(&artifacts.toml)
+        if no_configs {
+            write_toml(&artifacts.toml, Some(args.output.as_path()))?;
         } else {
-            None
-        };
-        write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+            let toml = if write_prover_toml {
+                Some(&artifacts.toml)
+            } else {
+                None
+            };
+            write_artifacts(toml, &artifacts.configs, Some(args.output.as_path()))?;
+        }
         Ok(())
     })?;
 

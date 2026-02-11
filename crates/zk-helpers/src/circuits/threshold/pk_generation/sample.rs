@@ -83,7 +83,7 @@ impl PkGenerationCircuitInput {
 mod tests {
     use crate::{
         computation::Computation,
-        threshold::pk_generation::{PkGenerationCircuitInput, Witness},
+        threshold::pk_generation::{Inputs, PkGenerationCircuitInput},
         CiphernodesCommitteeSize,
     };
 
@@ -95,12 +95,12 @@ mod tests {
         let sample =
             PkGenerationCircuitInput::generate_sample(BfvPreset::InsecureThreshold512, committee)
                 .unwrap();
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
-        assert_eq!(witness.pk0is.limbs.len(), 2);
-        assert_eq!(witness.a.limbs.len(), 2);
-        assert_eq!(witness.e_sm.limbs.len(), 2);
-        assert_eq!(witness.r1is.limbs.len(), 2);
-        assert_eq!(witness.r2is.limbs.len(), 2);
+        assert_eq!(inputs.pk0is.limbs.len(), 2);
+        assert_eq!(inputs.a.limbs.len(), 2);
+        assert_eq!(inputs.e_sm.limbs.len(), 2);
+        assert_eq!(inputs.r1is.limbs.len(), 2);
+        assert_eq!(inputs.r2is.limbs.len(), 2);
     }
 }
