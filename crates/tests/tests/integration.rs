@@ -88,6 +88,8 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
 
         #[cfg(unix)]
         std::os::unix::fs::symlink(&bb, &bb_binary).unwrap();
+        #[cfg(not(unix))]
+        compile_error!("Integration tests require unix symlink support");
 
         // Copy circuit fixtures from the zk-prover crate's test fixtures
         let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

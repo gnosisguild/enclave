@@ -22,12 +22,14 @@
 //! ```rust,ignore
 //! use e3_zk_prover::{ZkBackend, setup_zk_actors};
 //! use e3_events::BusHandle;
+//! use alloy::signers::local::PrivateKeySigner;
 //!
 //! let bus = BusHandle::default();
 //! let backend = ZkBackend::with_default_dir().await?;
+//! let signer = PrivateKeySigner::random();
 //!
 //! // Setup all actors with proper separation of concerns
-//! setup_zk_actors(&bus, &backend);
+//! setup_zk_actors(&bus, &backend, signer);
 //! ```
 
 pub mod proof_request;
@@ -50,7 +52,11 @@ use crate::ZkBackend;
 ///
 /// Requires a `ZkBackend` for proof generation/verification and a
 /// `PrivateKeySigner` for signing proofs (fault attribution).
-pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeySigner) -> ZkActors {
+pub fn setup_zk_actors(
+    bus: &BusHandle,
+    backend: &ZkBackend,
+    signer: PrivateKeySigner,
+) -> ZkActors {
     let zk_actor = ZkActor::new(backend).start();
     let verifier = zk_actor.clone().recipient();
 
