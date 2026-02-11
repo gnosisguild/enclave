@@ -19,7 +19,7 @@ impl Circuit for UserDataEncryptionCircuit {
     const DKG_INPUT_TYPE: Option<DkgInputType> = None;
 }
 
-pub struct UserDataEncryptionCircuitInput {
+pub struct UserDataEncryptionCircuitData {
     pub public_key: PublicKey,
     pub plaintext: Plaintext,
 }

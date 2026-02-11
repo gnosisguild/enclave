@@ -22,7 +22,7 @@ impl Circuit for PkAggregationCircuit {
 }
 
 #[derive(Debug, Clone)]
-pub struct PkAggregationCircuitInput {
+pub struct PkAggregationCircuitData {
     pub committee: CiphernodesCommittee,
     pub public_key: PublicKey,
     pub pk0_shares: Vec<CrtPolynomial>,

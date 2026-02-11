@@ -11,7 +11,7 @@ use e3_fhe_params::BfvPreset;
 use crate::circuits::computation::Computation;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
 use crate::threshold::decrypted_shares_aggregation::computation::{Configs, Inputs};
-use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput;
+use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
 use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
@@ -20,11 +20,11 @@ use crate::{Artifacts, CodegenConfigs, CodegenToml};
 /// Implementation of [`CircuitCodegen`] for [`DecryptedSharesAggregationCircuit`].
 impl CircuitCodegen for DecryptedSharesAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = DecryptedSharesAggregationCircuitInput;
+    type Data = DecryptedSharesAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let inputs = Inputs::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(inputs)?;
@@ -113,7 +113,7 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let input =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
         let circuit = DecryptedSharesAggregationCircuit;
 
         let artifacts = circuit.codegen(preset, &input).unwrap();

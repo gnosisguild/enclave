@@ -85,10 +85,12 @@ export const requestCommittee = task(
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
-      const { deployAndSaveEnclave } =
-        await import("../scripts/deployAndSave/enclave");
-      const { deployAndSaveMockStableToken } =
-        await import("../scripts/deployAndSave/mockStableToken");
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+      const { deployAndSaveMockStableToken } = await import(
+        "../scripts/deployAndSave/mockStableToken"
+      );
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -208,8 +210,9 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
   })
   .setAction(async () => ({
     default: async ({ e3Address }, hre) => {
-      const { deployAndSaveEnclave } =
-        await import("../scripts/deployAndSave/enclave");
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -255,11 +258,13 @@ export const publishCommittee = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, nodes, publicKey, publicKeyHash }, hre) => {
-      const { deployAndSaveCiphernodeRegistryOwnable } =
-        await import("../scripts/deployAndSave/ciphernodeRegistryOwnable");
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
 
-      const { deployAndSavePoseidonT3 } =
-        await import("../scripts/deployAndSave/poseidonT3");
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
       const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
       const { ciphernodeRegistry } =
@@ -331,8 +336,9 @@ export const publishCiphertext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
-      const { deployAndSaveEnclave } =
-        await import("../scripts/deployAndSave/enclave");
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
 
       const { enclave } = await deployAndSaveEnclave({
         hre,
@@ -402,8 +408,9 @@ export const publishPlaintext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
-      const { deployAndSaveEnclave } =
-        await import("../scripts/deployAndSave/enclave");
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
 
       const { enclave } = await deployAndSaveEnclave({
         hre,

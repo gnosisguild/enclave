@@ -15,7 +15,7 @@ use crate::compute_pk_aggregation_commitment;
 use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
-use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitInput;
+use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -36,14 +36,14 @@ pub struct PkAggregationComputationOutput {
 /// Implementation of [`CircuitComputation`] for [`PkAggregationCircuit`].
 impl CircuitComputation for PkAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = PkAggregationCircuitInput;
+    type Data = PkAggregationCircuitData;
     type Output = PkAggregationComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &())?;
-        let inputs = Inputs::compute(preset, &input)?;
+        let inputs = Inputs::compute(preset, &data)?;
 
         Ok(PkAggregationComputationOutput {
             bounds,
@@ -83,10 +83,10 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -107,10 +107,10 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -122,10 +122,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -149,10 +149,10 @@ impl Computation for Bounds {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = PkAggregationCircuitInput;
+    type Data = PkAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -165,12 +165,12 @@ impl Computation for Inputs {
         // key is also in [0, q_i). Centered representatives would make the sum before reduction
         // inconsistent and could break the aggregation check.
 
-        let mut pk0: Vec<CrtPolynomial> = input.pk0_shares.clone();
+        let mut pk0: Vec<CrtPolynomial> = data.pk0_shares.clone();
         // pk1 is the same (common random polynomial a) for all parties
-        let mut pk1: Vec<CrtPolynomial> = (0..input.committee.h).map(|_| input.a.clone()).collect();
+        let mut pk1: Vec<CrtPolynomial> = (0..data.committee.h).map(|_| data.a.clone()).collect();
         // Extract pk0_agg from aggregated public key
-        let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&input.public_key.c.c[0]);
-        let mut pk1_agg = input.a.clone();
+        let mut pk0_agg = CrtPolynomial::from_fhe_polynomial(&data.public_key.c.c[0]);
+        let mut pk1_agg = data.a.clone();
 
         // Compute expected_threshold_pk_commitments for each honest party
         // Each commitment is computed from pk0[i] and pk1[i] for party i
@@ -181,11 +181,11 @@ impl Computation for Inputs {
         pk0_agg.reduce_uniform(zkp_modulus);
 
         pk1_agg.reverse();
-        pk1_agg.scalar_mul(&BigInt::from(input.committee.h));
+        pk1_agg.scalar_mul(&BigInt::from(data.committee.h));
         pk1_agg.reduce(moduli)?;
         pk1_agg.reduce_uniform(zkp_modulus);
 
-        for party_index in 0..input.committee.h {
+        for party_index in 0..data.committee.h {
             pk0[party_index].reverse();
             pk0[party_index].reduce(moduli)?;
             pk0[party_index].reduce_uniform(zkp_modulus);

@@ -18,7 +18,7 @@ use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
-use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
+use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::utils::compute_modulus_bit;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
@@ -56,14 +56,14 @@ pub struct UserDataEncryptionComputationOutput {
 /// Implementation of [`CircuitComputation`] for [`UserDataEncryptionCircuit`].
 impl CircuitComputation for UserDataEncryptionCircuit {
     type Preset = BfvPreset;
-    type Input = UserDataEncryptionCircuitInput;
+    type Data = UserDataEncryptionCircuitData;
     type Output = UserDataEncryptionComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let inputs = Inputs::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(UserDataEncryptionComputationOutput {
             bounds,
@@ -136,10 +136,10 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -172,45 +172,45 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
-        let max_pk_bound = input.pk_bounds.iter().max().unwrap();
+    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+        let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
         let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
         // We can safely assume that the ct bound is the same as the pk bound.
         let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(input.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(input.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(input.e1_bound.clone()));
+        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
+        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
+        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
 
         // For k1, use the maximum of low and up bounds
-        let k1_low_bit = calculate_bit_width(BigInt::from(input.k1_low_bound.clone()));
-        let k1_up_bit = calculate_bit_width(BigInt::from(input.k1_up_bound.clone()));
+        let k1_low_bit = calculate_bit_width(BigInt::from(data.k1_low_bound.clone()));
+        let k1_up_bit = calculate_bit_width(BigInt::from(data.k1_up_bound.clone()));
         let k_bit = k1_low_bit.max(k1_up_bit);
 
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
-        for bound in input.r1_low_bounds.iter().chain(input.r1_up_bounds.iter()) {
+        for bound in data.r1_low_bounds.iter().chain(data.r1_up_bounds.iter()) {
             r1_bit = r1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
         // For r2, use the maximum of all bounds
         let mut r2_bit = 0;
-        for bound in &input.r2_bounds {
+        for bound in &data.r2_bounds {
             r2_bit = r2_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
         // For p1, use the maximum of all bounds
         let mut p1_bit = 0;
-        for bound in &input.p1_bounds {
+        for bound in &data.p1_bounds {
             p1_bit = p1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
         // For p2, use the maximum of all bounds
         let mut p2_bit = 0;
-        for bound in &input.p2_bounds {
+        for bound in &data.p2_bounds {
             p2_bit = p2_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
@@ -231,10 +231,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -354,22 +354,22 @@ impl Computation for Bounds {
 
 impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = UserDataEncryptionCircuitInput;
+    type Data = UserDataEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let pk_bit = compute_modulus_bit(&threshold_params);
 
-        let pk = input.public_key.clone();
-        let pt = input.plaintext.clone();
+        let pk = data.public_key.clone();
+        let pt = data.plaintext.clone();
 
         // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let (ct, u_rns, e0_rns, e1_rns) = input
+        let (ct, u_rns, e0_rns, e1_rns) = data
             .public_key
-            .try_encrypt_extended(&input.plaintext, &mut thread_rng())?;
+            .try_encrypt_extended(&data.plaintext, &mut thread_rng())?;
 
         // Context and plaintext modulus (use same ctx for e0 reconstruction and loop).
         let ctx = threshold_params.ctx_at_level(pt.level())?;
