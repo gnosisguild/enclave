@@ -68,7 +68,10 @@ impl ZkBackend {
 
         let home_dir = base_dirs.home_dir();
         let noir_dir = home_dir.join(".enclave").join("noir");
-        let bb_binary = noir_dir.join("bin").join("bb");
+
+        let bb_binary = std::env::var("DANGEROUSLY_OVERRIDE_BB")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| noir_dir.join("bin").join("bb"));
         let circuits_dir = noir_dir.join("circuits");
         let work_dir = noir_dir.join("work").join(node_name);
 

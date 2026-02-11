@@ -6,7 +6,7 @@
 
 use path_clean::clean;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PathsEngine {

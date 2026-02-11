@@ -258,7 +258,9 @@ impl AppConfig {
 
     /// Get the bb binary path
     pub fn bb_binary(&self) -> PathBuf {
-        self.paths.bb_binary()
+        std::env::var("DANGEROUSLY_OVERRIDE_BB")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| self.paths.bb_binary())
     }
 
     /// Get the circuits directory
@@ -504,6 +506,8 @@ pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
     use crate::rpc::RpcAuth;
     use figment::Jail;
@@ -763,7 +767,11 @@ chains:
             config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
             assert_eq!(chain.rpc_auth, RpcAuth::Bearer("testToken".to_string()));
-
+            assert_eq!(
+                config.bb_binary(),
+                PathBuf::from_str(&format!("{}/.config/enclave/.enclave/noir/bin/bb", home))
+                    .unwrap()
+            );
             Ok(())
         });
     }
@@ -776,6 +784,7 @@ chains:
             jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
             jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
+            jail.set_env("DANGEROUSLY_OVERRIDE_BB", "/path/to/bb");
             jail.set_env("TEST_PASSWORD", "envPassword");
             jail.set_env(
                 "TEST_CONTRACT_ADDRESS",
@@ -820,6 +829,11 @@ chains:
             assert_eq!(
                 chain.contracts.enclave.address_str(),
                 "0x1234567890123456789012345678901234567890"
+            );
+
+            assert_eq!(
+                config.bb_binary(),
+                PathBuf::from_str("/path/to/bb").unwrap()
             );
 
             Ok(())
