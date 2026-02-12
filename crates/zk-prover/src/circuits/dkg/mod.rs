@@ -5,3 +5,5 @@
 // or FITNESS FOR A PARTICULAR PURPOSE
 
 mod pk;
+mod share_computation;
+mod share_encryption;

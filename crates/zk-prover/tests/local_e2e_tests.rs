@@ -17,6 +17,9 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
+use e3_zk_helpers::computation::DkgInputType;
+use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
@@ -24,10 +27,12 @@ use e3_zk_helpers::{
     compute_threshold_pk_commitment,
 };
 use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
-use num_bigint::{BigInt, Sign};
 use std::path::PathBuf;
 use tempfile::TempDir;
 use tokio::{fs, process::Command};
+
+use crate::common::extract_field;
+use crate::common::extract_field_from_end;
 
 async fn find_bb() -> Option<PathBuf> {
     if let Ok(output) = Command::new("which").arg("bb").output().await {
@@ -101,6 +106,173 @@ async fn setup_circuit_fixtures(backend: &ZkBackend, circuit_path: &[&str], fixt
     )
     .await
     .unwrap();
+}
+
+async fn setup_share_encryption_e_sm_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareEncryptionCircuit,
+    ShareEncryptionCircuitData,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    let sd: e3_fhe_params::PresetSearchDefaults =
+        BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "e_sm_share_encryption"],
+        "e_sm_share_encryption",
+    )
+    .await;
+
+    let sample = ShareEncryptionCircuitData::generate_sample(
+        preset,
+        committee,
+        DkgInputType::SmudgingNoise,
+        sd.z,
+        sd.lambda,
+    )
+    .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareEncryptionCircuit,
+        sample,
+        preset,
+        "1",
+    ))
+}
+
+async fn setup_share_encryption_sk_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareEncryptionCircuit,
+    ShareEncryptionCircuitData,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    let sd: e3_fhe_params::PresetSearchDefaults =
+        BfvPreset::InsecureThreshold512.search_defaults().unwrap();
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "sk_share_encryption"],
+        "sk_share_encryption",
+    )
+    .await;
+
+    let sample = ShareEncryptionCircuitData::generate_sample(
+        preset,
+        committee,
+        DkgInputType::SecretKey,
+        sd.z,
+        sd.lambda,
+    )
+    .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareEncryptionCircuit,
+        sample,
+        preset,
+        "1",
+    ))
+}
+
+async fn setup_share_computation_sk_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareComputationCircuit,
+    ShareComputationCircuitData,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "sk_share_computation"],
+        "sk_share_computation",
+    )
+    .await;
+
+    let sample =
+        ShareComputationCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
+            .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareComputationCircuit,
+        sample,
+        preset,
+        "1",
+    ))
+}
+
+async fn setup_share_computation_e_sm_test() -> Option<(
+    ZkBackend,
+    tempfile::TempDir,
+    ZkProver,
+    ShareComputationCircuit,
+    ShareComputationCircuitData,
+    BfvPreset,
+    &'static str,
+)> {
+    let committee = CiphernodesCommitteeSize::Small.values();
+    let preset = BfvPreset::InsecureThreshold512;
+    let bb = find_bb().await?;
+    let (backend, temp) = setup_test_prover(&bb).await;
+
+    setup_circuit_fixtures(
+        &backend,
+        &["dkg", "e_sm_share_computation"],
+        "e_sm_share_computation",
+    )
+    .await;
+
+    let sample = ShareComputationCircuitData::generate_sample(
+        preset,
+        committee,
+        DkgInputType::SmudgingNoise,
+    )
+    .ok()?;
+    let prover = ZkProver::new(&backend);
+
+    Some((
+        backend,
+        temp,
+        prover,
+        ShareComputationCircuit,
+        sample,
+        preset,
+        "2",
+    ))
 }
 
 async fn setup_pk_generation_test() -> Option<(
@@ -192,6 +364,10 @@ macro_rules! e2e_proof_tests {
 e2e_proof_tests! {
     (pk_generation, setup_pk_generation_test()),
     (pk_bfv, setup_pk_bfv_test()),
+    (share_computation_sk, setup_share_computation_sk_test()),
+    (share_computation_e_sm, setup_share_computation_e_sm_test()),
+    (share_encryption_sk, setup_share_encryption_sk_test()),
+    (share_encryption_e_sm, setup_share_encryption_e_sm_test()),
 }
 
 #[tokio::test]
@@ -209,25 +385,10 @@ async fn test_pk_generation_commitment_consistency() {
 
     let computation_output = PkGenerationCircuit::compute(preset, &sample).unwrap();
 
-    let signals = &proof.public_signals;
     // Each commitment is represented as a single field element (32 bytes), and there are 3 commitments at the end of the public signals
-    let field_size: usize = 32;
-    let total_fields = signals.len() / field_size;
-    assert_eq!(total_fields, 1027);
-
-    // The 3 commitments are the last 3 field elements
-    let offset = (total_fields - 3) * field_size;
-
-    let sk_commitment_from_proof =
-        BigInt::from_bytes_be(Sign::Plus, &signals[offset..offset + field_size]);
-    let pk_commitment_from_proof = BigInt::from_bytes_be(
-        Sign::Plus,
-        &signals[offset + field_size..offset + 2 * field_size],
-    );
-    let e_sm_commitment_from_proof = BigInt::from_bytes_be(
-        Sign::Plus,
-        &signals[offset + 2 * field_size..offset + 3 * field_size],
-    );
+    let sk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 2);
+    let pk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 1);
+    let e_sm_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
 
     // Recompute commitments from the witness
     let sk_commitment_expected = compute_share_computation_sk_commitment(
@@ -288,6 +449,64 @@ async fn test_pk_bfv_commitment_consistency() {
         &computation_output.inputs.pk1is,
         computation_output.bits.pk_bit,
     );
+
+    assert_eq!(
+        commitment_from_proof, commitment_calculated,
+        "Commitment from proof must match independently calculated commitment"
+    );
+
+    prover.cleanup(e3_id).unwrap();
+}
+
+#[tokio::test]
+async fn test_share_computation_sk_commitment_consistency() {
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+        setup_share_computation_sk_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let proof = circuit
+        .prove(&prover, &preset, &sample, e3_id)
+        .expect("proof generation should succeed");
+
+    // Verify the commitment from the proof is a valid field element
+    let commitment_from_proof = extract_field(&proof.public_signals, 0);
+
+    // Compute the commitment independently to ensure consistency
+    let computation_output =
+        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
+    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
+
+    assert_eq!(
+        commitment_from_proof, commitment_calculated,
+        "Commitment from proof must match independently calculated commitment"
+    );
+
+    prover.cleanup(e3_id).unwrap();
+}
+
+#[tokio::test]
+async fn test_share_computation_e_sm_commitment_consistency() {
+    let Some((_backend, _temp, prover, circuit, sample, preset, e3_id)) =
+        setup_share_computation_e_sm_test().await
+    else {
+        println!("skipping: bb not found");
+        return;
+    };
+
+    let proof = circuit
+        .prove(&prover, &preset, &sample, e3_id)
+        .expect("proof generation should succeed");
+
+    // Verify the commitment from the proof is a valid field element
+    let commitment_from_proof = extract_field(&proof.public_signals, 0);
+
+    // Compute the commitment independently to ensure consistency
+    let computation_output =
+        ShareComputationCircuit::compute(preset, &sample).expect("computation should succeed");
+    let commitment_calculated = computation_output.inputs.expected_secret_commitment.clone();
 
     assert_eq!(
         commitment_from_proof, commitment_calculated,
