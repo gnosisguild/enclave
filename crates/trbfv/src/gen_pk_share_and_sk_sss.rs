@@ -16,10 +16,11 @@ use e3_utils::{utility_types::ArcBytes, SharedRng};
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
-    trbfv::ShareManager,
+    trbfv::{ShareManager, TRBFV},
 };
 use fhe_traits::Serialize as FheSerialize;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -28,11 +29,17 @@ pub struct GenPkShareAndSkSssRequest {
     pub trbfv_config: TrBFVConfig,
     /// Crp
     pub crp: ArcBytes,
+    /// Statistical security parameter λ for smudging noise generation.
+    pub lambda: usize,
+    /// Number of ciphertexts (z) for smudging noise generation.
+    pub num_ciphertexts: usize,
 }
 
 struct InnerRequest {
     pub trbfv_config: TrBFVConfig,
     pub crp: CommonRandomPoly,
+    pub lambda: usize,
+    pub num_ciphertexts: usize,
 }
 
 impl TryFrom<GenPkShareAndSkSssRequest> for InnerRequest {
@@ -43,6 +50,8 @@ impl TryFrom<GenPkShareAndSkSssRequest> for InnerRequest {
         Ok(InnerRequest {
             trbfv_config: value.trbfv_config,
             crp,
+            lambda: value.lambda,
+            num_ciphertexts: value.num_ciphertexts,
         })
     }
 }
@@ -53,6 +62,16 @@ pub struct GenPkShareAndSkSssResponse {
     pub pk_share: ArcBytes,
     /// SecretKey Shamir Shares for other parties
     pub sk_sss: Encrypted<SharedSecret>,
+    /// Raw pk0 share polynomial (RNS form) for ZK proof generation (T1a).
+    pub pk0_share_raw: ArcBytes,
+    /// Raw common random polynomial (RNS form) for ZK proof generation (T1a).
+    pub a_raw: ArcBytes,
+    /// Raw secret key polynomial (RNS form) for ZK proof generation (T1a).
+    pub sk_raw: ArcBytes,
+    /// Raw error polynomial from key generation (RNS form) for ZK proof generation (T1a).
+    pub eek_raw: ArcBytes,
+    /// Raw smudging noise polynomial (RNS form) for ZK proof generation (C1).
+    pub e_sm_raw: ArcBytes,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
@@ -62,15 +81,33 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = ArcBytes::from_bytes(&value.pk_share.to_bytes());
         let sk_sss = Encrypted::new(value.sk_sss, cipher)?;
-        Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
+        Ok(GenPkShareAndSkSssResponse { 
+            pk_share, 
+            sk_sss,
+            pk0_share_raw: value.pk0_share_raw,
+            a_raw: value.a_raw,
+            sk_raw: value.sk_raw,
+            eek_raw: value.eek_raw,
+            e_sm_raw: value.e_sm_raw,
+        })
     }
 }
 
 struct InnerResponse {
-    /// PublicKey share for this node
+    /// Aggregation-compatible PublicKeyShare for this node.
     pub pk_share: PublicKeyShare,
-    /// SecretKey Shamir Shares for other parties
+    /// Secret key Shamir shares for other parties.
     pub sk_sss: SharedSecret,
+    /// Raw pk0 share polynomial bytes for ZK proof.
+    pub pk0_share_raw: ArcBytes,
+    /// Raw CRP polynomial bytes for ZK proof.
+    pub a_raw: ArcBytes,
+    /// Raw secret key polynomial bytes for ZK proof.
+    pub sk_raw: ArcBytes,
+    /// Raw error polynomial bytes for ZK proof.
+    pub eek_raw: ArcBytes,
+    /// Raw smudging noise polynomial bytes for ZK proof.
+    pub e_sm_raw: ArcBytes,
 }
 
 pub fn gen_pk_share_and_sk_sss(
@@ -91,7 +128,26 @@ pub fn gen_pk_share_and_sk_sss(
         num_ciphernodes, threshold
     );
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
-    let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
+    let (pk0_share, a, sk_poly, eek) = { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
+
+    let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;
+
+    // Generate smudging noise
+    let trbfv = TRBFV::new(num_ciphernodes as usize, threshold as usize, params.clone())?;
+    let share_manager_for_esm =
+        ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
+    let esi_coeffs = trbfv.generate_smudging_error(
+        req.num_ciphertexts,
+        req.lambda,
+        &mut *rng.lock().unwrap(),
+    )?;
+    let e_sm_rns = share_manager_for_esm.bigints_to_poly(&esi_coeffs)?;
+    let e_sm_raw = ArcBytes::from_bytes(&e_sm_rns.deref().to_bytes());
+
+    let pk0_share_raw = ArcBytes::from_bytes(&pk0_share.to_bytes());
+    let a_raw = ArcBytes::from_bytes(&a.to_bytes());
+    let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
+    let eek_raw = ArcBytes::from_bytes(&eek.to_bytes());
 
     let mut share_manager =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
@@ -103,5 +159,13 @@ pub fn gen_pk_share_and_sk_sss(
         share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())?
     });
 
-    (InnerResponse { pk_share, sk_sss }, cipher).try_into()
+    (InnerResponse { 
+        pk_share, 
+        sk_sss,
+        pk0_share_raw,
+        a_raw,
+        sk_raw,
+        eek_raw,
+        e_sm_raw,
+    }, cipher).try_into()
 }

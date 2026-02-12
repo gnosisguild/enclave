@@ -363,7 +363,18 @@ fn handle_zk_request(
         ZkRequest::PkBfv(req) => timefunc("zk_pk_bfv", id, || {
             handle_pk_bfv_proof(&prover, req, request.clone())
         }),
+        ZkRequest::PkGeneration(req) => timefunc("zk_pk_generation", id, || {
+            handle_pk_generation_proof(&prover, req, request.clone())
+        }),
     }
+}
+
+fn handle_pk_generation_proof(
+    prover: &ZkProver,
+    req: PkBfvProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    
 }
 
 fn handle_pk_bfv_proof(

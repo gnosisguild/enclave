@@ -79,6 +79,7 @@ pub struct GeneratingThresholdShareData {
     pk_share: Option<ArcBytes>,
     sk_sss: Option<Encrypted<SharedSecret>>,
     esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
+    pk_generation_proof: Option<Proof>,
     sk_bfv: SensitiveBytes,
     pk_bfv: ArcBytes,
     collected_encryption_keys: Vec<Arc<EncryptionKey>>,
@@ -418,7 +419,12 @@ impl ThresholdKeyshare {
                 }
                 _ => Ok(()),
             },
-            ComputeResponseKind::Zk(_) => Ok(()),
+            ComputeResponseKind::Zk(zk) => match zk {
+                ZkResponse::PkGeneration(res) => {
+                    self.handle_pk_generation_proof_response(res.proof.clone())
+                }
+                _ => Ok(()),
+            },
         }
     }
 
@@ -499,6 +505,7 @@ impl ThresholdKeyshare {
                     sk_sss: None,
                     pk_share: None,
                     esi_sss: None,
+                    pk_generation_proof: None,
                     sk_bfv: current.sk_bfv,
                     pk_bfv: current.pk_bfv,
                     collected_encryption_keys: msg.keys,
@@ -569,9 +576,9 @@ impl ThresholdKeyshare {
             info!("try_store_esi_sss");
 
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            let next = match (current.pk_share, current.sk_sss) {
+            let next = match (current.pk_share, current.sk_sss, current.pk_generation_proof) {
                 // If the other shares are here then transition to aggregation
-                (Some(pk_share), Some(sk_sss)) => {
+                (Some(pk_share), Some(sk_sss), Some(_proof)) => {
                     K::AggregatingDecryptionKey(AggregatingDecryptionKey {
                         esi_sss,
                         pk_share,
@@ -581,15 +588,10 @@ impl ThresholdKeyshare {
                     })
                 }
                 // If the other shares are not here yet then don't transition
-                (None, None) => K::GeneratingThresholdShare(GeneratingThresholdShareData {
+                _ => K::GeneratingThresholdShare(GeneratingThresholdShareData {
                     esi_sss: Some(esi_sss),
-                    pk_share: None,
-                    sk_sss: None,
-                    sk_bfv: current.sk_bfv,
-                    pk_bfv: current.pk_bfv,
-                    collected_encryption_keys: current.collected_encryption_keys,
+                    ..current
                 }),
-                _ => bail!("Inconsistent state!"),
             };
 
             s.new_state(next)
@@ -628,9 +630,19 @@ impl ThresholdKeyshare {
             )
             .to_bytes(),
         );
+
+        let threshold_preset = self
+            .share_enc_preset
+            .threshold_counterpart()
+            .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", self.share_enc_preset))?;
+        let metadata = threshold_preset.metadata();
+        let defaults = threshold_preset
+            .search_defaults()
+            .ok_or_else(|| anyhow!("No search defaults for {:?}", threshold_preset))?;
+
         let event = ComputeRequest::trbfv(
             TrBFVRequest::GenPkShareAndSkSss(
-                GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
+                GenPkShareAndSkSssRequest { trbfv_config, crp, lambda: defaults.lambda as usize, num_ciphertexts: defaults.z as usize }.into(),
             ),
             CorrelationId::new(),
             e3_id,
@@ -656,30 +668,59 @@ impl ThresholdKeyshare {
         self.state.try_mutate(&ec, |s| {
             info!("try_store_pk_share_and_sk_sss");
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            let next = match current.esi_sss {
-                // If the esi shares are here then transition to aggregation
-                Some(esi_sss) => {
+            s.new_state(KeyshareState::GeneratingThresholdShare(
+                GeneratingThresholdShareData {
+                    pk_share: Some(pk_share),
+                    sk_sss: Some(sk_sss),
+                    ..current
+                },
+            ))
+        })?;
+
+        // Fire ZK proof request for PK generation (T1a)
+        let state = self.state.try_get()?;
+        let e3_id = state.e3_id.clone();
+
+        self.bus.publish(ComputeRequest::zk(
+            ZkRequest::PkGeneration(PkGenerationProofRequest::new(
+                output.pk0_share_raw,
+                output.a_raw,
+                output.sk_raw,
+                output.eek_raw,
+                self.share_enc_preset,
+                self.comm
+            )),
+            CorrelationId::new(),
+            e3_id,
+        ))?;
+
+        Ok(())
+    }
+
+    pub fn handle_pk_generation_proof_response(&mut self, proof: Proof) -> Result<()> {
+        self.state.try_mutate(|s| {
+            info!("try_store_pk_generation_proof");
+            let current: GeneratingThresholdShareData = s.clone().try_into()?;
+    
+            let next = match (&current.pk_share, &current.sk_sss, &current.esi_sss) {
+                (Some(pk_share), Some(sk_sss), Some(esi_sss)) => {
                     KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
-                        esi_sss,
-                        pk_share,
-                        sk_sss,
+                        pk_share: pk_share.clone(),
+                        sk_sss: sk_sss.clone(),
+                        esi_sss: esi_sss.clone(),
                         sk_bfv: current.sk_bfv,
                         collected_encryption_keys: current.collected_encryption_keys,
                     })
                 }
-                // If esi shares are not here yet then don't transition
-                None => KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
-                    esi_sss: None,
-                    pk_share: Some(pk_share),
-                    sk_sss: Some(sk_sss),
-                    sk_bfv: current.sk_bfv,
-                    pk_bfv: current.pk_bfv,
-                    collected_encryption_keys: current.collected_encryption_keys,
+                _ => KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
+                    pk_generation_proof: Some(proof),
+                    ..current
                 }),
             };
+    
             s.new_state(next)
         })?;
-
+    
         if let Some(ThresholdKeyshareState {
             state: KeyshareState::AggregatingDecryptionKey { .. },
             ..
