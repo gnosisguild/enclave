@@ -11,11 +11,6 @@ overrides:
   undici-types: 6.19.8
   viem: 2.38.6
 
-patchedDependencies:
-  '@aztec/bb.js@3.0.0-nightly.20251104':
-    hash: 9b211b3c4c21b184471aa037477136fed4b5f827a57f508ca07a2752d02097b4
-    path: examples/CRISP/patches/@aztec__bb.js@3.0.0-nightly.20251104.patch
-
 importers:
 
   .:
@@ -352,7 +347,7 @@ importers:
     dependencies:
       '@aztec/bb.js':
         specifier: 3.0.0-nightly.20251104
-        version: 3.0.0-nightly.20251104(patch_hash=9b211b3c4c21b184471aa037477136fed4b5f827a57f508ca07a2752d02097b4)
+        version: 3.0.0-nightly.20251104
       '@crisp-e3/zk-inputs':
         specifier: workspace:*
         version: link:../crisp-zk-inputs
@@ -613,7 +608,7 @@ importers:
     dependencies:
       '@aztec/bb.js':
         specifier: 3.0.0-nightly.20251104
-        version: 3.0.0-nightly.20251104(patch_hash=9b211b3c4c21b184471aa037477136fed4b5f827a57f508ca07a2752d02097b4)
+        version: 3.0.0-nightly.20251104
       '@enclave-e3/contracts':
         specifier: workspace:*
         version: link:../enclave-contracts
@@ -10367,7 +10362,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@aztec/bb.js@3.0.0-nightly.20251104(patch_hash=9b211b3c4c21b184471aa037477136fed4b5f827a57f508ca07a2752d02097b4)':
+  '@aztec/bb.js@3.0.0-nightly.20251104':
     dependencies:
       comlink: 4.4.2
       commander: 12.1.0
