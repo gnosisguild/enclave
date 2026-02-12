@@ -775,6 +775,7 @@ impl ThresholdKeyshare {
                 ))
             })?;
         }
+
         Ok(())
     }
 
@@ -850,6 +851,7 @@ impl ThresholdKeyshare {
             pk_share,
             sk_sss: encrypted_sk_sss,
             esi_sss: encrypted_esi_sss,
+            signed_pk_generation_proof: None,
         };
 
         // Build the proof request
