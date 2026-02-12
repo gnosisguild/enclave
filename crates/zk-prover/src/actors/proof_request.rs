@@ -10,7 +10,8 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Context, Handler};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber, EventType, PkBfvProofRequest, Proof, ProofPayload, ProofType, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber, EventType, PkBfvProofRequest, Proof, ProofPayload, ProofType, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    PkGenerationProofSigned,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info};
@@ -148,9 +149,8 @@ impl ProofRequestActor {
             }
         };
 
-        // Create share with signed proof
-        let mut share = (*pending.full_share).clone();
-        share.signed_pk_generation_proof = Some(signed);
+        let party_id = pending.full_share.party_id;
+        let share = &pending.full_share;
 
         // Publish per-party shares
         let num_parties = share.num_parties();
@@ -175,6 +175,18 @@ impl ProofRequestActor {
             } else {
                 error!("Failed to extract share for party {}", recipient_party_id);
             }
+        }
+
+        info!(
+            "Publishing PkGenerationProofSigned for E3 {} party {}",
+            pending.e3_id, party_id
+        );
+        if let Err(err) = self.bus.publish(PkGenerationProofSigned {
+            e3_id: pending.e3_id,
+            party_id,
+            signed_proof: signed,
+        }, ec.clone()) {
+            error!("Failed to publish PkGenerationProofSigned: {err}");
         }
     }
 

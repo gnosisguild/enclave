@@ -9,12 +9,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
-    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext, KeyshareCreated,
-    PartyId, PkGenerationProofRequest, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, ThresholdSharePending, TypedEvent,
+    BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext, KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending, TypedEvent, prelude::*, trap
 };
 use e3_fhe::create_crp;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -33,10 +28,11 @@ use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
+use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::{rngs::OsRng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use std::{
-    mem,
-    sync::{Arc, Mutex},
+    collections::HashMap, mem, sync::{Arc, Mutex}
 };
 use tracing::{info, trace, warn};
 
@@ -99,12 +95,8 @@ pub struct GeneratingThresholdShareData {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AggregatingDecryptionKey {
     pk_share: ArcBytes,
-    sk_sss: Encrypted<SharedSecret>,
-    esi_sss: Vec<Encrypted<SharedSecret>>,
-    e_sm_raw: ArcBytes,
     sk_bfv: SensitiveBytes,
-    collected_encryption_keys: Vec<Arc<EncryptionKey>>,
-    proof_request_data: ProofRequestData,
+    signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -112,6 +104,7 @@ pub struct ReadyForDecryption {
     pk_share: ArcBytes,
     sk_poly_sum: SensitiveBytes,
     es_poly_sum: Vec<SensitiveBytes>,
+    signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -119,6 +112,7 @@ pub struct Decrypting {
     pk_share: ArcBytes,
     sk_poly_sum: SensitiveBytes,
     es_poly_sum: Vec<SensitiveBytes>,
+    signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -417,6 +411,38 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
+    /// Handle PkGenerationProofSigned - stores the signed T1 proof in state
+    pub fn handle_pk_generation_proof_signed(
+        &mut self,
+        msg: TypedEvent<PkGenerationProofSigned>,
+    ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+
+        // Only accept proof for our own party
+        if msg.party_id != state.party_id {
+            return Ok(());
+        }
+
+        info!(
+            "Received PkGenerationProofSigned for party {} E3 {}",
+            msg.party_id, msg.e3_id
+        );
+
+        // Store the signed proof in AggregatingDecryptionKey state
+        self.state.try_mutate(&ec, |s| {
+            let current: AggregatingDecryptionKey = s.clone().try_into()?;
+            s.new_state(KeyshareState::AggregatingDecryptionKey(
+                AggregatingDecryptionKey {
+                    signed_pk_generation_proof: Some(msg.signed_proof),
+                    ..current
+                },
+            ))
+        })?;
+
+        Ok(())
+    }
+
     pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         match &msg.response {
             ComputeResponseKind::TrBFV(trbfv) => match trbfv {
@@ -472,18 +498,6 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        // let state = self.state.try_get()?;
-        // self.bus.publish(
-        //     EncryptionKeyCreated {
-        //         e3_id: state.e3_id.clone(),
-        //         key: Arc::new(EncryptionKey {
-        //             party_id: state.party_id,
-        //             pk_bfv: pk_bfv_bytes,
-        //         }),
-        //         external: false,
-        //     },
-        //     ec,
-        // )?;
         self.bus.publish(
             EncryptionKeyPending {
                 e3_id,
@@ -580,47 +594,43 @@ impl ThresholdKeyshare {
 
         let esi_sss = output.esi_sss;
 
+        // First store esi_sss in GeneratingThresholdShareData
         self.state.try_mutate(&ec, |s| {
-            use KeyshareState as K;
-
             info!("try_store_esi_sss");
-
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            let next = match (
-                &current.pk_share,
-                &current.sk_sss,
-                &current.e_sm_raw,
-                &current.proof_request_data,
-            ) {
-                // If the other shares are here then transition to aggregation
-                (Some(pk_share), Some(sk_sss), Some(e_sm_raw), Some(proof_request_data)) => {
-                    K::AggregatingDecryptionKey(AggregatingDecryptionKey {
-                        esi_sss,
-                        pk_share: pk_share.clone(),
-                        sk_sss: sk_sss.clone(),
-                        e_sm_raw: e_sm_raw.clone(),
-                        sk_bfv: current.sk_bfv,
-                        collected_encryption_keys: current.collected_encryption_keys,
-                        proof_request_data: proof_request_data.clone(),
-                    })
-                }
-                // If the other shares are not here yet then don't transition
-                _ => K::GeneratingThresholdShare(GeneratingThresholdShareData {
+            s.new_state(KeyshareState::GeneratingThresholdShare(
+                GeneratingThresholdShareData {
                     esi_sss: Some(esi_sss),
                     ..current
-                }),
-            };
-
-            s.new_state(next)
+                },
+            ))
         })?;
 
         info!("esi stored");
-        if let Some(ThresholdKeyshareState {
-            state: KeyshareState::AggregatingDecryptionKey { .. },
-            ..
-        }) = self.state.get()
-        {
-            self.handle_shares_generated(ec)?;
+
+        // Check if all data is ready, if so call handle_shares_generated BEFORE transitioning
+        let current: GeneratingThresholdShareData = self.state.try_get()?.try_into()?;
+        let ready = current.pk_share.is_some()
+            && current.sk_sss.is_some()
+            && current.esi_sss.is_some()
+            && current.e_sm_raw.is_some()
+            && current.proof_request_data.is_some();
+
+        if ready {
+            // Call handle_shares_generated while still in GeneratingThresholdShare state
+            self.handle_shares_generated(ec.clone())?;
+
+            // Now transition to AggregatingDecryptionKey with minimal state
+            self.state.try_mutate(&ec, |s| {
+                let current: GeneratingThresholdShareData = s.clone().try_into()?;
+                s.new_state(KeyshareState::AggregatingDecryptionKey(
+                    AggregatingDecryptionKey {
+                        pk_share: current.pk_share.expect("pk_share checked above"),
+                        sk_bfv: current.sk_bfv,
+                        signed_pk_generation_proof: None,
+                    },
+                ))
+            })?;
         }
         Ok(())
     }
@@ -716,10 +726,10 @@ impl ThresholdKeyshare {
         // Fire gen_esi_sss with the e_sm_raw
         let current_state: GeneratingThresholdShareData = self.state.try_get()?.try_into()?;
         if let Some(ciphernode_selected) = current_state.ciphernode_selected {
-            self.handle_gen_esi_sss_requested(GenEsiSss {
+            self.handle_gen_esi_sss_requested(TypedEvent::new(GenEsiSss {
                 ciphernode_selected,
                 e_sm_raw: current_state.e_sm_raw,
-            })?;
+            }, ec.clone()))?;
         }
 
         Ok(())
@@ -729,12 +739,12 @@ impl ThresholdKeyshare {
     pub fn handle_shares_generated(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
         let Some(ThresholdKeyshareState {
             state:
-                KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
-                    pk_share,
-                    sk_sss,
-                    esi_sss,
-                    e_sm_raw,
-                    proof_request_data,
+                KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
+                    pk_share: Some(pk_share),
+                    sk_sss: Some(sk_sss),
+                    esi_sss: Some(esi_sss),
+                    e_sm_raw: Some(e_sm_raw),
+                    proof_request_data: Some(proof_request_data),
                     collected_encryption_keys,
                     ..
                 }),
@@ -743,10 +753,10 @@ impl ThresholdKeyshare {
             ..
         }) = self.state.get()
         else {
-            bail!("Invalid state!");
+            bail!("Invalid state - expected GeneratingThresholdShare with all data");
         };
 
-        // Get collected BFV public keys from all parties (now from persisted state)
+        // Get collected BFV public keys from all parties (from persisted state)
         let encryption_keys = &collected_encryption_keys;
 
         // Convert to BFV public keys
@@ -782,7 +792,6 @@ impl ThresholdKeyshare {
             pk_share,
             sk_sss: encrypted_sk_sss,
             esi_sss: encrypted_esi_sss,
-            signed_pk_generation_proof: None,
         };
 
         // Build the proof request
@@ -811,7 +820,7 @@ impl ThresholdKeyshare {
             e3_id: e3_id.clone(),
             full_share: Arc::new(full_share),
             proof_request,
-        })?;
+        }, ec.clone())?;
 
         Ok(())
     }
@@ -906,14 +915,15 @@ impl ThresholdKeyshare {
             use KeyshareState as K;
             info!("Try store decryption key");
 
-            // Attempt to get pk_share from current state
+            // Get pk_share and signed proof from current state
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
 
-            // Transition to ReadyForDecryption
+            // Transition to ReadyForDecryption, carrying the signed proof
             let next = K::ReadyForDecryption(ReadyForDecryption {
                 pk_share: current.pk_share,
                 sk_poly_sum,
                 es_poly_sum,
+                signed_pk_generation_proof: current.signed_pk_generation_proof,
             });
 
             s.new_state(next)
@@ -928,9 +938,8 @@ impl ThresholdKeyshare {
             pubkey: current.pk_share,
             e3_id: e3_id.clone(),
             node: address,
-            // TODO add proof
-            signed_pk_generation_proof: None,
-        })?;
+            signed_pk_generation_proof: current.signed_pk_generation_proof,
+        }, ec.clone())?;
 
         Ok(())
     }
@@ -951,6 +960,7 @@ impl ThresholdKeyshare {
                 pk_share: current.pk_share,
                 sk_poly_sum: current.sk_poly_sum,
                 es_poly_sum: current.es_poly_sum,
+                signed_pk_generation_proof: current.signed_pk_generation_proof,
             });
 
             s.new_state(next)
@@ -1033,6 +1043,9 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             EnclaveEventData::EncryptionKeyCreated(data) => {
                 let _ =
                     self.handle_encryption_key_created(TypedEvent::new(data, ec), ctx.address());
+            }
+            EnclaveEventData::PkGenerationProofSigned(data) => {
+                let _ = self.handle_pk_generation_proof_signed(TypedEvent::new(data, ec));
             }
             EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
             EnclaveEventData::E3Failed(data) => {

@@ -115,7 +115,6 @@ pub fn generate_shares_hash_map(
                 esi_sss: encrypted_esi_sss,
                 sk_sss: encrypted_sk_sss,
                 pk_share,
-                signed_pk_generation_proof: None,
             },
         );
     }

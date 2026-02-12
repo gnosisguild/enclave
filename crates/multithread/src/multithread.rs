@@ -17,23 +17,15 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::run_once;
-use e3_events::trap_fut;
-use e3_events::BusHandle;
-use e3_events::ComputeRequestErrorKind;
 use e3_events::EType;
 use e3_events::EffectsEnabled;
-use e3_events::EnclaveEvent;
-use e3_events::EnclaveEventData;
-use e3_events::EventPublisher;
-use e3_events::EventSubscriber;
-use e3_events::TypedEvent;
-use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
+use e3_events::run_once;
+use e3_events::trap_fut;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, EnclaveEvent, EnclaveEventData, Event, EventPublisher, EventSubscriber,
+    ComputeResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber,
     EventType, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
-    PkGenerationProofResponse, ZkError as ZkEventError, ZkRequest, ZkResponse,
+    PkGenerationProofResponse, TypedEvent, ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::CrtPolynomial;
