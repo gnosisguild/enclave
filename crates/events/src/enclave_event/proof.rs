@@ -38,10 +38,16 @@ impl Proof {
 pub enum CircuitName {
     /// BFV public key proof (T0).
     PkBfv,
-    /// TrBFV public key share proof (T1).
+    /// TrBFV public key share proof (T1a).
     PkGeneration,
-    /// Encrypted shares proof (T2/T3).
-    EncShares,
+    /// Sk Share computation proof (T1b).
+    SkShareComputation,
+    /// E_SM share computation proof (T1c).
+    ESmShareComputation,
+    /// Encrypted sk share proof (T1d).
+    SkShareEncryption,
+    /// Encrypted E_SM share proof (T1e).
+    ESmShareEncryption,
     /// Decryption share proof (T4/T5).
     DecShares,
     /// Public key aggregation proof (T6).
@@ -53,7 +59,10 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
-            CircuitName::EncShares => "enc_shares",
+            CircuitName::SkShareComputation => "sk_share_computation",
+            CircuitName::ESmShareComputation => "e_sm_share_computation",
+            CircuitName::SkShareEncryption => "sk_share_encryption",
+            CircuitName::ESmShareEncryption => "e_sm_share_encryption",
             CircuitName::DecShares => "dec_shares",
             CircuitName::PkAgg => "pk_agg",
         }
@@ -63,7 +72,10 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "dkg",
             CircuitName::PkGeneration => "threshold",
-            CircuitName::EncShares => "threshold",
+            CircuitName::SkShareComputation => "dkg",
+            CircuitName::ESmShareComputation => "dkg",
+            CircuitName::SkShareEncryption => "dkg",
+            CircuitName::ESmShareEncryption => "dkg",
             CircuitName::DecShares => "threshold",
             CircuitName::PkAgg => "threshold",
         }

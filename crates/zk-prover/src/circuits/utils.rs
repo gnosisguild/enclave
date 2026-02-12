@@ -27,6 +27,11 @@ pub fn inputs_json_to_input_map(json: &serde_json::Value) -> Result<InputMap, Zk
 }
 
 fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkError> {
+    if let Some(s) = v.as_str() {
+        return FieldElement::try_from_str(s)
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", s)));
+    }
     if let Some(arr) = v.as_array() {
         let items = arr
             .iter()

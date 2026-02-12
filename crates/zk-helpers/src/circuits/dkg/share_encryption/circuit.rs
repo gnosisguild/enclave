@@ -43,4 +43,6 @@ pub struct ShareEncryptionCircuitData {
     pub e0_rns: Poly,
     /// Encryption error e1 in RNS form.
     pub e1_rns: Poly,
+    /// Type of DKG input (SecretKey or SmudgingNoise) to determine which circuit variant to use.
+    pub dkg_input_type: DkgInputType,
 }

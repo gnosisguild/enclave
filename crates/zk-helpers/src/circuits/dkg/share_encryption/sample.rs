@@ -107,6 +107,7 @@ impl ShareEncryptionCircuitData {
             u_rns,
             e0_rns,
             e1_rns,
+            dkg_input_type,
         })
     }
 }
