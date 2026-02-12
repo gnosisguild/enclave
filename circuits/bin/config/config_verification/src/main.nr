@@ -17,10 +17,10 @@ use lib::configs::secure::dkg::{
     // Threshold moduli reference
     L_THRESHOLD, QIS_THRESHOLD,
     // Share encryption bounds
-    SHARE_ENCRYPTION_T, SHARE_ENCRYPTION_K0IS, SHARE_ENCRYPTION_PK_BOUNDS,
-    SHARE_ENCRYPTION_E0_BOUND, SHARE_ENCRYPTION_E1_BOUND, SHARE_ENCRYPTION_U_BOUND,
-    SHARE_ENCRYPTION_R1_LOW_BOUNDS, SHARE_ENCRYPTION_R1_UP_BOUNDS, SHARE_ENCRYPTION_R2_BOUNDS,
-    SHARE_ENCRYPTION_P1_BOUNDS, SHARE_ENCRYPTION_P2_BOUNDS, SHARE_ENCRYPTION_MSG_BOUND,
+    SHARE_ENCRYPTION_K0IS, SHARE_ENCRYPTION_PK_BOUNDS, SHARE_ENCRYPTION_E0_BOUND,
+    SHARE_ENCRYPTION_E1_BOUND, SHARE_ENCRYPTION_U_BOUND, SHARE_ENCRYPTION_R1_LOW_BOUNDS,
+    SHARE_ENCRYPTION_R1_UP_BOUNDS, SHARE_ENCRYPTION_R2_BOUNDS, SHARE_ENCRYPTION_P1_BOUNDS,
+    SHARE_ENCRYPTION_P2_BOUNDS, SHARE_ENCRYPTION_MSG_BOUND,
 };
 
 use lib::configs::secure::threshold::{
@@ -86,7 +86,7 @@ fn verify_dkg_q_mod_t() {
 // Verifies share_encryption bounds (Circuit 3)
 fn verify_dkg_bounds() {
     let n: u128 = DKG_N as u128;
-    let t: u128 = SHARE_ENCRYPTION_T as u128;
+    let t: u128 = DKG_PLAINTEXT_MODULUS as u128;
     let u_bound: u128 = SHARE_ENCRYPTION_U_BOUND as u128;
     let e0_bound: u128 = SHARE_ENCRYPTION_E0_BOUND as u128;
     let e1_bound: u128 = SHARE_ENCRYPTION_E1_BOUND as u128;
@@ -141,7 +141,7 @@ fn verify_dkg_bounds() {
 
         // k0is[i] verification: k0i * t = -1 mod q_i
         let m = ModU128::new(DKG_QIS[i]);
-        let product = m.mul_mod(SHARE_ENCRYPTION_K0IS[i], SHARE_ENCRYPTION_T);
+        let product = m.mul_mod(SHARE_ENCRYPTION_K0IS[i], DKG_PLAINTEXT_MODULUS);
         let neg_one = DKG_QIS[i] - 1;
         assert(product == neg_one, "SHARE_ENCRYPTION_K0IS mismatch");
 
