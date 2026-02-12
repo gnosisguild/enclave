@@ -17,14 +17,10 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
-use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
-use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::ShareComputationCircuit;
-use e3_zk_helpers::dkg::share_computation::ShareComputationCircuitInput;
-use e3_zk_helpers::dkg::share_encryption::ShareEncryptionCircuit;
-use e3_zk_helpers::dkg::share_encryption::ShareEncryptionCircuitInput;
-use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitInput};
+use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
+use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
@@ -117,7 +113,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     ShareEncryptionCircuit,
-    ShareEncryptionCircuitInput,
+    ShareEncryptionCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -136,7 +132,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     )
     .await;
 
-    let sample = ShareEncryptionCircuitInput::generate_sample(
+    let sample = ShareEncryptionCircuitData::generate_sample(
         preset,
         committee,
         DkgInputType::SmudgingNoise,
@@ -162,7 +158,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     ShareEncryptionCircuit,
-    ShareEncryptionCircuitInput,
+    ShareEncryptionCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -181,7 +177,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
     )
     .await;
 
-    let sample = ShareEncryptionCircuitInput::generate_sample(
+    let sample = ShareEncryptionCircuitData::generate_sample(
         preset,
         committee,
         DkgInputType::SecretKey,
@@ -207,7 +203,7 @@ async fn setup_share_computation_sk_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     ShareComputationCircuit,
-    ShareComputationCircuitInput,
+    ShareComputationCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -224,7 +220,7 @@ async fn setup_share_computation_sk_test() -> Option<(
     .await;
 
     let sample =
-        ShareComputationCircuitInput::generate_sample(preset, committee, DkgInputType::SecretKey)
+        ShareComputationCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
             .ok()?;
     let prover = ZkProver::new(&backend);
 
@@ -244,7 +240,7 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     tempfile::TempDir,
     ZkProver,
     ShareComputationCircuit,
-    ShareComputationCircuitInput,
+    ShareComputationCircuitData,
     BfvPreset,
     &'static str,
 )> {
@@ -260,7 +256,7 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     )
     .await;
 
-    let sample = ShareComputationCircuitInput::generate_sample(
+    let sample = ShareComputationCircuitData::generate_sample(
         preset,
         committee,
         DkgInputType::SmudgingNoise,

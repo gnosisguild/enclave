@@ -8,7 +8,9 @@ use crate::traits::Provable;
 use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData, Inputs};
+use e3_zk_helpers::dkg::share_computation::{
+    Inputs, ShareComputationCircuit, ShareComputationCircuitData,
+};
 use noirc_abi::InputMap;
 
 impl Provable for ShareComputationCircuit {

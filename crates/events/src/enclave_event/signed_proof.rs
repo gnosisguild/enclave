@@ -305,7 +305,7 @@ mod tests {
         );
         assert_eq!(
             ProofType::T1SkShareEncryption.circuit_name(),
-            CircuitName::EncShares
+            CircuitName::SkShareEncryption
         );
         assert_eq!(
             ProofType::T2SkShareDecryption.circuit_name(),
