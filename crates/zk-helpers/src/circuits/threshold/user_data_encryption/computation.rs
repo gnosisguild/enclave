@@ -22,7 +22,6 @@ use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::center;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use fhe::bfv::SecretKey;
@@ -141,10 +140,7 @@ impl Computation for Configs {
         let moduli = threshold_params.moduli().to_vec();
         let plaintext = threshold_params.plaintext();
         let q = compute_q_product(&moduli);
-        let q_mod_t_uint = compute_q_mod_t(&q, plaintext);
-        let t = BigInt::from(plaintext);
-
-        let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
+        let q_mod_t = BigInt::from(compute_q_mod_t(&q, plaintext));
 
         let k0is = compute_k0is(threshold_params.moduli(), threshold_params.plaintext())?;
 

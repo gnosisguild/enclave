@@ -24,7 +24,7 @@ pub global QIS: [Field; L] =
 pub global Q_MOD_T: Field = -19;
 pub global PLAINTEXT_MODULUS: Field = 100;
 pub global Q_INVERSE_MOD_T: Field = 21;
-pub global Q_MOD_T: Field = -19;
+pub global Q_MOD_T: Field = 81;
 
 /************************************
 -------------------------------------
@@ -65,7 +65,6 @@ pk_aggregation (CIRCUIT 5)
 ************************************/
 
 pub global PK_AGGREGATION_BIT_PK: u32 = 52;
-
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************

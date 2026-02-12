@@ -17,7 +17,7 @@ pub global QIS: [Field; L] = [68719403009, 68719230977];
 pub global Q_MOD_T: Field = -7;
 pub global PLAINTEXT_MODULUS: Field = 100;
 pub global Q_INVERSE_MOD_T: Field = 57;
-pub global Q_MOD_T: Field = -7;
+pub global Q_MOD_T: Field = 93;
 
 /************************************
 -------------------------------------

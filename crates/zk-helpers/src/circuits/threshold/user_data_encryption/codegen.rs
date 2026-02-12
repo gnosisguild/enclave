@@ -62,7 +62,7 @@ pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
     Ok(toml::to_string(&json)?)
 }
 
-pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
+pub fn generate_configs(_: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
