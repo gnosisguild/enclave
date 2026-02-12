@@ -25,7 +25,8 @@ use lib::configs::secure::dkg::{
 
 use lib::configs::secure::threshold::{
     // Structural parameters
-    N as THRESHOLD_N, L as THRESHOLD_L, N_PARTIES, N_CIPHERTEXTS,
+    N as THRESHOLD_N, L as THRESHOLD_L, PARAMS_SEARCH_N as N_PARTIES,
+    PARAMS_SEARCH_Z as N_CIPHERTEXTS,
     // Moduli
     QIS as THRESHOLD_QIS,
     // Derived values
@@ -35,7 +36,7 @@ use lib::configs::secure::threshold::{
     PK_GENERATION_EEK_BOUND, PK_GENERATION_SK_BOUND, PK_GENERATION_E_SM_BOUND,
     PK_GENERATION_R1_BOUNDS, PK_GENERATION_R2_BOUNDS, PK_GENERATION_B_ENC,
     // share_decryption bounds
-    SHARE_DECRYPTION_R1_BOUNDS, SHARE_DECRYPTION_R2_BOUNDS,
+    THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS, THRESHOLD_SHARE_DECRYPTION_R2_BOUNDS,
     // user_data_encryption (Greco) bounds
     USER_DATA_ENCRYPTION_K0IS, USER_DATA_ENCRYPTION_PK_BOUNDS, USER_DATA_ENCRYPTION_E0_BOUND,
     USER_DATA_ENCRYPTION_E1_BOUND, USER_DATA_ENCRYPTION_U_BOUND, USER_DATA_ENCRYPTION_K1_LOW_BOUND,
@@ -269,14 +270,14 @@ fn verify_share_decryption_bounds() {
 
         // r2_bounds[i] = (q_i - 1) / 2
         assert(
-            SHARE_DECRYPTION_R2_BOUNDS[i] as u128 == qi_bound,
+            THRESHOLD_SHARE_DECRYPTION_R2_BOUNDS[i] as u128 == qi_bound,
             "SHARE_DECRYPTION_R2_BOUNDS mismatch",
         );
 
         // r1_bounds[i] = (qi_bound * (qi_bound * n + 3) - qi_bound) / q_i
         let expected_r1: u128 = (qi_bound * (qi_bound * n + 3) - qi_bound) / qi;
         assert(
-            SHARE_DECRYPTION_R1_BOUNDS[i] as u128 == expected_r1,
+            THRESHOLD_SHARE_DECRYPTION_R1_BOUNDS[i] as u128 == expected_r1,
             "SHARE_DECRYPTION_R1_BOUNDS mismatch",
         );
     }
