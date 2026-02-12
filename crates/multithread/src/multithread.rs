@@ -30,19 +30,26 @@ use e3_events::EventSubscriber;
 use e3_events::TypedEvent;
 use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
 use e3_events::{
-    ComputeRequestKind, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError, ZkRequest,
-    ZkResponse,
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
+    ComputeResponse, EnclaveEvent, EnclaveEventData, Event, EventPublisher, EventSubscriber,
+    EventType, PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest,
+    PkGenerationProofResponse, ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_polynomial::CrtPolynomial;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
+use e3_trbfv::helpers::try_poly_from_bytes;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
+use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
+    PkGenerationCircuit, PkGenerationCircuitData,
+};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
@@ -369,12 +376,75 @@ fn handle_zk_request(
     }
 }
 
+/// Helper to reduce boilerplate for ZK errors
+fn make_zk_error(request: &ComputeRequest, msg: String) -> ComputeRequestError {
+    ComputeRequestError::new(
+        ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(msg)),
+        request.clone(),
+    )
+}
+
 fn handle_pk_generation_proof(
     prover: &ZkProver,
-    req: PkBfvProofRequest,
+    req: PkGenerationProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    
+    // 1. Build BFV parameters from the threshold preset
+    let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
+
+    // 2. Deserialize raw polynomial bytes → Poly
+    let pk0_share_poly = try_poly_from_bytes(&req.pk0_share, &params)
+        .map_err(|e| make_zk_error(&request, format!("pk0_share: {}", e)))?;
+
+    let a_poly = try_poly_from_bytes(&req.a, &params)
+        .map_err(|e| make_zk_error(&request, format!("a: {}", e)))?;
+
+    let sk_poly = try_poly_from_bytes(&req.sk, &params)
+        .map_err(|e| make_zk_error(&request, format!("sk: {}", e)))?;
+
+    let eek_poly = try_poly_from_bytes(&req.eek, &params)
+        .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
+
+    let e_sm_poly = try_poly_from_bytes(&req.e_sm, &params)
+        .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
+
+    // 3. Convert Poly → CrtPolynomial
+    let pk0_share = CrtPolynomial::from_fhe_polynomial(&pk0_share_poly);
+    let a = CrtPolynomial::from_fhe_polynomial(&a_poly);
+    let sk = CrtPolynomial::from_fhe_polynomial(&sk_poly);
+    let eek = CrtPolynomial::from_fhe_polynomial(&eek_poly);
+    let e_sm = CrtPolynomial::from_fhe_polynomial(&e_sm_poly);
+
+    // 4. Build circuit data
+    let committee = req.committee_size.values();
+    let circuit_data = PkGenerationCircuitData {
+        committee,
+        pk0_share,
+        a,
+        eek,
+        e_sm,
+        sk,
+    };
+
+    // 5. Generate proof via Provable trait
+    let circuit = PkGenerationCircuit;
+    let e3_id_str = request.e3_id.to_string();
+
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 6. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof)),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }
 
 fn handle_pk_bfv_proof(

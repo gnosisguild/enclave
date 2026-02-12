@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use serde::{Deserialize, Serialize};
+
 /// @todo this must be integrated inside Ciphernodes & Smart Contract
 /// instead of being a separate type in here. The pvss crate should import this and
 /// the default values that must be used and shared among the whole enclave repository.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CiphernodesCommitteeSize {
     /// Small committee size (fast local/testing).
     Small,

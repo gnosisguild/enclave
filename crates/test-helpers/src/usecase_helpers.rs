@@ -69,15 +69,20 @@ pub fn generate_shares_hash_map(
                 esi_per_ct,
                 error_size: error_size.clone(),
                 trbfv_config: trbfv_config.clone(),
+                e_sm_raw: None,
             },
         )?;
 
-        let GenPkShareAndSkSssResponse { sk_sss, pk_share } = gen_pk_share_and_sk_sss(
+        let GenPkShareAndSkSssResponse {
+            sk_sss, pk_share, ..
+        } = gen_pk_share_and_sk_sss(
             &rng,
             &cipher,
             GenPkShareAndSkSssRequest {
                 trbfv_config: trbfv_config.clone(),
                 crp: ArcBytes::from_bytes(&crp.to_bytes()),
+                lambda: 40,
+                num_ciphertexts: 1,
             },
         )?;
 
@@ -110,6 +115,7 @@ pub fn generate_shares_hash_map(
                 esi_sss: encrypted_esi_sss,
                 sk_sss: encrypted_sk_sss,
                 pk_share,
+                signed_pk_generation_proof: None,
             },
         );
     }

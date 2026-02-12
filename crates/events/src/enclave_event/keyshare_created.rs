@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::E3id;
+use crate::{E3id, SignedProofPayload};
 use actix::Message;
 use derivative::Derivative;
 use e3_utils::ArcBytes;
@@ -19,6 +19,7 @@ pub struct KeyshareCreated {
     pub pubkey: ArcBytes,
     pub e3_id: E3id,
     pub node: String,
+    pub signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 
 impl Display for KeyshareCreated {

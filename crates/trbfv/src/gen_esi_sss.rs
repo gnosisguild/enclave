@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
+    helpers::try_poly_from_bytes,
     shares::{Encrypted, SharedSecret},
     TrBFVConfig,
 };
@@ -24,12 +25,15 @@ pub struct GenEsiSssRequest {
     pub error_size: ArcBytes,
     /// Smudging noise per ciphertext
     pub esi_per_ct: u64,
+    /// This is pre-generated smudging noise. If provided, use this instead of generating new.
+    pub e_sm_raw: Option<ArcBytes>,
 }
 
 struct InnerRequest {
     pub trbfv_config: TrBFVConfig,
     pub error_size: BigUint,
     pub esi_per_ct: u64,
+    pub e_sm_raw: Option<ArcBytes>,
 }
 
 impl TryFrom<GenEsiSssRequest> for InnerRequest {
@@ -39,6 +43,7 @@ impl TryFrom<GenEsiSssRequest> for InnerRequest {
             trbfv_config: value.trbfv_config,
             error_size: BigUint::from_bytes_be(&value.error_size),
             esi_per_ct: value.esi_per_ct,
+            e_sm_raw: value.e_sm_raw,
         })
     }
 }
@@ -81,26 +86,37 @@ pub fn gen_esi_sss(
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
     let error_size = req.error_size;
     let esi_per_ct = req.esi_per_ct as usize;
-    let esi_sss: Vec<SharedSecret> = (0..esi_per_ct)
-        .map(|_| -> Result<_> {
-            info!("gen_esi_sss:mapping...");
-            let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
-            info!("gen_esi_sss:generate_smudging_error...");
-            let esi_coeffs = {
-                generator
-                    .generate_smudging_error(&mut *rng.lock().unwrap())
-                    .context("Failed to generate smudging error")?
-            };
-            let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
-            let esi_poly = share_manager.bigints_to_poly(&esi_coeffs)?;
-            info!("gen_esi_sss:generate_secret_shares_from_poly...");
-            Ok(SharedSecret::from({
-                share_manager
-                    .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
-                    .context("Failed to generate secret shares from poly")?
-            }))
-        })
-        .collect::<Result<_>>()?;
+    let esi_sss: Vec<SharedSecret> = if let Some(e_sm_raw) = req.e_sm_raw {
+        // we are going to be using pre generated smudging noise
+        let e_sm_poly = try_poly_from_bytes(&e_sm_raw, &params)?;
+        let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+        vec![SharedSecret::from(
+            share_manager
+                .generate_secret_shares_from_poly(e_sm_poly.into(), &mut *rng.lock().unwrap())?,
+        )]
+    } else {
+        (0..esi_per_ct)
+            .map(|_| -> Result<_> {
+                info!("gen_esi_sss:mapping...");
+                let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
+                info!("gen_esi_sss:generate_smudging_error...");
+                let esi_coeffs = {
+                    generator
+                        .generate_smudging_error(&mut *rng.lock().unwrap())
+                        .context("Failed to generate smudging error")?
+                };
+                let mut share_manager =
+                    ShareManager::new(num_ciphernodes, threshold, params.clone());
+                let esi_poly = share_manager.bigints_to_poly(&esi_coeffs)?;
+                info!("gen_esi_sss:generate_secret_shares_from_poly...");
+                Ok(SharedSecret::from({
+                    share_manager
+                        .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
+                        .context("Failed to generate secret shares from poly")?
+                }))
+            })
+            .collect::<Result<_>>()?
+    };
 
     info!("gen_esi_sss:returning...");
 

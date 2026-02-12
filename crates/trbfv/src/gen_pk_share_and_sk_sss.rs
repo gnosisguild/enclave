@@ -81,8 +81,8 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = ArcBytes::from_bytes(&value.pk_share.to_bytes());
         let sk_sss = Encrypted::new(value.sk_sss, cipher)?;
-        Ok(GenPkShareAndSkSssResponse { 
-            pk_share, 
+        Ok(GenPkShareAndSkSssResponse {
+            pk_share,
             sk_sss,
             pk0_share_raw: value.pk0_share_raw,
             a_raw: value.a_raw,
@@ -128,7 +128,8 @@ pub fn gen_pk_share_and_sk_sss(
         num_ciphernodes, threshold
     );
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
-    let (pk0_share, a, sk_poly, eek) = { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
+    let (pk0_share, a, sk_poly, eek) =
+        { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
 
     let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;
 
@@ -159,13 +160,17 @@ pub fn gen_pk_share_and_sk_sss(
         share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())?
     });
 
-    (InnerResponse { 
-        pk_share, 
-        sk_sss,
-        pk0_share_raw,
-        a_raw,
-        sk_raw,
-        eek_raw,
-        e_sm_raw,
-    }, cipher).try_into()
+    (
+        InnerResponse {
+            pk_share,
+            sk_sss,
+            pk0_share_raw,
+            a_raw,
+            sk_raw,
+            eek_raw,
+            e_sm_raw,
+        },
+        cipher,
+    )
+        .try_into()
 }

@@ -43,6 +43,7 @@ mod sync_start;
 mod test_event;
 mod threshold_share_collection_failed;
 mod threshold_share_created;
+mod threshold_share_pending;
 mod ticket_balance_updated;
 mod ticket_generated;
 mod ticket_submitted;
@@ -89,6 +90,7 @@ pub use sync_start::*;
 pub use test_event::*;
 pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
+pub use threshold_share_pending::*;
 pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
@@ -217,6 +219,7 @@ pub enum EnclaveEventData {
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
+    ThresholdSharePending(ThresholdSharePending),
     EncryptionKeyPending(EncryptionKeyPending),
     EncryptionKeyReceived(EncryptionKeyReceived),
     EncryptionKeyCreated(EncryptionKeyCreated),
@@ -463,6 +466,7 @@ impl EnclaveEventData {
             EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ThresholdSharePending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyReceived(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id.clone()),
@@ -531,6 +535,7 @@ impl_event_types!(
     TestEvent,
     DocumentReceived,
     ThresholdShareCreated,
+    ThresholdSharePending,
     EncryptionKeyPending,
     EncryptionKeyReceived,
     EncryptionKeyCreated,
