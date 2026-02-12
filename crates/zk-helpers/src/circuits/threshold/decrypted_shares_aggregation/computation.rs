@@ -303,18 +303,9 @@ impl Computation for Inputs {
                     .collect()
             })
             .collect();
-        let party_ids: Vec<BigInt> = party_ids
-            .iter()
-            .map(|c| reduce(c, &zkp_modulus))
-            .collect();
-        let message: Vec<BigInt> = message
-            .iter()
-            .map(|c| reduce(c, &zkp_modulus))
-            .collect();
-        let u_global: Vec<BigInt> = u_global
-            .iter()
-            .map(|c| reduce(c, &zkp_modulus))
-            .collect();
+        let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let message: Vec<BigInt> = message.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let u_global: Vec<BigInt> = u_global.iter().map(|c| reduce(c, &zkp_modulus)).collect();
         let crt_quotients: Vec<Vec<BigInt>> = crt_quotients
             .iter()
             .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
