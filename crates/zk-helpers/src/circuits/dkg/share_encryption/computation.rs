@@ -361,18 +361,17 @@ impl Computation for Inputs {
         let moduli = dkg_params.moduli();
 
         #[allow(non_snake_case)]
-        let modulus_Q = BigInt::from(ctx.modulus().clone());
+        let modulus_q = BigInt::from(ctx.modulus().clone());
         let t = dkg_params.plaintext();
         let n = dkg_params.degree() as u64;
-        let q_mod_t = (&modulus_Q % t)
+        let q_mod_t = (&modulus_q % t)
             .to_u64()
             .ok_or_else(|| CircuitsErrors::Other("Failed to convert q_mod_t to u64".into()))?;
         let cyclo = cyclotomic_polynomial(n);
 
-        #[allow(non_snake_case)]
-        let mut e0_mod_Q = Polynomial::from_fhe_polynomial(e0);
-        e0_mod_Q.reverse();
-        e0_mod_Q.center(&modulus_Q);
+        let mut e0_mod_q = Polynomial::from_fhe_polynomial(e0);
+        e0_mod_q.reverse();
+        e0_mod_q.center(&modulus_q);
 
         let mut k1_u64 = pt.value.deref().to_vec();
         Modulus::new(t)
@@ -437,7 +436,7 @@ impl Computation for Inputs {
         .map(|(i, (qi, ct0i, ct1i, pk0i, pk1i, e0i))| {
             let qi_bigint = BigInt::from(qi.modulus());
 
-            let diff = e0_mod_Q.sub(&e0i);
+            let diff = e0_mod_q.sub(&e0i);
             let qi_poly = Polynomial::constant(qi_bigint.clone());
             let (e0_quotient, remainder) = diff.div(&qi_poly).expect("CRT requires exact division");
 
@@ -541,8 +540,7 @@ impl Computation for Inputs {
         e0_quotients.reduce_uniform(&zkp_modulus);
         e1.reduce(&zkp_modulus);
         u.reduce(&zkp_modulus);
-        e0_mod_Q.reduce(&zkp_modulus);
-        k1.reduce(&zkp_modulus);
+        e0_mod_q.reduce(&zkp_modulus);
 
         let pk_bit = compute_modulus_bit(&dkg_params);
         let msg_bit = compute_msg_bit(&dkg_params);
@@ -560,7 +558,7 @@ impl Computation for Inputs {
             p2is,
             e0is,
             e0_quotients,
-            e0: e0_mod_Q,
+            e0: e0_mod_q,
             e1,
             u,
             message,

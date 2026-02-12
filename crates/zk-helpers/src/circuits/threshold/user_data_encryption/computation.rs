@@ -366,12 +366,12 @@ impl Computation for Inputs {
         let ctx = threshold_params.ctx_at_level(0)?;
 
         #[allow(non_snake_case)]
-        let modulus_Q = BigInt::from(ctx.modulus().clone());
+        let modulus_q = BigInt::from(ctx.modulus().clone());
         let moduli = threshold_params.moduli();
 
         let t = threshold_params.plaintext();
         let n = threshold_params.degree() as u64;
-        let q_mod_t = (&modulus_Q % t)
+        let q_mod_t = (&modulus_q % t)
             .to_u64()
             .ok_or_else(|| CircuitsErrors::Other("Failed to convert q_mod_t to u64".into()))?; // [q]_t
         let cyclo = cyclotomic_polynomial(n);
@@ -382,11 +382,10 @@ impl Computation for Inputs {
             .try_encrypt_extended(&data.plaintext, &mut thread_rng())?;
 
         // Reconstruct e0 coefficients mod Q (CRT) for e0_quotient computation.
-        #[allow(non_snake_case)]
-        let mut e0_mod_Q = Polynomial::from_fhe_polynomial(&e0);
+        let mut e0_mod_q = Polynomial::from_fhe_polynomial(&e0);
 
-        e0_mod_Q.reverse();
-        e0_mod_Q.center(&modulus_Q);
+        e0_mod_q.reverse();
+        e0_mod_q.center(&modulus_q);
 
         // Reconstruct k1 from plaintext polynomial.
         let mut k1_u64 = pt.value.deref().to_vec(); // m
@@ -456,7 +455,7 @@ impl Computation for Inputs {
             // Compute e0_quotients[i] = (e0 - e0i) / qi for each coefficient
             // This is used for CRT consistency check: e0[j] = e0i[j] + e0_quotients[i][j] * qi
             // Polynomial div by constant yields coefficient-wise division.
-            let diff = e0_mod_Q.sub(&e0i);
+            let diff = e0_mod_q.sub(&e0i);
             let qi_poly = Polynomial::constant(qi_bigint.clone());
             let (e0_quotient, remainder) = diff.div(&qi_poly).expect("CRT requires exact division");
 
@@ -566,7 +565,7 @@ impl Computation for Inputs {
         e0_quotients.reduce_uniform(&zkp_modulus);
         e1.reduce(&zkp_modulus);
         u.reduce(&zkp_modulus);
-        e0_mod_Q.reduce(&zkp_modulus);
+        e0_mod_q.reduce(&zkp_modulus);
         k1.reduce(&zkp_modulus);
 
         let pk_bit = compute_modulus_bit(&threshold_params);
@@ -584,7 +583,7 @@ impl Computation for Inputs {
             p2is,
             e0is,
             e0_quotients,
-            e0: e0_mod_Q,
+            e0: e0_mod_q,
             e1,
             u,
             k1: k1,
