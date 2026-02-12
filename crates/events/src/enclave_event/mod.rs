@@ -36,6 +36,7 @@ mod proof;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
+mod signed_proof;
 mod sync_effect;
 mod sync_end;
 mod sync_start;
@@ -80,6 +81,7 @@ pub use proof::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
+pub use signed_proof::*;
 use strum::IntoStaticStr;
 pub use sync_effect::*;
 pub use sync_end::*;
@@ -223,6 +225,8 @@ pub enum EnclaveEventData {
     ComputeRequest(ComputeRequest),           // ComputeRequested
     ComputeResponse(ComputeResponse),         // ComputeResponseReceived
     ComputeRequestError(ComputeRequestError), // ComputeRequestFailed
+    SignedProofFailed(SignedProofFailed),
+    OutgoingSyncRequested(OutgoingSyncRequested),
     NetSyncEventsReceived(NetSyncEventsReceived),
     HistoricalEvmSyncStart(HistoricalEvmSyncStart),
     HistoricalNetSyncStart(HistoricalNetSyncStart),
@@ -471,6 +475,7 @@ impl EnclaveEventData {
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
+            EnclaveEventData::SignedProofFailed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3Failed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::E3StageChanged(ref data) => Some(data.e3_id.clone()),
             _ => None,
@@ -534,6 +539,8 @@ impl_event_types!(
     ComputeRequest,
     ComputeResponse,
     ComputeRequestError,
+    SignedProofFailed,
+    OutgoingSyncRequested,
     NetSyncEventsReceived,
     HistoricalEvmSyncStart,
     HistoricalNetSyncStart,
