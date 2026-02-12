@@ -49,8 +49,6 @@ pub global PK_GENERATION_R2_BOUNDS: [Field; L] =
 
 pub global PK_GENERATION_B_ENC: Field = 39614081257132168796771975168000;
 
-pub global PK_GENERATION_B_ENC: Field = 39614081257132168796771975168000;
-
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
     PK_GENERATION_EEK_BOUND,
