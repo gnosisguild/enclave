@@ -9,7 +9,7 @@
 //! **Generic BFV math** lives in [`crate::math`] and is re-exported here for convenience.
 //! **This module** adds only Shamir + scalar CRT helpers: [`lagrange_recover_at_zero`] and
 //! [`crt_reconstruct`]. Coefficient reduction uses [`e3_polynomial::reduce`] in
-//! [`super::computation::Inputs::standard_form`].
+//! [`Inputs::compute`](super::computation::Inputs).
 
 use crate::math;
 use crate::CircuitsErrors;

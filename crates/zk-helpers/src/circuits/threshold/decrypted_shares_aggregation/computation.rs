@@ -8,7 +8,7 @@
 //!
 //! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
 //! Lagrange-at-zero recovery, and scalar CRT reconstruction. Input coefficients are normalized
-//! with [`e3_polynomial::reduce`] in [`Input::standard_form`], consistent with other circuits.
+//! with [`e3_polynomial::reduce`] to [0, zkp_modulus) inside [`Inputs::compute`].
 
 use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
@@ -80,7 +80,7 @@ pub struct Configs {
 }
 
 /// Input for decrypted shares aggregation (same shape as old DecSharesAggTrBfvVectors).
-/// All coefficients reduced to [0, zkp_modulus) in standard_form.
+/// All coefficients reduced to [0, zkp_modulus) by compute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
     /// [party][modulus][coeff]
@@ -292,59 +292,35 @@ impl Computation for Inputs {
             .map(|row| truncate(&row))
             .collect();
 
-        let inputs = Inputs {
+        let zkp_modulus = get_zkp_modulus();
+
+        let decryption_shares: Vec<Vec<Vec<BigInt>>> = decryption_shares
+            .iter()
+            .map(|party| {
+                party
+                    .iter()
+                    .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
+                    .collect()
+            })
+            .collect();
+        let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let message: Vec<BigInt> = message.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let u_global: Vec<BigInt> = u_global.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let crt_quotients: Vec<Vec<BigInt>> = crt_quotients
+            .iter()
+            .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
+            .collect();
+
+        Ok(Inputs {
             decryption_shares,
             party_ids,
             message,
             u_global,
             crt_quotients,
-        };
-
-        Ok(inputs.standard_form())
-    }
-}
-
-impl Inputs {
-    /// Reduce all coefficients to [0, zkp_modulus). Uses `e3_polynomial::reduce` like other circuits.
-    pub fn standard_form(&self) -> Self {
-        let zkp_modulus = get_zkp_modulus();
-        Inputs {
-            decryption_shares: self
-                .decryption_shares
-                .iter()
-                .map(|party| {
-                    party
-                        .iter()
-                        .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
-                        .collect()
-                })
-                .collect(),
-            party_ids: self
-                .party_ids
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            message: self
-                .message
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            u_global: self
-                .u_global
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            crt_quotients: self
-                .crt_quotients
-                .iter()
-                .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
-                .collect(),
-        }
+        })
     }
 
-    /// Serializes the input to JSON for Prover.toml. Each polynomial is emitted as
-    /// `{ "coefficients": [string, ...] }` to match Noir's `Polynomial` struct.
-    pub fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         use crate::bigint_1d_to_json_values;
         use crate::poly_coefficients_to_toml_json;
 
