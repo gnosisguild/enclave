@@ -499,68 +499,44 @@ async fn test_trbfv_actor() -> Result<()> {
     ));
 
     // First, wait for all EncryptionKeyCreated events (BFV key exchange)
-    // Each of the 5 parties:
-    // - EncryptionKeyPending = 5
-    // - ComputeRequest (T0 ZK proof) = 5
-    // - ComputeResponse (T0 ZK proof) = 5
-    // - EncryptionKeyCreated = 5
-    // Total: 20 events
     let encryption_keys_timer = Instant::now();
-    let expected_count = 5 + 5 + 5 + 5; // EncKeyPending + T0 ComputeReq + T0 ComputeResp + EncKeyCreated
-    println!(
-        "DEBUG: Waiting for {} encryption key events...",
-        expected_count
-    );
-    let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+    let expected = vec![
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+    ];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: EncryptionKey phase events: {:?}", h.event_types());
     report.push((
         "All EncryptionKeyCreated events",
         encryption_keys_timer.elapsed(),
     ));
 
-    // Then wait for share generation compute events + ThresholdShareCreated + PkGenerationProofSigned
-    // Each of the 5 parties:
-    // - ComputeRequest + ComputeResponse for GenPkShareAndSkSss = 10
-    // - ComputeRequest + ComputeResponse for GenEsiSss = 10
-    // - ThresholdSharePending = 5
-    // - ComputeRequest + ComputeResponse for T1 ZK proof = 10
-    // - 5 ThresholdShareCreated events (one per target party) = 25 total
-    // - 1 PkGenerationProofSigned event = 5 total
-    // Total: 10 + 10 + 5 + 10 + 25 + 5 = 65 events
+    // Then wait for all ThresholdShareCreated events
+    // With domain-level splitting, each of the 5 parties publishes 5 events (one per target party)
+    // Total: 5 parties × 5 targets = 25 events
     let shares_timer = Instant::now();
-    let expected_count = 10 + 10 + 5 + 10 + 25 + 5; // GenPk + GenEsi + TSPending + T1 ZK + TSCreated + PkGenProof
-    println!(
-        "DEBUG: Waiting for {} share generation events...",
-        expected_count
-    );
-    let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+    let expected: Vec<&str> = (0..25).map(|_| "ThresholdShareCreated").collect();
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!(
-        "DEBUG: Share generation phase events: {:?}",
-        h.event_types()
-    );
-    report.push(("All share generation events", shares_timer.elapsed()));
+    report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
 
-    // Wait for CalculateDecryptionKey compute events + KeyshareCreated + PublicKeyAggregated
-    // Each of the 5 parties:
-    // - ComputeRequest for CalculateDecryptionKey
-    // - ComputeResponse for CalculateDecryptionKey
-    // - KeyshareCreated
-    // Plus 1 PublicKeyAggregated at the end
-    // Total: 5 + 5 + 5 + 1 = 16 events
     let shares_to_pubkey_agg_timer = Instant::now();
-    let expected_count = 5 + 5 + 5 + 1; // ComputeRequest + ComputeResponse + KeyshareCreated + PublicKeyAggregated
-    println!(
-        "DEBUG: Waiting for {} decryption key events...",
-        expected_count
-    );
+    let expected = vec![
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "PublicKeyAggregated",
+    ];
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: Decryption key phase events: {:?}", h.event_types());
 
     report.push((
         "ThresholdShares -> PublicKeyAggregated",
@@ -572,16 +548,14 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_requested_timer.elapsed(),
     ));
     let app_gen_timer = Instant::now();
+    assert_eq!(h.event_types(), expected);
+    // Aggregate decryption
 
-    // Verify we got the expected events (last should be PublicKeyAggregated)
     // First we get the public key
     println!("Getting public key");
     let Some(EnclaveEventData::PublicKeyAggregated(pubkey_event)) = h.last().map(|e| e.get_data())
     else {
-        panic!(
-            "Was expecting last event to be PublicKeyAggregated, got: {:?}",
-            h.event_types()
-        );
+        panic!("Was expecting event to be PublicKeyAggregated");
     };
 
     let pubkey_bytes = pubkey_event.pubkey.clone();
@@ -629,24 +603,23 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("CiphertextOutputPublished event has been dispatched!");
 
     // Lets grab decryption share events
-    // Each of the 5 parties:
-    // - ComputeRequest for CalculateDecryptionShare
-    // - ComputeResponse for CalculateDecryptionShare
-    // - DecryptionshareCreated
-    // Plus aggregation:
-    // - 1 CiphertextOutputPublished
-    // - 1 ComputeRequest (PlaintextAggregation)
-    // - 1 ComputeResponse (PlaintextAggregation)
-    // - 1 PlaintextAggregated
-    // Total: 1 + 5*3 + 3 = 19 events
-    let expected_count = 1 + (5 * 3) + 3;
-    println!("DEBUG: Waiting for {} decryption events...", expected_count);
+    let expected = vec![
+        "CiphertextOutputPublished",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "ComputeRequest",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "ComputeResponse",
+        "PlaintextAggregated",
+    ];
 
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: Decryption phase events: {:?}", h.event_types());
 
+    assert_eq!(h.event_types(), expected);
     report.push((
         "Ciphertext published -> PlaintextAggregated",
         publishing_ct_timer.elapsed(),
@@ -657,10 +630,7 @@ async fn test_trbfv_actor() -> Result<()> {
         ..
     })) = h.last().map(|e| e.get_data())
     else {
-        bail!(
-            "Expected last event to be PlaintextAggregated, got: {:?}",
-            h.event_types()
-        )
+        bail!("bad event")
     };
 
     let results = plaintext
