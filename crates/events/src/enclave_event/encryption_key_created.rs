@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, Proof};
+use crate::{E3id, Proof, SignedProofPayload};
 use actix::Message;
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
@@ -23,6 +23,9 @@ pub struct EncryptionKey {
     pub pk_bfv: ArcBytes,
     /// Proof of correct BFV public key generation (T0 proof).
     pub proof: Option<Proof>,
+    /// ECDSA-signed payload for fault attribution.
+    /// Present when the node signs its proof before broadcasting.
+    pub signed_payload: Option<SignedProofPayload>,
 }
 
 impl EncryptionKey {
@@ -31,11 +34,17 @@ impl EncryptionKey {
             party_id,
             pk_bfv: pk_bfv.into(),
             proof: None,
+            signed_payload: None,
         }
     }
 
     pub fn with_proof(mut self, proof: Proof) -> Self {
         self.proof = Some(proof);
+        self
+    }
+
+    pub fn with_signed_payload(mut self, signed: SignedProofPayload) -> Self {
+        self.signed_payload = Some(signed);
         self
     }
 }

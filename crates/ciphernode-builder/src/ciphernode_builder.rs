@@ -7,6 +7,7 @@
 use crate::event_system::AggregateConfig;
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use derivative::Derivative;
 use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
@@ -67,6 +68,7 @@ pub struct CiphernodeBuilder {
     testmode_history: bool,
     task_pool: Option<TaskPool>,
     threads: Option<usize>,
+    testmode_signer: Option<PrivateKeySigner>,
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
@@ -132,6 +134,7 @@ impl CiphernodeBuilder {
             testmode_history: false,
             task_pool: None,
             threads: None,
+            testmode_signer: None,
             threshold_plaintext_agg: false,
             net_config: None,
             zk_backend: None,
@@ -261,6 +264,13 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Pre-populate the signer cache with the given signer.
+    /// This is conspicuously named so we understand that this should only be used when testing.
+    pub fn testmode_with_signer(mut self, signer: PrivateKeySigner) -> Self {
+        self.testmode_signer = Some(signer);
+        self
+    }
+
     /// Use score-based sortition (recommended)
     pub fn with_sortition_score(mut self) -> Self {
         self.sortition_backend = SortitionBackend::score();
@@ -358,7 +368,11 @@ impl CiphernodeBuilder {
         };
 
         // Create provider cache early to use for chain validation
-        let mut provider_cache = ProviderCache::new();
+        let mut provider_cache = if let Some(signer) = self.testmode_signer.take() {
+            ProviderCache::new().with_signer(signer)
+        } else {
+            ProviderCache::new()
+        };
         let aggregate_config = self.create_aggregate_config(&mut provider_cache).await?;
 
         // Get an event system instance.
@@ -434,8 +448,13 @@ impl CiphernodeBuilder {
                 share_enc_preset,
             ));
 
+            let backend = self
+                .zk_backend
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
             info!("Setting up ZK actors");
-            setup_zk_actors(&bus, self.zk_backend.as_ref());
+            let signer = provider_cache.ensure_signer().await?;
+            setup_zk_actors(&bus, backend, signer);
         }
 
         if self.pubkey_agg {
