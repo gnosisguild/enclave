@@ -34,11 +34,8 @@ use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
-use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::{rngs::OsRng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
 use std::{
-    collections::HashMap,
     mem,
     sync::{Arc, Mutex},
 };
@@ -737,6 +734,7 @@ impl ThresholdKeyshare {
                 ))
             })?;
         }
+
         Ok(())
     }
 
@@ -797,6 +795,7 @@ impl ThresholdKeyshare {
             pk_share,
             sk_sss: encrypted_sk_sss,
             esi_sss: encrypted_esi_sss,
+            signed_pk_generation_proof: None,
         };
 
         // Build the proof request
