@@ -35,8 +35,16 @@ use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
+<<<<<<< HEAD
 use rand::rngs::OsRng;
 use std::{collections::HashMap, mem, sync::Arc};
+=======
+use rand::{rngs::OsRng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use std::{
+    collections::HashMap, mem, sync::{Arc, Mutex}
+};
+>>>>>>> be8c56d3 (chore: refactoring)
 use tracing::{info, trace, warn};
 
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
@@ -787,7 +795,6 @@ impl ThresholdKeyshare {
             pk_share,
             sk_sss: encrypted_sk_sss,
             esi_sss: encrypted_esi_sss,
-            signed_pk_generation_proof: None,
         };
 
         // Build the proof request

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, SignedProofPayload};
+use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
 use e3_trbfv::shares::BfvEncryptedShares;
@@ -32,8 +32,6 @@ pub struct ThresholdShare {
     pub sk_sss: BfvEncryptedShares,
     /// BFV-encrypted esi_sss - one per secret key (sk), each recipient can decrypt their share
     pub esi_sss: Vec<BfvEncryptedShares>,
-    /// The signed proof payload for fault attribution
-    pub signed_pk_generation_proof: Option<SignedProofPayload>,
 }
 
 impl ThresholdShare {
@@ -51,7 +49,6 @@ impl ThresholdShare {
             pk_share: self.pk_share.clone(),
             sk_sss,
             esi_sss,
-            signed_pk_generation_proof: self.signed_pk_generation_proof.clone(),
         })
     }
 
