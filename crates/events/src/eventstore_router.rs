@@ -13,7 +13,7 @@ use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient
 use anyhow::Result;
 use e3_utils::{major_issue, MAILBOX_LIMIT};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// QueryAggregator - handles a single query's lifecycle
 struct QueryAggregator {
@@ -90,7 +90,7 @@ pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
 
 impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     pub fn new(stores: HashMap<usize, Addr<EventStore<I, L>>>) -> Self {
-        info!("Making eventstore router...");
+        debug!("Making eventstore router...");
         let stores = stores
             .into_iter()
             .map(|(index, addr)| (AggregateId::new(index), addr))
@@ -99,7 +99,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
     }
 
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
-        info!("Handling store event requested....");
+        debug!("Handling store event requested....");
         let aggregate_id = msg.event.aggregate_id();
         let store_addr = self.stores.get(&aggregate_id).unwrap_or_else(|| {
             self.stores
@@ -118,7 +118,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         msg: EventStoreQueryBy<TsAgg>,
         _ctx: &mut Context<Self>,
     ) -> Result<()> {
-        info!("Received request for timestamp query.");
+        debug!("Received request for timestamp query.");
         let parent_id = msg.id();
         let query = msg.query().clone();
         let sender = msg.sender();
@@ -133,7 +133,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
             .collect();
 
         if sub_queries.is_empty() {
-            info!("No valid stores to query, sending empty response immediately");
+            debug!("No valid stores to query, sending empty response immediately");
             let response = EventStoreQueryResponse::new(parent_id, Vec::new());
             sender.do_send(response);
             return Ok(());
@@ -148,7 +148,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         for (aggregate_id, ts, sub_query_id, store_addr) in sub_queries {
             let get_events_msg =
                 EventStoreQueryBy::<Ts>::new(sub_query_id, ts, aggregator_addr.clone().recipient());
-            info!("Sending query for aggregate {:?}", aggregate_id);
+            debug!("Sending query for aggregate {:?}", aggregate_id);
             store_addr.do_send(get_events_msg);
         }
 
@@ -160,7 +160,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         msg: EventStoreQueryBy<SeqAgg>,
         _ctx: &mut Context<Self>,
     ) -> Result<()> {
-        info!("Received request for sequence query.");
+        debug!("Received request for sequence query.");
         let parent_id = msg.id();
         let query = msg.query().clone();
         let sender = msg.sender();
@@ -175,7 +175,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
             .collect();
 
         if sub_queries.is_empty() {
-            info!("No valid stores to query, sending empty response immediately");
+            debug!("No valid stores to query, sending empty response immediately");
             let response = EventStoreQueryResponse::new(parent_id, Vec::new());
             sender.do_send(response);
             return Ok(());
@@ -193,7 +193,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
                 seq,
                 aggregator_addr.clone().recipient(),
             );
-            info!("Sending query for aggregate {:?}", aggregate_id);
+            debug!("Sending query for aggregate {:?}", aggregate_id);
             store_addr.do_send(get_events_msg);
         }
 
