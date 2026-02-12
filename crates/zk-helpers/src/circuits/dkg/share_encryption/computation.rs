@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the share-encryption circuit: configs, bounds, bit widths, and witness.
+//! Computation types for the share-encryption circuit: configs, bounds, bit widths, and input.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) plaintext, ciphertext, and encryption randomness. Witness values are
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) plaintext, ciphertext, and encryption randomness. Input values are
 //! normalized for the ZKP field so the Noir circuit's range checks and commitment checks succeed.
 
 use crate::circuits::commitments::{
@@ -16,7 +16,7 @@ use crate::circuits::commitments::{
 use std::ops::Deref;
 
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
-use crate::dkg::share_encryption::ShareEncryptionCircuitInput;
+use crate::dkg::share_encryption::ShareEncryptionCircuitData;
 use crate::get_zkp_modulus;
 use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
@@ -41,33 +41,33 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelBridge;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`ShareEncryptionCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`ShareEncryptionCircuit`]: bounds, bit widths, and input.
 #[derive(Debug)]
 pub struct ShareEncryptionOutput {
     /// Coefficient bounds used to derive bit widths.
     pub bounds: Bounds,
     /// Bit widths used by the Noir prover for packing.
     pub bits: Bits,
-    /// Witness data for the share-encryption circuit.
-    pub witness: Witness,
+    /// Input for the share-encryption circuit.
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`ShareEncryptionCircuit`].
 impl CircuitComputation for ShareEncryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareEncryptionCircuitInput;
+    type Data = ShareEncryptionCircuitData;
     type Output = ShareEncryptionOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, input)?;
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(ShareEncryptionOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -117,12 +117,12 @@ pub struct Bounds {
     pub p2_bounds: Vec<BigUint>,
 }
 
-/// Witness data for the share-encryption circuit: CRT limbs for pk, ct, randomness, and message.
+/// Input for the share-encryption circuit: CRT limbs for pk, ct, randomness, and message.
 ///
 /// Coefficients are reduced to the ZKP field modulus for serialization. The circuit verifies
 /// that the ciphertext and commitments match the public inputs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     /// Public key and ciphertext polynomials in CRT form (per modulus).
     pub pk0is: CrtPolynomial,
     pub pk1is: CrtPolynomial,
@@ -144,10 +144,10 @@ pub struct Witness {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ShareEncryptionCircuitInput;
+    type Data = ShareEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -163,7 +163,7 @@ impl Computation for Configs {
 
         let k0is = compute_k0is(&moduli, plaintext)?;
 
-        let bounds = Bounds::compute(preset, input)?;
+        let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -179,26 +179,25 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = crate::utils::ZkHelpersUtilsError;
 
-    fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
-        let max_pk_bound = input.pk_bounds.iter().max().unwrap();
-        let max_r2_bound = input.r2_bounds.iter().max().unwrap();
-        let max_p1_bound = input.p1_bounds.iter().max().unwrap();
-        let max_p2_bound = input.p2_bounds.iter().max().unwrap();
+    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+        let max_pk_bound = data.pk_bounds.iter().max().unwrap();
+        let max_r2_bound = data.r2_bounds.iter().max().unwrap();
+        let max_p1_bound = data.p1_bounds.iter().max().unwrap();
+        let max_p2_bound = data.p2_bounds.iter().max().unwrap();
 
         let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
         let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(input.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(input.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(input.e1_bound.clone()));
-        let msg_bit = calculate_bit_width(BigInt::from(input.msg_bound.clone()));
+        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
+        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
+        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
+        let msg_bit = calculate_bit_width(BigInt::from(data.msg_bound.clone()));
         let r1_bit = calculate_bit_width(BigInt::from(
-            input
-                .r1_low_bounds
+            data.r1_low_bounds
                 .iter()
-                .chain(input.r1_up_bounds.iter())
+                .chain(data.r1_up_bounds.iter())
                 .max()
                 .unwrap()
                 .clone(),
@@ -224,10 +223,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ShareEncryptionCircuitInput;
+    type Data = ShareEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
@@ -344,24 +343,24 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = ShareEncryptionCircuitInput;
+    type Data = ShareEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-        let ctx = dkg_params.ctx_at_level(input.plaintext.level())?;
+        let ctx = dkg_params.ctx_at_level(data.plaintext.level())?;
 
         let pk_bit = compute_modulus_bit(&dkg_params);
         let msg_bit = compute_msg_bit(&dkg_params);
 
-        let pk = input.public_key.clone();
-        let pt = input.plaintext.clone();
+        let pk = data.public_key.clone();
+        let pt = data.plaintext.clone();
 
         // Reconstruct e0 in mod Q so that e0_poly row i matches e0_rns row i (same ctx).
-        let mut e0_power = input.e0_rns.clone();
+        let mut e0_power = data.e0_rns.clone();
         e0_power.change_representation(Representation::PowerBasis);
         let e0_mod_q: Vec<BigUint> = Vec::<BigUint>::from(&e0_power);
         let e0_bigints: Vec<BigInt> = e0_mod_q.iter().map(|c| c.to_bigint().unwrap()).collect();
@@ -388,10 +387,10 @@ impl Computation for Witness {
         let mut k1 = Polynomial::from_u64_vector(k1_u64);
         k1.center(&BigInt::from(t.modulus()));
 
-        let mut u_rns_copy = input.u_rns.clone();
-        let mut e0_rns_copy = input.e0_rns.clone();
+        let mut u_rns_copy = data.u_rns.clone();
+        let mut e0_rns_copy = data.e0_rns.clone();
         let mut e0_poly_copy = e0.clone();
-        let mut e1_rns_copy = input.e1_rns.clone();
+        let mut e1_rns_copy = data.e1_rns.clone();
 
         u_rns_copy.change_representation(Representation::PowerBasis);
         e0_rns_copy.change_representation(Representation::PowerBasis);
@@ -432,8 +431,8 @@ impl Computation for Witness {
             };
 
         // Extract and convert ciphertext and public key polynomials
-        let mut ct0 = input.ciphertext.c[0].clone(); // ct0
-        let mut ct1 = input.ciphertext.c[1].clone(); // ct1
+        let mut ct0 = data.ciphertext.c[0].clone(); // ct0
+        let mut ct1 = data.ciphertext.c[1].clone(); // ct1
         ct0.change_representation(Representation::PowerBasis);
         ct1.change_representation(Representation::PowerBasis);
 
@@ -682,7 +681,7 @@ impl Computation for Witness {
         let pk_commitment = compute_dkg_pk_commitment(&pk0is, &pk1is, pk_bit);
         let msg_commitment = compute_share_encryption_commitment_from_message(&message, msg_bit);
 
-        Ok(Witness {
+        Ok(Inputs {
             pk0is,
             pk1is,
             ct0is,
@@ -702,7 +701,7 @@ impl Computation for Witness {
         })
     }
 
-    // Used as witness for Nargo execution.
+    // Used as input for Nargo execution.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
@@ -756,7 +755,7 @@ mod tests {
     fn test_bound_and_bits_computation_consistency() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -779,7 +778,7 @@ mod tests {
     fn test_constants_json_roundtrip() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -801,10 +800,10 @@ mod tests {
     }
 
     #[test]
-    fn test_witness_message_consistency() {
+    fn test_input_message_consistency() {
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
         let committee = CiphernodesCommitteeSize::Small.values();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee,
             DkgInputType::SecretKey,
@@ -812,13 +811,13 @@ mod tests {
             sd.lambda,
         )
         .unwrap();
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
-        // witness.message is plaintext coefficients (reversed, as used in circuit)
+        // inputs.message is plaintext coefficients (reversed, as used in circuit)
         let expected_message = Polynomial::from_u64_vector(sample.plaintext.value.deref().to_vec());
         let mut expected = expected_message;
         expected.reverse();
 
-        assert_eq!(witness.message.coefficients(), expected.coefficients());
+        assert_eq!(inputs.message.coefficients(), expected.coefficients());
     }
 }

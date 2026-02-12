@@ -12,7 +12,7 @@
 use crate::errors::CircuitsErrors;
 use std::path::Path;
 
-/// Prover TOML file content (witness and circuit inputs).
+/// Prover TOML file content (circuit inputs).
 pub type CodegenToml = String;
 /// Noir configs file content (global constants for the prover).
 pub type CodegenConfigs = String;
@@ -20,23 +20,23 @@ pub type CodegenConfigs = String;
 /// Generated files for a circuit: Prover TOML and Noir configs.
 #[derive(Debug, Clone)]
 pub struct Artifacts {
-    /// Prover.toml content (witness and circuit inputs).
+    /// Prover.toml content (circuit inputs).
     pub toml: CodegenToml,
     /// configs.nr content (constants for the Noir prover).
     pub configs: CodegenConfigs,
 }
 
-/// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific input.
+/// Trait for circuits that can generate Prover.toml and configs.nr from circuit-specific data.
 pub trait CircuitCodegen: crate::registry::Circuit {
     /// Circuit-specific BFV threshold parameters preset.
     type Preset;
-    /// Circuit-specific codegen input (e.g. preset + public key).
-    type Input;
+    /// Circuit-specific codegen data (e.g. preset + public key).
+    type Data;
     /// Error type for codegen failures.
     type Error;
 
     /// Produces [`Artifacts`] for this circuit from the given input.
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error>;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error>;
 }
 
 /// Writes the Prover TOML string to `path/Prover.toml`, or `./Prover.toml` if `path` is `None`.

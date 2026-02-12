@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Computation types for the threshold share decryption circuit: constants, bounds, bit widths, and witness.
+//! Computation types for the threshold share decryption circuit: constants, bounds, bit widths, and inputs.
 //!
-//! [`Configs`], [`Bounds`], [`Bits`], and [`Witness`] are produced from BFV parameters
-//! and (for witness) ciphertext plus aggregated shares (s, e, d_share). They implement
+//! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
+//! and (for input) ciphertext plus aggregated shares (s, e, d_share). They implement
 //! [`Computation`] and are used by codegen.
 
 use crate::calculate_bit_width;
@@ -17,7 +17,7 @@ use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
 use crate::get_zkp_modulus;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
-use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitInput;
+use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -32,30 +32,30 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
 
-/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and witness.
+/// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and inputs.
 #[derive(Debug)]
 pub struct ShareDecryptionComputationOutput {
     pub bounds: Bounds,
     pub bits: Bits,
-    pub witness: Witness,
+    pub inputs: Inputs,
 }
 
 /// Implementation of [`CircuitComputation`] for [`ShareDecryptionCircuit`].
 impl CircuitComputation for ShareDecryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Output = ShareDecryptionComputationOutput;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self::Output, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
-        let witness = Witness::compute(preset, input)?;
+        let inputs = Inputs::compute(preset, data)?;
 
         Ok(ShareDecryptionComputationOutput {
             bounds,
             bits,
-            witness,
+            inputs,
         })
     }
 }
@@ -86,7 +86,7 @@ pub struct Bounds {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Witness {
+pub struct Inputs {
     pub ct0: CrtPolynomial,
     pub ct1: CrtPolynomial,
     pub sk: CrtPolynomial,
@@ -100,10 +100,10 @@ pub struct Witness {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -124,19 +124,19 @@ impl Computation for Configs {
 
 impl Computation for Bits {
     type Preset = BfvPreset;
-    type Input = Bounds;
+    type Data = Bounds;
     type Error = CircuitsErrors;
 
-    fn compute(_: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
-        for bound in input.r1_bounds.iter() {
+        for bound in data.r1_bounds.iter() {
             r1_bit = r1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
         // For r2, use the maximum of all bounds
         let mut r2_bit = 0;
-        for bound in &input.r2_bounds {
+        for bound in &data.r2_bounds {
             r2_bit = r2_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
         }
 
@@ -153,10 +153,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Input = ();
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, _: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -202,12 +202,12 @@ impl Computation for Bounds {
     }
 }
 
-impl Computation for Witness {
+impl Computation for Inputs {
     type Preset = BfvPreset;
-    type Input = ShareDecryptionCircuitInput;
+    type Data = ShareDecryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, input: &Self::Input) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -220,8 +220,8 @@ impl Computation for Witness {
         let n = threshold_params.degree() as u64;
 
         // Extract and convert ciphertext polynomials
-        let ct0 = CrtPolynomial::from_fhe_polynomial(&input.ciphertext.c[0]);
-        let ct1 = CrtPolynomial::from_fhe_polynomial(&input.ciphertext.c[1]);
+        let ct0 = CrtPolynomial::from_fhe_polynomial(&data.ciphertext.c[0]);
+        let ct1 = CrtPolynomial::from_fhe_polynomial(&data.ciphertext.c[1]);
 
         // Create cyclotomic polynomial x^N + 1
         let mut cyclo = vec![BigInt::from(0u64); (n + 1) as usize];
@@ -242,9 +242,9 @@ impl Computation for Witness {
             moduli.clone(),
             ct0.limbs.clone(),
             ct1.limbs.clone(),
-            input.s.limbs.clone(),
-            input.e.limbs.clone(),
-            input.d_share.limbs.clone(),
+            data.s.limbs.clone(),
+            data.e.limbs.clone(),
+            data.d_share.limbs.clone(),
         )
         .enumerate()
         .par_bridge()
@@ -322,7 +322,7 @@ impl Computation for Witness {
         let expected_sk_commitment = compute_aggregated_shares_commitment(&sk, modulus_bit);
         let expected_e_sm_commitment = compute_aggregated_shares_commitment(&e_sm, modulus_bit);
 
-        Ok(Witness {
+        Ok(Inputs {
             ct0,
             ct1,
             sk,

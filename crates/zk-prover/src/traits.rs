@@ -6,7 +6,7 @@
 
 use std::fmt::Display;
 
-use crate::circuits::utils::witness_json_to_input_map;
+use crate::circuits::utils::inputs_json_to_input_map;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
 use crate::witness::{CompiledCircuit, WitnessGenerator};
@@ -16,28 +16,29 @@ use noirc_abi::InputMap;
 
 /// Trait for types that can generate ZK proofs.
 ///
-/// Implementors specify the circuit, params, input, and witness types.
-/// `build_witness`, `prove`, and `verify` use default implementations
-/// that compute the witness via [`Computation::compute`] and serialize via
+/// Implementors specify the circuit, params, and input types.
+/// `build_inputs`, `prove`, and `verify` use default implementations
+/// that compute the inputs via [`Computation::compute`] and serialize via
 /// [`Computation::to_json`].
 pub trait Provable: Send + Sync {
     type Params: Send + Sync + Clone;
     type Input: Send + Sync;
-    type Witness;
+    type Inputs;
 
     fn circuit(&self) -> CircuitName;
 
-    fn build_witness(&self, params: &Self::Params, input: &Self::Input) -> Result<InputMap, ZkError>
+    fn build_inputs(&self, params: &Self::Params, input: &Self::Input) -> Result<InputMap, ZkError>
     where
-        Self::Witness: Computation<Preset = Self::Params, Input = Self::Input> + serde::Serialize,
-        <Self::Witness as Computation>::Error: Display,
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
+        <Self::Inputs as Computation>::Error: Display,
     {
-        let witness = Self::Witness::compute(params.clone(), input)
-            .map_err(|e| ZkError::WitnessGenerationFailed(e.to_string()))?;
-        let json = witness
+        let inputs = Self::Inputs::compute(params.clone(), input)
+            .map_err(|e| ZkError::InputsGenerationFailed(e.to_string()))?;
+        let json = inputs
             .to_json()
             .map_err(|e| ZkError::SerializationError(e.to_string()))?;
-        witness_json_to_input_map(&json)
+
+        inputs_json_to_input_map(&json)
     }
 
     fn prove(
@@ -48,10 +49,10 @@ pub trait Provable: Send + Sync {
         e3_id: &str,
     ) -> Result<Proof, ZkError>
     where
-        Self::Witness: Computation<Preset = Self::Params, Input = Self::Input> + serde::Serialize,
-        <Self::Witness as Computation>::Error: Display,
+        Self::Inputs: Computation<Preset = Self::Params, Data = Self::Input> + serde::Serialize,
+        <Self::Inputs as Computation>::Error: Display,
     {
-        let inputs = self.build_witness(params, input)?;
+        let inputs = self.build_inputs(params, input)?;
 
         let circuit_name = self.circuit().as_str();
         let circuit_path = prover

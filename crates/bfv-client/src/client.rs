@@ -6,8 +6,8 @@
 
 use anyhow::{anyhow, Result};
 use e3_fhe_params::{build_bfv_params_arc, DEFAULT_BFV_PRESET};
-use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitInput;
-use e3_zk_helpers::circuits::threshold::user_data_encryption::Witness as UserDataEncryptionWitness;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::Inputs as UserDataEncryptionInputs;
 use e3_zk_helpers::circuits::Computation;
 use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::Error as FheError;
@@ -101,16 +101,16 @@ where
     let plaintext = Plaintext::try_encode(&data, Encoding::poly(), &params)
         .map_err(|e: FheError| anyhow!("Error encoding plaintext: {}", e))?;
 
-    let witness = UserDataEncryptionWitness::compute(
+    let inputs = UserDataEncryptionInputs::compute(
         DEFAULT_BFV_PRESET,
-        &UserDataEncryptionCircuitInput {
+        &UserDataEncryptionCircuitData {
             public_key: pk,
             plaintext: plaintext,
         },
     )?;
 
-    let encrypted_data = witness.ciphertext.clone();
-    let circuit_inputs = witness.to_json()?.to_string();
+    let encrypted_data = inputs.ciphertext.clone();
+    let circuit_inputs = inputs.to_json()?.to_string();
 
     Ok(VerifiableEncryptionResult {
         encrypted_data,

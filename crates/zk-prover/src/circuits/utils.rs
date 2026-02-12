@@ -10,13 +10,13 @@ use crate::error::ZkError;
 use acir::FieldElement;
 use noirc_abi::{input_parser::InputValue, InputMap};
 
-/// Converts witness JSON (from `Witness::to_json()`) to `InputMap` for Noir ABI.
+/// Converts inputs JSON (from `Inputs::to_json()`) to `InputMap` for Noir ABI.
 /// Expects the same structure: CRT fields as arrays of `{coefficients: [...]}`,
 /// polynomial fields as `{coefficients: [...]}`.
-pub fn witness_json_to_input_map(json: &serde_json::Value) -> Result<InputMap, ZkError> {
+pub fn inputs_json_to_input_map(json: &serde_json::Value) -> Result<InputMap, ZkError> {
     let obj = json
         .as_object()
-        .ok_or_else(|| ZkError::SerializationError("witness json must be an object".into()))?;
+        .ok_or_else(|| ZkError::SerializationError("inputs json must be an object".into()))?;
 
     let mut inputs = InputMap::new();
     for (key, value) in obj {

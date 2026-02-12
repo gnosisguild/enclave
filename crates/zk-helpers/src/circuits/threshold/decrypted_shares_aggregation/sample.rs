@@ -8,13 +8,13 @@
 //!
 //! Produces TRBFV parties with secret/public key shares, collects and aggregates shares,
 //! encrypts a message, computes T+1 decryption shares, and decrypts to obtain the message.
-//! The result is used as input for witness computation and codegen.
+//! The result is used as inputs for computation and codegen.
 
 use crate::circuits::computation::Computation;
 use crate::threshold::decrypted_shares_aggregation::computation::Configs;
 use crate::CircuitsErrors;
 use crate::{
-    threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput,
+    threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData,
     CiphernodesCommittee,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
@@ -38,7 +38,7 @@ struct Party {
     es_poly_sum: Poly,
 }
 
-impl DecryptedSharesAggregationCircuitInput {
+impl DecryptedSharesAggregationCircuitData {
     /// Generates sample data for the decrypted shares aggregation circuit:
     /// TRBFV setup, parties with sk/pk shares and smudging error shares, share collection
     /// and aggregation, encryption of a message, T+1 decryption shares, and threshold decrypt.
@@ -255,7 +255,7 @@ impl DecryptedSharesAggregationCircuitInput {
         let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly())
             .map_err(|e| CircuitsErrors::Sample(format!("Failed to decode plaintext: {:?}", e)))?;
 
-        Ok(DecryptedSharesAggregationCircuitInput {
+        Ok(DecryptedSharesAggregationCircuitData {
             committee,
             d_share_polys,
             reconstructing_parties,
@@ -268,52 +268,50 @@ impl DecryptedSharesAggregationCircuitInput {
 mod tests {
     use crate::{
         computation::Computation,
-        threshold::decrypted_shares_aggregation::{
-            DecryptedSharesAggregationCircuitInput, Witness,
-        },
+        threshold::decrypted_shares_aggregation::{DecryptedSharesAggregationCircuitData, Inputs},
         CiphernodesCommitteeSize,
     };
     use e3_fhe_params::BfvPreset;
     use num_bigint::BigInt;
 
-    /// Sample generation and witness computation: output shapes match circuit expectations.
+    /// Sample generation and input computation: output shapes match circuit expectations.
     #[test]
     fn test_generate_sample() {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
 
         let sample =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
-        let witness = Witness::compute(preset, &sample).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
+        let inputs = Inputs::compute(preset, &sample).unwrap();
 
         assert_eq!(
-            witness.decryption_shares.len(),
+            inputs.decryption_shares.len(),
             sample.committee.threshold + 1
         );
-        assert_eq!(witness.party_ids.len(), sample.reconstructing_parties.len());
+        assert_eq!(inputs.party_ids.len(), sample.reconstructing_parties.len());
         let configs =
             crate::threshold::decrypted_shares_aggregation::computation::Configs::compute(
                 preset,
                 &(),
             )
             .unwrap();
-        assert_eq!(witness.message.len(), configs.max_msg_non_zero_coeffs);
+        assert_eq!(inputs.message.len(), configs.max_msg_non_zero_coeffs);
     }
 
-    /// Witness message matches sample (ascending order: index 0 = constant term).
+    /// Input message matches sample (ascending order: index 0 = constant term).
     #[test]
-    fn test_witness_message_matches_sample() {
+    fn test_input_message_matches_sample() {
         use crate::threshold::decrypted_shares_aggregation::computation::Configs;
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
-        let witness = Witness::compute(preset, &sample).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
+        let inputs = Inputs::compute(preset, &sample).unwrap();
         let configs = Configs::compute(preset, &()).unwrap();
         let n = configs.max_msg_non_zero_coeffs;
         for i in 0..n {
             let expected = sample.message_vec.get(i).copied().unwrap_or(0);
-            let w = &witness.message[i];
+            let w = &inputs.message[i];
             let exp = BigInt::from(expected);
             assert_eq!(w, &exp, "message coeff {} mismatch", i);
         }

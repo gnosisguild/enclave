@@ -1,6 +1,5 @@
 {
   "extends": "solhint:recommended",
-  "plugins": ["prettier"],
   "rules": {
     "code-complexity": ["error", 8],
     "compiler-version": ["error", ">=0.8.27"],
@@ -10,12 +9,6 @@
     "no-console": "off",
     "not-rely-on-time": "off",
     "gas-custom-errors": "off",
-    "one-contract-per-file": "off",
-    "prettier/prettier": [
-      "error",
-      {
-        "endOfLine": "auto"
-      }
-    ]
+    "one-contract-per-file": "off"
   }
 }

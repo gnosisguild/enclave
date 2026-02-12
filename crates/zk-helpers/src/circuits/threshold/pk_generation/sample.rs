@@ -10,7 +10,7 @@
 //! for codegen and tests.
 
 use crate::{
-    threshold::pk_generation::PkGenerationCircuitInput, CiphernodesCommittee, CircuitsErrors,
+    threshold::pk_generation::PkGenerationCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::CrtPolynomial;
@@ -23,7 +23,7 @@ use fhe::{
 use rand::thread_rng;
 use std::ops::Deref;
 
-impl PkGenerationCircuitInput {
+impl PkGenerationCircuitData {
     pub fn generate_sample(
         preset: BfvPreset,
         committee: CiphernodesCommittee,
@@ -68,7 +68,7 @@ impl PkGenerationCircuitInput {
 
         let e_sm = e_sm_rns_zeroizing.deref().clone();
 
-        Ok(PkGenerationCircuitInput {
+        Ok(PkGenerationCircuitData {
             committee,
             pk0_share: CrtPolynomial::from_fhe_polynomial(&pk0_share),
             a: CrtPolynomial::from_fhe_polynomial(&a),
@@ -83,7 +83,7 @@ impl PkGenerationCircuitInput {
 mod tests {
     use crate::{
         computation::Computation,
-        threshold::pk_generation::{PkGenerationCircuitInput, Witness},
+        threshold::pk_generation::{Inputs, PkGenerationCircuitData},
         CiphernodesCommitteeSize,
     };
 
@@ -93,14 +93,14 @@ mod tests {
     fn test_generate_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sample =
-            PkGenerationCircuitInput::generate_sample(BfvPreset::InsecureThreshold512, committee)
+            PkGenerationCircuitData::generate_sample(BfvPreset::InsecureThreshold512, committee)
                 .unwrap();
-        let witness = Witness::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
+        let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
-        assert_eq!(witness.pk0is.limbs.len(), 2);
-        assert_eq!(witness.a.limbs.len(), 2);
-        assert_eq!(witness.e_sm.limbs.len(), 2);
-        assert_eq!(witness.r1is.limbs.len(), 2);
-        assert_eq!(witness.r2is.limbs.len(), 2);
+        assert_eq!(inputs.pk0is.limbs.len(), 2);
+        assert_eq!(inputs.a.limbs.len(), 2);
+        assert_eq!(inputs.e_sm.limbs.len(), 2);
+        assert_eq!(inputs.r1is.limbs.len(), 2);
+        assert_eq!(inputs.r2is.limbs.len(), 2);
     }
 }

@@ -42,7 +42,7 @@ use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
-use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitInput};
+use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
@@ -385,7 +385,7 @@ fn handle_pk_bfv_proof(
     })?;
 
     let circuit = PkCircuit;
-    let circuit_input = PkCircuitInput { public_key: pk_bfv };
+    let circuit_data = PkCircuitData { public_key: pk_bfv };
     let e3_id_str = request.e3_id.to_string();
     let preset_counterpart = req
         .params_preset
@@ -394,7 +394,7 @@ fn handle_pk_bfv_proof(
     // But here we have to pass the InsecureThreshold512 preset because the underlaying witness generator
     // builds both params, but will only use the DKG one
     let proof = circuit
-        .prove(prover, &preset_counterpart, &circuit_input, &e3_id_str)
+        .prove(prover, &preset_counterpart, &circuit_data, &e3_id_str)
         .map_err(|e| {
             ComputeRequestError::new(
                 ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),

@@ -9,6 +9,6 @@ pub mod codegen;
 pub mod computation;
 pub mod sample;
 
-pub use circuit::{PkCircuit, PkCircuitInput};
+pub use circuit::{PkCircuit, PkCircuitData};
 pub use codegen::{generate_configs, generate_toml};
-pub use computation::{Bits, Bounds, Configs, PkComputationOutput, Witness};
+pub use computation::{Bits, Bounds, Configs, Inputs, PkComputationOutput};

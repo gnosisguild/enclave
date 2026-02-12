@@ -8,10 +8,10 @@
 
 use crate::circuits::computation::CircuitComputation;
 use crate::circuits::dkg::share_encryption::Configs;
+use crate::circuits::dkg::share_encryption::Inputs;
 use crate::circuits::dkg::share_encryption::ShareEncryptionCircuit;
-use crate::circuits::dkg::share_encryption::ShareEncryptionCircuitInput;
+use crate::circuits::dkg::share_encryption::ShareEncryptionCircuitData;
 use crate::circuits::dkg::share_encryption::ShareEncryptionOutput;
-use crate::circuits::dkg::share_encryption::Witness;
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
 use crate::computation::Computation;
@@ -22,14 +22,14 @@ use e3_fhe_params::BfvPreset;
 /// Implementation of [`CircuitCodegen`] for [`ShareEncryptionCircuit`].
 impl CircuitCodegen for ShareEncryptionCircuit {
     type Preset = BfvPreset;
-    type Input = ShareEncryptionCircuitInput;
+    type Data = ShareEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let ShareEncryptionOutput { witness, .. } = ShareEncryptionCircuit::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let ShareEncryptionOutput { inputs, .. } = ShareEncryptionCircuit::compute(preset, data)?;
 
-        let toml = generate_toml(&witness)?;
-        let configs = Configs::compute(preset, input)?;
+        let toml = generate_toml(&inputs)?;
+        let configs = Configs::compute(preset, data)?;
         let configs_str = generate_configs(preset, &configs);
 
         Ok(Artifacts {
@@ -39,11 +39,9 @@ impl CircuitCodegen for ShareEncryptionCircuit {
     }
 }
 
-/// Serializes the witness to TOML string for the Noir prover (Prover.toml).
-pub fn generate_toml(witness: &Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+/// Serializes the input to TOML string for the Noir prover (Prover.toml).
+pub fn generate_toml(inputs: &Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }
@@ -187,7 +185,7 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
 mod tests {
     use super::*;
 
-    use crate::circuits::dkg::share_encryption::{Bounds, ShareEncryptionCircuitInput};
+    use crate::circuits::dkg::share_encryption::{Bounds, ShareEncryptionCircuitData};
     use crate::computation::Computation;
     use crate::computation::DkgInputType;
     use crate::{CiphernodesCommitteeSize, Circuit};
@@ -197,7 +195,7 @@ mod tests {
     fn test_toml_generation_and_structure() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,
@@ -220,7 +218,7 @@ mod tests {
     fn test_configs_generation_contains_expected() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let sd = BfvPreset::InsecureThreshold512.search_defaults().unwrap();
-        let sample = ShareEncryptionCircuitInput::generate_sample(
+        let sample = ShareEncryptionCircuitData::generate_sample(
             BfvPreset::InsecureThreshold512,
             committee.clone(),
             DkgInputType::SecretKey,

@@ -28,14 +28,14 @@ impl Circuit for ShareEncryptionCircuit {
 }
 
 /// Input to the share-encryption circuit: plaintext, ciphertext, keys, and encryption randomness.
-pub struct ShareEncryptionCircuitInput {
+pub struct ShareEncryptionCircuitData {
     /// Plaintext (encoded share row).
     pub plaintext: Plaintext,
     /// Ciphertext (encryption under public_key).
     pub ciphertext: Ciphertext,
     /// DKG public key used to encrypt.
     pub public_key: PublicKey,
-    /// Secret key (for witness; not revealed in proof).
+    /// Secret key (for input; not revealed in proof).
     pub secret_key: SecretKey,
     /// Encryption randomness u in RNS form (from try_encrypt_extended).
     pub u_rns: Poly,

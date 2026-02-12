@@ -10,8 +10,8 @@ use e3_fhe_params::BfvPreset;
 
 use crate::circuits::computation::Computation;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
-use crate::threshold::decrypted_shares_aggregation::computation::{Configs, Witness};
-use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitInput;
+use crate::threshold::decrypted_shares_aggregation::computation::{Configs, Inputs};
+use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
 use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
@@ -20,14 +20,14 @@ use crate::{Artifacts, CodegenConfigs, CodegenToml};
 /// Implementation of [`CircuitCodegen`] for [`DecryptedSharesAggregationCircuit`].
 impl CircuitCodegen for DecryptedSharesAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = DecryptedSharesAggregationCircuitInput;
+    type Data = DecryptedSharesAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs_str = generate_configs(preset, &configs);
 
         Ok(Artifacts {
@@ -37,15 +37,15 @@ impl CircuitCodegen for DecryptedSharesAggregationCircuit {
     }
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness.to_json().map_err(CircuitsErrors::SerdeJson)?;
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs.to_json().map_err(CircuitsErrors::SerdeJson)?;
 
     Ok(toml::to_string(&json)?)
 }
 
 /// Generates the decrypted_shares_aggregation config fragment for threshold.nr.
 /// Emits L, QIS, PLAINTEXT_MODULUS, Q_INVERSE_MOD_T so the circuit uses the same
-/// crypto params as the witness (avoids "Cannot satisfy constraint" from config mismatch).
+/// crypto params as the input (avoids "Cannot satisfy constraint" from config mismatch).
 pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <DecryptedSharesAggregationCircuit as Circuit>::PREFIX;
     let qis_str = configs
@@ -58,16 +58,16 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
     format!(
         r#"use crate::core::threshold::decrypted_shares_aggregation::Configs as DecryptedSharesAggregationConfigs;
 
+pub global L: u32 = {};
+pub global QIS: [Field; L] = [{}];
+pub global PLAINTEXT_MODULUS: Field = {};
+pub global Q_INVERSE_MOD_T: Field = {};
+        
 /************************************
 -------------------------------------
 decrypted_shares_aggregation (CIRCUIT 7)
 -------------------------------------
 ************************************/
-
-pub global L: u32 = {};
-pub global QIS: [Field; L] = [{}];
-pub global PLAINTEXT_MODULUS: Field = {};
-pub global Q_INVERSE_MOD_T: Field = {};
 
 pub global {}_BIT_NOISE: u32 = {};
 
@@ -113,7 +113,7 @@ mod tests {
         let preset = BfvPreset::InsecureThreshold512;
         let committee = CiphernodesCommitteeSize::Small.values();
         let input =
-            DecryptedSharesAggregationCircuitInput::generate_sample(preset, committee).unwrap();
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
         let circuit = DecryptedSharesAggregationCircuit;
 
         let artifacts = circuit.codegen(preset, &input).unwrap();

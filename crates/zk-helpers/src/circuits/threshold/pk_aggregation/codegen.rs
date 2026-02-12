@@ -10,8 +10,8 @@ use e3_fhe_params::BfvPreset;
 
 use crate::circuits::computation::Computation;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
-use crate::threshold::pk_aggregation::computation::{Configs, Witness};
-use crate::threshold::pk_aggregation::PkAggregationCircuitInput;
+use crate::threshold::pk_aggregation::computation::{Configs, Inputs};
+use crate::threshold::pk_aggregation::PkAggregationCircuitData;
 use crate::utils::join_display;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;
@@ -21,24 +21,22 @@ use crate::{Circuit, CodegenConfigs};
 /// Implementation of [`CircuitCodegen`] for [`PkAggregationCircuit`].
 impl CircuitCodegen for PkAggregationCircuit {
     type Preset = BfvPreset;
-    type Input = PkAggregationCircuitInput;
+    type Data = PkAggregationCircuitData;
     type Error = CircuitsErrors;
 
-    fn codegen(&self, preset: Self::Preset, input: &Self::Input) -> Result<Artifacts, Self::Error> {
-        let witness = Witness::compute(preset, input)?;
+    fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
+        let inputs = Inputs::compute(preset, data)?;
         let configs = Configs::compute(preset, &())?;
 
-        let toml = generate_toml(witness)?;
+        let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
 
         Ok(Artifacts { toml, configs })
     }
 }
 
-pub fn generate_toml(witness: Witness) -> Result<CodegenToml, CircuitsErrors> {
-    let json = witness
-        .to_json()
-        .map_err(|e| CircuitsErrors::SerdeJson(e))?;
+pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
+    let json = inputs.to_json().map_err(|e| CircuitsErrors::SerdeJson(e))?;
 
     Ok(toml::to_string(&json)?)
 }
@@ -64,7 +62,7 @@ pk_aggregation (CIRCUIT 5)
 
 pub global {}_BIT_PK: u32 = {};
 
-pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);
+pub global {}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 "#,
         configs.n,           // N
         configs.l,           // L
@@ -87,13 +85,13 @@ mod tests {
         let committee = CiphernodesCommitteeSize::Small.values();
         let prefix: &str = <PkAggregationCircuit as Circuit>::PREFIX;
 
-        let sample = PkAggregationCircuitInput::generate_sample(preset, committee).unwrap();
-        let witness = Witness::compute(preset, &sample).unwrap();
+        let sample = PkAggregationCircuitData::generate_sample(preset, committee).unwrap();
+        let inputs = Inputs::compute(preset, &sample).unwrap();
         let configs = Configs::compute(preset, &()).unwrap();
 
         let qis_str = join_display(&configs.moduli, ", ");
 
-        let parsed: serde_json::Value = witness.to_json().unwrap();
+        let parsed: serde_json::Value = inputs.to_json().unwrap();
         let pk0 = parsed
             .get("pk0")
             .and_then(|value| value.as_array())
@@ -115,7 +113,7 @@ mod tests {
         assert!(!pk0_agg.is_empty());
         assert!(!pk1_agg.is_empty());
 
-        let codegen_toml = generate_toml(witness).unwrap();
+        let codegen_toml = generate_toml(inputs).unwrap();
         let codegen_configs = generate_configs(preset, &configs);
 
         assert!(codegen_toml.contains("pk0"));
@@ -129,7 +127,7 @@ mod tests {
             .contains(format!("{}_BIT_PK: u32 = {}", prefix, configs.bits.pk_bit).as_str()));
         assert!(codegen_configs.contains(
             format!(
-                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS,);",
+                "{}_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);",
                 prefix
             )
             .as_str()

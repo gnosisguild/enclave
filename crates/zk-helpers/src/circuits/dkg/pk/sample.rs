@@ -6,14 +6,14 @@
 
 //! Sample data generation for the pk circuit: committee and DKG public key only.
 
-use crate::dkg::pk::PkCircuitInput;
+use crate::dkg::pk::PkCircuitData;
 use crate::CircuitsErrors;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use fhe::bfv::{PublicKey, SecretKey};
 use rand::thread_rng;
 
-impl PkCircuitInput {
+impl PkCircuitData {
     /// Generates sample data for the pk circuit.
     pub fn generate_sample(preset: BfvPreset) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) = build_pair_for_preset(preset).map_err(|e| {
@@ -32,12 +32,12 @@ impl PkCircuitInput {
 
 #[cfg(test)]
 mod tests {
-    use crate::dkg::pk::PkCircuitInput;
+    use crate::dkg::pk::PkCircuitData;
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_generate_pk_sample() {
-        let sample = PkCircuitInput::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
+        let sample = PkCircuitData::generate_sample(BfvPreset::InsecureThreshold512).unwrap();
 
         assert_eq!(sample.public_key.c.c.len(), 2);
     }
