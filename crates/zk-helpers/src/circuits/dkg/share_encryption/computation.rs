@@ -30,8 +30,6 @@ use e3_fhe_params::BfvPreset;
 use e3_polynomial::Polynomial;
 use e3_polynomial::{center, reduce, CrtPolynomial};
 use fhe::bfv::SecretKey;
-use fhe_math::rq::Poly;
-use fhe_math::rq::Representation;
 use fhe_math::zq::Modulus;
 use itertools::izip;
 use num_bigint::ToBigInt;
@@ -348,318 +346,186 @@ impl Computation for Inputs {
     type Data = ShareEncryptionCircuitData;
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(_preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (_, dkg_params) =
-            build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
-        let ctx = dkg_params.ctx_at_level(data.plaintext.level())?;
-
-        let pk_bit = compute_modulus_bit(&dkg_params);
-        let msg_bit = compute_msg_bit(&dkg_params);
+            build_pair_for_preset(_preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let pk = data.public_key.clone();
         let pt = data.plaintext.clone();
+        let ct = &data.ciphertext;
+        let u = &data.u_rns;
+        let e0 = &data.e0_rns;
+        let e1 = &data.e1_rns;
 
-        // Reconstruct e0 in mod Q so that e0_poly row i matches e0_rns row i (same ctx).
-        let mut e0_power = data.e0_rns.clone();
-        e0_power.change_representation(Representation::PowerBasis);
-        let e0_mod_q: Vec<BigUint> = Vec::<BigUint>::from(&e0_power);
-        let e0_bigints: Vec<BigInt> = e0_mod_q.iter().map(|c| c.to_bigint().unwrap()).collect();
-        let e0 = (*Poly::from_bigints(&e0_bigints, &ctx)
-            .map_err(|e| CircuitsErrors::Other(e.to_string()))?)
-        .clone();
+        let ctx = dkg_params.ctx_at_level(pt.level())?;
+        let moduli = dkg_params.moduli();
 
-        let t = Modulus::new(dkg_params.plaintext())
-            .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?;
-        let n: u64 = ctx.degree as u64;
+        #[allow(non_snake_case)]
+        let modulus_Q = BigInt::from(ctx.modulus().clone());
+        let t = dkg_params.plaintext();
+        let n = dkg_params.degree() as u64;
+        let q_mod_t = (&modulus_Q % t)
+            .to_u64()
+            .ok_or_else(|| CircuitsErrors::Other("Failed to convert q_mod_t to u64".into()))?;
+        let cyclo = cyclotomic_polynomial(n);
+
+        #[allow(non_snake_case)]
+        let mut e0_mod_Q = Polynomial::from_fhe_polynomial(e0);
+        e0_mod_Q.reverse();
+        e0_mod_Q.center(&modulus_Q);
+
+        let mut k1_u64 = pt.value.deref().to_vec();
+        Modulus::new(t)
+            .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?
+            .scalar_mul_vec(&mut k1_u64, q_mod_t);
+
+        let mut k1 = Polynomial::from_u64_vector(k1_u64);
+        k1.reverse();
+        k1.center(&BigInt::from(t));
 
         let mut message = Polynomial::from_u64_vector(pt.value.deref().to_vec());
         message.reverse();
 
-        // k1[i] = (q_mod_t * message[i]) mod t, centered to [-t/2, t/2)
-        let q_mod_t = (ctx.modulus() % t.modulus()).to_u64().unwrap();
-        let mut k1_u64: Vec<u64> = message
-            .coefficients()
-            .iter()
-            .map(|c| c.to_u64().unwrap())
-            .collect();
-        t.scalar_mul_vec(&mut k1_u64, q_mod_t);
+        let mut u = CrtPolynomial::from_fhe_polynomial(u).limb(0).clone();
+        let mut e1 = CrtPolynomial::from_fhe_polynomial(e1).limb(0).clone();
 
-        let mut k1 = Polynomial::from_u64_vector(k1_u64);
-        k1.center(&BigInt::from(t.modulus()));
+        u.center(&BigInt::from(moduli[0]));
+        u.reverse();
 
-        let mut u_rns_copy = data.u_rns.clone();
-        let mut e0_rns_copy = data.e0_rns.clone();
-        let mut e0_poly_copy = e0.clone();
-        let mut e1_rns_copy = data.e1_rns.clone();
+        e1.center(&BigInt::from(moduli[0]));
+        e1.reverse();
 
-        u_rns_copy.change_representation(Representation::PowerBasis);
-        e0_rns_copy.change_representation(Representation::PowerBasis);
-        e0_poly_copy.change_representation(Representation::PowerBasis);
-        e1_rns_copy.change_representation(Representation::PowerBasis);
+        let mut ct0 = CrtPolynomial::from_fhe_polynomial(&ct.c[0]);
+        let mut ct1 = CrtPolynomial::from_fhe_polynomial(&ct.c[1]);
+        let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk.c.c[0]);
+        let mut pk1 = CrtPolynomial::from_fhe_polynomial(&pk.c.c[1]);
+        let mut e0_crt = CrtPolynomial::from_fhe_polynomial(e0);
 
-        // Extract coefficients using the current API
-        let u: Vec<BigInt> =
-            unsafe {
-                ctx.moduli_operators()[0]
-                    .center_vec_vt(u_rns_copy.coefficients().row(0).as_slice().ok_or_else(
-                        || CircuitsErrors::Other("Cannot center coefficients.".into()),
-                    )?)
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect()
-            };
+        ct0.reverse();
+        ct1.reverse();
+        pk0.reverse();
+        pk1.reverse();
+        e0_crt.reverse();
 
-        let mut e0_vec = Polynomial::new(e0_bigints.clone());
-        e0_vec.reverse();
+        ct0.reduce(moduli)?;
+        ct1.reduce(moduli)?;
+        pk0.reduce(moduli)?;
+        pk1.reduce(moduli)?;
 
-        // Center the coefficients mod Q
-        let q_bigint = BigInt::from(ctx.modulus().clone());
+        ct0.center(moduli)?;
+        ct1.center(moduli)?;
+        pk0.center(moduli)?;
+        pk1.center(moduli)?;
+        e0_crt.center(moduli)?;
 
-        e0_vec.center(&q_bigint);
+        let CrtPolynomial { limbs: ct0_limbs } = ct0;
+        let CrtPolynomial { limbs: ct1_limbs } = ct1;
+        let CrtPolynomial { limbs: pk0_limbs } = pk0;
+        let CrtPolynomial { limbs: pk1_limbs } = pk1;
+        let CrtPolynomial { limbs: e0_limbs } = e0_crt;
 
-        let e1: Vec<BigInt> =
-            unsafe {
-                ctx.moduli_operators()[0]
-                    .center_vec_vt(e1_rns_copy.coefficients().row(0).as_slice().ok_or_else(
-                        || CircuitsErrors::Other("Cannot center coefficients.".into()),
-                    )?)
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect()
-            };
-
-        // Extract and convert ciphertext and public key polynomials
-        let mut ct0 = data.ciphertext.c[0].clone(); // ct0
-        let mut ct1 = data.ciphertext.c[1].clone(); // ct1
-        ct0.change_representation(Representation::PowerBasis);
-        ct1.change_representation(Representation::PowerBasis);
-
-        let mut pk0: Poly = pk.c.c[0].clone();
-        let mut pk1: Poly = pk.c.c[1].clone();
-        pk0.change_representation(Representation::PowerBasis);
-        pk1.change_representation(Representation::PowerBasis);
-
-        let cyclo = cyclotomic_polynomial(n);
-
-        let ct0_coeffs = ct0.coefficients();
-        let ct1_coeffs = ct1.coefficients();
-        let pk0_coeffs = pk0.coefficients();
-        let pk1_coeffs = pk1.coefficients();
-        let e0_coeffs = e0_rns_copy.coefficients();
-        let e0_poly_coeffs = e0_poly_copy.coefficients();
-
-        let ct0_coeffs_rows = ct0_coeffs.rows();
-        let ct1_coeffs_rows = ct1_coeffs.rows();
-        let pk0_coeffs_rows = pk0_coeffs.rows();
-        let pk1_coeffs_rows = pk1_coeffs.rows();
-        let e0_coeffs_rows = e0_coeffs.rows();
-        let e0_poly_coeffs_rows = e0_poly_coeffs.rows();
-
-        // Perform the main computation logic
-        let results: Vec<_> = izip!(
+        let mut results: Vec<_> = izip!(
             ctx.moduli_operators(),
-            ct0_coeffs_rows,
-            ct1_coeffs_rows,
-            pk0_coeffs_rows,
-            pk1_coeffs_rows,
-            e0_coeffs_rows,
-            e0_poly_coeffs_rows,
+            ct0_limbs,
+            ct1_limbs,
+            pk0_limbs,
+            pk1_limbs,
+            e0_limbs,
         )
         .enumerate()
         .par_bridge()
-        .map(
-            |(
+        .map(|(i, (qi, ct0i, ct1i, pk0i, pk1i, e0i))| {
+            let qi_bigint = BigInt::from(qi.modulus());
+
+            let diff = e0_mod_Q.sub(&e0i);
+            let qi_poly = Polynomial::constant(qi_bigint.clone());
+            let (e0_quotient, remainder) = diff.div(&qi_poly).expect("CRT requires exact division");
+
+            assert!(
+                remainder.is_zero(),
+                "e0 - e0i must be divisible by qi (CRT consistency)"
+            );
+
+            let k0qi = BigInt::from(qi.inv(qi.neg(t)).unwrap());
+            let ki = k1.scalar_mul(&k0qi);
+
+            let ct0i_hat = {
+                let pk0i_u_times = pk0i.mul(&u);
+                let e0_plus_ki = e0i.add(&ki);
+
+                assert_eq!((pk0i_u_times.coefficients().len() as u64) - 1, 2 * (n - 1));
+                assert_eq!((e0_plus_ki.coefficients().len() as u64) - 1, n - 1);
+
+                pk0i_u_times.add(&e0_plus_ki)
+            };
+
+            assert_eq!((ct0i_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
+
+            let (r1i, r2i) = decompose_residue(&ct0i, &ct0i_hat, &qi_bigint, &cyclo, n);
+
+            let ct1i_hat = {
+                let pk1i_u_times = pk1i.mul(&u);
+
+                assert_eq!((pk1i_u_times.coefficients().len() as u64) - 1, 2 * (n - 1));
+
+                pk1i_u_times.add(&e1)
+            };
+            assert_eq!((ct1i_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
+
+            let (p1i, p2i) = decompose_residue(&ct1i, &ct1i_hat, &qi_bigint, &cyclo, n);
+
+            (
                 i,
-                (qi, ct0_coeffs, ct1_coeffs, pk0_coeffs, pk1_coeffs, e0_coeffs, e0_poly_coeffs),
-            )| {
-                // --------------------------------------------------- ct0i ---------------------------------------------------
-
-                // Convert to vectors of bigint, center, and reverse order.
-                let mut ct0i = Polynomial::from_u64_vector(ct0_coeffs.to_vec());
-                let mut ct1i = Polynomial::from_u64_vector(ct1_coeffs.to_vec());
-                let mut pk0i = Polynomial::from_u64_vector(pk0_coeffs.to_vec());
-                let mut pk1i = Polynomial::from_u64_vector(pk1_coeffs.to_vec());
-
-                ct0i.reverse();
-                ct1i.reverse();
-                pk0i.reverse();
-                pk1i.reverse();
-
-                let qi_bigint = BigInt::from(qi.modulus());
-
-                ct0i.reduce(&qi_bigint);
-                ct0i.center(&qi_bigint);
-                ct1i.reduce(&qi_bigint);
-                ct1i.center(&qi_bigint);
-                pk0i.reduce(&qi_bigint);
-                pk0i.center(&qi_bigint);
-                pk1i.reduce(&qi_bigint);
-                pk1i.center(&qi_bigint);
-
-                let e0i: Vec<BigInt> = unsafe {
-                    qi.center_vec_vt(
-                        e0_coeffs
-                            .as_slice()
-                            .ok_or_else(|| "Cannot center coefficients.".to_string())
-                            .unwrap(),
-                    )
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect()
-                };
-
-                // Explicitly check e1is[i] == e1 mod qi (after centering and reversal)
-                let e0i_from_poly: Vec<BigInt> = unsafe {
-                    qi.center_vec_vt(
-                        e0_poly_coeffs
-                            .as_slice()
-                            .ok_or_else(|| "Cannot center coefficients.".to_string())
-                            .unwrap(),
-                    )
-                    .iter()
-                    .rev()
-                    .map(|&x| BigInt::from(x))
-                    .collect()
-                };
-
-                // Check that e0i equals e0 reduced modulo q_i (from e0_poly)
-                assert_eq!(e0i, e0i_from_poly);
-
-                // Compute e0_quotients[i] = (e0 - e0i) / qi for each coefficient
-                // This is used for CRT consistency check: e0[j] = e0i[j] + e0_quotients[i][j] * qi
-                let e0_quotient: Vec<BigInt> = e0_vec
-                    .coefficients()
-                    .iter()
-                    .zip(e0i.iter())
-                    .map(|(e0_coeff, e0i_coeff)| {
-                        let diff = e0_coeff - e0i_coeff;
-                        // Division should be exact since e0 = e0i (mod qi)
-                        let quotient = &diff / &qi_bigint;
-                        // Verify the CRT relationship
-                        assert_eq!(e0_coeff, &(e0i_coeff + &quotient * &qi_bigint));
-                        quotient
-                    })
-                    .collect();
-
-                // k0qi = -t^{-1} mod qi
-                let koqi_u64 = qi.inv(qi.neg(t.modulus())).unwrap();
-                let k0qi = BigInt::from(koqi_u64); // Do not need to center this
-
-                // ki = k1 * k0qi
-                let ki_poly = Polynomial::new(k1.coefficients().to_vec()).scalar_mul(&k0qi);
-                let ki = ki_poly.coefficients().to_vec();
-
-                // Calculate ct0i_hat = pk0 * ui + e0i + ki
-                let ct0i_hat = {
-                    let pk0i_poly = pk0i.clone();
-                    let u_poly = Polynomial::new(u.clone());
-                    let pk0i_times_u = pk0i_poly.mul(&u_poly);
-                    assert_eq!((pk0i_times_u.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-                    let e0i_poly = Polynomial::new(e0i.clone());
-                    let ki_poly = Polynomial::new(ki.clone());
-                    let e0_plus_ki = e0i_poly.add(&ki_poly);
-                    assert_eq!((e0_plus_ki.coefficients().len() as u64) - 1, n - 1);
-
-                    pk0i_times_u.add(&e0_plus_ki).coefficients().to_vec()
-                };
-                assert_eq!((ct0i_hat.len() as u64) - 1, 2 * (n - 1));
-
-                let ct0i_hat_poly = Polynomial::new(ct0i_hat.clone());
-                let (r1i_poly, r2i_poly) =
-                    decompose_residue(&ct0i, &ct0i_hat_poly, &qi_bigint, &cyclo, n);
-                let r1i = r1i_poly.coefficients().to_vec();
-                let r2i = r2i_poly.coefficients().to_vec();
-
-                // --------------------------------------------------- ct1i ---------------------------------------------------
-
-                // Calculate ct1i_hat = pk1i * ui + e1
-                let ct1i_hat = {
-                    let pk1i_poly = pk1i.clone();
-                    let u_poly = Polynomial::new(u.clone());
-                    let pk1i_times_u = pk1i_poly.mul(&u_poly);
-                    assert_eq!((pk1i_times_u.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-                    let e1_poly = Polynomial::new(e1.clone());
-                    pk1i_times_u.add(&e1_poly).coefficients().to_vec()
-                };
-                assert_eq!((ct1i_hat.len() as u64) - 1, 2 * (n - 1));
-
-                let ct1i_hat_poly = Polynomial::new(ct1i_hat.clone());
-                let (p1i_poly, p2i_poly) =
-                    decompose_residue(&ct1i, &ct1i_hat_poly, &qi_bigint, &cyclo, n);
-                let p1i = p1i_poly.coefficients().to_vec();
-                let p2i = p2i_poly.coefficients().to_vec();
-
-                (
-                    i,
-                    r2i,
-                    r1i,
-                    k0qi,
-                    ct0i,
-                    ct1i,
-                    pk0i,
-                    pk1i,
-                    p1i,
-                    p2i,
-                    e0i,
-                    e0_quotient,
-                )
-            },
-        )
+                r2i,
+                r1i,
+                ct0i,
+                ct1i,
+                pk0i,
+                pk1i,
+                p1i,
+                p2i,
+                e0i,
+                e0_quotient,
+            )
+        })
         .collect();
 
-        // Sort by modulus index so CRT limbs are in order
-        let mut results = results.clone();
         results.sort_by_key(|(i, ..)| *i);
 
-        // results elements: (i, r2i, r1i, k0qi, ct0i, ct1i, pk0i, pk1i, p1i, p2i, e0i, e0_quotient)
-        let mut pk0is = CrtPolynomial::from_bigint_vectors(
-            results
-                .iter()
-                .map(|row| row.6.clone())
-                .map(|pk0i| pk0i.coefficients().to_vec())
-                .collect(),
-        );
-        let mut pk1is = CrtPolynomial::from_bigint_vectors(
-            results
-                .iter()
-                .map(|row| row.7.clone())
-                .map(|pk1i| pk1i.coefficients().to_vec())
-                .collect(),
-        );
-        let mut ct0is = CrtPolynomial::from_bigint_vectors(
-            results
-                .iter()
-                .map(|row| row.4.clone())
-                .map(|ct0i| ct0i.coefficients().to_vec())
-                .collect(),
-        );
-        let mut ct1is = CrtPolynomial::from_bigint_vectors(
-            results
-                .iter()
-                .map(|row| row.5.clone())
-                .map(|ct1i| ct1i.coefficients().to_vec())
-                .collect(),
-        );
-        let mut r1is =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.2.clone()).collect());
-        let mut r2is =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.1.clone()).collect());
-        let mut p1is =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.8.clone()).collect());
-        let mut p2is =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.9.clone()).collect());
-        let mut e0is =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.10.clone()).collect());
-        let mut e0_quotients =
-            CrtPolynomial::from_bigint_vectors(results.iter().map(|row| row.11.clone()).collect());
+        let mut pk0is = Vec::with_capacity(results.len());
+        let mut pk1is = Vec::with_capacity(results.len());
+        let mut ct0is = Vec::with_capacity(results.len());
+        let mut ct1is = Vec::with_capacity(results.len());
+        let mut r1is = Vec::with_capacity(results.len());
+        let mut r2is = Vec::with_capacity(results.len());
+        let mut p1is = Vec::with_capacity(results.len());
+        let mut p2is = Vec::with_capacity(results.len());
+        let mut e0is = Vec::with_capacity(results.len());
+        let mut e0_quotients = Vec::with_capacity(results.len());
 
-        let mut e1 = Polynomial::new(e1);
-        let mut u = Polynomial::new(u);
+        for (_, r2i, r1i, ct0i, ct1i, pk0i, pk1i, p1i, p2i, e0i, e0_quotient) in results {
+            pk0is.push(pk0i);
+            pk1is.push(pk1i);
+            ct0is.push(ct0i);
+            ct1is.push(ct1i);
+            r1is.push(r1i);
+            r2is.push(r2i);
+            p1is.push(p1i);
+            p2is.push(p2i);
+            e0is.push(e0i);
+            e0_quotients.push(e0_quotient);
+        }
+
+        let mut pk0is = CrtPolynomial::new(pk0is);
+        let mut pk1is = CrtPolynomial::new(pk1is);
+        let mut ct0is = CrtPolynomial::new(ct0is);
+        let mut ct1is = CrtPolynomial::new(ct1is);
+        let mut r1is = CrtPolynomial::new(r1is);
+        let mut r2is = CrtPolynomial::new(r2is);
+        let mut p1is = CrtPolynomial::new(p1is);
+        let mut p2is = CrtPolynomial::new(p2is);
+        let mut e0is = CrtPolynomial::new(e0is);
+        let mut e0_quotients = CrtPolynomial::new(e0_quotients);
 
         let zkp_modulus = get_zkp_modulus();
 
@@ -675,9 +541,11 @@ impl Computation for Inputs {
         e0_quotients.reduce_uniform(&zkp_modulus);
         e1.reduce(&zkp_modulus);
         u.reduce(&zkp_modulus);
-        e0_vec.reduce(&zkp_modulus);
+        e0_mod_Q.reduce(&zkp_modulus);
         k1.reduce(&zkp_modulus);
 
+        let pk_bit = compute_modulus_bit(&dkg_params);
+        let msg_bit = compute_msg_bit(&dkg_params);
         let pk_commitment = compute_dkg_pk_commitment(&pk0is, &pk1is, pk_bit);
         let msg_commitment = compute_share_encryption_commitment_from_message(&message, msg_bit);
 
@@ -692,7 +560,7 @@ impl Computation for Inputs {
             p2is,
             e0is,
             e0_quotients,
-            e0: e0_vec,
+            e0: e0_mod_Q,
             e1,
             u,
             message,
