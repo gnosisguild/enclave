@@ -52,11 +52,7 @@ use crate::ZkBackend;
 ///
 /// Requires a `ZkBackend` for proof generation/verification and a
 /// `PrivateKeySigner` for signing proofs (fault attribution).
-pub fn setup_zk_actors(
-    bus: &BusHandle,
-    backend: &ZkBackend,
-    signer: PrivateKeySigner,
-) -> ZkActors {
+pub fn setup_zk_actors(bus: &BusHandle, backend: &ZkBackend, signer: PrivateKeySigner) -> ZkActors {
     let zk_actor = ZkActor::new(backend).start();
     let verifier = zk_actor.clone().recipient();
 

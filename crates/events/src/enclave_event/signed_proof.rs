@@ -92,7 +92,7 @@ impl fmt::Display for ProofType {
 ///
 /// Only contains data needed for on-chain fault verification:
 /// the E3 identifier, proof type, and the ZK proof itself.
-/// Encoded via `abi.encodePacked(chainId, e3Id, proofType, proof, publicSignals)`
+/// Encoded via `abi.encode(chainId, e3Id, proofType, proof, publicSignals)`
 /// so on-chain `ecrecover` can reconstruct the same digest.
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
