@@ -106,7 +106,7 @@ impl ProofRequestActor {
         info!("Requesting T1 PkGeneration proof generation");
         if let Err(err) = self.bus.publish(request, ec) {
             error!("Failed to publish ZK proof request: {err}");
-            self.pending.remove(&correlation_id);
+            self.pending_threshold.remove(&correlation_id);
         }
     }
 
