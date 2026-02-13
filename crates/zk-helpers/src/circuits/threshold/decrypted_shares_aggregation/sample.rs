@@ -295,7 +295,10 @@ mod tests {
                 &(),
             )
             .unwrap();
-        assert_eq!(inputs.message.len(), configs.max_msg_non_zero_coeffs);
+        assert_eq!(
+            inputs.message.coefficients().len(),
+            configs.max_msg_non_zero_coeffs
+        );
     }
 
     /// Input message matches sample (ascending order: index 0 = constant term).
@@ -311,7 +314,7 @@ mod tests {
         let n = configs.max_msg_non_zero_coeffs;
         for i in 0..n {
             let expected = sample.message_vec.get(i).copied().unwrap_or(0);
-            let w = &inputs.message[i];
+            let w = &inputs.message.coefficients()[i];
             let exp = BigInt::from(expected);
             assert_eq!(w, &exp, "message coeff {} mismatch", i);
         }
