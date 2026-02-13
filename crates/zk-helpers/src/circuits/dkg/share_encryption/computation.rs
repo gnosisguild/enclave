@@ -406,11 +406,6 @@ impl Computation for Inputs {
         pk1.reverse();
         e0_crt.reverse();
 
-        ct0.reduce(moduli)?;
-        ct1.reduce(moduli)?;
-        pk0.reduce(moduli)?;
-        pk1.reduce(moduli)?;
-
         ct0.center(moduli)?;
         ct1.center(moduli)?;
         pk0.center(moduli)?;
@@ -515,32 +510,16 @@ impl Computation for Inputs {
             e0_quotients.push(e0_quotient);
         }
 
-        let mut pk0is = CrtPolynomial::new(pk0is);
-        let mut pk1is = CrtPolynomial::new(pk1is);
-        let mut ct0is = CrtPolynomial::new(ct0is);
-        let mut ct1is = CrtPolynomial::new(ct1is);
-        let mut r1is = CrtPolynomial::new(r1is);
-        let mut r2is = CrtPolynomial::new(r2is);
-        let mut p1is = CrtPolynomial::new(p1is);
-        let mut p2is = CrtPolynomial::new(p2is);
-        let mut e0is = CrtPolynomial::new(e0is);
-        let mut e0_quotients = CrtPolynomial::new(e0_quotients);
-
-        let zkp_modulus = get_zkp_modulus();
-
-        pk0is.reduce_uniform(&zkp_modulus);
-        pk1is.reduce_uniform(&zkp_modulus);
-        ct0is.reduce_uniform(&zkp_modulus);
-        ct1is.reduce_uniform(&zkp_modulus);
-        r1is.reduce_uniform(&zkp_modulus);
-        r2is.reduce_uniform(&zkp_modulus);
-        p1is.reduce_uniform(&zkp_modulus);
-        p2is.reduce_uniform(&zkp_modulus);
-        e0is.reduce_uniform(&zkp_modulus);
-        e0_quotients.reduce_uniform(&zkp_modulus);
-        e1.reduce(&zkp_modulus);
-        u.reduce(&zkp_modulus);
-        e0_mod_q.reduce(&zkp_modulus);
+        let pk0is = CrtPolynomial::new(pk0is);
+        let pk1is = CrtPolynomial::new(pk1is);
+        let ct0is = CrtPolynomial::new(ct0is);
+        let ct1is = CrtPolynomial::new(ct1is);
+        let r1is = CrtPolynomial::new(r1is);
+        let r2is = CrtPolynomial::new(r2is);
+        let p1is = CrtPolynomial::new(p1is);
+        let p2is = CrtPolynomial::new(p2is);
+        let e0is = CrtPolynomial::new(e0is);
+        let e0_quotients = CrtPolynomial::new(e0_quotients);
 
         let pk_bit = compute_modulus_bit(&dkg_params);
         let msg_bit = compute_msg_bit(&dkg_params);

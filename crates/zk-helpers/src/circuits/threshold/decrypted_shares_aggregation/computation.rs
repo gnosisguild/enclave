@@ -211,9 +211,7 @@ impl Computation for Inputs {
         // Decryption shares: one CrtPolynomial per party (from_fhe + reduce)
         let mut decryption_shares: Vec<CrtPolynomial> = Vec::with_capacity(d_share_polys.len());
         for d_share in &d_share_polys {
-            let mut crt = CrtPolynomial::from_fhe_polynomial(d_share);
-            crt.reduce(moduli)
-                .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+            let crt = CrtPolynomial::from_fhe_polynomial(d_share);
             decryption_shares.push(crt);
         }
 
@@ -289,9 +287,6 @@ impl Computation for Inputs {
 
         let zkp_modulus = get_zkp_modulus();
 
-        for crt in &mut decryption_shares {
-            crt.reduce_uniform(&zkp_modulus);
-        }
         let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
         let message = Polynomial::new(
             message_trunc
@@ -305,7 +300,6 @@ impl Computation for Inputs {
                 .map(|c| reduce(c, &zkp_modulus))
                 .collect(),
         );
-        crt_quotients.reduce_uniform(&zkp_modulus);
 
         Ok(Inputs {
             decryption_shares,

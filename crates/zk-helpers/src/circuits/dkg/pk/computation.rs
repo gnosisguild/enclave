@@ -13,7 +13,6 @@ use crate::circuits::dkg::pk::circuit::PkCircuit;
 use crate::circuits::dkg::pk::circuit::PkCircuitData;
 use crate::compute_max_modulus;
 use crate::crt_polynomial_to_toml_json;
-use crate::get_zkp_modulus;
 use crate::utils::compute_modulus_bit;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
@@ -147,13 +146,8 @@ impl Computation for Inputs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let moduli = dkg_params.moduli();
 
-        let mut pk0is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[0], moduli)?;
-        let mut pk1is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[1], moduli)?;
-
-        let zkp_modulus = &get_zkp_modulus();
-
-        pk0is.reduce_uniform(zkp_modulus);
-        pk1is.reduce_uniform(zkp_modulus);
+        let pk0is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[0], moduli)?;
+        let pk1is = crate::math::fhe_poly_to_crt_centered(&data.public_key.c.c[1], moduli)?;
 
         Ok(Inputs { pk0is, pk1is })
     }

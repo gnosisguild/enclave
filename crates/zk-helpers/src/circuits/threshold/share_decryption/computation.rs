@@ -15,7 +15,6 @@ use crate::circuits::commitments::compute_aggregated_shares_commitment;
 use crate::compute_modulus_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::decompose_residue;
-use crate::get_zkp_modulus;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
@@ -250,23 +249,18 @@ impl Computation for Inputs {
         .par_bridge()
         .map(|(i, (qi, mut ct0, mut ct1, mut s, mut e, mut d_share))| {
             ct0.reverse();
-            ct0.reduce(&qi);
             ct0.center(&qi);
 
             ct1.reverse();
-            ct1.reduce(&qi);
             ct1.center(&qi);
 
             s.reverse();
-            s.reduce(&qi);
             s.center(&qi);
 
             e.reverse();
-            e.reduce(&qi);
             e.center(&qi);
 
             d_share.reverse();
-            d_share.reduce(&qi);
             d_share.center(&qi);
 
             // Compute d_share_hat = ct0 + ct1 * s + e
@@ -306,16 +300,6 @@ impl Computation for Inputs {
             r2.add_limb(r2i);
             d.add_limb(d_sharei);
         }
-
-        let zkp_modulus = &get_zkp_modulus();
-
-        ct0.reduce_uniform(zkp_modulus);
-        ct1.reduce_uniform(zkp_modulus);
-        sk.reduce_uniform(zkp_modulus);
-        e_sm.reduce_uniform(zkp_modulus);
-        r1.reduce_uniform(zkp_modulus);
-        r2.reduce_uniform(zkp_modulus);
-        d.reduce_uniform(zkp_modulus);
 
         // Compute commitments to s and e (matches circuit's commitment functions)
         let modulus_bit = compute_modulus_bit(&threshold_params);

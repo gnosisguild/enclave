@@ -196,7 +196,7 @@ impl Computation for Inputs {
 
     // Used as input for Nargo execution.
     /// Serializes input so that `decrypted_shares` matches Noir's `[[Polynomial<N>; L]; H]`:
-    /// each polynomial is `{ "coefficients": [string, ...] }`.
+    /// each polynomial is `{ "coefficients": [number|string, ...] }` (numbers when fit in i64).
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let expected_commitments = bigint_2d_to_json_values(&self.expected_commitments);
         let decrypted_shares: Vec<Vec<serde_json::Value>> = self

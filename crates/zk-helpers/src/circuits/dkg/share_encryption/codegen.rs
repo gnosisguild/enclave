@@ -65,6 +65,8 @@ pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs 
 pub global N: u32 = {};
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
+pub global PLAINTEXT_MODULUS: Field = {};
+pub global Q_MOD_T: Field = {};
 
 /************************************
 -------------------------------------
@@ -84,8 +86,6 @@ pub global {}_BIT_R2: u32 = {};
 pub global {}_BIT_P1: u32 = {};
 pub global {}_BIT_P2: u32 = {};
 
-pub global {}_T: Field = {};
-pub global {}_Q_MOD_T: Field = {};
 pub global {}_K0IS: [Field; L] = [{}];
 pub global {}_PK_BOUNDS: [Field; L] = [{}];
 pub global {}_E0_BOUND: Field = {};
@@ -99,8 +99,8 @@ pub global {}_P2_BOUNDS: [Field; L] = [{}];
 pub global {}_MSG_BOUND: Field = {};
 
 pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
-    {}_T,
-    {}_Q_MOD_T,
+    PLAINTEXT_MODULUS,
+    Q_MOD_T,
     QIS,
     {}_K0IS,
     {}_PK_BOUNDS,
@@ -118,6 +118,8 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
         preset.dkg_counterpart().unwrap().metadata().degree,
         preset.dkg_counterpart().unwrap().metadata().num_moduli,
         qis_str,
+        configs.t,
+        configs.q_mod_t,
         prefix,
         configs.bits.pk_bit,
         prefix,
@@ -138,10 +140,6 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
         configs.bits.p1_bit,
         prefix,
         configs.bits.p2_bit,
-        prefix,
-        configs.t,
-        prefix,
-        configs.q_mod_t,
         prefix,
         k0is_str,
         prefix,
@@ -164,8 +162,6 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
         p2_bounds_str,
         prefix,
         configs.bounds.msg_bound,
-        prefix,
-        prefix,
         prefix,
         prefix,
         prefix,
