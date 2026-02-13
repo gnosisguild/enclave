@@ -286,7 +286,7 @@ fn verify_share_decryption_bounds() {
 //user_data_encryption Bounds
 
 // Verifies user_data_encryption (Greco) bounds
-// Uses THRESHOLD parameters (L=4 moduli, t=100)
+// Uses THRESHOLD parameters
 fn verify_greco_bounds() {
     let n: u128 = THRESHOLD_N as u128;
     let t: u128 = THRESHOLD_PLAINTEXT_MODULUS as u128;
