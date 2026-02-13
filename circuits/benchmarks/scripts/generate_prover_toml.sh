@@ -47,20 +47,12 @@ get_zk_args() {
             echo "share-computation smudging-noise"
             return
             ;;
-        dkg/sk_share_encryption)
+        dkg/share_encryption)
             echo "share-encryption secret-key"
             return
             ;;
-        dkg/e_sm_share_encryption)
-            echo "share-encryption smudging-noise"
-            return
-            ;;
-        dkg/sk_share_decryption)
+        dkg/share_decryption)
             echo "share-decryption secret-key"
-            return
-            ;;
-        dkg/e_sm_share_decryption)
-            echo "share-decryption smudging-noise"
             return
             ;;
         threshold/user_data_encryption)
