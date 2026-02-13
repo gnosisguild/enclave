@@ -47,6 +47,8 @@ pub enum ProofType {
     T2ESmShareDecryption = 7,
     /// T5 — Share decryption proof (Proof 6).
     T5ShareDecryption = 8,
+    /// T6 — Decrypted shares aggregation proof (Proof 7).
+    T6DecryptedSharesAggregation = 9,
 }
 
 impl ProofType {
@@ -59,10 +61,10 @@ impl ProofType {
             ProofType::T1ESmShareComputation => CircuitName::ESmShareComputation,
             ProofType::T1SkShareEncryption => CircuitName::SkShareEncryption,
             ProofType::T1ESmShareEncryption => CircuitName::ESmShareEncryption,
-            ProofType::T2SkShareDecryption | ProofType::T2ESmShareDecryption => {
-                CircuitName::DecShares
-            }
-            ProofType::T5ShareDecryption => CircuitName::DecShares,
+            ProofType::T2SkShareDecryption => CircuitName::DkgSkShareDecryption,
+            ProofType::T2ESmShareDecryption => CircuitName::DkgESmShareDecryption,
+            ProofType::T5ShareDecryption => CircuitName::ThresholdShareDecryption,
+            ProofType::T6DecryptedSharesAggregation => CircuitName::DecryptedSharesAggregation,
         }
     }
 
@@ -78,6 +80,7 @@ impl ProofType {
             | ProofType::T2SkShareDecryption
             | ProofType::T2ESmShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::T5ShareDecryption => "E3_BAD_DECRYPTION_PROOF",
+            ProofType::T6DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
         }
     }
 }
@@ -309,7 +312,11 @@ mod tests {
         );
         assert_eq!(
             ProofType::T2SkShareDecryption.circuit_name(),
-            CircuitName::DecShares
+            CircuitName::DkgSkShareDecryption
+        );
+        assert_eq!(
+            ProofType::T5ShareDecryption.circuit_name(),
+            CircuitName::ThresholdShareDecryption
         );
     }
 }

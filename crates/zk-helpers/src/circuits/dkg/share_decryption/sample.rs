@@ -130,6 +130,7 @@ impl ShareDecryptionCircuitData {
         Ok(ShareDecryptionCircuitData {
             honest_ciphertexts,
             secret_key: dkg_secret_key,
+            dkg_input_type,
         })
     }
 }
