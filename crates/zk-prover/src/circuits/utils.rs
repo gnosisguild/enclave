@@ -47,10 +47,17 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
             let fields = coeff_arr
                 .iter()
                 .map(|c| {
-                    let s = c.as_str().ok_or_else(|| {
-                        ZkError::SerializationError("coefficient must be string".into())
-                    })?;
-                    FieldElement::try_from_str(s)
+                    let s = c
+                        .as_str()
+                        .map(String::from)
+                        .or_else(|| c.as_i64().map(|n| n.to_string()))
+                        .or_else(|| c.as_u64().map(|n| n.to_string()))
+                        .ok_or_else(|| {
+                            ZkError::SerializationError(
+                                "coefficient must be string or number".into(),
+                            )
+                        })?;
+                    FieldElement::try_from_str(&s)
                         .map(InputValue::Field)
                         .ok_or_else(|| {
                             ZkError::SerializationError(format!("invalid field element: {}", s))
