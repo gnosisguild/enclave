@@ -5,10 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use lib::configs::default::threshold::{
-    L, N, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_E1,
-    USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_P1, USER_DATA_ENCRYPTION_BIT_P2,
-    USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2,
-    USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_CONFIGS, USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P,
+    L, N, Q_MOD_T, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_E0,
+    USER_DATA_ENCRYPTION_BIT_E1, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_P1,
+    USER_DATA_ENCRYPTION_BIT_P2, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_R1,
+    USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_CONFIGS,
 };
 use lib::core::threshold::user_data_encryption::UserDataEncryption;
 use lib::math::commitments::compute_ciphertext_commitment;
@@ -177,7 +177,7 @@ fn main(
     let ct_commitment = compute_ciphertext_commitment::<512, 2, 36>(ct0is, ct1is);
 
     if is_mask_vote == false {
-        check_coefficient_values_with_balance(k1, USER_DATA_ENCRYPTION_Q_MOD_T_MOD_P, balance, num_options);
+        check_coefficient_values_with_balance(k1, Q_MOD_T, balance, num_options);
         validate_signature(hashed_message, public_key_x, public_key_y, signature);
 
         let voter_address = address_to_field(derive_address(public_key_x, public_key_y));

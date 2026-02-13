@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::math::fhe_poly_to_crt_centered;
-use crate::utils::{compute_modulus_bit, get_zkp_modulus, ZkHelpersUtilsError};
+use crate::utils::{compute_modulus_bit, ZkHelpersUtilsError};
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 
@@ -28,13 +28,9 @@ pub fn bfv_ciphertext_to_greco(
     ciphertext: &Ciphertext,
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
     let moduli = params.moduli();
-    let zkp_modulus = get_zkp_modulus();
 
-    let mut ct0is = fhe_poly_to_crt_centered(&ciphertext.c[0], moduli)?;
-    let mut ct1is = fhe_poly_to_crt_centered(&ciphertext.c[1], moduli)?;
-
-    ct0is.reduce_uniform(&zkp_modulus);
-    ct1is.reduce_uniform(&zkp_modulus);
+    let ct0is = fhe_poly_to_crt_centered(&ciphertext.c[0], moduli)?;
+    let ct1is = fhe_poly_to_crt_centered(&ciphertext.c[1], moduli)?;
 
     Ok((ct0is, ct1is))
 }
@@ -58,13 +54,9 @@ pub fn bfv_public_key_to_greco(
     public_key: &PublicKey,
 ) -> Result<(CrtPolynomial, CrtPolynomial), CrtPolynomialError> {
     let moduli = params.moduli();
-    let zkp_modulus = get_zkp_modulus();
 
-    let mut pk0is = fhe_poly_to_crt_centered(&public_key.c.c[0], moduli)?;
-    let mut pk1is = fhe_poly_to_crt_centered(&public_key.c.c[1], moduli)?;
-
-    pk0is.reduce_uniform(&zkp_modulus);
-    pk1is.reduce_uniform(&zkp_modulus);
+    let pk0is = fhe_poly_to_crt_centered(&public_key.c.c[0], moduli)?;
+    let pk1is = fhe_poly_to_crt_centered(&public_key.c.c[1], moduli)?;
 
     Ok((pk0is, pk1is))
 }

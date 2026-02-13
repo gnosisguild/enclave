@@ -213,6 +213,14 @@ REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
 echo "✓ Report generated: ${REPORT_FILE}"
 echo ""
 
+# Remove raw JSON folder after report is generated
+RAW_DIR="${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
+if [ -d "$RAW_DIR" ]; then
+    rm -rf "$RAW_DIR"
+    echo "✓ Removed raw data: ${RAW_DIR}"
+    echo ""
+fi
+
 # Clean artifacts if requested
 if [ "$CLEAN_ARTIFACTS" = true ]; then
     echo "Cleaning circuit artifacts..."
@@ -233,7 +241,6 @@ echo "║       Benchmark Complete!                      ║"
 echo "╚════════════════════════════════════════════════╝"
 echo ""
 echo "Results:"
-echo "  Raw data: ${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw/"
 echo "  Report: ${REPORT_FILE}"
 echo ""
 echo "To view the report:"

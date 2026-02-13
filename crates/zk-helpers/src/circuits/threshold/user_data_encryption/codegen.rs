@@ -81,6 +81,7 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
 pub global N: u32 = {};
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
+pub global Q_MOD_T: Field = {};
 
 /************************************
 -------------------------------------
@@ -99,7 +100,6 @@ pub global {}_BIT_R2: u32 = {};
 pub global {}_BIT_P1: u32 = {};
 pub global {}_BIT_P2: u32 = {};
 
-pub global {}_Q_MOD_T_MOD_P: Field = {};
 pub global {}_K0IS: [Field; L] = [{}];
 pub global {}_PK_BOUNDS: [Field; L] = [{}];
 pub global {}_E0_BOUND: Field = {};
@@ -114,25 +114,26 @@ pub global {}_P1_BOUNDS: [Field; L] = [{}];
 pub global {}_P2_BOUNDS: [Field; L] = [{}];
 
 pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-{}_Q_MOD_T_MOD_P,
-QIS,
-{}_K0IS,
-{}_PK_BOUNDS,
-{}_E0_BOUND,
-{}_E1_BOUND,
-{}_U_BOUND,
-{}_R1_LOW_BOUNDS,
-{}_R1_UP_BOUNDS,
-{}_R2_BOUNDS,
-{}_P1_BOUNDS,
-{}_P2_BOUNDS,
-{}_K1_LOW_BOUND,
-{}_K1_UP_BOUND
+    Q_MOD_T,
+    QIS,
+    {}_K0IS,
+    {}_PK_BOUNDS,
+    {}_E0_BOUND,
+    {}_E1_BOUND,
+    {}_U_BOUND,
+    {}_R1_LOW_BOUNDS,
+    {}_R1_UP_BOUNDS,
+    {}_R2_BOUNDS,
+    {}_P1_BOUNDS,
+    {}_P2_BOUNDS,
+    {}_K1_LOW_BOUND,
+    {}_K1_UP_BOUND
 );
 "#,
-        configs.n, // N
-        configs.l, // L
-        qis_str,   // QIS array
+        configs.n,       // N
+        configs.l,       // L
+        qis_str,         // QIS array
+        configs.q_mod_t, // Q_MOD_T
         prefix,
         configs.bits.pk_bit, // BIT_PK
         prefix,
@@ -153,8 +154,6 @@ QIS,
         configs.bits.p1_bit, // BIT_P1
         prefix,
         configs.bits.p2_bit, // BIT_P2
-        prefix,
-        configs.q_mod_t_mod_p, // Q_MOD_T_MOD_P
         prefix,
         k0is_str, // K0IS array
         prefix,
@@ -179,7 +178,6 @@ QIS,
         p1_bounds_str, // P1_BOUNDS array
         prefix,
         p2_bounds_str, // P2_BOUNDS array
-        prefix,
         prefix,
         prefix,
         prefix,

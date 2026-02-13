@@ -10,16 +10,15 @@
 //! and (for input) secret plus shares. Input values are normalized to [0, q_j) per modulus
 //! and then to the ZKP field modulus so the Noir circuit's range check and parity check succeed.
 
+use crate::bigint_3d_to_json_values;
 use crate::circuits::commitments::{
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
 };
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuit;
 use crate::dkg::share_computation::ShareComputationCircuitData;
-use crate::poly_coefficients_to_toml_json;
 use crate::CircuitsErrors;
-use crate::{bigint_3d_to_json_values, get_zkp_modulus};
-use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
+use crate::{calculate_bit_width, crt_polynomial_to_toml_json, poly_coefficients_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
@@ -228,17 +227,6 @@ impl Computation for Inputs {
                 compute_share_computation_e_sm_commitment(&secret_crt, bits.bit_e_sm_secret)
             }
         };
-
-        let zkp_modulus = &get_zkp_modulus();
-
-        secret_crt.reduce_uniform(zkp_modulus);
-        for coeff in &mut y {
-            for mod_row in coeff.iter_mut() {
-                for value in mod_row.iter_mut() {
-                    *value = reduce(value, zkp_modulus);
-                }
-            }
-        }
 
         Ok(Inputs {
             secret_crt,

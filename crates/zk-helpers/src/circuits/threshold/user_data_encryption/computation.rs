@@ -12,11 +12,9 @@
 use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
 use crate::compute_ciphertext_commitment;
-use crate::crt_polynomial_to_toml_json;
 use crate::get_zkp_modulus;
 use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
-use crate::polynomial_to_toml_json;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::utils::compute_modulus_bit;
@@ -25,7 +23,6 @@ use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::center;
-use e3_polynomial::reduce;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
 use fhe::bfv::SecretKey;
@@ -76,7 +73,7 @@ pub struct Configs {
     pub n: usize,
     pub l: usize,
     pub moduli: Vec<u64>,
-    pub q_mod_t_mod_p: BigInt,
+    pub q_mod_t: BigInt,
     pub k0is: Vec<u64>,
     pub bits: Bits,
     pub bounds: Bounds,
@@ -146,10 +143,8 @@ impl Computation for Configs {
         let q = compute_q_product(&moduli);
         let q_mod_t_uint = compute_q_mod_t(&q, plaintext);
         let t = BigInt::from(plaintext);
-        let p = get_zkp_modulus();
 
         let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
-        let q_mod_t_mod_p = reduce(&q_mod_t, &p);
 
         let k0is = compute_k0is(threshold_params.moduli(), threshold_params.plaintext())?;
 
@@ -159,7 +154,7 @@ impl Computation for Configs {
         Ok(Configs {
             n: threshold_params.degree(),
             l: moduli.len(),
-            q_mod_t_mod_p,
+            q_mod_t,
             k0is,
             moduli,
             bits,
@@ -421,11 +416,6 @@ impl Computation for Inputs {
         pk1.reverse();
         e0.reverse();
 
-        ct0.reduce(&moduli)?;
-        ct1.reduce(&moduli)?;
-        pk0.reduce(&moduli)?;
-        pk1.reduce(&moduli)?;
-
         ct0.center(&moduli)?;
         ct1.center(&moduli)?;
         pk0.center(&moduli)?;
@@ -540,33 +530,20 @@ impl Computation for Inputs {
             e0_quotients.push(e0_quotient);
         }
 
-        let mut pk0is = CrtPolynomial::new(pk0is);
-        let mut pk1is = CrtPolynomial::new(pk1is);
-        let mut ct0is = CrtPolynomial::new(ct0is);
-        let mut ct1is = CrtPolynomial::new(ct1is);
-        let mut r1is = CrtPolynomial::new(r1is);
-        let mut r2is = CrtPolynomial::new(r2is);
-        let mut p1is = CrtPolynomial::new(p1is);
-        let mut p2is = CrtPolynomial::new(p2is);
-        let mut e0is = CrtPolynomial::new(e0is);
-        let mut e0_quotients = CrtPolynomial::new(e0_quotients);
+        let pk0is = CrtPolynomial::new(pk0is);
+        let pk1is = CrtPolynomial::new(pk1is);
+        let ct0is = CrtPolynomial::new(ct0is);
+        let ct1is = CrtPolynomial::new(ct1is);
+        let r1is = CrtPolynomial::new(r1is);
+        let r2is = CrtPolynomial::new(r2is);
+        let p1is = CrtPolynomial::new(p1is);
+        let p2is = CrtPolynomial::new(p2is);
+        let e0is = CrtPolynomial::new(e0is);
+        let e0_quotients = CrtPolynomial::new(e0_quotients);
 
+        // e0 is mod Q (huge); reduce to zkp_modulus so it fits in the proof system field.
         let zkp_modulus = get_zkp_modulus();
-
-        pk0is.reduce_uniform(&zkp_modulus);
-        pk1is.reduce_uniform(&zkp_modulus);
-        ct0is.reduce_uniform(&zkp_modulus);
-        ct1is.reduce_uniform(&zkp_modulus);
-        r1is.reduce_uniform(&zkp_modulus);
-        r2is.reduce_uniform(&zkp_modulus);
-        p1is.reduce_uniform(&zkp_modulus);
-        p2is.reduce_uniform(&zkp_modulus);
-        e0is.reduce_uniform(&zkp_modulus);
-        e0_quotients.reduce_uniform(&zkp_modulus);
-        e1.reduce(&zkp_modulus);
-        u.reduce(&zkp_modulus);
         e0_mod_q.reduce(&zkp_modulus);
-        k1.reduce(&zkp_modulus);
 
         let pk_bit = compute_modulus_bit(&threshold_params);
         let pk_commitment = compute_pk_aggregation_commitment(&pk0is, &pk1is, pk_bit);
@@ -593,8 +570,11 @@ impl Computation for Inputs {
         })
     }
 
-    // Used as input for Nargo execution.
+    // Used as input for Nargo execution. Coefficients are JSON numbers when they fit in i64, else strings.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        use crate::crt_polynomial_to_toml_json;
+        use crate::polynomial_to_toml_json;
+
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
         let ct0is = crt_polynomial_to_toml_json(&self.ct0is);
