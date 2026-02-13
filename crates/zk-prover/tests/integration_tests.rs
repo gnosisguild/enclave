@@ -9,17 +9,12 @@
 
 #![cfg(feature = "integration-tests")]
 
-use e3_zk_prover::{BbTarget, SetupStatus, ZkBackend, ZkConfig};
+mod common;
+
+use common::test_backend;
+use e3_zk_prover::{BbTarget, SetupStatus, ZkConfig};
 use std::path::PathBuf;
 use tempfile::tempdir;
-
-fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
-    let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
-    let circuits_dir = noir_dir.join("circuits");
-    let work_dir = noir_dir.join("work").join("test_node");
-    ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
-}
 
 fn versions_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")

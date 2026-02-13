@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod helpers;
+pub use helpers::*;
+
 use std::path::PathBuf;
 
 use num_bigint::{BigInt, Sign};
