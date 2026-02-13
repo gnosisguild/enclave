@@ -1745,9 +1745,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.55"
+version = "1.2.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47b26a0954ae34af09b50f0de26458fa95369a0d478d8236d3f93082b219bd29"
+checksum = "aebf35691d1bfb0ac386a69bac2fde4dd276fb618cf8bf4f5318fe285e821bb2"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2345,7 +2345,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-bfv-client"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
@@ -2359,7 +2359,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -2378,7 +2378,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "alloy",
  "anyhow",
@@ -2394,7 +2394,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe-params"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -2409,7 +2409,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2424,7 +2424,7 @@ dependencies = [
 
 [[package]]
 name = "e3-parity-matrix"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2434,7 +2434,7 @@ dependencies = [
 
 [[package]]
 name = "e3-polynomial"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "fhe-math",
  "ndarray",
@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "e3-safe"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
@@ -2472,7 +2472,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "e3-bfv-client",
  "e3-evm-helpers",
@@ -2503,7 +2503,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "actix",
  "alloy",
@@ -2518,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "e3-zk-helpers"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
@@ -3748,9 +3748,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.181"
+version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "459427e2af2b9c839b132acb702a1c654d95e10f8c326bfc2ad11310e458b1c5"
+checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
 
 [[package]]
 name = "libm"
