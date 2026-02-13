@@ -190,7 +190,7 @@ class NoirCircuitBuilder {
   private generateVk(jsonFile: string, targetDir: string, packageName: string): string | null {
     const vkFile = join(targetDir, `${packageName}.vk`)
     try {
-      execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}" --oracle_hash keccak`, { stdio: 'pipe' })
+      execSync(`bb write_vk -b "${jsonFile}" -o "${targetDir}"`, { stdio: 'pipe' })
       const defaultVk = join(targetDir, 'vk')
       if (existsSync(defaultVk)) {
         if (existsSync(vkFile)) rmSync(vkFile)
