@@ -14,10 +14,9 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 pub global N: u32 = 512;
 pub global L: u32 = 2;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
-pub global Q_MOD_T: Field = -7;
+pub global Q_MOD_T: Field = 93;
 pub global PLAINTEXT_MODULUS: Field = 100;
 pub global Q_INVERSE_MOD_T: Field = 57;
-pub global Q_MOD_T: Field = 93;
 
 /************************************
 -------------------------------------

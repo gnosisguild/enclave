@@ -17,7 +17,6 @@ use std::ops::Deref;
 
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::get_zkp_modulus;
 use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
@@ -27,8 +26,8 @@ use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
+use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
-use e3_polynomial::{center, reduce, CrtPolynomial};
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use itertools::izip;
@@ -152,12 +151,7 @@ impl Computation for Configs {
         let moduli = dkg_params.moduli().to_vec();
         let plaintext = dkg_params.plaintext();
         let q = compute_q_product(&moduli);
-        let q_mod_t_uint = compute_q_mod_t(&q, plaintext);
-        let t = BigInt::from(plaintext);
-        let p = get_zkp_modulus();
-
-        let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
-        let q_mod_t_mod_p = reduce(&q_mod_t, &p);
+        let q_mod_t = BigInt::from(compute_q_mod_t(&q, plaintext));
 
         let k0is = compute_k0is(&moduli, plaintext)?;
 
@@ -166,7 +160,7 @@ impl Computation for Configs {
 
         Ok(Configs {
             t: plaintext as usize,
-            q_mod_t: q_mod_t_mod_p,
+            q_mod_t,
             moduli,
             k0is,
             bits,
