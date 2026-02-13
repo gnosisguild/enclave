@@ -89,7 +89,6 @@ pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
 pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-    Q_MOD_T,
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
     USER_DATA_ENCRYPTION_PK_BOUNDS,

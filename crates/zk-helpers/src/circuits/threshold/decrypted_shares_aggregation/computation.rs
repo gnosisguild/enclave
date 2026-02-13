@@ -12,6 +12,7 @@
 //! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
 use crate::calculate_bit_width;
+use crate::compute_q_mod_t;
 use crate::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitData;
@@ -26,7 +27,6 @@ use fhe_math::rq::{Poly, Representation};
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
-
 /// Output of [`CircuitComputation::compute`] for [`DecryptedSharesAggregationCircuit`].
 #[derive(Debug)]
 pub struct DecryptedSharesAggregationComputationOutput {
@@ -74,6 +74,7 @@ pub struct Configs {
     pub threshold: usize,
     pub moduli: Vec<u64>,
     pub plaintext_modulus: u64,
+    pub q_mod_t: BigInt,
     pub q_inverse_mod_t: u64,
     pub bits: Bits,
     pub bounds: Bounds,
@@ -137,6 +138,7 @@ impl Computation for Configs {
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
         let q = utils::compute_q_product(&moduli);
+        let q_mod_t = BigInt::from(compute_q_mod_t(&q, t));
         let q_inverse_mod_t = utils::compute_q_inverse_mod_t(&q, t)?;
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
@@ -145,6 +147,7 @@ impl Computation for Configs {
             l: moduli.len(),
             moduli,
             plaintext_modulus: t,
+            q_mod_t,
             q_inverse_mod_t,
             bits,
             bounds,
