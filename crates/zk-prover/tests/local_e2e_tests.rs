@@ -25,9 +25,14 @@ use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecrypti
 use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_helpers::threshold::pk_generation::{PkGenerationCircuit, PkGenerationCircuitData};
 use e3_zk_helpers::threshold::{
-    decrypted_shares_aggregation::{DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData},
+    decrypted_shares_aggregation::{
+        DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
+    },
     pk_aggregation::{PkAggregationCircuit, PkAggregationCircuitData},
-    share_decryption::{ShareDecryptionCircuit as ThresholdShareDecryptionCircuit, ShareDecryptionCircuitData as ThresholdShareDecryptionCircuitData},
+    share_decryption::{
+        ShareDecryptionCircuit as ThresholdShareDecryptionCircuit,
+        ShareDecryptionCircuitData as ThresholdShareDecryptionCircuitData,
+    },
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_helpers::{
@@ -355,12 +360,9 @@ async fn setup_share_decryption_sk_test() -> Option<(
         return None;
     }
 
-    let sample = ShareDecryptionCircuitData::generate_sample(
-        preset,
-        committee,
-        DkgInputType::SecretKey,
-    )
-    .ok()?;
+    let sample =
+        ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
+            .ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -398,12 +400,9 @@ async fn setup_share_decryption_e_sm_test() -> Option<(
         return None;
     }
 
-    let sample = ShareDecryptionCircuitData::generate_sample(
-        preset,
-        committee,
-        DkgInputType::SmudgingNoise,
-    )
-    .ok()?;
+    let sample =
+        ShareDecryptionCircuitData::generate_sample(preset, committee, DkgInputType::SmudgingNoise)
+            .ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -511,8 +510,7 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
         return None;
     }
 
-    let sample =
-        DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).ok()?;
+    let sample = DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
 
     Some((
@@ -758,9 +756,16 @@ async fn test_pk_aggregation_commitment_consistency() {
         .expect("proof generation should succeed");
 
     let computation_output = PkAggregationCircuit::compute(preset, &sample).unwrap();
-    let h = computation_output.inputs.expected_threshold_pk_commitments.len();
+    let h = computation_output
+        .inputs
+        .expected_threshold_pk_commitments
+        .len();
 
-    for (i, expected) in computation_output.inputs.expected_threshold_pk_commitments.iter().enumerate()
+    for (i, expected) in computation_output
+        .inputs
+        .expected_threshold_pk_commitments
+        .iter()
+        .enumerate()
     {
         let commitment_from_proof = extract_field_from_end(&proof.public_signals, h - 1 - i);
         assert_eq!(
@@ -786,20 +791,18 @@ async fn test_threshold_share_decryption_commitment_consistency() {
         .prove(&prover, &preset, &sample, e3_id)
         .expect("proof generation should succeed");
 
-    let computation_output =
-        ThresholdShareDecryptionCircuit::compute(preset, &sample).expect("computation should succeed");
+    let computation_output = ThresholdShareDecryptionCircuit::compute(preset, &sample)
+        .expect("computation should succeed");
 
     let sk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 1);
     let e_sm_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
 
     assert_eq!(
-        sk_commitment_from_proof,
-        computation_output.inputs.expected_sk_commitment,
+        sk_commitment_from_proof, computation_output.inputs.expected_sk_commitment,
         "sk commitment mismatch"
     );
     assert_eq!(
-        e_sm_commitment_from_proof,
-        computation_output.inputs.expected_e_sm_commitment,
+        e_sm_commitment_from_proof, computation_output.inputs.expected_e_sm_commitment,
         "e_sm commitment mismatch"
     );
 
