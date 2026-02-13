@@ -30,4 +30,6 @@ pub struct ShareDecryptionCircuitData {
     pub secret_key: SecretKey,
     /// Ciphertexts from H honest parties: [party_idx][mod_idx] (one ciphertext per party per TRBFV modulus).
     pub honest_ciphertexts: Vec<Vec<Ciphertext>>,
+    /// Which input type (SecretKey or SmudgingNoise) to resolve circuit path.
+    pub dkg_input_type: DkgInputType,
 }

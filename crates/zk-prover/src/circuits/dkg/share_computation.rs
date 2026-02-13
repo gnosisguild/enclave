@@ -11,7 +11,6 @@ use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{
     Inputs, ShareComputationCircuit, ShareComputationCircuitData,
 };
-use noirc_abi::InputMap;
 
 impl Provable for ShareComputationCircuit {
     type Params = BfvPreset;

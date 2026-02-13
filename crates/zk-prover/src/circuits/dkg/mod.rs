@@ -6,4 +6,5 @@
 
 mod pk;
 mod share_computation;
+mod share_decryption;
 mod share_encryption;
