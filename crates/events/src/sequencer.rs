@@ -16,25 +16,21 @@ use e3_utils::{major_issue, MAILBOX_LIMIT_LARGE};
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     eventstore: Recipient<StoreEventRequested>,
-    buffer: Recipient<EnclaveEvent>,
 }
 
 impl Sequencer {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
         eventstore: impl Into<Recipient<StoreEventRequested>>,
-        buffer: impl Into<Recipient<EnclaveEvent>>,
     ) -> Self {
         Self {
             bus: bus.clone(),
             eventstore: eventstore.into(),
-            buffer: buffer.into(),
         }
     }
 
     fn handle_store_event_response(&self, msg: StoreEventResponse) -> Result<()> {
         let event = msg.into_event();
-        self.buffer.try_send(event.clone())?;
         self.bus.try_send(event)?;
         Ok(())
     }

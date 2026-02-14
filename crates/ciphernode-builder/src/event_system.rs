@@ -14,8 +14,8 @@ use e3_data::{
 use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
-    EventStoreQueryBy, EventStoreRouter, InsertBatch, SeqAgg, Sequencer, SnapshotBuffer,
-    StoreEventRequested, TsAgg, UpdateDestination,
+    EventStoreQueryBy, EventStoreRouter, EventSubscriber, EventType, InsertBatch, SeqAgg,
+    Sequencer, SnapshotBuffer, StoreEventRequested, TsAgg, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
@@ -224,7 +224,7 @@ impl EventSystem {
         self.sequencer
             .get_or_try_init(|| {
                 let router = self.eventstore_router()?;
-                Ok(Sequencer::new(&self.eventbus(), router, self.buffer()?).start())
+                Ok(Sequencer::new(&self.eventbus(), router).start())
             })
             .cloned()
     }
@@ -353,11 +353,11 @@ impl EventSystem {
         println!("handle");
         self.handle
             .get_or_try_init(|| {
-                Ok(BusHandle::new(
-                    self.eventbus(),
-                    self.sequencer()?,
-                    self.hlc()?,
-                ))
+                let handle = BusHandle::new(self.eventbus(), self.sequencer()?, self.hlc()?);
+                // Buffer subscribes to all events first
+                // This is important so as to open up a batch for each sequence
+                handle.subscribe(EventType::All, self.buffer()?.recipient());
+                Ok(handle)
             })
             .cloned()
     }
@@ -504,7 +504,6 @@ mod tests {
         let _guard = with_tracing("debug");
         let tmp = TempDir::new().unwrap();
         let system = EventSystem::persisted("cn2", tmp.path().join("log"), tmp.path().join("sled"));
-        // system.buffer()?.send(Start).await?;
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
         Ok(())
