@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // TODO: Remove feature flag / network access requirement for this test.
-// There are very few situations where we should be relient on external
+// There are very few situations where we should be reliant on external
 // network access for tests to pass and this feature flag makes it so this
 // code does not get checked in editors as it is not always found by lsps.
 
