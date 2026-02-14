@@ -4,4 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod decrypted_shares_aggregation;
+mod pk_aggregation;
 mod pk_generation;
+mod share_decryption;

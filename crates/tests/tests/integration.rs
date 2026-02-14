@@ -6,6 +6,7 @@
 
 use actix::Actor;
 use alloy::primitives::{Address, FixedBytes, I256, U256};
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Result};
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
@@ -26,17 +27,97 @@ use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCom
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
+use e3_zk_prover::{ZkBackend, ZkConfig};
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::time::{Duration, Instant};
-use std::{fs, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 use tokio::{
     sync::{broadcast, mpsc},
     time::sleep,
 };
+
+/// Find the bb binary on the system.
+async fn find_bb() -> Option<PathBuf> {
+    if let Ok(output) = tokio::process::Command::new("which")
+        .arg("bb")
+        .output()
+        .await
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        for path in [
+            format!("{}/.bb/bb", home),
+            format!("{}/.nargo/bin/bb", home),
+            format!("{}/.enclave/noir/bin/bb", home),
+        ] {
+            if std::path::Path::new(&path).exists() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    None
+}
+
+/// Create a ZkBackend for integration tests.
+/// If a local bb binary is found, uses it with fixture files (fast path).
+/// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
+async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
+    let temp = tempfile::tempdir().unwrap();
+    let temp_path = temp.path();
+    let noir_dir = temp_path.join("noir");
+    let bb_binary = noir_dir.join("bin").join("bb");
+    let circuits_dir = noir_dir.join("circuits");
+    let work_dir = noir_dir.join("work").join("test_node");
+
+    if let Some(bb) = find_bb().await {
+        tokio::fs::create_dir_all(bb_binary.parent().unwrap())
+            .await
+            .unwrap();
+        tokio::fs::create_dir_all(&circuits_dir).await.unwrap();
+        tokio::fs::create_dir_all(&work_dir).await.unwrap();
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&bb, &bb_binary).unwrap();
+        #[cfg(not(unix))]
+        compile_error!("Integration tests require unix symlink support");
+
+        // Copy circuit fixtures from the zk-prover crate's test fixtures
+        let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("zk-prover")
+            .join("tests")
+            .join("fixtures");
+        let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
+        tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
+        tokio::fs::copy(fixtures_dir.join("pk.json"), pk_circuit_dir.join("pk.json"))
+            .await
+            .unwrap();
+        tokio::fs::copy(fixtures_dir.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
+            .await
+            .unwrap();
+
+        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        (backend, temp)
+    } else {
+        println!("bb binary not found locally, downloading via ensure_installed()...");
+        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        backend
+            .ensure_installed()
+            .await
+            .expect("Failed to download and install ZK backend");
+        (backend, temp)
+    }
+}
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
@@ -246,6 +327,9 @@ async fn test_trbfv_actor() -> Result<()> {
     let task_pool = Multithread::create_taskpool(max_threadroom, concurrent_jobs);
     let multithread_report = MultithreadReport::new(max_threadroom, concurrent_jobs).start();
 
+    // Setup ZK backend for proof generation/verification
+    let (zk_backend, _zk_temp) = setup_test_zk_backend().await;
+
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 20 total nodes: 5 for committee + 4 buffer = 9 selected, 11 unselected
         .add_group(1, || async {
@@ -258,6 +342,8 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
+                .with_zkproof(zk_backend.clone())
+                .testmode_with_signer(PrivateKeySigner::random())
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
@@ -275,6 +361,8 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
                 .with_trbfv()
+                .with_zkproof(zk_backend.clone())
+                .testmode_with_signer(PrivateKeySigner::random())
                 .with_sortition_score()
                 .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()

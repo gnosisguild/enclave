@@ -8,7 +8,6 @@ use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
 use e3_zk_helpers::crt_polynomial_to_toml_json;
 use e3_zk_helpers::utils::compute_modulus_bit;
-use e3_zk_helpers::utils::get_zkp_modulus;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -83,20 +82,7 @@ impl CiphertextAdditionWitness {
         let mut r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, &moduli)
             .with_context(|| "Failed to compute r1 quotient")?;
 
-        let zkp_modulus = &get_zkp_modulus();
-
-        // Reduce all coefficients modulo the ZKP modulus so they lie in the proof system's
-        // native field. The circuit expects witnesses in [0, zkp_modulus); unreduced values
-        // would break constraint satisfaction or overflow the field representation.
-        prev_ct0.reduce_uniform(zkp_modulus);
-        prev_ct1.reduce_uniform(zkp_modulus);
-        ct0.reduce_uniform(zkp_modulus);
-        ct1.reduce_uniform(zkp_modulus);
-        sum_ct0.reduce_uniform(zkp_modulus);
-        sum_ct1.reduce_uniform(zkp_modulus);
-        r0.reduce_uniform(zkp_modulus);
-        r1.reduce_uniform(zkp_modulus);
-
+        // Coefficients are centered per modulus; no zkp reduce. The circuit reduces mod r when needed.
         let pk_bit = compute_modulus_bit(params);
         let prev_ct_commitment = compute_ciphertext_commitment(&prev_ct0, &prev_ct1, pk_bit);
 

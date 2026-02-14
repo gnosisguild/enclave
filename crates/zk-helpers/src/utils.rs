@@ -20,7 +20,7 @@ use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_safe::SafeSponge;
 use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
-use num_traits::Zero;
+use num_traits::{ToPrimitive, Zero};
 use std::fmt::Display;
 use std::str::FromStr;
 use thiserror::Error as ThisError;
@@ -207,16 +207,24 @@ pub fn get_zkp_modulus() -> BigInt {
     .expect("Invalid ZKP modulus")
 }
 
-/// Poly-with-coefficients shape for TOML JSON: `{"coefficients": [string, ...]}`.
-///
-/// Use for a single limb (e.g. sk_secret) where the circuit expects one "coefficients" array.
+/// Converts a BigInt to a JSON value: number when it fits in i64 (preserves sign), else string.
+pub fn bigint_to_json_value(n: &BigInt) -> serde_json::Value {
+    n.to_i64()
+        .map(serde_json::Number::from)
+        .map(serde_json::Value::Number)
+        .unwrap_or_else(|| serde_json::Value::String(n.to_string()))
+}
+
+/// Poly-with-coefficients shape for TOML JSON: `{"coefficients": [number|string, ...]}`.
+/// Coefficients use numbers when they fit in i64, else strings.
 pub fn poly_coefficients_to_toml_json(coefficients: &[BigInt]) -> serde_json::Value {
     serde_json::json!({
-        "coefficients": to_string_1d_vec(coefficients)
+        "coefficients": coefficients.iter().map(bigint_to_json_value).collect::<Vec<_>>()
     })
 }
 
-/// Map a CRT polynomial to a vector of JSON values (one `{"coefficients": [...]}` per limb).
+/// Map a CRT polynomial to a vector of JSON values (one `{"coefficients": [number|string, ...]}` per limb).
+/// Coefficients use numbers when they fit in i64, else strings.
 pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_json::Value> {
     crt_polynomial
         .limbs
@@ -225,67 +233,31 @@ pub fn crt_polynomial_to_toml_json(crt_polynomial: &CrtPolynomial) -> Vec<serde_
         .collect()
 }
 
-/// Convert a 1D vector of BigInt to a vector of JSON values.
-///
-/// # Arguments
-/// * `bigint_1d` - 1D vector of BigInt values
-///
-/// # Returns
-/// A vector of JSON values
+/// Convert a 1D vector of BigInt to a vector of JSON values (numbers when fit in i64, else strings).
 pub fn bigint_1d_to_json_values(bigint_1d: &[BigInt]) -> Vec<serde_json::Value> {
-    bigint_1d
-        .iter()
-        .map(|v| serde_json::Value::String(v.to_string()))
-        .collect()
+    bigint_1d.iter().map(bigint_to_json_value).collect()
 }
 
-/// Convert a 2D vector of BigInt to a vector of vectors of JSON values.
-///
-/// # Arguments
-/// * `bigint_2d` - 2D vector of BigInt values
-///
-/// # Returns
-/// A vector of vectors of JSON values
+/// Convert a 2D vector of BigInt to a vector of vectors of JSON values (numbers when fit in i64, else strings).
 pub fn bigint_2d_to_json_values(y: &[Vec<BigInt>]) -> Vec<Vec<serde_json::Value>> {
     y.iter()
-        .map(|coeff| {
-            coeff
-                .iter()
-                .map(|v| serde_json::Value::String(v.to_string()))
-                .collect()
-        })
+        .map(|coeff| coeff.iter().map(bigint_to_json_value).collect())
         .collect()
 }
 
-/// Nested BigInt structure to JSON: map each value to `Value::String(s)`.
-///
-/// # Arguments
-/// * `y` - 3D vector of BigInt values
-///
-/// # Returns
-/// A vector of vectors of vectors of JSON values
+/// Nested BigInt structure to JSON (numbers when fit in i64, else strings).
 pub fn bigint_3d_to_json_values(y: &[Vec<Vec<BigInt>>]) -> Vec<Vec<Vec<serde_json::Value>>> {
     y.iter()
         .map(|coeff| {
             coeff
                 .iter()
-                .map(|v| {
-                    v.iter()
-                        .map(|x| serde_json::Value::String(x.to_string()))
-                        .collect()
-                })
+                .map(|v| v.iter().map(bigint_to_json_value).collect())
                 .collect()
         })
         .collect()
 }
 
-/// Map a polynomial to a vector of JSON values.
-///
-/// # Arguments
-/// * `polynomial` - Polynomial to convert to TOML JSON
-///
-/// # Returns
-/// A vector of JSON values
+/// Map a polynomial to TOML JSON: `{"coefficients": [number|string, ...]}`.
 pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> serde_json::Value {
     poly_coefficients_to_toml_json(polynomial.coefficients())
 }

@@ -8,14 +8,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use actix::{Actor, Addr, Context, Handler};
+use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
     EncryptionKeyCreated, EncryptionKeyPending, Event, EventPublisher, EventSubscriber, EventType,
-    PkBfvProofRequest, ZkRequest, ZkResponse,
+    PkBfvProofRequest, ProofPayload, ProofType, SignedProofPayload, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[derive(Clone, Debug)]
 struct PendingProofRequest {
@@ -24,23 +25,27 @@ struct PendingProofRequest {
 }
 
 /// Core actor that handles encryption key proof requests.
+///
+/// Proofs are always wrapped in a [`SignedProofPayload`] before being published,
+/// enabling fault attribution via the signed proof model.
+/// A signer is required — if signing fails, the proof is not published.
 pub struct ProofRequestActor {
     bus: BusHandle,
-    proofs_enabled: bool,
+    signer: PrivateKeySigner,
     pending: HashMap<CorrelationId, PendingProofRequest>,
 }
 
 impl ProofRequestActor {
-    pub fn new(bus: &BusHandle, proofs_enabled: bool) -> Self {
+    pub fn new(bus: &BusHandle, signer: PrivateKeySigner) -> Self {
         Self {
             bus: bus.clone(),
-            proofs_enabled,
+            signer,
             pending: HashMap::new(),
         }
     }
 
-    pub fn setup(bus: &BusHandle, proofs_enabled: bool) -> Addr<Self> {
-        let addr = Self::new(bus, proofs_enabled).start();
+    pub fn setup(bus: &BusHandle, signer: PrivateKeySigner) -> Addr<Self> {
+        let addr = Self::new(bus, signer).start();
         bus.subscribe(EventType::EncryptionKeyPending, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
@@ -48,21 +53,6 @@ impl ProofRequestActor {
     }
 
     fn handle_encryption_key_pending(&mut self, msg: EncryptionKeyPending) {
-        if !self.proofs_enabled {
-            info!(
-                "ZK proofs disabled; publishing EncryptionKeyCreated without proof for party {}",
-                msg.key.party_id
-            );
-            if let Err(err) = self.bus.publish(EncryptionKeyCreated {
-                e3_id: msg.e3_id,
-                key: msg.key,
-                external: false,
-            }) {
-                error!("Failed to publish EncryptionKeyCreated: {err}");
-            }
-            return;
-        }
-
         let correlation_id = CorrelationId::new();
         self.pending.insert(
             correlation_id,
@@ -98,7 +88,29 @@ impl ProofRequestActor {
         };
 
         let mut key = (*pending.key).clone();
-        key.proof = Some(resp.proof);
+        key.proof = Some(resp.proof.clone());
+
+        // Always sign the proof payload — unsigned proofs are not published
+        let payload = ProofPayload {
+            e3_id: pending.e3_id.clone(),
+            proof_type: ProofType::T0PkBfv,
+            proof: resp.proof.clone(),
+        };
+
+        match SignedProofPayload::sign(payload, &self.signer) {
+            Ok(signed) => {
+                info!(
+                    "Signed T0 proof for party {} (signer: {})",
+                    key.party_id,
+                    self.signer.address()
+                );
+                key.signed_payload = Some(signed);
+            }
+            Err(err) => {
+                error!("Failed to sign T0 proof payload: {err} — proof will not be published");
+                return;
+            }
+        }
 
         if let Err(err) = self.bus.publish(EncryptionKeyCreated {
             e3_id: pending.e3_id,
@@ -115,17 +127,10 @@ impl ProofRequestActor {
         };
 
         if let Some(pending) = self.pending.remove(msg.correlation_id()) {
-            warn!("ZK proof request failed for E3 {}: {err}", pending.e3_id);
-
-            // Publish EncryptionKeyCreated without proof to allow the system to continue
-            // Applications can check the proof field to determine if validation occurred
-            if let Err(err) = self.bus.publish(EncryptionKeyCreated {
-                e3_id: pending.e3_id,
-                key: pending.key,
-                external: false,
-            }) {
-                error!("Failed to publish EncryptionKeyCreated after ZK proof failure: {err}");
-            }
+            error!(
+                "ZK proof request failed for E3 {}: {err} — key will not be published without proof",
+                pending.e3_id
+            );
         }
     }
 }

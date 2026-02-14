@@ -36,16 +36,28 @@ impl Proof {
 /// Circuit identifiers for ZK proofs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CircuitName {
-    /// BFV public key proof (T0).
+    /// BFV public key proof (C0).
     PkBfv,
-    /// TrBFV public key share proof (T1).
+    /// TrBFV public key share proof (C1).
     PkGeneration,
-    /// Encrypted shares proof (T2/T3).
-    EncShares,
-    /// Decryption share proof (T4/T5).
-    DecShares,
-    /// Public key aggregation proof (T6).
-    PkAgg,
+    /// Sk Share computation proof (C2a).
+    SkShareComputation,
+    /// E_SM share computation proof (C2b).
+    ESmShareComputation,
+    /// Encrypted sk share proof (C3a).
+    SkShareEncryption,
+    /// Encrypted E_SM share proof (C3b).
+    ESmShareEncryption,
+    /// Sk share decryption proof (C4a).
+    DkgSkShareDecryption,
+    /// E_SM share decryption proof (C4b).
+    DkgESmShareDecryption,
+    /// Public key aggregation proof (C5).
+    PkAggregation,
+    /// Decryption share proof (C6).
+    ThresholdShareDecryption,
+    /// Decrypted shares aggregation proof (C7).
+    DecryptedSharesAggregation,
 }
 
 impl CircuitName {
@@ -53,19 +65,31 @@ impl CircuitName {
         match self {
             CircuitName::PkBfv => "pk",
             CircuitName::PkGeneration => "pk_generation",
-            CircuitName::EncShares => "enc_shares",
-            CircuitName::DecShares => "dec_shares",
-            CircuitName::PkAgg => "pk_agg",
+            CircuitName::SkShareComputation => "sk_share_computation",
+            CircuitName::ESmShareComputation => "e_sm_share_computation",
+            CircuitName::SkShareEncryption => "sk_share_encryption",
+            CircuitName::ESmShareEncryption => "e_sm_share_encryption",
+            CircuitName::DkgSkShareDecryption => "dkg_sk_share_decryption",
+            CircuitName::DkgESmShareDecryption => "dkg_e_sm_share_decryption",
+            CircuitName::PkAggregation => "pk_aggregation",
+            CircuitName::ThresholdShareDecryption => "threshold_share_decryption",
+            CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
         }
     }
 
     pub fn group(&self) -> &'static str {
         match self {
             CircuitName::PkBfv => "dkg",
+            CircuitName::SkShareComputation => "dkg",
+            CircuitName::ESmShareComputation => "dkg",
+            CircuitName::SkShareEncryption => "dkg",
+            CircuitName::ESmShareEncryption => "dkg",
+            CircuitName::DkgSkShareDecryption => "dkg",
+            CircuitName::DkgESmShareDecryption => "dkg",
             CircuitName::PkGeneration => "threshold",
-            CircuitName::EncShares => "threshold",
-            CircuitName::DecShares => "threshold",
-            CircuitName::PkAgg => "threshold",
+            CircuitName::ThresholdShareDecryption => "threshold",
+            CircuitName::PkAggregation => "threshold",
+            CircuitName::DecryptedSharesAggregation => "threshold",
         }
     }
 

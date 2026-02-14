@@ -7,8 +7,9 @@
 //! Bounds, configs, bits, and input computation for the Decryption Share Aggregation TRBFV circuit.
 //!
 //! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
-//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Input coefficients are normalized
-//! with [`e3_polynomial::reduce`] in [`Input::standard_form`], consistent with other circuits.
+//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Decryption shares are normalized
+//! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
+//! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
 use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
@@ -20,7 +21,8 @@ use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::reduce;
-use fhe_math::rq::Representation;
+use e3_polynomial::{CrtPolynomial, Polynomial};
+use fhe_math::rq::{Poly, Representation};
 use num_bigint::{BigInt, BigUint};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -80,19 +82,20 @@ pub struct Configs {
 }
 
 /// Input for decrypted shares aggregation (same shape as old DecSharesAggTrBfvVectors).
-/// All coefficients reduced to [0, zkp_modulus) in standard_form.
+/// All polynomial-shaped data uses [`Polynomial`] / [`CrtPolynomial`] to match the Noir circuit;
+/// coefficients are reduced to [0, zkp_modulus) by compute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
-    /// [party][modulus][coeff]
-    pub decryption_shares: Vec<Vec<Vec<BigInt>>>,
+    /// One CrtPolynomial per party (public witnesses); circuit: `[[Polynomial; L]; T+1]`
+    pub decryption_shares: Vec<CrtPolynomial>,
     /// Party IDs (1-based: 1, 2, ..., T+1)
     pub party_ids: Vec<BigInt>,
-    /// Message polynomial coefficients
-    pub message: Vec<BigInt>,
-    /// u_global polynomial (CRT reconstruction)
-    pub u_global: Vec<BigInt>,
-    /// [modulus][coeff]
-    pub crt_quotients: Vec<Vec<BigInt>>,
+    /// Message polynomial (public witness)
+    pub message: Polynomial,
+    /// u_global polynomial (CRT reconstruction, secret witness)
+    pub u_global: Polynomial,
+    /// CRT quotient polynomials per modulus (secret witnesses)
+    pub crt_quotients: CrtPolynomial,
 }
 
 impl Computation for Bounds {
@@ -152,6 +155,21 @@ impl Computation for Configs {
     }
 }
 
+/// Truncate to first max_len coefficients (index 0 = constant term, ascending order).
+fn truncate_to_max_coeffs(v: &[BigInt], max_len: usize) -> Vec<BigInt> {
+    v.iter().take(max_len).cloned().collect()
+}
+
+/// Truncate each limb of a [`CrtPolynomial`] to max_len coefficients.
+fn truncate_crt_to_max_coeffs(crt: CrtPolynomial, max_len: usize) -> CrtPolynomial {
+    let limbs = crt
+        .limbs
+        .iter()
+        .map(|limb| Polynomial::new(truncate_to_max_coeffs(limb.coefficients(), max_len)))
+        .collect();
+    CrtPolynomial::new(limbs)
+}
+
 impl Computation for Inputs {
     type Preset = BfvPreset;
     type Data = DecryptedSharesAggregationCircuitData;
@@ -168,9 +186,10 @@ impl Computation for Inputs {
         let degree = ctx.degree;
         let threshold = data.committee.threshold;
         let max_msg_non_zero_coeffs = configs.max_msg_non_zero_coeffs;
+        let moduli = ctx.moduli();
 
         // Copy to PowerBasis for coefficient extraction
-        let d_share_polys: Vec<_> = data
+        let d_share_polys: Vec<Poly> = data
             .d_share_polys
             .iter()
             .map(|p| {
@@ -189,46 +208,26 @@ impl Computation for Inputs {
             )));
         }
 
-        // 1. Extract decryption shares per modulus per party [party][modulus][coeff]
-        let mut decryption_shares = Vec::with_capacity(d_share_polys.len());
+        // Decryption shares: one CrtPolynomial per party (from_fhe + reduce)
+        let mut decryption_shares: Vec<CrtPolynomial> = Vec::with_capacity(d_share_polys.len());
         for d_share in &d_share_polys {
-            let coeffs = d_share.coefficients();
-            let mut party_shares = Vec::with_capacity(num_moduli);
-            for m in 0..num_moduli {
-                let modulus_row = coeffs.row(m);
-                let qi_bigint = BigInt::from(ctx.moduli()[m]);
-                let coeff_vec: Vec<BigInt> = modulus_row
-                    .iter()
-                    .map(|&x| {
-                        let mut coeff = BigInt::from(x);
-                        coeff %= &qi_bigint;
-                        if coeff < BigInt::zero() {
-                            coeff += &qi_bigint;
-                        }
-                        coeff
-                    })
-                    .collect();
-                party_shares.push(coeff_vec);
-            }
-            decryption_shares.push(party_shares);
+            let crt = CrtPolynomial::from_fhe_polynomial(d_share);
+            decryption_shares.push(crt);
         }
 
-        // 2. Party IDs (1-based)
         let party_ids: Vec<BigInt> = data
             .reconstructing_parties
             .iter()
             .map(|&x| BigInt::from(x))
             .collect();
-
-        // 3. Message (pad to degree for computation, then truncate to MAX_MSG_NON_ZERO_COEFFS for input)
         let mut message: Vec<BigInt> = data.message_vec.iter().map(|&x| BigInt::from(x)).collect();
         message.resize(degree, BigInt::zero());
 
-        // 4. u^{(l)} via Lagrange per modulus
+        // u^{(l)} per modulus via Lagrange at zero
         let reconstructing_parties = &data.reconstructing_parties;
         let mut u_per_modulus: Vec<Vec<u64>> = Vec::new();
         for m in 0..num_moduli {
-            let modulus = ctx.moduli()[m];
+            let modulus = moduli[m];
             let mut u_modulus_coeffs = Vec::with_capacity(degree);
             for coeff_idx in 0..degree {
                 let shares: Vec<BigInt> = (0..=threshold)
@@ -245,23 +244,23 @@ impl Computation for Inputs {
             u_per_modulus.push(u_modulus_coeffs);
         }
 
-        // 5. u_global via CRT reconstruction
-        let mut u_global: Vec<BigInt> = Vec::with_capacity(degree);
+        // u_global per coefficient via CRT reconstruction
+        let mut u_global_vec: Vec<BigInt> = Vec::with_capacity(degree);
         for coeff_idx in 0..degree {
             let rests: Vec<u64> = (0..num_moduli)
                 .map(|m| u_per_modulus[m][coeff_idx])
                 .collect();
-            let u_global_coeff = utils::crt_reconstruct(&rests, ctx.moduli())?;
-            u_global.push(BigInt::from(u_global_coeff));
+            let u_global_coeff = utils::crt_reconstruct(&rests, moduli)?;
+            u_global_vec.push(BigInt::from(u_global_coeff));
         }
 
-        // 6. CRT quotients: r^{(m)} = (u_global - u^{(m)}) / q_m
-        let mut crt_quotients: Vec<Vec<BigInt>> = Vec::new();
+        // CRT quotients: r^{(m)} = (u_global - u^{(m)}) / q_m
+        let mut crt_quotients_limbs: Vec<Polynomial> = Vec::with_capacity(num_moduli);
         for (m, u_modulus) in u_per_modulus.iter().enumerate().take(num_moduli) {
-            let q_m = ctx.moduli()[m];
+            let q_m = moduli[m];
             let q_m_bigint = BigInt::from(q_m);
             let mut r_m_coeffs = Vec::with_capacity(degree);
-            for (coeff_idx, u_global_val) in u_global.iter().enumerate().take(degree) {
+            for (coeff_idx, u_global_val) in u_global_vec.iter().enumerate().take(degree) {
                 let u_m = BigInt::from(u_modulus[coeff_idx]);
                 let diff = u_global_val - &u_m;
                 let remainder = &diff % &q_m_bigint;
@@ -273,99 +272,58 @@ impl Computation for Inputs {
                 }
                 r_m_coeffs.push(&diff / &q_m_bigint);
             }
-            crt_quotients.push(r_m_coeffs);
+            crt_quotients_limbs.push(Polynomial::new(r_m_coeffs));
         }
+        let mut crt_quotients = CrtPolynomial::new(crt_quotients_limbs);
 
-        // Truncate to max_msg_non_zero_coeffs. Do NOT reverse: match old impl (dec_shares_agg_trbfv
-        // vectors.rs) and circuit—index 0 = constant term (ascending order).
-        let truncate = |v: &[BigInt]| -> Vec<BigInt> {
-            v.iter().take(max_msg_non_zero_coeffs).cloned().collect()
-        };
-        let decryption_shares: Vec<Vec<Vec<BigInt>>> = decryption_shares
+        // Truncate to max_msg_non_zero_coeffs (index 0 = constant term, ascending order)
+        decryption_shares = decryption_shares
             .into_iter()
-            .map(|party| party.into_iter().map(|row| truncate(&row)).collect())
+            .map(|crt| truncate_crt_to_max_coeffs(crt, max_msg_non_zero_coeffs))
             .collect();
-        let message = truncate(&message);
-        let u_global = truncate(&u_global);
-        let crt_quotients: Vec<Vec<BigInt>> = crt_quotients
-            .into_iter()
-            .map(|row| truncate(&row))
-            .collect();
+        let message_trunc = truncate_to_max_coeffs(&message, max_msg_non_zero_coeffs);
+        let u_global_trunc = truncate_to_max_coeffs(&u_global_vec, max_msg_non_zero_coeffs);
+        crt_quotients = truncate_crt_to_max_coeffs(crt_quotients, max_msg_non_zero_coeffs);
 
-        let inputs = Inputs {
+        let zkp_modulus = get_zkp_modulus();
+
+        let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let message = Polynomial::new(
+            message_trunc
+                .iter()
+                .map(|c| reduce(c, &zkp_modulus))
+                .collect(),
+        );
+        let u_global = Polynomial::new(
+            u_global_trunc
+                .iter()
+                .map(|c| reduce(c, &zkp_modulus))
+                .collect(),
+        );
+
+        Ok(Inputs {
             decryption_shares,
             party_ids,
             message,
             u_global,
             crt_quotients,
-        };
-
-        Ok(inputs.standard_form())
-    }
-}
-
-impl Inputs {
-    /// Reduce all coefficients to [0, zkp_modulus). Uses `e3_polynomial::reduce` like other circuits.
-    pub fn standard_form(&self) -> Self {
-        let zkp_modulus = get_zkp_modulus();
-        Inputs {
-            decryption_shares: self
-                .decryption_shares
-                .iter()
-                .map(|party| {
-                    party
-                        .iter()
-                        .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
-                        .collect()
-                })
-                .collect(),
-            party_ids: self
-                .party_ids
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            message: self
-                .message
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            u_global: self
-                .u_global
-                .iter()
-                .map(|c| reduce(c, &zkp_modulus))
-                .collect(),
-            crt_quotients: self
-                .crt_quotients
-                .iter()
-                .map(|row| row.iter().map(|c| reduce(c, &zkp_modulus)).collect())
-                .collect(),
-        }
+        })
     }
 
-    /// Serializes the input to JSON for Prover.toml. Each polynomial is emitted as
-    /// `{ "coefficients": [string, ...] }` to match Noir's `Polynomial` struct.
-    pub fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         use crate::bigint_1d_to_json_values;
-        use crate::poly_coefficients_to_toml_json;
+        use crate::crt_polynomial_to_toml_json;
+        use crate::polynomial_to_toml_json;
 
         let decryption_shares_json: Vec<Vec<serde_json::Value>> = self
             .decryption_shares
             .iter()
-            .map(|party| {
-                party
-                    .iter()
-                    .map(|modulus_row| poly_coefficients_to_toml_json(modulus_row))
-                    .collect()
-            })
+            .map(crt_polynomial_to_toml_json)
             .collect();
         let party_ids_json = bigint_1d_to_json_values(&self.party_ids);
-        let message_json = poly_coefficients_to_toml_json(&self.message);
-        let u_global_json = poly_coefficients_to_toml_json(&self.u_global);
-        let crt_quotients_json: Vec<serde_json::Value> = self
-            .crt_quotients
-            .iter()
-            .map(|row| poly_coefficients_to_toml_json(row))
-            .collect();
+        let message_json = polynomial_to_toml_json(&self.message);
+        let u_global_json = polynomial_to_toml_json(&self.u_global);
+        let crt_quotients_json = crt_polynomial_to_toml_json(&self.crt_quotients);
 
         let json = serde_json::json!({
             "decryption_shares": decryption_shares_json,
@@ -419,8 +377,19 @@ mod tests {
         let configs = Configs::compute(preset, &()).unwrap();
         assert_eq!(out.inputs.decryption_shares.len(), committee.threshold + 1);
         assert_eq!(out.inputs.party_ids.len(), committee.threshold + 1);
-        assert_eq!(out.inputs.message.len(), configs.max_msg_non_zero_coeffs);
-        assert_eq!(out.inputs.u_global.len(), configs.max_msg_non_zero_coeffs);
+        assert_eq!(
+            out.inputs.message.coefficients().len(),
+            configs.max_msg_non_zero_coeffs
+        );
+        assert_eq!(
+            out.inputs.u_global.coefficients().len(),
+            configs.max_msg_non_zero_coeffs
+        );
+        assert_eq!(out.inputs.crt_quotients.limbs.len(), configs.l);
+        assert_eq!(
+            out.inputs.crt_quotients.limb(0).coefficients().len(),
+            configs.max_msg_non_zero_coeffs
+        );
         assert!(out.bits.noise_bit > 0);
     }
 }

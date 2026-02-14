@@ -34,6 +34,7 @@ e3-trbfv = { workspace = true }
 e3-bfv-client = { workspace = true }
 e3-fhe-params = { workspace = true }
 e3-utils = { workspace = true }
+e3-zk-prover = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe = { workspace = true }
@@ -41,6 +42,7 @@ num-bigint = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 serial_test = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

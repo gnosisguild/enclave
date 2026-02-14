@@ -12,8 +12,8 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let N: u32, let L: u32> {
     /// CRT moduli: [q_0, q_1, ..., q_{L-1}]
     pub qis: [Field; L],
-    /// Plaintext modulus: q mod t mod p
-    pub q_mod_t_mod_p: Field,
+    /// Plaintext modulus: q mod t
+    pub q_mod_t: Field,
     /// Scaling factors for each basis: [k0_0, k0_1, ..., k0_{L-1}]
     pub k0is: [Field; L],
     /// Bounds for public key polynomials for each CRT basis
@@ -42,7 +42,7 @@ pub struct Configs<let N: u32, let L: u32> {
 
 impl<let N: u32, let L: u32> Configs<N, L> {
     pub fn new(
-        q_mod_t_mod_p: Field,
+        q_mod_t: Field,
         qis: [Field; L],
         k0is: [Field; L],
         pk_bounds: [Field; L],
@@ -59,7 +59,7 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     ) -> Self {
         Configs {
             qis,
-            q_mod_t_mod_p,
+            q_mod_t,
             k0is,
             pk_bounds,
             e0_bound,

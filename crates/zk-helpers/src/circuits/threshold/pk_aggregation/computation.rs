@@ -13,7 +13,6 @@ use crate::bigint_1d_to_json_values;
 use crate::compute_modulus_bit;
 use crate::compute_pk_aggregation_commitment;
 use crate::crt_polynomial_to_toml_json;
-use crate::get_zkp_modulus;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuit;
 use crate::threshold::pk_aggregation::circuit::PkAggregationCircuitData;
 use crate::CircuitsErrors;
@@ -158,7 +157,6 @@ impl Computation for Inputs {
 
         let bit_pk = compute_modulus_bit(&threshold_params);
         let moduli = threshold_params.moduli();
-        let zkp_modulus = &get_zkp_modulus();
 
         // Coefficients must be in [0, q_i), not centered to (-q_i/2, q_i/2]. The circuit sums
         // party coefficients then applies reduce_mod to get a value in [0, q_l); the aggregated
@@ -177,22 +175,15 @@ impl Computation for Inputs {
         let mut expected_threshold_pk_commitments = Vec::new();
 
         pk0_agg.reverse();
-        pk0_agg.reduce(moduli)?;
-        pk0_agg.reduce_uniform(zkp_modulus);
 
         pk1_agg.reverse();
         pk1_agg.scalar_mul(&BigInt::from(data.committee.h));
         pk1_agg.reduce(moduli)?;
-        pk1_agg.reduce_uniform(zkp_modulus);
 
         for party_index in 0..data.committee.h {
             pk0[party_index].reverse();
-            pk0[party_index].reduce(moduli)?;
-            pk0[party_index].reduce_uniform(zkp_modulus);
 
             pk1[party_index].reverse();
-            pk1[party_index].reduce(moduli)?;
-            pk1[party_index].reduce_uniform(zkp_modulus);
 
             let commitment =
                 compute_pk_aggregation_commitment(&pk0[party_index], &pk1[party_index], bit_pk);
