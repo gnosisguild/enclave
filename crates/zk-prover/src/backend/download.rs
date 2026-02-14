@@ -20,7 +20,7 @@ use super::ZkBackend;
 
 impl ZkBackend {
     pub async fn download_bb(&self) -> Result<(), ZkError> {
-        if !self.using_custom_bb {
+        if self.using_custom_bb {
             return Ok(());
         }
 
