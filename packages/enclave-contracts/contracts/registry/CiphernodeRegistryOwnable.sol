@@ -8,6 +8,7 @@ pragma solidity >=0.8.27;
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { IEnclave } from "../interfaces/IEnclave.sol";
+import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -65,6 +66,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Maps E3 ID to its committee data
     mapping(uint256 e3Id => Committee committee) internal committees;
+
+    /// @notice Address of the slashing manager authorized to expel committee members
+    ISlashingManager public slashingManager;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -143,6 +147,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Caller is not authorized
     error Unauthorized();
 
+    /// @notice Caller is not the slashing manager
+    error NotSlashingManager();
+
     /// @notice Not enough registered ciphernodes to meet threshold
     /// @param requested The requested committee size (N)
     /// @param available The number of registered ciphernodes
@@ -172,6 +179,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             msg.sender == owner() || msg.sender == address(bondingRegistry),
             NotOwnerOrBondingRegistry()
         );
+        _;
+    }
+
+    /// @dev Restricts function access to only the slashing manager
+    modifier onlySlashingManager() {
+        require(msg.sender == address(slashingManager), NotSlashingManager());
         _;
     }
 
@@ -375,6 +388,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         }
 
         c.committee = c.topNodes;
+        // Initialize active committee tracking in Committee struct
+        uint256 committeeLen = c.committee.length;
+        for (uint256 i = 0; i < committeeLen; ) {
+            c.active[c.committee[i]] = true;
+            unchecked {
+                ++i;
+            }
+        }
+        c.activeCount = committeeLen;
+
         enclave.onCommitteeFinalized(e3Id);
         emit CommitteeFinalized(e3Id, c.topNodes);
         return true;
@@ -404,6 +427,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(address(_bondingRegistry) != address(0), ZeroAddress());
         bondingRegistry = _bondingRegistry;
         emit BondingRegistrySet(address(_bondingRegistry));
+    }
+
+    /// @notice Sets the slashing manager contract address
+    /// @dev Only callable by owner
+    /// @param _slashingManager Address of the slashing manager contract
+    function setSlashingManager(
+        ISlashingManager _slashingManager
+    ) public onlyOwner {
+        require(address(_slashingManager) != address(0), ZeroAddress());
+        slashingManager = _slashingManager;
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -494,6 +527,86 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         Committee storage c = committees[e3Id];
         require(c.initialized, CommitteeNotRequested());
         return c.committeeDeadline;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //              Committee Expulsion Functions             //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @inheritdoc ICiphernodeRegistry
+    function expelCommitteeMember(
+        uint256 e3Id,
+        address node,
+        bytes32 reason
+    )
+        external
+        onlySlashingManager
+        returns (uint256 activeCount, uint32 thresholdM)
+    {
+        Committee storage c = committees[e3Id];
+        thresholdM = c.threshold[0];
+
+        // Idempotent: if already expelled, return current state
+        if (!c.active[node]) {
+            activeCount = c.activeCount;
+            return (activeCount, thresholdM);
+        }
+
+        c.active[node] = false;
+        c.activeCount--;
+
+        activeCount = c.activeCount;
+        emit CommitteeMemberExpelled(e3Id, node, reason, activeCount);
+
+        // Emit viability update
+        bool viable = activeCount >= thresholdM;
+        emit CommitteeViabilityUpdated(e3Id, activeCount, thresholdM, viable);
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function isCommitteeMemberActive(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        return committees[e3Id].active[node];
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getActiveCommitteeNodes(
+        uint256 e3Id
+    ) external view returns (address[] memory) {
+        Committee storage c = committees[e3Id];
+        uint256 total = c.committee.length;
+        uint256 actCount = c.activeCount;
+
+        address[] memory activeNodes = new address[](actCount);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < total; ) {
+            if (c.active[c.committee[i]]) {
+                activeNodes[idx] = c.committee[i];
+                idx++;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        return activeNodes;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getActiveCommitteeCount(
+        uint256 e3Id
+    ) external view returns (uint256) {
+        return committees[e3Id].activeCount;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommitteeThreshold(
+        uint256 e3Id
+    ) external view returns (uint32[2] memory) {
+        return committees[e3Id].threshold;
     }
 
     ////////////////////////////////////////////////////////////

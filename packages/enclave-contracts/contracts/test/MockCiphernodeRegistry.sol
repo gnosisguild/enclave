@@ -94,6 +94,38 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function isOpen(uint256) external pure returns (bool) {
         return false;
     }
+
+    // solhint-disable-next-line no-empty-blocks
+    function expelCommitteeMember(
+        uint256,
+        address,
+        bytes32
+    ) external pure returns (uint256, uint32) {
+        return (0, 0);
+    }
+
+    function isCommitteeMemberActive(
+        uint256,
+        address
+    ) external pure returns (bool) {
+        return true;
+    }
+
+    function getActiveCommitteeNodes(
+        uint256
+    ) external pure returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function getActiveCommitteeCount(uint256) external pure returns (uint256) {
+        return 0;
+    }
+
+    function getCommitteeThreshold(
+        uint256
+    ) external pure returns (uint32[2] memory) {
+        return [uint32(0), uint32(0)];
+    }
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
@@ -178,5 +210,37 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function isOpen(uint256) external pure returns (bool) {
         return false;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function expelCommitteeMember(
+        uint256,
+        address,
+        bytes32
+    ) external pure returns (uint256, uint32) {
+        return (0, 0);
+    }
+
+    function isCommitteeMemberActive(
+        uint256,
+        address
+    ) external pure returns (bool) {
+        return true;
+    }
+
+    function getActiveCommitteeNodes(
+        uint256
+    ) external pure returns (address[] memory) {
+        return new address[](0);
+    }
+
+    function getActiveCommitteeCount(uint256) external pure returns (uint256) {
+        return 0;
+    }
+
+    function getCommitteeThreshold(
+        uint256
+    ) external pure returns (uint32[2] memory) {
+        return [uint32(0), uint32(0)];
     }
 }

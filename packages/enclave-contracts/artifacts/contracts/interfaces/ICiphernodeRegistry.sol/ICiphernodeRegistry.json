@@ -138,6 +138,37 @@
           "type": "uint256"
         },
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "activeCountAfter",
+          "type": "uint256"
+        }
+      ],
+      "name": "CommitteeMemberExpelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
           "indexed": false,
           "internalType": "address[]",
           "name": "nodes",
@@ -188,6 +219,37 @@
         }
       ],
       "name": "CommitteeRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "activeCount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "thresholdM",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "viable",
+          "type": "bool"
+        }
+      ],
+      "name": "CommitteeViabilityUpdated",
       "type": "event"
     },
     {
@@ -285,6 +347,40 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "reason",
+          "type": "bytes32"
+        }
+      ],
+      "name": "expelCommitteeMember",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "activeCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "thresholdM",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
         }
       ],
       "name": "finalizeCommittee",
@@ -296,6 +392,44 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getActiveCommitteeCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "count",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getActiveCommitteeNodes",
+      "outputs": [
+        {
+          "internalType": "address[]",
+          "name": "nodes",
+          "type": "address[]"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -352,6 +486,25 @@
     {
       "inputs": [
         {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCommitteeThreshold",
+      "outputs": [
+        {
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "address",
           "name": "ciphernode",
           "type": "address"
@@ -366,6 +519,30 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "isCommitteeMemberActive",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "active",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -590,5 +767,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-d7b7e823e5eb177cd42a96206dc5c5f8387609a9"
+  "buildInfoId": "solc-0_8_28-9c1ebc56a4c13150b3adbadeabc6f1b966156894"
 }

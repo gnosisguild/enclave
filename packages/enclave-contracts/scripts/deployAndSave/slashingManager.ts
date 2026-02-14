@@ -17,6 +17,8 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 export interface SlashingManagerArgs {
   admin?: string;
   bondingRegistry?: string;
+  ciphernodeRegistry?: string;
+  enclave?: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -28,6 +30,8 @@ export interface SlashingManagerArgs {
 export const deployAndSaveSlashingManager = async ({
   admin,
   bondingRegistry,
+  ciphernodeRegistry,
+  enclave,
   hre,
 }: SlashingManagerArgs): Promise<{
   slashingManager: SlashingManager;
@@ -41,8 +45,13 @@ export const deployAndSaveSlashingManager = async ({
   if (
     !admin ||
     !bondingRegistry ||
+    !ciphernodeRegistry ||
+    !enclave ||
     (preDeployedArgs?.constructorArgs?.admin === admin &&
-      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry)
+      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
+      preDeployedArgs?.constructorArgs?.ciphernodeRegistry ===
+        ciphernodeRegistry &&
+      preDeployedArgs?.constructorArgs?.enclave === enclave)
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error(
@@ -61,6 +70,8 @@ export const deployAndSaveSlashingManager = async ({
   const slashingManager = await slashingManagerFactory.deploy(
     admin,
     bondingRegistry,
+    ciphernodeRegistry,
+    enclave,
   );
 
   await slashingManager.waitForDeployment();
@@ -74,6 +85,8 @@ export const deployAndSaveSlashingManager = async ({
       constructorArgs: {
         admin,
         bondingRegistry,
+        ciphernodeRegistry,
+        enclave,
       },
       blockNumber,
       address: slashingManagerAddress,

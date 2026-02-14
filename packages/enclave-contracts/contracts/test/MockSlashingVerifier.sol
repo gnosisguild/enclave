@@ -5,15 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import { ISlashVerifier } from "../interfaces/ISlashVerifier.sol";
+import { ICircuitVerifier } from "../interfaces/ICircuitVerifier.sol";
 
-contract MockSlashingVerifier is ISlashVerifier {
+/// @notice Mock circuit verifier for testing. Returns configurable result.
+/// @dev Default returnValue = false means proof is invalid = fault confirmed (slash proceeds).
+///      Set returnValue = true to simulate a valid proof = no fault (ProofIsValid revert).
+contract MockCircuitVerifier is ICircuitVerifier {
+    bool public returnValue;
+
+    function setReturnValue(bool _returnValue) external {
+        returnValue = _returnValue;
+    }
+
     function verify(
-        uint256,
-        bytes memory data
-    ) external pure returns (bool success) {
-        data;
-
-        if (data.length > 0) success = true;
+        bytes calldata,
+        bytes32[] calldata
+    ) external view returns (bool) {
+        return returnValue;
     }
 }

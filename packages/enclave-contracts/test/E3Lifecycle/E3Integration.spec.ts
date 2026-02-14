@@ -128,6 +128,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: addressOne, // Will be updated
+            ciphernodeRegistry: addressOne, // Will be updated
+            enclave: addressOne, // Will be updated
           },
         },
       },
@@ -253,7 +255,14 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     await slashingManagerContract.slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
     );
+    await slashingManagerContract.slashingManager.setCiphernodeRegistry(
+      ciphernodeRegistryAddress,
+    );
+    await slashingManagerContract.slashingManager.setEnclave(enclaveAddress);
     await registry.setBondingRegistry(await bondingRegistry.getAddress());
+    await registry.setSlashingManager(
+      await slashingManagerContract.slashingManager.getAddress(),
+    );
 
     // Update ticket token registry
     await ticketTokenContract.enclaveTicketToken.setRegistry(

@@ -8,6 +8,7 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
+import { ISlashingManager } from "./interfaces/ISlashingManager.sol";
 import { IE3RefundManager } from "./interfaces/IE3RefundManager.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
@@ -43,6 +44,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice E3 Refund Manager contract for handling failed E3 refunds.
     /// @dev Manages refund calculation and claiming for failed E3s.
     IE3RefundManager public e3RefundManager;
+
+    /// @notice Slashing Manager contract for fault attribution.
+    /// @dev Used to check which operators have been slashed for E3s.
+    ISlashingManager public slashingManager;
 
     /// @notice Address of the ERC20 token used for E3 fees.
     /// @dev All E3 request fees must be paid in this token.
@@ -202,6 +207,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(
             msg.sender == address(ciphernodeRegistry),
             "Only CiphernodeRegistry"
+        );
+        _;
+    }
+
+    /// @notice Restricts function to CiphernodeRegistry or SlashingManager
+    modifier onlyCiphernodeRegistryOrSlashingManager() {
+        require(
+            msg.sender == address(ciphernodeRegistry) ||
+                msg.sender == address(slashingManager),
+            "Only CiphernodeRegistry or SlashingManager"
         );
         _;
     }
@@ -454,21 +469,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Distributes rewards to committee members after successful E3 completion.
-    /// @dev Divides the E3 payment equally among all committee members and transfers via bonding registry.
-    /// @dev Emits RewardsDistributed event upon successful distribution.
+    /// @notice Distributes rewards to active committee members after successful E3 completion.
+    /// @dev Uses active committee nodes (excluding expelled members).
+    ///      Divides the E3 payment equally among active members and transfers via bonding registry.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
-        address[] memory committeeNodes = ciphernodeRegistry.getCommitteeNodes(
-            e3Id
-        );
-        uint256 committeeLength = committeeNodes.length;
-        uint256[] memory amounts = new uint256[](committeeLength);
+        address[] memory activeNodes = ciphernodeRegistry
+            .getActiveCommitteeNodes(e3Id);
+        uint256 activeLength = activeNodes.length;
 
-        // TODO: do we need to pay different amounts to different nodes?
-        // For now, we'll pay the same amount to all nodes.
-        uint256 amount = e3Payments[e3Id] / committeeLength;
-        for (uint256 i = 0; i < committeeLength; i++) {
+        if (activeLength == 0) return;
+
+        uint256[] memory amounts = new uint256[](activeLength);
+
+        // Distribute equally among active (non-expelled) committee members
+        uint256 amount = e3Payments[e3Id] / activeLength;
+        for (uint256 i = 0; i < activeLength; i++) {
             amounts[i] = amount;
         }
 
@@ -477,16 +493,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         feeToken.approve(address(bondingRegistry), totalAmount);
 
-        bondingRegistry.distributeRewards(feeToken, committeeNodes, amounts);
+        bondingRegistry.distributeRewards(feeToken, activeNodes, amounts);
 
-        // TODO: decide where does dust go? Treasury maybe?
+        // Dust goes to treasury (implicit via remaining approval)
         feeToken.approve(address(bondingRegistry), 0);
 
-        emit RewardsDistributed(e3Id, committeeNodes, amounts);
+        emit RewardsDistributed(e3Id, activeNodes, amounts);
     }
 
     /// @notice Retrieves the honest committee nodes for a given E3.
-    /// @dev Determines honest nodes based on failure reason and committee publication status.
+    /// @dev Uses active committee view from the registry (which excludes expelled/slashed members).
     /// @param e3Id The ID of the E3.
     /// @return honestNodes An array of addresses of honest committee nodes.
     function _getHonestNodes(
@@ -502,12 +518,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             return new address[](0);
         }
 
-        // Try to get published committee nodes
-        try ciphernodeRegistry.getCommitteeNodes(e3Id) returns (
+        // Use active committee nodes (already filtered by expulsion)
+        try ciphernodeRegistry.getActiveCommitteeNodes(e3Id) returns (
             address[] memory nodes
         ) {
-            // TODO: Implement fault attribution to filter honest from faulting nodes
-            return nodes; // Assume all are honest for now
+            return nodes;
         } catch {
             return new address[](0); // Committee not published (DKG failed)
         }
@@ -634,6 +649,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3RefundManagerSet(address(_e3RefundManager));
     }
 
+    /// @notice Sets the Slashing Manager contract address
+    /// @param _slashingManager The new Slashing Manager contract address
+    function setSlashingManager(
+        ISlashingManager _slashingManager
+    ) public onlyOwner {
+        require(
+            address(_slashingManager) != address(0),
+            "Invalid SlashingManager address"
+        );
+        slashingManager = _slashingManager;
+    }
+
     /// @notice Process a failed E3 and calculate refunds
     /// @dev Can be called by anyone once E3 is in failed state
     /// @param e3Id The ID of the failed E3
@@ -701,7 +728,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function onE3Failed(
         uint256 e3Id,
         uint8 reason
-    ) external onlyCiphernodeRegistry {
+    ) external onlyCiphernodeRegistryOrSlashingManager {
         require(reason > 0 && reason <= 12, "Invalid failure reason");
         // Mark E3 as failed with the given reason
         _markE3FailedWithReason(e3Id, FailureReason(reason));
