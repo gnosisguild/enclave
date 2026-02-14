@@ -6,6 +6,9 @@ echo "Press any key to continue or Ctrl+C to cancel..."
 
 read
 
+# Use the locally installed bb
+export E3_CUSTOM_BB=$(which bb)
+
 rm -rf * && \
   git reset --hard HEAD && \
   git submodule update --init --recursive && \
