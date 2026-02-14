@@ -47,7 +47,6 @@ struct PersistedBackend {
 
 impl PersistedBackend {
     fn get_or_init_store(&self, handle: &BusHandle) -> Result<Addr<SledStore>> {
-        println!("get_or_init_store in {:?} ...", self.sled_path);
         self.store
             .get_or_try_init(|| SledStore::new(handle, &self.sled_path))
             .cloned()
@@ -288,10 +287,8 @@ impl EventSystem {
     pub fn persisted_eventstore_router(
         &self,
     ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
-        info!("persisted_eventstore_router...");
         let eventstores = self.eventstore_addrs()?;
         if let EventStoreAddrs::Persisted(addrs) = eventstores {
-            info!("creating router...");
             let router = EventStoreRouter::new(addrs);
             Ok(router.start())
         } else {
@@ -301,7 +298,6 @@ impl EventSystem {
 
     /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
-        info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
             EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
@@ -310,7 +306,6 @@ impl EventSystem {
     }
 
     pub fn eventstore_getter_seq(&self) -> Result<Recipient<EventStoreQueryBy<SeqAgg>>> {
-        info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
             EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
@@ -319,7 +314,6 @@ impl EventSystem {
     }
 
     pub fn eventstore_getter_ts(&self) -> Result<Recipient<EventStoreQueryBy<TsAgg>>> {
-        info!("eventstore_reader...");
         let eventstores = self.eventstore_addrs()?;
         match &eventstores {
             EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
@@ -336,7 +330,6 @@ impl EventSystem {
 
     /// Get the BusHandle
     pub fn handle(&self) -> Result<BusHandle> {
-        println!("handle");
         self.handle
             .get_or_try_init(|| {
                 let handle = BusHandle::new(self.eventbus(), self.sequencer()?, self.hlc()?);
@@ -350,7 +343,6 @@ impl EventSystem {
 
     /// Get the DataStore
     pub fn store(&self) -> Result<DataStore> {
-        println!("store()...");
         let store = match &self.backend {
             EventSystemBackend::InMem(b) => {
                 let base = b.get_or_init_store();
