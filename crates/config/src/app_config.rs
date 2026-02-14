@@ -180,6 +180,25 @@ pub struct AppConfig {
     using_custom_bb: bool,
 }
 
+#[derive(Debug, Clone)]
+pub enum BBPath {
+    Custom(PathBuf),
+    Default(PathBuf),
+}
+
+impl BBPath {
+    pub fn is_custom(&self) -> bool {
+        matches!(self, BBPath::Custom(_))
+    }
+
+    pub fn path(&self) -> PathBuf {
+        match self {
+            BBPath::Custom(p) => p.clone(),
+            BBPath::Default(p) => p.clone(),
+        }
+    }
+}
+
 impl AppConfig {
     pub fn try_from_unscoped(
         name: &str,
@@ -261,8 +280,13 @@ impl AppConfig {
     }
 
     /// Get the bb binary path
-    pub fn bb_binary(&self) -> PathBuf {
-        self.paths.bb_binary()
+    pub fn bb_binary(&self) -> BBPath {
+        let bb = self.paths.bb_binary();
+        if self.using_custom_bb {
+            BBPath::Custom(bb)
+        } else {
+            BBPath::Default(bb)
+        }
     }
 
     /// Get the circuits directory
@@ -370,10 +394,6 @@ impl AppConfig {
     pub fn program(&self) -> &ProgramConfig {
         &self.program
     }
-
-    pub fn using_custom_bb(&self) -> bool {
-        self.using_custom_bb
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -476,8 +496,8 @@ pub fn load_config(
         load_yaml_with_env(&resolved_config_path).context("Configuration file not found")?;
 
     let config: UnscopedAppConfig = Figment::from(
-        Figment::from(Env::prefixed("E3_"))
-            .merge(Serialized::defaults(&UnscopedAppConfig::default()))
+        Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
+            .merge(Env::prefixed("E3_"))
             .merge(Yaml::string(&loaded_yaml))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
