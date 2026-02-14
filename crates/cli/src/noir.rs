@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::env;
-
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
@@ -137,7 +135,6 @@ async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
             .download_bb()
             .await
             .map_err(|e| anyhow!("Failed to download bb: {}", e))?;
-
         backend
             .download_circuits()
             .await
