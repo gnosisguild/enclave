@@ -22,7 +22,6 @@ use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
-use tracing::info;
 
 struct InMemBackend {
     eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
