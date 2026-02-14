@@ -27,11 +27,12 @@ impl ZkBackend {
     pub async fn check_status(&self) -> SetupStatus {
         let version_info = self.load_version_info().await;
 
-        let bb_ok = if self.using_custom_bb {
-            self.verify_bb().await.unwrap_or("null".to_string()) == self.config.required_bb_version
-        } else {
-            version_info.bb_matches(&self.config.required_bb_version) && self.bb_binary.exists()
-        };
+        let bb_ok = self.bb_binary.exists()
+            && if self.using_custom_bb {
+                self.verify_bb().await.unwrap_or_default() == self.config.required_bb_version
+            } else {
+                version_info.bb_matches(&self.config.required_bb_version)
+            };
 
         let circuits_ok = version_info.circuits_match(&self.config.required_circuits_version)
             && self.circuits_dir.exists();
