@@ -177,7 +177,7 @@ pub struct AppConfig {
     /// Program config
     program: ProgramConfig,
     /// A custom bb implementation has been provided do not download and checksum a binary
-    use_custom_bb: bool,
+    using_custom_bb: bool,
 }
 
 impl AppConfig {
@@ -236,7 +236,7 @@ impl AppConfig {
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
-            use_custom_bb: config.custom_bb.is_some(),
+            using_custom_bb: config.custom_bb.is_some(),
         })
     }
 
@@ -371,8 +371,8 @@ impl AppConfig {
         &self.program
     }
 
-    pub fn use_custom_bb(&self) -> bool {
-        self.use_custom_bb
+    pub fn using_custom_bb(&self) -> bool {
+        self.using_custom_bb
     }
 }
 
@@ -397,7 +397,9 @@ pub struct UnscopedAppConfig {
     otel: Option<String>,
     /// Program config
     program: Option<ProgramConfig>,
-    /// Path to custom bb binary
+    /// Path to custom bb binary. When this is set the bb binary is used will not be checksummed it
+    /// is up to the node operator to ensure bb matches the version that exactly matches the
+    /// application.
     custom_bb: Option<PathBuf>,
 }
 
