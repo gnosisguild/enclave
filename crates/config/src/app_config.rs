@@ -495,17 +495,16 @@ pub fn load_config(
     let loaded_yaml =
         load_yaml_with_env(&resolved_config_path).context("Configuration file not found")?;
 
-    let config: UnscopedAppConfig = Figment::from(
+    let config: UnscopedAppConfig =
         Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
             .merge(Env::prefixed("E3_"))
             .merge(Yaml::string(&loaded_yaml))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
-            })),
-    )
-    .extract()
-    .context("Could not parse configuration")?;
+            }))
+            .extract()
+            .context("Could not parse configuration")?;
 
     Ok(config.into_scoped(name).context(format!(
         "Could not apply scope '{}' to configuration.",
