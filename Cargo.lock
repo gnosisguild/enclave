@@ -3696,6 +3696,7 @@ dependencies = [
  "e3-aggregator",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-config",
  "e3-crypto",
  "e3-data",
  "e3-events",
