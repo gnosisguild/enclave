@@ -14,6 +14,23 @@ use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
 use zk_inputs::ZKInputsGenerator as CoreZKInputsGenerator;
 
+/// Converts a JsValue (string, number, or JS BigInt) to a string suitable for BigInt parsing.
+/// Circuit inputs may serialize coefficients as JSON numbers when they fit in i64,
+/// or pass them as JavaScript BigInt values.
+fn js_value_to_bigint_string(val: JsValue) -> Option<String> {
+    if let Some(s) = val.as_string() {
+        return Some(s);
+    }
+    if let Some(n) = val.as_f64() {
+        return Some(format!("{:.0}", n));
+    }
+    // JS BigInt: convert via js_sys::BigInt::toString(10)
+    val.dyn_into::<js_sys::BigInt>()
+        .ok()
+        .and_then(|b| b.to_string(10).ok())
+        .and_then(|js| JsValue::from(js).as_string())
+}
+
 /// JavaScript-compatible CRISP ZK inputs generator.
 #[wasm_bindgen]
 pub struct ZKInputsGenerator {
@@ -135,7 +152,8 @@ impl ZKInputsGenerator {
         ct0is: JsValue,
         ct1is: JsValue,
     ) -> Result<String, JsValue> {
-        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb)
+        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb).
+        // Coefficients may be strings or numbers (JSON can emit numbers when values fit in i64).
         let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
         let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
 
@@ -148,10 +166,8 @@ impl ZKInputsGenerator {
 
             let mut coefficients: Vec<BigInt> = Vec::new();
             for j in 0..inner_array.length() {
-                let s = inner_array
-                    .get(j)
-                    .as_string()
-                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let s = js_value_to_bigint_string(inner_array.get(j))
+                    .ok_or_else(|| JsValue::from_str("Expected string, number, or BigInt in inner array"))?;
                 let bigint = s
                     .parse::<BigInt>()
                     .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
@@ -169,10 +185,8 @@ impl ZKInputsGenerator {
 
             let mut coefficients: Vec<BigInt> = Vec::new();
             for j in 0..inner_array.length() {
-                let s = inner_array
-                    .get(j)
-                    .as_string()
-                    .ok_or_else(|| JsValue::from_str("Expected string in inner array"))?;
+                let s = js_value_to_bigint_string(inner_array.get(j))
+                    .ok_or_else(|| JsValue::from_str("Expected string, number, or BigInt in inner array"))?;
                 let bigint = s
                     .parse::<BigInt>()
                     .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;

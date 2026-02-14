@@ -11,7 +11,6 @@
 
 use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
-use crate::get_zkp_modulus;
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
@@ -278,7 +277,6 @@ impl Computation for Inputs {
         .map(
             |(i, (qi, mut pk0_share, mut a, mut eek, mut e_sm, mut sk))| {
                 pk0_share.reverse();
-                pk0_share.reduce(&qi);
                 pk0_share.center(&qi);
 
                 a.reverse();
@@ -335,16 +333,6 @@ impl Computation for Inputs {
             a.add_limb(ai);
             e_sm.add_limb(e_smi);
         }
-
-        let zkp_modulus = &get_zkp_modulus();
-
-        pk0_share.reduce_uniform(zkp_modulus);
-        a.reduce_uniform(zkp_modulus);
-        r1.reduce_uniform(zkp_modulus);
-        r2.reduce_uniform(zkp_modulus);
-        e_sm.reduce_uniform(zkp_modulus);
-        eek.reduce(zkp_modulus);
-        sk.reduce(zkp_modulus);
 
         Ok(Inputs {
             a: a.clone(),

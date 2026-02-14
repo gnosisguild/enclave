@@ -17,7 +17,7 @@ const VERSIONS_MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/zk-prover/versions.json";
 
 const BB_VERSION: &str = "3.0.0-nightly.20251104";
-const CIRCUITS_VERSION: &str = "0.1.11";
+const CIRCUITS_VERSION: &str = "0.1.13";
 
 /// Supported bb binary targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
