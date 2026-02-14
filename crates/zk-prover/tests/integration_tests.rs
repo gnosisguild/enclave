@@ -4,9 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// TODO: Remove network access requirement for this test.
-// There is no situation where we should be relient on external
-// network access for tests to pass
+// TODO: Remove feature flag / network access requirement for this test.
+// There are very few situations where we should be relient on external
+// network access for tests to pass and this feature flag makes it so this
+// code does not get checked in editors as it is not always found by lsps.
 
 //! Integration tests that require network access to download binaries.
 //! Run with: cargo test --features integration-tests

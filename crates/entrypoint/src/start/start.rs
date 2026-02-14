@@ -26,7 +26,6 @@ pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeH
         config.work_dir(),
         zk_config,
     );
-
     backend.ensure_installed().await?;
 
     let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
