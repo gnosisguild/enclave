@@ -51,7 +51,7 @@ pub struct SnapshotBuffer {
 }
 
 impl SnapshotBuffer {
-    pub fn new(_: bool) -> Self {
+    pub fn new() -> Self {
         SnapshotBuffer {
             router: None,
             timelock: None,
@@ -62,16 +62,9 @@ impl SnapshotBuffer {
     pub fn spawn(
         config: &AggregateConfig,
         store: impl Into<Recipient<InsertBatch>>,
-        start_buffering: bool,
     ) -> Result<Addr<Self>> {
         info!("spawning SnapshotBuffer...");
-        let (addr, _) = Self::with_clock(
-            config,
-            store,
-            Arc::new(SystemClock),
-            Some(1),
-            start_buffering,
-        )?;
+        let (addr, _) = Self::with_clock(config, store, Arc::new(SystemClock), Some(1))?;
         Ok(addr)
     }
 
@@ -80,9 +73,8 @@ impl SnapshotBuffer {
         store: impl Into<Recipient<InsertBatch>>,
         clock: Arc<dyn Clock>,
         interval: Option<u64>,
-        start_buffering: bool,
     ) -> Result<(Addr<Self>, Addr<TimelockQueue>)> {
-        let addr = Self::new(start_buffering).start();
+        let addr = Self::new().start();
         let store = store.into();
         let router =
             BatchRouter::with_clock(config, addr.clone(), store.clone(), clock.clone()).start();
@@ -270,7 +262,7 @@ mod tests {
 
         let clock = Arc::new(MockClock::new(1000));
         let (buffer, timelock) =
-            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None, false)?;
+            SnapshotBuffer::with_clock(config, store.clone(), clock.clone(), None)?;
 
         buffer
             .send(EnclaveEvent::from_data_ec(

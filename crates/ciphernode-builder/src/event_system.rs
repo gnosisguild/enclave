@@ -94,8 +94,6 @@ pub struct EventSystem {
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
     eventstore_addrs: OnceCell<EventStoreAddrs>,
-    /// Whether to start the buffer straight away
-    start_buffer: bool,
 }
 
 impl EventSystem {
@@ -119,7 +117,6 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
-            start_buffer: false,
         }
     }
 
@@ -138,7 +135,6 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
-            start_buffer: false,
         }
     }
 
@@ -159,7 +155,6 @@ impl EventSystem {
             hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
-            start_buffer: false,
         }
     }
 
@@ -189,11 +184,6 @@ impl EventSystem {
         self
     }
 
-    pub fn start_buffer_immediately(mut self) -> Self {
-        self.start_buffer = true;
-        self
-    }
-
     /// Get the eventbus address
     pub fn eventbus(&self) -> Addr<EventBus<EnclaveEvent>> {
         self.eventbus.get_or_init(get_enclave_event_bus).clone()
@@ -210,11 +200,7 @@ impl EventSystem {
     pub fn buffer(&self) -> Result<Addr<SnapshotBuffer>> {
         self.buffer
             .get_or_try_init(|| {
-                SnapshotBuffer::spawn(
-                    &self.aggregate_config(),
-                    NoopBatchReceiver::new().start(),
-                    self.start_buffer,
-                )
+                SnapshotBuffer::spawn(&self.aggregate_config(), NoopBatchReceiver::new().start())
             })
             .cloned()
     }
