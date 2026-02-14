@@ -15,7 +15,7 @@ use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use figment::{
-    providers::{Format, Serialized, Yaml},
+    providers::{Env, Format, Serialized, Yaml},
     Figment,
 };
 use serde::{Deserialize, Serialize};
@@ -176,6 +176,8 @@ pub struct AppConfig {
     autowallet: bool,
     /// Program config
     program: ProgramConfig,
+    /// A custom bb implementation has been provided do not download and checksum a binary
+    use_custom_bb: bool,
 }
 
 impl AppConfig {
@@ -201,11 +203,11 @@ impl AppConfig {
 
         let node = node.clone();
 
-        let config_dir_override = (node.config_dir != std::path::PathBuf::new())
+        let config_dir_override = (node.config_dir != PathBuf::new())
             .then_some(&node.config_dir)
             .or_else(|| config.config_dir.as_ref());
 
-        let data_dir_override = (node.data_dir != std::path::PathBuf::new())
+        let data_dir_override = (node.data_dir != PathBuf::new())
             .then_some(&node.data_dir)
             .or_else(|| config.data_dir.as_ref());
 
@@ -220,6 +222,7 @@ impl AppConfig {
             Some(&node.db_file),
             Some(&node.key_file),
             Some(&node.log_file),
+            config.custom_bb.as_ref(),
         );
 
         Ok(AppConfig {
@@ -233,6 +236,7 @@ impl AppConfig {
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
+            use_custom_bb: config.custom_bb.is_some(),
         })
     }
 
@@ -366,6 +370,10 @@ impl AppConfig {
     pub fn program(&self) -> &ProgramConfig {
         &self.program
     }
+
+    pub fn use_custom_bb(&self) -> bool {
+        self.use_custom_bb
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -389,6 +397,8 @@ pub struct UnscopedAppConfig {
     otel: Option<String>,
     /// Program config
     program: Option<ProgramConfig>,
+    /// Path to custom bb binary
+    custom_bb: Option<PathBuf>,
 }
 
 impl Default for UnscopedAppConfig {
@@ -402,6 +412,7 @@ impl Default for UnscopedAppConfig {
             otel: None,
             nodes: HashMap::new(),
             program: None,
+            custom_bb: None,
         }
     }
 }
@@ -462,15 +473,17 @@ pub fn load_config(
     let loaded_yaml =
         load_yaml_with_env(&resolved_config_path).context("Configuration file not found")?;
 
-    let config: UnscopedAppConfig =
-        Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
+    let config: UnscopedAppConfig = Figment::from(
+        Figment::from(Env::prefixed("E3_"))
+            .merge(Serialized::defaults(&UnscopedAppConfig::default()))
             .merge(Yaml::string(&loaded_yaml))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
-            }))
-            .extract()
-            .context("Could not parse configuration")?;
+            })),
+    )
+    .extract()
+    .context("Could not parse configuration")?;
 
     Ok(config.into_scoped(name).context(format!(
         "Could not apply scope '{}' to configuration.",
