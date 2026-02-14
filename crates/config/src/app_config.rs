@@ -497,8 +497,8 @@ pub fn load_config(
 
     let config: UnscopedAppConfig =
         Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
-            .merge(Env::prefixed("E3_"))
             .merge(Yaml::string(&loaded_yaml))
+            .merge(Env::prefixed("E3_"))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
