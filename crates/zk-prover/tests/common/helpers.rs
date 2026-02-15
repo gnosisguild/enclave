@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use super::fixtures_dir;
+use e3_config::BBPath;
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -57,7 +58,7 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
 
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     let backend = ZkBackend::new(
@@ -118,7 +119,7 @@ pub async fn setup_circuit_fixtures(
 /// Lightweight backend for tests that don't need a real bb binary.
 pub fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     ZkBackend::new(bb_binary, circuits_dir, work_dir, config)

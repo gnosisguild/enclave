@@ -7,6 +7,7 @@ export CARGO_INCREMENTAL=1
 echo "SETUP..."
 echo "pnpm install"
 (cd ../../ && pnpm install --frozen-lockfile)
+(cd ../../ && pnpm build:ts)
 echo "sdk"
 (pnpm build:sdk)
 echo "evm"

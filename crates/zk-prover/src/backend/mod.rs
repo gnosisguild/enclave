@@ -6,10 +6,10 @@
 
 mod download;
 mod setup;
+use e3_config::BBPath;
 
 #[cfg(test)]
 mod tests;
-
 use crate::config::ZkConfig;
 use crate::error::ZkError;
 use std::path::PathBuf;
@@ -35,11 +35,12 @@ pub struct ZkBackend {
     pub circuits_dir: PathBuf,
     pub work_dir: PathBuf,
     pub config: ZkConfig,
+    pub using_custom_bb: bool,
 }
 
 impl ZkBackend {
     pub fn new(
-        bb_binary: PathBuf,
+        bb_binary: BBPath,
         circuits_dir: PathBuf,
         work_dir: PathBuf,
         config: ZkConfig,
@@ -50,11 +51,12 @@ impl ZkBackend {
             .to_path_buf();
 
         Self {
-            bb_binary,
+            bb_binary: bb_binary.path(),
             circuits_dir,
             work_dir,
             base_dir,
             config,
+            using_custom_bb: bb_binary.is_custom(),
         }
     }
 
@@ -68,7 +70,7 @@ impl ZkBackend {
 
         let home_dir = base_dirs.home_dir();
         let noir_dir = home_dir.join(".enclave").join("noir");
-        let bb_binary = noir_dir.join("bin").join("bb");
+        let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
         let circuits_dir = noir_dir.join("circuits");
         let work_dir = noir_dir.join("work").join(node_name);
 

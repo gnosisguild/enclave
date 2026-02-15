@@ -27,15 +27,19 @@ impl ZkBackend {
     pub async fn check_status(&self) -> SetupStatus {
         let version_info = self.load_version_info().await;
 
-        let bb_ok =
-            version_info.bb_matches(&self.config.required_bb_version) && self.bb_binary.exists();
+        let (bb_ok, bb_version) = if self.using_custom_bb {
+            self.custom_bb_ok().await
+        } else {
+            self.default_bb_ok(&version_info).await
+        };
+
         let circuits_ok = version_info.circuits_match(&self.config.required_circuits_version)
             && self.circuits_dir.exists();
 
         match (bb_ok, circuits_ok) {
             (true, true) => SetupStatus::Ready,
             (false, true) => SetupStatus::BbNeedsUpdate {
-                installed: version_info.bb_version,
+                installed: bb_version,
                 required: self.config.required_bb_version.clone(),
             },
             (true, false) => SetupStatus::CircuitsNeedUpdate {
@@ -44,6 +48,26 @@ impl ZkBackend {
             },
             (false, false) => SetupStatus::FullSetupNeeded,
         }
+    }
+
+    async fn custom_bb_ok(&self) -> (bool, Option<String>) {
+        if !self.bb_binary.exists() {
+            return (false, None);
+        };
+        let version = self.verify_bb().await.ok();
+        let bb_ok = version
+            .as_ref()
+            .is_some_and(|o| o == &self.config.required_bb_version);
+        (bb_ok, version)
+    }
+
+    async fn default_bb_ok(&self, version_info: &VersionInfo) -> (bool, Option<String>) {
+        if !self.bb_binary.exists() {
+            return (false, None);
+        };
+        let version = self.verify_bb().await.ok();
+        let bb_ok = version_info.bb_matches(&self.config.required_bb_version);
+        (bb_ok, version)
     }
 
     pub async fn ensure_installed(&self) -> Result<(), ZkError> {

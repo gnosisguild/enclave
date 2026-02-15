@@ -4,6 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+// TODO: Remove feature flag & network access requirement for this test.
+// a) There are very few situations where we should be reliant on external
+// network access for tests to pass - if we can avoid it by using virtualization
+// or proxies we should.
+// b) This feature flag makes it so that rust_analyzer will not work by default
+// without adjusting global editor configuration which makes this code quite hard to work on.
+
 //! Integration tests that require network access to download binaries.
 //! Run with: cargo test --features integration-tests
 

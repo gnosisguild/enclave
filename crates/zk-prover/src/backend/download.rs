@@ -20,6 +20,10 @@ use super::ZkBackend;
 
 impl ZkBackend {
     pub async fn download_bb(&self) -> Result<(), ZkError> {
+        if self.using_custom_bb {
+            return Ok(());
+        }
+
         let target = BbTarget::current().ok_or_else(|| ZkError::UnsupportedPlatform {
             os: std::env::consts::OS.to_string(),
             arch: std::env::consts::ARCH.to_string(),
