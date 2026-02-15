@@ -44,7 +44,9 @@ use std::{collections::HashMap, mem, sync::Arc};
 use rand::{rngs::OsRng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::{
-    collections::HashMap, mem, sync::{Arc, Mutex}
+    collections::HashMap,
+    mem,
+    sync::{Arc, Mutex},
 };
 >>>>>>> be8c56d3 (chore: refactoring)
 use tracing::{info, trace, warn};
@@ -787,17 +789,14 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-     /// 3. GenEsiSss
-     pub fn handle_gen_esi_sss_requested(&self, msg: TypedEvent<GenEsiSss>) -> Result<()> {
+    /// 3. GenEsiSss
+    pub fn handle_gen_esi_sss_requested(&self, msg: TypedEvent<GenEsiSss>) -> Result<()> {
         let (msg, ec) = msg.into_components();
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.ciphernode_selected;
         let e_sm_raw = msg.e_sm_raw;
-        let CiphernodeSelected {
-            e3_id,
-            ..
-        } = evt.clone();
+        let CiphernodeSelected { e3_id, .. } = evt.clone();
 
         let state = self
             .state
@@ -869,7 +868,6 @@ impl ThresholdKeyshare {
         }
         Ok(())
     }
-
 
     /// 4. SharesGenerated - Encrypt shares with BFV and publish
     pub fn handle_shares_generated(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
