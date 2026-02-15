@@ -157,6 +157,29 @@ impl From<TicketSubmittedWithChainId> for EnclaveEventData {
     }
 }
 
+struct CommitteeMemberExpelledWithChainId(
+    pub ICiphernodeRegistry::CommitteeMemberExpelled,
+    pub u64,
+);
+
+impl From<CommitteeMemberExpelledWithChainId> for e3_events::CommitteeMemberExpelled {
+    fn from(value: CommitteeMemberExpelledWithChainId) -> Self {
+        e3_events::CommitteeMemberExpelled {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            node: value.0.node,
+            reason: value.0.reason.into(),
+            active_count_after: value.0.activeCountAfter.to(),
+        }
+    }
+}
+
+impl From<CommitteeMemberExpelledWithChainId> for EnclaveEventData {
+    fn from(value: CommitteeMemberExpelledWithChainId) -> Self {
+        let payload: e3_events::CommitteeMemberExpelled = value.into();
+        EnclaveEventData::from(payload)
+    }
+}
+
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
@@ -201,6 +224,16 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 return None;
             };
             Some(EnclaveEventData::from(TicketSubmittedWithChainId(
+                event, chain_id,
+            )))
+        }
+        Some(&ICiphernodeRegistry::CommitteeMemberExpelled::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CommitteeMemberExpelled::decode_log_data(data)
+            else {
+                error!("Error parsing event CommitteeMemberExpelled after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEventData::from(CommitteeMemberExpelledWithChainId(
                 event, chain_id,
             )))
         }

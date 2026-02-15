@@ -37,6 +37,7 @@ pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeH
         .with_contract_bonding_registry()
         .with_max_threads()
         .with_contract_ciphernode_registry()
+        .with_contract_slashing_manager()
         .with_trbfv()
         .with_zkproof(backend)
         .with_net(config.peers(), config.quic_port())
