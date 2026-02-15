@@ -10,8 +10,12 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Context, Handler};
 use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse, ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber, EventType, PkBfvProofRequest, Proof, ProofPayload, ProofType, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
-    PkGenerationProofSigned,
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
+    ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber,
+    EventType, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType,
+    Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending,
+    TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info};
@@ -123,7 +127,12 @@ impl ProofRequestActor {
         }
     }
 
-    fn handle_pk_generation_response(&mut self, correlation_id: &CorrelationId, proof: Proof, ec: &EventContext<Sequenced>) {
+    fn handle_pk_generation_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proof: Proof,
+        ec: &EventContext<Sequenced>,
+    ) {
         let Some(pending) = self.pending_threshold.remove(correlation_id) else {
             return;
         };
@@ -161,12 +170,15 @@ impl ProofRequestActor {
 
         for recipient_party_id in 0..num_parties {
             if let Some(party_share) = share.extract_for_party(recipient_party_id) {
-                if let Err(err) = self.bus.publish(ThresholdShareCreated {
-                    e3_id: pending.e3_id.clone(),
-                    share: Arc::new(party_share),
-                    target_party_id: recipient_party_id as u64,
-                    external: false,
-                }, ec.clone()) {
+                if let Err(err) = self.bus.publish(
+                    ThresholdShareCreated {
+                        e3_id: pending.e3_id.clone(),
+                        share: Arc::new(party_share),
+                        target_party_id: recipient_party_id as u64,
+                        external: false,
+                    },
+                    ec.clone(),
+                ) {
                     error!(
                         "Failed to publish ThresholdShareCreated for party {}: {err}",
                         recipient_party_id
@@ -181,16 +193,24 @@ impl ProofRequestActor {
             "Publishing PkGenerationProofSigned for E3 {} party {}",
             pending.e3_id, party_id
         );
-        if let Err(err) = self.bus.publish(PkGenerationProofSigned {
-            e3_id: pending.e3_id,
-            party_id,
-            signed_proof: signed,
-        }, ec.clone()) {
+        if let Err(err) = self.bus.publish(
+            PkGenerationProofSigned {
+                e3_id: pending.e3_id,
+                party_id,
+                signed_proof: signed,
+            },
+            ec.clone(),
+        ) {
             error!("Failed to publish PkGenerationProofSigned: {err}");
         }
     }
 
-    fn handle_pk_bfv_response(&mut self, correlation_id: &CorrelationId, proof: Proof, ec: &EventContext<Sequenced>) {
+    fn handle_pk_bfv_response(
+        &mut self,
+        correlation_id: &CorrelationId,
+        proof: Proof,
+        ec: &EventContext<Sequenced>,
+    ) {
         let Some(pending) = self.pending.remove(&correlation_id) else {
             return;
         };
@@ -263,10 +283,18 @@ impl Handler<EnclaveEvent> for ProofRequestActor {
         let (msg, ec) = msg.into_components();
 
         match msg {
-            EnclaveEventData::EncryptionKeyPending(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::ThresholdSharePending(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
-            EnclaveEventData::ComputeRequestError(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            EnclaveEventData::EncryptionKeyPending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ThresholdSharePending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeResponse(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeRequestError(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -287,7 +315,11 @@ impl Handler<TypedEvent<EncryptionKeyPending>> for ProofRequestActor {
 impl Handler<TypedEvent<ThresholdSharePending>> for ProofRequestActor {
     type Result = ();
 
-    fn handle(&mut self, msg: TypedEvent<ThresholdSharePending>, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ThresholdSharePending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.handle_threshold_share_pending(msg);
     }
 }

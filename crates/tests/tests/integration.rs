@@ -129,7 +129,12 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir, ZkConfig::default());
+        let backend = ZkBackend::new(
+            BBPath::Default(bb_binary),
+            circuits_dir,
+            work_dir,
+            ZkConfig::default(),
+        );
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");

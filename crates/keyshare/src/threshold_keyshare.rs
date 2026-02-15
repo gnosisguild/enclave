@@ -9,7 +9,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext, KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, ThresholdSharePending, TypedEvent, prelude::*, trap
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
+    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
+    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
+    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
+    KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, Sequenced,
+    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
+    ThresholdSharePending, TypedEvent,
 };
 use e3_fhe::create_crp;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -32,7 +38,9 @@ use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::{rngs::OsRng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::{
-    collections::HashMap, mem, sync::{Arc, Mutex}
+    collections::HashMap,
+    mem,
+    sync::{Arc, Mutex},
 };
 use tracing::{info, trace, warn};
 
@@ -539,9 +547,10 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        self.handle_gen_pk_share_and_sk_sss_requested(TypedEvent::new(GenPkShareAndSkSss(
-            current.ciphernode_selected,
-        ), ec))?;
+        self.handle_gen_pk_share_and_sk_sss_requested(TypedEvent::new(
+            GenPkShareAndSkSss(current.ciphernode_selected),
+            ec,
+        ))?;
 
         Ok(())
     }
@@ -637,26 +646,28 @@ impl ThresholdKeyshare {
         // Fire gen_esi_sss with the e_sm_raw
         let current_state: GeneratingThresholdShareData = self.state.try_get()?.try_into()?;
         if let Some(ciphernode_selected) = current_state.ciphernode_selected {
-            self.handle_gen_esi_sss_requested(TypedEvent::new(GenEsiSss {
-                ciphernode_selected,
-                e_sm_raw: current_state.e_sm_raw.expect("e_sm_raw should be set at this point"),
-            }, ec.clone()))?;
+            self.handle_gen_esi_sss_requested(TypedEvent::new(
+                GenEsiSss {
+                    ciphernode_selected,
+                    e_sm_raw: current_state
+                        .e_sm_raw
+                        .expect("e_sm_raw should be set at this point"),
+                },
+                ec.clone(),
+            ))?;
         }
 
         Ok(())
     }
 
-     /// 3. GenEsiSss
-     pub fn handle_gen_esi_sss_requested(&self, msg: TypedEvent<GenEsiSss>) -> Result<()> {
+    /// 3. GenEsiSss
+    pub fn handle_gen_esi_sss_requested(&self, msg: TypedEvent<GenEsiSss>) -> Result<()> {
         let (msg, ec) = msg.into_components();
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.ciphernode_selected;
         let e_sm_raw = msg.e_sm_raw;
-        let CiphernodeSelected {
-            e3_id,
-            ..
-        } = evt.clone();
+        let CiphernodeSelected { e3_id, .. } = evt.clone();
 
         let state = self
             .state
@@ -728,7 +739,6 @@ impl ThresholdKeyshare {
         }
         Ok(())
     }
-
 
     /// 4. SharesGenerated - Encrypt shares with BFV and publish
     pub fn handle_shares_generated(&mut self, ec: EventContext<Sequenced>) -> Result<()> {
@@ -811,11 +821,14 @@ impl ThresholdKeyshare {
         );
 
         // Publish ThresholdSharePending - ProofRequestActor will generate proof, sign, and publish ThresholdShareCreated
-        self.bus.publish(ThresholdSharePending {
-            e3_id: e3_id.clone(),
-            full_share: Arc::new(full_share),
-            proof_request,
-        }, ec.clone())?;
+        self.bus.publish(
+            ThresholdSharePending {
+                e3_id: e3_id.clone(),
+                full_share: Arc::new(full_share),
+                proof_request,
+            },
+            ec.clone(),
+        )?;
 
         Ok(())
     }
@@ -929,12 +942,15 @@ impl ThresholdKeyshare {
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
-        self.bus.publish(KeyshareCreated {
-            pubkey: current.pk_share,
-            e3_id: e3_id.clone(),
-            node: address,
-            signed_pk_generation_proof: current.signed_pk_generation_proof,
-        }, ec.clone())?;
+        self.bus.publish(
+            KeyshareCreated {
+                pubkey: current.pk_share,
+                e3_id: e3_id.clone(),
+                node: address,
+                signed_pk_generation_proof: current.signed_pk_generation_proof,
+            },
+            ec.clone(),
+        )?;
 
         Ok(())
     }
