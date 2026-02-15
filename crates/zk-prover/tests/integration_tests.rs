@@ -4,18 +4,26 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+// TODO: Remove feature flag & network access requirement for this test.
+// a) There are very few situations where we should be reliant on external
+// network access for tests to pass - if we can avoid it by using virtualization
+// or proxies we should.
+// b) This feature flag makes it so that rust_analyzer will not work by default
+// without adjusting global editor configuration which makes this code quite hard to work on.
+
 //! Integration tests that require network access to download binaries.
 //! Run with: cargo test --features integration-tests
 
 #![cfg(feature = "integration-tests")]
 
+use e3_config::BBPath;
 use e3_zk_prover::{BbTarget, SetupStatus, ZkBackend, ZkConfig};
 use std::path::PathBuf;
 use tempfile::tempdir;
 
 fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     ZkBackend::new(bb_binary, circuits_dir, work_dir, config)

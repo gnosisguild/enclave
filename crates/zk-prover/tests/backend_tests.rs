@@ -4,13 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_config::BBPath;
 use e3_zk_prover::{ZkBackend, ZkConfig, ZkProver};
 use tempfile::tempdir;
 use tokio::fs;
 
 fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     ZkBackend::new(bb_binary, circuits_dir, work_dir, config)

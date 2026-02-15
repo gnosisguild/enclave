@@ -15,6 +15,7 @@
 mod common;
 
 use common::fixtures_dir;
+use e3_config::BBPath;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
@@ -76,11 +77,11 @@ async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
 
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
-    let bb_binary = noir_dir.join("bin").join("bb");
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     let backend = ZkBackend::new(
-        bb_binary.clone(),
+        bb_binary,
         circuits_dir.clone(),
         work_dir.clone(),
         ZkConfig::default(),

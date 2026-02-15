@@ -15,7 +15,7 @@ use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use figment::{
-    providers::{Format, Serialized, Yaml},
+    providers::{Env, Format, Serialized, Yaml},
     Figment,
 };
 use serde::{Deserialize, Serialize};
@@ -176,6 +176,27 @@ pub struct AppConfig {
     autowallet: bool,
     /// Program config
     program: ProgramConfig,
+    /// A custom bb implementation has been provided do not download and checksum a binary
+    using_custom_bb: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum BBPath {
+    Custom(PathBuf),
+    Default(PathBuf),
+}
+
+impl BBPath {
+    pub fn is_custom(&self) -> bool {
+        matches!(self, BBPath::Custom(_))
+    }
+
+    pub fn path(&self) -> PathBuf {
+        match self {
+            BBPath::Custom(p) => p.clone(),
+            BBPath::Default(p) => p.clone(),
+        }
+    }
 }
 
 impl AppConfig {
@@ -201,11 +222,11 @@ impl AppConfig {
 
         let node = node.clone();
 
-        let config_dir_override = (node.config_dir != std::path::PathBuf::new())
+        let config_dir_override = (node.config_dir != PathBuf::new())
             .then_some(&node.config_dir)
             .or_else(|| config.config_dir.as_ref());
 
-        let data_dir_override = (node.data_dir != std::path::PathBuf::new())
+        let data_dir_override = (node.data_dir != PathBuf::new())
             .then_some(&node.data_dir)
             .or_else(|| config.data_dir.as_ref());
 
@@ -220,6 +241,7 @@ impl AppConfig {
             Some(&node.db_file),
             Some(&node.key_file),
             Some(&node.log_file),
+            config.custom_bb.as_ref(),
         );
 
         Ok(AppConfig {
@@ -233,6 +255,7 @@ impl AppConfig {
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
+            using_custom_bb: config.custom_bb.is_some(),
         })
     }
 
@@ -257,8 +280,13 @@ impl AppConfig {
     }
 
     /// Get the bb binary path
-    pub fn bb_binary(&self) -> PathBuf {
-        self.paths.bb_binary()
+    pub fn bb_binary(&self) -> BBPath {
+        let bb = self.paths.bb_binary();
+        if self.using_custom_bb {
+            BBPath::Custom(bb)
+        } else {
+            BBPath::Default(bb)
+        }
     }
 
     /// Get the circuits directory
@@ -389,6 +417,10 @@ pub struct UnscopedAppConfig {
     otel: Option<String>,
     /// Program config
     program: Option<ProgramConfig>,
+    /// Path to custom bb binary. When this is set the bb binary is used will not be checksummed it
+    /// is up to the node operator to ensure bb matches the version that exactly matches the
+    /// application.
+    custom_bb: Option<PathBuf>,
 }
 
 impl Default for UnscopedAppConfig {
@@ -402,6 +434,7 @@ impl Default for UnscopedAppConfig {
             otel: None,
             nodes: HashMap::new(),
             program: None,
+            custom_bb: None,
         }
     }
 }
@@ -465,6 +498,7 @@ pub fn load_config(
     let config: UnscopedAppConfig =
         Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
             .merge(Yaml::string(&loaded_yaml))
+            .merge(Env::prefixed("E3_"))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
