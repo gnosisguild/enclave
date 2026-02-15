@@ -4,26 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::{BTreeMap, HashSet};
-
-use crate::EvmEvent;
-use actix::Message;
 use serde::{Deserialize, Serialize};
-type Chainid = u64;
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub enum SyncEvmEvent {
-    /// Signal that this reader has completed historical sync
-    HistoricalSyncComplete(ChainId),
-    /// An actual event from the blockchain
-    Event(EvmEvent),
-}
-
-impl From<EvmEvent> for SyncEvmEvent {
-    fn from(event: EvmEvent) -> SyncEvmEvent {
-        SyncEvmEvent::Event(event)
-    }
-}
+use std::collections::{BTreeMap, HashSet};
 
 type ChainId = u64;
 type DeployBlock = u64;
@@ -55,6 +37,13 @@ impl EvmEventConfig {
             config: BTreeMap::new(),
         }
     }
+
+    pub fn from_config(config: impl Into<BTreeMap<ChainId, EvmEventConfigChain>>) -> Self {
+        EvmEventConfig {
+            config: config.into(),
+        }
+    }
+
     pub fn get(&self, chain_id: &ChainId) -> Option<&EvmEventConfigChain> {
         self.config.get(&chain_id)
     }
@@ -65,5 +54,9 @@ impl EvmEventConfig {
 
     pub fn chains(&self) -> HashSet<u64> {
         self.config.keys().cloned().collect()
+    }
+
+    pub fn deploy_block(&self, chain_id: u64) -> Option<u64> {
+        self.get(&chain_id).map(|c| c.deploy_block())
     }
 }

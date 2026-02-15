@@ -9,10 +9,18 @@ use std::{fmt, ops::Deref};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    E3id, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced, Unsequenced,
+    E3id, EnclaveEventData, EventContextAccessors, EventContextSeq, EventId, SeqState, Sequenced,
+    Unsequenced,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EventSource {
+    Local,
+    Net,
+    Evm,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Ord, PartialOrd, Eq, Hash, Serialize, Deserialize)]
 pub struct AggregateId(usize);
 
 impl AggregateId {
@@ -23,15 +31,31 @@ impl AggregateId {
     pub fn to_usize(&self) -> usize {
         self.0
     }
+
+    /// Create AggregateId from Option<chain_id>
+    /// None → AggregateId(0), Some(chain_id) → AggregateId(chain_id)
+    pub fn from_chain_id(chain_id: Option<u64>) -> Self {
+        match chain_id {
+            None => Self::new(0),
+            Some(id) => Self::new(id.try_into().unwrap_or(0)),
+        }
+    }
+
+    /// Convert back to Option<chain_id>
+    /// AggregateId(0) → None, otherwise → Some(chain_id)
+    pub fn to_chain_id(&self) -> Option<u64> {
+        if self.0 == 0 {
+            None
+        } else {
+            Some(self.0 as u64)
+        }
+    }
 }
 
 impl From<Option<E3id>> for AggregateId {
     fn from(value: Option<E3id>) -> Self {
-        if let Some(e3_id) = value {
-            Self::new(e3_id.chain_id() as usize)
-        } else {
-            Self::new(0)
-        }
+        let chain_id = value.map(|e3_id| e3_id.chain_id());
+        Self::from_chain_id(chain_id)
     }
 }
 
@@ -57,6 +81,8 @@ pub struct EventContext<S: SeqState> {
     seq: S::Seq,
     ts: u128,
     aggregate_id: AggregateId,
+    block: Option<u64>,
+    source: EventSource,
 }
 
 impl EventContext<Unsequenced> {
@@ -66,6 +92,8 @@ impl EventContext<Unsequenced> {
         origin_id: EventId,
         ts: u128,
         aggregate_id: AggregateId,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Self {
         Self {
             id,
@@ -74,11 +102,19 @@ impl EventContext<Unsequenced> {
             seq: (),
             ts,
             aggregate_id,
+            block,
+            source,
         }
     }
 
-    pub fn new_origin(id: EventId, ts: u128, aggregate_id: AggregateId) -> Self {
-        Self::new(id, id, id, ts, aggregate_id)
+    pub fn new_origin(
+        id: EventId,
+        ts: u128,
+        aggregate_id: AggregateId,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Self {
+        Self::new(id, id, id, ts, aggregate_id, block, source)
     }
 
     pub fn from_cause(
@@ -86,8 +122,28 @@ impl EventContext<Unsequenced> {
         cause: EventContext<Sequenced>,
         ts: u128,
         aggregate_id: AggregateId,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Self {
-        EventContext::new(id, cause.id(), cause.origin_id(), ts, aggregate_id)
+        EventContext::new(
+            id,
+            cause.id(),
+            cause.origin_id(),
+            ts,
+            aggregate_id,
+            cause.block.max(block), // block watermark
+            source,
+        )
+    }
+
+    pub fn with_ts(mut self, ts: u128) -> Self {
+        self.ts = ts;
+        self
+    }
+
+    pub fn with_aggregate(mut self, aggregate_id: AggregateId) -> Self {
+        self.aggregate_id = aggregate_id;
+        self
     }
 
     pub fn sequence(self, value: u64) -> EventContext<Sequenced> {
@@ -98,7 +154,22 @@ impl EventContext<Unsequenced> {
             origin_id: self.origin_id,
             ts: self.ts,
             aggregate_id: self.aggregate_id,
+            block: self.block,
+            source: self.source,
         }
+    }
+}
+
+impl From<EnclaveEventData> for EventContext<Unsequenced> {
+    fn from(value: EnclaveEventData) -> Self {
+        let id = EventId::hash(value);
+        EventContext::<Unsequenced>::new_origin(
+            id,
+            0,
+            AggregateId::new(0),
+            Some(0),
+            EventSource::Local,
+        )
     }
 }
 
@@ -122,6 +193,19 @@ impl<S: SeqState> EventContextAccessors for EventContext<S> {
     fn aggregate_id(&self) -> AggregateId {
         self.aggregate_id
     }
+
+    fn block(&self) -> Option<u64> {
+        self.block
+    }
+
+    fn source(&self) -> EventSource {
+        self.source
+    }
+
+    fn with_source(mut self, source: EventSource) -> Self {
+        self.source = source;
+        self
+    }
 }
 
 impl EventContextSeq for EventContext<Sequenced> {
@@ -134,7 +218,7 @@ impl EventContextSeq for EventContext<Sequenced> {
 mod tests {
     use crate::{
         event_context::{AggregateId, EventContext},
-        EventId,
+        EventId, EventSource,
     };
 
     #[test]
@@ -147,16 +231,32 @@ mod tests {
             EventId::hash(1),
             1,
             AggregateId::new(1),
+            None,
+            EventSource::Local,
         )
         .sequence(1);
         events.push(one.clone());
 
-        let two =
-            EventContext::from_cause(EventId::hash(2), one, 2, AggregateId::new(1)).sequence(2);
+        let two = EventContext::from_cause(
+            EventId::hash(2),
+            one,
+            2,
+            AggregateId::new(1),
+            None,
+            EventSource::Local,
+        )
+        .sequence(2);
         events.push(two.clone());
 
-        let three =
-            EventContext::from_cause(EventId::hash(3), two, 3, AggregateId::new(1)).sequence(3);
+        let three = EventContext::from_cause(
+            EventId::hash(3),
+            two,
+            3,
+            AggregateId::new(1),
+            None,
+            EventSource::Local,
+        )
+        .sequence(3);
         events.push(three.clone());
 
         assert_eq!(
@@ -169,6 +269,8 @@ mod tests {
                     causation_id: EventId::hash(1),
                     ts: 1,
                     aggregate_id: AggregateId::new(1),
+                    block: None,
+                    source: EventSource::Local
                 },
                 EventContext {
                     seq: 2,
@@ -177,6 +279,8 @@ mod tests {
                     causation_id: EventId::hash(1),
                     ts: 2,
                     aggregate_id: AggregateId::new(1),
+                    block: None,
+                    source: EventSource::Local
                 },
                 EventContext {
                     seq: 3,
@@ -185,6 +289,8 @@ mod tests {
                     causation_id: EventId::hash(2),
                     ts: 3,
                     aggregate_id: AggregateId::new(1),
+                    block: None,
+                    source: EventSource::Local
                 },
             ]
         )

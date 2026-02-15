@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod repo;
 mod sync;
 
+pub use repo::*;
 pub use sync::*;

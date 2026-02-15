@@ -4,13 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::ops::{Deref, DerefMut};
-
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::ops::{Deref, DerefMut};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Cid(pub Vec<u8>);
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct Cid(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub Vec<u8>);
 
 impl Cid {
     pub fn from_content(content: &[u8]) -> Self {

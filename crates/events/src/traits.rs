@@ -11,7 +11,7 @@ use std::hash::Hash;
 
 use crate::{
     event_context::{AggregateId, EventContext},
-    EnclaveEvent, EventId, EventType, Sequenced, Unsequenced,
+    EnclaveEvent, EventId, EventSource, EventType, Sequenced, Unsequenced,
 };
 
 /// Trait that must be implemented by events used with EventBus
@@ -56,13 +56,16 @@ pub trait EventFactory<E: Event> {
     /// event ordering.
     ///
     /// This method should be used for events that originated from remote sources.
+    ///
+    /// The Option `caused_by` is for correlation when we send a remote request and receive a response.
+    /// Block should be provided when the event is from the blockchain
     fn event_from_remote_source(
         &self,
         data: impl Into<E::Data>,
-        // NOTE: `caused_by` makes sense here as we could be sending out requests and receiving
-        // responses that relate to the request
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Result<E>;
 }
 
@@ -83,12 +86,42 @@ pub trait EventPublisher<E: Event> {
     /// to the event bus.
     ///
     /// This method should be used for events that have originated locally.
-    fn publish(&self, data: impl Into<E::Data>) -> Result<()>;
+    ///
+    /// The ctx parameter is to pass on the current context to the local event.
+    fn publish(
+        &self,
+        data: impl Into<E::Data>,
+        caused_by: impl Into<EventContext<Sequenced>>,
+    ) -> Result<()>;
+    /// This creates a context based on the given data. This should only be used when an event is
+    /// the origin event and does not originate remotely. This is also useful in tests.
+    fn publish_without_context(&self, data: impl Into<E::Data>) -> Result<()>;
     /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
     /// event ordering and publish it.
     ///
     /// This method should be used for events that originated from remote sources.
-    fn publish_from_remote(&self, data: impl Into<E::Data>, ts: u128) -> Result<()>;
+    fn publish_from_remote(
+        &self,
+        data: impl Into<E::Data>,
+        remote_ts: u128,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Result<()>;
+    /// Create a new event from the given event data, apply the given remote HLC time to ensure correct
+    /// event ordering and publish it.
+    ///
+    /// This method should be used for events that originated from remote sources as a response to
+    /// a request we have sent
+    ///
+    /// The `caused_by` parameter is for correlation when we send a remote request and receive a response.
+    fn publish_from_remote_as_response(
+        &self,
+        data: impl Into<E::Data>,
+        remote_ts: u128,
+        caused_by: impl Into<EventContext<Sequenced>>,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Result<()>;
     /// Dispatch the given event without applying any HLC transformation.
     fn naked_dispatch(&self, event: E);
 }
@@ -116,6 +149,8 @@ pub trait EventConstructorWithTimestamp: Event + Sized {
         data: Self::Data,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Self;
 }
 
@@ -153,6 +188,12 @@ pub trait EventContextAccessors {
     fn ts(&self) -> u128;
     /// The aggregate id for this event
     fn aggregate_id(&self) -> AggregateId;
+    /// The highest block watermark we have seen
+    fn block(&self) -> Option<u64>;
+    /// The event source
+    fn source(&self) -> EventSource;
+    /// Apply a new source fluently
+    fn with_source(self, source: EventSource) -> Self;
 }
 
 pub trait EventContextSeq {
@@ -168,6 +209,8 @@ pub trait WithAggregateId {
 /// An EventContextManager hold the current event context for use in event publishing and
 /// persistence management
 pub trait EventContextManager {
-    fn set_ctx(&mut self, value: &EventContext<Sequenced>);
+    fn set_ctx<C>(&mut self, value: C)
+    where
+        C: Into<EventContext<Sequenced>>;
     fn get_ctx(&self) -> Option<EventContext<Sequenced>>;
 }

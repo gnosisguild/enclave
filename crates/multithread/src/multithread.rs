@@ -17,11 +17,21 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
+use e3_events::run_once;
+use e3_events::trap_fut;
+use e3_events::BusHandle;
+use e3_events::ComputeRequestErrorKind;
+use e3_events::EType;
+use e3_events::EffectsEnabled;
+use e3_events::EnclaveEvent;
+use e3_events::EnclaveEventData;
+use e3_events::EventPublisher;
+use e3_events::EventSubscriber;
+use e3_events::TypedEvent;
+use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
 use e3_events::{
-    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
-    ComputeResponse, EType, EnclaveEvent, EnclaveEventData, ErrorDispatcher, Event, EventPublisher,
-    EventSubscriber, EventType, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError,
-    ZkRequest, ZkResponse,
+    ComputeRequestKind, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError, ZkRequest,
+    ZkResponse,
 };
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
@@ -31,6 +41,7 @@ use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
+use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
@@ -90,7 +101,21 @@ impl Multithread {
         report: Option<Addr<MultithreadReport>>,
     ) -> Addr<Self> {
         let addr = Self::new(bus.clone(), rng.clone(), cipher.clone(), task_pool, report).start();
-        bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+
+        bus.subscribe(
+            EventType::EffectsEnabled,
+            run_once::<EffectsEnabled>({
+                let bus = bus.clone();
+                let addr = addr.clone();
+                move |_| {
+                    bus.subscribe(EventType::ComputeRequest, addr.clone().recipient());
+                    info!("Multithread actor listening for events.");
+                    Ok(())
+                }
+            })
+            .recipient(),
+        );
+
         addr
     }
 
@@ -117,41 +142,42 @@ impl Multithread {
 
 impl Actor for Multithread {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for Multithread {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         info!("Multithread received EnclaveEvent!");
-        match msg.get_data() {
-            EnclaveEventData::ComputeRequest(data) => ctx.notify(data.clone()),
+        let (data, ec) = msg.into_components();
+        match data {
+            EnclaveEventData::ComputeRequest(data) => ctx.notify(TypedEvent::new(data, ec)),
             _ => (),
         }
     }
 }
 
-impl Handler<ComputeRequest> for Multithread {
+impl Handler<TypedEvent<ComputeRequest>> for Multithread {
     type Result = ResponseFuture<()>;
-    fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TypedEvent<ComputeRequest>, _: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let bus = self.bus.clone();
         let pool = self.task_pool.clone();
         let report = self.report.clone();
         let zk_prover = self.zk_prover.clone();
-
-        Box::pin(async move {
-            match handle_compute_request_event(msg, bus, cipher, rng, pool, report, zk_prover).await
-            {
-                Ok(_) => (),
-                Err(e) => error!("{e}"),
-            }
-        })
+        trap_fut(
+            EType::Computation,
+            &self.bus.clone(),
+            handle_compute_request_event(msg, bus, cipher, rng, pool, report, zk_prover),
+        )
     }
 }
 
 async fn handle_compute_request_event(
-    msg: ComputeRequest,
+    msg: TypedEvent<ComputeRequest>,
     bus: BusHandle,
     cipher: Arc<Cipher>,
     rng: SharedRng,
@@ -161,6 +187,8 @@ async fn handle_compute_request_event(
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
+    let (msg, ctx) = msg.into_components();
+    // We spawn a thread on rayon moving to "sync"-land
 
     let (result, duration) = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
@@ -173,11 +201,11 @@ async fn handle_compute_request_event(
     };
 
     match result {
-        Ok(val) => bus.publish(val)?,
+        Ok(val) => bus.publish(val, ctx)?,
         Err(e) => {
             // Publish ComputeRequestError so ProofRequestActor can handle it
             // and continue without proof if needed
-            bus.publish(e)?
+            bus.publish(e, ctx)?
         }
     };
     Ok(())

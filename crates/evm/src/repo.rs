@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
+use e3_events::StoreKeys;
 
 use crate::EvmReadInterfaceState;
 

@@ -11,15 +11,15 @@ use std::fmt::{self, Display};
 /// Dispatched once the sync process is complete and live listening should continue
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct SyncEnd;
+pub struct SyncEnded;
 
-impl SyncEnd {
+impl SyncEnded {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Display for SyncEnd {
+impl Display for SyncEnded {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

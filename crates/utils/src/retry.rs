@@ -9,6 +9,7 @@ use std::{future::Future, time::Duration};
 use tokio::time::sleep;
 use tracing::{error, warn};
 
+#[derive(Debug)]
 pub enum RetryError {
     Failure(anyhow::Error),
     Retry(anyhow::Error),
@@ -46,6 +47,7 @@ where
         match operation().await {
             Ok(value) => return Ok(value),
             Err(re) => {
+                tracing::error!("RETRY FAILED {:?}", re);
                 match re {
                     RetryError::Retry(e) => {
                         if current_attempt >= max_attempts {
