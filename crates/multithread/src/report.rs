@@ -6,13 +6,38 @@
 
 use std::{collections::HashMap, thread, time::Duration};
 
-use crate::TrackDuration;
+use actix::{Actor, Handler, Message, MessageResponse};
+use e3_utils::MAILBOX_LIMIT;
+
+#[derive(Message)]
+#[rtype(result = "FlattenedReport")]
+pub struct ToReport;
+
+#[derive(Message, Debug)]
+#[rtype("()")]
+pub struct TrackDuration {
+    name: String,
+    duration: Duration,
+}
+
+impl TrackDuration {
+    pub fn new(name: String, duration: Duration) -> Self {
+        Self { name, duration }
+    }
+}
 
 #[derive(Default)]
 pub struct MultithreadReport {
     rayon_threads: usize,
     max_simultaneous_rayon_tasks: usize,
     events: Vec<TrackDuration>,
+}
+
+impl Actor for MultithreadReport {
+    type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl MultithreadReport {
@@ -24,11 +49,11 @@ impl MultithreadReport {
         }
     }
 
-    pub fn track(&mut self, msg: TrackDuration) {
+    fn track(&mut self, msg: TrackDuration) {
         self.events.push(msg);
     }
 
-    pub fn to_report(&self) -> FlattenedReport {
+    fn to_report(&self) -> FlattenedReport {
         let mut total_dur: HashMap<String, Duration> = HashMap::new();
         let mut runs: HashMap<String, u64> = HashMap::new();
         let cores_available: usize = match thread::available_parallelism() {
@@ -74,6 +99,21 @@ impl MultithreadReport {
     }
 }
 
+impl Handler<TrackDuration> for MultithreadReport {
+    type Result = ();
+    fn handle(&mut self, msg: TrackDuration, _: &mut Self::Context) -> Self::Result {
+        self.track(msg)
+    }
+}
+
+impl Handler<ToReport> for MultithreadReport {
+    type Result = FlattenedReport;
+    fn handle(&mut self, _: ToReport, _: &mut Self::Context) -> Self::Result {
+        self.to_report()
+    }
+}
+
+#[derive(MessageResponse, Debug, Clone, Eq, PartialEq)]
 pub struct FlattenedReport {
     cores_available: usize,
     rayon_threads: usize,

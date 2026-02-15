@@ -4,7 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Address, type Hash, type Log, encodeAbiParameters } from 'viem'
+import { type Address, type Hash, type Log, PublicClient, encodeAbiParameters } from 'viem'
+import type { BfvParams } from './types'
 
 export class SDKError extends Error {
   constructor(
@@ -53,29 +54,13 @@ export function generateEventId(log: Log): string {
 
 /**
  * Get the current timestamp in seconds
+ * from onchain
+ * @param publicClient - The public client to use
  */
-export function getCurrentTimestamp(): number {
-  return Math.floor(Date.now() / 1000)
+export async function getCurrentTimestamp(publicClient: PublicClient): Promise<bigint> {
+  const block = await publicClient.getBlock()
+  return block.timestamp
 }
-
-// BFV parameter set matching the Rust INSECURE_SET_2048_1032193_1 configuration
-export const INSECURE_SET_2048_1032193_1 = {
-  degree: 2048,
-  plaintext_modulus: 1032193,
-  moduli: [0x3fffffff000001n], // BigInt for the modulus
-  error1_variance: '10',
-} as const
-
-// BFV parameter set matching the Rust SET_8192_1000_4 configuration
-export const SET_8192_1000_4 = {
-  degree: 8192,
-  plaintext_modulus: 1000,
-  moduli: [0x00800000022a0001n, 0x00800000021a0001n, 0x0080000002120001n, 0x0080000001f60001n],
-  error1_variance: '52309181128222339698631578526730685514457152477762943514050560000',
-}
-
-// Set default parameter set
-export const BFV_PARAMS_SET = INSECURE_SET_2048_1032193_1
 
 // Compute provider parameters structure
 export interface ComputeProviderParams {
@@ -95,7 +80,6 @@ export const DEFAULT_COMPUTE_PROVIDER_PARAMS: ComputeProviderParams = {
 export const DEFAULT_E3_CONFIG = {
   threshold_min: 2,
   threshold_max: 5,
-  window_size: 120, // 2 minutes in seconds
   duration: 1800, // 30 minutes in seconds
   payment_amount: '0', // 0 ETH in wei
 } as const
@@ -104,12 +88,16 @@ export const DEFAULT_E3_CONFIG = {
  * Encode BFV parameters for the smart contract
  * BFV (Brakerski-Fan-Vercauteren) is a type of fully homomorphic encryption
  */
-export function encodeBfvParams(
-  degree: number = BFV_PARAMS_SET.degree,
-  plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
-  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli,
-  error1_variance: string = BFV_PARAMS_SET.error1_variance,
-): `0x${string}` {
+export function encodeBfvParams(params: BfvParams): `0x${string}` {
+  const { degree, plaintextModulus, moduli, error1Variance } = params
+
+  if (error1Variance === undefined) {
+    throw new SDKError(
+      'error1Variance is required in ProtocolParams. All BFV parameter sets must specify error1_variance.',
+      'MISSING_ERROR1_VARIANCE',
+    )
+  }
+
   return encodeAbiParameters(
     [
       {
@@ -126,9 +114,9 @@ export function encodeBfvParams(
     [
       {
         degree: BigInt(degree),
-        plaintext_modulus: BigInt(plaintext_modulus),
+        plaintext_modulus: BigInt(plaintextModulus),
         moduli: [...moduli],
-        error1_variance,
+        error1_variance: error1Variance,
       },
     ],
   )
@@ -161,12 +149,23 @@ export function encodeCustomParams(params: Record<string, unknown>): `0x${string
   return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
+// inputWindow[0] is always larger than now and dkg deadline
+export const inputWindowStartBuffer = 15n
+
 /**
  * Calculate start window for E3 request
+ * @dev This function can be used for testing purposes, or for E3s which need to start as soon as possible.
+ * @param publicClient - The public client to use
+ * @param duration - The duration of the input window in seconds
+ * @param startBuffer - Buffer in seconds added to current timestamp for input window start
  */
-export function calculateStartWindow(windowSize: number = DEFAULT_E3_CONFIG.window_size): [bigint, bigint] {
-  const now = getCurrentTimestamp()
-  return [BigInt(now), BigInt(now + windowSize)]
+export async function calculateInputWindow(
+  publicClient: PublicClient,
+  duration: number = DEFAULT_E3_CONFIG.duration,
+  startBuffer: bigint = inputWindowStartBuffer,
+): Promise<[bigint, bigint]> {
+  const now = await getCurrentTimestamp(publicClient)
+  return [BigInt(now) + startBuffer, BigInt(now) + startBuffer + BigInt(duration)]
 }
 
 /**

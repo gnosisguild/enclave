@@ -65,7 +65,58 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CommitteeFinalized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CommitteeFormed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
           "indexed": false,
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "failedAtStage",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IEnclave.FailureReason",
+          "name": "reason",
+          "type": "uint8"
+        }
+      ],
+      "name": "E3Failed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -73,17 +124,17 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "expiration",
+          "name": "paymentAmount",
           "type": "uint256"
         },
         {
           "indexed": false,
-          "internalType": "bytes",
-          "name": "committeePublicKey",
-          "type": "bytes"
+          "internalType": "uint256",
+          "name": "honestNodeCount",
+          "type": "uint256"
         }
       ],
-      "name": "E3Activated",
+      "name": "E3FailureProcessed",
       "type": "event"
     },
     {
@@ -116,6 +167,19 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "e3RefundManager",
+          "type": "address"
+        }
+      ],
+      "name": "E3RefundManagerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": false,
           "internalType": "uint256",
           "name": "e3Id",
@@ -140,18 +204,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -192,6 +246,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "indexed": false,
@@ -207,6 +266,31 @@
         }
       ],
       "name": "E3Requested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "previousStage",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "newStage",
+          "type": "uint8"
+        }
+      ],
+      "name": "E3StageChanged",
       "type": "event"
     },
     {
@@ -337,27 +421,75 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "dkgWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "computeWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriod",
+              "type": "uint256"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct IEnclave.E3TimeoutConfig",
+          "name": "config",
+          "type": "tuple"
+        }
+      ],
+      "name": "TimeoutConfigUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "bondingRegistry",
+      "outputs": [
+        {
+          "internalType": "contract IBondingRegistry",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "publicKey",
-          "type": "bytes"
         }
       ],
-      "name": "activate",
+      "name": "checkFailureCondition",
       "outputs": [
         {
           "internalType": "bool",
-          "name": "success",
+          "name": "canFail",
           "type": "bool"
+        },
+        {
+          "internalType": "enum IEnclave.FailureReason",
+          "name": "reason",
+          "type": "uint8"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -369,13 +501,7 @@
         }
       ],
       "name": "disableE3Program",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -388,13 +514,7 @@
         }
       ],
       "name": "disableEncryptionScheme",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -407,14 +527,57 @@
         }
       ],
       "name": "enableE3Program",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "feeToken",
       "outputs": [
         {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
+          "internalType": "contract IERC20",
+          "name": "",
+          "type": "address"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getDeadlines",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "dkgDeadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "computeDeadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionDeadline",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnclave.E3Deadlines",
+          "name": "deadlines",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -465,18 +628,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -517,6 +670,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "internalType": "struct E3",
@@ -538,13 +696,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -589,6 +742,166 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
+        }
+      ],
+      "name": "getE3Stage",
+      "outputs": [
+        {
+          "internalType": "enum IEnclave.E3Stage",
+          "name": "stage",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getFailureReason",
+      "outputs": [
+        {
+          "internalType": "enum IEnclave.FailureReason",
+          "name": "reason",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getRequester",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "requester",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getTimeoutConfig",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "dkgWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "computeWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnclave.E3TimeoutConfig",
+          "name": "config",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "markE3Failed",
+      "outputs": [
+        {
+          "internalType": "enum IEnclave.FailureReason",
+          "name": "reason",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "onCommitteeFinalized",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "committeePublicKeyHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "onCommitteePublished",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "reason",
+          "type": "uint8"
+        }
+      ],
+      "name": "onE3Failed",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
         },
         {
           "internalType": "bytes",
@@ -602,30 +915,6 @@
         }
       ],
       "name": "publishCiphertextOutput",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        }
-      ],
-      "name": "publishInput",
       "outputs": [
         {
           "internalType": "bool",
@@ -676,13 +965,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
             },
             {
               "internalType": "contract IE3Program",
@@ -736,18 +1020,8 @@
             },
             {
               "internalType": "uint256[2]",
-              "name": "startWindow",
+              "name": "inputWindow",
               "type": "uint256[2]"
-            },
-            {
-              "internalType": "uint256",
-              "name": "duration",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "expiration",
-              "type": "uint256"
             },
             {
               "internalType": "bytes32",
@@ -788,6 +1062,11 @@
               "internalType": "bytes",
               "name": "plaintextOutput",
               "type": "bytes"
+            },
+            {
+              "internalType": "address",
+              "name": "requester",
+              "type": "address"
             }
           ],
           "internalType": "struct E3",
@@ -807,13 +1086,7 @@
         }
       ],
       "name": "setBondingRegistry",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -826,13 +1099,7 @@
         }
       ],
       "name": "setCiphernodeRegistry",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -850,13 +1117,7 @@
         }
       ],
       "name": "setDecryptionVerifier",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -869,13 +1130,7 @@
         }
       ],
       "name": "setE3ProgramsParams",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -888,13 +1143,7 @@
         }
       ],
       "name": "setFeeToken",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
-        }
-      ],
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -907,13 +1156,42 @@
         }
       ],
       "name": "setMaxDuration",
-      "outputs": [
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
         {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "dkgWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "computeWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "decryptionWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "gracePeriod",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IEnclave.E3TimeoutConfig",
+          "name": "config",
+          "type": "tuple"
         }
       ],
+      "name": "setTimeoutConfig",
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     }
@@ -924,5 +1202,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-15da934c0854938352efc3fea207d9956917d5c6"
+  "buildInfoId": "solc-0_8_28-d7b7e823e5eb177cd42a96206dc5c5f8387609a9"
 }

@@ -9,9 +9,11 @@ use std::{
 };
 
 use anyhow::Result;
-use e3_bfv_helpers::{build_bfv_params_arc, decode_bytes_to_vec_u64, encode_bfv_params};
+use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::{encode_bfv_params, BfvParamSet};
 use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
 use e3_trbfv::{
     calculate_decryption_share::{
@@ -43,18 +45,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     let _guard = tracing::subscriber::set_default(subscriber);
     let rng = create_shared_rng_from_u64(42);
 
-    let (degree, plaintext_modulus, moduli) = (
-        8192usize,
-        16384u64,
-        &[
-            0x1FFFFFFEA0001u64, // 562949951979521
-            0x1FFFFFFE88001u64, // 562949951881217
-            0x1FFFFFFE48001u64, // 562949951619073
-            0xfffffebc001u64,   //
-        ] as &[u64],
-    );
-
-    let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+    let params_raw = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
     let params = ArcBytes::from_bytes(&encode_bfv_params(&params_raw.clone()));
 
     // E3Parameters
@@ -83,7 +74,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     );
 
     // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
-    let shares_hash_map = usecase_helpers::generate_shares_hash_map(
+    let generated = usecase_helpers::generate_shares_hash_map(
         &trbfv_config,
         esi_per_ct as u64,
         &error_size,
@@ -93,9 +84,14 @@ async fn test_trbfv_isolation() -> Result<()> {
     )?;
 
     let pubkey =
-        usecase_helpers::get_public_key(&shares_hash_map, trbfv_config.params(), &crp_raw)?;
-    let shares = to_ordered_vec(shares_hash_map);
-    let decryption_keys = usecase_helpers::get_decryption_keys(shares, &cipher, &trbfv_config)?;
+        usecase_helpers::get_public_key(&generated.shares, trbfv_config.params(), &crp_raw)?;
+    let shares = to_ordered_vec(generated.shares);
+    let decryption_keys = usecase_helpers::get_decryption_keys(
+        shares,
+        &generated.bfv_secret_keys,
+        &cipher,
+        &trbfv_config,
+    )?;
     // Create the inputs
     let num_votes_per_voter = 3;
     let num_voters = 30;
@@ -106,8 +102,11 @@ async fn test_trbfv_isolation() -> Result<()> {
         num_votes_per_voter,
     );
 
-    let outputs =
-        e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
+    let outputs = e3_test_helpers::application::run_application(
+        &inputs,
+        params_raw.clone(),
+        num_votes_per_voter,
+    );
 
     // Encrypt the plaintext
     let ciphertexts = outputs
@@ -157,10 +156,12 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect();
 
     // Show summation result
+    let plaintext_modulus = params_raw.clone().plaintext();
+
     let mut expected_result = vec![0u64; 3];
     for vals in &numbers {
         for j in 0..num_votes_per_voter {
-            expected_result[j] += vals[j];
+            expected_result[j] = (expected_result[j] + vals[j]) % plaintext_modulus;
         }
     }
 

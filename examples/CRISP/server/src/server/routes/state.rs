@@ -4,30 +4,103 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::str::FromStr;
+
 use crate::server::{
     app_data::AppData,
-    models::{GetRoundRequest, WebhookPayload},
+    models::{
+        GetRoundRequest, IsSlotEmptyRequest, IsSlotEmptyResponse, PreviousCiphertextRequest,
+        PreviousCiphertextResponse, RoundRequestWithRequester, WebhookPayload,
+    },
     CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::primitives::{Bytes, U256};
+use alloy::primitives::{Address, Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{
     EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
 };
+use evm_helpers::CRISPContractFactory;
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/state")
             .route("/result", web::post().to(get_round_result))
-            .route("/all", web::get().to(get_all_round_results))
+            .route("/all", web::post().to(get_all_round_results))
             .route("/lite", web::post().to(get_round_state_lite))
             // Do we need protection on this endpoint? technically they would need to send a valid proof for it to
             // be included on chain
             .route("/add-result", web::post().to(handle_program_server_result))
             // Get the token holders hashes for a given round
-            .route("/token-holders", web::post().to(get_token_holders_hashes)),
+            .route("/token-holders", web::post().to(get_token_holders_hashes))
+            .route(
+                "/eligible-addresses",
+                web::post().to(handle_get_eligible_addresses),
+            )
+            .route(
+                "/previous-ciphertext",
+                web::post().to(handle_get_previous_ciphertext),
+            )
+            .route("/is-slot-empty", web::post().to(handle_is_slot_empty)),
     );
+}
+
+/// Endpoint to get the ciphertext input at a certain slot. Used for masking operations
+///
+/// # Arguments
+/// * `data` - The round id and the slot index
+///
+/// # Returns
+/// * A JSON response with the result of the operation. If sucessfull it includes the ciphertext input at the given slot
+async fn handle_get_previous_ciphertext(
+    data: web::Json<PreviousCiphertextRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    let contract =
+        match CRISPContractFactory::create_read(&CONFIG.http_rpc_url, &CONFIG.e3_program_address)
+            .await
+        {
+            Ok(contract) => contract,
+            Err(e) => {
+                error!("Failed to create CRISP contract: {:?}", e);
+                return HttpResponse::InternalServerError().body("Failed to create CRISP contract");
+            }
+        };
+
+    let address = match Address::from_str(incoming.address.as_str()) {
+        Ok(addr) => addr,
+        Err(e) => {
+            error!("Invalid address format: {:?}", e);
+            return HttpResponse::BadRequest().body("Invalid address format");
+        }
+    };
+
+    let slot_index = match contract
+        .get_slot_index_from_address(U256::from(incoming.round_id), address)
+        .await
+    {
+        Ok(index) => index.to::<u64>(),
+        Err(e) => {
+            error!("Error getting slot index from address: {:?}", e);
+            return HttpResponse::InternalServerError()
+                .body("Failed to get slot index from address");
+        }
+    };
+
+    match store
+        .e3(incoming.round_id)
+        .get_ciphertext_input(slot_index)
+        .await
+    {
+        Ok(Some(ciphertext)) => HttpResponse::Ok().json(PreviousCiphertextResponse { ciphertext }),
+        Ok(None) => HttpResponse::NotFound().body("Ciphertext not found"),
+        Err(e) => {
+            error!("Error getting previous ciphertext: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get previous ciphertext")
+        }
+    }
 }
 
 /// Webhook callback from program server
@@ -149,7 +222,12 @@ async fn get_round_result(
 /// # Returns
 ///
 /// * A JSON response containing the results for all rounds
-async fn get_all_round_results(store: web::Data<AppData>) -> impl Responder {
+async fn get_all_round_results(
+    data: web::Json<RoundRequestWithRequester>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
     let round_count = match store.current_round().get_current_round_id().await {
         Ok(count) => count,
         Err(e) => {
@@ -159,11 +237,21 @@ async fn get_all_round_results(store: web::Data<AppData>) -> impl Responder {
     };
 
     let mut states = Vec::new();
+    let requesters = incoming.requesters;
 
     // FIXME: This assumes ids are ordered
     for i in 0..round_count + 1 {
         match store.e3(i).get_web_result_request().await {
-            Ok(w) => states.push(w),
+            Ok(w) => {
+                if !requesters.is_empty() {
+                    // if we have any requesters to filter by, do it
+                    if requesters.contains(&w.requester) {
+                        states.push(w);
+                    }
+                } else {
+                    states.push(w);
+                }
+            }
             Err(e) => {
                 info!("Error retrieving state for round {}: {:?}", i, e);
                 continue;
@@ -210,6 +298,65 @@ async fn get_token_holders_hashes(
         Err(e) => {
             error!("Error getting token holders hashes: {:?}", e);
             HttpResponse::InternalServerError().body("Failed to get token holders hashes")
+        }
+    }
+}
+
+/// Check if a slot is empty given an address
+/// # Arguments
+/// * `IsSlotEmptyRequest` - The request containing round_id and address
+async fn handle_is_slot_empty(data: web::Json<IsSlotEmptyRequest>) -> impl Responder {
+    let incoming = data.into_inner();
+
+    let contract =
+        match CRISPContractFactory::create_read(&CONFIG.http_rpc_url, &CONFIG.e3_program_address)
+            .await
+        {
+            Ok(contract) => contract,
+            Err(e) => {
+                error!("Failed to create CRISP contract: {:?}", e);
+                return HttpResponse::InternalServerError().body("Failed to create CRISP contract");
+            }
+        };
+
+    let address = match Address::from_str(incoming.address.as_str()) {
+        Ok(addr) => addr,
+        Err(e) => {
+            error!("Invalid address format: {:?}", e);
+            return HttpResponse::BadRequest().body("Invalid address format");
+        }
+    };
+
+    let is_empty = match contract
+        .get_is_slot_empty_by_address(U256::from(incoming.round_id), address)
+        .await
+    {
+        Ok(empty) => empty,
+        Err(e) => {
+            error!("Error checking if slot is empty: {:?}", e);
+            return HttpResponse::InternalServerError().body("Failed to check if slot is empty");
+        }
+    };
+
+    HttpResponse::Ok().json(IsSlotEmptyResponse { is_empty })
+}
+
+/// Get the eligible addresses for a given round
+/// # Arguments
+/// * `GetRoundRequest` - The request data containing the round ID
+/// # Returns
+/// * A JSON response containing the list of eligible addresses and their balances
+async fn handle_get_eligible_addresses(
+    data: web::Json<GetRoundRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    match store.e3(incoming.round_id).get_eligible_addresses().await {
+        Ok(addresses) => HttpResponse::Ok().json(addresses),
+        Err(e) => {
+            error!("Error getting eligible addresses: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get eligible addresses")
         }
     }
 }

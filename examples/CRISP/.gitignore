@@ -48,4 +48,5 @@ playwright-report/
 .enclave/config/ 
 .enclave/caches/
 .enclave/ready
+.enclave/noir/
 cache_hardhat/

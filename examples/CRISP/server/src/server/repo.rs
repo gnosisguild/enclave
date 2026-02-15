@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::models::{CustomParams, TokenHolder};
+
 use super::{
     database::generate_emoji,
     models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
@@ -11,6 +13,7 @@ use super::{
 use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
+use num_bigint::BigUint;
 
 pub struct CurrentRoundRepository<S: DataStore> {
     store: SharedStore<S>,
@@ -37,7 +40,42 @@ impl<S: DataStore> CurrentRoundRepository<S> {
             .get::<CurrentRound>(&key)
             .await
             .map_err(|_| eyre::eyre!("Could get e3 at '{key}'"))?;
+
         Ok(round)
+    }
+
+    /// Get the current (most recent) round for a specific requester
+    ///
+    /// # Arguments
+    /// * `requester` - The requester address to find the current round for
+    ///
+    /// # Returns
+    /// * The CurrentRound object for the most recent round by this requester, or None if not found
+    pub async fn get_current_round_for_requester(
+        &self,
+        requester: String,
+    ) -> Result<Option<CurrentRound>> {
+        // Get the current round count to iterate through all rounds
+        let round_count = self.get_current_round_id().await?;
+
+        // Iterate backwards from the most recent round to find the latest one for this requester
+        for round_id in (0..=round_count).rev() {
+            let crisp_repo = CrispE3Repository::new(self.store.clone(), round_id);
+
+            match crisp_repo.get_e3_state_lite().await {
+                Ok(state) => {
+                    if state.requester == requester {
+                        return Ok(Some(CurrentRound { id: round_id }));
+                    }
+                }
+                Err(e) => {
+                    info!("Error retrieving state for round {}: {:?}", round_id, e);
+                    continue;
+                }
+            }
+        }
+
+        Ok(None)
     }
 
     pub async fn get_current_round_id(&self) -> Result<u64> {
@@ -116,22 +154,39 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    pub async fn get_ciphertext_input(&self, index: u64) -> Result<Option<Vec<u8>>> {
+        let e3_crisp = self.get_crisp().await?;
+        for (vote, i) in e3_crisp.ciphertext_inputs {
+            if i == index {
+                return Ok(Some(vote));
+            }
+        }
+
+        Ok(None)
+    }
+
     pub async fn initialize_round(
         &mut self,
-        token_address: String,
-        balance_threshold: String,
+        custom_params: CustomParams,
+        requester: String,
+        end_time: u64,
     ) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
             start_time: 0u64,
             status: "Requested".to_string(),
-            votes_option_1: 0,
-            votes_option_2: 0,
+            tally: vec![],
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
-            token_address,
-            balance_threshold,
+            eligible_addresses: vec![],
+            token_address: custom_params.token_address,
+            balance_threshold: custom_params.balance_threshold,
             ciphertext_inputs: vec![],
+            requester,
+            num_options: custom_params.num_options,
+            credit_mode: custom_params.credit_mode,
+            credits: custom_params.credits,
+            end_time,
         })
         .await
     }
@@ -143,6 +198,11 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn get_e3(&self) -> Result<EnclaveE3> {
         let e3 = self.get_e3_repo().get_e3().await?;
         Ok(e3)
+    }
+
+    pub async fn get_num_options(&self) -> Result<usize> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.num_options.parse::<usize>()?)
     }
 
     pub async fn get_vote_count(&self) -> Result<u64> {
@@ -165,19 +225,25 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn set_votes(&mut self, option_1: u64, option_2: u64) -> Result<()> {
-        info!("set_votes(option_1:{} option_2:{})", option_1, option_2);
+    pub async fn set_votes(&mut self, votes: Vec<BigUint>) -> Result<()> {
+        info!(
+            "set_votes: [{}]",
+            votes.iter().enumerate()
+                .map(|(i, v)| format!("option_{}: {}", i, v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
         let key = self.crisp_key();
         self.store
-            .modify(&key, |e3_obj: Option<E3Crisp>| {
-                e3_obj.map(|mut e| {
-                    e.votes_option_1 = option_1;
-                    e.votes_option_2 = option_2;
-                    e
-                })
+        .modify(&key, |e3_obj: Option<E3Crisp>| {
+            e3_obj.map(|mut e| {
+                e.tally = votes.iter().map(|v| v.to_string()).collect();
+                e
             })
-            .await
-            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+        })
+        .await
+        .map_err(|_| eyre::eyre!("Could not set votes for '{key}'"))?;
         Ok(())
     }
 
@@ -196,12 +262,12 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(WebResultRequest {
             round_id: e3.id,
-            option_1_tally: e3_crisp.votes_option_1,
-            option_2_tally: e3_crisp.votes_option_2,
-            total_votes: e3_crisp.votes_option_1 + e3_crisp.votes_option_2,
+            tally: e3_crisp.tally,
             option_1_emoji: e3_crisp.emojis[0].clone(),
             option_2_emoji: e3_crisp.emojis[1].clone(),
-            end_time: e3.expiration,
+            end_time: e3.input_window[1],
+            total_votes: self.get_vote_count().await?,
+            requester: e3_crisp.requester,
         })
     }
 
@@ -210,19 +276,28 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_crisp = self.get_crisp().await?;
         Ok(E3StateLite {
             emojis: e3_crisp.emojis,
-            expiration: e3.expiration,
             id: self.e3_id,
             status: e3_crisp.status,
             chain_id: e3.chain_id,
-            duration: e3.duration,
+            start_time: e3.input_window[0],
+            end_time: e3.input_window[1],
             vote_count: u64::try_from(e3_crisp.has_voted.len())?,
-            start_time: e3_crisp.start_time,
             start_block: e3.request_block,
             enclave_address: e3.enclave_address,
             committee_public_key: e3.committee_public_key,
             token_address: e3_crisp.token_address,
             balance_threshold: e3_crisp.balance_threshold,
+            requester: e3_crisp.requester,
+            num_options: e3_crisp.num_options,
+            credit_mode: e3_crisp.credit_mode,
+            credits: e3_crisp.credits,
         })
+    }
+
+    /// Get the input deadline for the current round
+    pub async fn get_input_deadline(&self) -> Result<u64> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.end_time)
     }
 
     pub async fn get_ciphertext_inputs(&self) -> Result<Vec<(Vec<u8>, u64)>> {
@@ -296,6 +371,26 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn get_token_holder_hashes(&self) -> Result<Vec<String>> {
         let e3_crisp = self.get_crisp().await?;
         Ok(e3_crisp.token_holder_hashes)
+    }
+
+    pub async fn set_eligible_addresses(&mut self, holders: Vec<TokenHolder>) -> Result<()> {
+        let key = self.crisp_key();
+
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.eligible_addresses = holders.clone();
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not set eligible_addresses for '{key}'"))?;
+        Ok(())
+    }
+
+    pub async fn get_eligible_addresses(&self) -> Result<Vec<TokenHolder>> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.eligible_addresses)
     }
 
     fn crisp_key(&self) -> String {

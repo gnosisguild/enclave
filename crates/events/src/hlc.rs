@@ -33,8 +33,11 @@ pub enum HlcError {
 /// HLC timestamp
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HlcTimestamp {
+    /// Physical timestamp in microseconds since UNIX epoch
     pub ts: u64,
+    /// Logical counter for same-timestamp ordering
     pub counter: u32,
+    /// Unique node identifier for tie-breaking
     pub node: u32,
 }
 
@@ -42,6 +45,11 @@ impl HlcTimestamp {
     /// Create a new Timestamp
     pub fn new(ts: u64, counter: u32, node: u32) -> Self {
         Self { ts, counter, node }
+    }
+
+    /// Extract wall time from a u128 timestamp
+    pub fn wall_time(ts: u128) -> u64 {
+        Self::from_u128(ts).ts
     }
 
     /// Packs the HLC timestamp into a 128bit big-endian representation.
@@ -159,9 +167,10 @@ impl From<u128> for HlcTimestamp {
 /// # Ok(())
 /// # }
 /// ```
+#[derive(Clone)]
 pub struct Hlc {
     /// Inner state guarded by mutex
-    inner: Mutex<HlcInner>,
+    inner: Arc<Mutex<HlcInner>>,
     /// Our node id
     node: u32,
     /// Maximum drift amount
@@ -170,8 +179,11 @@ pub struct Hlc {
     clock: Option<Arc<dyn Fn() -> u64 + Send + Sync>>,
 }
 
+#[derive(PartialEq)]
 struct HlcInner {
+    /// Current timestamp value
     ts: u64,
+    /// Current logical counter
     counter: u32,
 }
 
@@ -182,12 +194,21 @@ impl Default for Hlc {
     }
 }
 
+impl PartialEq for Hlc {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+            && self.node == other.node
+            && self.max_drift == other.max_drift
+        // note clock ignored because it is only used in testing
+    }
+}
+
 impl Hlc {
-    const DEFAULT_MAX_DRIFT: u64 = 60_000_000; // 60 sec
+    const DEFAULT_MAX_DRIFT: u64 = 5 * 60 * 1_000_000; // 5 min
 
     pub fn new(node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts: 0, counter: 0 }),
+            inner: Arc::new(Mutex::new(HlcInner { ts: 0, counter: 0 })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,
@@ -203,7 +224,7 @@ impl Hlc {
 
     pub fn with_state(ts: u64, counter: u32, node: u32) -> Self {
         Self {
-            inner: Mutex::new(HlcInner { ts, counter }),
+            inner: Arc::new(Mutex::new(HlcInner { ts, counter })),
             node,
             max_drift: Self::DEFAULT_MAX_DRIFT,
             clock: None,

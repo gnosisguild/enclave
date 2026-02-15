@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd circuits
-nargo test --workspace
+cd circuits/lib
+nargo test
 
 echo "Noir circuits tested successfully"

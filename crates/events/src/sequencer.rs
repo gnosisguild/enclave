@@ -4,46 +4,78 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, Handler};
+use crate::{
+    events::{StoreEventRequested, StoreEventResponse},
+    EnclaveEvent, EventBus, Sequenced, Unsequenced,
+};
+use actix::{Actor, Addr, AsyncContext, Handler, Recipient};
+use anyhow::Result;
+use e3_utils::{major_issue, MAILBOX_LIMIT_LARGE};
 
-use crate::{EnclaveEvent, EventBus, Sequenced, Unsequenced};
-
+/// Component to sequence the storage of events
 pub struct Sequencer {
     bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
-    seq: u64,
+    eventstore: Recipient<StoreEventRequested>,
 }
 
 impl Sequencer {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>) -> Self {
+    pub fn new(
+        bus: &Addr<EventBus<EnclaveEvent<Sequenced>>>,
+        eventstore: impl Into<Recipient<StoreEventRequested>>,
+    ) -> Self {
         Self {
             bus: bus.clone(),
-            seq: 0,
+            eventstore: eventstore.into(),
         }
+    }
+
+    fn handle_store_event_response(&self, msg: StoreEventResponse) -> Result<()> {
+        let event = msg.into_event();
+        self.bus.try_send(event)?;
+        Ok(())
     }
 }
 
 impl Actor for Sequencer {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl Handler<EnclaveEvent<Unsequenced>> for Sequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, _: &mut Self::Context) -> Self::Result {
-        // NOTE: FAKE SEQUENCER FOR NOW - JUST SET THE SEQUENCE NUMBER AND UPDATE
-        self.seq += 1;
-        self.bus.do_send(msg.into_sequenced(self.seq))
+    fn handle(&mut self, msg: EnclaveEvent<Unsequenced>, ctx: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self
+            .eventstore
+            .try_send(StoreEventRequested::new(msg, ctx.address()))
+        {
+            panic!("{}", major_issue("Could not store event in eventstore.", e))
+        }
+    }
+}
+
+impl Handler<StoreEventResponse> for Sequencer {
+    type Result = ();
+    fn handle(&mut self, msg: StoreEventResponse, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_store_event_response(msg) {
+            panic!(
+                "{}",
+                major_issue("Could not send event to snapshot_buffer or bus.", e)
+            )
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::{prelude::*, BusHandle, EnclaveEvent, EventBus, TakeEvents, TestEvent};
-    use actix::Actor;
+    use e3_ciphernode_builder::EventSystem;
+    use e3_events::{EnclaveEvent, EventPublisher, TakeEvents, TestEvent};
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let bus = BusHandle::new_from_consumer(EventBus::<EnclaveEvent>::default().start());
+        let system = EventSystem::new("test");
+        let bus = system.handle()?;
         let history = bus.history();
 
         let event_data = vec![
@@ -53,7 +85,7 @@ mod tests {
         ];
 
         for d in event_data.clone() {
-            bus.publish(d)?;
+            bus.publish_without_context(d)?;
         }
 
         let expected = event_data

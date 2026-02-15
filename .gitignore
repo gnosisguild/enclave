@@ -6,3 +6,8 @@ node_modules
 target
 
 *.DS_Store
+
+dist
+
+# circuit benchmarks
+circuits/benchmarks/results_*/raw/

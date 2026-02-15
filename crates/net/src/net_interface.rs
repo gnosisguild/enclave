@@ -4,14 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use e3_events::CorrelationId;
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
-    identify::{self, Behaviour as IdentifyBehaviour},
+    identify::{Behaviour as IdentifyBehaviour, Config as IdentifyConfig},
     identity::Keypair,
     kad::{
         self,
@@ -19,15 +19,22 @@ use libp2p::{
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
         QueryResult, Quorum, Record, RecordKey,
     },
+    request_response::{
+        self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
+        Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
+    },
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     StreamProtocol, Swarm,
 };
-use std::sync::atomic::AtomicBool;
+use rand::prelude::IteratorRandom;
 use std::{
     collections::HashMap,
+    fmt::Display,
     sync::{atomic::Ordering, Arc},
     time::Instant,
 };
+use std::{hash::Hash, sync::atomic::AtomicBool};
+
 use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
@@ -36,7 +43,10 @@ const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 
-use crate::events::{GossipData, NetCommand};
+use crate::events::{
+    estimate_hashmap_size, GossipData, NetCommand, OutgoingSyncRequestFailed,
+    OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue, SyncResponseValue,
+};
 use crate::events::{NetEvent, PutOrStoreError};
 use crate::{dialer::dial_peers, Cid};
 
@@ -46,6 +56,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
+    sync: CborRequestResponse<SyncRequestValue, SyncResponseValue>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -135,7 +146,7 @@ impl NetInterface {
             let peers = self.peers.clone();
             async move {
                 dial_peers(&cmd_tx, &event_tx, &peers).await?;
-
+                event_tx.send(NetEvent::AllPeersDialed)?;
                 return anyhow::Ok(());
             }
         });
@@ -167,8 +178,8 @@ fn create_behaviour(
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
-    let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/enclave/0.0.1".into(), key.public())
+    let identify = IdentifyBehaviour::new(
+        IdentifyConfig::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -183,7 +194,16 @@ fn create_behaviour(
         gossipsub::MessageAuthenticity::Signed(key.clone()),
         gossipsub_config,
     )?;
+    let request_response_config =
+        request_response::Config::default().with_request_timeout(Duration::from_secs(30));
 
+    let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
+        [(
+            StreamProtocol::new("/enclave/sync/0.0.1"),
+            ProtocolSupport::Full,
+        )],
+        request_response_config,
+    );
     let mut config = KademliaConfig::new(PROTOCOL_NAME);
     config
         .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
@@ -203,7 +223,8 @@ fn create_behaviour(
         gossipsub,
         kademlia,
         connection_limits,
-        identify: identify_config,
+        identify,
+        sync,
     })
 }
 
@@ -223,9 +244,13 @@ async fn process_swarm_event(
             peer_id,
             endpoint,
             connection_id,
+            num_established,
             ..
         } => {
-            info!("Connected to {peer_id}");
+            // Only log on first connection to this peer to avoid spam
+            if num_established.get() == 1 {
+                info!("Connected to {peer_id}");
+            }
             let remote_addr = endpoint.get_remote_address().clone();
             swarm
                 .behaviour_mut()
@@ -240,6 +265,13 @@ async fn process_swarm_event(
             error,
             connection_id,
         } => {
+            let error_str = format!("{}", error);
+            if error_str.contains("Unexpected peer ID") {
+                if let Some(expected_peer) = &peer_id {
+                    debug!("Removing stale peer {expected_peer} due to peer ID mismatch");
+                    swarm.behaviour_mut().kademlia.remove_peer(expected_peer);
+                }
+            }
             warn!("Failed to dial {peer_id:?}: {error}");
             event_tx.send(NetEvent::OutgoingConnectionError {
                 connection_id,
@@ -248,7 +280,13 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
-            warn!("{:#}", anyhow::Error::from(error))
+            let error_str = format!("{:#}", anyhow::Error::from(error));
+            // Downgrade self dial attempts to debug
+            if error_str.contains("Local peer ID") {
+                debug!("{}", error_str);
+            } else {
+                warn!("{}", error_str);
+            }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
@@ -332,9 +370,11 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
+
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
         }
+
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
             topic,
@@ -343,6 +383,90 @@ async fn process_swarm_event(
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            message:
+                RequestResponseMessage::Request {
+                    request,
+                    channel,
+                    request_id,
+                },
+            ..
+        })) => {
+            info!("***INCOMING REQUEST RECEIVED {}!!***", request_id);
+
+            // received a request for events
+            event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
+                request_id,
+                channel: OnceTake::new(channel),
+                value: request,
+            }))?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::Message {
+            message:
+                RequestResponseMessage::Response {
+                    request_id,
+                    response,
+                    ..
+                },
+            ..
+        })) => {
+            info!("***OUTGOING SYNC REQUEST RESPONSE***{}", request_id);
+            // received a response to a request for events
+            let correlation_id = correlator.expire(request_id)?;
+            info!("correlation_id = {correlation_id}");
+            event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
+                OutgoingSyncRequestSucceeded {
+                    value: response,
+                    correlation_id,
+                },
+            ))?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(
+            RequestResponseEvent::OutboundFailure {
+                peer,
+                request_id,
+                error,
+            },
+        )) => {
+            info!(
+                "***OUTBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+                peer, request_id, error
+            );
+            let correlation_id = correlator.expire(request_id)?;
+            event_tx.send(NetEvent::OutgoingSyncRequestFailed(
+                OutgoingSyncRequestFailed {
+                    correlation_id,
+                    error: format!("Outbound sync request failed: {:?}", error),
+                },
+            ))?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::InboundFailure {
+            peer,
+            request_id,
+            error,
+        })) => {
+            info!(
+                "***INBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+                peer, request_id, error
+            );
+            // Handle inbound failures - log for now, could add more sophisticated error handling if needed
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::ResponseSent {
+            peer,
+            request_id,
+        })) => {
+            info!(
+                "***SYNC RESPONSE SENT*** peer={}, request_id={}",
+                peer, request_id
+            );
+            // Successfully sent response to inbound request
+        }
+
         unknown => {
             trace!("Unknown event: {:?}", unknown);
         }
@@ -388,6 +512,11 @@ async fn process_swarm_command(
             key,
         } => handle_get_record(swarm, correlator, correlation_id, key),
         NetCommand::Shutdown => handle_shutdown(swarm, shutdown_flag),
+        NetCommand::OutgoingSyncRequest {
+            correlation_id,
+            value,
+        } => handle_outgoing_sync_request(swarm, correlator, correlation_id, value),
+        NetCommand::SyncResponse { value, channel } => handle_sync_response(swarm, channel, value),
     }
 }
 
@@ -513,10 +642,63 @@ fn handle_shutdown(
     Ok(())
 }
 
+fn handle_outgoing_sync_request(
+    swarm: &mut Swarm<NodeBehaviour>,
+    correlator: &mut Correlator,
+    correlation_id: CorrelationId,
+    value: SyncRequestValue,
+) -> Result<()> {
+    info!("***OUTGOING SYNC REQUEST!! {} ***", correlation_id);
+    // TODO:
+    // This is a first pass.
+    // Lots of stuff to work through here:
+    // How can I know events are correct?
+    // How can I trust this peer?
+    // Can I validate events with another peer?
+    // Should I use an OrderedSet with a hash and request the hash from a second peer?
+
+    // Pick a random peer
+    let Some(peer) = swarm
+        .connected_peers()
+        .choose(&mut rand::thread_rng())
+        .copied()
+    else {
+        bail!("No peer found on swarm!")
+    };
+
+    info!("VALUE SIZE: {:?}", estimate_hashmap_size(&value.since));
+
+    // Request events
+    let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);
+    info!(
+        "QueryId={} correlated with correlation_id={}",
+        query_id, correlation_id
+    );
+    correlator.track(query_id, correlation_id);
+    Ok(())
+}
+
+fn handle_sync_response(
+    swarm: &mut Swarm<NodeBehaviour>,
+    channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+    value: SyncResponseValue,
+) -> Result<()> {
+    info!("Sending response...");
+    let channel = channel.try_take()?;
+    match swarm.behaviour_mut().sync.send_response(channel, value) {
+        Ok(_) => (),
+        Err(value) => {
+            // TODO: report failure
+            error!("sync sending response failure! {:?}", value);
+        }
+    }
+    Ok(())
+}
+
 /// This correlates query_id and correlation_id.
 #[derive(Clone)]
 struct Correlator {
-    inner: HashMap<QueryId, CorrelationId>,
+    inner: HashMap<String, CorrelationId>,
 }
 
 impl Correlator {
@@ -526,13 +708,13 @@ impl Correlator {
         }
     }
     /// Add a pairing between query_id and correlation_id
-    pub fn track(&mut self, query_id: QueryId, correlation_id: CorrelationId) {
-        self.inner.insert(query_id, correlation_id);
+    pub fn track(&mut self, query_id: impl Display, correlation_id: CorrelationId) {
+        self.inner.insert(format!("{query_id}"), correlation_id);
     }
     /// Remove the pairing and return the correlation_id
-    pub fn expire(&mut self, query_id: &QueryId) -> Result<CorrelationId> {
+    pub fn expire(&mut self, query_id: impl Display) -> Result<CorrelationId> {
         self.inner
-            .remove(query_id)
+            .remove(&format!("{query_id}"))
             .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
     }
 }

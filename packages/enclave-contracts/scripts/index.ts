@@ -18,4 +18,5 @@ export * from "./deployAndSave/slashingManager";
 export * from "./deployAndSave/mockComputeProvider";
 export * from "./deployAndSave/mockDecryptionVerifier";
 export * from "./deployAndSave/mockProgram";
+export * from "./deployAndSave/verifiers";
 export * from "./verify";

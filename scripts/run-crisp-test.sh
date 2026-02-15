@@ -6,4 +6,15 @@ echo "Press any key to continue or Ctrl+C to cancel..."
 
 read
 
-rm -rf * && git reset --hard HEAD && git submodule update --init --recursive && pnpm install && pnpm build && cd examples/CRISP && pnpm test:e2e "$@"
+# Use the locally installed bb
+export E3_CUSTOM_BB=$(which bb)
+
+echo "Resetting installed enclave"
+rm -rf ~/.cargo/bin/enclave
+
+rm -rf * && \
+  git reset --hard HEAD && \
+  git submodule update --init --recursive && \
+  cd examples/CRISP && \
+  pnpm dev:setup && \
+  pnpm test:e2e "$@"

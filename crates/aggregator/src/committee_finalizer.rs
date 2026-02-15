@@ -7,8 +7,9 @@
 use actix::prelude::*;
 use e3_events::{
     prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
-    EnclaveEvent, EnclaveEventData, Shutdown,
+    EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
 };
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{error, info};
@@ -32,7 +33,7 @@ impl CommitteeFinalizer {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.subscribe_all(
-            &["CommitteeRequested", "Shutdown"],
+            &[EventType::CommitteeRequested, EventType::Shutdown],
             addr.clone().recipient(),
         );
 
@@ -42,28 +43,39 @@ impl CommitteeFinalizer {
 
 impl Actor for CommitteeFinalizer {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for CommitteeFinalizer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::CommitteeRequested(data) => ctx.notify(data),
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::CommitteeRequested(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
 }
 
-impl Handler<CommitteeRequested> for CommitteeFinalizer {
+impl Handler<TypedEvent<CommitteeRequested>> for CommitteeFinalizer {
     type Result = ();
 
-    fn handle(&mut self, msg: CommitteeRequested, ctx: &mut Self::Context) -> Self::Result {
+    // TODO: Remove all async from this function. Remove reliance on e3_evm package. Add unit test.
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeRequested>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let ec = msg.get_ctx().clone();
         let e3_id = msg.e3_id.clone();
-        let submission_deadline = msg.submission_deadline;
+        let committee_deadline = msg.committee_deadline;
 
         const FINALIZATION_BUFFER_SECONDS: u64 = 1;
-
         let e3_id_for_log = e3_id.clone();
         let fut = async move {
             // TODO: we should have no dependencies on e3_evm here. Reason being that this is core
@@ -89,12 +101,12 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
             fut.into_actor(self)
                 .then(move |current_timestamp, act, ctx| {
                     if let Some(current_timestamp) = current_timestamp {
-                        let seconds_until_deadline = if submission_deadline > current_timestamp {
-                            (submission_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
+                        let seconds_until_deadline = if committee_deadline > current_timestamp {
+                            (committee_deadline - current_timestamp) + FINALIZATION_BUFFER_SECONDS
                         } else {
                             info!(
                                 e3_id = %e3_id_for_async,
-                                submission_deadline = submission_deadline,
+                                committee_deadline = committee_deadline,
                                 current_timestamp = current_timestamp,
                                 "Submission deadline already passed, finalizing with buffer"
                             );
@@ -103,7 +115,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
                         info!(
                             e3_id = %e3_id_for_async,
-                            submission_deadline = submission_deadline,
+                            committee_deadline = committee_deadline,
                             current_timestamp = current_timestamp,
                             seconds_to_wait = seconds_until_deadline,
                             "Scheduling committee finalization"
@@ -117,10 +129,10 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
                             move |act, _ctx| {
                                 info!(e3_id = %e3_id_clone, "Dispatching CommitteeFinalizeRequested event");
 
-                                trap(EType::Sortition, &act.bus.clone(), || {
+                                trap(EType::Sortition, &act.bus.with_ec(&ec), || {
                                     bus.publish(CommitteeFinalizeRequested {
                                         e3_id: e3_id_clone.clone(),
-                                    })?;
+                                    },ec)?;
                                     Ok(())
                                 });
 

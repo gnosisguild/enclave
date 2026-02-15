@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::helpers::EthProvider;
+use crate::send_tx_with_retry;
 use actix::prelude::*;
-use actix::Addr;
 use alloy::{
     primitives::Address,
     providers::{Provider, WalletProvider},
@@ -17,12 +17,15 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
-use e3_events::prelude::*;
 use e3_events::BusHandle;
-use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
+use e3_events::EventType;
 use e3_events::Shutdown;
+use e3_events::{prelude::*, EffectsEnabled};
+use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3id, EType, PlaintextAggregated};
+use e3_utils::NotifySync;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 sol!(
@@ -51,19 +54,28 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
         })
     }
 
-    pub async fn attach(
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-    ) -> Result<Addr<EnclaveSolWriter<P>>> {
-        let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-        bus.subscribe_all(&["PlaintextAggregated", "Shutdown"], addr.clone().into());
-        Ok(addr)
+    pub fn attach(bus: &BusHandle, provider: EthProvider<P>, contract_address: Address) {
+        let addr = run_once::<EffectsEnabled>({
+            let bus = bus.clone();
+            move |_| {
+                let addr = EnclaveSolWriter::new(&bus, provider, contract_address)?.start();
+                bus.subscribe_all(
+                    &[EventType::PlaintextAggregated, EventType::Shutdown],
+                    addr.clone().into(),
+                );
+                Ok(())
+            }
+        });
+
+        bus.subscribe(EventType::EffectsEnabled, addr.recipient());
     }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Actor for EnclaveSolWriter<P> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {
@@ -77,7 +89,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
                     ctx.notify(data);
                 }
             }
-            EnclaveEventData::Shutdown(data) => ctx.notify(data),
+            EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
             _ => (),
         }
     }
@@ -140,11 +152,6 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     decrypted_output: Vec<u8>,
 ) -> Result<TransactionReceipt> {
     let e3_id: U256 = e3_id.try_into()?;
-    let decrypted_output = Bytes::from(decrypted_output);
-    let proof = Bytes::from(vec![1]);
-
-    // Wait for ciphertext output transaction to propagate
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider
@@ -153,11 +160,20 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    let contract = IEnclave::new(contract_address, provider.provider());
-    info!("publishPlaintextOutput() e3_id={:?}", e3_id);
-    let builder = contract
-        .publishPlaintextOutput(e3_id, decrypted_output, proof)
-        .nonce(current_nonce);
-    let receipt = builder.send().await?.get_receipt().await?;
-    Ok(receipt)
+    // 0x0cb083bc = CiphertextOutputNotPublished() - RPC may not have synced ciphertext output being published yet
+    send_tx_with_retry("publishPlaintextOutput", &["0x0cb083bc"], || {
+        info!("publishPlaintextOutput() e3_id={:?}", e3_id);
+        let proof = Bytes::from(vec![1]);
+        let decrypted_output = Bytes::from(decrypted_output.clone());
+        let contract = IEnclave::new(contract_address, provider.provider());
+
+        async move {
+            let builder = contract
+                .publishPlaintextOutput(e3_id, decrypted_output, proof)
+                .nonce(current_nonce);
+            let receipt = builder.send().await?.get_receipt().await?;
+            Ok(receipt)
+        }
+    })
+    .await
 }

@@ -8,7 +8,10 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber};
+use e3_events::{
+    prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
+};
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 pub struct PublicKeyWriter {
@@ -21,13 +24,16 @@ impl PublicKeyWriter {
             path: path.to_owned(),
         }
         .start();
-        bus.subscribe("PublicKeyAggregated", addr.clone().recipient());
+        bus.subscribe(EventType::PublicKeyAggregated, addr.clone().recipient());
         addr
     }
 }
 
 impl Actor for PublicKeyWriter {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for PublicKeyWriter {

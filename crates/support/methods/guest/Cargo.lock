@@ -1037,22 +1037,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
-name = "e3-bfv-helpers"
-version = "0.1.5"
-source = "git+https://github.com/gnosisguild/enclave?rev=632766e4ed1ceeccdeb023a56f16413a33be6f46#632766e4ed1ceeccdeb023a56f16413a33be6f46"
+name = "e3-bfv-client"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
 dependencies = [
- "alloy-dyn-abi",
- "alloy-primitives",
  "anyhow",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
+ "e3-greco-helpers",
  "fhe",
- "fhe-math",
  "fhe-traits",
- "fhe-util",
- "num-bigint",
  "rand 0.8.5",
- "strum",
  "thiserror 1.0.69",
  "zkfhe-greco",
+ "zkfhe-shared",
 ]
 
 [[package]]
@@ -1074,11 +1071,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-compute-provider"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "ark-bn254 0.4.0",
+ "ark-ff 0.4.2",
+ "e3-bfv-client",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80)",
+ "hex",
+ "lean-imt",
+ "light-poseidon",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "serde",
+ "sha3",
+ "zk-kit-imt",
+]
+
+[[package]]
+name = "e3-fhe-params"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "alloy-dyn-abi",
+ "alloy-primitives",
+ "fhe",
+ "num-bigint",
+ "thiserror 1.0.69",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "e3-fhe-params"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae#dbdaaee1db9d868adacc03f75bb2ac85024359ae"
+dependencies = [
+ "fhe",
+ "num-bigint",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-greco-helpers"
+version = "0.1.7"
+source = "git+https://github.com/gnosisguild/enclave?rev=7a361de36d7ccd8f421b874008895cc07f246b80#7a361de36d7ccd8f421b874008895cc07f246b80"
+dependencies = [
+ "fhe",
+ "fhe-math",
+ "num-bigint",
+ "zkfhe-shared",
+]
+
+[[package]]
 name = "e3-user-program"
 version = "0.1.0"
 dependencies = [
- "e3-bfv-helpers",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.7",
+ "e3-fhe-params 0.1.7 (git+https://github.com/gnosisguild/enclave?rev=dbdaaee1db9d868adacc03f75bb2ac85024359ae)",
  "fhe",
  "fhe-traits",
 ]
@@ -1421,7 +1472,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.5",
  "e3-user-program",
  "risc0-zkvm",
 ]
@@ -2785,27 +2836,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "strum"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
-dependencies = [
- "strum_macros",
-]
-
-[[package]]
-name = "strum_macros"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 2.0.111",
-]
 
 [[package]]
 name = "subtle"

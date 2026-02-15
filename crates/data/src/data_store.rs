@@ -6,79 +6,15 @@
 
 use std::borrow::Cow;
 
-use crate::{InMemStore, IntoKey, SledStore};
-use actix::{Addr, Message, Recipient};
+use crate::{InMemStore, SledStore};
+use actix::{Addr, Recipient};
 use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
+use e3_events::IntoKey;
+use e3_events::{Get, Insert, InsertSync, Remove};
 use serde::{Deserialize, Serialize};
 use tracing::error;
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "()")]
-pub struct Insert(pub Vec<u8>, pub Vec<u8>);
-impl Insert {
-    pub fn new<K: IntoKey>(key: K, value: Vec<u8>) -> Self {
-        Self(key.into_key(), value)
-    }
-
-    pub fn key(&self) -> &Vec<u8> {
-        &self.0
-    }
-
-    pub fn value(&self) -> &Vec<u8> {
-        &self.1
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "Result<()>")]
-pub struct InsertSync(pub Vec<u8>, pub Vec<u8>);
-impl InsertSync {
-    pub fn new<K: IntoKey>(key: K, value: Vec<u8>) -> Self {
-        Self(key.into_key(), value)
-    }
-
-    pub fn key(&self) -> &Vec<u8> {
-        &self.0
-    }
-
-    pub fn value(&self) -> &Vec<u8> {
-        &self.1
-    }
-}
-
-impl From<InsertSync> for Insert {
-    fn from(value: InsertSync) -> Self {
-        Insert::new(value.key(), value.value().clone())
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "Option<Vec<u8>>")]
-pub struct Get(pub Vec<u8>);
-impl Get {
-    pub fn new<K: IntoKey>(key: K) -> Self {
-        Self(key.into_key())
-    }
-
-    pub fn key(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "()")]
-pub struct Remove(pub Vec<u8>);
-impl Remove {
-    pub fn new<K: IntoKey>(key: K) -> Self {
-        Self(key.into_key())
-    }
-
-    pub fn key(&self) -> &Vec<u8> {
-        &self.0
-    }
-}
 
 #[derive(Clone, Debug)]
 pub enum StoreAddr {
@@ -87,13 +23,6 @@ pub enum StoreAddr {
 }
 
 impl StoreAddr {
-    pub fn to_data_store(&self) -> DataStore {
-        match self {
-            StoreAddr::InMem(s) => s.into(),
-            StoreAddr::Sled(s) => s.into(),
-        }
-    }
-
     pub fn to_maybe_in_mem(&self) -> Option<&Addr<InMemStore>> {
         match self {
             StoreAddr::InMem(ref store) => Some(store),
@@ -171,6 +100,31 @@ impl DataStore {
         &self.addr
     }
 
+    /// Get a reference to the Recipient<Get>
+    pub fn get_recipient(&self) -> &Recipient<Get> {
+        &self.get
+    }
+
+    /// Get a reference to the Recipient<Remove>
+    pub fn remove_recipient(&self) -> &Recipient<Remove> {
+        &self.remove
+    }
+
+    /// Get a reference to the Recipient<Insert>
+    pub fn insert_recipient(&self) -> &Recipient<Insert> {
+        &self.insert
+    }
+
+    /// Get a reference to the Recipient<InsertSync>
+    pub fn insert_sync_recipient(&self) -> &Recipient<InsertSync> {
+        &self.insert_sync
+    }
+
+    /// Get a clone of the scope bytes
+    pub fn scope_bytes(&self) -> &[u8] {
+        &self.scope
+    }
+
     /// Changes the scope for the data store.
     /// Note that if the scope does not start with a slash one is appended.
     /// ```
@@ -215,6 +169,57 @@ impl DataStore {
             insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope: key.into_key(),
+        }
+    }
+
+    pub fn from_sled_store_with_buffer(
+        addr: &Addr<SledStore>,
+        snapshot_buffer: impl Into<Recipient<Insert>>,
+    ) -> Self {
+        println!("from_sled_store_with_buffer...");
+        Self {
+            addr: StoreAddr::Sled(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: snapshot_buffer.into(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_in_mem_with_buffer(
+        addr: &Addr<InMemStore>,
+        snapshot_buffer: impl Into<Recipient<Insert>>,
+    ) -> Self {
+        Self {
+            addr: StoreAddr::InMem(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: snapshot_buffer.into(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_in_mem(addr: &Addr<InMemStore>) -> Self {
+        Self {
+            addr: StoreAddr::InMem(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+
+    pub fn from_sled_store(addr: &Addr<SledStore>) -> Self {
+        Self {
+            addr: StoreAddr::Sled(addr.clone()),
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
+            scope: vec![],
         }
     }
 }

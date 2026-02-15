@@ -13,14 +13,15 @@ mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
-use e3_ciphernode_builder::CiphernodeHandle;
+use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
 use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
-    EventPublisher, HistoryCollector, Seed, Subscribe,
+    EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
+use e3_fhe_params::BfvParamSet;
+use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_net::{DocumentPublisher, NetEventTranslator};
-use e3_sdk::bfv_helpers::{BfvParamSet, BfvParamSets};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
@@ -31,6 +32,7 @@ use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
+use tracing::trace;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
@@ -83,19 +85,22 @@ pub fn get_common_setup(
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
     let errors = HistoryCollector::<EnclaveEvent>::new().start();
     let history = HistoryCollector::<EnclaveEvent>::new().start();
-    bus.do_send(Subscribe::new("*", history.clone().recipient()));
-    bus.do_send(Subscribe::new("EnclaveError", errors.clone().recipient()));
+    bus.do_send(Subscribe::new(EventType::All, history.clone().recipient()));
+    bus.do_send(Subscribe::new(
+        EventType::EnclaveError,
+        errors.clone().recipient(),
+    ));
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let param_set = param_set.unwrap_or(BfvParamSets::InsecureSet2048_1032193_1.into());
+    let param_set = param_set.unwrap_or(DEFAULT_BFV_PRESET.into());
     let degree = param_set.degree;
     let plaintext_modulus = param_set.plaintext_modulus;
     let moduli = param_set.moduli;
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
-
-    Ok((bus.into(), rng, seed, params, crpoly, errors, history))
+    let handle = EventSystem::in_mem("cn1").with_event_bus(bus).handle()?;
+    Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 
 /// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
@@ -126,23 +131,19 @@ pub fn get_common_setup(
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
-        let source = node.bus().consumer();
+        let source = node.bus();
         for (_, node) in nodes.iter().enumerate() {
-            let dest = node.bus().consumer();
+            let dest = node.bus();
             if source != dest {
-                EventBus::pipe_filter(
-                    source,
-                    move |e: &EnclaveEvent| {
-                        // TODO: Document publisher events need to be
-                        // converted to DocumentReceived events
+                source.pipe_to(dest, |e: &EnclaveEvent| {
+                    // TODO: Document publisher events need to be
+                    // converted to DocumentReceived events
 
-                        NetEventTranslator::is_forwardable_event(e)
-                            || DocumentPublisher::is_document_publisher_event(e)
-                    },
-                    dest,
-                )
+                    NetEventTranslator::is_forwardable_event(e)
+                        || DocumentPublisher::is_document_publisher_event(e)
+                });
             } else {
-                println!("not piping bus to itself");
+                trace!("Source = Dest! Not piping bus to itself");
             }
         }
     }
@@ -182,7 +183,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.publish(evt.clone())?;
+        self.bus.publish_without_context(evt.clone())?;
 
         Ok(evt.into())
     }

@@ -21,8 +21,7 @@ export interface PollResult {
 
 export interface PollRequestResult {
   round_id: number
-  option_1_tally: number
-  option_2_tally: number
+  tally: number[]
   option_1_emoji: string
   option_2_emoji: string
   end_time: number

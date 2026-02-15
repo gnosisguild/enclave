@@ -21,14 +21,13 @@ import {
   updateSubmissionWindow,
 } from "./tasks/ciphernode";
 import {
-  activateE3,
   enableE3,
   publishCiphertext,
   publishCommittee,
-  publishInput,
   publishPlaintext,
   requestCommittee,
 } from "./tasks/enclave";
+import { publishInput } from "./tasks/program";
 import { cleanDeploymentsTask } from "./tasks/utils";
 
 dotenv.config();
@@ -97,9 +96,8 @@ const config: HardhatUserConfig = {
     requestCommittee,
     publishPlaintext,
     publishCiphertext,
-    publishInput,
-    activateE3,
     publishCommittee,
+    publishInput,
     enableE3,
     cleanDeploymentsTask,
     updateSubmissionWindow,
@@ -181,7 +179,7 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 800,
+            runs: 100,
           },
           metadata: {
             bytecodeHash: "none",

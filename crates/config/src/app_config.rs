@@ -15,7 +15,7 @@ use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use figment::{
-    providers::{Format, Serialized, Yaml},
+    providers::{Env, Format, Serialized, Yaml},
     Figment,
 };
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,8 @@ pub struct NodeDefinition {
     pub db_file: PathBuf,
     /// The name for the keyfile
     pub key_file: PathBuf,
+    /// The name for the logfile
+    pub log_file: PathBuf,
     /// The data dir for enclave defaults to `~/.local/share/enclave/{name}`
     pub data_dir: PathBuf,
     /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
@@ -80,6 +82,7 @@ impl Default for NodeDefinition {
             quic_port: 9091,
             key_file: PathBuf::from("key"), // ~/.config/enclave/key
             db_file: PathBuf::from("db"),   // ~/.config/enclave/db
+            log_file: PathBuf::from("log"), // ~/.config/enclave/log
             config_dir: std::path::PathBuf::new(), // ~/.config/enclave
             data_dir: std::path::PathBuf::new(), // ~/.config/enclave
             role: NodeRole::Ciphernode,
@@ -173,6 +176,27 @@ pub struct AppConfig {
     autowallet: bool,
     /// Program config
     program: ProgramConfig,
+    /// A custom bb implementation has been provided do not download and checksum a binary
+    using_custom_bb: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum BBPath {
+    Custom(PathBuf),
+    Default(PathBuf),
+}
+
+impl BBPath {
+    pub fn is_custom(&self) -> bool {
+        matches!(self, BBPath::Custom(_))
+    }
+
+    pub fn path(&self) -> PathBuf {
+        match self {
+            BBPath::Custom(p) => p.clone(),
+            BBPath::Default(p) => p.clone(),
+        }
+    }
 }
 
 impl AppConfig {
@@ -198,11 +222,11 @@ impl AppConfig {
 
         let node = node.clone();
 
-        let config_dir_override = (node.config_dir != std::path::PathBuf::new())
+        let config_dir_override = (node.config_dir != PathBuf::new())
             .then_some(&node.config_dir)
             .or_else(|| config.config_dir.as_ref());
 
-        let data_dir_override = (node.data_dir != std::path::PathBuf::new())
+        let data_dir_override = (node.data_dir != PathBuf::new())
             .then_some(&node.data_dir)
             .or_else(|| config.data_dir.as_ref());
 
@@ -216,6 +240,8 @@ impl AppConfig {
             data_dir_override,
             Some(&node.db_file),
             Some(&node.key_file),
+            Some(&node.log_file),
+            config.custom_bb.as_ref(),
         );
 
         Ok(AppConfig {
@@ -229,6 +255,7 @@ impl AppConfig {
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
+            using_custom_bb: config.custom_bb.is_some(),
         })
     }
 
@@ -245,6 +272,31 @@ impl AppConfig {
     /// Get the database file
     pub fn db_file(&self) -> PathBuf {
         self.paths.db_file()
+    }
+
+    /// Get the log file
+    pub fn log_file(&self) -> PathBuf {
+        self.paths.log_file()
+    }
+
+    /// Get the bb binary path
+    pub fn bb_binary(&self) -> BBPath {
+        let bb = self.paths.bb_binary();
+        if self.using_custom_bb {
+            BBPath::Custom(bb)
+        } else {
+            BBPath::Default(bb)
+        }
+    }
+
+    /// Get the circuits directory
+    pub fn circuits_dir(&self) -> PathBuf {
+        self.paths.circuits_dir()
+    }
+
+    /// Get the work directory for this node
+    pub fn work_dir(&self) -> PathBuf {
+        self.paths.work_dir(&self.name)
     }
 
     fn node_def(&self) -> &NodeDefinition {
@@ -365,6 +417,10 @@ pub struct UnscopedAppConfig {
     otel: Option<String>,
     /// Program config
     program: Option<ProgramConfig>,
+    /// Path to custom bb binary. When this is set the bb binary is used will not be checksummed it
+    /// is up to the node operator to ensure bb matches the version that exactly matches the
+    /// application.
+    custom_bb: Option<PathBuf>,
 }
 
 impl Default for UnscopedAppConfig {
@@ -378,6 +434,7 @@ impl Default for UnscopedAppConfig {
             otel: None,
             nodes: HashMap::new(),
             program: None,
+            custom_bb: None,
         }
     }
 }
@@ -441,6 +498,7 @@ pub fn load_config(
     let config: UnscopedAppConfig =
         Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
             .merge(Yaml::string(&loaded_yaml))
+            .merge(Env::prefixed("E3_"))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
@@ -568,7 +626,7 @@ nodes:
             let chain = config.chains().first().unwrap();
             assert_eq!(config.quic_port(), 1235);
             assert_eq!(
-                chain.contracts.ciphernode_registry.address(),
+                chain.contracts.ciphernode_registry.address_str(),
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
             assert_eq!(config.peers(), vec!["one", "two"]);
@@ -679,11 +737,11 @@ chains:
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
             assert_eq!(
-                chain.contracts.enclave.address(),
+                chain.contracts.enclave.address_str(),
                 "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
             );
             assert_eq!(
-                chain.contracts.ciphernode_registry.address(),
+                chain.contracts.ciphernode_registry.address_str(),
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
             assert_eq!(
@@ -794,7 +852,7 @@ chains:
                 }
             );
             assert_eq!(
-                chain.contracts.enclave.address(),
+                chain.contracts.enclave.address_str(),
                 "0x1234567890123456789012345678901234567890"
             );
 

@@ -16,6 +16,7 @@ base64 = { workspace = true }
 bincode = { workspace = true }
 clap = { workspace = true }
 e3-aggregator = { workspace = true }
+e3-config = { workspace = true }
 e3-crypto = { workspace = true }
 e3-ciphernode-builder = { workspace = true }
 e3-data = { workspace = true }
@@ -31,7 +32,10 @@ e3-sdk = { workspace = true }
 e3-sortition = { workspace = true }
 e3-test-helpers = { workspace = true }
 e3-trbfv = { workspace = true }
+e3-bfv-client = { workspace = true }
+e3-fhe-params = { workspace = true }
 e3-utils = { workspace = true }
+e3-zk-prover = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe = { workspace = true }
@@ -39,6 +43,7 @@ num-bigint = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 serial_test = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -46,3 +51,4 @@ zeroize = { workspace = true }
 
 [dev-dependencies]
 e3-events = { workspace = true, features = ["test-helpers"] }
+

@@ -66,7 +66,7 @@ pub(crate) struct ChainContext {
 impl ChainContext {
     pub(crate) async fn new(config: &AppConfig, selection: Option<&str>) -> Result<Self> {
         let chain = select_chain(config, selection)?;
-        let bonding_registry = parse_address(chain.contracts.bonding_registry.address())?;
+        let bonding_registry = parse_address(chain.contracts.bonding_registry.address_str())?;
 
         let rpc = chain.rpc_url()?;
         let cipher = Cipher::from_file(config.key_file()).await?;

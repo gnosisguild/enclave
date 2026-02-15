@@ -1,0 +1,33 @@
+[package]
+name = "e3-polynomial"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A polynomial library with big integer coefficients for cryptographic operations"
+repository = "https://github.com/gnosisguild/enclave/crates/polynomial"
+
+[dependencies]
+num-bigint = { workspace = true, features = ["rand", "serde"] }
+num-traits = { workspace = true }
+serde = { workspace = true, optional = true, features = ["rc"] }
+bincode = { workspace = true, optional = true }
+thiserror = { workspace = true }
+fhe-math = { workspace = true }
+ndarray = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.5"
+bincode = { workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde"]
+bincode = ["dep:bincode", "serde"]
+
+[[bench]]
+name = "polynomial"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

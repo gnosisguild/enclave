@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import express, { Request, Response } from 'express'
-import { EnclaveSDK, EnclaveEventType, type E3ActivatedData, FheProtocol } from '@enclave-e3/sdk'
+import { EnclaveSDK, RegistryEventType, CommitteePublishedData } from '@enclave-e3/sdk'
 import { Log, PublicClient } from 'viem'
 import { handleTestInteraction } from './testHandler'
 import { getCheckedEnvVars } from './utils'
@@ -40,7 +40,7 @@ async function createPrivateSDK() {
       feeToken: FEE_TOKEN_CONTRACT as `0x${string}`,
     },
     chainId: CHAIN_ID,
-    protocol: FheProtocol.BFV,
+    thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
   })
 
   await sdk.initialize()
@@ -116,26 +116,29 @@ function getActivationDefer(e3Id: bigint): Defer {
   return d
 }
 
-async function handleE3ActivatedEvent(event: any) {
-  const data = event.data as E3ActivatedData
+async function handleCommitteePublishedEvent(event: any) {
+  const data = event.data as CommitteePublishedData
   const e3Id = data.e3Id
-  const expiration = data.expiration
 
-  // This allows us to wait until the session has been activated avoiding race conditions
   const def = getActivationDefer(e3Id)
 
-  console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`)
+  const sdk = await createPrivateSDK()
+  const publicClient = sdk.getPublicClient()
 
-  const sessionKey = e3Id.toString()
+  console.log('📡 Fetching E3 data from contract...')
+  const e3 = await sdk.getE3(e3Id)
 
-  if (!e3Sessions.has(sessionKey)) {
-    const sdk = await createPrivateSDK()
-    console.log('📡 Fetching E3 data from contract...')
+  console.log('✅ Received E3 data from contract.')
 
-    const e3 = await sdk.getE3(e3Id)
-    console.log('✅ Received E3 data from contract.')
+  const expiration = e3.inputWindow[1]
 
-    e3Sessions.set(sessionKey, {
+  console.log(`🎯 Committee Published for: ${e3Id}, expiration: ${expiration}`)
+
+  console.log(`📥 Setting up session for E3 ${e3Id}...`)
+  console.log(e3Sessions)
+
+  if (!e3Sessions.has(e3Id.toString())) {
+    e3Sessions.set(e3Id.toString(), {
       e3Id,
       e3ProgramParams: e3.e3ProgramParams,
       expiration,
@@ -143,10 +146,11 @@ async function handleE3ActivatedEvent(event: any) {
       isProcessing: false,
       isCompleted: false,
     })
+
     def.resolve()
   }
 
-  const currentTime = BigInt(Math.floor(Date.now() / 1000))
+  const currentTime = (await publicClient.getBlock()).timestamp
   const sleepSeconds = expiration > currentTime ? Number(expiration - currentTime) : 0
 
   if (sleepSeconds > 0) {
@@ -210,7 +214,9 @@ async function setupEventListeners() {
 
   console.log('📡 Setting up event listeners...')
 
-  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent)
+  // we need to listen to CommitteePublished to know when an E3 is ready
+  sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublishedEvent)
+
   await listenToInputPublishedEvents(sdk.getPublicClient(), PROGRAM_ADDRESS as `0x${string}`, 0n)
 
   console.log('✅ Event listeners set up successfully')

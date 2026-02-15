@@ -4,19 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::event_reader::EvmEventReaderState;
-use crate::helpers::EthProvider;
-use crate::{EnclaveEvmEvent, EvmEventReader};
-use actix::{Addr, Recipient};
+use crate::events::EvmEventProcessor;
+use crate::evm_parser::EvmParser;
+use actix::{Actor, Addr};
 use alloy::primitives::{LogData, B256};
-use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
-use anyhow::Result;
-use e3_data::Repository;
-use e3_events::{BusHandle, E3id, EnclaveEventData};
-use e3_utils::utility_types::ArcBytes;
+use e3_events::E3id;
+use e3_events::EnclaveEventData;
+use e3_events::{E3Failed, E3Stage, E3StageChanged, FailureReason};
+use e3_fhe_params::decode_bfv_params_arc;
+use e3_trbfv::helpers::calculate_error_size;
+use e3_utils::ArcBytes;
 use num_bigint::BigUint;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 sol!(
     #[sol(rpc)]
@@ -28,17 +28,51 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
+        let params_bytes = value.0.e3.e3ProgramParams.to_vec();
+        let threshold_m = value.0.e3.threshold[0] as usize;
+        let threshold_n = value.0.e3.threshold[1] as usize;
+        let params_arc = decode_bfv_params_arc(&params_bytes).expect("Failed to decode BFV params");
+
+        // TODO: These should be delivered from the e3_program contract
+        // For now, using defaults that match the test configuration:
+        // - lambda = 2 (INSECURE, for testing only. Production should use lambda = 80)
+        // - esi_per_ct = 3 (number of ciphertexts per encryption slot)
+        let lambda = 2;
+        let esi_per_ct = 3;
+
+        let error_size = match calculate_error_size(
+            params_arc.clone(),
+            threshold_n,
+            threshold_m,
+            lambda,
+        ) {
+            Ok(size) => {
+                let size_bytes = size.to_bytes_be();
+                info!(
+                    "Calculated error_size for E3 (threshold_n={}, threshold_m={}, lambda={}): {} bytes",
+                    threshold_n, threshold_m, lambda, size_bytes.len()
+                );
+                ArcBytes::from_bytes(&size_bytes)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to calculate error_size, using fallback: {}. \
+                    This may cause decryption failures!",
+                    e
+                );
+                ArcBytes::from_bytes(
+                    &BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
+                )
+            }
+        };
+
         e3_events::E3Requested {
-            params: ArcBytes::from_bytes(&value.0.e3.e3ProgramParams.to_vec()),
-            threshold_m: value.0.e3.threshold[0] as usize,
-            threshold_n: value.0.e3.threshold[1] as usize,
+            params: ArcBytes::from_bytes(&params_bytes),
+            threshold_m,
+            threshold_n,
             seed: value.0.e3.seed.into(),
-            // TODO: this should be delivered from the e3_program. Here we provide a sensible
-            // default that passes our tests
-            error_size: ArcBytes::from_bytes(
-                &BigUint::from(36128399948547143872891754381312u128).to_bytes_be(),
-            ),
-            esi_per_ct: 3, // TODO: this should be delivered from the e3_program
+            error_size,
+            esi_per_ct,
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
         }
     }
@@ -71,6 +105,77 @@ impl From<CiphertextOutputPublishedWithChainId> for EnclaveEventData {
     }
 }
 
+struct E3FailedWithChainId(pub IEnclave::E3Failed, pub u64);
+
+fn convert_u8_to_e3_stage(stage_u8: u8) -> E3Stage {
+    match stage_u8 {
+        0 => E3Stage::None,
+        1 => E3Stage::Requested,
+        2 => E3Stage::CommitteeFinalized,
+        3 => E3Stage::KeyPublished,
+        4 => E3Stage::CiphertextReady,
+        5 => E3Stage::Complete,
+        6 => E3Stage::Failed,
+        _ => E3Stage::None,
+    }
+}
+
+// Helper function to convert u8 to Rust FailureReason
+fn convert_u8_to_failure_reason(reason_u8: u8) -> FailureReason {
+    match reason_u8 {
+        0 => FailureReason::None,
+        1 => FailureReason::CommitteeFormationTimeout,
+        2 => FailureReason::InsufficientCommitteeMembers,
+        3 => FailureReason::DKGTimeout,
+        4 => FailureReason::DKGInvalidShares,
+        5 => FailureReason::NoInputsReceived,
+        6 => FailureReason::ComputeTimeout,
+        7 => FailureReason::ComputeProviderExpired,
+        8 => FailureReason::ComputeProviderFailed,
+        9 => FailureReason::RequesterCancelled,
+        10 => FailureReason::DecryptionTimeout,
+        11 => FailureReason::DecryptionInvalidShares,
+        12 => FailureReason::VerificationFailed,
+        _ => FailureReason::None,
+    }
+}
+
+impl From<E3FailedWithChainId> for E3Failed {
+    fn from(value: E3FailedWithChainId) -> Self {
+        E3Failed {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            failed_at_stage: convert_u8_to_e3_stage(value.0.failedAtStage),
+            reason: convert_u8_to_failure_reason(value.0.reason),
+        }
+    }
+}
+
+impl From<E3FailedWithChainId> for EnclaveEventData {
+    fn from(value: E3FailedWithChainId) -> Self {
+        let payload: E3Failed = value.into();
+        payload.into()
+    }
+}
+
+struct E3StageChangedWithChainId(pub IEnclave::E3StageChanged, pub u64);
+
+impl From<E3StageChangedWithChainId> for E3StageChanged {
+    fn from(value: E3StageChangedWithChainId) -> Self {
+        E3StageChanged {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            previous_stage: convert_u8_to_e3_stage(value.0.previousStage),
+            new_stage: convert_u8_to_e3_stage(value.0.newStage),
+        }
+    }
+}
+
+impl From<E3StageChangedWithChainId> for EnclaveEventData {
+    fn from(value: E3StageChangedWithChainId) -> Self {
+        let payload: E3StageChanged = value.into();
+        payload.into()
+    }
+}
+
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
@@ -91,6 +196,32 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 CiphertextOutputPublishedWithChainId(event, chain_id),
             ))
         }
+        Some(&IEnclave::E3Failed::SIGNATURE_HASH) => {
+            let Ok(event) = IEnclave::E3Failed::decode_log_data(data) else {
+                error!("Error parsing event E3Failed after topic matched!");
+                return None;
+            };
+            info!(
+                "E3Failed event received: e3_id={}, stage={:?}, reason={:?}",
+                event.e3Id, event.failedAtStage, event.reason
+            );
+            Some(EnclaveEventData::from(E3FailedWithChainId(event, chain_id)))
+        }
+        Some(&IEnclave::E3StageChanged::SIGNATURE_HASH) => {
+            let Ok(event) = IEnclave::E3StageChanged::decode_log_data(data) else {
+                error!("Error parsing event E3StageChanged after topic matched!");
+                return None;
+            };
+            trace!(
+                "E3StageChanged event received: e3_id={}, {:?} -> {:?}",
+                event.e3Id,
+                event.previousStage,
+                event.newStage
+            );
+            Some(EnclaveEventData::from(E3StageChangedWithChainId(
+                event, chain_id,
+            )))
+        }
         _topic => {
             trace!(
                 topic=?_topic,
@@ -105,32 +236,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub async fn attach<P>(
-        processor: &Recipient<EnclaveEvmEvent>,
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: &str,
-        repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>,
-        rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<P>>>
-    where
-        P: Provider + Clone + 'static,
-    {
-        let addr = EvmEventReader::attach(
-            provider,
-            extractor,
-            contract_address,
-            start_block,
-            processor,
-            bus,
-            repository,
-            rpc_url,
-        )
-        .await?;
-
-        info!(address=%contract_address, "EnclaveSolReader is listening to address");
-
-        Ok(addr)
+    pub fn setup(next: &EvmEventProcessor) -> Addr<EvmParser> {
+        EvmParser::new(next, extractor).start()
     }
 }

@@ -11,11 +11,7 @@ use e3_entrypoint::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
-pub async fn execute(
-    mut config: AppConfig,
-    peers: Vec<String>,
-    experimental_trbfv: bool,
-) -> Result<()> {
+pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
 
     let Some(address) = config.address() else {
@@ -25,7 +21,7 @@ pub async fn execute(
     // add cli peers to the config
     config.add_peers(peers);
 
-    let (bus, handle, peer_id) = match config.role() {
+    let node = match config.role() {
         // Launch in aggregator configuration
         NodeRole::Aggregator {
             pubkey_write_path,
@@ -33,27 +29,25 @@ pub async fn execute(
         } => {
             e3_entrypoint::start::aggregator_start::execute(
                 &config,
+                address,
                 pubkey_write_path,
                 plaintext_write_path,
-                experimental_trbfv,
             )
             .await?
         }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => {
-            e3_entrypoint::start::start::execute(&config, address, experimental_trbfv).await?
-        }
+        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config, address).await?,
     };
 
     info!(
         "LAUNCHING CIPHERNODE: ({}/{}/{})",
         config.name(),
         address,
-        peer_id
+        node.peer_id
     );
 
-    tokio::spawn(listen_for_shutdown(bus, handle)).await?;
+    tokio::spawn(listen_for_shutdown(node)).await?;
 
     Ok(())
 }

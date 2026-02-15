@@ -170,7 +170,7 @@ class VersionBumper {
       // Run prettier from root before committing to avoid hook failures
       console.log('   Running prettier from root...')
       try {
-        execSync('pnpm prettier --write .', {
+        execSync('pnpm format', {
           cwd: this.rootDir,
           stdio: 'pipe',
         })
@@ -280,27 +280,20 @@ class VersionBumper {
     console.log('\n📝 Generating changelog...')
 
     try {
-      execSync('pnpm conventional-changelog --help', {
+      execSync('pnpm auto-changelog --help', {
         stdio: 'ignore',
         cwd: this.rootDir,
       })
 
-      const changelogPath = join(this.rootDir, 'CHANGELOG.md')
-
-      if (!existsSync(changelogPath)) {
-        // First time - generate entire changelog
-        console.log('   Generating full changelog from git history...')
-        execSync('npx conventional-changelog -p angular -i CHANGELOG.md -s -r 0', {
+      console.log('\n📝 Generating changelog...')
+      try {
+        execSync('pnpm auto-changelog -o CHANGELOG.md --commit-limit false --tag-prefix v', {
           cwd: this.rootDir,
           stdio: 'inherit',
         })
-      } else {
-        // Update existing changelog with changes since last release
-        console.log('   Updating changelog with new changes...')
-        execSync('npx conventional-changelog -p angular -i CHANGELOG.md -s', {
-          cwd: this.rootDir,
-          stdio: 'inherit',
-        })
+        console.log('   ✓ Changelog generated successfully')
+      } catch (error) {
+        console.warn('   ⚠️  Could not generate changelog:', error)
       }
 
       console.log('   ✓ Changelog generated successfully')
@@ -320,6 +313,14 @@ class VersionBumper {
     try {
       execSync('cargo update --workspace', {
         cwd: this.rootDir,
+        stdio: 'pipe',
+      })
+      execSync('cargo update', {
+        cwd: `${this.rootDir}/examples/CRISP`,
+        stdio: 'pipe',
+      })
+      execSync('cargo update', {
+        cwd: `${this.rootDir}/templates/default`,
         stdio: 'pipe',
       })
       console.log('   ✓ Cargo.lock updated')

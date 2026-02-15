@@ -17,12 +17,14 @@ interface IE3Program {
     /// @param seed Random seed for the computation
     /// @param e3ProgramParams ABI encoded E3 program parameters
     /// @param computeProviderParams ABI encoded compute provider parameters
+    /// @param customParams ABI encoded custom parameters for the E3 program
     /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation
     function validate(
         uint256 e3Id,
         uint256 seed,
         bytes calldata e3ProgramParams,
-        bytes calldata computeProviderParams
+        bytes calldata computeProviderParams,
+        bytes calldata customParams
     ) external returns (bytes32 encryptionSchemeId);
 
     /// @notice Verify the ciphertext output of an E3 computation
@@ -38,13 +40,9 @@ interface IE3Program {
     ) external returns (bool success);
 
     /// @notice Validate and process input data for a computation
-    /// @dev This function is called by the Enclave contract when input is published
+    /// @dev This function is called by data providers when they want to submit their
+    /// encrypted data
     /// @param e3Id ID of the E3 computation
-    /// @param sender The account that is submitting the input
     /// @param data The input data to be validated
-    function validateInput(
-        uint256 e3Id,
-        address sender,
-        bytes memory data
-    ) external;
+    function publishInput(uint256 e3Id, bytes memory data) external;
 }

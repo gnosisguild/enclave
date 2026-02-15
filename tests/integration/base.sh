@@ -7,6 +7,7 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Source the file from the same directory
 source "$THIS_DIR/fns.sh"
+source "$THIS_DIR/lib/utils.sh"
 
 heading "Start the EVM node"
 
@@ -26,6 +27,9 @@ enclave_wallet_set cn2 "$PRIVATE_KEY_CN2"
 enclave_wallet_set cn3 "$PRIVATE_KEY_CN3"
 enclave_wallet_set cn4 "$PRIVATE_KEY_CN4"
 enclave_wallet_set cn5 "$PRIVATE_KEY_CN5"
+
+heading "Setup ZK prover"
+$ENCLAVE_BIN noir setup
 
 # start swarm
 enclave_nodes_up
@@ -54,38 +58,34 @@ pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_5 --network localho
 heading "Request Committee"
 
 ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh \
-  --moduli 0x800000022a0001 \
-  --moduli 0x800000021a0001 \
-  --moduli 0x80000002120001 \
-  --moduli 0x80000001f60001 \
-  --degree 8192 \
-  --plaintext-modulus 1032193)
+  --moduli 0xffffee001 \
+  --moduli 0xffffc4001 \
+  --degree 512 \
+  --plaintext-modulus 100)
 
 sleep 4
 
+CURRENT_TIMESTAMP=$(get_evm_timestamp)
+INPUT_WINDOW_START=$((CURRENT_TIMESTAMP + 20))
+INPUT_WINDOW_END=$((CURRENT_TIMESTAMP + 30))
+
 pnpm committee:new \
   --network localhost \
-  --duration 4 \
+  --input-window-start "$INPUT_WINDOW_START" \
+  --input-window-end "$INPUT_WINDOW_END" \
   --e3-params "$ENCODED_PARAMS" \
   --threshold-quorum 2 \
   --threshold-total 5
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 
-PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
-
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT --params "$ENCODED_PARAMS"
 
-heading "Mock activate e3-id"
-PUBLIC_KEY_FILE=/tmp/enclave-public-key.txt
-echo "0x${PUBLIC_KEY}" > $PUBLIC_KEY_FILE
-pnpm -s e3:activate --e3-id 0 --network localhost --public-key-file $PUBLIC_KEY_FILE
-
 heading "Mock publish input e3-id"
-pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
+pnpm e3-program:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-sleep 4 # wait for input deadline to pass
+sleep 4 
 
 waiton "$SCRIPT_DIR/output/output.bin"
 

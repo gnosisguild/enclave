@@ -4,4 +4,4 @@ set -euo pipefail
 
 echo "CLIENT SCRIPT RUNNING..."
 
-(cd ./client && pnpm dev-static)
+(cd ./client && if [[ ! -f .env ]]; then cp .env.example .env; fi && pnpm dev-static)

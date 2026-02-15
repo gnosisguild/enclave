@@ -6,9 +6,9 @@
 
 use crate::backends::SortitionBackend;
 use crate::sortition::NodeStateStore;
-use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
-use e3_events::E3id;
+use e3_events::{E3id, StoreKeys};
+use e3_request::E3Meta;
 use std::collections::HashMap;
 
 pub trait SortitionRepositoryFactory {
@@ -18,6 +18,16 @@ pub trait SortitionRepositoryFactory {
 impl SortitionRepositoryFactory for Repositories {
     fn sortition(&self) -> Repository<HashMap<u64, SortitionBackend>> {
         Repository::new(self.store.scope(StoreKeys::sortition()))
+    }
+}
+
+pub trait CiphernodeSelectorFactory {
+    fn ciphernode_selector(&self) -> Repository<HashMap<E3id, E3Meta>>;
+}
+
+impl CiphernodeSelectorFactory for Repositories {
+    fn ciphernode_selector(&self) -> Repository<HashMap<E3id, E3Meta>> {
+        Repository::new(self.store.scope(StoreKeys::ciphernode_selector()))
     }
 }
 

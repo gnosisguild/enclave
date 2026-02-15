@@ -50,14 +50,9 @@ export interface SDKConfig {
   chainId?: number
 
   /**
-   * The protocol to use for the Enclave requests
+   * The threshold BFV parameters preset name to use for the Enclave requests
    */
-  protocol: FheProtocol
-
-  /**
-   * The protocol parameters to use for the Enclave requests
-   */
-  protocolParams?: ProtocolParams
+  thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
 }
 
 export interface EventListenerConfig {
@@ -77,7 +72,6 @@ export interface ContractInstances {
 export enum EnclaveEventType {
   // E3 Lifecycle Events
   E3_REQUESTED = 'E3Requested',
-  E3_ACTIVATED = 'E3Activated',
   CIPHERTEXT_OUTPUT_PUBLISHED = 'CiphertextOutputPublished',
   PLAINTEXT_OUTPUT_PUBLISHED = 'PlaintextOutputPublished',
 
@@ -121,9 +115,7 @@ export interface E3 {
   seed: bigint
   threshold: readonly [number, number]
   requestBlock: bigint
-  startWindow: readonly [bigint, bigint]
-  duration: bigint
-  expiration: bigint
+  inputWindow: readonly [bigint, bigint]
   encryptionSchemeId: string
   e3Program: string
   e3ProgramParams: string
@@ -175,11 +167,12 @@ export interface CommitteeRequestedData {
   seed: bigint
   threshold: [bigint, bigint]
   requestBlock: bigint
-  submissionDeadline: bigint
+  committeeDeadline: bigint
 }
 
 export interface CommitteePublishedData {
   e3Id: bigint
+  nodes: string[]
   publicKey: string
 }
 
@@ -191,7 +184,6 @@ export interface CommitteeFinalizedData {
 // Event data mapping
 export interface EnclaveEventData {
   [EnclaveEventType.E3_REQUESTED]: E3RequestedData
-  [EnclaveEventType.E3_ACTIVATED]: E3ActivatedData
   [EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED]: CiphertextOutputPublishedData
   [EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED]: PlaintextOutputPublishedData
   [EnclaveEventType.E3_PROGRAM_ENABLED]: { e3Program: string }
@@ -262,27 +254,14 @@ export interface VerifiableEncryptionResult {
 }
 
 /**
- * The protocol to use for the Enclave requests
- */
-export enum FheProtocol {
-  /**
-   * The BFV protocol
-   */
-  BFV = 'BFV',
-  /**
-   * The TrBFV protocol
-   */
-  TRBFV = 'TRBFV',
-}
-
-/**
- * Protocol parameters for an Enclave program request
+ * BFV parameters for an Enclave program request
  * Example for BFV
- *   2048,               // degree
- *   1032193,            // plaintext_modulus
- *   0x3FFFFFFF000001,   // moduli
+ *   512,           // degree
+ *   10,            // plaintext_modulus
+ *   0xffffee001,   // moduli
+ *   0xffffc4001,   // moduli
  */
-export interface ProtocolParams {
+export interface BfvParams {
   /**
    * The degree of the polynomial
    */
@@ -301,43 +280,12 @@ export interface ProtocolParams {
   error1Variance: string | undefined
 }
 
-export type ProtocolParamsName =
-  | 'INSECURE_SET_2048_1032193_1'
-  | 'INSECURE_SET_512_10_1'
-  | 'INSECURE_SET_512_0XFFFFEE001_1'
-  | 'SET_8192_1000_4'
-  | 'SET_8192_144115188075855872_2'
+export type ThresholdBfvParamsPresetName = 'INSECURE_THRESHOLD_512' | 'SECURE_THRESHOLD_8192'
 
-/**
- * Parameters for the BFV protocol
- */
-export const BfvProtocolParams = {
-  /**
-   * Recommended parameters for BFV protocol
-   * - Degree: 2048
-   * - Plaintext modulus: 1032193
-   * - Moduli:0x3FFFFFFF000001
-   */
-  BFV_NORMAL: {
-    degree: 2048,
-    plaintextModulus: 1032193n,
-    moduli: [0x3fffffff000001n],
-    error1Variance: '10',
-  } as const satisfies ProtocolParams,
-
-  /**
-   * Recommended parameters for TrBFV protocol
-   * - Degree: 8192
-   * - Plaintext modulus: 1000
-   * - Moduli: [0x00800000022a0001, 0x00800000021a0001, 0x0080000002120001, 0x0080000001f60001]
-   */
-  BFV_THRESHOLD: {
-    degree: 8192,
-    plaintextModulus: 1000n,
-    moduli: [0x00800000022a0001n, 0x00800000021a0001n, 0x0080000002120001n, 0x0080000001f60001n],
-    error1Variance: '10',
-  } as const satisfies ProtocolParams,
-}
+export const ThresholdBfvParamsPresetNames = [
+  'INSECURE_THRESHOLD_512',
+  'SECURE_THRESHOLD_8192',
+] as const satisfies ReadonlyArray<ThresholdBfvParamsPresetName>
 
 /**
  * The result of encrypting a value and generating a proof
@@ -351,5 +299,5 @@ export interface EncryptedValueAndPublicInputs {
   /**
    * The public inputs for the proof
    */
-  publicInputs: CircuitInputs
+  circuitInputs: CircuitInputs
 }

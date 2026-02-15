@@ -531,6 +531,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "numActiveOperators",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -877,5 +890,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IBondingRegistry.sol",
-  "buildInfoId": "solc-0_8_28-15da934c0854938352efc3fea207d9956917d5c6"
+  "buildInfoId": "solc-0_8_28-d7b7e823e5eb177cd42a96206dc5c5f8387609a9"
 }

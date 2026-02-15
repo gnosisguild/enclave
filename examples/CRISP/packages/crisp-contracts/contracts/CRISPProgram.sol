@@ -10,11 +10,19 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IE3Program } from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import { IEnclave } from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import { E3 } from "@enclave-e3/contracts/contracts/interfaces/IE3.sol";
-import { LazyIMTData, InternalLazyIMT, PoseidonT3 } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
+import { LazyIMTData, InternalLazyIMT } from "@zk-kit/lazy-imt.sol/InternalLazyIMT.sol";
 import { HonkVerifier } from "./CRISPVerifier.sol";
 
 contract CRISPProgram is IE3Program, Ownable {
   using InternalLazyIMT for LazyIMTData;
+
+  /// @notice Enum to represent credit modes
+  enum CreditMode {
+    /// @notice Everyone has constant credits
+    CONSTANT,
+    /// @notice Credits are custom (can be based on token balance, etc)
+    CUSTOM
+  }
 
   /// @notice Struct to store all data related to a voting round
   struct RoundData {
@@ -22,6 +30,8 @@ contract CRISPProgram is IE3Program, Ownable {
     bytes32 paramsHash;
     mapping(address slot => uint40 index) voteSlots;
     LazyIMTData votes;
+    uint256 numOptions;
+    CreditMode creditMode;
   }
 
   // Constants
@@ -29,8 +39,8 @@ contract CRISPProgram is IE3Program, Ownable {
   bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
   /// @notice The depth of the input Merkle tree.
   uint8 public constant TREE_DEPTH = 20;
-  /// @notice Half of the largest minimum degree used to fit votes inside the plaintext polynomial.
-  uint256 public constant HALF_LARGEST_MINIMUM_DEGREE = 28; // static, hardcoded in the circuit.
+  /// @notice Maximum number of bits allocated for vote counts in the plaintext output per option.
+  uint256 constant MAX_VOTE_BITS = 50;
 
   // State variables
   IEnclave public enclave;
@@ -39,13 +49,11 @@ contract CRISPProgram is IE3Program, Ownable {
   HonkVerifier private immutable honkVerifier;
 
   // Mappings
-  mapping(address => bool) public authorizedContracts;
   mapping(uint256 e3Id => RoundData) e3Data;
 
   // Errors
   error CallerNotAuthorized();
   error E3AlreadyInitialized();
-  error E3DoesNotExist();
   error EnclaveAddressZero();
   error Risc0VerifierAddressZero();
   error InvalidHonkVerifier();
@@ -53,9 +61,16 @@ contract CRISPProgram is IE3Program, Ownable {
   error InvalidNoirProof();
   error InvalidMerkleRoot();
   error MerkleRootAlreadySet();
+  error InvalidTallyLength();
+  error SlotIsEmpty();
+  error MerkleRootNotSet();
+  error InvalidNumOptions();
+  error InputDeadlinePassed(uint256 e3Id, uint256 deadline);
+  error KeyNotPublished(uint256 e3Id);
+  error E3NotAcceptingInputs(uint256 e3Id);
 
   // Events
-  event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+  event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
 
   /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
   /// @param _enclave The enclave address
@@ -70,7 +85,6 @@ contract CRISPProgram is IE3Program, Ownable {
     enclave = _enclave;
     risc0Verifier = _risc0Verifier;
     honkVerifier = _honkVerifier;
-    authorizedContracts[address(_enclave)] = true;
     imageId = _imageId;
   }
 
@@ -105,9 +119,24 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validate(uint256 e3Id, uint256, bytes calldata e3ProgramParams, bytes calldata) external returns (bytes32) {
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+  function validate(
+    uint256 e3Id,
+    uint256,
+    bytes calldata e3ProgramParams,
+    bytes calldata,
+    bytes calldata customParams
+  ) external returns (bytes32) {
+    if (msg.sender != address(enclave) && msg.sender != owner()) revert CallerNotAuthorized();
     if (e3Data[e3Id].paramsHash != bytes32(0)) revert E3AlreadyInitialized();
+
+    // decode custom params to get the number of options
+    (, , uint256 numOptions, CreditMode creditMode, ) = abi.decode(customParams, (address, uint256, uint256, CreditMode, uint256));
+    if (numOptions < 2) revert InvalidNumOptions();
+
+    // we need to know the number of options for decoding the tally
+    e3Data[e3Id].numOptions = numOptions;
+    // we want to save the credit mode so it can be verified on chain by everyone
+    e3Data[e3Id].creditMode = creditMode;
 
     e3Data[e3Id].paramsHash = keccak256(e3ProgramParams);
 
@@ -118,85 +147,122 @@ contract CRISPProgram is IE3Program, Ownable {
   }
 
   /// @inheritdoc IE3Program
-  function validateInput(uint256 e3Id, address, bytes memory data) external {
-    // it should only be called via Enclave for now
-    if (!authorizedContracts[msg.sender] && msg.sender != owner()) revert CallerNotAuthorized();
+  function publishInput(uint256 e3Id, bytes memory data) external {
+    E3 memory e3 = enclave.getE3(e3Id);
+
+    // check that we are in the correct stage
+    IEnclave.E3Stage stage = enclave.getE3Stage(e3Id);
+    if (stage != IEnclave.E3Stage.KeyPublished) {
+      revert KeyNotPublished(e3Id);
+    }
+
+    // check that we are not past the input deadline
+    if (block.timestamp > e3.inputWindow[1]) {
+      revert InputDeadlinePassed(e3Id, e3.inputWindow[1]);
+    }
+
+    // check that we are within the input window
+    if (block.timestamp < e3.inputWindow[0]) {
+      revert E3NotAcceptingInputs(e3Id);
+    }
 
     // We need to ensure that the CRISP admin set the merkle root of the census.
-    // TODO: Uncomment this when we make the merkle root a public input of the circuit.
-    // if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
+    if (e3Data[e3Id].merkleRoot == 0) revert MerkleRootNotSet();
 
     if (data.length == 0) revert EmptyInputData();
 
-    (bytes memory noirProof, bytes32[] memory vote, address slotAddress) = abi.decode(data, (bytes, bytes32[], address));
+    (bytes memory noirProof, address slotAddress, bytes32 encryptedVoteCommitment, bytes memory encryptedVote) = abi.decode(
+      data,
+      (bytes, address, bytes32, bytes)
+    );
 
-    bytes memory voteBytes = abi.encode(vote);
+    (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) = _processVote(e3Id, slotAddress, encryptedVoteCommitment);
 
-    (uint40 voteIndex, bool isFirstVote) = _processVote(e3Id, slotAddress, voteBytes);
-
-    // Set public inputs for the proof. Order must match Noir circuit.
-    bytes32[] memory noirPublicInputs = new bytes32[](2 + vote.length);
-
-    noirPublicInputs[0] = bytes32(uint256(uint160(slotAddress)));
-    noirPublicInputs[1] = bytes32(uint256(isFirstVote ? 1 : 0));
-    for (uint256 i = 0; i < vote.length; i++) {
-      noirPublicInputs[i + 2] = vote[i];
-    }
+    // Set the public inputs for the proof. Order must match Noir circuit.
+    bytes32[] memory noirPublicInputs = new bytes32[](7);
+    noirPublicInputs[0] = previousEncryptedVoteCommitment;
+    noirPublicInputs[1] = e3.committeePublicKey;
+    noirPublicInputs[2] = bytes32(e3Data[e3Id].merkleRoot);
+    noirPublicInputs[3] = bytes32(uint256(uint160(slotAddress)));
+    noirPublicInputs[4] = bytes32(uint256(previousEncryptedVoteCommitment == bytes32(0) ? 1 : 0));
+    noirPublicInputs[5] = bytes32(e3Data[e3Id].numOptions);
+    noirPublicInputs[6] = encryptedVoteCommitment;
 
     // Check if the ciphertext was encrypted correctly
     if (!honkVerifier.verify(noirProof, noirPublicInputs)) {
       revert InvalidNoirProof();
     }
 
-    emit InputPublished(e3Id, voteBytes, voteIndex);
+    emit InputPublished(e3Id, encryptedVote, voteIndex);
   }
 
   /// @notice Decode the tally from the plaintext output
   /// @param e3Id The E3 program ID
-  /// @return yes The number of yes votes
-  /// @return no The number of no votes
-  function decodeTally(uint256 e3Id) public view returns (uint256 yes, uint256 no) {
-    // fetch from enclave
+  /// @return votes - an array of vote counts for each option
+  function decodeTally(uint256 e3Id) public view returns (uint256[] memory votes) {
     E3 memory e3 = enclave.getE3(e3Id);
 
-    // abi decode it into an array of uint256
-    uint256[] memory tally = abi.decode(e3.plaintextOutput, (uint256[]));
+    uint256 numOptions = e3Data[e3Id].numOptions;
 
-    /// @notice We want to completely ignore anything outside of the coefficients
-    /// we agreed to store out votes on.
-    uint256 halfD = tally.length / 2;
-    uint256 START_INDEX_Y = halfD - HALF_LARGEST_MINIMUM_DEGREE;
-    uint256 START_INDEX_N = tally.length - HALF_LARGEST_MINIMUM_DEGREE;
-
-    // first weight (we are converting back from bits to integer)
-    uint256 weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
-
-    // Convert yes votes
-    for (uint256 i = START_INDEX_Y; i < halfD; i++) {
-      yes += tally[i] * weight;
-      weight /= 2; // Right shift equivalent
+    // If num optionsis not configured, return empty array to avoid decoding errors.
+    // Users might be calling this function too early and there's no
+    if (numOptions == 0) {
+      return new uint256[](0);
     }
 
-    // Reset weight for no votes
-    weight = 2 ** (HALF_LARGEST_MINIMUM_DEGREE - 1);
+    uint64[] memory tally = _decodeBytesToUint64Array(e3.plaintextOutput);
 
-    // Convert no votes
-    for (uint256 i = START_INDEX_N; i < tally.length; i++) {
-      no += tally[i] * weight;
-      weight /= 2;
+    uint256 segmentSize = tally.length / numOptions;
+    uint256 effectiveSize = segmentSize > MAX_VOTE_BITS ? MAX_VOTE_BITS : segmentSize;
+
+    votes = new uint256[](numOptions);
+
+    for (uint256 optIdx = 0; optIdx < numOptions; optIdx++) {
+      uint256 segmentStart = optIdx * segmentSize;
+      // Read only the last effectiveSize bits (where the value is, MSB first)
+      uint256 readStart = segmentStart + segmentSize - effectiveSize;
+      uint256 value = 0;
+
+      for (uint256 i = 0; i < effectiveSize; i++) {
+        uint256 weight = 2 ** (effectiveSize - 1 - i);
+        value += uint256(tally[readStart + i]) * weight;
+      }
+
+      votes[optIdx] = value;
     }
 
-    return (yes, no);
+    return votes;
+  }
+
+  /// @notice Get the slot index for a given E3 ID and slot address
+  /// @param e3Id The E3 program ID
+  /// @param slotAddress The slot address
+  /// @return The slot index
+  function getSlotIndex(uint256 e3Id, address slotAddress) external view returns (uint40) {
+    uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
+    if (storedIndexPlusOne == 0) {
+      revert SlotIsEmpty();
+    }
+    return storedIndexPlusOne - 1;
+  }
+
+  /// @notice Check if a slot is empty for a given E3 ID and slot address
+  /// @param e3Id The E3 program ID
+  /// @param slotAddress The slot address
+  /// @return Whether the slot is empty or not
+  function isSlotEmptyByAddress(uint256 e3Id, address slotAddress) external view returns (bool) {
+    return e3Data[e3Id].voteSlots[slotAddress] == 0;
   }
 
   /// @inheritdoc IE3Program
   function verify(uint256 e3Id, bytes32 ciphertextOutputHash, bytes memory proof) external view override returns (bool) {
-    if (e3Data[e3Id].paramsHash == bytes32(0)) revert E3DoesNotExist();
+    bytes32 paramsHash = getParamsHash(e3Id);
+
     bytes32 inputRoot = bytes32(e3Data[e3Id].votes._root(TREE_DEPTH));
     bytes memory journal = new bytes(396); // (32 + 1) * 4 * 3
 
     _encodeLengthPrefixAndHash(journal, 0, ciphertextOutputHash);
-    _encodeLengthPrefixAndHash(journal, 132, e3Data[e3Id].paramsHash);
+    _encodeLengthPrefixAndHash(journal, 132, paramsHash);
     _encodeLengthPrefixAndHash(journal, 264, inputRoot);
 
     risc0Verifier.verify(proof, imageId, sha256(journal));
@@ -205,22 +271,26 @@ contract CRISPProgram is IE3Program, Ownable {
 
   /// @notice Process a vote: insert or update in the merkle tree depending
   /// on whether it's the first vote or an override.
-  function _processVote(uint256 e3Id, address slotAddress, bytes memory vote) internal returns (uint40 voteIndex, bool isFirstVote) {
+  function _processVote(
+    uint256 e3Id,
+    address slotAddress,
+    bytes32 encryptedVoteCommitment
+  ) internal returns (uint40 voteIndex, bytes32 previousEncryptedVoteCommitment) {
     uint40 storedIndexPlusOne = e3Data[e3Id].voteSlots[slotAddress];
 
     // we treat the index 0 as not voted yet
     // any valid index will be index + 1
     if (storedIndexPlusOne == 0) {
       // FIRST VOTE
-      isFirstVote = true;
+      previousEncryptedVoteCommitment = bytes32(0);
       voteIndex = e3Data[e3Id].votes.numberOfLeaves;
       e3Data[e3Id].voteSlots[slotAddress] = voteIndex + 1;
-      e3Data[e3Id].votes._insert(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]));
+      e3Data[e3Id].votes._insert(uint256(encryptedVoteCommitment));
     } else {
       // RE-VOTE
-      isFirstVote = false;
       voteIndex = storedIndexPlusOne - 1;
-      e3Data[e3Id].votes._update(PoseidonT3.hash([uint256(keccak256(vote)), voteIndex]), voteIndex);
+      previousEncryptedVoteCommitment = bytes32(e3Data[e3Id].votes.elements[voteIndex]);
+      e3Data[e3Id].votes._update(uint256(encryptedVoteCommitment), voteIndex);
     }
   }
 
@@ -235,5 +305,31 @@ contract CRISPProgram is IE3Program, Ownable {
     for (uint256 i = 0; i < 32; i++) {
       journal[startIndex + i * 4] = hashVal[i];
     }
+  }
+
+  /// @notice Decode bytes to uint64 array
+  /// @param data The bytes to decode (must be multiple of 8)
+  /// @return result Array of uint64 values
+  function _decodeBytesToUint64Array(bytes memory data) internal pure returns (uint64[] memory result) {
+    if (data.length % 8 != 0) {
+      revert InvalidTallyLength();
+    }
+
+    uint256 arrayLength = data.length / 8;
+    result = new uint64[](arrayLength);
+
+    for (uint256 i = 0; i < arrayLength; i++) {
+      uint256 offset = i * 8;
+      uint64 value = 0;
+
+      // Read 8 bytes in little-endian order
+      for (uint64 j = 0; j < 8; j++) {
+        value |= uint64(uint8(data[offset + j])) << (j * 8);
+      }
+
+      result[i] = value;
+    }
+
+    return result;
   }
 }

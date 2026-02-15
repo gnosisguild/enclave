@@ -5,9 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::traits::{ErrorEvent, Event};
-use crate::{prelude::*, BusHandle, EnclaveEvent, Sequenced};
+use crate::EventType;
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
+use e3_utils::{colorize, Color, MAILBOX_LIMIT, MAILBOX_LIMIT_LARGE};
 use std::collections::{HashMap, VecDeque};
 use std::marker::PhantomData;
 use tracing::info;
@@ -49,6 +50,9 @@ pub struct EventBus<E: Event> {
 
 impl<E: Event> Actor for EventBus<E> {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl<E: Event> EventBus<E> {
@@ -66,18 +70,21 @@ impl<E: Event> EventBus<E> {
 
     pub fn history(source: &Addr<EventBus<E>>) -> Addr<HistoryCollector<E>> {
         let addr = HistoryCollector::<E>::new().start();
-        source.do_send(Subscribe::new("*", addr.clone().recipient()));
+        source.do_send(Subscribe::new(EventType::All, addr.clone().recipient()));
         addr
     }
 
     pub fn error<EE: Event>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
         let addr = HistoryCollector::<EE>::new().start();
-        source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
+        source.do_send(Subscribe::new(
+            EventType::EnclaveError,
+            addr.clone().recipient(),
+        ));
         addr
     }
 
     pub fn pipe(source: &Addr<EventBus<E>>, dest: &Addr<EventBus<E>>) {
-        source.do_send(Subscribe::new("*", dest.clone().recipient()))
+        source.do_send(Subscribe::new(EventType::All, dest.clone().recipient()))
     }
 
     pub fn pipe_filter<F>(source: &Addr<EventBus<E>>, predicate: F, dest: &Addr<EventBus<E>>)
@@ -86,7 +93,7 @@ impl<E: Event> EventBus<E> {
     {
         let filter = EventFilter::new(dest.clone().recipient(), predicate).start();
 
-        source.do_send(Subscribe::new("*", filter.recipient()));
+        source.do_send(Subscribe::new(EventType::All, filter.recipient()));
     }
 
     fn track(&mut self, event: E) {
@@ -128,7 +135,7 @@ impl<E: Event> Handler<E> for EventBus<E> {
         }
 
         // TODO: workshop to work out best display format
-        tracing::info!(">>> {}", event);
+        tracing::info!("{} {}", colorize(">>>", Color::Yellow), event);
         self.track(event);
     }
 }
@@ -215,6 +222,9 @@ impl<E: Event> EventFilter<E> {
 
 impl<E: Event> Actor for EventFilter<E> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE)
+    }
 }
 
 impl<E: Event> Handler<E> for EventFilter<E> {
@@ -397,6 +407,9 @@ impl<E: Event> Handler<TakeEvents<E>> for HistoryCollector<E> {
 
 impl<E: Event> Actor for HistoryCollector<E> {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<E: Event> Handler<E> for HistoryCollector<E> {
@@ -404,18 +417,4 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.add_event(msg);
     }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Test Helper Functions
-//////////////////////////////////////////////////////////////////////////////
-
-/// Function to help with testing when we want to maintain a vec of events
-pub fn new_event_bus_with_history() -> (BusHandle, Addr<HistoryCollector<EnclaveEvent<Sequenced>>>)
-{
-    let consumer = EventBus::<EnclaveEvent<Sequenced>>::default().start();
-    let bus: BusHandle = BusHandle::new_from_consumer(consumer);
-    let history = HistoryCollector::new().start();
-    bus.subscribe("*", history.clone().recipient());
-    (bus, history)
 }

@@ -6,7 +6,7 @@
 
 use crate::server::token_holders::{get_mock_token_holders, EtherscanClient};
 use crate::server::{
-    models::{CurrentRound, CustomParams},
+    models::{CreditMode, CurrentRound, CustomParams},
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     token_holders::{build_tree, compute_token_holder_hashes},
@@ -15,15 +15,15 @@ use crate::server::{
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::sol_types::{sol_data, SolType};
 use alloy_primitives::{Address, U256};
-use e3_sdk::indexer::IndexerContext;
+use crisp_utils::decode_tally;
 use e3_sdk::{
-    bfv_helpers::decode_bytes_to_vec_u64,
     evm_helpers::{
-        contracts::{EnclaveRead, EnclaveWrite, ReadWrite},
+        contracts::{EnclaveRead, ReadWrite},
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
+            CiphertextOutputPublished, CommitteePublished, E3Requested,
             PlaintextOutputPublished,
         },
+        retry::call_with_retry,
     },
     indexer::{DataStore, EnclaveIndexer, SharedStore},
 };
@@ -32,7 +32,6 @@ use eyre::Context;
 use log::info;
 use num_bigint::BigUint;
 use std::error::Error;
-use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -46,20 +45,53 @@ pub async fn register_e3_requested(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
 
+            let contract = ctx.contract();
+
             info!("[e3_id={}] E3Requested: {:?}", e3_id, event);
 
             async move {
-                // Convert custom params bytes back to token address and balance threshold.
+                // 0xcd6f4a4f = E3DoesNotExist()
+                let e3 = call_with_retry("get_e3", &["0xcd6f4a4f"], || {
+                    let contract = contract.clone();
+                    let event_e3_id = event.e3Id;
+                    async move {
+                        contract
+                            .get_e3(event_e3_id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!("{}", e))
+                    }
+                })
+                .await
+                .map_err(|e| eyre::eyre!("{}", e))?;
+
+                let input_window = [e3.inputWindow[0].to::<u64>(), e3.inputWindow[1].to::<u64>()];
 
                 // Use sol_data types instead of primitives
-                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>);
+                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>);
 
                 let decoded = <CustomParamsTuple as SolType>::abi_decode(&event.e3.customParams)
                     .with_context(|| "Failed to decode custom params from E3 event")?;
 
+                let credit_mode = CreditMode::try_from(decoded.3.to::<u64>())?;
+                let credits = match credit_mode {
+                    CreditMode::Constant => {
+                        info!("[e3_id={}] Credit mode: Constant", e3_id);
+                        Some(decoded.4.to_string())
+                    }
+                    CreditMode::Custom => {
+                        info!("[e3_id={}] Credit mode: Custom", e3_id);
+                        None
+                    }
+                };
+
+                let credits_clone = credits.clone();
+
                 let custom_params = CustomParams {
                     token_address: decoded.0.to_string(),
                     balance_threshold: decoded.1.to_string(),
+                    num_options: decoded.2.to_string(),
+                    credit_mode,
+                    credits,
                 };
 
                 let balance_threshold =
@@ -70,9 +102,7 @@ pub async fn register_e3_requested(
                     .parse()
                     .with_context(|| "Invalid token address")?;
 
-                // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold)
-                    .await?;
+                let input_window = [e3.inputWindow[0].to::<u64>(), e3.inputWindow[1].to::<u64>()];
 
                 // Get token holders from Etherscan API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -90,23 +120,44 @@ pub async fn register_e3_requested(
 
                     let etherscan_client =
                         EtherscanClient::new(CONFIG.etherscan_api_key.clone(), CONFIG.chain_id);
-                    etherscan_client
-                        .get_token_holders_with_voting_power(
-                            token_address,
-                            event.e3.requestBlock.to::<u64>(),
-                            &CONFIG.http_rpc_url,
-                            U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
-                                |e| {
-                                    eyre::eyre!(
-                                        "[e3_id={}] Failed to convert balance threshold to U256: {}",
-                                        e3_id,
-                                        e
-                                    )
-                                },
-                            )?,
-                        )
-                        .await
-                        .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+
+                    match custom_params.credit_mode {
+                        CreditMode::Constant => {
+                            let credits_str = credits_clone.expect("credits must be set for Constant mode");
+                            let credits_u256: alloy_primitives::Uint<256, 4> = U256::from_str_radix(&credits_str, 10)
+                            .map_err(|e| eyre::eyre!("Failed to parse credits: {}", e))?;
+
+                            etherscan_client
+                            .get_token_holders_with_constant_balance(
+                                token_address,
+                                // the block is the one before the request
+                                event.e3.requestBlock.to::<u64>() - 1u64,
+                                credits_u256
+                            )
+                            .await
+                            .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+                        }
+                        CreditMode::Custom => {
+                            etherscan_client
+                            .get_token_holders_with_voting_power(
+                                token_address,
+                                // the block is the one before the request
+                                event.e3.requestBlock.to::<u64>() - 1u64,
+                                &CONFIG.http_rpc_url,
+                                U256::from_str_radix(&balance_threshold.to_string(), 10).map_err(
+                                    |e| {
+                                        eyre::eyre!(
+                                            "[e3_id={}] Failed to convert balance threshold to U256: {}",
+                                            e3_id,
+                                            e
+                                        )
+                                    },
+                                )?,
+                            )
+                            .await
+                            .map_err(|e| eyre::eyre!("Etherscan error: {}", e))?
+                        }
+                    }
                 };
 
                 if token_holders.is_empty() {
@@ -117,6 +168,14 @@ pub async fn register_e3_requested(
                     )
                     .into());
                 }
+
+                // save the e3 details
+                repo.initialize_round(custom_params, e3.requester.to_string(), input_window[1])
+                .await?;
+
+                // Store eligible addresses in the repository.
+                repo.set_eligible_addresses(token_holders.clone())
+                    .await?;
 
                 // Compute Poseidon hashes for token holder address + balance pairs.
                 let token_holder_hashes = compute_token_holder_hashes(&token_holders)
@@ -168,37 +227,6 @@ pub async fn register_e3_requested(
                     e3_id, receipt.transaction_hash
                 );
 
-                Ok(())
-            }
-        })
-        .await;
-    Ok(indexer)
-}
-
-pub async fn register_e3_activated(
-    indexer: EnclaveIndexer<impl DataStore, ReadWrite>,
-) -> Result<EnclaveIndexer<impl DataStore, ReadWrite>> {
-    // E3Activated
-    indexer
-        .add_event_handler(move |event: E3Activated, ctx| {
-            let store = ctx.store();
-            let e3_id = event.e3Id.to::<u64>();
-            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
-            let mut current_round_repo = CurrentRoundRepository::new(store);
-            let expiration = event.expiration.to::<u64>();
-
-            info!("[e3_id={}] Handling E3 request", e3_id);
-            async move {
-                repo.start_round().await?;
-
-                current_round_repo
-                    .set_current_round(CurrentRound { id: e3_id })
-                    .await?;
-
-                info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
-                ctx.do_later(expiration, move |_, ctx| {
-                    handle_e3_input_deadline_expiration(e3_id, ctx.store())
-                });
                 Ok(())
             }
         })
@@ -289,29 +317,17 @@ pub async fn register_plaintext_output_published(
             async move {
                 info!("[e3_id={}] Handling PlaintextOutputPublished", e3_id);
 
+                let num_options = repo.get_num_options().await?;
+
                 // The plaintextOutput from the event contains the result of the FHE computation.
-                // The computation sums the encrypted votes: '0' for Option 1, '1' for Option 2.
-                // Thus, the decrypted sum directly represents the number of votes for Option 2.
-                // The output is expected to be a Vec<u8> in little endian format of u64s.
-                let decoded = decode_bytes_to_vec_u64(&event.plaintextOutput)?;
+                // Decode the tally using the utility function.
+                let vote_counts = decode_tally(&event.plaintextOutput, num_options)?;
+                
+                for (i, count) in vote_counts.iter().enumerate() {
+                    info!("[e3_id={}] Option index: {} votes: {:?}", e3_id, i, count);
+                }
 
-                // decoded[0] is the sum of all encrypted votes (0s and 1s).
-                // Since Option 1 votes are encrypted as '0' and Option 2 votes as '1',
-                // this sum is equivalent to the count of votes for Option 2.
-                let option_2 = decoded[0];
-
-                // Retrieve the total number of votes that were cast and recorded for this round.
-                let total_votes = repo.get_vote_count().await?;
-
-                // The number of votes for Option 1 can be derived by subtracting
-                // the Option 2 votes (the sum from the FHE output) from the total votes.
-                let option_1 = total_votes - option_2;
-
-                info!("[e3_id={}] Vote Count: {:?}", e3_id, total_votes);
-                info!("[e3_id={}] Votes Option 1: {:?}", e3_id, option_1);
-                info!("[e3_id={}] Votes Option 2: {:?}", e3_id, option_2);
-
-                repo.set_votes(option_1, option_2).await?;
+                repo.set_votes(vote_counts).await?;
                 repo.update_status("Finished").await?;
                 Ok(())
             }
@@ -327,28 +343,26 @@ pub async fn register_committee_published(
     indexer
         .add_event_handler(move |event: CommitteePublished, ctx| {
             async move {
-                let contract = ctx.contract();
-                // We need to do this to ensure this is idempotent.
-                // TODO: conserve bandwidth and check for E3AlreadyActivated error instead of
-                // making two calls to contract
-                let e3 = contract.get_e3(event.e3Id).await?;
-                if u64::try_from(e3.expiration)? > 0 {
-                    info!("[e3_id={}] E3 already activated", event.e3Id);
-                    return Ok(());
-                }
-
-                // Read Start time in Seconds
-                let start_time = e3.startWindow[0].to::<u64>();
-                info!("[e3_id={}] Start time: {}", event.e3Id, start_time);
-
+                let store = ctx.store();
+                let e3_id = event.e3Id.to::<u64>();
+                let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+                let mut current_round_repo = CurrentRoundRepository::new(store);
+                info!("[e3_id={}] Handling CommitteePublished", e3_id);
                 // Get current time
                 let now = get_current_timestamp_rpc().await?;
                 info!("[e3_id={}] Current time: {}", event.e3Id, now);
 
-                let later_event = event.clone();
-                ctx.do_later(start_time, move |_, ctx| {
-                    let event = later_event.clone();
-                    handle_committee_time_expired(event, ctx)
+                repo.start_round().await?;
+
+                current_round_repo
+                    .set_current_round(CurrentRound { id: e3_id })
+                    .await?;
+
+                let expiration = repo.get_input_deadline().await?;
+
+                info!("[e3_id={}] Registering hook for {}", e3_id, expiration);
+                ctx.do_later(expiration, move |_, ctx| {
+                    handle_e3_input_deadline_expiration(e3_id, ctx.store())
                 });
 
                 Ok(())
@@ -356,19 +370,6 @@ pub async fn register_committee_published(
         })
         .await;
     Ok(indexer)
-}
-
-async fn handle_committee_time_expired(
-    event: CommitteePublished,
-    ctx: Arc<IndexerContext<impl DataStore, ReadWrite>>,
-) -> eyre::Result<()> {
-    // If not activated activate
-    let tx = ctx.contract().activate(event.e3Id, event.publicKey).await?;
-    info!(
-        "[e3_id={}] E3 activated with tx: {:?}",
-        event.e3Id, tx.transaction_hash
-    );
-    Ok(())
 }
 
 pub async fn get_current_timestamp_rpc() -> eyre::Result<u64> {
@@ -394,10 +395,10 @@ pub async fn register_input_published(
                     "InputPublished: e3_id={}, index={}, data=0x{}...",
                     event.e3Id,
                     event.index,
-                    hex::encode(&event.vote[..8.min(event.vote.len())])
+                    hex::encode(&event.encryptedVote[..8.min(event.encryptedVote.len())])
                 );
 
-                repo.insert_ciphertext_input(event.vote.to_vec(), event.index.to::<u64>())
+                repo.insert_ciphertext_input(event.encryptedVote.to_vec(), event.index.to::<u64>())
                     .await?;
                 Ok(())
             }
@@ -425,7 +426,6 @@ pub async fn start_indexer(
     info!("CRISP: Indexer registering handlers...");
 
     let crisp_indexer = register_e3_requested(crisp_indexer).await?;
-    let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_committee_published(crisp_indexer).await?;

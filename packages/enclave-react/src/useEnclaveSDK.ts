@@ -11,8 +11,7 @@ import {
   type SDKConfig,
   type AllEventTypes,
   type EventCallback,
-  type FheProtocol,
-  type ProtocolParams,
+  type ThresholdBfvParamsPresetName,
   EnclaveEventType,
   RegistryEventType,
   SDKError,
@@ -26,8 +25,7 @@ export interface UseEnclaveSDKConfig {
   }
   chainId?: number
   autoConnect?: boolean
-  protocol: FheProtocol
-  protocolParams?: ProtocolParams
+  thresholdBfvParamsPresetName: ThresholdBfvParamsPresetName
 }
 
 export interface UseEnclaveSDKReturn {
@@ -36,8 +34,7 @@ export interface UseEnclaveSDKReturn {
   error: string | null
   // Contract interaction methods (only the ones commonly used)
   requestE3: typeof EnclaveSDK.prototype.requestE3
-  activateE3: typeof EnclaveSDK.prototype.activateE3
-  publishInput: typeof EnclaveSDK.prototype.publishInput
+  getThresholdBfvParamsSet: typeof EnclaveSDK.prototype.getThresholdBfvParamsSet
   // Event handling
   onEnclaveEvent: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
   off: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void
@@ -69,12 +66,7 @@ export interface UseEnclaveSDKReturn {
  *       enclave: '0x...',
  *       ciphernodeRegistry: '0x...'
  *     },
- *     protocol: EFheProtocol.BFV,
- *     protocolParams: {
- *       degree: 2048,
- *       plaintextModulus: 1032193n,
- *       moduli: 0x3FFFFFFF000001n,
- *     },
+ *     thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
  *   });
  *
  *   // Use the SDK...
@@ -98,8 +90,8 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
         throw new Error('Public client not available')
       }
 
-      if (sdk) {
-        sdk.cleanup()
+      if (sdkRef.current) {
+        sdkRef.current.cleanup()
       }
 
       const sdkConfig: SDKConfig = {
@@ -111,8 +103,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
           feeToken: '0x0000000000000000000000000000000000000000',
         },
         chainId: config.chainId,
-        protocol: config.protocol,
-        protocolParams: config.protocolParams,
+        thresholdBfvParamsPresetName: config.thresholdBfvParamsPresetName,
       }
 
       const newSdk = new EnclaveSDK(sdkConfig)
@@ -125,7 +116,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
       setError(errorMessage)
       console.error('SDK initialization failed:', err)
     }
-  }, [publicClient, walletClient, config.contracts, config.chainId])
+  }, [publicClient, walletClient, config.contracts, config.chainId, config.thresholdBfvParamsPresetName])
 
   // Initialize SDK when wagmi clients are available
   useEffect(() => {
@@ -139,7 +130,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     if (isInitialized && publicClient && walletClient) {
       initializeSDK()
     }
-  }, [walletClient, initializeSDK])
+  }, [walletClient, initializeSDK, isInitialized, publicClient])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -150,27 +141,16 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     }
   }, [])
 
+  const getThresholdBfvParamsSet = useCallback(async () => {
+    if (!sdk) throw new Error('SDK not initialized')
+    return sdk.getThresholdBfvParamsSet()
+  }, [sdk])
+
   // Contract interaction methods
   const requestE3 = useCallback(
     (...args: Parameters<typeof EnclaveSDK.prototype.requestE3>) => {
       if (!sdk) throw new Error('SDK not initialized')
       return sdk.requestE3(...args)
-    },
-    [sdk],
-  )
-
-  const activateE3 = useCallback(
-    (...args: Parameters<typeof EnclaveSDK.prototype.activateE3>) => {
-      if (!sdk) throw new Error('SDK not initialized')
-      return sdk.activateE3(...args)
-    },
-    [sdk],
-  )
-
-  const publishInput = useCallback(
-    (...args: Parameters<typeof EnclaveSDK.prototype.publishInput>) => {
-      if (!sdk) throw new Error('SDK not initialized')
-      return sdk.publishInput(...args)
     },
     [sdk],
   )
@@ -197,8 +177,7 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
     isInitialized,
     error,
     requestE3,
-    activateE3,
-    publishInput,
+    getThresholdBfvParamsSet,
     onEnclaveEvent,
     off,
     EnclaveEventType,

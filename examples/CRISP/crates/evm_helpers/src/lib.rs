@@ -5,18 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
-    network::{Ethereum, EthereumWallet},
-    primitives::{Address, U256},
-    providers::{
-        fillers::{
+    network::{Ethereum, EthereumWallet}, primitives::{Address, Bytes, U256}, providers::{
+        Identity, ProviderBuilder, RootProvider, fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
-        },
-        Identity, ProviderBuilder, RootProvider,
-    },
-    rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
-    sol,
+        }
+    }, rpc::types::TransactionReceipt, signers::local::PrivateKeySigner, sol
 };
 use eyre::Result;
 use std::sync::Arc;
@@ -26,12 +20,25 @@ sol! {
     #[sol(rpc)]
     contract CRISPProgram {
         function setMerkleRoot(uint256 e3_id, uint256 _root) external;
+        function getSlotIndex(uint256 e3_id, address slot_address) external view returns (uint256);
+        function isSlotEmptyByAddress(uint256 e3_id, address slot_address) external view returns (bool);
+        function publishInput(uint256 e3_id, bytes data) external;
     }
 }
 
 sol! {
-    event InputPublished(uint256 indexed e3Id, bytes vote, uint256 index);
+    event InputPublished(uint256 indexed e3Id, bytes encryptedVote, uint256 index);
 }
+
+/// Type alias for read-only provider (no wallet)
+pub type CRISPReadProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
+    RootProvider<Ethereum>,
+    Ethereum,
+>;
 
 /// Type alias for write provider (same as EnclaveWriteProvider)
 pub type CRISPWriteProvider = FillProvider<
@@ -48,23 +55,18 @@ pub type CRISPWriteProvider = FillProvider<
 
 /// CRISP contract instance for interacting with CRISPProgram
 #[derive(Clone)]
-pub struct CRISPContract {
-    provider: Arc<CRISPWriteProvider>,
+pub struct CRISPContract<P = CRISPWriteProvider> {
+    provider: Arc<P>,
     contract_address: Address,
 }
 
-impl CRISPContract {
-    /// Get the contract address
-    pub fn address(&self) -> &Address {
-        &self.contract_address
-    }
-
-    /// Create a new CRISP contract instance
+impl CRISPContract<CRISPWriteProvider> {
+    /// Create a new CRISP contract instance with write capabilities
     pub async fn new(
         http_rpc_url: &str,
         private_key: &str,
         contract_address: &str,
-    ) -> Result<CRISPContract> {
+    ) -> Result<Self> {
         let contract_address = contract_address.parse()?;
         let signer: PrivateKeySigner = private_key.parse()?;
         let wallet = EthereumWallet::from(signer);
@@ -95,6 +97,75 @@ impl CRISPContract {
 
         Ok(receipt)
     }
+
+    // publish an input to the CRISPProgram contract
+    pub async fn publish_input(
+        &self,
+        e3_id: U256,
+        data: Bytes,
+    ) -> Result<TransactionReceipt> {
+        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+        let receipt = contract
+            .publishInput(e3_id, data.into())
+            .send()
+            .await?
+            .get_receipt()
+            .await?;
+
+        Ok(receipt)
+    }
+}
+
+impl CRISPContract<CRISPReadProvider> {
+    /// Create a read-only CRISP contract instance (no private key required)
+    pub async fn new_read_only(http_rpc_url: &str, contract_address: &str) -> Result<Self> {
+        let contract_address = contract_address.parse()?;
+        let provider = ProviderBuilder::new().connect(http_rpc_url).await?;
+
+        Ok(CRISPContract {
+            provider: Arc::new(provider),
+            contract_address,
+        })
+    }
+
+    /// Get the slot index from a given slot address
+    pub async fn get_slot_index_from_address(
+        &self,
+        e3_id: U256,
+        slot_address: Address,
+    ) -> Result<U256> {
+        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+
+        match contract.getSlotIndex(e3_id, slot_address).call().await {
+            Ok(slot_index) => Ok(slot_index),
+            Err(e) => Err(eyre::eyre!("Failed to get slot index: {}", e)),
+        }
+    }
+
+    /// Check if a slot is empty by its address
+    pub async fn get_is_slot_empty_by_address(
+        &self,
+        e3_id: U256,
+        slot_address: Address,
+    ) -> Result<bool> {
+        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+
+        match contract
+            .isSlotEmptyByAddress(e3_id, slot_address)
+            .call()
+            .await
+        {
+            Ok(is_empty) => Ok(is_empty),
+            Err(e) => Err(eyre::eyre!("Failed to check if slot is empty: {}", e)),
+        }
+    }
+}
+
+impl<P> CRISPContract<P> {
+    /// Get the contract address
+    pub fn address(&self) -> &Address {
+        &self.contract_address
+    }
 }
 
 /// Factory for creating CRISP contract instances
@@ -106,7 +177,14 @@ impl CRISPContractFactory {
         http_rpc_url: &str,
         contract_address: &str,
         private_key: &str,
-    ) -> Result<CRISPContract> {
+    ) -> Result<CRISPContract<CRISPWriteProvider>> {
         CRISPContract::new(http_rpc_url, private_key, contract_address).await
+    }
+
+    pub async fn create_read(
+        http_rpc_url: &str,
+        contract_address: &str,
+    ) -> Result<CRISPContract<CRISPReadProvider>> {
+        CRISPContract::new_read_only(http_rpc_url, contract_address).await
     }
 }

@@ -6,17 +6,45 @@
 
 use keccak256::keccak256;
 
-/// Given a public key, signature, and hashed message, verify the signature
-pub fn verify_signature(
+/// Validates an ECDSA signature over a hashed message.
+///
+/// This function validates that a signature was created by the holder of the private key
+/// corresponding to the provided public key, and that it signs the given hashed message.
+/// The function asserts internally, ensuring the signature is valid.
+///
+/// # Arguments
+/// * `hashed_message` - The Keccak256 hash of the message being signed (32 bytes)
+/// * `pub_key_x` - The x-coordinate of the public key (32 bytes, big-endian)
+/// * `pub_key_y` - The y-coordinate of the public key (32 bytes, big-endian)
+/// * `signature` - The ECDSA signature (64 bytes: r || s, both 32 bytes big-endian)
+///
+/// # Note
+/// The signature is verified using secp256k1 curve (same as Ethereum). The message
+/// should already be hashed before calling this function.
+pub fn validate_signature(
     hashed_message: [u8; 32],
     pub_key_x: [u8; 32],
     pub_key_y: [u8; 32],
     signature: [u8; 64],
-) -> bool {
-    std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message)
+) {
+    let is_valid =
+        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
+    assert(is_valid == true);
 }
 
-/// Given a public key, derive the Ethereum address
+/// Derives an Ethereum address from a secp256k1 public key.
+///
+/// This function implements the standard Ethereum address derivation algorithm:
+/// 1. Concatenate the public key coordinates (64 bytes total)
+/// 2. Compute Keccak256 hash of the concatenated bytes
+/// 3. Extract the last 20 bytes as the address
+///
+/// # Arguments
+/// * `pub_key_x` - The x-coordinate of the public key (32 bytes, big-endian)
+/// * `pub_key_y` - The y-coordinate of the public key (32 bytes, big-endian)
+///
+/// # Returns
+/// A 20-byte array representing the Ethereum address.
 pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
     let mut pub_key_bytes = [0; 64];
     for i in 0..32 {
@@ -36,7 +64,16 @@ pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
     derived_address
 }
 
-// Convert a 20-byte address to a field element.
+/// Converts a 20-byte Ethereum address to a field element.
+///
+/// This function interprets the address bytes as a big-endian integer and converts it
+/// to a field element.
+///
+/// # Arguments
+/// * `addr` - A 20-byte Ethereum address
+///
+/// # Returns
+/// A field element representing the address as an integer.
 pub fn address_to_field(addr: [u8; 20]) -> Field {
     let mut acc: Field = 0;
 
@@ -68,7 +105,7 @@ fn test_derive_address() {
 }
 
 #[test]
-fn test_verify_signature() {
+fn test_validate_signature() {
     let hashed_message = [
         67, 126, 157, 164, 162, 165, 56, 242, 155, 214, 113, 196, 83, 198, 228, 36, 174, 104, 152,
         87, 167, 108, 64, 34, 234, 161, 122, 55, 44, 62, 151, 55,
@@ -87,11 +124,11 @@ fn test_verify_signature() {
         124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
         171, 163, 213, 62, 223, 152,
     ];
-    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == true);
+    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
 }
 
 #[test]
-fn test_verify_signature_sdk_input() {
+fn test_validate_signature_sdk_input() {
     let hashed_message = [
         200, 232, 98, 162, 80, 131, 242, 57, 252, 76, 226, 45, 127, 206, 207, 39, 206, 44, 211, 171,
         113, 67, 121, 68, 78, 253, 202, 79, 29, 128, 130, 76,
@@ -112,11 +149,14 @@ fn test_verify_signature_sdk_input() {
         236, 18,
     ];
 
-    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == true);
+    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
 }
 
-#[test]
-fn test_fail_verify_signature() {
+#[test(should_fail)]
+fn test_fail_validate_signature() {
+    // This test verifies that invalid signatures cause validation to fail.
+    // The test itself will fail (assertion failure) when validate_signature is called
+    // with an invalid signature, which demonstrates that invalid signatures are properly rejected.
     let hashed_message = [
         67, 126, 157, 164, 162, 165, 56, 242, 155, 214, 113, 196, 83, 198, 228, 36, 174, 104, 152,
         87, 167, 108, 64, 34, 234, 161, 122, 55, 44, 62, 151, 55,
@@ -136,7 +176,8 @@ fn test_fail_verify_signature() {
         171, 163, 213, 62, 223, 151,
     ];
 
-    assert(verify_signature(hashed_message, pub_key_x, pub_key_y, signature) == false);
+    // This call should fail (assertion failure) because the signature is invalid
+    validate_signature(hashed_message, pub_key_x, pub_key_y, signature);
 }
 
 #[test]

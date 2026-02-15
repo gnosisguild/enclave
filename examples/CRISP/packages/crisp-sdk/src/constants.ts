@@ -8,20 +8,16 @@ import { hashMessage } from 'viem'
 
 export const CRISP_SERVER_TOKEN_TREE_ENDPOINT = 'state/token-holders'
 export const CRISP_SERVER_STATE_LITE_ENDPOINT = 'state/lite'
+export const CRISP_SERVER_PREVIOUS_CIPHERTEXT_ENDPOINT = 'state/previous-ciphertext'
+export const CRISP_SERVER_IS_SLOT_EMPTY_ENDPOINT = 'state/is-slot-empty'
 
 export const MERKLE_TREE_MAX_DEPTH = 20 // static, hardcoded in the circuit.
 
-/**
- * Half the minimum degree needed to support the maxium vote value
- * If you change MAXIMUM_VOTE_VALUE, make sure to update this value too.
- */
-export const HALF_LARGEST_MINIMUM_DEGREE = 50
-
-/**
- * This is the maximum value for a vote (Yes or No). This is 2^50 - 1
- * The minimum degree that BFV should use is 100 (to accommodate both Yes and No votes)
- */
-export const MAXIMUM_VOTE_VALUE = BigInt(Math.pow(2, HALF_LARGEST_MINIMUM_DEGREE) - 1)
+// @note that the following must be changed accordingly to the CRISP circuit
+// Hard limit on the maximum number of vote bits supported for each option.
+export const MAX_VOTE_BITS = 50
+// Hard limit on the maximum number of vote options supported.
+export const MAX_VOTE_OPTIONS = 10
 
 /**
  * Message used by users to prove ownership of their Ethereum account

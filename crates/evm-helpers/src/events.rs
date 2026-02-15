@@ -10,9 +10,6 @@ use alloy::sol;
 
 sol! {
     #[derive(Debug)]
-    event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
-
-    #[derive(Debug)]
     event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
 
     #[derive(Debug)]
@@ -30,9 +27,7 @@ sol! {
         uint256 seed;
         uint32[2] threshold;
         uint256 requestBlock;
-        uint256[2] startWindow;
-        uint256 duration;
-        uint256 expiration;
+        uint256[2] inputWindow;
         bytes32 encryptionSchemeId;
         IE3Program e3Program;
         bytes e3ProgramParams;
@@ -41,6 +36,7 @@ sol! {
         bytes32 committeePublicKey;
         bytes32 ciphertextOutput;
         bytes plaintextOutput;
+        address requester;
     }
 
     #[derive(Debug)]
@@ -51,4 +47,41 @@ sol! {
 
     #[derive(Debug)]
     event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
+
+    #[derive(Debug)]
+    enum E3Stage {
+        None,
+        Requested,
+        CommitteeFinalized,
+        KeyPublished,
+        CiphertextReady,
+        Complete,
+        Failed
+    }
+
+    #[derive(Debug)]
+    enum FailureReason {
+        None,
+        CommitteeFormationTimeout,
+        InsufficientCommitteeMembers,
+        DKGTimeout,
+        DKGInvalidShares,
+        NoInputsReceived,
+        ComputeTimeout,
+        ComputeProviderExpired,
+        ComputeProviderFailed,
+        RequesterCancelled,
+        DecryptionTimeout,
+        DecryptionInvalidShares,
+        VerificationFailed
+    }
+
+    #[derive(Debug)]
+    event CommitteeFinalized(uint256 indexed e3Id);
+
+    #[derive(Debug)]
+    event E3StageChanged(uint256 indexed e3Id, E3Stage previousStage, E3Stage newStage);
+
+    #[derive(Debug)]
+    event E3Failed(uint256 indexed e3Id, E3Stage failedAtStage, FailureReason reason);
 }

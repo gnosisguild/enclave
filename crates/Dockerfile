@@ -43,7 +43,7 @@ COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.jso
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
-COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
+COPY crates/bfv-client/Cargo.toml ./bfv-client/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
@@ -56,6 +56,7 @@ COPY crates/events/Cargo.toml ./events/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
+COPY crates/fhe-params/Cargo.toml ./fhe-params/Cargo.toml
 COPY crates/fs/Cargo.toml ./fs/Cargo.toml
 COPY crates/hamt/Cargo.toml ./hamt/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
@@ -64,17 +65,23 @@ COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml ./logger/Cargo.toml
 COPY crates/multithread/Cargo.toml ./multithread/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
+COPY crates/parity-matrix/Cargo.toml ./parity-matrix/Cargo.toml
+COPY crates/zk-prover/Cargo.toml ./zk-prover/Cargo.toml
+COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
+COPY crates/polynomial/benches ./polynomial/benches
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
+COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
+COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
@@ -89,6 +96,10 @@ RUN for d in ./*/ ; do \
           fi \
         fi \
     done
+
+# Crates with [[bin]] in Cargo.toml need stub binaries so the first build succeeds
+RUN mkdir -p ./zk-helpers/src/bin && echo 'fn main() {}' > ./zk-helpers/src/bin/zk_cli.rs
+RUN mkdir -p ./fhe-params/src/bin && echo 'fn main() {}' > ./fhe-params/src/bin/search_params.rs
 
 RUN cargo build --locked --release
 

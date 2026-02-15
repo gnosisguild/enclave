@@ -6,15 +6,15 @@
 
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { hashMessage } from 'viem'
 import { useSignMessage } from 'wagmi'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 import { Poll } from '@/model/poll.model'
-import { BroadcastVoteRequest, VoteStateLite, VotingRound } from '@/model/vote.model'
-
-import { encryptVote } from '@crisp-e3/sdk'
+import { BroadcastVoteRequest, Vote, VoteStateLite, VotingRound } from '@/model/vote.model'
+import { hashMessage } from 'viem'
+import { useEnclaveServer } from '../enclave/useEnclaveServer'
+import { getRandomVoterToMask } from '@/utils/voters'
 
 export type VotingStep = 'idle' | 'signing' | 'encrypting' | 'generating_proof' | 'broadcasting' | 'confirming' | 'complete' | 'error'
 
@@ -44,6 +44,15 @@ const extractCleanErrorMessage = (errorMessage: string | undefined): string => {
   return errorMessage
 }
 
+interface VoteData {
+  vote: Vote
+  slotAddress: string
+  balance: bigint
+  signature: string
+  messageHash: `0x${string}`
+  error?: string
+}
+
 export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVotingRound?: VotingRound | null) => {
   const {
     user,
@@ -60,17 +69,37 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
   const votingRound = customVotingRound ?? contextVotingRound
 
   const { signMessageAsync } = useSignMessage()
+  const { getEligibleVoters, getMerkleLeaves } = useEnclaveServer()
   const { showToast } = useNotificationAlertContext()
   const navigate = useNavigate()
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isVoting, setIsVoting] = useState<boolean>(false)
+  const [isMasking, setIsMasking] = useState<boolean>(false)
   const [votingStep, setVotingStep] = useState<VotingStep>('idle')
   const [lastActiveStep, setLastActiveStep] = useState<VotingStep | null>(null)
   const [stepMessage, setStepMessage] = useState<string>('')
 
   const handleProofGeneration = useCallback(
-    async (vote: Poll, address: string, signature: string, messageHash: `0x${string}`, previousCiphertext?: Uint8Array) => {
+    async (
+      vote: Vote,
+      address: string,
+      balance: bigint,
+      signature: string,
+      messageHash: `0x${string}`,
+      isAMask: boolean,
+      merkleLeaves: bigint[],
+    ) => {
       if (!votingRound) throw new Error('No voting round available for proof generation')
-      return generateProof(BigInt(vote.value), new Uint8Array(votingRound.pk_bytes), address, signature, messageHash, previousCiphertext)
+      return generateProof(
+        votingRound.round_id,
+        vote,
+        new Uint8Array(votingRound.pk_bytes),
+        address,
+        balance,
+        signature,
+        messageHash,
+        isAMask,
+        merkleLeaves,
+      )
     },
     [generateProof, votingRound],
   )
@@ -79,12 +108,96 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
     setVotingStep('idle')
     setLastActiveStep(null)
     setStepMessage('')
-    setIsLoading(false)
+    setIsVoting(false)
+    setIsMasking(false)
   }, [])
 
+  /**
+   * Handles masking a vote by selecting a random eligible voter.
+   */
+  const handleMask = useCallback(async (): Promise<VoteData> => {
+    if (!user || !roundState) {
+      throw new Error('Cannot mask vote: Missing user or round state.')
+    }
+
+    const eligibleVoters = await getEligibleVoters(roundState.id)
+
+    if (!eligibleVoters || eligibleVoters.length === 0) {
+      throw new Error('No eligible voters available for masking')
+    }
+
+    try {
+      const randomVoterToMask = getRandomVoterToMask(eligibleVoters)
+
+      return {
+        vote: [0n, 0n],
+        slotAddress: randomVoterToMask.address,
+        balance: BigInt(randomVoterToMask.balance),
+        signature: '',
+        messageHash: '' as `0x${string}`,
+      }
+    } catch (error) {
+      return {
+        vote: [0n, 0n],
+        slotAddress: '',
+        balance: 0n,
+        signature: '',
+        messageHash: '' as `0x${string}`,
+        error: (error as Error).message,
+      }
+    }
+  }, [user, roundState, getEligibleVoters])
+
+  /**
+   * Handles the voting process including signing the message.
+   */
+  const handleVote = useCallback(
+    async (pollSelected: Poll, slotAddress: string): Promise<VoteData> => {
+      if (!roundState) {
+        throw new Error('No round state available for voting')
+      }
+
+      // Step 1: Signing
+      setVotingStep('signing')
+      setLastActiveStep('signing')
+      setStepMessage('Please sign the message in your wallet...')
+
+      const message = `Vote for round ${roundState.id}`
+      const messageHash = hashMessage(message)
+
+      // vote is either 0 or 1, so we need to encode the vote accordingly.
+      const balance = 1n
+      const vote = pollSelected.value === 0 ? [balance, 0n] : [0n, balance]
+
+      let signature: string
+      try {
+        signature = await signMessageAsync({ message })
+        return {
+          signature,
+          messageHash,
+          vote,
+          slotAddress,
+          balance,
+        }
+      } catch (error) {
+        console.log('User rejected signature or signing failed', error)
+        resetVotingState()
+        return {
+          signature: '',
+          messageHash: '' as `0x${string}`,
+          vote: [0n, 0n],
+          slotAddress: '',
+          balance: 0n,
+          error: 'User rejected signature or signing failed',
+        }
+      }
+    },
+    [roundState, signMessageAsync, resetVotingState],
+  )
+
   const castVoteWithProof = useCallback(
-    async (pollSelected: Poll | null, isVoteUpdate: boolean = false) => {
-      if (!pollSelected) {
+    async (pollSelected: Poll | null, isAMask: boolean = false) => {
+      if (!isAMask && !pollSelected) {
         console.log('Cannot cast vote: Poll option not selected.')
         showToast({ type: 'danger', message: 'Please select a poll option first.' })
         return
@@ -99,27 +212,19 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         return
       }
 
-      setIsLoading(true)
-      const actionText = isVoteUpdate ? 'Updating vote' : 'Processing vote'
-      console.log(`${actionText}...`)
-
       try {
-        // Step 1: Signing
-        setVotingStep('signing')
-        setLastActiveStep('signing')
-        setStepMessage('Please sign the message in your wallet...')
-        const message = `Vote for round ${roundState.id}`
-        const messageHash = hashMessage(message)
+        let voteData
 
-        let signature: string
-        try {
-          signature = await signMessageAsync({ message })
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (signError) {
-          console.log('User rejected signature or signing failed')
-          showToast({ type: 'danger', message: 'Signature cancelled or failed.' })
-          resetVotingState()
-          return
+        if (isAMask) {
+          setIsMasking(true)
+          voteData = await handleMask()
+        } else {
+          setIsVoting(true)
+          voteData = await handleVote(pollSelected!, user.address)
+        }
+
+        if (voteData.error) {
+          throw new Error(voteData.error)
         }
 
         // Step 2: Encrypting vote
@@ -127,10 +232,22 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         setLastActiveStep('encrypting')
         setStepMessage('')
 
-        // @todo get this from the contract or server
-        const newEncryptionTemp = encryptVote({ yes: 0n, no: 0n }, new Uint8Array(votingRound!.pk_bytes))
-        const previousCiphertext = isVoteUpdate ? newEncryptionTemp : undefined
-        const encodedProof = await handleProofGeneration(pollSelected, user.address, signature, messageHash, previousCiphertext)
+        const merkleLeaves = await getMerkleLeaves(roundState.id)
+
+        if (!merkleLeaves || merkleLeaves?.length === 0) {
+          throw new Error('No merkle leaves available for proof generation')
+        }
+
+        const encodedProof = await handleProofGeneration(
+          voteData.vote,
+          voteData.slotAddress,
+          voteData.balance,
+          voteData.signature,
+          voteData.messageHash,
+          isAMask,
+          merkleLeaves.map((s: string) => BigInt(`0x${s}`)),
+        )
+
         if (!encodedProof) {
           throw new Error('Failed to encrypt vote.')
         }
@@ -149,7 +266,7 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
         const voteRequest: BroadcastVoteRequest = {
           round_id: roundState.id,
           encoded_proof: encodedProof,
-          address: user.address,
+          address: voteData.slotAddress,
         }
 
         const broadcastVoteResponse = await broadcastVote(voteRequest)
@@ -158,14 +275,18 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           switch (broadcastVoteResponse.status) {
             case 'success': {
               setVotingStep('complete')
-              setStepMessage('Vote submitted successfully!')
+              setStepMessage(`${isAMask ? 'Masking' : 'Vote'} submitted successfully!'`)
 
               const url = `https://sepolia.etherscan.io/tx/${broadcastVoteResponse.tx_hash}`
               setTxUrl(url)
 
-              markVotedInRound(roundState.id)
+              if (!isAMask) markVotedInRound(roundState.id)
 
-              const successMessage = broadcastVoteResponse.is_vote_update ? 'Vote updated successfully!' : 'Vote submitted successfully!'
+              const successMessage = isAMask
+                ? 'Slot masked successfully'
+                : broadcastVoteResponse.is_vote_update
+                  ? 'Vote updated successfully!'
+                  : 'Vote submitted successfully!'
               showToast({
                 type: 'success',
                 message: successMessage,
@@ -203,7 +324,8 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
           persistent: true,
         })
       } finally {
-        setIsLoading(false)
+        setIsVoting(false)
+        setIsMasking(false)
       }
     },
     [
@@ -214,16 +336,17 @@ export const useVoteCasting = (customRoundState?: VoteStateLite | null, customVo
       showToast,
       navigate,
       handleProofGeneration,
-      signMessageAsync,
       markVotedInRound,
-      resetVotingState,
-      votingRound,
+      handleMask,
+      handleVote,
+      getMerkleLeaves,
     ],
   )
 
   return {
     castVoteWithProof,
-    isLoading,
+    isVoting,
+    isMasking,
     votingStep,
     lastActiveStep,
     stepMessage,

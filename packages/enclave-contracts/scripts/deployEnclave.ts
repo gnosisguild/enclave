@@ -8,13 +8,26 @@ import hre from "hardhat";
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveE3RefundManager } from "./deployAndSave/e3RefundManager";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
 import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
+import { deployAndSaveAllVerifiers } from "./deployAndSave/verifiers";
 import { deployMocks } from "./deployMocks";
+
+/**
+ * Default timeout configuration (in seconds)
+ */
+const DEFAULT_TIMEOUT_CONFIG = {
+  committeeFormationWindow: 3600,
+  dkgWindow: 7200,
+  computeWindow: 86400,
+  decryptionWindow: 3600,
+  gracePeriod: 600,
+};
 
 /**
  * Deploys the Enclave contracts
@@ -30,13 +43,18 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ownerAddress = await owner.getAddress();
 
-  const polynomial_degree = ethers.toBigInt(2048);
-  const plaintext_modulus = ethers.toBigInt(1032193);
-  const moduli = [ethers.toBigInt("18014398492704769")];
-
+  const polynomial_degree = ethers.toBigInt(512);
+  const plaintext_modulus = ethers.toBigInt(10);
+  const moduli = [
+    ethers.toBigInt("0xffffee001"),
+    ethers.toBigInt("0xffffc4001"),
+  ];
+  const error1_variance = "3";
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256", "uint256", "uint256[]"],
-    [polynomial_degree, plaintext_modulus, moduli],
+    [
+      "tuple(uint256 degree, uint256 plaintext_modulus, uint256[] moduli, string error1_variance)",
+    ],
+    [[polynomial_degree, plaintext_modulus, moduli, error1_variance]],
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
@@ -123,11 +141,26 @@ export const deployEnclave = async (withMocks?: boolean) => {
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
+    e3RefundManager: addressOne, // placeholder, will be updated
     feeToken: feeTokenAddress,
+    timeoutConfig: DEFAULT_TIMEOUT_CONFIG,
     hre,
   });
   const enclaveAddress = await enclave.getAddress();
   console.log("Enclave deployed to:", enclaveAddress);
+
+  console.log("Deploying E3RefundManager...");
+  const { e3RefundManager } = await deployAndSaveE3RefundManager({
+    owner: ownerAddress,
+    enclave: enclaveAddress,
+    treasury: ownerAddress, // Protocol treasury
+    hre,
+  });
+  const e3RefundManagerAddress = await e3RefundManager.getAddress();
+  console.log("E3RefundManager deployed to:", e3RefundManagerAddress);
+
+  console.log("Setting E3RefundManager in Enclave...");
+  await enclave.setE3RefundManager(e3RefundManagerAddress);
 
   ///////////////////////////////////////////
   // Configure cross-contract dependencies
@@ -162,6 +195,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
 
+  // E3RefundManager already has correct enclave from deployment
+
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
@@ -191,6 +226,16 @@ export const deployEnclave = async (withMocks?: boolean) => {
     console.log(`Successfully enabled E3 Program in Enclave contract`);
   }
 
+  // Deploy circuit verifiers (if any exist in contracts/verifier/)
+  console.log("Deploying circuit verifiers...");
+  const verifierDeployments = await deployAndSaveAllVerifiers(hre);
+  const verifierEntries = Object.entries(verifierDeployments);
+
+  const verifierLines =
+    verifierEntries.length > 0
+      ? verifierEntries.map(([name, addr]) => `    ${name}: ${addr}`).join("\n")
+      : "    (none)";
+
   console.log(`
     ============================================
     Deployment Complete!
@@ -201,7 +246,10 @@ export const deployEnclave = async (withMocks?: boolean) => {
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
+    E3RefundManager: ${e3RefundManagerAddress}
     Enclave: ${enclaveAddress}
+    Circuit Verifiers:
+${verifierLines}
     ============================================
   `);
 };

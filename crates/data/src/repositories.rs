@@ -3,9 +3,10 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+use crate::{DataStore, InMemStore, Repository};
+use actix::Actor;
 
-use crate::{DataStore, Repository};
-
+#[derive(Clone)]
 pub struct Repositories {
     pub store: DataStore,
 }
@@ -26,6 +27,10 @@ impl From<&DataStore> for Repositories {
 impl Repositories {
     pub fn new(store: DataStore) -> Self {
         Repositories { store }
+    }
+
+    pub fn in_mem() -> Self {
+        DataStore::from_in_mem(&InMemStore::new(false).start()).into()
     }
 }
 

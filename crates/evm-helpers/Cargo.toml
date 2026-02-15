@@ -8,6 +8,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/evm-helpers"
 
 [dependencies]
 alloy.workspace = true
+anyhow.workspace = true
 async-trait.workspace = true
 eyre.workspace = true
 futures.workspace = true
@@ -15,3 +16,4 @@ futures-util.workspace = true
 once_cell.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+e3-utils.workspace = true

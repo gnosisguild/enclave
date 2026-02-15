@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
-use e3_bfv_helpers::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
+use e3_bfv_client::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::Plaintext;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};

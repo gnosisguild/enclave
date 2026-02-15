@@ -5,10 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Message;
+use e3_utils::major_issue;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    future::Future,
+    pin::Pin,
+};
 
 use crate::{BusHandle, ErrorDispatcher};
+
+use super::{EnclaveEvent, Unsequenced};
 
 pub trait FromError {
     fn from_error(err_type: EType, error: impl Into<String>) -> Self;
@@ -37,8 +44,11 @@ pub enum EType {
     PlaintextAggregation,
     Decryption,
     Sortition,
+    Sync,
     Data,
     Event,
+    Computation,
+    DocumentPublishing,
 }
 
 impl EnclaveError {
@@ -61,12 +71,75 @@ impl FromError for EnclaveError {
 
 /// Function to run a closure that returns a result. If result is an Err variant it is trapped and
 /// sent to the bus as an ErrorEvent
-pub fn trap<F>(err_type: EType, bus: &BusHandle, runner: F)
+pub fn trap<F>(err_type: EType, bus: &impl ErrorDispatcher<EnclaveEvent<Unsequenced>>, runner: F)
 where
     F: FnOnce() -> anyhow::Result<()>,
 {
     match runner() {
         Ok(_) => (),
         Err(e) => bus.err(err_type, e),
+    }
+}
+
+/// Function to accept a future that resolves to a result. If result is an Err variant it is trapped and
+/// sent to the bus as an ErrorEvent
+pub fn trap_fut<F>(
+    err_type: EType,
+    bus: &BusHandle,
+    fut: F,
+) -> Pin<Box<dyn Future<Output = ()> + Send>>
+where
+    F: Future<Output = anyhow::Result<()>> + Send + 'static,
+{
+    let bus = bus.clone();
+    Box::pin(async move {
+        if let Err(e) = fut.await {
+            bus.err(err_type, e);
+        }
+    })
+}
+
+// The following dispatchers should be used where you don't have the BusHandle available.
+
+// A struct that panics on errors
+pub struct PanicDispatcher;
+
+impl PanicDispatcher {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for PanicDispatcher {
+    fn err(&self, _: EType, error: impl Into<anyhow::Error>) {
+        panic!("{}", major_issue("Failure!", error));
+    }
+}
+
+// A struct that warns on errors
+pub struct WarningDispatcher;
+impl WarningDispatcher {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for WarningDispatcher {
+    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
+        tracing::warn!("{:?} Failure! {}", err_type, error.into());
+    }
+}
+
+// A struct that logs errors on errors
+// Avoid using this over BusHandle
+pub struct LogErrorDispatcher;
+impl LogErrorDispatcher {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for LogErrorDispatcher {
+    fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
+        tracing::error!("{:?} Failure! {}", err_type, error.into());
     }
 }

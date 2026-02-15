@@ -22,8 +22,10 @@ enclave wallet set --name cn3 --private-key "$PRIVATE_KEY_CN3"
 enclave wallet set --name cn4 --private-key "$PRIVATE_KEY_CN4"
 enclave wallet set --name cn5 --private-key "$PRIVATE_KEY_CN5"
 
+echo "Setting up ZK prover..."
+enclave noir setup
+
 # using & instead of -d so that wait works below
-# TODO: add --experimental-trbfv after testing
 enclave nodes up -v &
 
 sleep 2

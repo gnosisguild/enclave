@@ -25,7 +25,7 @@ pub async fn approve_token(
     amount: U256,
 ) -> Result<()> {
     use alloy::network::EthereumWallet;
-    use alloy::providers::{Provider, ProviderBuilder};
+    use alloy::providers::ProviderBuilder;
     use alloy::signers::local::PrivateKeySigner;
 
     let token_address: Address = token_address.parse()?;

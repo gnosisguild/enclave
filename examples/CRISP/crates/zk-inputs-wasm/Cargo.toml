@@ -10,11 +10,15 @@ description = "Core logic to pre-compute CRISP ZK inputs (WASM/JavaScript bindin
 crate-type = ["cdylib"]
 
 [dependencies]
+e3-polynomial = { workspace = true }
 zk-inputs = { path = "../zk-inputs" }
 wasm-bindgen = "0.2"
 js-sys = "0.3"
 web-sys = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
+serde_json.workspace = true
+num-bigint = "0.4.6"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
+e3-fhe-params = { workspace = true }

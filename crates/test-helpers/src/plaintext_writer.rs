@@ -8,8 +8,9 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData};
-use e3_sdk::bfv_helpers::decode_bytes_to_vec_u64;
+use e3_bfv_client::decode_bytes_to_vec_u64;
+use e3_events::{prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventType};
+use e3_utils::MAILBOX_LIMIT;
 use tracing::{error, info};
 
 pub struct PlaintextWriter {
@@ -22,13 +23,16 @@ impl PlaintextWriter {
             path: path.to_owned(),
         }
         .start();
-        bus.subscribe("PlaintextAggregated", addr.clone().recipient());
+        bus.subscribe(EventType::PlaintextAggregated, addr.clone().recipient());
         addr
     }
 }
 
 impl Actor for PlaintextWriter {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for PlaintextWriter {

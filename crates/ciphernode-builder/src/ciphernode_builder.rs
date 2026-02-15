@@ -4,40 +4,43 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::CiphernodeHandle;
+use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
-use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use derivative::Derivative;
-use e3_aggregator::ext::{
-    PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
-    ThresholdPlaintextAggregatorExtension,
-};
+use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
+use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
-use e3_events::{BusHandle, EnclaveEvent, EventBus, EventBusConfig};
-use e3_evm::{
-    helpers::{
-        load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
-        ProviderConfig,
-    },
-    BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CoordinatorStart, EnclaveSol,
-    EnclaveSolReader, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
-    HistoricalEventCoordinator,
+use e3_data::{InMemStore, RepositoriesFactory};
+use e3_events::{
+    AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
+use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
+use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use e3_fhe::ext::FheExtension;
-use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
-use e3_multithread::Multithread;
+use e3_fhe_params::BfvPreset;
+use e3_keyshare::ext::ThresholdKeyshareExtension;
+use e3_multithread::{Multithread, MultithreadReport, TaskPool};
+use e3_net::{setup_net, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::{
-    CiphernodeSelector, FinalizedCommitteesRepositoryFactory, NodeStateRepositoryFactory,
-    Sortition, SortitionBackend, SortitionRepositoryFactory,
+    CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
+    NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
+use e3_sync::sync;
 use e3_utils::{rand_eth_addr, SharedRng};
-use std::{collections::HashMap, sync::Arc};
+use e3_zk_prover::{setup_zk_actors, ZkBackend};
+use std::time::Duration;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
+
+#[derive(Clone, Debug)]
+enum EventSystemType {
+    Persisted { log_path: PathBuf, kv_path: PathBuf },
+    InMem,
+}
 
 /// Build a ciphernode configuration.
 // NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
@@ -51,21 +54,40 @@ pub struct CiphernodeBuilder {
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
     contract_components: ContractComponents,
-    datastore: Option<DataStore>,
+    event_system: EventSystemType,
+    in_mem_store: Option<Addr<InMemStore>>,
     keyshare: Option<KeyshareKind>,
     logging: bool,
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
-    multithread_capture_events: bool,
-    plaintext_agg: bool,
+    multithread_report: Option<Addr<MultithreadReport>>,
+    name: String,
     pubkey_agg: bool,
     rng: SharedRng,
-    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     sortition_backend: SortitionBackend,
+    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     testmode_errors: bool,
     testmode_history: bool,
+    task_pool: Option<TaskPool>,
     threads: Option<usize>,
+    testmode_signer: Option<PrivateKeySigner>,
     threshold_plaintext_agg: bool,
+    zk_backend: Option<ZkBackend>,
+    net_config: Option<NetConfig>,
+    start_buffer: bool,
+}
+
+// Simple Net Configuration
+#[derive(Debug)]
+struct NetConfig {
+    pub peers: Vec<String>,
+    pub quic_port: u16,
+}
+
+impl NetConfig {
+    pub fn new(peers: Vec<String>, quic_port: u16) -> Self {
+        Self { peers, quic_port }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -85,31 +107,41 @@ pub enum BusMode<T> {
 #[derive(Clone, Debug)]
 pub enum KeyshareKind {
     Threshold,
-    NonThreshold, // Soft Deprecated
 }
 
 impl CiphernodeBuilder {
-    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
+    /// Create a new ciphernode builder.
+    ///
+    /// - name - Unique name for the ciphernode
+    /// - rng - Arc Mutex wrapped random number generator
+    /// - cipher - Cipher for encryption and decryption of sensitive data
+    pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
             chains: vec![],
             cipher,
             contract_components: ContractComponents::default(),
-            datastore: None,
+            event_system: EventSystemType::InMem,
+            in_mem_store: None,
             keyshare: None,
             logging: false,
             multithread_cache: None,
-            plaintext_agg: false,
-            pubkey_agg: false,
             multithread_concurrent_jobs: None,
+            multithread_report: None,
+            name: name.to_owned(),
+            pubkey_agg: false,
             rng,
-            source_bus: None,
             sortition_backend: SortitionBackend::score(),
+            source_bus: None,
             testmode_errors: false,
             testmode_history: false,
+            task_pool: None,
             threads: None,
-            multithread_capture_events: false,
+            testmode_signer: None,
             threshold_plaintext_agg: false,
+            net_config: None,
+            start_buffer: false,
+            zk_backend: None,
         }
     }
 
@@ -132,16 +164,19 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the Deprecated Keyshare feature
-    #[deprecated = "in future versions we will migrate to with_trbfv()"]
-    pub fn with_keyshare(mut self) -> Self {
-        self.keyshare = Some(KeyshareKind::NonThreshold);
+    /// Use the given in-mem datastore. This is useful for injecting a store dump.
+    pub fn with_in_mem_datastore(mut self, store: &Addr<InMemStore>) -> Self {
+        self.in_mem_store = Some(store.to_owned());
         self
     }
 
-    /// Attach an existing in mem store to the node
-    pub fn with_datastore(mut self, store: DataStore) -> Self {
-        self.datastore = Some(store);
+    /// Add persistence information for storing events and data. Without persistence information
+    /// the node will run in memory by default.
+    pub fn with_persistence(mut self, log_path: &PathBuf, kv_path: &PathBuf) -> Self {
+        self.event_system = EventSystemType::Persisted {
+            log_path: log_path.to_owned(),
+            kv_path: kv_path.to_owned(),
+        };
         self
     }
 
@@ -158,6 +193,12 @@ impl CiphernodeBuilder {
         self.testmode_errors = true;
         self
     }
+    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnded. This is important
+    /// for tests that don't specifically
+    pub fn testmode_start_buffer_immediately(mut self) -> Self {
+        self.start_buffer = true;
+        self
+    }
 
     /// Use the node configuration on these specific chains. This will overwrite any previously
     /// given chains.
@@ -166,7 +207,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the given Address to represent the node
+    /// Use the given Address to represent the node. This should be unique.
     pub fn with_address(mut self, addr: &str) -> Self {
         self.address = Some(addr.to_owned());
         self
@@ -184,15 +225,15 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Do plaintext aggregation
-    pub fn with_plaintext_aggregation(mut self) -> Self {
-        self.plaintext_agg = true;
+    /// Connect rayon work to the given threadpool
+    pub fn with_shared_taskpool(mut self, pool: &TaskPool) -> Self {
+        self.task_pool = Some(pool.clone());
         self
     }
 
-    /// Inject a preexisting multithread actor. This is mainly used for testing.
-    pub fn with_injected_multithread(mut self, multithread: Addr<Multithread>) -> Self {
-        self.multithread_cache = Some(multithread);
+    /// Shared MultithreadReport for benchmarking
+    pub fn with_shared_multithread_report(mut self, report: &Addr<MultithreadReport>) -> Self {
+        self.multithread_report = Some(report.clone());
         self
     }
 
@@ -221,14 +262,22 @@ impl CiphernodeBuilder {
         self
     }
 
-    pub fn with_multithread_capture_events(mut self) -> Self {
-        self.multithread_capture_events = true;
-        self
-    }
-
     /// Setup a ThresholdPlaintextAggregator
     pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
         self.threshold_plaintext_agg = true;
+        self
+    }
+
+    /// Enable ZK proof generation with the given backend.
+    pub fn with_zkproof(mut self, backend: ZkBackend) -> Self {
+        self.zk_backend = Some(backend);
+        self
+    }
+
+    /// Pre-populate the signer cache with the given signer.
+    /// This is conspicuously named so we understand that this should only be used when testing.
+    pub fn testmode_with_signer(mut self, signer: PrivateKeySigner) -> Self {
+        self.testmode_signer = Some(signer);
         self
     }
 
@@ -261,8 +310,29 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Setup net package components.
+    pub fn with_net(mut self, peers: Vec<String>, quic_port: u16) -> Self {
+        self.net_config = Some(NetConfig::new(peers, quic_port));
+        self
+    }
+
     fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
+    }
+
+    /// Create aggregate configuration from configured chains
+    async fn create_aggregate_config(
+        &self,
+        provider_cache: &mut ProviderCache,
+    ) -> Result<AggregateConfig> {
+        let mut chain_providers = Vec::new();
+        for chain in &self.chains {
+            let provider = provider_cache.ensure_read_provider(chain).await?;
+            chain_providers.push((chain.clone(), provider.chain_id()));
+        }
+
+        let delays = create_aggregate_delays(&chain_providers)?;
+        Ok(AggregateConfig::new(delays))
     }
 
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
@@ -298,9 +368,6 @@ impl CiphernodeBuilder {
             None
         };
 
-        // Get a handle from the event bus
-        let bus = BusHandle::new_from_consumer(local_bus);
-
         let addr = if let Some(addr) = self.address.clone() {
             info!("Using eth address = {}", addr);
             addr
@@ -310,15 +377,48 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
-        let store = self
-            .datastore
-            .clone()
-            .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
+        // Create provider cache early to use for chain validation
+        let mut provider_cache = if let Some(signer) = self.testmode_signer.take() {
+            ProviderCache::new().with_signer(signer)
+        } else {
+            ProviderCache::new()
+        };
+        let aggregate_config = self.create_aggregate_config(&mut provider_cache).await?;
 
-        let repositories = store.repositories();
+        // Get an event system instance.
+        let event_system =
+            if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
+                EventSystem::persisted(&addr, log_path, kv_path)
+                    .with_event_bus(local_bus)
+                    .with_aggregate_config(aggregate_config.clone())
+            } else {
+                if let Some(ref store) = self.in_mem_store {
+                    EventSystem::in_mem_from_store(&addr, store)
+                        .with_event_bus(local_bus)
+                        .with_aggregate_config(aggregate_config.clone())
+                } else {
+                    EventSystem::in_mem(&addr)
+                        .with_event_bus(local_bus)
+                        .with_aggregate_config(aggregate_config.clone())
+                }
+            };
+
+        let bus = event_system.handle()?;
+        let store = event_system.store()?;
+        let eventstore_ts = event_system.eventstore_getter_ts()?;
+        let eventstore_seq = event_system.eventstore_getter_seq()?;
+        let cipher = &self.cipher;
+        let repositories = Arc::new(store.repositories());
+
+        // Now we add write support as store depends on event system
+        let mut provider_cache =
+            provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
 
         // Use the configured backend directly
         let default_backend = self.sortition_backend.clone();
+
+        let ciphernode_selector =
+            CiphernodeSelector::attach(&bus, repositories.ciphernode_selector(), &addr).await?;
 
         let sortition = Sortition::attach(
             &bus,
@@ -326,131 +426,50 @@ impl CiphernodeBuilder {
             repositories.node_state(),
             repositories.finalized_committees(),
             default_backend,
+            ciphernode_selector,
+            &addr,
         )
         .await?;
 
-        CiphernodeSelector::attach(&bus, &sortition, &addr, &store);
-
-        let mut provider_cache = ProviderCaches::new();
-        let cipher = &self.cipher;
-
-        let coordinator = HistoricalEventCoordinator::setup(bus.clone());
-        let processor = coordinator.clone().recipient();
-
-        // TODO: gather an async handle from the event readers that closes when they shutdown and
-        // join it with the network manager joinhandle below
-        for chain in self
-            .chains
-            .iter()
-            .filter(|chain| chain.enabled.unwrap_or(true))
-        {
-            if self.contract_components.enclave {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                let write_provider = provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await?;
-                EnclaveSol::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    write_provider.clone(),
-                    &chain.contracts.enclave.address(),
-                    &repositories.enclave_sol_reader(read_provider.chain_id()),
-                    chain.contracts.enclave.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
-            }
-
-            if self.contract_components.enclave_reader {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                EnclaveSolReader::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.enclave.address(),
-                    &repositories.enclave_sol_reader(read_provider.chain_id()),
-                    chain.contracts.enclave.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
-            }
-
-            if self.contract_components.bonding_registry {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                BondingRegistrySol::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.bonding_registry.address(),
-                    &repositories.bonding_registry_reader(read_provider.chain_id()),
-                    chain.contracts.bonding_registry.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
-            }
-
-            if self.contract_components.ciphernode_registry {
-                let read_provider = provider_cache.ensure_read_provider(chain).await?;
-                CiphernodeRegistrySol::attach(
-                    &processor,
-                    &bus,
-                    read_provider.clone(),
-                    &chain.contracts.ciphernode_registry.address(),
-                    &repositories.ciphernode_registry_reader(read_provider.chain_id()),
-                    chain.contracts.ciphernode_registry.deploy_block(),
-                    chain.rpc_url.clone(),
-                )
-                .await?;
-
-                match provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await
-                {
-                    Ok(write_provider) => {
-                        let _writer = CiphernodeRegistrySol::attach_writer(
-                            &bus,
-                            write_provider.clone(),
-                            &chain.contracts.ciphernode_registry.address(),
-                            self.pubkey_agg,
-                        )
-                        .await?;
-                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
-
-                        if self.pubkey_agg && matches!(self.sortition_backend, SortitionBackend::Score(_)) {
-                            info!("Attaching CommitteeFinalizer for score sortition");
-                            e3_aggregator::CommitteeFinalizer::attach(&bus);
-                        }
-                    }
-                    Err(e) => error!(
-                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
-                        e
-                    ),
-                }
-            }
-        }
-
-        // We start after all readers have registered
-        coordinator.do_send(CoordinatorStart);
+        // Setup evm system
+        // TODO: gather an async handle from the event readers in thre following function
+        // that closes when they shutdown and join it with the network manager joinhandle externally
+        let evm_config = setup_evm_system(
+            &self.chains,
+            &mut provider_cache,
+            &bus,
+            &self.contract_components,
+            self.pubkey_agg,
+        )
+        .await?;
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&bus, store.clone());
 
         if let Some(KeyshareKind::Threshold) = self.keyshare {
-            let multithread = self.ensure_multithread();
+            let _ = self.ensure_multithread(&bus);
+            // TODO: Make BfvPreset configurable via builder method (e.g., with_share_enc_preset())
+            // Currently hardcoded to InsecureDkg512 for DKG operations.
+            // Production deployments should use BfvPreset::SecureDkg8192.
+            let share_enc_preset = BfvPreset::InsecureDkg512;
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &bus,
                 &self.cipher,
-                &multithread,
                 &addr,
-            ))
+                share_enc_preset,
+            ));
+
+            let backend = self
+                .zk_backend
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ZK backend is required for threshold keyshare"))?;
+            info!("Setting up ZK actors");
+            let signer = provider_cache.ensure_signer().await?;
+            setup_zk_actors(&bus, backend, signer);
         }
 
-        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold))
-            || self.pubkey_agg
-            || self.plaintext_agg
-        {
+        if self.pubkey_agg {
             info!("Setting up FheExtension");
             e3_builder = e3_builder.with(FheExtension::create(&bus, &self.rng))
         }
@@ -460,27 +479,45 @@ impl CiphernodeBuilder {
             e3_builder = e3_builder.with(PublicKeyAggregatorExtension::create(&bus))
         }
 
-        if self.plaintext_agg {
-            info!("Setting up PlaintextAggregationExtension (legacy)");
-            e3_builder = e3_builder.with(PlaintextAggregatorExtension::create(&bus, &sortition))
-        }
-
         if self.threshold_plaintext_agg {
-            info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
-            let multithread = self.ensure_multithread();
+            info!("Setting up ThresholdPlaintextAggregatorExtension");
+            let _ = self.ensure_multithread(&bus);
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &bus,
-                &sortition,
-                &multithread,
+                &bus, &sortition,
             ))
         }
 
-        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold)) {
-            info!("Setting up KeyshareExtension (legacy)!");
-            e3_builder = e3_builder.with(KeyshareExtension::create(&bus, &addr, &self.cipher))
-        }
         info!("building...");
+
         e3_builder.build().await?;
+
+        let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
+            let repositories = store.repositories();
+            setup_net(
+                bus.clone(),
+                net_config.peers,
+                &self.cipher,
+                net_config.quic_port,
+                repositories.libp2p_keypair(),
+                eventstore_ts,
+            )
+            .await?
+        } else {
+            (
+                tokio::spawn(std::future::ready(Ok(()))),
+                "-not set-".to_string(),
+            )
+        };
+
+        // Run the sync routine
+        sync(
+            &bus,
+            &evm_config,
+            &repositories,
+            &aggregate_config,
+            &eventstore_seq,
+        )
+        .await?;
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
@@ -488,23 +525,47 @@ impl CiphernodeBuilder {
             bus,
             history,
             errors,
+            peer_id,
+            join_handle,
         ))
     }
 
-    fn ensure_multithread(&mut self) -> Addr<Multithread> {
+    fn ensure_multithread(&mut self, bus: &BusHandle) -> Addr<Multithread> {
         // If we have it cached return it
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
+
         info!("Setting up multithread actor...");
-        // Create it
-        let addr = Multithread::attach(
-            self.rng.clone(),
-            self.cipher.clone(),
-            self.threads.unwrap_or(1),
-            self.multithread_concurrent_jobs.unwrap_or(1),
-            self.multithread_capture_events,
-        );
+
+        // Setup threadpool if not set
+        let task_pool = self.task_pool.clone().unwrap_or_else(|| {
+            Multithread::create_taskpool(
+                self.threads.unwrap_or(1),
+                self.multithread_concurrent_jobs.unwrap_or(1),
+            )
+        });
+
+        // Create it with or without ZK prover
+        let addr = if let Some(ref backend) = self.zk_backend {
+            info!("Multithread actor with ZK prover");
+            Multithread::attach_with_zk(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+                backend,
+            )
+        } else {
+            Multithread::attach(
+                bus,
+                self.rng.clone(),
+                self.cipher.clone(),
+                task_pool,
+                self.multithread_report.clone(),
+            )
+        };
 
         // Set the cache
         self.multithread_cache = Some(addr.clone());
@@ -514,68 +575,118 @@ impl CiphernodeBuilder {
     }
 }
 
-/// Struct to cache modules required during the ciphernode construction so that providers are only
-/// constructed once.
-struct ProviderCaches {
-    signer_cache: Option<LocalSigner<SigningKey>>,
-    read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
-    write_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteWriteProvider>>,
+/// Validate chain ID matches expected configuration
+fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
+    if let Some(expected_chain_id) = chain.chain_id {
+        if actual_chain_id != expected_chain_id {
+            return Err(anyhow::anyhow!(
+                "Chain '{}' validation failed: expected chain_id {}, but provider returned chain_id {}",
+                chain.name, expected_chain_id, actual_chain_id
+            ));
+        }
+    }
+    Ok(())
 }
 
-impl ProviderCaches {
-    pub fn new() -> Self {
-        ProviderCaches {
-            signer_cache: None,
-            read_provider_cache: HashMap::new(),
-            write_provider_cache: HashMap::new(),
-        }
+/// Build delay configuration for a specific chain
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, Duration) {
+    let aggregate_id = AggregateId::from_chain_id(Some(actual_chain_id));
+    let finalization_ms = chain.finalization_ms.unwrap_or(0);
+    let delay_us = finalization_ms * 1000; // ms → microseconds
+    (aggregate_id, Duration::from_micros(delay_us))
+}
+
+/// Build delays configuration from chain providers
+fn create_aggregate_delays(
+    chain_providers: &[(ChainConfig, u64)],
+) -> Result<HashMap<AggregateId, Duration>> {
+    let mut delays = HashMap::new();
+
+    for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
+        // Validate chain_id if specified in configuration
+        validate_chain_id(&chain, actual_chain_id)?;
+
+        // Add delay if configured
+        let (aggregate_id, delay_us) = create_aggregate_delay(&chain, actual_chain_id);
+        delays.insert(aggregate_id, delay_us);
     }
 
-    pub async fn ensure_signer(
-        &mut self,
-        cipher: &Cipher,
-        repositories: &Repositories,
-    ) -> Result<LocalSigner<SigningKey>> {
-        if let Some(ref cache) = self.signer_cache {
-            return Ok(cache.clone());
+    Ok(delays)
+}
+
+async fn setup_evm_system(
+    chains: &Vec<ChainConfig>,
+    provider_cache: &mut ProviderCache<WriteEnabled>,
+    bus: &BusHandle,
+    contract_components: &ContractComponents,
+    pubkey_agg: bool,
+) -> Result<EvmEventConfig> {
+    let mut evm_config = EvmEventConfig::new();
+    for chain in chains.iter().filter(|chain| chain.enabled.unwrap_or(true)) {
+        let provider = provider_cache.ensure_read_provider(chain).await?;
+        let chain_id = provider.chain_id();
+        evm_config.insert(chain_id, chain.try_into()?);
+        let mut system = EvmSystemChainBuilder::new(&bus, &provider);
+
+        if contract_components.enclave {
+            let write_provider = provider_cache.ensure_write_provider(chain).await?;
+            let contract = &chain.contracts.enclave;
+            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?);
+            system.with_contract(contract.address()?, move |next| {
+                EnclaveSolReader::setup(&next).recipient()
+            });
         }
 
-        let signer = load_signer_from_repository(repositories.eth_private_key(), cipher).await?;
-        self.signer_cache = Some(signer.clone());
-        Ok(signer)
-    }
+        if contract_components.enclave_reader {
+            let contract = &chain.contracts.enclave;
 
-    pub async fn ensure_read_provider(
-        &mut self,
-        chain: &ChainConfig,
-    ) -> Result<EthProvider<ConcreteReadProvider>> {
-        if let Some(cache) = self.read_provider_cache.get(chain) {
-            return Ok(cache.clone());
-        }
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let read_provider = provider_config.create_readonly_provider().await?;
-        self.read_provider_cache
-            .insert(chain.clone(), read_provider.clone());
-        Ok(read_provider)
-    }
-
-    pub async fn ensure_write_provider(
-        &mut self,
-        repositories: &Repositories,
-        chain: &ChainConfig,
-        cipher: &Cipher,
-    ) -> Result<EthProvider<ConcreteWriteProvider>> {
-        if let Some(cache) = self.write_provider_cache.get(chain) {
-            return Ok(cache.clone());
+            system.with_contract(contract.address()?, move |next| {
+                EnclaveSolReader::setup(&next).recipient()
+            });
         }
 
-        let signer = self.ensure_signer(cipher, repositories).await?;
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let write_provider = provider_config.create_signer_provider(&signer).await?;
-        self.write_provider_cache
-            .insert(chain.clone(), write_provider.clone());
-        Ok(write_provider)
+        if contract_components.bonding_registry {
+            let contract = &chain.contracts.bonding_registry;
+            system.with_contract(contract.address()?, move |next| {
+                BondingRegistrySolReader::setup(&next).recipient()
+            });
+        }
+
+        if contract_components.ciphernode_registry {
+            let contract = &chain.contracts.ciphernode_registry;
+
+            system.with_contract(contract.address()?, move |next| {
+                CiphernodeRegistrySolReader::setup(&next).recipient()
+            });
+
+            // TODO: Should we not let this pass and just use '?'?
+            // Above if we include enclave in the config and we don't have a wallet it will fail
+            match provider_cache
+                    .ensure_write_provider(&chain)
+                    .await
+                {
+                    Ok(write_provider) => {
+                        CiphernodeRegistrySol::attach_writer(
+                            &bus,
+                            write_provider.clone(),
+                            contract.address()?,
+                            pubkey_agg,
+                        );
+                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
+
+                        if pubkey_agg {
+                            info!("Attaching CommitteeFinalizer for score sortition");
+                            CommitteeFinalizer::attach(&bus);
+                        }
+                    }
+                    Err(e) => error!(
+                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+                        e
+                    )
+                }
+        }
+        system.build();
     }
+
+    Ok(evm_config)
 }

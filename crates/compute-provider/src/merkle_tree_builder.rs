@@ -6,10 +6,11 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
+use e3_bfv_client::client::compute_ct_commitment;
+use e3_fhe_params::decode_bfv_params;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use num_traits::Num;
-use sha3::{Digest, Keccak256};
 use std::str::FromStr;
 use zk_kit_imt::imt::IMT;
 
@@ -35,22 +36,19 @@ impl MerkleTreeBuilder {
         self
     }
 
-    pub fn compute_leaf_hashes(&mut self, data: &[(Vec<u8>, u64)]) {
+    pub fn compute_leaf_hashes(&mut self, data: &[(Vec<u8>, u64)], params_bytes: &[u8]) {
+        let params = decode_bfv_params(params_bytes).expect("Failed to decode BFV params");
+        let degree = params.degree();
+        let plaintext_modulus = params.plaintext();
+        let moduli = params.moduli().to_vec();
+
         for item in data {
-            let hex_output = hex::encode(Keccak256::digest(&item.0));
-            let sanitized_hex = hex_output.trim_start_matches("0x");
-            let numeric_value = BigUint::from_str_radix(sanitized_hex, 16)
-                .unwrap()
-                .to_string();
-            let fr_element = Fr::from_str(&numeric_value).unwrap();
-            let index_element = Fr::from_str(&item.1.to_string()).unwrap();
-            let mut poseidon_instance = Poseidon::<Fr>::new_circom(2).unwrap();
-            let hash_bigint: BigInt<4> = poseidon_instance
-                .hash(&[fr_element, index_element])
-                .unwrap()
-                .into();
-            let hash = hex::encode(hash_bigint.to_bytes_be());
-            self.leaf_hashes.push(hash);
+            let commitment =
+                compute_ct_commitment(item.0.clone(), degree, plaintext_modulus, moduli.clone())
+                    .expect("Failed to compute ciphertext commitment");
+
+            let commitment_hex = hex::encode(commitment);
+            self.leaf_hashes.push(commitment_hex);
         }
     }
 

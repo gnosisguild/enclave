@@ -29,16 +29,16 @@ The Enclave SDK handles much of this complexity for you, providing:
 
 ### Install the SDK
 
-For TypeScript/JavaScript applications:
+For TypeScript/JavaScript applications install the TypeScript SDK:
 
 ```bash
-pnpm add @enclave-e3/contracts
+pnpm add @enclave-e3/sdk
 ```
 
-For React applications:
+For React applications add the hook helpers as well:
 
 ```bash
-pnpm add @enclave-e3/contracts @enclave-e3/react
+pnpm add @enclave-e3/sdk @enclave-e3/react
 ```
 
 ### Basic TypeScript Client
@@ -265,9 +265,7 @@ class E3CoordinationServer {
       console.log(`Auto-activating E3 ${e3Id}`)
 
       try {
-        // In a real implementation, you'd generate/retrieve the public key
-        const publicKey = '0x...' // Your FHE public key
-        await this.sdk.activateE3(e3Id, publicKey)
+        await this.sdk.activateE3(e3Id)
       } catch (error) {
         console.error(`Failed to activate E3 ${e3Id}:`, error)
       }

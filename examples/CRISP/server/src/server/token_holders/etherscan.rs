@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::CONFIG;
+use crate::server::{models::TokenHolder};
 use alloy::primitives::{Address, U256};
 use alloy::providers::ProviderBuilder;
 use alloy::sol;
 use eyre::{eyre, Context, Result}; // Add this import
 use reqwest;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use tokio::time::{sleep, Duration};
 
@@ -20,6 +20,7 @@ sol! {
     #[sol(rpc)]
     contract ERC20Votes {
         function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
+        function balanceOf(address account) external view returns (uint256);
         function decimals() external view returns (uint8);
     }
 }
@@ -27,14 +28,6 @@ sol! {
 // Config
 pub const ETHERSCAN_API_URL: &str = "https://api.etherscan.io/v2/api";
 const ZERO_ADDRESS: Address = Address::ZERO;
-
-/// Represents a token holder with their address and balance.
-/// Balance is stored as a string to preserve precision for large numbers.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct TokenHolder {
-    pub address: String,
-    pub balance: String,
-}
 
 // Response types
 #[derive(Debug, Deserialize)]
@@ -334,7 +327,7 @@ impl EtherscanClient {
 
         let scale_factor = U256::from(10u128.pow(half_decimals as u32));
 
-        for voter in potential_voters {
+        for voter in potential_voters { 
             match Self::get_past_votes(token_address, voter.address, block_number, rpc_url).await {
                 Ok(votes) => {
                     if votes >= threshold {
@@ -453,13 +446,22 @@ impl EtherscanClient {
         let provider = ProviderBuilder::new().connect_http(url);
         let token = ERC20Votes::new(token_address, provider);
 
-        let votes = token
-            .getPastVotes(voter_address, U256::from(block_number - 1))
+        match token
+            .getPastVotes(voter_address, U256::from(block_number))
             .call()
             .await
-            .context("Failed to call getPastVotes")?;
-
-        Ok(votes)
+        {
+            Ok(votes) => Ok(votes),
+            Err(_) => {
+                // Fallback to balanceOf if getPastVotes fails
+                let balance = token
+                    .balanceOf(voter_address)
+                    .call()
+                    .await
+                    .context("Failed to call balanceOf")?;
+                Ok(balance)
+            }
+        }
     }
 
     /// Get the token decimals
@@ -572,49 +574,118 @@ impl EtherscanClient {
 
         Ok(token_holders)
     }
+
+    /// Get all token holders with a constant balance
+    /// Returns all addresses that either have a token balance or have delegation,
+    /// with their balance set to the provided constant value.
+    /// No RPC verification - eligibility is based purely on log analysis.
+    pub async fn get_token_holders_with_constant_balance(
+        &self,
+        token_address: Address,
+        snapshot_block: u64,
+        balance: U256,
+    ) -> Result<Vec<TokenHolder>> {
+        log::info!(
+            "Starting token holder discovery (constant balance) for {}",
+            token_address
+        );
+
+        // Step 1: Determine starting block
+        let start_block = self
+            .get_deployment_block(&token_address.to_string())
+            .await
+            .context("Failed to get deployment block")?;
+        log::info!("Token deployed at block: {}", start_block);
+
+        // Step 2: Fetch transfer logs
+        log::info!(
+            "Fetching transfer logs from block {} to {}...",
+            start_block,
+            snapshot_block
+        );
+        let transfer_logs = self
+            .get_transfer_logs(&token_address.to_string(), start_block, snapshot_block)
+            .await
+            .context("Failed to fetch transfer logs")?;
+        log::info!("Found {} transfer events", transfer_logs.len());
+
+        // Step 3: Fetch delegation logs
+        log::info!("Fetching delegation logs...");
+        let delegation_logs = self
+            .get_delegate_votes_changed_logs(
+                &token_address.to_string(),
+                start_block,
+                snapshot_block,
+            )
+            .await
+            .context("Failed to fetch delegation logs")?;
+        log::info!("Found {} delegation events", delegation_logs.len());
+
+        // Step 4: Identify potential voters
+        log::info!("Identifying potential voters...");
+        let potential_voters = self.get_potential_voters(&transfer_logs, &delegation_logs);
+        log::info!("Found {} potential voters", potential_voters.len());
+
+        // Step 5: Convert to token holders with constant balance
+        let token_holders: Vec<TokenHolder> = potential_voters
+            .into_iter()
+            .filter(|v| v.token_balance > U256::ZERO || v.has_delegation)
+            .map(|v| TokenHolder {
+                address: v.address.to_string(),
+                balance: balance.to_string(),
+            })
+            .collect();
+
+        log::info!(
+            "Discovery complete: {} eligible addresses",
+            token_holders.len()
+        );
+
+        Ok(token_holders)
+    }
 }
 
 /// Convenience function to get mocked token holder data for testing.
 pub fn get_mock_token_holders() -> Vec<TokenHolder> {
     vec![
         TokenHolder {
-            address: "0x1234567890123456789012345678901234567890".to_string(),
-            balance: "1000".to_string(),
+            address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x2345678901234567890123456789012345678901".to_string(),
-            balance: "500".to_string(),
+            address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x3456789012345678901234567890123456789012".to_string(),
-            balance: "250".to_string(),
+            address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x4567890123456789012345678901234567890123".to_string(),
-            balance: "100".to_string(),
+            address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x5678901234567890123456789012345678901234".to_string(),
-            balance: "75".to_string(),
+            address: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x6789012345678901234567890123456789012345".to_string(),
-            balance: "50".to_string(),
+            address: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x7890123456789012345678901234567890123456".to_string(),
-            balance: "25".to_string(),
+            address: "0x976EA74026E726554dB657fA54763abd0C3a0aa9".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x8901234567890123456789012345678901234567".to_string(),
-            balance: "10".to_string(),
+            address: "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x9012345678901234567890123456789012345678".to_string(),
-            balance: "5".to_string(),
+            address: "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f".to_string(),
+            balance: "1".to_string(),
         },
         TokenHolder {
-            address: "0x0123456789012345678901234567890123456789".to_string(),
+            address: "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720".to_string(),
             balance: "1".to_string(),
         },
     ]
@@ -623,6 +694,7 @@ pub fn get_mock_token_holders() -> Vec<TokenHolder> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::CONFIG;
 
     #[test]
     fn test_extract_addresses() {

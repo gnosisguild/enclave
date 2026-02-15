@@ -5,132 +5,39 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    Keyshare, KeyshareParams, KeyshareRepositoryFactory, KeyshareState, ThresholdKeyshare,
-    ThresholdKeyshareParams, ThresholdKeyshareRepositoryFactory, ThresholdKeyshareState,
+    ThresholdKeyshare, ThresholdKeyshareParams, ThresholdKeyshareRepositoryFactory,
+    ThresholdKeyshareState,
 };
-use actix::{Actor, Addr};
+use actix::Actor;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData};
-use e3_fhe::ext::FHE_KEY;
-use e3_multithread::Multithread;
+use e3_fhe_params::BfvPreset;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
+
+use crate::KeyshareState;
 use std::sync::Arc;
-
-pub struct KeyshareExtension {
-    bus: BusHandle,
-    address: String,
-    cipher: Arc<Cipher>,
-}
-
-impl KeyshareExtension {
-    pub fn create(bus: &BusHandle, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
-        Box::new(Self {
-            bus: bus.clone(),
-            address: address.to_owned(),
-            cipher: cipher.to_owned(),
-        })
-    }
-}
-
-const ERROR_KEYSHARE_FHE_MISSING: &str =
-    "Could not create Keyshare because the fhe instance it depends on was not set on the context.";
-
-#[async_trait]
-impl E3Extension for KeyshareExtension {
-    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
-        // if this is NOT a CiphernodeSelected event then ignore
-        let EnclaveEventData::CiphernodeSelected(data) = evt.get_data() else {
-            return;
-        };
-
-        // Has the FHE dependency been already setup? (hint: it should have)
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus
-                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
-            return;
-        };
-
-        let e3_id = data.clone().e3_id;
-        let repo = ctx.repositories().keyshare(&e3_id);
-        let container = repo.send(None); // New container with None
-
-        ctx.set_event_recipient(
-            "keyshare",
-            Some(
-                Keyshare::new(KeyshareParams {
-                    bus: self.bus.clone(),
-                    secret: container,
-                    fhe: fhe.clone(),
-                    address: self.address.clone(),
-                    cipher: self.cipher.clone(),
-                })
-                .start()
-                .into(),
-            ),
-        );
-    }
-
-    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
-        // No keyshare on the snapshot -> bail
-        if !snapshot.contains("keyshare") {
-            return Ok(());
-        };
-
-        // Get the saved state as a persistable
-        let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
-
-        // No Snapshot returned from the sync_secret -> bail
-        if !sync_secret.has() {
-            return Ok(());
-        };
-
-        // Has the FHE dependency been already setup? (hint: it should have)
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus
-                .err(EType::KeyGeneration, anyhow!(ERROR_KEYSHARE_FHE_MISSING));
-            return Ok(());
-        };
-
-        // Construct from snapshot
-        let value = Keyshare::new(KeyshareParams {
-            fhe: fhe.clone(),
-            bus: self.bus.clone(),
-            secret: sync_secret,
-            address: self.address.clone(),
-            cipher: self.cipher.clone(),
-        })
-        .start()
-        .into();
-
-        // send to context
-        ctx.set_event_recipient("keyshare", Some(value));
-
-        Ok(())
-    }
-}
-
 pub struct ThresholdKeyshareExtension {
     bus: BusHandle,
     cipher: Arc<Cipher>,
     address: String,
-    multithread: Addr<Multithread>,
+    share_enc_preset: BfvPreset,
 }
 
 impl ThresholdKeyshareExtension {
     pub fn create(
         bus: &BusHandle,
         cipher: &Arc<Cipher>,
-        multithread: &Addr<Multithread>,
         address: &str,
+        share_enc_preset: BfvPreset,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
-            multithread: multithread.clone(),
             address: address.to_owned(),
+            share_enc_preset,
         })
     }
 }
@@ -171,8 +78,8 @@ impl E3Extension for ThresholdKeyshareExtension {
                 ThresholdKeyshare::new(ThresholdKeyshareParams {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
-                    multithread: self.multithread.clone(),
                     state: container,
+                    share_enc_preset: self.share_enc_preset,
                 })
                 .start()
                 .into(),
@@ -201,8 +108,8 @@ impl E3Extension for ThresholdKeyshareExtension {
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
-            multithread: self.multithread.clone(),
             state,
+            share_enc_preset: self.share_enc_preset,
         })
         .start()
         .into();

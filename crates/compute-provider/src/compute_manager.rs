@@ -59,7 +59,10 @@ where
         let num_leaves = self.input.fhe_inputs.ciphertexts.len();
         let mut tree_builder = MerkleTreeBuilder::new(num_leaves);
 
-        tree_builder.compute_leaf_hashes(&self.input.fhe_inputs.ciphertexts);
+        tree_builder.compute_leaf_hashes(
+            &self.input.fhe_inputs.ciphertexts,
+            &self.input.fhe_inputs.params,
+        );
         self.input.leaf_hashes = tree_builder.leaf_hashes.clone();
 
         // Compute the ciphertext
@@ -87,7 +90,7 @@ where
             .map(|chunk| {
                 let mut tree_builder = MerkleTreeBuilder::new(chunk.len());
 
-                tree_builder.compute_leaf_hashes(&chunk);
+                tree_builder.compute_leaf_hashes(&chunk, params.as_slice());
                 let merkle_root = tree_builder.build_tree().root().unwrap();
 
                 let fhe_inputs = FHEInputs {

@@ -65,18 +65,9 @@ export type MerkleProof = {
 }
 
 /**
- * Type representing a vote with power for 'yes' and 'no'
+ * Type representing a vote
  */
-export type Vote = {
-  /**
-   * The voting power for 'yes' votes
-   */
-  yes: bigint
-  /**
-   * The voting power for 'no' votes
-   */
-  no: bigint
-}
+export type Vote = bigint[]
 
 /**
  * Type representing a vector with coefficients
@@ -125,6 +116,7 @@ export type CircuitInputs = {
   // Ciphertext Addition Section.
   prev_ct0is: Polynomial[]
   prev_ct1is: Polynomial[]
+  prev_ct_commitment: string
   sum_ct0is: Polynomial[]
   sum_ct1is: Polynomial[]
   sum_r0is: Polynomial[]
@@ -162,30 +154,51 @@ export type CircuitInputs = {
   balance: string
   // Whether this is the first vote for this slot.
   is_first_vote: boolean
+  // Whether this is a mask vote.
+  is_mask_vote: boolean
+  // The number of options for this vote
+  num_options: string
+}
+
+export type ProofData = {
+  publicInputs: string[]
+  proof: Uint8Array
+  encryptedVote: Uint8Array
 }
 
 export type ExecuteCircuitResult = {
   witness: Uint8Array
-  returnValue: [Polynomial[][], Polynomial[][]]
+  returnValue: bigint
 }
 
 export type ProofInputs = {
+  previousCiphertext?: Uint8Array
   vote: Vote
   publicKey: Uint8Array
   signature: `0x${string}`
+  messageHash: `0x${string}`
   balance: bigint
   slotAddress: string
-  previousCiphertext?: Uint8Array
   merkleProof: MerkleProof
-  messageHash?: `0x${string}`
+  isMaskVote: boolean
 }
 
 export type MaskVoteProofInputs = {
-  previousCiphertext?: Uint8Array
-  merkleLeaves: string[] | bigint[]
   publicKey: Uint8Array
   balance: bigint
   slotAddress: string
+  merkleLeaves: string[] | bigint[]
+  previousCiphertext?: Uint8Array
+  numOptions: number
+}
+
+export type MaskVoteProofRequest = {
+  e3Id: number
+  publicKey: Uint8Array
+  balance: bigint
+  slotAddress: string
+  merkleLeaves: string[] | bigint[]
+  numOptions: number
 }
 
 export type VoteProofInputs = {
@@ -194,6 +207,28 @@ export type VoteProofInputs = {
   balance: bigint
   vote: Vote
   signature: `0x${string}`
-  previousCiphertext?: Uint8Array
   messageHash: `0x${string}`
+  slotAddress: string
+  previousCiphertext?: Uint8Array
+}
+
+export type VoteProofRequest = {
+  e3Id: number
+  merkleLeaves: string[] | bigint[]
+  publicKey: Uint8Array
+  balance: bigint
+  vote: Vote
+  signature: `0x${string}`
+  messageHash: `0x${string}`
+  slotAddress: string
+}
+
+/**
+ * Enum representing the credit mode for a round, which can be either constant or custom.
+ * In constant mode, all voters receive the same amount of credits, while in custom mode,
+ * the credits can vary based on certain criteria (e.g., voter balance).
+ */
+export enum CreditMode {
+  CONSTANT = 0,
+  CUSTOM = 1,
 }

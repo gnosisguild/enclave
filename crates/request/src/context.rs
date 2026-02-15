@@ -80,13 +80,15 @@ impl E3Context {
 
     pub fn forward_message(&self, msg: &EnclaveEvent, buffer: &mut EventBuffer) {
         self.recipients().into_iter().for_each(|(key, recipient)| {
+            // Use composite key of e3_id:recipient_key to scope buffered events per E3 request
+            let buffer_key = format!("{}:{}", self.e3_id, key);
             if let Some(act) = recipient {
                 act.do_send(msg.clone());
-                for m in buffer.take(&key) {
+                for m in buffer.take(&buffer_key) {
                     act.do_send(m);
                 }
             } else {
-                buffer.add(&key, msg.clone());
+                buffer.add(&buffer_key, msg.clone());
             }
         });
     }

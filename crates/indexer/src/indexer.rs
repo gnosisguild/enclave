@@ -19,7 +19,7 @@ use e3_evm_helpers::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, ProviderType, ReadOnly, ReadWrite,
     },
     event_listener::EventListener,
-    events::{CiphertextOutputPublished, E3Activated, PlaintextOutputPublished},
+    events::{CiphertextOutputPublished, CommitteePublished, PlaintextOutputPublished},
 };
 use eyre::eyre;
 use eyre::Result;
@@ -329,54 +329,51 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
             .await;
     }
 
-    async fn register_e3_activated(&mut self) -> Result<()> {
-        self.add_event_handler(move |e: E3Activated, ctx| {
-            async move {
-                let contract = ctx.contract();
-                let db = ctx.store();
-                let enclave_address = ctx.enclave_address();
-                println!(
-                    "E3Activated: id={}, expiration={}, pubkey=0x{}...",
-                    e.e3Id,
-                    e.expiration,
-                    hex::encode(&e.committeePublicKey[..8.min(e.committeePublicKey.len())])
-                );
-                let e3_id = u64_try_from(e.e3Id)?;
-                let e3 = contract.get_e3(e.e3Id).await?;
-                let duration = u64_try_from(e3.duration)?;
-                let expiration = u64_try_from(e.expiration)?;
-                let seed = e3.seed.to_be_bytes();
-                let request_block = u64_try_from(e3.requestBlock)?;
-                let start_window = [
-                    u64_try_from(e3.startWindow[0])?,
-                    u64_try_from(e3.startWindow[1])?,
-                ];
-                // NOTE: we are only saving protocol specific info
-                // here and not CRISP specific info so E3 corresponds to the solidity E3
-                let e3_obj = E3 {
-                    chain_id: ctx.chain_id(),
-                    ciphertext_inputs: vec![],
-                    ciphertext_output: vec![],
-                    committee_public_key: e.committeePublicKey.to_vec(),
-                    duration,
-                    custom_params: e3.customParams.to_vec(),
-                    e3_params: e3.e3ProgramParams.to_vec(),
-                    enclave_address,
-                    encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                    expiration,
-                    id: e3_id,
-                    plaintext_output: vec![],
-                    request_block,
-                    seed,
-                    start_window,
-                    threshold: e3.threshold,
-                };
+    async fn register_committee_published(&mut self) -> Result<()> {
+        self.add_event_handler(move |e: CommitteePublished, ctx| async move {
+            let contract = ctx.contract();
+            let db = ctx.store();
+            let enclave_address = ctx.enclave_address();
+            let e3_id = u64_try_from(e.e3Id)?;
 
-                let mut repo = E3Repository::new(db, e3_id);
+            info!(
+                "CommitteePublished: id={}, public_key_len={}",
+                e.e3Id,
+                e.publicKey.len()
+            );
 
-                repo.set_e3(e3_obj).await?;
-                Ok(())
-            }
+            let e3 = contract.get_e3(e.e3Id).await?;
+            let seed = e3.seed.to_be_bytes();
+            let request_block = u64_try_from(e3.requestBlock)?;
+            let input_window = [
+                u64_try_from(e3.inputWindow[0])?,
+                u64_try_from(e3.inputWindow[1])?,
+            ];
+
+            let e3_obj = E3 {
+                chain_id: ctx.chain_id(),
+                ciphertext_inputs: vec![],
+                ciphertext_output: vec![],
+                committee_public_key: e.publicKey.to_vec(),
+                custom_params: e3.customParams.to_vec(),
+                e3_params: e3.e3ProgramParams.to_vec(),
+                enclave_address,
+                encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
+                id: e3_id,
+                plaintext_output: vec![],
+                request_block,
+                seed,
+                input_window,
+                threshold: e3.threshold,
+                requester: e3.requester.to_string(),
+            };
+
+            let mut repo = E3Repository::new(db, e3_id);
+            repo.set_e3(e3_obj).await?;
+
+            info!("E3 {} created and stored", e3_id);
+
+            Ok(())
         })
         .await;
         Ok(())
@@ -441,7 +438,7 @@ impl<S: DataStore, R: ProviderType> EnclaveIndexer<S, R> {
 
     async fn setup_listeners(&mut self) -> Result<()> {
         info!("Setting up listeners for EnclaveIndexer...");
-        self.register_e3_activated().await?;
+        self.register_committee_published().await?;
         self.register_ciphertext_output_published().await?;
         self.register_plaintext_output_published().await?;
         self.register_blocktime_callback_handler().await?;

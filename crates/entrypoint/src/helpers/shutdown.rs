@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
-use e3_events::{prelude::*, BusHandle, Shutdown};
+use e3_ciphernode_builder::CiphernodeHandle;
+use e3_events::{prelude::*, Shutdown};
 use std::time::Duration;
 use tokio::{
     select,
     signal::unix::{signal, SignalKind},
-    task::JoinHandle,
 };
 use tracing::{error, info};
 
-pub async fn listen_for_shutdown(bus: BusHandle, mut handle: JoinHandle<Result<()>>) {
+pub async fn listen_for_shutdown(node: CiphernodeHandle) {
+    let (bus, mut handle) = node.split();
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
     select! {
@@ -22,7 +22,7 @@ pub async fn listen_for_shutdown(bus: BusHandle, mut handle: JoinHandle<Result<(
             info!("SIGTERM received, initiating graceful shutdown...");
 
             // Stop the actor system
-            match bus.publish(Shutdown){
+            match bus.publish_without_context(Shutdown){
                 Ok(_) => (),
                 Err(e) => error!("Shutdown failed to publish! {e}")
             }

@@ -8,21 +8,22 @@ use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
     CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
+    RoundRequestWithRequester,
 };
 
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use alloy::sol_types::SolValue;
 use chrono::Utc;
-use crisp_constants::get_default_paramset;
-use e3_sdk::bfv_helpers::{build_bfv_params_from_set_arc, encode_bfv_params};
+use e3_fhe_params::default_param_set;
+use e3_fhe_params::{build_bfv_params_from_set_arc, encode_bfv_params};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/rounds")
-            .route("/current", web::get().to(get_current_round))
+            .route("/current", web::post().to(get_current_round))
             .route("/public-key", web::post().to(get_public_key))
             .route("/ciphertext", web::post().to(get_ciphertext))
             .route("/request", web::post().to(request_new_round)),
@@ -74,8 +75,26 @@ async fn request_new_round(data: web::Json<RoundRequest>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the current round
-async fn get_current_round(store: web::Data<AppData>) -> impl Responder {
-    match store.current_round().get_current_round().await {
+async fn get_current_round(
+    data: web::Json<RoundRequestWithRequester>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    // Get the first requester if any exist
+    // .get(0) returns Option<&String>, so we need to handle that
+    let result = if let Some(requester) = incoming.requesters.get(0) {
+        // We have a requester, filter by it
+        store
+            .current_round()
+            .get_current_round_for_requester(requester.clone())
+            .await
+    } else {
+        // No requester provided (empty array)
+        store.current_round().get_current_round().await
+    };
+
+    match result {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
@@ -180,7 +199,7 @@ pub async fn initialize_crisp_round(
     }
 
     info!("Generating parameters...");
-    let params = encode_bfv_params(&build_bfv_params_from_set_arc(get_default_paramset()));
+    let params = encode_bfv_params(&build_bfv_params_from_set_arc(default_param_set()));
 
     let token_address: Address = token_address.parse()?;
     let balance_threshold = U256::from_str_radix(&balance_threshold, 10)?;
@@ -190,11 +209,8 @@ pub async fn initialize_crisp_round(
 
     info!("Requesting E3...");
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let start_window: [U256; 2] = [
-        U256::from(Utc::now().timestamp()),
-        U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
-    ];
-    let duration: U256 = U256::from(CONFIG.e3_duration);
+    
+    let input_window = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp()) + U256::from(CONFIG.e3_duration)];
     let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
@@ -205,8 +221,7 @@ pub async fn initialize_crisp_round(
     let (receipt, e3_id) = contract
         .request_e3(
             threshold,
-            start_window,
-            duration,
+            input_window,
             e3_program,
             e3_params,
             compute_provider_params,
