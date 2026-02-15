@@ -138,9 +138,6 @@ impl PublicKeyAggregator {
         })
     }
 
-    /// Handle a committee member being expelled by reducing the expected
-    /// keyshare count. If enough keyshares have already been collected,
-    /// transition to the Computing state.
     pub fn handle_member_expelled(
         &mut self,
         node: &str,
@@ -154,11 +151,9 @@ impl PublicKeyAggregator {
                 ..
             } = &mut state
             else {
-                // Not in collecting state — nothing to adjust
                 return Ok(state);
             };
 
-            // Reduce expected count
             if *threshold_n > 0 {
                 *threshold_n -= 1;
                 info!(
@@ -167,7 +162,6 @@ impl PublicKeyAggregator {
                 );
             }
 
-            // Check if we now have enough keyshares
             if keyshares.len() == *threshold_n && *threshold_n > 0 {
                 info!("PublicKeyAggregator: enough keyshares after expulsion, computing aggregate");
                 return Ok(PublicKeyAggregatorState::Computing {
@@ -206,7 +200,6 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
                     self.handle_member_expelled(&node_addr, &ec)?;
 
-                    // If the state transitioned to Computing, trigger aggregation
                     if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
                         &self.state.get()
                     {
@@ -286,7 +279,6 @@ impl Handler<TypedEvent<ComputeAggregate>> for PublicKeyAggregator {
                 self.fhe.params.moduli().to_vec(),
             )?;
 
-            // Update the local state
             self.set_pubkey(pubkey, &ec)?;
 
             if let Some(PublicKeyAggregatorState::Complete {

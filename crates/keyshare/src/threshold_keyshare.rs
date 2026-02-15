@@ -308,9 +308,6 @@ pub struct ThresholdKeyshare {
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     state: Persistable<ThresholdKeyshareState>,
     share_enc_preset: BfvPreset,
-    /// Committee member addresses, ordered by party_id (index = party_id).
-    /// Populated when `CommitteeFinalized` is received. Used to resolve
-    /// `CommitteeMemberExpelled.node` (Address) → `party_id` (u64).
     committee: Option<Vec<String>>,
 }
 
@@ -376,12 +373,6 @@ impl ThresholdKeyshare {
         Ok(addr.clone())
     }
 
-    /// Handle a committee member being expelled (slashed on-chain).
-    ///
-    /// Resolves the expelled node's address to a party_id using the stored
-    /// committee list, then forwards expulsion messages to the encryption key
-    /// and threshold share collectors so they can remove the party from their
-    /// `todo` sets. This allows the DKG to complete with N-1 parties.
     fn handle_committee_member_expelled(
         &mut self,
         data: CommitteeMemberExpelled,
@@ -393,11 +384,8 @@ impl ThresholdKeyshare {
             node_addr, data.e3_id, data.active_count_after
         );
 
-        // Resolve Address → party_id using stored committee list
         let party_id = match &self.committee {
             Some(committee) => {
-                // The committee list is ordered by party_id (index = party_id)
-                // Normalize both to lowercase checksummed for comparison
                 let node_lower = node_addr.to_lowercase();
                 committee
                     .iter()
@@ -426,7 +414,6 @@ impl ThresholdKeyshare {
             node_addr, party_id
         );
 
-        // Forward expulsion to encryption key collector
         if let Some(ref collector) = self.encryption_key_collector {
             collector.do_send(ExpelPartyFromKeyCollection {
                 party_id,
@@ -434,7 +421,6 @@ impl ThresholdKeyshare {
             });
         }
 
-        // Forward expulsion to threshold share collector
         if let Some(ref collector) = self.decryption_key_collector {
             collector.do_send(ExpelPartyFromShareCollection { party_id, ec });
         }

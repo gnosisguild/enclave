@@ -4,22 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Core business logic actor for verifying received encryption keys.
-//!
-//! This actor verifies `EncryptionKeyReceived` events and converts them
-//! to `EncryptionKeyCreated` events after validation.
-//!
-//! ## Signature Verification
-//!
-//! Every received key must carry a [`SignedProofPayload`]. This actor:
-//! 1. Recovers the address from the ECDSA signature.
-//! 2. Delegates the ZK proof to `ZkActor` for verification.
-//! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
-//!    so fault attribution can submit a slash on-chain. The E3 is NOT killed
-//!    locally — the on-chain `SlashingManager` decides whether to fail the E3
-//!    based on whether the committee drops below threshold after expulsion.
-//!
-//! Keys without a signed proof are rejected outright.
+//! Verifies `EncryptionKeyReceived` events: recovers ECDSA address, delegates
+//! ZK proof to `ZkActor`, and on failure emits [`SignedProofFailed`] for
+//! on-chain fault attribution.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,7 +21,6 @@ use e3_events::{
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
 
-/// Request to verify a ZK proof.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationRequest {
@@ -44,7 +30,6 @@ pub struct ZkVerificationRequest {
     pub sender: Recipient<TypedEvent<ZkVerificationResponse>>,
 }
 
-/// Response from ZK proof verification with context.
 #[derive(Debug, Clone, Message)]
 #[rtype(result = "()")]
 pub struct ZkVerificationResponse {
@@ -54,25 +39,15 @@ pub struct ZkVerificationResponse {
     pub key: Arc<EncryptionKey>,
 }
 
-/// Tracks a pending verification including the signed payload for fault evidence.
 #[derive(Clone, Debug)]
 struct PendingVerification {
     signed_payload: SignedProofPayload,
     recovered_signer: Address,
 }
 
-/// Core actor that handles encryption key verification.
-///
-/// Requires every received key to carry a [`SignedProofPayload`].
-/// On ZK verification failure, emits [`SignedProofFailed`] so the
-/// `FaultSubmitter` can submit a slash on-chain. The on-chain
-/// `SlashingManager` then decides whether to fail the E3 based on
-/// whether the committee drops below threshold after expulsion.
 pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
-    /// Tracks signed payloads for keys currently being verified,
-    /// keyed by `(e3_id, party_id)`.
     pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
@@ -108,7 +83,6 @@ impl ProofVerificationActor {
             return;
         };
 
-        // Signed proofs are mandatory — reject keys without a signed payload
         let signed = match &msg.key.signed_payload {
             Some(signed) => signed.clone(),
             None => {
@@ -120,7 +94,6 @@ impl ProofVerificationActor {
             }
         };
 
-        // Recover the address from the signature
         let recovered_address = match signed.recover_address() {
             Ok(addr) => {
                 info!(
@@ -138,7 +111,6 @@ impl ProofVerificationActor {
             }
         };
 
-        // Store the signed payload so we can reference it in the verification response
         self.pending.insert(
             (msg.e3_id.clone(), msg.key.party_id),
             PendingVerification {
@@ -234,7 +206,6 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                 msg.key.party_id, error_msg
             );
 
-            // Emit SignedProofFailed for fault attribution
             if let Some(PendingVerification {
                 signed_payload,
                 recovered_signer,

@@ -4,14 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! FaultSubmitter actor — subscribes to `SignedProofFailed` events and submits
-//! `proposeSlash` transactions on the SlashingManager contract.
-//!
-//! When a ciphernode broadcasts a ZK proof that fails local verification,
-//! the `ProofVerificationActor` emits a `SignedProofFailed` event carrying the
-//! self-authenticating evidence (the signed proof payload).  This actor consumes
-//! that event, ABI-encodes the proof data, and calls `proposeSlash(e3Id, operator,
-//! reason, proof)` on-chain.
+//! Subscribes to `SignedProofFailed` events and submits `proposeSlash`
+//! transactions on the SlashingManager contract.
 
 use crate::helpers::EthProvider;
 use crate::send_tx_with_retry;
@@ -41,7 +35,7 @@ sol!(
     "../../packages/enclave-contracts/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json"
 );
 
-/// Consumes `SignedProofFailed` events and submits slash proposals on-chain.
+/// Submits `SignedProofFailed` events as slash proposals on-chain.
 pub struct SlashingManagerSolWriter<P> {
     provider: EthProvider<P>,
     contract_address: Address,
@@ -87,7 +81,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg.into_data() {
             EnclaveEventData::SignedProofFailed(data) => {
-                // Only submit if the chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
@@ -145,11 +138,11 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     let operator = data.faulting_node;
     let reason = keccak256(data.proof_type.slash_reason().as_bytes());
 
-    // Encode the proof as (bytes zkProof, bytes32[] publicInputs) per SlashingManager.proposeSlash
+    // Encode as (bytes zkProof, bytes32[] publicInputs)
     let zk_proof = Bytes::copy_from_slice(&data.signed_payload.payload.proof.data);
     let public_inputs_bytes = &data.signed_payload.payload.proof.public_signals;
 
-    // Convert public signals to bytes32[] — each 32-byte chunk is one element
+    // Each 32-byte chunk of public_signals becomes one bytes32 element
     let mut public_inputs: Vec<[u8; 32]> = Vec::new();
     for chunk in public_inputs_bytes.chunks(32) {
         let mut padded = [0u8; 32];
@@ -158,7 +151,6 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
         public_inputs.push(padded);
     }
 
-    // abi.encode(bytes, bytes32[])
     let proof_data = (zk_proof, public_inputs).abi_encode();
 
     let from_address = provider.provider().default_signer_address();

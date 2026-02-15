@@ -4,9 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Reads `SlashExecuted` events from the SlashingManager contract on-chain
-//! and converts them into `EnclaveEventData::SlashExecuted` events on the bus.
-
 use crate::{
     events::EvmEventProcessor, evm_parser::EvmParser, slashing_manager_sol_writer::ISlashingManager,
 };
@@ -16,7 +13,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use e3_events::{E3id, EnclaveEventData};
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEventData> {
     match topic {
@@ -25,8 +22,12 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event SlashExecuted after topic was matched!");
                 return None;
             };
+            info!(
+                "SlashExecuted event received: proposal_id={}, e3_id={}, operator={}, reason={:?}, ticket={}, license={}",
+                event.proposalId, event.e3Id, event.operator, event.reason, event.ticketAmount, event.licenseAmount
+            );
             Some(EnclaveEventData::from(e3_events::SlashExecuted {
-                e3_id: E3id::new("0", chain_id), // SlashExecuted doesn't carry e3Id directly
+                e3_id: E3id::new(event.e3Id.to_string(), chain_id),
                 proposal_id: event.proposalId.to(),
                 operator: event.operator,
                 reason: event.reason.into(),

@@ -185,6 +185,8 @@ describe("Enclave", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: addressOne,
+            ciphernodeRegistry: addressOne,
+            enclave: addressOne,
           },
         },
       },

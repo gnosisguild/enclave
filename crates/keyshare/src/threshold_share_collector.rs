@@ -34,10 +34,8 @@ pub(crate) enum CollectorState {
 #[rtype(result = "()")]
 pub struct ThresholdShareCollectionTimeout;
 
-/// Message sent when a committee member has been expelled (slashed on-chain).
-///
-/// The collector removes this party from its `todo` set so the DKG can
-/// complete with N-1 shares instead of waiting for a share that will never arrive.
+/// Removes this party from the `todo` set so the DKG can complete with
+/// N-1 shares instead of waiting for a share that will never arrive.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ExpelPartyFromShareCollection {
@@ -178,7 +176,6 @@ impl Handler<ThresholdShareCollectionTimeout> for ThresholdShareCollector {
             missing_parties,
         });
 
-        // Stop the actor
         ctx.stop();
     }
 }

@@ -134,6 +134,8 @@ describe("CiphernodeRegistryOwnable", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: AddressOne,
+            ciphernodeRegistry: AddressOne,
+            enclave: AddressOne,
           },
         },
       },

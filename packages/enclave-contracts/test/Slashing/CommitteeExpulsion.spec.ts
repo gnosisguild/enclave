@@ -898,6 +898,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         .to.emit(slashingManager, "SlashExecuted")
         .withArgs(
           0, // proposalId
+          0, // e3Id
           op1Addr,
           REASON_BAD_DKG,
           ethers.parseUnits("10", 6), // ticketPenalty

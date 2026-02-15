@@ -14,9 +14,11 @@
 !/artifacts/contracts/interfaces/IEnclave.sol/
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/
+!/artifacts/contracts/interfaces/ISlashingManager.sol/
 !/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/IBondingRegistry.json
+!/artifacts/contracts/interfaces/ISlashingManager.sol/ISlashingManager.json
 
 # Registry
 !/artifacts/contracts/registry/

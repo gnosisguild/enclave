@@ -233,6 +233,10 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event CommitteeMemberExpelled after topic was matched!");
                 return None;
             };
+            info!(
+                "CommitteeMemberExpelled event received: e3_id={}, node={}, reason={:?}, active_count_after={}",
+                event.e3Id, event.node, event.reason, event.activeCountAfter
+            );
             Some(EnclaveEventData::from(CommitteeMemberExpelledWithChainId(
                 event, chain_id,
             )))

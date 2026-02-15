@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Events emitted by the SlashingManager contract and received on-chain.
-
 use crate::E3id;
 use actix::Message;
 use alloy::primitives::Address;

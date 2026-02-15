@@ -58,10 +58,8 @@ impl From<HashMap<u64, Arc<EncryptionKey>>> for AllEncryptionKeysCollected {
 #[rtype(result = "()")]
 pub struct EncryptionKeyCollectionTimeout;
 
-/// Message sent when a committee member has been expelled (slashed on-chain).
-///
-/// The collector removes this party from its `todo` set so the DKG can
-/// complete with N-1 keys instead of waiting for a key that will never arrive.
+/// Removes this party from the `todo` set so the DKG can complete with
+/// N-1 keys instead of waiting for a key that will never arrive.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct ExpelPartyFromKeyCollection {
@@ -208,7 +206,6 @@ impl Handler<EncryptionKeyCollectionTimeout> for EncryptionKeyCollector {
             missing_parties,
         });
 
-        // Stop the actor
         ctx.stop();
     }
 }
