@@ -32,7 +32,6 @@ import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
-  EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
   EnclaveToken__factory as EnclaveTokenFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
   MockDecryptionVerifier__factory as MockDecryptionVerifierFactory,
