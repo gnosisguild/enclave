@@ -24,6 +24,8 @@ pub struct PathsEngine {
     /// This can either be a fully qualified path to a specific db file or a relative path to the
     /// data_dir location
     db_file_override: Option<PathBuf>,
+    /// This should be a fully qualified path to a specific bb executable
+    bb_file_override: Option<PathBuf>,
     /// This can either be a fully qualified path to a specific log file or a relative path to the
     /// data_dir location
     log_file_override: Option<PathBuf>,
@@ -59,6 +61,7 @@ impl PathsEngine {
         db_file_override: Option<&PathBuf>,
         key_file_override: Option<&PathBuf>,
         log_file_override: Option<&PathBuf>,
+        bb_file_override: Option<&PathBuf>,
     ) -> Self {
         Self {
             name: name.to_owned(),
@@ -71,6 +74,7 @@ impl PathsEngine {
             db_file_override: db_file_override.map(PathBuf::from),
             key_file_override: key_file_override.map(PathBuf::from),
             log_file_override: log_file_override.map(PathBuf::from),
+            bb_file_override: bb_file_override.map(PathBuf::from),
         }
     }
 
@@ -184,6 +188,13 @@ impl PathsEngine {
 
     /// Get the bb binary path
     pub fn bb_binary(&self) -> PathBuf {
+        if let Some(bb_file) = self.bb_file_override.clone() {
+            if bb_file.is_absolute() {
+                return clean(bb_file);
+            } else {
+                return clean(self.noir_dir().join(bb_file));
+            }
+        }
         clean(self.noir_dir().join("bin").join("bb"))
     }
 
@@ -222,6 +233,7 @@ mod test {
         db_file_override: Option<&'static str>,
         log_file_override: Option<&'static str>,
         key_file_override: Option<&'static str>,
+        bb_file_override: Option<&'static str>,
     }
 
     struct PathsExpected {
@@ -229,6 +241,10 @@ mod test {
         key_file: &'static str,
         db_file: &'static str,
         log_file: &'static str,
+        bb_file: &'static str,
+        noir_dir: &'static str,
+        circuits_dir: &'static str,
+        work_dir: &'static str,
     }
 
     fn test_cases(test_cases: Vec<TestCase>) {
@@ -245,6 +261,7 @@ mod test {
             let db_file = test_case.input.db_file_override.map(PathBuf::from);
             let key_file = test_case.input.key_file_override.map(PathBuf::from);
             let log_file = test_case.input.log_file_override.map(PathBuf::from);
+            let bb_file = test_case.input.bb_file_override.map(PathBuf::from);
             let cwd = PathBuf::from(test_case.input.cwd);
 
             let paths = PathsEngine::new(
@@ -258,6 +275,7 @@ mod test {
                 db_file.as_ref(),
                 key_file.as_ref(),
                 log_file.as_ref(),
+                bb_file.as_ref(),
             );
 
             assert_eq!(
@@ -285,6 +303,34 @@ mod test {
                 "Failed log_file assertion for test case: {}",
                 test_case.name
             );
+
+            assert_eq!(
+                paths.bb_binary(),
+                PathBuf::from(test_case.expected.bb_file),
+                "Failed bb_file assertion for test case: {}",
+                test_case.name
+            );
+
+            assert_eq!(
+                paths.noir_dir(),
+                PathBuf::from(test_case.expected.noir_dir),
+                "Failed noir_dir assertion for test case: {}",
+                test_case.name
+            );
+
+            assert_eq!(
+                paths.circuits_dir(),
+                PathBuf::from(test_case.expected.circuits_dir),
+                "Failed circuits_dir assertion for test case: {}",
+                test_case.name
+            );
+
+            assert_eq!(
+                paths.work_dir(test_case.input.name),
+                PathBuf::from(test_case.expected.work_dir),
+                "Failed work_dir assertion for test case: {}",
+                test_case.name
+            );
         }
     }
 
@@ -304,12 +350,17 @@ mod test {
                     db_file_override: None,
                     key_file_override: None,
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/home/user/.config/enclave/enclave.config.yaml",
                     key_file: "/home/user/.config/enclave/_default/key",
                     db_file: "/home/user/.local/share/enclave/_default/db",
                     log_file: "/home/user/.local/share/enclave/_default/log",
+                    bb_file: "/home/user/.config/enclave/.enclave/noir/bin/bb",
+                    noir_dir: "/home/user/.config/enclave/.enclave/noir",
+                    circuits_dir: "/home/user/.config/enclave/.enclave/noir/circuits",
+                    work_dir: "/home/user/.config/enclave/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -325,12 +376,17 @@ mod test {
                     db_file_override: None,
                     key_file_override: None,
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/foo/.enclave/config/_default/key",
                     db_file: "/foo/.enclave/data/_default/db",
                     log_file: "/foo/.enclave/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -346,12 +402,17 @@ mod test {
                     db_file_override: None,
                     key_file_override: None,
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/foo/.enclave/config/_default/key",
                     db_file: "/path/to/data/_default/db",
                     log_file: "/path/to/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -367,12 +428,17 @@ mod test {
                     db_file_override: None,
                     key_file_override: None,
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/_default/key",
                     db_file: "/path/to/data/_default/db",
                     log_file: "/path/to/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -388,12 +454,17 @@ mod test {
                     db_file_override: None,
                     key_file_override: Some("/ding/bat/key_file"),
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/ding/bat/key_file",
                     db_file: "/path/to/data/_default/db",
                     log_file: "/path/to/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -409,6 +480,7 @@ mod test {
                     db_file_override: None,
                     key_file_override: Some("../bat/key_file"),
                     log_file_override: None,
+                    bb_file_override: None,
                 },
 
                 expected: PathsExpected {
@@ -416,6 +488,10 @@ mod test {
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/path/to/data/_default/db",
                     log_file: "/path/to/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -431,12 +507,17 @@ mod test {
                     db_file_override: Some("/ding/blat/foo/my/data"),
                     key_file_override: Some("../bat/key_file"),
                     log_file_override: Some("../ding/loggy"),
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/ding/blat/foo/my/data",
                     log_file: "/path/to/data/ding/loggy",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
             TestCase {
@@ -452,12 +533,69 @@ mod test {
                     db_file_override: Some("../../yes"),
                     key_file_override: Some("../bat/key_file"),
                     log_file_override: None,
+                    bb_file_override: None,
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
                     db_file: "/path/to/yes",
                     log_file: "/path/to/data/_default/log",
+                    bb_file: "/foo/.enclave/noir/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
+                },
+            },
+            TestCase {
+                name: "BB file override absolute",
+                input: PathsInput {
+                    name: "_default",
+                    cwd: "/no/matter",
+                    default_data_dir: "/home/user/.local/share/enclave/data",
+                    default_config_dir: "/home/user/.config/enclave/config",
+                    config_dir_override: None,
+                    found_config_file: Some("/foo/some.config.yaml"),
+                    data_dir_override: None,
+                    db_file_override: None,
+                    key_file_override: None,
+                    log_file_override: None,
+                    bb_file_override: Some("/custom/bin/bb"),
+                },
+                expected: PathsExpected {
+                    config_file: "/foo/some.config.yaml",
+                    key_file: "/foo/.enclave/config/_default/key",
+                    db_file: "/foo/.enclave/data/_default/db",
+                    log_file: "/foo/.enclave/data/_default/log",
+                    bb_file: "/custom/bin/bb",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
+                },
+            },
+            TestCase {
+                name: "BB file override relative",
+                input: PathsInput {
+                    name: "_default",
+                    cwd: "/no/matter",
+                    default_data_dir: "/home/user/.local/share/enclave/data",
+                    default_config_dir: "/home/user/.config/enclave/config",
+                    config_dir_override: None,
+                    found_config_file: Some("/foo/some.config.yaml"),
+                    data_dir_override: None,
+                    db_file_override: None,
+                    key_file_override: None,
+                    log_file_override: None,
+                    bb_file_override: Some("../bb-binary"),
+                },
+                expected: PathsExpected {
+                    config_file: "/foo/some.config.yaml",
+                    key_file: "/foo/.enclave/config/_default/key",
+                    db_file: "/foo/.enclave/data/_default/db",
+                    log_file: "/foo/.enclave/data/_default/log",
+                    bb_file: "/foo/.enclave/bb-binary",
+                    noir_dir: "/foo/.enclave/noir",
+                    circuits_dir: "/foo/.enclave/noir/circuits",
+                    work_dir: "/foo/.enclave/noir/work/_default",
                 },
             },
         ]);

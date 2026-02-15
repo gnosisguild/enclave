@@ -10,6 +10,7 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Result};
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
+use e3_config::BBPath;
 use e3_crypto::Cipher;
 use e3_events::{
     prelude::*, BusHandle, CiphertextOutputPublished, CommitteeFinalized, ConfigurationUpdated,
@@ -108,11 +109,21 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .await
             .unwrap();
 
-        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        let backend = ZkBackend::new(
+            BBPath::Default(bb_binary),
+            circuits_dir,
+            work_dir,
+            ZkConfig::default(),
+        );
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
-        let backend = ZkBackend::new(bb_binary, circuits_dir, work_dir, ZkConfig::default());
+        let backend = ZkBackend::new(
+            BBPath::Default(bb_binary),
+            circuits_dir,
+            work_dir,
+            ZkConfig::default(),
+        );
         backend
             .ensure_installed()
             .await
