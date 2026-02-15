@@ -26,8 +26,8 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::Address;
 use e3_events::{
     BusHandle, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyReceived, Event, EventPublisher, EventSubscriber, EventType,
-    FailureReason, Proof, SignedProofFailed, SignedProofPayload,
+    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
+    EventType, FailureReason, Proof, Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -39,7 +39,7 @@ pub struct ZkVerificationRequest {
     pub proof: Proof,
     pub e3_id: E3id,
     pub key: Arc<EncryptionKey>,
-    pub sender: Recipient<ZkVerificationResponse>,
+    pub sender: Recipient<TypedEvent<ZkVerificationResponse>>,
 }
 
 /// Response from ZK proof verification with context.
@@ -66,14 +66,14 @@ struct PendingVerification {
 /// attribution) and [`E3Failed`] (to stop the E3 computation).
 pub struct ProofVerificationActor {
     bus: BusHandle,
-    verifier: Recipient<ZkVerificationRequest>,
+    verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
     /// Tracks signed payloads for keys currently being verified,
     /// keyed by `(e3_id, party_id)`.
     pending: HashMap<(E3id, u64), PendingVerification>,
 }
 
 impl ProofVerificationActor {
-    pub fn new(bus: &BusHandle, verifier: Recipient<ZkVerificationRequest>) -> Self {
+    pub fn new(bus: &BusHandle, verifier: Recipient<TypedEvent<ZkVerificationRequest>>) -> Self {
         Self {
             bus: bus.clone(),
             verifier,
@@ -81,13 +81,21 @@ impl ProofVerificationActor {
         }
     }
 
-    pub fn setup(bus: &BusHandle, verifier: Recipient<ZkVerificationRequest>) -> Addr<Self> {
+    pub fn setup(
+        bus: &BusHandle,
+        verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
+    ) -> Addr<Self> {
         let addr = Self::new(bus, verifier).start();
         bus.subscribe(EventType::EncryptionKeyReceived, addr.clone().into());
         addr
     }
 
-    fn handle_encryption_key_received(&mut self, msg: EncryptionKeyReceived, ctx: &Context<Self>) {
+    fn handle_encryption_key_received(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyReceived>,
+        ctx: &Context<Self>,
+    ) {
+        let (msg, ec) = msg.into_components();
         let Some(ref proof) = msg.key.proof else {
             error!(
                 "External key from party {} is missing T0 proof - rejecting",
@@ -135,22 +143,33 @@ impl ProofVerificationActor {
             },
         );
 
-        let request = ZkVerificationRequest {
-            proof: proof.clone(),
-            e3_id: msg.e3_id,
-            key: msg.key,
-            sender: ctx.address().recipient(),
-        };
+        let request = TypedEvent::new(
+            ZkVerificationRequest {
+                proof: proof.clone(),
+                e3_id: msg.e3_id,
+                key: msg.key,
+                sender: ctx.address().recipient(),
+            },
+            ec,
+        );
 
         self.verifier.do_send(request);
     }
 
-    fn publish_key_created(&self, e3_id: E3id, key: Arc<EncryptionKey>) {
-        if let Err(err) = self.bus.publish(EncryptionKeyCreated {
-            e3_id,
-            key,
-            external: true,
-        }) {
+    fn publish_key_created(
+        &self,
+        e3_id: E3id,
+        key: Arc<EncryptionKey>,
+        ec: EventContext<Sequenced>,
+    ) {
+        if let Err(err) = self.bus.publish(
+            EncryptionKeyCreated {
+                e3_id,
+                key,
+                external: true,
+            },
+            ec,
+        ) {
             error!("Failed to publish EncryptionKeyCreated: {err}");
         }
     }
@@ -164,25 +183,37 @@ impl Handler<EnclaveEvent> for ProofVerificationActor {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::EncryptionKeyReceived(data) => self.notify_sync(ctx, data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::EncryptionKeyReceived(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<EncryptionKeyReceived> for ProofVerificationActor {
+impl Handler<TypedEvent<EncryptionKeyReceived>> for ProofVerificationActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EncryptionKeyReceived, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyReceived>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.handle_encryption_key_received(msg, ctx)
     }
 }
 
-impl Handler<ZkVerificationResponse> for ProofVerificationActor {
+impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
     type Result = ();
 
-    fn handle(&mut self, msg: ZkVerificationResponse, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ZkVerificationResponse>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let pending_key = (msg.e3_id.clone(), msg.key.party_id);
         let pending = self.pending.remove(&pending_key);
 
@@ -191,7 +222,7 @@ impl Handler<ZkVerificationResponse> for ProofVerificationActor {
                 "T0 proof verified for party {} - accepting key",
                 msg.key.party_id
             );
-            self.publish_key_created(msg.e3_id, msg.key);
+            self.publish_key_created(msg.e3_id, msg.key, ec.clone());
         } else {
             let error_msg = msg.error.unwrap_or_else(|| "unknown error".to_string());
             error!(
@@ -209,22 +240,28 @@ impl Handler<ZkVerificationResponse> for ProofVerificationActor {
                     "Emitting SignedProofFailed for party {} (address: {recovered_signer})",
                     msg.key.party_id
                 );
-                if let Err(err) = self.bus.publish(SignedProofFailed {
-                    e3_id: msg.e3_id.clone(),
-                    faulting_node: recovered_signer,
-                    proof_type: signed_payload.payload.proof_type,
-                    signed_payload,
-                }) {
+                if let Err(err) = self.bus.publish(
+                    SignedProofFailed {
+                        e3_id: msg.e3_id.clone(),
+                        faulting_node: recovered_signer,
+                        proof_type: signed_payload.payload.proof_type,
+                        signed_payload,
+                    },
+                    ec.clone(),
+                ) {
                     error!("Failed to publish SignedProofFailed: {err}");
                 }
             }
 
             // Stop the E3 computation — proof verification failure is fatal
-            if let Err(err) = self.bus.publish(E3Failed {
-                e3_id: msg.e3_id,
-                failed_at_stage: E3Stage::CommitteeFinalized,
-                reason: FailureReason::VerificationFailed,
-            }) {
+            if let Err(err) = self.bus.publish(
+                E3Failed {
+                    e3_id: msg.e3_id,
+                    failed_at_stage: E3Stage::CommitteeFinalized,
+                    reason: FailureReason::VerificationFailed,
+                },
+                ec,
+            ) {
                 error!("Failed to publish E3Failed: {err}");
             }
         }

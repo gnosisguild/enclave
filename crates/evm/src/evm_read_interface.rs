@@ -17,17 +17,18 @@ use alloy_primitives::Address;
 use anyhow::anyhow;
 use e3_events::{BusHandle, CorrelationId, ErrorDispatcher, Event, EventSubscriber, EventType};
 use e3_events::{EType, EnclaveEvent, EnclaveEventData, EventId};
+use e3_utils::MAILBOX_LIMIT;
 use futures_util::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
 pub struct EvmReadInterfaceParams<P> {
     provider: EthProvider<P>,
-    processor: Recipient<EnclaveEvmEvent>,
+    next: Recipient<EnclaveEvmEvent>,
     bus: BusHandle,
     filters: Filters,
 }
@@ -74,8 +75,8 @@ pub struct EvmReadInterface<P> {
     shutdown_rx: Option<oneshot::Receiver<()>>,
     /// The sender for the shutdown signal this is only used internally
     shutdown_tx: Option<oneshot::Sender<()>>,
-    /// Processor to forward events an actor
-    processor: EvmEventProcessor,
+    /// Processor to forward events
+    next: EvmEventProcessor,
     /// Event bus for error propagation only
     bus: BusHandle,
     /// Filters to configure when to seek from
@@ -89,7 +90,7 @@ impl<P: Provider + Clone + 'static> EvmReadInterface<P> {
             provider: Some(params.provider),
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
-            processor: params.processor,
+            next: params.next,
             bus: params.bus,
             filters: params.filters,
         }
@@ -97,13 +98,13 @@ impl<P: Provider + Clone + 'static> EvmReadInterface<P> {
 
     pub fn setup(
         provider: &EthProvider<P>,
-        next: &EvmEventProcessor,
+        next: impl Into<EvmEventProcessor>,
         bus: &BusHandle,
         filters: Filters,
     ) -> Addr<Self> {
         let params = EvmReadInterfaceParams {
             provider: provider.clone(),
-            processor: next.clone(),
+            next: next.into(),
             bus: bus.clone(),
             filters,
         };
@@ -119,9 +120,11 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+
         // let reader_addr = ctx.address();
         let bus = self.bus.clone();
-        let processor = self.processor.clone();
+        let next = self.next.clone();
         let filters = self.filters.clone();
 
         let Some(provider) = self.provider.take() else {
@@ -136,7 +139,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
         };
 
         ctx.spawn(
-            async move { stream_from_evm(provider, processor, shutdown, &bus, filters).await }
+            async move { stream_from_evm(provider, next, shutdown, &bus, filters).await }
                 .into_actor(self),
         );
     }
@@ -148,7 +151,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
 #[instrument(name = "evm_interface", skip_all)]
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
-    processor: EvmEventProcessor,
+    next: EvmEventProcessor,
     mut shutdown: oneshot::Receiver<()>,
     bus: &BusHandle,
     filters: Filters,
@@ -165,8 +168,8 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                 let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
                 let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
                 last_id = Some(evt.get_id());
-                info!("Sending event({})", evt.get_id());
-                processor.do_send(evt)
+                debug!("Sending event({})", evt.get_id());
+                next.do_send(evt)
             }
         }
         Err(e) => {
@@ -176,11 +179,11 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
         }
     }
     let historical_sync_event = HistoricalSyncComplete::new(chain_id, last_id);
-    warn!(
+    info!(
         "Historical Sync Complete event({})",
         historical_sync_event.get_id()
     );
-    processor.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
+    next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
         historical_sync_event,
     ));
 
@@ -196,13 +199,13 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
                         match maybe_log {
                             Some(log) => {
                                 let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
-                                processor.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp)))
+                                next.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp)))
                             }
                             None => break, // Stream ended
                         }
                     }
                     _ = &mut shutdown => {
-                        info!("Received shutdown signal, stopping EVM stream");
+                        warn!("Received shutdown signal, stopping EVM stream");
                         match provider_ref.unsubscribe(id).await {
                             Ok(_) => info!("Unsubscribed successfully from EVM event stream"),
                             Err(err) => error!("Cannot unsubscribe from EVM event stream: {}", err),

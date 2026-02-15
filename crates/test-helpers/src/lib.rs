@@ -32,6 +32,7 @@ use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
+use tracing::trace;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
@@ -142,7 +143,7 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
                         || DocumentPublisher::is_document_publisher_event(e)
                 });
             } else {
-                println!("not piping bus to itself");
+                trace!("Source = Dest! Not piping bus to itself");
             }
         }
     }
@@ -182,7 +183,7 @@ impl AddToCommittee {
 
         self.count += 1;
 
-        self.bus.publish(evt.clone())?;
+        self.bus.publish_without_context(evt.clone())?;
 
         Ok(evt.into())
     }

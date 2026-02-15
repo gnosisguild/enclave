@@ -6,7 +6,18 @@
 
 use std::{fmt::Debug, fs, io::Write, path::PathBuf};
 
-use tracing::{error, trace};
+use tracing::{error, subscriber::DefaultGuard, trace};
+use tracing_subscriber::{fmt, EnvFilter};
+
+/// Use this at the top of a test to include tracing
+pub fn with_tracing(level: &str) -> DefaultGuard {
+    tracing::subscriber::set_default(
+        fmt()
+            .with_env_filter(EnvFilter::new(level))
+            .with_test_writer()
+            .finish(),
+    )
+}
 
 pub fn write_file_with_dirs(path: &PathBuf, content: &[u8]) -> std::io::Result<()> {
     let abs_path = if path.is_absolute() {

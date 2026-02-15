@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr, Handler};
+use e3_utils::MAILBOX_LIMIT;
 
 use crate::events::{EnclaveEvmEvent, EvmEventProcessor};
 
@@ -25,11 +26,14 @@ impl EvmHub {
 
 impl Actor for EvmHub {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvmEvent> for EvmHub {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         let EnclaveEvmEvent::Log { .. } = msg.clone() else {
             return;
         };

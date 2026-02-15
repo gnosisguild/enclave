@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::MAILBOX_LIMIT;
 use actix::prelude::*;
 use anyhow::Result;
 use std::marker::PhantomData;
@@ -40,6 +41,9 @@ where
     M: Message<Result = ()> + 'static + Unpin,
 {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<F, M> Handler<M> for OneShotRunner<F, M>

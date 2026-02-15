@@ -9,6 +9,7 @@ use std::sync::Arc;
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::error;
 
 use crate::{
@@ -16,11 +17,11 @@ use crate::{
     hlc::Hlc,
     sequencer::Sequencer,
     traits::{
-        ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventFactory, EventPublisher,
-        EventSubscriber,
+        ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventContextAccessors,
+        EventFactory, EventPublisher, EventSubscriber,
     },
-    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventType,
-    HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
+    EType, EnclaveEvent, EnclaveEventData, ErrorEvent, EventBus, EventContextManager, EventSource,
+    EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
 #[derive(Clone, Derivative)]
@@ -57,7 +58,7 @@ impl BusHandle {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.event_bus)
     }
 
-    /// Access the sequencer to internally dispatch am event to
+    /// Access the sequencer to internally dispatch an event to
     pub fn sequencer(&self) -> &Addr<Sequencer> {
         &self.sequencer
     }
@@ -81,23 +82,74 @@ impl BusHandle {
         let pipe = BusHandlePipe::new(other.to_owned(), predicate).start();
         self.subscribe(EventType::All, pipe.into());
     }
+
+    pub fn with_ec(&self, ec: &EventContext<Sequenced>) -> Self {
+        let mut bus = self.clone();
+        bus.set_ctx(ec.clone());
+        bus
+    }
 }
 
 impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
-    fn publish(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
-        let evt = self.event_from(data, self.get_ctx())?;
-        self.sequencer.do_send(evt);
-        Ok(())
+    fn publish(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        caused_by: impl Into<EventContext<Sequenced>>,
+    ) -> Result<()> {
+        self.publish_local(data, Some(caused_by.into()))
     }
 
-    fn publish_from_remote(&self, data: impl Into<EnclaveEventData>, ts: u128) -> Result<()> {
-        let evt = self.event_from_remote_source(data, self.get_ctx(), ts)?;
-        self.sequencer.do_send(evt);
-        Ok(())
+    fn publish_without_context(&self, data: impl Into<EnclaveEventData>) -> Result<()> {
+        self.publish_local(data, None)
+    }
+
+    fn publish_from_remote(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Result<()> {
+        self.publish_from_remote_impl(data, remote_ts, None, block, source)
+    }
+
+    fn publish_from_remote_as_response(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+        caused_by: impl Into<EventContext<Sequenced>>,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Result<()> {
+        self.publish_from_remote_impl(data, remote_ts, Some(caused_by.into()), block, source)
     }
 
     fn naked_dispatch(&self, event: EnclaveEvent<Unsequenced>) {
         self.sequencer.do_send(event);
+    }
+}
+
+impl BusHandle {
+    fn publish_from_remote_impl(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        remote_ts: u128,
+        caused_by: Option<EventContext<Sequenced>>,
+        block: Option<u64>,
+        source: EventSource,
+    ) -> Result<()> {
+        let evt = self.event_from_remote_source(data, caused_by, remote_ts, block, source)?;
+        self.sequencer.do_send(evt);
+        Ok(())
+    }
+    fn publish_local(
+        &self,
+        data: impl Into<EnclaveEventData>,
+        caused_by: Option<EventContext<Sequenced>>,
+    ) -> Result<()> {
+        let evt = self.event_from(data, caused_by)?;
+        self.sequencer.do_send(evt);
+        Ok(())
     }
 }
 
@@ -121,6 +173,8 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
             data.into(),
             caused_by,
             ts.into(),
+            None,
+            EventSource::Local,
         ))
     }
 
@@ -129,12 +183,16 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
         data: impl Into<EnclaveEventData>,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Result<EnclaveEvent<Unsequenced>> {
         let ts = self.hlc.receive(&ts.into())?;
         Ok(EnclaveEvent::<Unsequenced>::new_with_timestamp(
             data.into(),
             caused_by,
             ts.into(),
+            block,
+            source,
         ))
     }
 }
@@ -175,8 +233,11 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
 }
 
 impl EventContextManager for BusHandle {
-    fn set_ctx(&mut self, value: &EventContext<Sequenced>) {
-        self.ctx = Some(value.clone());
+    fn set_ctx<C>(&mut self, value: C)
+    where
+        C: Into<EventContext<Sequenced>>,
+    {
+        self.ctx = Some(value.into().clone());
     }
     fn get_ctx(&self) -> Option<EventContext<Sequenced>> {
         self.ctx.clone()
@@ -189,8 +250,8 @@ mod tests {
     use e3_ciphernode_builder::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
-        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher, EventType,
-        TestEvent,
+        hlc::Hlc, prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventPublisher,
+        EventSource, EventType, TestEvent,
     };
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::time::sleep;
@@ -220,7 +281,9 @@ mod tests {
             type Result = ();
             fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
                 let ts = msg.ts();
-                self.dest.publish_from_remote(msg.into_data(), ts).unwrap()
+                self.dest
+                    .publish_from_remote(msg.into_data(), ts, None, EventSource::Local)
+                    .unwrap()
             }
         }
 
@@ -276,13 +339,13 @@ mod tests {
         bus_c.subscribe(EventType::All, saver.clone().into());
 
         // Publish events in causal order across buses
-        bus_a.publish(TestEvent::new("one", 1))?;
+        bus_a.publish_without_context(TestEvent::new("one", 1))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish(TestEvent::new("two", 2))?;
+        bus_b.publish_without_context(TestEvent::new("two", 2))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_a.publish(TestEvent::new("three", 3))?;
+        bus_a.publish_without_context(TestEvent::new("three", 3))?;
         sleep(Duration::from_millis(5)).await; // next tick
-        bus_b.publish(TestEvent::new("four", 4))?;
+        bus_b.publish_without_context(TestEvent::new("four", 4))?;
         sleep(Duration::from_millis(50)).await; // next tick
 
         // Get events
@@ -356,6 +419,9 @@ where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<F> Handler<EnclaveEvent<Sequenced>> for BusHandlePipe<F>
@@ -365,8 +431,11 @@ where
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent<Sequenced>, _: &mut Self::Context) -> Self::Result {
         if (self.predicate)(&msg) {
+            let source = msg.source();
             let (data, ts) = msg.split();
-            let _ = self.handle.publish_from_remote(data, ts);
+            let _ = self.handle.publish_from_remote(data, ts, None, source);
+            // TODO: check if this is fine
+            // to erase block data
         }
     }
 }

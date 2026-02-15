@@ -103,5 +103,7 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
 pub fn get_enclave_bus_handle(config: &AppConfig) -> anyhow::Result<BusHandle> {
     let bus = get_enclave_event_bus();
     let system = EventSystem::new(&config.name()).with_event_bus(bus);
+    system.store()?; // Ensure store is initialized before returning to avoid potentially dropping
+                     // events.
     Ok(system.handle()?)
 }
