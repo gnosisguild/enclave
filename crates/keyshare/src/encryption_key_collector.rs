@@ -12,7 +12,8 @@ use std::{
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
 use e3_events::{
-    E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, TypedEvent,
+    E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EventContext,
+    Sequenced, TypedEvent,
 };
 use e3_trbfv::PartyId;
 use e3_utils::MAILBOX_LIMIT;
@@ -57,10 +58,23 @@ impl From<HashMap<u64, Arc<EncryptionKey>>> for AllEncryptionKeysCollected {
 #[rtype(result = "()")]
 pub struct EncryptionKeyCollectionTimeout;
 
+/// Message sent when a committee member has been expelled (slashed on-chain).
+///
+/// The collector removes this party from its `todo` set so the DKG can
+/// complete with N-1 keys instead of waiting for a key that will never arrive.
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct ExpelPartyFromKeyCollection {
+    pub party_id: PartyId,
+    pub ec: EventContext<Sequenced>,
+}
+
 /// Actor that collects BFV encryption keys from all parties.
 ///
 /// Once all keys are collected, it sends `AllEncryptionKeysCollected` to the parent
 /// `ThresholdKeyshare` actor. If collection times out, it sends `EncryptionKeyCollectionFailed`.
+/// If a party is expelled (slashed), it is removed from the expected set so the
+/// collection can complete with N-1 parties.
 pub struct EncryptionKeyCollector {
     e3_id: E3id,
     todo: HashSet<PartyId>,
@@ -196,5 +210,59 @@ impl Handler<EncryptionKeyCollectionTimeout> for EncryptionKeyCollector {
 
         // Stop the actor
         ctx.stop();
+    }
+}
+
+impl Handler<ExpelPartyFromKeyCollection> for EncryptionKeyCollector {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: ExpelPartyFromKeyCollection,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        // Only handle if we're still collecting
+        if !matches!(self.state, CollectorState::Collecting) {
+            return;
+        }
+
+        let party_id = msg.party_id;
+
+        // Remove expelled party from the todo set
+        if !self.todo.remove(&party_id) {
+            info!(
+                e3_id = %self.e3_id,
+                party_id = party_id,
+                "Expelled party {} was not in todo set (already received or unknown)",
+                party_id
+            );
+            return;
+        }
+
+        info!(
+            e3_id = %self.e3_id,
+            party_id = party_id,
+            remaining = self.todo.len(),
+            "Removed expelled party {} from encryption key collection, {} remaining",
+            party_id,
+            self.todo.len()
+        );
+
+        // Check if all remaining keys have been collected
+        if self.todo.is_empty() {
+            info!(
+                e3_id = %self.e3_id,
+                "All remaining encryption keys collected after party expulsion!"
+            );
+            self.state = CollectorState::Finished;
+
+            // Cancel the timeout since we're done
+            if let Some(handle) = self.timeout_handle.take() {
+                ctx.cancel_future(handle);
+            }
+
+            let event: TypedEvent<AllEncryptionKeysCollected> =
+                TypedEvent::new(self.keys.clone().into(), msg.ec.clone());
+            self.parent.do_send(event);
+        }
     }
 }

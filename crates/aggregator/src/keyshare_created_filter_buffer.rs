@@ -69,6 +69,16 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 self.committee = Some(data.committee.iter().cloned().collect());
                 self.process_buffered_events();
             }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Remove the expelled node from our committee set so we don't
+                // forward any late KeyshareCreated events from them
+                if let Some(ref mut committee) = self.committee {
+                    let node_addr = format!("{:?}", data.node);
+                    committee.remove(&node_addr);
+                }
+                // Forward to PublicKeyAggregator for threshold_n adjustment
+                self.dest.do_send(msg);
+            }
             _ => {
                 // forward all other events
                 self.dest.do_send(msg);

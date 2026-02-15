@@ -9,12 +9,12 @@ use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
-    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    KeyshareCreated, PartyId, Sequenced, ThresholdShare, ThresholdShareCollectionFailed,
-    ThresholdShareCreated, TypedEvent,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptionshareCreated, Die, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
+    EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, KeyshareCreated, PartyId, Sequenced, ThresholdShare,
+    ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
 };
 use e3_fhe::create_crp;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -40,10 +40,12 @@ use std::{
     mem,
     sync::{Arc, Mutex},
 };
-use tracing::{info, trace, warn};
+use tracing::{error, info, trace, warn};
 
-use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
-use crate::threshold_share_collector::ThresholdShareCollector;
+use crate::encryption_key_collector::{
+    AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromKeyCollection,
+};
+use crate::threshold_share_collector::{ExpelPartyFromShareCollection, ThresholdShareCollector};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
@@ -306,6 +308,10 @@ pub struct ThresholdKeyshare {
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     state: Persistable<ThresholdKeyshareState>,
     share_enc_preset: BfvPreset,
+    /// Committee member addresses, ordered by party_id (index = party_id).
+    /// Populated when `CommitteeFinalized` is received. Used to resolve
+    /// `CommitteeMemberExpelled.node` (Address) → `party_id` (u64).
+    committee: Option<Vec<String>>,
 }
 
 impl ThresholdKeyshare {
@@ -317,6 +323,7 @@ impl ThresholdKeyshare {
             encryption_key_collector: None,
             state: params.state,
             share_enc_preset: params.share_enc_preset,
+            committee: None,
         }
     }
 }
@@ -367,6 +374,70 @@ impl ThresholdKeyshare {
             .encryption_key_collector
             .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
         Ok(addr.clone())
+    }
+
+    /// Handle a committee member being expelled (slashed on-chain).
+    ///
+    /// Resolves the expelled node's address to a party_id using the stored
+    /// committee list, then forwards expulsion messages to the encryption key
+    /// and threshold share collectors so they can remove the party from their
+    /// `todo` sets. This allows the DKG to complete with N-1 parties.
+    fn handle_committee_member_expelled(
+        &mut self,
+        data: CommitteeMemberExpelled,
+        ec: EventContext<Sequenced>,
+    ) {
+        let node_addr = format!("{:?}", data.node);
+        info!(
+            "CommitteeMemberExpelled received: node={} for e3_id={}, active_count_after={}",
+            node_addr, data.e3_id, data.active_count_after
+        );
+
+        // Resolve Address → party_id using stored committee list
+        let party_id = match &self.committee {
+            Some(committee) => {
+                // The committee list is ordered by party_id (index = party_id)
+                // Normalize both to lowercase checksummed for comparison
+                let node_lower = node_addr.to_lowercase();
+                committee
+                    .iter()
+                    .position(|addr| addr.to_lowercase() == node_lower)
+                    .map(|idx| idx as u64)
+            }
+            None => {
+                error!(
+                    "Cannot resolve expelled node {} to party_id: committee list not available",
+                    node_addr
+                );
+                None
+            }
+        };
+
+        let Some(party_id) = party_id else {
+            error!(
+                "Expelled node {} not found in committee list, cannot remove from collectors",
+                node_addr
+            );
+            return;
+        };
+
+        info!(
+            "Resolved expelled node {} to party_id={}, forwarding to collectors",
+            node_addr, party_id
+        );
+
+        // Forward expulsion to encryption key collector
+        if let Some(ref collector) = self.encryption_key_collector {
+            collector.do_send(ExpelPartyFromKeyCollection {
+                party_id,
+                ec: ec.clone(),
+            });
+        }
+
+        // Forward expulsion to threshold share collector
+        if let Some(ref collector) = self.decryption_key_collector {
+            collector.do_send(ExpelPartyFromShareCollection { party_id, ec });
+        }
     }
 
     pub fn handle_threshold_share_created(
@@ -1020,6 +1091,17 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
             }
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteeFinalized(data) => {
+                info!(
+                    "ThresholdKeyshare received CommitteeFinalized with {} committee members for e3_id={}",
+                    data.committee.len(),
+                    data.e3_id
+                );
+                self.committee = Some(data.committee);
+            }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                self.handle_committee_member_expelled(data, ec);
             }
             _ => (),
         }

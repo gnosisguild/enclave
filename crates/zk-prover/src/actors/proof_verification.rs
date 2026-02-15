@@ -15,7 +15,9 @@
 //! 1. Recovers the address from the ECDSA signature.
 //! 2. Delegates the ZK proof to `ZkActor` for verification.
 //! 3. On ZK failure, emits [`SignedProofFailed`] with the full evidence bundle
-//!    and [`E3Failed`] to stop the E3 computation.
+//!    so fault attribution can submit a slash on-chain. The E3 is NOT killed
+//!    locally — the on-chain `SlashingManager` decides whether to fail the E3
+//!    based on whether the committee drops below threshold after expulsion.
 //!
 //! Keys without a signed proof are rejected outright.
 
@@ -25,9 +27,9 @@ use std::sync::Arc;
 use actix::{Actor, Addr, AsyncContext, Context, Handler, Message, Recipient};
 use alloy::primitives::Address;
 use e3_events::{
-    BusHandle, E3Failed, E3Stage, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber,
-    EventType, FailureReason, Proof, Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
+    BusHandle, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey, EncryptionKeyCreated,
+    EncryptionKeyReceived, EventContext, EventPublisher, EventSubscriber, EventType, Proof,
+    Sequenced, SignedProofFailed, SignedProofPayload, TypedEvent,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info, warn};
@@ -62,8 +64,10 @@ struct PendingVerification {
 /// Core actor that handles encryption key verification.
 ///
 /// Requires every received key to carry a [`SignedProofPayload`].
-/// On ZK verification failure, emits both [`SignedProofFailed`] (for fault
-/// attribution) and [`E3Failed`] (to stop the E3 computation).
+/// On ZK verification failure, emits [`SignedProofFailed`] so the
+/// `FaultSubmitter` can submit a slash on-chain. The on-chain
+/// `SlashingManager` then decides whether to fail the E3 based on
+/// whether the committee drops below threshold after expulsion.
 pub struct ProofVerificationActor {
     bus: BusHandle,
     verifier: Recipient<TypedEvent<ZkVerificationRequest>>,
@@ -253,17 +257,11 @@ impl Handler<TypedEvent<ZkVerificationResponse>> for ProofVerificationActor {
                 }
             }
 
-            // Stop the E3 computation — proof verification failure is fatal
-            if let Err(err) = self.bus.publish(
-                E3Failed {
-                    e3_id: msg.e3_id,
-                    failed_at_stage: E3Stage::CommitteeFinalized,
-                    reason: FailureReason::VerificationFailed,
-                },
-                ec,
-            ) {
-                error!("Failed to publish E3Failed: {err}");
-            }
+            // NOTE: We do NOT emit E3Failed here. The on-chain SlashingManager
+            // will expel the faulting node and check if the committee drops below
+            // threshold. If it does, the contract emits E3Failed on-chain, which
+            // the EVM reader picks up and propagates to all actors. If the committee
+            // is still above threshold, the DKG continues with N-1 nodes.
         }
     }
 }

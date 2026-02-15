@@ -137,6 +137,48 @@ impl PublicKeyAggregator {
             })
         })
     }
+
+    /// Handle a committee member being expelled by reducing the expected
+    /// keyshare count. If enough keyshares have already been collected,
+    /// transition to the Computing state.
+    pub fn handle_member_expelled(
+        &mut self,
+        node: &str,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        self.state.try_mutate(ec, |mut state| {
+            let PublicKeyAggregatorState::Collecting {
+                threshold_n,
+                keyshares,
+                nodes,
+                ..
+            } = &mut state
+            else {
+                // Not in collecting state — nothing to adjust
+                return Ok(state);
+            };
+
+            // Reduce expected count
+            if *threshold_n > 0 {
+                *threshold_n -= 1;
+                info!(
+                    "PublicKeyAggregator: reduced threshold_n to {} after expelling {}",
+                    threshold_n, node
+                );
+            }
+
+            // Check if we now have enough keyshares
+            if keyshares.len() == *threshold_n && *threshold_n > 0 {
+                info!("PublicKeyAggregator: enough keyshares after expulsion, computing aggregate");
+                return Ok(PublicKeyAggregatorState::Computing {
+                    keyshares: std::mem::take(keyshares),
+                    nodes: std::mem::take(nodes),
+                });
+            }
+
+            Ok(state)
+        })
+    }
 }
 
 impl Actor for PublicKeyAggregator {
@@ -155,6 +197,33 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                let node_addr = format!("{:?}", data.node);
+                info!(
+                    "PublicKeyAggregator: committee member expelled: {} for e3_id={}",
+                    node_addr, data.e3_id
+                );
+                trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                    self.handle_member_expelled(&node_addr, &ec)?;
+
+                    // If the state transitioned to Computing, trigger aggregation
+                    if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
+                        &self.state.get()
+                    {
+                        self.notify_sync(
+                            ctx,
+                            TypedEvent::new(
+                                ComputeAggregate {
+                                    keyshares: keyshares.clone(),
+                                    e3_id: data.e3_id,
+                                },
+                                ec.clone(),
+                            ),
+                        );
+                    }
+                    Ok(())
+                });
+            }
             _ => (),
         };
     }
