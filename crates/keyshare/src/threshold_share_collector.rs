@@ -11,8 +11,11 @@ use std::{
 };
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
-use e3_events::{E3id, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated};
+use e3_events::{
+    E3id, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated, TypedEvent,
+};
 use e3_trbfv::PartyId;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
 use crate::{AllThresholdSharesCollected, ThresholdKeyshare};
@@ -31,11 +34,17 @@ pub(crate) enum CollectorState {
 pub struct ThresholdShareCollectionTimeout;
 
 pub struct ThresholdShareCollector {
+    /// The E3id for the round
     e3_id: E3id,
+    /// The partys the collector expects to receive from
     todo: HashSet<PartyId>,
+    /// The parent actor that has requested collection
     parent: Addr<ThresholdKeyshare>,
+    /// The current state of the collector
     state: CollectorState,
+    /// The shares collected
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
+    /// A timeout handle for when this collector will report failure
     timeout_handle: Option<SpawnHandle>,
 }
 
@@ -57,6 +66,7 @@ impl Actor for ThresholdShareCollector {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
         info!(
             e3_id = %self.e3_id,
             "ThresholdShareCollector started, scheduling timeout in {:?}",
@@ -68,9 +78,14 @@ impl Actor for ThresholdShareCollector {
     }
 }
 
-impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
+impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ThresholdShareCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let start = Instant::now();
         info!("ThresholdShareCollector: ThresholdShareCreated received by collector");
 
@@ -108,7 +123,8 @@ impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: AllThresholdSharesCollected = self.shares.clone().into();
+            let event: TypedEvent<AllThresholdSharesCollected> =
+                TypedEvent::new(self.shares.clone().into(), ec);
             self.parent.do_send(event);
         }
         info!(

@@ -4,10 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::IntoKey;
+use crate::{EventContext, IntoKey, Sequenced};
 use actix::Message;
 use anyhow::Result;
-use e3_events::{EventContext, Sequenced};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "()")]

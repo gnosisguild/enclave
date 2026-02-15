@@ -7,6 +7,7 @@
 use std::{collections::HashMap, thread, time::Duration};
 
 use actix::{Actor, Handler, Message, MessageResponse};
+use e3_utils::MAILBOX_LIMIT;
 
 #[derive(Message)]
 #[rtype(result = "FlattenedReport")]
@@ -34,6 +35,9 @@ pub struct MultithreadReport {
 
 impl Actor for MultithreadReport {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl MultithreadReport {

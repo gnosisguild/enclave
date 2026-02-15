@@ -8,7 +8,8 @@ use crate::{EnclaveEvmEvent, EvmEventProcessor, HistoricalSyncComplete};
 use actix::{Actor, Addr, Handler};
 use bloom::{BloomFilter, ASMS};
 use e3_events::CorrelationId;
-use tracing::info;
+use e3_utils::MAILBOX_LIMIT;
+use tracing::{debug, info};
 
 pub struct FixHistoricalOrder {
     dest: EvmEventProcessor,
@@ -36,7 +37,7 @@ impl FixHistoricalOrder {
         })) = self.pending_sync_complete
         {
             if self.seen_ids.contains(id) {
-                info!("Forwarding historical send complete event");
+                debug!("Forwarding historical send complete event");
                 self.dest
                     .do_send(self.pending_sync_complete.take().unwrap());
             }
@@ -50,6 +51,9 @@ impl FixHistoricalOrder {
 
 impl Actor for FixHistoricalOrder {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
@@ -57,13 +61,13 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
 
     fn handle(&mut self, msg: EnclaveEvmEvent, _ctx: &mut Self::Context) {
         let id = msg.get_id();
-        info!("Receiving EnclaveEvmEvent event({})", msg.get_id());
+        debug!("Receiving EnclaveEvmEvent event({})", msg.get_id());
         match msg {
             none_hist @ EnclaveEvmEvent::HistoricalSyncComplete(HistoricalSyncComplete {
                 prev_event: None,
                 ..
             }) => {
-                info!(
+                debug!(
                     "Historical order event({}) has no previous event. Forwarding...",
                     id
                 );
@@ -73,7 +77,7 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
                 prev_event: Some(prev),
                 ..
             }) => {
-                info!(
+                debug!(
                     "Historical order event({}) has previous event({}). Buffering...",
                     id, prev
                 );
@@ -82,7 +86,7 @@ impl Handler<EnclaveEvmEvent> for FixHistoricalOrder {
             }
             EnclaveEvmEvent::Processed(id) => self.track_id(id),
             other => {
-                info!("Forwarding event({})", other.get_id());
+                debug!("Forwarding event({})", other.get_id());
                 self.track_id(other.get_id());
                 self.dest.do_send(other);
             }

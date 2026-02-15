@@ -7,7 +7,6 @@
 use crate::helpers::EthProvider;
 use crate::send_tx_with_retry;
 use actix::prelude::*;
-use actix::Addr;
 use alloy::{
     primitives::Address,
     providers::{Provider, WalletProvider},
@@ -18,14 +17,15 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
-use e3_events::prelude::*;
 use e3_events::BusHandle;
-use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
+use e3_events::{prelude::*, EffectsEnabled};
+use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3id, EType, PlaintextAggregated};
 use e3_utils::NotifySync;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 sol!(
@@ -54,22 +54,28 @@ impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
         })
     }
 
-    pub async fn attach(
-        bus: &BusHandle,
-        provider: EthProvider<P>,
-        contract_address: Address,
-    ) -> Result<Addr<EnclaveSolWriter<P>>> {
-        let addr = EnclaveSolWriter::new(bus, provider, contract_address)?.start();
-        bus.subscribe_all(
-            &[EventType::PlaintextAggregated, EventType::Shutdown],
-            addr.clone().into(),
-        );
-        Ok(addr)
+    pub fn attach(bus: &BusHandle, provider: EthProvider<P>, contract_address: Address) {
+        let addr = run_once::<EffectsEnabled>({
+            let bus = bus.clone();
+            move |_| {
+                let addr = EnclaveSolWriter::new(&bus, provider, contract_address)?.start();
+                bus.subscribe_all(
+                    &[EventType::PlaintextAggregated, EventType::Shutdown],
+                    addr.clone().into(),
+                );
+                Ok(())
+            }
+        });
+
+        bus.subscribe(EventType::EffectsEnabled, addr.recipient());
     }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Actor for EnclaveSolWriter<P> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {

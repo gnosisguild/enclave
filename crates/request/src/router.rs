@@ -27,6 +27,7 @@ use e3_events::EType;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::{E3id, EnclaveEvent, Event};
+use e3_utils::MAILBOX_LIMIT;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -145,12 +146,15 @@ impl E3Router {
 
 impl Actor for E3Router {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        trap(EType::Event, &self.bus.clone(), || {
+        trap(EType::Event, &self.bus.with_ec(msg.get_ctx()), || {
             // If we are shutting down then bail on anything else
             if let EnclaveEventData::Shutdown(_) = msg.get_data() {
                 for (_, ctx) in self.contexts.iter() {
@@ -184,8 +188,8 @@ impl Handler<EnclaveEvent> for E3Router {
             }
 
             context.forward_message(&msg, &mut self.buffer);
-
-            match msg.into_data() {
+            let (data, ctx) = msg.into_components();
+            match data {
                 EnclaveEventData::PlaintextAggregated(_) => {
                     // Here we are detemining that by receiving the PlaintextAggregated event our request is
                     // complete and we can notify everyone. This might change as we consider other factors
@@ -195,7 +199,7 @@ impl Handler<EnclaveEvent> for E3Router {
                     };
 
                     // Send to bus so all other actors can react to a request being complete.
-                    self.bus.publish(event)?;
+                    self.bus.publish(event, ctx)?;
                 }
                 EnclaveEventData::E3RequestComplete(_) => {
                     // Note this will be sent above to the children who can kill themselves based on

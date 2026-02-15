@@ -7,7 +7,10 @@
 use crate::Cid;
 use actix::Message;
 use anyhow::{bail, Context, Result};
-use e3_events::{AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, Sequenced, Unsequenced};
+use e3_events::{
+    AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource,
+    Sequenced, Unsequenced,
+};
 use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
@@ -23,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
+use tracing::{error, info};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -59,7 +63,7 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
             bail!("GossipData was not the GossipBytes variant");
         };
 
-        Ok(EnclaveEvent::from_bytes(&bytes)?)
+        Ok(EnclaveEvent::from_bytes(&bytes)?.with_source(EventSource::Net))
     }
 }
 
@@ -71,6 +75,7 @@ pub struct SyncRequestValue {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncResponseValue {
     pub events: Vec<GossipData>,
+    pub ts: u128,
 }
 
 #[derive(Message, Clone, Debug)]
@@ -85,10 +90,14 @@ pub struct SyncRequestReceived {
 #[rtype("()")]
 pub struct OutgoingSyncRequestSucceeded {
     pub value: SyncResponseValue,
+    pub correlation_id: CorrelationId,
 }
 
 #[derive(Debug, Clone)]
-pub struct OutgoingSyncRequestFailed;
+pub struct OutgoingSyncRequestFailed {
+    pub correlation_id: CorrelationId,
+    pub error: String,
+}
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
 #[derive(Debug)]
@@ -117,7 +126,10 @@ pub enum NetCommand {
     Shutdown,
     /// Called from the syning node to request libp2p events from a random peer node starting
     /// from the given timestamp.
-    OutgoingSyncRequest { value: SyncRequestValue },
+    OutgoingSyncRequest {
+        correlation_id: CorrelationId,
+        value: SyncRequestValue,
+    },
     /// Send libp2p events back to a peer that requested a sync.
     SyncResponse {
         value: SyncResponseValue,
@@ -132,6 +144,7 @@ impl NetCommand {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
             N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingSyncRequest { correlation_id, .. } => Some(*correlation_id),
             _ => None,
         }
     }
@@ -198,6 +211,7 @@ pub enum NetEvent {
     /// Received gossipsub events from a peer in response to a `SyncRequest`.
     OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
     OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
+    AllPeersDialed,
 }
 
 #[derive(Clone, Debug)]
@@ -216,6 +230,8 @@ impl NetEvent {
             N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingSyncRequestSucceeded(msg) => Some(msg.correlation_id),
+            N::OutgoingSyncRequestFailed(msg) => Some(msg.correlation_id),
             _ => None,
         }
     }
@@ -228,11 +244,12 @@ impl NetEvent {
 pub struct DocumentPublishedNotification {
     pub meta: DocumentMeta,
     pub key: Cid,
+    pub ts: u128,
 }
 
 impl DocumentPublishedNotification {
-    pub fn new(meta: DocumentMeta, key: Cid) -> Self {
-        Self { meta, key }
+    pub fn new(meta: DocumentMeta, key: Cid, ts: u128) -> Self {
+        Self { meta, key, ts }
     }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
@@ -270,21 +287,36 @@ where
     let debug_cmd = format!("{:?}", command);
 
     // Send the command to NetInterface
+    info!(
+        "call_and_await_response: SENDING command {:?} with timeout {:?}",
+        command, timeout
+    );
     net_cmds.send(command).await?;
 
     let result = tokio::time::timeout(timeout, async {
         loop {
             match rx.recv().await {
                 Ok(event) => {
+                    info!("RECEIVED and event {:?}", event);
                     // Only process events matching our correlation ID
                     if event.correlation_id() == Some(id) {
                         if let Some(result) = matcher(&event) {
                             return result;
                         } // None means unexpected event type, keep waiting
-                    } // Ignore events with non-matching IDs
+                        info!("matcher failed for event {:?}! skipping...", event);
+                    } else {
+                        // Ignore events with non-matching IDs
+                        info!(
+                            "correlation failed for event {:?} against correlation={:?}! skipping...",
+                            event, id
+                        );
+                    }
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(e) => return Err(e.into()),
+                Err(e) => {
+                    error!("RECEIVED an error from rx: {:?} returning error", e);
+                    return Err(e.into());
+                }
             }
         }
     })
@@ -293,10 +325,46 @@ where
     result
 }
 
+pub async fn await_event<F, R>(
+    net_events: &Arc<broadcast::Receiver<NetEvent>>,
+    matcher: F,
+    timeout: Duration,
+) -> Result<R>
+where
+    F: Fn(&NetEvent) -> Option<R>,
+{
+    let mut rx = net_events.resubscribe();
+
+    let result = tokio::time::timeout(timeout, async {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    if let Some(result) = matcher(&event) {
+                        return Ok(result);
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for event")))?;
+    result
+}
+
+pub fn estimate_hashmap_size<K, V>(map: &HashMap<K, V>) -> usize {
+    let entry_size = size_of::<K>() + size_of::<V>();
+    let capacity = map.capacity();
+
+    // HashMap uses ~1 byte of overhead per slot for metadata
+    capacity * (entry_size + 1) + size_of::<HashMap<K, V>>()
+}
+
 #[cfg(test)]
 mod tests {
     use e3_events::{
-        EnclaveEvent, EventConstructorWithTimestamp, Sequenced, TestEvent, Unsequenced,
+        EnclaveEvent, EventConstructorWithTimestamp, EventSource, Sequenced, TestEvent, Unsequenced,
     };
 
     use super::GossipData;
@@ -304,8 +372,13 @@ mod tests {
     #[test]
     fn test_enclave_event_gossip_lifecycle() -> anyhow::Result<()> {
         // event is created locally
-        let event: EnclaveEvent<Unsequenced> =
-            EnclaveEvent::new_with_timestamp(TestEvent::new("fish", 42).into(), None, 31415);
+        let event: EnclaveEvent<Unsequenced> = EnclaveEvent::new_with_timestamp(
+            TestEvent::new("fish", 42).into(),
+            None,
+            31415,
+            None,
+            EventSource::Local,
+        );
 
         // event is sequenced after bus.publish() adds a sequence number
         let event: EnclaveEvent<Sequenced> = event.into_sequenced(90210);

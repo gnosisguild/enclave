@@ -16,14 +16,13 @@ use alloy::{
 use anyhow::Result;
 use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
 use e3_events::{
-    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEvent, EvmEventConfig,
-    EvmEventConfigChain, GetEvents, HistoryCollector, SyncEnd, SyncEvmEvent, SyncStart, TestEvent,
+    prelude::*, trap, BusHandle, EType, EnclaveEvent, EnclaveEventData, EvmEventConfig,
+    EvmEventConfigChain, GetEvents, HistoricalEvmEventsReceived, HistoricalEvmSyncStart, SyncEnded,
+    TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventProcessor, EvmParser};
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
-use tracing::subscriber::DefaultGuard;
-use tracing_subscriber::{fmt, EnvFilter};
 
 sol!(
     #[sol(rpc)]
@@ -42,10 +41,10 @@ fn test_event_extractor(
                 return None;
             };
             Some(
-                TestEvent {
-                    msg: event.value,
-                    entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests
-                }
+                TestEvent::new(
+                    &event.value,
+                    event.count.try_into().unwrap(), // This prevents de-duplication in tests
+                )
                 .into(),
             )
         }
@@ -61,24 +60,8 @@ impl TestEventParser {
     }
 }
 
-async fn get_msgs(history_collector: &Addr<HistoryCollector<EnclaveEvent>>) -> Result<Vec<String>> {
-    let history = history_collector
-        .send(GetEvents::<EnclaveEvent>::new())
-        .await?;
-    let msgs: Vec<String> = history
-        .into_iter()
-        .filter_map(|evt| match evt.into_data() {
-            EnclaveEventData::TestEvent(data) => Some(data.msg),
-            _ => None,
-        })
-        .collect();
-
-    Ok(msgs)
-}
-
 struct FakeSyncActor {
     bus: BusHandle,
-    buffer: Vec<EvmEvent>,
 }
 
 impl Actor for FakeSyncActor {
@@ -87,47 +70,30 @@ impl Actor for FakeSyncActor {
 
 impl FakeSyncActor {
     pub fn setup(bus: &BusHandle) -> Addr<Self> {
-        Self {
-            bus: bus.clone(),
-            buffer: Vec::new(),
-        }
-        .start()
+        Self { bus: bus.clone() }.start()
     }
 }
 
-impl Handler<SyncEvmEvent> for FakeSyncActor {
+impl Handler<HistoricalEvmEventsReceived> for FakeSyncActor {
     type Result = ();
-    fn handle(&mut self, msg: SyncEvmEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        mut msg: HistoricalEvmEventsReceived,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         trap(EType::Sync, &self.bus.clone(), || {
-            match msg {
-                // Buffer events as the sync actor receives them
-                SyncEvmEvent::Event(event) => self.buffer.push(event),
-                // When we hear that sync is complete send all events on chain then publish SyncEnd
-                SyncEvmEvent::HistoricalSyncComplete(_) => {
-                    for evt in self.buffer.drain(..) {
-                        let (data, ts, _) = evt.split();
-                        self.bus.publish_from_remote(data, ts)?;
-                    }
-                    self.bus.publish(SyncEnd::new())?;
-                }
-            };
+            for evt in msg.events.drain(..) {
+                self.bus.naked_dispatch(evt);
+            }
+            self.bus.publish_without_context(SyncEnded::new())?;
             Ok(())
         })
     }
 }
 
-fn add_tracing() -> DefaultGuard {
-    tracing::subscriber::set_default(
-        fmt()
-            .with_env_filter(EnvFilter::new("info"))
-            .with_test_writer()
-            .finish(),
-    )
-}
-
 #[actix::test]
 async fn evm_reader() -> Result<()> {
-    let _guard = add_tracing();
+    let _guard = e3_test_helpers::with_tracing("info");
 
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
@@ -156,11 +122,11 @@ async fn evm_reader() -> Result<()> {
         })
         .build();
 
-    // SyncStart holds initialization information such as start block and earliest event
+    // HistoricalEvmSyncStart holds initialization information such as start block and earliest event
     // This should trigger all chains to start to sync
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish(SyncStart::new(sync, evm_info))?;
+    bus.publish_without_context(HistoricalEvmSyncStart::new(sync, evm_info))?;
 
     sleep(Duration::from_secs(1)).await;
     contract
@@ -197,7 +163,7 @@ async fn evm_reader() -> Result<()> {
 }
 #[actix::test]
 async fn ensure_historical_events() -> Result<()> {
-    let _guard = add_tracing();
+    let _guard = e3_test_helpers::with_tracing("info");
 
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
@@ -238,7 +204,7 @@ async fn ensure_historical_events() -> Result<()> {
         .build();
     let mut evm_info = EvmEventConfig::new();
     evm_info.insert(chain_id, EvmEventConfigChain::new(0));
-    bus.publish(SyncStart::new(sync, evm_info))?;
+    bus.publish_without_context(HistoricalEvmSyncStart::new(sync, evm_info))?;
 
     for msg in live_events.clone() {
         contract

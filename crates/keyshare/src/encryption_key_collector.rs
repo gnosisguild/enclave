@@ -11,8 +11,11 @@ use std::{
 };
 
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, Message, SpawnHandle};
-use e3_events::{E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated};
+use e3_events::{
+    E3id, EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, TypedEvent,
+};
 use e3_trbfv::PartyId;
+use e3_utils::MAILBOX_LIMIT;
 use tracing::{info, warn};
 
 const DEFAULT_COLLECTION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -85,6 +88,7 @@ impl Actor for EncryptionKeyCollector {
     type Context = actix::Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
         info!(
             e3_id = %self.e3_id,
             "EncryptionKeyCollector started, scheduling timeout in {:?}",
@@ -96,9 +100,14 @@ impl Actor for EncryptionKeyCollector {
     }
 }
 
-impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
+impl Handler<TypedEvent<EncryptionKeyCreated>> for EncryptionKeyCollector {
     type Result = ();
-    fn handle(&mut self, msg: EncryptionKeyCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyCreated>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         let start = Instant::now();
         info!("EncryptionKeyCollector: EncryptionKeyCreated received");
 
@@ -141,7 +150,8 @@ impl Handler<EncryptionKeyCreated> for EncryptionKeyCollector {
                 ctx.cancel_future(handle);
             }
 
-            let event: AllEncryptionKeysCollected = self.keys.clone().into();
+            let event: TypedEvent<AllEncryptionKeysCollected> =
+                TypedEvent::new(self.keys.clone().into(), ec);
             self.parent.do_send(event);
         }
 

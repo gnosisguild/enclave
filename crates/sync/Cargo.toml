@@ -10,8 +10,12 @@ repository = "https://github.com/gnosisguild/enclave/crates/sync"
 actix.workspace = true
 anyhow.workspace = true
 e3-events.workspace = true
+e3-data.workspace = true
+e3-config.workspace = true
+e3-utils.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
 e3-ciphernode-builder.workspace = true
+e3-test-helpers.workspace = true
