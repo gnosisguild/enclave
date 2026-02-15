@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertBatch, InsertSync, Remove};
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
+use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
+use e3_utils::MAILBOX_LIMIT;
 use std::collections::BTreeMap;
+use tracing::info;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -31,6 +33,9 @@ pub struct InMemStore {
 
 impl Actor for InMemStore {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl InMemStore {

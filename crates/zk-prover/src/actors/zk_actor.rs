@@ -10,6 +10,7 @@
 //! This is an IO actor - it performs file system operations.
 
 use actix::{Actor, Context, Handler};
+use e3_events::TypedEvent;
 use tracing::{debug, error};
 
 use crate::{ZkBackend, ZkProver};
@@ -33,10 +34,15 @@ impl Actor for ZkActor {
     type Context = Context<Self>;
 }
 
-impl Handler<ZkVerificationRequest> for ZkActor {
+impl Handler<TypedEvent<ZkVerificationRequest>> for ZkActor {
     type Result = ();
 
-    fn handle(&mut self, msg: ZkVerificationRequest, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ZkVerificationRequest>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (msg, ec) = msg.into_components();
         debug!(
             "Verifying proof for circuit: {} (party {})",
             msg.proof.circuit, msg.key.party_id
@@ -51,35 +57,38 @@ impl Handler<ZkVerificationRequest> for ZkActor {
             msg.key.party_id,
         );
 
-        let response = match result {
-            Ok(true) => {
-                debug!("Proof verification successful");
-                ZkVerificationResponse {
-                    verified: true,
-                    error: None,
-                    e3_id: msg.e3_id,
-                    key: msg.key,
+        let response = TypedEvent::new(
+            match result {
+                Ok(true) => {
+                    debug!("Proof verification successful");
+                    ZkVerificationResponse {
+                        verified: true,
+                        error: None,
+                        e3_id: msg.e3_id,
+                        key: msg.key,
+                    }
                 }
-            }
-            Ok(false) => {
-                error!("Proof verification failed");
-                ZkVerificationResponse {
-                    verified: false,
-                    error: Some("Verification returned false".to_string()),
-                    e3_id: msg.e3_id,
-                    key: msg.key,
+                Ok(false) => {
+                    error!("Proof verification failed");
+                    ZkVerificationResponse {
+                        verified: false,
+                        error: Some("Verification returned false".to_string()),
+                        e3_id: msg.e3_id,
+                        key: msg.key,
+                    }
                 }
-            }
-            Err(e) => {
-                error!("Proof verification error: {}", e);
-                ZkVerificationResponse {
-                    verified: false,
-                    error: Some(e.to_string()),
-                    e3_id: msg.e3_id,
-                    key: msg.key,
+                Err(e) => {
+                    error!("Proof verification error: {}", e);
+                    ZkVerificationResponse {
+                        verified: false,
+                        error: Some(e.to_string()),
+                        e3_id: msg.e3_id,
+                        key: msg.key,
+                    }
                 }
-            }
-        };
+            },
+            ec,
+        );
 
         // Send response back to the sender
         msg.sender.do_send(response);

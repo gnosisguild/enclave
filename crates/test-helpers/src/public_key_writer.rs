@@ -11,6 +11,7 @@ use actix::{Actor, Addr, Context, Handler};
 use e3_events::{
     prelude::*, BusHandle, EnclaveEvent, EnclaveEventData, EventSubscriber, EventType,
 };
+use e3_utils::MAILBOX_LIMIT;
 use tracing::info;
 
 pub struct PublicKeyWriter {
@@ -30,6 +31,9 @@ impl PublicKeyWriter {
 
 impl Actor for PublicKeyWriter {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for PublicKeyWriter {

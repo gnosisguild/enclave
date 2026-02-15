@@ -12,8 +12,9 @@ use alloy::signers::local::PrivateKeySigner;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeResponse,
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCreated, EncryptionKeyPending, Event, EventPublisher, EventSubscriber, EventType,
-    PkBfvProofRequest, ProofPayload, ProofType, SignedProofPayload, ZkRequest, ZkResponse,
+    EncryptionKeyCreated, EncryptionKeyPending, EventPublisher, EventSubscriber, EventType,
+    PkBfvProofRequest, ProofPayload, ProofType, SignedProofPayload, TypedEvent, ZkRequest,
+    ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info};
@@ -52,7 +53,8 @@ impl ProofRequestActor {
         addr
     }
 
-    fn handle_encryption_key_pending(&mut self, msg: EncryptionKeyPending) {
+    fn handle_encryption_key_pending(&mut self, msg: TypedEvent<EncryptionKeyPending>) {
+        let (msg, ec) = msg.into_components();
         let correlation_id = CorrelationId::new();
         self.pending.insert(
             correlation_id,
@@ -72,13 +74,14 @@ impl ProofRequestActor {
         );
 
         info!("Requesting T0 proof generation");
-        if let Err(err) = self.bus.publish(request) {
+        if let Err(err) = self.bus.publish(request, ec) {
             error!("Failed to publish ZK proof request: {err}");
             self.pending.remove(&correlation_id);
         }
     }
 
-    fn handle_compute_response(&mut self, msg: ComputeResponse) {
+    fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) {
+        let (msg, ec) = msg.into_components();
         let ComputeResponseKind::Zk(ZkResponse::PkBfv(resp)) = msg.response else {
             return;
         };
@@ -112,16 +115,19 @@ impl ProofRequestActor {
             }
         }
 
-        if let Err(err) = self.bus.publish(EncryptionKeyCreated {
-            e3_id: pending.e3_id,
-            key: Arc::new(key),
-            external: false,
-        }) {
+        if let Err(err) = self.bus.publish(
+            EncryptionKeyCreated {
+                e3_id: pending.e3_id,
+                key: Arc::new(key),
+                external: false,
+            },
+            ec,
+        ) {
             error!("Failed to publish EncryptionKeyCreated: {err}");
         }
     }
 
-    fn handle_compute_request_error(&mut self, msg: ComputeRequestError) {
+    fn handle_compute_request_error(&mut self, msg: TypedEvent<ComputeRequestError>) {
         let ComputeRequestErrorKind::Zk(err) = msg.get_err() else {
             return;
         };
@@ -143,35 +149,54 @@ impl Handler<EnclaveEvent> for ProofRequestActor {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg.into_data() {
-            EnclaveEventData::EncryptionKeyPending(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::ComputeResponse(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::ComputeRequestError(data) => self.notify_sync(ctx, data),
+        let (msg, ec) = msg.into_components();
+        match msg {
+            EnclaveEventData::EncryptionKeyPending(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeResponse(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::ComputeRequestError(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
 }
 
-impl Handler<EncryptionKeyPending> for ProofRequestActor {
+impl Handler<TypedEvent<EncryptionKeyPending>> for ProofRequestActor {
     type Result = ();
 
-    fn handle(&mut self, msg: EncryptionKeyPending, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<EncryptionKeyPending>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.handle_encryption_key_pending(msg)
     }
 }
 
-impl Handler<ComputeResponse> for ProofRequestActor {
+impl Handler<TypedEvent<ComputeResponse>> for ProofRequestActor {
     type Result = ();
 
-    fn handle(&mut self, msg: ComputeResponse, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeResponse>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.handle_compute_response(msg)
     }
 }
 
-impl Handler<ComputeRequestError> for ProofRequestActor {
+impl Handler<TypedEvent<ComputeRequestError>> for ProofRequestActor {
     type Result = ();
 
-    fn handle(&mut self, msg: ComputeRequestError, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: TypedEvent<ComputeRequestError>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         self.handle_compute_request_error(msg)
     }
 }

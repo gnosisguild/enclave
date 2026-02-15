@@ -5,12 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Handler};
-use e3_events::{hlc::HlcTimestamp, EnclaveEventData, EvmEvent};
-use tracing::info;
+use e3_events::{hlc::HlcTimestamp, EnclaveEventData};
+use e3_utils::MAILBOX_LIMIT;
+use tracing::{debug, info};
 
 use crate::{
     events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog},
-    ExtractorFn,
+    EvmEvent, ExtractorFn,
 };
 
 pub struct EvmParser {
@@ -20,6 +21,9 @@ pub struct EvmParser {
 
 impl Actor for EvmParser {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl EvmParser {
@@ -41,7 +45,7 @@ impl Handler<EnclaveEvmEvent> for EvmParser {
                 id,
                 timestamp,
             }) => {
-                info!("processing event({})", msg.get_id());
+                debug!("processing event({})", msg.get_id());
                 let extractor = self.extractor;
 
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {

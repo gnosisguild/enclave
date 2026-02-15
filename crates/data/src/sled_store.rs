@@ -4,10 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Get, Insert, InsertBatch, InsertSync, Remove, SledDb};
+use crate::SledDb;
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, EventType};
+use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
+use e3_utils::MAILBOX_LIMIT;
 use std::path::PathBuf;
 use tracing::{error, info};
 
@@ -18,6 +20,9 @@ pub struct SledStore {
 
 impl Actor for SledStore {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT)
+    }
 }
 
 impl SledStore {

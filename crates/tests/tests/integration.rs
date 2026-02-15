@@ -23,7 +23,9 @@ use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, AddToCommittee};
+use e3_test_helpers::{
+    create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
+};
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
@@ -207,7 +209,7 @@ async fn setup_score_sortition_environment(
     eth_addrs: &Vec<String>,
     chain_id: u64,
 ) -> Result<()> {
-    bus.publish(ConfigurationUpdated {
+    bus.publish_without_context(ConfigurationUpdated {
         parameter: "ticketPrice".to_string(),
         old_value: U256::ZERO,
         new_value: U256::from(10_000_000u64),
@@ -218,7 +220,7 @@ async fn setup_score_sortition_environment(
     for addr in eth_addrs {
         adder.add(addr).await?;
 
-        bus.publish(TicketBalanceUpdated {
+        bus.publish_without_context(TicketBalanceUpdated {
             operator: addr.clone(),
             delta: I256::try_from(1_000_000_000u64).unwrap(),
             new_balance: U256::from(1_000_000_000u64),
@@ -226,7 +228,7 @@ async fn setup_score_sortition_environment(
             chain_id,
         })?;
 
-        bus.publish(OperatorActivationChanged {
+        bus.publish_without_context(OperatorActivationChanged {
             operator: addr.clone(),
             active: true,
             chain_id,
@@ -260,14 +262,8 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("Running test_trbfv_actor...");
     let mut report: Vec<(&str, Duration)> = vec![];
     let whole_test = Instant::now();
-    use tracing_subscriber::{fmt, EnvFilter};
 
-    let subscriber = fmt()
-        .with_env_filter(EnvFilter::new("info"))
-        .with_test_writer()
-        .finish();
-
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let _guard = with_tracing("info");
 
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
     // avoid over abstracting test helpers and favouring straight forward single descriptive
@@ -347,6 +343,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
+                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
@@ -364,6 +361,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_zkproof(zk_backend.clone())
                 .testmode_with_signer(PrivateKeySigner::random())
                 .with_sortition_score()
+                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
                 .with_logging()
                 .build()
@@ -426,11 +424,7 @@ async fn test_trbfv_actor() -> Result<()> {
         params,
     };
 
-    println!(
-        "Publishing E3Requested: e3_id={}, threshold={}/{}",
-        e3_id, threshold_m, threshold_n
-    );
-    bus.publish(e3_requested)?;
+    bus.publish_without_context(e3_requested)?;
 
     sleep(Duration::from_millis(500)).await;
 
@@ -454,7 +448,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
 
-    bus.publish(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: e3_id.clone(),
         committee: committee.clone(),
         chain_id,
@@ -572,7 +566,7 @@ async fn test_trbfv_actor() -> Result<()> {
         e3_id: e3_id.clone(),
     };
 
-    bus.publish(ciphertext_published_event.clone())?;
+    bus.publish_without_context(ciphertext_published_event.clone())?;
 
     println!("CiphertextOutputPublished event has been dispatched!");
 
@@ -709,9 +703,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         ..CiphernodeSelected::default()
     };
 
-    bus.publish(evt_1.clone())?;
-    bus.publish(evt_2.clone())?;
-    bus.publish(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
+    bus.publish_without_context(evt_1.clone())?;
+    bus.publish_without_context(evt_2.clone())?;
+    bus.publish_without_context(local_evt_3.clone())?; // This is a local event which should not be broadcast to the network
 
     // check the history of the event bus
     let history = history_collector
@@ -863,7 +857,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         };
 
         // Send e3request
-        bus.publish(E3Requested {
+        bus.publish_without_context(E3Requested {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             threshold_n: 2,
@@ -872,7 +866,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             ..E3Requested::default()
         })?;
 
-        bus.publish(CommitteeFinalized {
+        bus.publish_without_context(CommitteeFinalized {
             e3_id: e3_id.clone(),
             committee: eth_addrs.clone(),
             chain_id: 1,
@@ -888,7 +882,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         assert_eq!(errors.len(), 0);
 
         // SEND SHUTDOWN!
-        bus.publish(Shutdown)?;
+        bus.publish_without_context(Shutdown)?;
 
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
@@ -953,7 +947,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     use e3_test_helpers::encrypt_ciphertext;
     let raw_plaintext = vec![vec![4, 5]];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
-    bus.publish(CiphertextOutputPublished {
+    bus.publish_without_context(CiphertextOutputPublished {
         ciphertext_output: ciphertext
             .iter()
             .map(|ct| ArcBytes::from_bytes(&ct.to_bytes()))
@@ -1100,7 +1094,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     setup_score_sortition_environment(&bus, &eth_addrs, 2).await?;
 
     // Send the computation requested event
-    bus.publish(E3Requested {
+    bus.publish_without_context(E3Requested {
         e3_id: E3id::new("1234", 1),
         threshold_m: 2,
         threshold_n: 5,
@@ -1109,7 +1103,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     })?;
 
-    bus.publish(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 1),
         committee: eth_addrs.clone(),
         chain_id: 1,
@@ -1144,7 +1138,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     );
 
     // Send the computation requested event
-    bus.publish(E3Requested {
+    bus.publish_without_context(E3Requested {
         e3_id: E3id::new("1234", 2),
         threshold_m: 2,
         threshold_n: 5,
@@ -1153,7 +1147,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         ..E3Requested::default()
     })?;
 
-    bus.publish(CommitteeFinalized {
+    bus.publish_without_context(CommitteeFinalized {
         e3_id: E3id::new("1234", 2),
         committee: eth_addrs.clone(),
         chain_id: 2,

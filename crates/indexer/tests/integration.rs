@@ -43,7 +43,7 @@ sol!(
 async fn test_indexer() -> Result<()> {
     const E3_ID: u64 = 10;
     const THRESHOLD: u64 = 10;
-    const INDEXER_DELAY_MS: u64 = 10;
+    const INDEXER_DELAY_MS: u64 = 30;
 
     let param_set = DEFAULT_BFV_PRESET.into();
     let params = build_bfv_params_from_set_arc(param_set);

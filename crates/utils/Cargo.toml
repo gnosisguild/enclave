@@ -12,6 +12,7 @@ alloy.workspace = true
 anyhow.workspace = true
 derivative.workspace = true
 rand.workspace = true
+regex.workspace = true
 rand_chacha.workspace = true
 serde.workspace = true
 tokio.workspace = true

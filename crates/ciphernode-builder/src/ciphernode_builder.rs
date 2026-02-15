@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::event_system::AggregateConfig;
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
 use alloy::signers::local::PrivateKeySigner;
@@ -15,7 +14,9 @@ use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
-use e3_events::{AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig};
+use e3_events::{
+    AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
+};
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
 use e3_evm::{
     CiphernodeRegistrySol, EnclaveSolReader, SlashingManagerSolReader, SlashingManagerSolWriter,
@@ -24,15 +25,16 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::{Multithread, MultithreadReport, TaskPool};
-use e3_net::{NetEventTranslator, NetRepositoryFactory};
+use e3_net::{setup_net, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::{
     CiphernodeSelector, CiphernodeSelectorFactory, FinalizedCommitteesRepositoryFactory,
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
-use e3_sync::Synchronizer;
+use e3_sync::sync;
 use e3_utils::{rand_eth_addr, SharedRng};
 use e3_zk_prover::{setup_zk_actors, ZkBackend};
+use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tracing::{error, info};
 
@@ -74,6 +76,7 @@ pub struct CiphernodeBuilder {
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
+    start_buffer: bool,
 }
 
 // Simple Net Configuration
@@ -140,6 +143,7 @@ impl CiphernodeBuilder {
             testmode_signer: None,
             threshold_plaintext_agg: false,
             net_config: None,
+            start_buffer: false,
             zk_backend: None,
         }
     }
@@ -190,6 +194,12 @@ impl CiphernodeBuilder {
     /// This is conspicuously named so we understand that this should only be used when testing
     pub fn testmode_with_errors(mut self) -> Self {
         self.testmode_errors = true;
+        self
+    }
+    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnded. This is important
+    /// for tests that don't specifically
+    pub fn testmode_start_buffer_immediately(mut self) -> Self {
+        self.start_buffer = true;
         self
     }
 
@@ -390,7 +400,7 @@ impl CiphernodeBuilder {
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
                 EventSystem::persisted(&addr, log_path, kv_path)
                     .with_event_bus(local_bus)
-                    .with_aggregate_config(aggregate_config)
+                    .with_aggregate_config(aggregate_config.clone())
             } else {
                 if let Some(ref store) = self.in_mem_store {
                     EventSystem::in_mem_from_store(&addr, store)
@@ -405,6 +415,8 @@ impl CiphernodeBuilder {
 
         let bus = event_system.handle()?;
         let store = event_system.store()?;
+        let eventstore_ts = event_system.eventstore_getter_ts()?;
+        let eventstore_seq = event_system.eventstore_getter_seq()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
 
@@ -491,15 +503,15 @@ impl CiphernodeBuilder {
 
         let (join_handle, peer_id) = if let Some(net_config) = self.net_config {
             let repositories = store.repositories();
-            let (_, _, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
+            setup_net(
                 bus.clone(),
                 net_config.peers,
                 &self.cipher,
                 net_config.quic_port,
                 repositories.libp2p_keypair(),
+                eventstore_ts,
             )
-            .await?;
-            (join_handle, peer_id)
+            .await?
         } else {
             (
                 tokio::spawn(std::future::ready(Ok(()))),
@@ -507,7 +519,15 @@ impl CiphernodeBuilder {
             )
         };
 
-        Synchronizer::setup(&bus, evm_config); // TODO: add net config if required
+        // Run the sync routine
+        sync(
+            &bus,
+            &evm_config,
+            &repositories,
+            &aggregate_config,
+            &eventstore_seq,
+        )
+        .await?;
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
@@ -579,17 +599,17 @@ fn validate_chain_id(chain: &ChainConfig, actual_chain_id: u64) -> Result<()> {
 }
 
 /// Build delay configuration for a specific chain
-fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, u64) {
-    let aggregate_id = AggregateId::new(actual_chain_id as usize);
+fn create_aggregate_delay(chain: &ChainConfig, actual_chain_id: u64) -> (AggregateId, Duration) {
+    let aggregate_id = AggregateId::from_chain_id(Some(actual_chain_id));
     let finalization_ms = chain.finalization_ms.unwrap_or(0);
     let delay_us = finalization_ms * 1000; // ms → microseconds
-    (aggregate_id, delay_us)
+    (aggregate_id, Duration::from_micros(delay_us))
 }
 
 /// Build delays configuration from chain providers
 fn create_aggregate_delays(
     chain_providers: &[(ChainConfig, u64)],
-) -> Result<HashMap<AggregateId, u64>> {
+) -> Result<HashMap<AggregateId, Duration>> {
     let mut delays = HashMap::new();
 
     for (chain, actual_chain_id) in chain_providers.into_iter().cloned() {
@@ -621,7 +641,7 @@ async fn setup_evm_system(
         if contract_components.enclave {
             let write_provider = provider_cache.ensure_write_provider(chain).await?;
             let contract = &chain.contracts.enclave;
-            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?).await?;
+            EnclaveSolWriter::attach(&bus, write_provider.clone(), contract.address()?);
             system.with_contract(contract.address()?, move |next| {
                 EnclaveSolReader::setup(&next).recipient()
             });
@@ -661,8 +681,7 @@ async fn setup_evm_system(
                             write_provider.clone(),
                             contract.address()?,
                             pubkey_agg,
-                        )
-                        .await?;
+                        );
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
 
                         if pubkey_agg {

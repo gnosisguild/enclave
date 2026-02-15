@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "anyhow::Result<()>")]
+#[rtype(result = "()")]
 pub struct DecryptionshareCreated {
     pub party_id: u64,
     pub decryption_share: Vec<ArcBytes>, // per index depending on what is required for the

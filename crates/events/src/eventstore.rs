@@ -5,16 +5,21 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    events::{EventStored, StoreEventRequested},
-    EventContextAccessors, EventLog, GetEventsAfter, ReceiveEvents, SequenceIndex,
+    events::{StoreEventRequested, StoreEventResponse},
+    EventContextAccessors, EventLog, EventStoreQueryBy, EventStoreQueryResponse, Seq,
+    SequenceIndex, Ts,
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
-use tracing::error;
+use e3_utils::{major_issue, MAILBOX_LIMIT};
+use tracing::{error, warn};
+
+const MAX_STORAGE_ERRORS: u64 = 10;
 
 pub struct EventStore<I: SequenceIndex, L: EventLog> {
     index: I,
     log: L,
+    storage_errors: u64,
 }
 
 impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
@@ -23,19 +28,28 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         let sender = msg.sender;
         let ts = event.ts();
         if let Some(_) = self.index.get(ts)? {
-            bail!("Event already stored at timestamp {ts}!");
+            warn!("Event already stored at timestamp {ts}! This might happen when recovering from a snapshot. Skipping storage");
+            self.storage_errors += 1;
+            if self.storage_errors > MAX_STORAGE_ERRORS {
+                bail!(
+                    "The eventstore had too many storage errors! {}",
+                    self.storage_errors
+                );
+            }
+            return Ok(());
         }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
-        sender.try_send(EventStored(event.into_sequenced(seq)))?;
+        sender.try_send(StoreEventResponse(event.into_sequenced(seq)))?;
         Ok(())
     }
 
-    pub fn handle_get_events_after(&mut self, msg: GetEventsAfter) -> Result<()> {
+    pub fn handle_event_store_query_ts(&mut self, msg: EventStoreQueryBy<Ts>) -> Result<()> {
         // if there are no events after the timestamp return an empty vector
-        let Some(seq) = self.index.seek(msg.ts())? else {
+        let id = msg.id();
+        let Some(seq) = self.index.seek(msg.query())? else {
             msg.sender()
-                .try_send(ReceiveEvents::new(msg.id(), vec![]))?;
+                .try_send(EventStoreQueryResponse::new(id, vec![]))?;
             return Ok(());
         };
         // read and return the events
@@ -45,38 +59,70 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
             .map(|(s, e)| e.into_sequenced(s))
             .collect::<Vec<_>>();
 
-        msg.sender().try_send(ReceiveEvents::new(msg.id(), evts))?;
+        msg.sender()
+            .try_send(EventStoreQueryResponse::new(id, evts))?;
+        Ok(())
+    }
+
+    pub fn handle_event_store_query_seq(&mut self, msg: EventStoreQueryBy<Seq>) -> Result<()> {
+        // if there are no events after the timestamp return an empty vector
+        let id = msg.id();
+
+        // read and return the events
+        let evts = self
+            .log
+            .read_from(msg.query())
+            .map(|(s, e)| e.into_sequenced(s))
+            .collect::<Vec<_>>();
+
+        msg.sender()
+            .try_send(EventStoreQueryResponse::new(id, evts))?;
         Ok(())
     }
 }
 
 impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
     pub fn new(index: I, log: L) -> Self {
-        Self { index, log }
+        Self {
+            index,
+            log,
+            storage_errors: 0,
+        }
     }
 }
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStore<I, L> {
     type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<I, L> {
     type Result = ();
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
-        match self.handle_store_event_requested(msg) {
-            Ok(_) => (),
-            Err(e) => panic!("{e}"), // panic here because when event storage fails we really need
-                                     // to just give up
+        if let Err(e) = self.handle_store_event_requested(msg) {
+            panic!("{}", major_issue("Could not store event in eventstore.", e))
+            // panic here because when event storage fails we really need
+            // to just give up
         }
     }
 }
 
-impl<I: SequenceIndex, L: EventLog> Handler<GetEventsAfter> for EventStore<I, L> {
+impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Ts>> for EventStore<I, L> {
     type Result = ();
-    fn handle(&mut self, msg: GetEventsAfter, _: &mut Self::Context) -> Self::Result {
-        match self.handle_get_events_after(msg) {
-            Ok(_) => (),
-            Err(e) => error!("{e}"),
+    fn handle(&mut self, msg: EventStoreQueryBy<Ts>, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_event_store_query_ts(msg) {
+            error!("{e}");
+        }
+    }
+}
+
+impl<I: SequenceIndex, L: EventLog> Handler<EventStoreQueryBy<Seq>> for EventStore<I, L> {
+    type Result = ();
+    fn handle(&mut self, msg: EventStoreQueryBy<Seq>, _: &mut Self::Context) -> Self::Result {
+        if let Err(e) = self.handle_event_store_query_seq(msg) {
+            error!("{e}");
         }
     }
 }

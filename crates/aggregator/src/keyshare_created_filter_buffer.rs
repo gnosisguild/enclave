@@ -7,6 +7,7 @@
 use actix::prelude::*;
 
 use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData};
+use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
 
 use crate::PublicKeyAggregator;
@@ -42,6 +43,9 @@ impl KeyshareCreatedFilterBuffer {
 
 impl Actor for KeyshareCreatedFilterBuffer {
     type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+    }
 }
 
 impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {

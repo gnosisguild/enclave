@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Handler, Message, ResponseActFuture, WrapFuture};
+pub mod channel;
+pub mod oneshot_runner;
 
+use actix::{Actor, Handler, Message, ResponseActFuture, WrapFuture};
 use anyhow::{anyhow, Result};
 
 // Helper to allow for bail behaviour in actor model async handlers

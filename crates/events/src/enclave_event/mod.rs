@@ -20,12 +20,12 @@ mod e3_failed;
 mod e3_request_complete;
 mod e3_requested;
 mod e3_stage_changed;
+mod enable_effects;
 mod enclave_error;
 mod encryption_key_collection_failed;
 mod encryption_key_created;
 mod encryption_key_pending;
 mod encryption_key_received;
-mod evm_sync_events_received;
 mod keyshare_created;
 mod net_sync_events_received;
 mod operator_activation_changed;
@@ -65,13 +65,13 @@ pub use e3_failed::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use e3_stage_changed::*;
-use e3_utils::{colorize, Color};
+use e3_utils::{colorize, colorize_event_ids, Color};
+pub use enable_effects::*;
 pub use enclave_error::*;
 pub use encryption_key_collection_failed::*;
 pub use encryption_key_created::*;
 pub use encryption_key_pending::*;
 pub use encryption_key_received::*;
-pub use evm_sync_events_received::*;
 pub use keyshare_created::*;
 pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
@@ -99,7 +99,7 @@ pub use typed_event::*;
 use crate::{
     event_context::{AggregateId, EventContext},
     traits::{ErrorEvent, Event, EventConstructorWithTimestamp, EventContextAccessors},
-    E3id, EventContextSeq, EventId, WithAggregateId,
+    E3id, EventContextSeq, EventId, EventSource, WithAggregateId,
 };
 use actix::Message;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -232,10 +232,11 @@ pub enum EnclaveEventData {
     CommitteeMemberExpelled(CommitteeMemberExpelled),
     OutgoingSyncRequested(OutgoingSyncRequested),
     NetSyncEventsReceived(NetSyncEventsReceived),
-    EvmSyncEventsReceived(EvmSyncEventsReceived),
-    SyncStart(SyncStart),
+    HistoricalEvmSyncStart(HistoricalEvmSyncStart),
+    HistoricalNetSyncStart(HistoricalNetSyncStart),
     SyncEffect(SyncEffect),
-    SyncEnd(SyncEnd),
+    SyncEnded(SyncEnded),
+    EffectsEnabled(EffectsEnabled),
     /// This is a test event to use in testing
     TestEvent(TestEvent),
 }
@@ -301,6 +302,10 @@ where
         (self.payload, self.ctx.ts())
     }
 
+    pub fn into_components(self) -> (EnclaveEventData, EventContext<S>) {
+        (self.payload, self.ctx)
+    }
+
     pub fn get_ctx(&self) -> &EventContext<S> {
         &self.ctx
     }
@@ -322,6 +327,16 @@ impl<S: SeqState> EventContextAccessors for EnclaveEvent<S> {
     fn aggregate_id(&self) -> AggregateId {
         self.ctx.aggregate_id()
     }
+    fn block(&self) -> Option<u64> {
+        self.ctx.block()
+    }
+    fn source(&self) -> EventSource {
+        self.ctx.source()
+    }
+    fn with_source(mut self, source: EventSource) -> Self {
+        self.ctx = self.ctx.with_source(source);
+        self
+    }
 }
 
 impl EventContextSeq for EnclaveEvent<Sequenced> {
@@ -333,8 +348,9 @@ impl EventContextSeq for EnclaveEvent<Sequenced> {
 impl EnclaveEvent<Sequenced> {
     pub fn clone_unsequenced(&self) -> EnclaveEvent<Unsequenced> {
         let ts = self.ts();
+        let block = self.block();
         let data = self.clone().into_data();
-        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts)
+        EnclaveEvent::new_with_timestamp(data, Some(self.ctx.clone()), ts, block, self.source())
     }
 
     pub fn to_typed_event<T>(&self, data: T) -> TypedEvent<T> {
@@ -354,9 +370,22 @@ impl EnclaveEvent<Unsequenced> {
 
 #[cfg(feature = "test-helpers")]
 impl EnclaveEvent<Sequenced> {
-    /// test-helpers only utility function to create a new unsequenced event
+    /// test-helpers only utility function to create a new sequenced event
     pub fn new_stored_event(data: EnclaveEventData, time: u128, seq: u64) -> Self {
-        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time).into_sequenced(seq)
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(data, None, time, None, EventSource::Local)
+            .into_sequenced(seq)
+    }
+
+    /// test-helpers only utility function to create a new sequenced event
+    pub fn from_data_ec(data: EnclaveEventData, ec: EventContext<Sequenced>) -> Self {
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            data,
+            Some(ec.clone()),
+            ec.ts(),
+            ec.block(),
+            EventSource::Local,
+        )
+        .into_sequenced(ec.seq())
     }
 
     /// test-helpers only utility function to remove time information from an event
@@ -401,8 +430,12 @@ impl ErrorEvent for EnclaveEvent<Unsequenced> {
         let aggregate_id = AggregateId::new(0); // Error events use default aggregate_id
 
         let ctx = caused_by
-            .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
-            .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id));
+            .map(|cause| {
+                EventContext::from_cause(id, cause, ts, aggregate_id, None, EventSource::Local)
+            })
+            .unwrap_or_else(|| {
+                EventContext::new_origin(id, ts, aggregate_id, None, EventSource::Local)
+            });
 
         Ok(EnclaveEvent {
             payload: payload.into(),
@@ -445,6 +478,7 @@ impl EnclaveEventData {
             EnclaveEventData::TicketSubmitted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ComputeResponse(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::TestEvent(ref data) => data.e3_id.clone(),
             EnclaveEventData::SignedProofFailed(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::SlashExecuted(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteeMemberExpelled(ref data) => Some(data.e3_id.clone()),
@@ -457,12 +491,8 @@ impl EnclaveEventData {
 
 impl WithAggregateId for EnclaveEventData {
     fn get_aggregate_id(&self) -> AggregateId {
-        let maybe_e3_id = self.get_e3_id();
-        if let Some(e3_id) = maybe_e3_id {
-            AggregateId::new(e3_id.chain_id() as usize)
-        } else {
-            AggregateId::new(0)
-        }
+        let chain_id = self.get_e3_id().map(|e3_id| e3_id.chain_id());
+        AggregateId::from_chain_id(chain_id)
     }
 }
 
@@ -520,10 +550,11 @@ impl_event_types!(
     CommitteeMemberExpelled,
     OutgoingSyncRequested,
     NetSyncEventsReceived,
-    EvmSyncEventsReceived,
-    SyncStart,
+    HistoricalEvmSyncStart,
+    HistoricalNetSyncStart,
     SyncEffect,
-    SyncEnd
+    SyncEnded,
+    EffectsEnabled
 );
 
 impl TryFrom<&EnclaveEvent<Sequenced>> for EnclaveError {
@@ -543,6 +574,16 @@ impl TryFrom<EnclaveEvent<Sequenced>> for EnclaveError {
         }
     }
 }
+impl From<EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: EnclaveEvent) -> Self {
+        (&value).into()
+    }
+}
+impl From<&EnclaveEvent<Sequenced>> for EventContext<Sequenced> {
+    fn from(value: &EnclaveEvent) -> Self {
+        value.ctx.clone()
+    }
+}
 
 // Add convenience method to EnclaveEvent
 impl<S: SeqState> EnclaveEvent<S> {
@@ -555,7 +596,13 @@ impl<S: SeqState> EnclaveEvent<S> {
 impl<S: SeqState> fmt::Display for EnclaveEvent<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let t = self.event_type();
-        f.write_str(&format!("{} {:?}", colorize(t, Color::Cyan), self))
+        let colorized_debug = colorize_event_ids(self);
+
+        let s = match t.as_str() {
+            "EnclaveError" => format!("{} {}", colorize(t, Color::Red), colorized_debug),
+            _ => format!("{} {}", colorize(t, Color::Cyan), colorized_debug),
+        };
+        f.write_str(&s)
     }
 }
 
@@ -564,6 +611,8 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         data: Self::Data,
         caused_by: Option<EventContext<Sequenced>>,
         ts: u128,
+        block: Option<u64>,
+        source: EventSource,
     ) -> Self {
         let payload: EnclaveEventData = data.into();
         let id = EventId::hash(&payload);
@@ -571,8 +620,8 @@ impl EventConstructorWithTimestamp for EnclaveEvent<Unsequenced> {
         EnclaveEvent {
             payload,
             ctx: caused_by
-                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id))
-                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id)),
+                .map(|cause| EventContext::from_cause(id, cause, ts, aggregate_id, block, source))
+                .unwrap_or_else(|| EventContext::new_origin(id, ts, aggregate_id, block, source)),
         }
     }
 }
