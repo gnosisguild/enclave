@@ -174,6 +174,7 @@ interface ISlashingManager {
     /**
      * @notice Emitted when a slash proposal is executed and penalties are applied
      * @param proposalId ID of the executed proposal
+     * @param e3Id ID of the E3 committee associated with this slash
      * @param operator Address of the slashed operator
      * @param reason Hash of the slash reason
      * @param ticketAmount Amount of ticket collateral slashed
@@ -182,6 +183,7 @@ interface ISlashingManager {
      */
     event SlashExecuted(
         uint256 indexed proposalId,
+        uint256 e3Id,
         address indexed operator,
         bytes32 indexed reason,
         uint256 ticketAmount,

@@ -23,9 +23,9 @@ import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry"
 import EnclaveModule from "../../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
-import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
 import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
+import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
+import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
@@ -35,9 +35,9 @@ import {
   EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
   EnclaveToken__factory as EnclaveTokenFactory,
   MockCircuitVerifier__factory as MockCircuitVerifierFactory,
-  MockUSDC__factory as MockUSDCFactory,
-  MockE3Program__factory as MockE3ProgramFactory,
   MockDecryptionVerifier__factory as MockDecryptionVerifierFactory,
+  MockE3Program__factory as MockE3ProgramFactory,
+  MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
 
@@ -308,10 +308,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const startTime = (await time.latest()) + 100;
       const requestParams = {
         threshold: threshold,
-        inputWindow: [startTime + 100, startTime + ONE_DAY] as [
-          number,
-          number,
-        ],
+        inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
         computeProviderParams: abiCoder.encode(
@@ -412,7 +409,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       // threshold [2, 3] means M=2, N=3
       await makeRequest([2, 3]);
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       const op1Address = await operator1.getAddress();
 
@@ -462,7 +463,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]); // M=2, N=3
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Slash one member — 3 active → 2 active, threshold is 2, still viable
       const proof = encodeProof();
@@ -496,7 +501,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]); // M=2, N=3
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Slash first member — 3 → 2 active, still >= 2
       const proof1 = encodeProof("0x1111");
@@ -548,7 +557,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]);
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Slash operator1 once
       const proof1 = encodeProof("0xaaaa");
@@ -590,7 +603,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]);
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Before expulsion: all 3 should be in active nodes
       const nodesBefore = await registry.getActiveCommitteeNodes(0);
@@ -634,7 +651,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]); // M=2, N=3
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Expel one member
       const proof = encodeProof();
@@ -759,7 +780,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]); // M=2, N=3
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       // Expel operator1 — still viable (2 >= 2)
       const proof1 = encodeProof("0x1111");
@@ -818,7 +843,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]);
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       const proof = encodeProof();
       const tx = await slashingManager.proposeSlash(
@@ -883,7 +912,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await setupOperator(operator3);
 
       await makeRequest([2, 3]);
-      await finalizeCommitteeWithOperators(0, [operator1, operator2, operator3]);
+      await finalizeCommitteeWithOperators(0, [
+        operator1,
+        operator2,
+        operator3,
+      ]);
 
       const proof = encodeProof();
       const op1Addr = await operator1.getAddress();
@@ -894,17 +927,15 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         proof,
       );
 
-      await expect(tx)
-        .to.emit(slashingManager, "SlashExecuted")
-        .withArgs(
-          0, // proposalId
-          0, // e3Id
-          op1Addr,
-          REASON_BAD_DKG,
-          ethers.parseUnits("10", 6), // ticketPenalty
-          ethers.parseEther("50"), // licensePenalty
-          true, // executed
-        );
+      await expect(tx).to.emit(slashingManager, "SlashExecuted").withArgs(
+        0, // proposalId
+        0, // e3Id
+        op1Addr,
+        REASON_BAD_DKG,
+        ethers.parseUnits("10", 6), // ticketPenalty
+        ethers.parseEther("50"), // licensePenalty
+        true, // executed
+      );
     });
   });
 });

@@ -202,7 +202,7 @@
           "type": "uint256"
         },
         {
-          "indexed": true,
+          "indexed": false,
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -214,7 +214,7 @@
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "bytes32",
           "name": "reason",
           "type": "bytes32"
@@ -820,5 +820,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-ae0b6c33e5fca23f9554b44e15b97ffa4e4f6aed"
+  "buildInfoId": "solc-0_8_28-0871e0e155b06f51b6fb81507908de5a4ecc60f9"
 }

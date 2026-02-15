@@ -406,6 +406,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         emit SlashExecuted(
             proposalId,
+            p.e3Id,
             p.operator,
             p.reason,
             p.ticketAmount,
