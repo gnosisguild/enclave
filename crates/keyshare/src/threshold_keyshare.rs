@@ -711,7 +711,7 @@ impl ThresholdKeyshare {
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.ciphernode_selected;
-        let e_sm_raw_decrypted = ArcBytes::from_bytes(&msg.e_sm_raw.access_raw(&self.cipher)?);
+        let e_sm_raw = msg.e_sm_raw;
         let CiphernodeSelected { e3_id, .. } = evt.clone();
 
         let state = self
