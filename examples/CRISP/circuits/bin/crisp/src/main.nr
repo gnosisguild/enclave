@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkVerificationKey, UltraHonkZKProof, verify_ultrahonkzk_proof};
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use crisp_lib::ciphertext_addition::CiphertextAddition;
 use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
 use crisp_lib::ecdsa::{address_to_field, derive_address, validate_signature};
@@ -54,7 +54,7 @@ fn main(
     // Greco Section.
     greco_verification_key: UltraHonkVerificationKey,
     greco_key_hash: Field,
-    greco_proof: UltraHonkZKProof,
+    greco_proof: UltraHonkProof,
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     k1: Polynomial<N>,
@@ -134,7 +134,7 @@ fn main(
     // This check applies to BOTH cases:
     // - For actual votes: verifies the vote ciphertext is correctly formed
     // - For mask votes: verifies the zero vote ciphertext is correctly formed
-    verify_ultrahonkzk_proof(
+    verify_honk_proof_non_zk(
         greco_verification_key,
         greco_proof,
         [pk_commitment, k1_commitment, ct_commitment],
