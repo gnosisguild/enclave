@@ -50,6 +50,11 @@ pub struct Filters {
     start_block: u64,
 }
 
+struct HistoricalFetchResult {
+    last_id: Option<CorrelationId>,
+    latest_block: u64,
+}
+
 impl Filters {
     pub fn new(addresses: Vec<Address>, start_block: u64) -> Self {
         let historical = Filter::new()
@@ -156,7 +161,7 @@ async fn fetch_historical_logs_chunked<P: Provider + Clone + 'static>(
     chain_id: u64,
     next: &EvmEventProcessor,
     timestamp_tracker: &mut TimestampTracker,
-) -> Result<Option<CorrelationId>, anyhow::Error> {
+) -> Result<HistoricalFetchResult, anyhow::Error> {
     let latest_block = provider
         .get_block_number()
         .await
@@ -169,7 +174,10 @@ async fn fetch_historical_logs_chunked<P: Provider + Clone + 'static>(
             latest_block = latest_block,
             "No blocks to sync (latest < from_block)"
         );
-        return Ok(None);
+        return Ok(HistoricalFetchResult {
+            last_id: None,
+            latest_block,
+        });
     }
 
     let total_blocks = latest_block - from_block + 1;
@@ -245,7 +253,10 @@ async fn fetch_historical_logs_chunked<P: Provider + Clone + 'static>(
         chunks_fetched = chunk_idx,
         "Historical log fetch complete"
     );
-    Ok(last_id)
+    Ok(HistoricalFetchResult {
+        last_id,
+        latest_block,
+    })
 }
 
 #[instrument(name = "evm_interface", skip_all)]
@@ -261,7 +272,7 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     let mut timestamp_tracker = TimestampTracker::new();
 
     // Historical events — chunked to respect RPC block-range limits
-    let last_id = match fetch_historical_logs_chunked(
+    let result = match fetch_historical_logs_chunked(
         provider_ref,
         &filters.historical,
         filters.start_block,
@@ -271,9 +282,9 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     )
     .await
     {
-        Ok(id) => {
+        Ok(result) => {
             info!(chain_id = chain_id, "Historical sync succeeded");
-            id
+            result
         }
         Err(e) => {
             error!(chain_id = chain_id, error = %e, "Failed to fetch historical events — node cannot operate without full state, exiting");
@@ -283,15 +294,19 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     };
 
     next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
-        HistoricalSyncComplete::new(chain_id, last_id),
+        HistoricalSyncComplete::new(chain_id, result.last_id),
     ));
+
+    // Start live subscription from the block after the last historical fetch
+    // to avoid missing events mined during the historical sync.
+    let live_filter = filters.current.clone().from_block(result.latest_block + 1);
 
     subscribe_live_events(
         provider_ref,
         &next,
         &mut shutdown,
         bus,
-        &filters,
+        &live_filter,
         chain_id,
         &mut timestamp_tracker,
     )
@@ -303,7 +318,7 @@ async fn subscribe_live_events<P: Provider + Clone + 'static>(
     next: &EvmEventProcessor,
     shutdown: &mut oneshot::Receiver<()>,
     bus: &BusHandle,
-    filters: &Filters,
+    filter: &Filter,
     chain_id: u64,
     timestamp_tracker: &mut TimestampTracker,
 ) {
@@ -324,7 +339,7 @@ async fn subscribe_live_events<P: Provider + Clone + 'static>(
             return;
         }
 
-        match provider.subscribe_logs(&filters.current).await {
+        match provider.subscribe_logs(filter).await {
             Ok(subscription) => {
                 let sub_id: B256 = subscription.local_id().clone();
                 let mut stream = subscription.into_stream();
