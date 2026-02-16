@@ -44,7 +44,7 @@ async function checkE3Ready(e3id: number): Promise<boolean> {
   }
 }
 
-async function waitForE3Ready(e3id: number, maxWaitMs: number = 80000): Promise<void> {
+async function waitForE3Ready(e3id: number, maxWaitMs: number = 200000): Promise<void> {
   const startTime = Date.now()
   while (Date.now() - startTime < maxWaitMs) {
     const isActivated = await checkE3Ready(e3id)
@@ -52,7 +52,7 @@ async function waitForE3Ready(e3id: number, maxWaitMs: number = 80000): Promise<
       console.log(`E3 ${e3id} is ready`)
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 5000))
   }
   throw new Error(`E3 ${e3id} was not ready within ${maxWaitMs}ms`)
 }

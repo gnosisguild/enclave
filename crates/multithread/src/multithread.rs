@@ -25,8 +25,8 @@ use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber, EventType,
     PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
-    ShareComputationProofRequest, ShareComputationProofResponse, TypedEvent,
-    ZkError as ZkEventError, ZkRequest, ZkResponse,
+    ShareComputationProofRequest, ShareComputationProofResponse, ShareEncryptionProofRequest,
+    ShareEncryptionProofResponse, TypedEvent, ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -48,9 +48,11 @@ use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
 };
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
+use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
-use fhe::bfv::PublicKey;
-use fhe_traits::DeserializeParametrized;
+use fhe::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
+use fhe_traits::{DeserializeParametrized, FheEncoder};
+use rand::rngs::OsRng;
 use ndarray::Array2;
 use num_bigint::BigInt;
 use rand::Rng;
@@ -409,6 +411,9 @@ fn handle_zk_request(
         ZkRequest::ShareComputation(req) => timefunc("zk_share_computation", id, || {
             handle_share_computation_proof(&prover, &cipher, req, request.clone())
         }),
+        ZkRequest::ShareEncryption(req) => timefunc("zk_share_encryption", id, || {
+            handle_share_encryption_proof(&prover, req, request.clone())
+        }),
     }
 }
 
@@ -617,6 +622,72 @@ fn handle_pk_bfv_proof(
 
     Ok(ComputeResponse::zk(
         ZkResponse::PkBfv(PkBfvProofResponse::new(proof)),
+        request.correlation_id,
+        request.e3_id,
+    ))
+}
+
+fn handle_share_encryption_proof(
+    prover: &ZkProver,
+    req: ShareEncryptionProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build DKG params from threshold preset
+    let (_threshold_params, dkg_params) = build_pair_for_preset(req.params_preset)
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Deserialize share row and re-encode as Plaintext
+    let share_row: Vec<u64> = bincode::deserialize(&req.share_row_raw)
+        .map_err(|e| make_zk_error(&request, format!("share_row: {}", e)))?;
+    let plaintext = Plaintext::try_encode(&share_row, Encoding::poly(), &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("plaintext encode: {:?}", e)))?;
+
+    // 3. Deserialize ciphertext, public key, polys using DKG params
+    let ciphertext = Ciphertext::from_bytes(&req.ciphertext_raw, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("ciphertext: {:?}", e)))?;
+    let public_key = PublicKey::from_bytes(&req.recipient_pk_raw, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("recipient_pk: {:?}", e)))?;
+    let u_rns = try_poly_from_bytes(&req.u_rns_raw, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("u_rns: {}", e)))?;
+    let e0_rns = try_poly_from_bytes(&req.e0_rns_raw, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("e0_rns: {}", e)))?;
+    let e1_rns = try_poly_from_bytes(&req.e1_rns_raw, &dkg_params)
+        .map_err(|e| make_zk_error(&request, format!("e1_rns: {}", e)))?;
+
+    // 4. Dummy SecretKey (not used by Inputs::compute)
+    let dummy_sk = SecretKey::random(&dkg_params, &mut OsRng);
+
+    // 5. Build circuit data
+    let circuit_data = ShareEncryptionCircuitData {
+        plaintext,
+        ciphertext,
+        public_key,
+        secret_key: dummy_sk,
+        u_rns,
+        e0_rns,
+        e1_rns,
+        dkg_input_type: req.dkg_input_type,
+    };
+
+    // 6. Generate proof (preset = threshold preset; Inputs::compute derives DKG internally)
+    let circuit = ShareEncryptionCircuit;
+    let e3_id_str = request.e3_id.to_string();
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    Ok(ComputeResponse::zk(
+        ZkResponse::ShareEncryption(ShareEncryptionProofResponse {
+            proof,
+            dkg_input_type: req.dkg_input_type,
+            recipient_party_id: req.recipient_party_id,
+            row_index: req.row_index,
+        }),
         request.correlation_id,
         request.e3_id,
     ))

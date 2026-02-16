@@ -167,6 +167,40 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
+        let sk_share_encryption_circuit_dir = circuits_dir.join("dkg").join("sk_share_encryption");
+        tokio::fs::create_dir_all(&sk_share_encryption_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("sk_share_encryption.json"),
+            sk_share_encryption_circuit_dir.join("sk_share_encryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("sk_share_encryption.vk"),
+            sk_share_encryption_circuit_dir.join("sk_share_encryption.vk"),
+        )
+        .await
+        .unwrap();
+
+        let e_sm_share_encryption_circuit_dir = circuits_dir.join("dkg").join("e_sm_share_encryption");
+        tokio::fs::create_dir_all(&e_sm_share_encryption_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("e_sm_share_encryption.json"),
+            e_sm_share_encryption_circuit_dir.join("e_sm_share_encryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("e_sm_share_encryption.vk"),
+            e_sm_share_encryption_circuit_dir.join("e_sm_share_encryption.vk"),
+        )
+        .await
+        .unwrap();
+
         let backend = ZkBackend::new(
             BBPath::Default(bb_binary),
             circuits_dir,
@@ -366,7 +400,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // round information
     let threshold_m = 2;
     let threshold_n = 5;
-    let esi_per_ct = 3;
+    let esi_per_ct = 1;
 
     // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
     // This is just for INSECURE parameter set.
