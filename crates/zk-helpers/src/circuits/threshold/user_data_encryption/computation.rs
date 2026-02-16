@@ -13,7 +13,7 @@ use crate::calculate_bit_width;
 use crate::commitments::compute_pk_aggregation_commitment;
 use crate::compute_ciphertext_commitment;
 use crate::get_zkp_modulus;
-use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
+use crate::math::compute_k0is;
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
@@ -72,7 +72,6 @@ pub struct Configs {
     pub n: usize,
     pub l: usize,
     pub moduli: Vec<u64>,
-    pub q_mod_t: BigInt,
     pub k0is: Vec<u64>,
     pub bits: Bits,
     pub bounds: Bounds,
@@ -138,10 +137,6 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = threshold_params.moduli().to_vec();
-        let plaintext = threshold_params.plaintext();
-        let q = compute_q_product(&moduli);
-        let q_mod_t = BigInt::from(compute_q_mod_t(&q, plaintext));
-
         let k0is = compute_k0is(threshold_params.moduli(), threshold_params.plaintext())?;
 
         let bounds = Bounds::compute(preset, &())?;
@@ -150,7 +145,6 @@ impl Computation for Configs {
         Ok(Configs {
             n: threshold_params.degree(),
             l: moduli.len(),
-            q_mod_t,
             k0is,
             moduli,
             bits,
