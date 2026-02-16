@@ -276,11 +276,9 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
             id
         }
         Err(e) => {
-            error!(chain_id = chain_id, error = %e, "Failed to fetch historical events");
-            // Still send HistoricalSyncComplete so the gateway transitions to Live
-            // and live events can flow. Otherwise the node is completely dead.
+            error!(chain_id = chain_id, error = %e, "Failed to fetch historical events — node cannot operate without full state, exiting");
             bus.err(EType::Evm, anyhow!(e));
-            None
+            return;
         }
     };
 
