@@ -10,12 +10,11 @@ use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
 use crisp_lib::ecdsa::{address_to_field, derive_address, validate_signature};
 use crisp_lib::merkle_tree::get_merkle_root;
 use crisp_lib::utils::{check_coefficient_values_with_balance, check_coefficient_zero};
-use pvss_lib::configs::default::threshold::{
+use enclave_lib::configs::default::threshold::{
     L, N, Q_MOD_T_CENTERED, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_K,
-    USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_CONFIGS,
+    USER_DATA_ENCRYPTION_CONFIGS,
 };
-use pvss_lib::math::commitments::compute_ciphertext_commitment;
-use pvss_lib::math::polynomial::Polynomial;
+use enclave_lib::math::{commitments::compute_ciphertext_commitment, polynomial::Polynomial};
 
 /// Main circuit function for CRISP vote verification.
 ///
@@ -85,10 +84,12 @@ fn main(
     // Compute commitments for all ciphertexts and plaintexts that will be verified
     // in subsequent steps. These commitments are used to verify consistency between
     // the provided commitments and the actual polynomial values.
-    let _prev_ct_commitment = compute_ct_commitment::<N, L, GRECO_BIT_CT>(prev_ct0is, prev_ct1is);
-    let _ct_commitment = compute_ct_commitment::<N, L, GRECO_BIT_CT>(ct0is, ct1is);
-    let _k1_commitment = compute_k1_commitment::<N, GRECO_BIT_K>(k1);
-    let sum_ct_commitment = compute_ct_commitment::<N, L, GRECO_BIT_CT>(sum_ct0is, sum_ct1is);
+    let _prev_ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(prev_ct0is, prev_ct1is);
+    let _ct_commitment = compute_ct_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
+    let _k1_commitment = compute_k1_commitment::<N, USER_DATA_ENCRYPTION_BIT_K>(k1);
+    let sum_ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(sum_ct0is, sum_ct1is);
 
     // ============================================================================
     // STEP 2: Eligibility - Merkle Tree Proof
@@ -154,7 +155,8 @@ fn main(
     //     to authenticate the voter
     //   - Verify address matches slot address (checked via valid_address)
     //   - Return new vote ciphertext commitment (ct_commitment)
-    let valid_vote = check_coefficient_values_with_balance(k1, Q_MOD_T_MOD_P, balance);
+    let valid_vote =
+        check_coefficient_values_with_balance(k1, Q_MOD_T_CENTERED, balance, num_options);
     let valid_signature = validate_signature(hashed_message, public_key_x, public_key_y, signature);
     let valid_address =
         slot_address == address_to_field(derive_address(public_key_x, public_key_y));
@@ -175,10 +177,10 @@ fn main(
     //     * Mask votes add zero to the previous ciphertext, creating a different ciphertext
     //       with the same plaintext, preventing receipt sharing attacks
     //     * Return sum ciphertext commitment (sum_ct_commitment)
-    let valid_zero_vote = check_coefficient_zero(k1);
+    let valid_zero_vote = check_coefficient_zero(k1, num_options);
     let valid_prev_ct = prev_ct_commitment == _prev_ct_commitment;
-    let ct_add: CiphertextAddition<N, L, GRECO_BIT_CT, GRECO_BIT_CT, GRECO_BIT_CT> = CiphertextAddition::new(
-        GRECO_CONFIGS,
+    let ct_add: CiphertextAddition<N, L, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT> = CiphertextAddition::new(
+        USER_DATA_ENCRYPTION_CONFIGS,
         ct0is,
         ct1is,
         ct_commitment,
@@ -191,7 +193,7 @@ fn main(
         sum_r0is,
         sum_r1is,
     );
-    let valid_ct_add = ct_add.verify();
+    let valid_ct_add = ct_add.execute();
 
     // Actual conditional logic.
     if is_mask_vote == false {

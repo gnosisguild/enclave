@@ -39,9 +39,9 @@
 //! 3. Verifies the addition equations hold at these points
 //! 4. Checks range constraints on all coefficients
 
-use lib::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
-use lib::math::commitments::compute_commitments;
-use lib::math::polynomial::Polynomial;
+use enclave_lib::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
+use enclave_lib::math::commitments::compute_commitments;
+use enclave_lib::math::polynomial::Polynomial;
 
 /// Parameters for ciphertext addition verification.
 ///

@@ -326,9 +326,7 @@ mod tests {
     fn test_inputs_generation_with_custom_params() {
         let generator =
             ZKInputsGenerator::from_set(BfvParamSet::from(BfvPreset::InsecureThreshold512));
-        let public_key = generator
-            .generate_public_key()
-            .expect("failed to generate public key");
+        let (_secret_key, public_key) = generator.generate_keys().expect("failed to generate keys");
         let vote = create_vote_vector();
         let prev_ciphertext = generator
             .encrypt_vote(&public_key, vote.clone())
@@ -527,9 +525,9 @@ mod tests {
 
         // Test with different vote patterns
         let test_votes = vec![
-            vec![0u64; DEFAULT_DEGREE], // All zeros
-            vec![1u64; DEFAULT_DEGREE], // All ones
-            create_vote_vector(),       // Alternating pattern
+            vec![0u64; insecure_512::DEGREE], // All zeros
+            vec![1u64; insecure_512::DEGREE], // All ones
+            create_vote_vector(),             // Alternating pattern
         ];
 
         for vote in test_votes {
@@ -586,7 +584,7 @@ mod tests {
         assert!(result.is_err(), "Should fail with invalid secret key");
 
         // Test invalid ciphertext bytes
-        let valid_sk_bytes = bincode::serialize(&vec![0i64; DEFAULT_DEGREE]).unwrap();
+        let valid_sk_bytes = bincode::serialize(&vec![0i64; insecure_512::DEGREE]).unwrap();
         let result = generator.decrypt_vote(&valid_sk_bytes, &[1, 2, 3]);
         assert!(result.is_err(), "Should fail with invalid ciphertext");
 

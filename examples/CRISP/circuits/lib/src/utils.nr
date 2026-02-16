@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use lib::math::polynomial::Polynomial;
+use enclave_lib::math::polynomial::Polynomial;
 
 use crate::constants::{MAX_OPTIONS, MAX_VOTE_BITS};
 
@@ -24,9 +24,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     q_mod_t_centered: Field,
     balance: Field,
     num_options: u32,
-) {
-    assert(num_options > 1);
-    assert(num_options as u64 <= MAX_OPTIONS as u64);
+) -> bool {
+    let mut valid = (num_options > 1) & (num_options as u64 <= MAX_OPTIONS as u64);
 
     let segment_size: u32 = D / num_options;
     let remainder: u32 = D - (segment_size * num_options);
@@ -52,7 +51,7 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
                     let coeff = k1.coefficients[idx];
 
                     // Binary constraint: coeff must be 0 or q_mod_t
-                    assert(0 == coeff * (q_mod_t_centered - coeff));
+                    valid = valid & (0 == coeff * (q_mod_t_centered - coeff));
 
                     let bit: u64 = if coeff == 0 { 0 } else { 1 };
                     sum += bit * (1 << (bit_pos as u64));
@@ -70,21 +69,18 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 
     // Voting rules based on number of options
     if num_options == 2 {
-        // Binary vote: mutually exclusive, only one option can be non-zero
-        assert(non_zero_count <= 1);
+        valid = valid & (non_zero_count <= 1);
 
-        // Single vote must not exceed balance
         for opt_idx in 0..MAX_OPTIONS {
             if ((opt_idx as u64) < (num_options as u64)) & (sums[opt_idx] != 0) {
-                assert(sums[opt_idx] <= (balance as u64));
+                valid = valid & (sums[opt_idx] <= (balance as u64));
             }
         }
     } else {
-        // Multi-option vote: can split, but total must not exceed balance
-        assert(total_votes <= (balance as u64));
+        valid = valid & (total_votes <= (balance as u64));
     }
 
-    res
+    valid
 }
 
 /// Checks if all vote coefficients are zero.
@@ -99,10 +95,8 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 /// # Returns
 /// Returns `true` if all vote coefficients are zero, `false` otherwise.
 ///
-pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
-    assert(num_options > 1);
-    assert(num_options as u64 <= MAX_OPTIONS as u64);
-
+pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) -> bool {
+    let mut valid = (num_options > 1) & (num_options as u64 <= MAX_OPTIONS as u64);
     let segment_size: u32 = D / num_options;
     let remainder: u32 = D - (segment_size * num_options);
 
@@ -114,14 +108,13 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
             for bit_pos in 0..MAX_VOTE_BITS {
                 if (bit_pos as u64) < (segment_size as u64) {
                     let idx: u32 = start_idx + bit_pos;
-                    assert(k1.coefficients[idx] == 0);
+                    valid = valid & (k1.coefficients[idx] == 0);
                 }
             }
         }
     }
 
-    // Return true only if both regions are completely zero
-    res
+    valid
 }
 
 #[test]
@@ -132,7 +125,7 @@ fn test_2_options_vote_first() {
     coeffs[52] = 1; // 2^2 = 4
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 2);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 2));
 }
 
 #[test]
@@ -143,20 +136,20 @@ fn test_2_options_vote_second() {
     coeffs[1] = 1; // 2^1 = 2
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 2);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 2));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_2_options_both_voted_fails() {
     let mut coeffs = [0; 100];
     coeffs[50] = 1; // Option 0
     coeffs[0] = 1; // Option 1
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 2);
+    assert(!check_coefficient_values_with_balance(pol, 1, 100, 2));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_2_options_exceeds_balance_fails() {
     let mut coeffs = [0; 100];
     // Option 0, value 10, balance 5
@@ -164,7 +157,7 @@ fn test_2_options_exceeds_balance_fails() {
     coeffs[53] = 1; // 2^3 = 8
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 5, 2);
+    assert(!check_coefficient_values_with_balance(pol, 1, 5, 2));
 }
 
 // --- 3+ Options (Split Voting) ---
@@ -188,7 +181,7 @@ fn test_3_options_split_vote() {
     // Total: 60
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 3);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 3));
 }
 
 #[test]
@@ -218,10 +211,10 @@ fn test_3_options_vote_all_three() {
     // Total: 30
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 3);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 3));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_3_options_total_exceeds_balance_fails() {
     // Vote 60 + 60 = 120, balance = 100
     let mut coeffs = [0; 99];
@@ -239,7 +232,7 @@ fn test_3_options_total_exceeds_balance_fails() {
     coeffs[38] = 1; // 2^5 = 32
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 3);
+    assert(!check_coefficient_values_with_balance(pol, 1, 100, 3));
 }
 
 #[test]
@@ -255,13 +248,13 @@ fn test_5_options_single_vote() {
     // Total: 50
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 5);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 5));
 }
 
 #[test]
 fn test_zero_vote_passes() {
     let pol = Polynomial { coefficients: [0; 100] };
-    check_coefficient_values_with_balance(pol, 1, 100, 3);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 3));
 }
 
 #[test]
@@ -282,22 +275,22 @@ fn test_invalid_coefficient_fails() {
     coeffs[50] = 2; // Invalid
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 2);
+    assert(!check_coefficient_values_with_balance(pol, 1, 100, 2));
 }
 
 #[test]
 fn test_check_coefficient_zero_passes() {
     let pol = Polynomial { coefficients: [0; 100] };
-    check_coefficient_zero(pol, 3);
+    assert(check_coefficient_zero(pol, 3));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_check_coefficient_zero_fails() {
     let mut coeffs = [0; 99];
     coeffs[33] = 1;
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_zero(pol, 3);
+    assert(!check_coefficient_zero(pol, 3));
 }
 
 #[test(should_fail)]

@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use lib::math::commitments::compute_commitments;
-use lib::math::commitments::multiple_polynomial_payload;
-use lib::math::commitments::single_polynomial_payload;
-use lib::math::polynomial::Polynomial;
+use enclave_lib::math::commitments::compute_commitments;
+use enclave_lib::math::commitments::multiple_polynomial_payload;
+use enclave_lib::math::commitments::single_polynomial_payload;
+use enclave_lib::math::polynomial::Polynomial;
 
 // Domain separator - "CRISP_CT"
 pub global DS_CRISP_CT: [u8; 64] = [
