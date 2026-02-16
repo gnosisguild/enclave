@@ -128,7 +128,7 @@ pub fn gen_pk_share_and_sk_sss(
         num_ciphernodes, threshold
     );
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
-    let (pk0_share, a, sk_poly, eek) =
+    let (pk0_share, a, _, eek) =
         { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
 
     let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;

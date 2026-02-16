@@ -3485,6 +3485,7 @@ version = "0.1.15"
 dependencies = [
  "actix",
  "anyhow",
+ "bincode 1.3.3",
  "e3-crypto",
  "e3-data",
  "e3-events",
@@ -3496,6 +3497,8 @@ dependencies = [
  "e3-zk-prover",
  "fhe",
  "fhe-traits",
+ "ndarray",
+ "num-bigint",
  "rand 0.8.5",
  "rayon",
  "thiserror 1.0.69",

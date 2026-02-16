@@ -131,6 +131,42 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
+        // Copy T2a (sk_share_computation) circuit
+        let sk_share_comp_circuit_dir = circuits_dir.join("dkg").join("sk_share_computation");
+        tokio::fs::create_dir_all(&sk_share_comp_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("sk_share_computation.json"),
+            sk_share_comp_circuit_dir.join("sk_share_computation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("sk_share_computation.vk"),
+            sk_share_comp_circuit_dir.join("sk_share_computation.vk"),
+        )
+        .await
+        .unwrap();
+
+        // Copy T2b (e_sm_share_computation) circuit
+        let e_sm_share_comp_circuit_dir = circuits_dir.join("dkg").join("e_sm_share_computation");
+        tokio::fs::create_dir_all(&e_sm_share_comp_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("e_sm_share_computation.json"),
+            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("e_sm_share_computation.vk"),
+            e_sm_share_comp_circuit_dir.join("e_sm_share_computation.vk"),
+        )
+        .await
+        .unwrap();
+
         let backend = ZkBackend::new(
             BBPath::Default(bb_binary),
             circuits_dir,
