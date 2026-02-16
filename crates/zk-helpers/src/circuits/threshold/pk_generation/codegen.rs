@@ -17,6 +17,7 @@ use crate::CircuitCodegen;
 use crate::CircuitsErrors;
 use crate::{Artifacts, CodegenToml};
 use crate::{Circuit, CodegenConfigs};
+use num_bigint::BigUint;
 
 /// Implementation of [`CircuitCodegen`] for [`PkGenerationCircuit`].
 impl CircuitCodegen for PkGenerationCircuit {
@@ -26,7 +27,7 @@ impl CircuitCodegen for PkGenerationCircuit {
 
     fn codegen(&self, preset: Self::Preset, data: &Self::Data) -> Result<Artifacts, Self::Error> {
         let inputs = Inputs::compute(preset, data)?;
-        let configs = Configs::compute(preset, &data.committee)?;
+        let configs = Configs::compute(preset, &())?;
 
         let toml = generate_toml(inputs)?;
         let configs = generate_configs(preset, &configs);
@@ -41,13 +42,18 @@ pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
     Ok(toml::to_string(&json)?)
 }
 
-pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
+pub fn generate_configs(preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <PkGenerationCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
 
     let r1_bounds_str = join_display(&configs.bounds.r1_bounds, ", ");
     let r2_bounds_str = join_display(&configs.bounds.r2_bounds, ", ");
+
+    let (threshold_params, _) = preset.build_pair().unwrap();
+
+    // B_enc ≈ sqrt(3 * error1_variance)
+    let b_enc = (BigUint::from(3u32) * threshold_params.get_error1_variance()).sqrt();
 
     format!(
         r#"use crate::core::threshold::pk_generation::Configs as PkGenerationConfigs;
@@ -75,6 +81,8 @@ pub global {}_SK_BOUND: Field = {};
 pub global {}_E_SM_BOUND: Field = {};
 pub global {}_R1_BOUNDS: [Field; L] = [{}];
 pub global {}_R2_BOUNDS: [Field; L] = [{}];
+
+pub global {}_B_ENC: Field = {};
 
 pub global {}_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
 QIS,
@@ -110,6 +118,8 @@ QIS,
         r1_bounds_str,
         prefix,
         r2_bounds_str,
+        prefix,
+        b_enc,
         prefix,
         prefix,
         prefix,
@@ -175,7 +185,7 @@ mod tests {
         assert!(configs_path.exists());
 
         let configs_content = std::fs::read_to_string(&configs_path).unwrap();
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &sample.committee).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         assert!(configs_content.contains(
