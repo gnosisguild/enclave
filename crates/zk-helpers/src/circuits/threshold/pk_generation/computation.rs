@@ -15,7 +15,6 @@ use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
-use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -49,7 +48,7 @@ impl CircuitComputation for PkGenerationCircuit {
     type Error = CircuitsErrors;
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self::Output, Self::Error> {
-        let bounds = Bounds::compute(preset, &data.committee)?;
+        let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
         let inputs = Inputs::compute(preset, data)?;
 
@@ -104,16 +103,16 @@ pub struct Inputs {
 
 impl Computation for Configs {
     type Preset = BfvPreset;
-    type Data = CiphernodesCommittee;
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         let moduli = threshold_params.moduli().to_vec();
 
-        let bounds = Bounds::compute(preset, data)?;
+        let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
@@ -163,10 +162,10 @@ impl Computation for Bits {
 
 impl Computation for Bounds {
     type Preset = BfvPreset;
-    type Data = CiphernodesCommittee;
+    type Data = ();
     type Error = CircuitsErrors;
 
-    fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
+    fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
@@ -178,15 +177,14 @@ impl Computation for Bounds {
         let sk_bound = SecretKey::sk_bound();
         let eek_bound = cbd_bound;
 
-        let defaults = preset
+        let sd = preset
             .search_defaults()
             .ok_or_else(|| CircuitsErrors::Other("missing search defaults".to_string()))?;
-        let num_ciphertexts = defaults.z;
 
         let smudging_config = SmudgingBoundCalculatorConfig::new(
             threshold_params.clone(),
-            data.n,
-            num_ciphertexts as usize,
+            sd.n as usize,
+            sd.z as usize,
             preset.metadata().lambda,
         );
         let smudging_calculator = SmudgingBoundCalculator::new(smudging_config);
@@ -373,16 +371,12 @@ impl Computation for Inputs {
 
 #[cfg(test)]
 mod tests {
-    use crate::CiphernodesCommitteeSize;
-
     use super::*;
-
     use e3_fhe_params::BfvPreset;
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let committee = CiphernodesCommitteeSize::Small.values();
-        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
+        let bounds = Bounds::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let expected_bit = calculate_bit_width(BigInt::from(bounds.pk_bound.clone()));
@@ -392,8 +386,7 @@ mod tests {
 
     #[test]
     fn test_constants_json_roundtrip() {
-        let committee = CiphernodesCommitteeSize::Small.values();
-        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &committee).unwrap();
+        let constants = Configs::compute(BfvPreset::InsecureThreshold512, &()).unwrap();
 
         let json = constants.to_json().unwrap();
         let decoded: Configs = serde_json::from_value(json).unwrap();

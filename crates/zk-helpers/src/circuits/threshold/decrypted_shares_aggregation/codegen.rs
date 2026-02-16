@@ -61,6 +61,7 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
 pub global PLAINTEXT_MODULUS: Field = {};
+pub global Q_MOD_T: Field = {};
 pub global Q_INVERSE_MOD_T: Field = {};
         
 /************************************
@@ -77,6 +78,7 @@ pub global {}_CONFIGS: DecryptedSharesAggregationConfigs<L> =
         configs.l,
         qis_str,
         configs.plaintext_modulus,
+        configs.q_mod_t,
         configs.q_inverse_mod_t,
         prefix,
         configs.bits.noise_bit,
