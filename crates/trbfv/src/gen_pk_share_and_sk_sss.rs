@@ -147,13 +147,13 @@ pub fn gen_pk_share_and_sk_sss(
 
     let pk0_share_raw = ArcBytes::from_bytes(&pk0_share.to_bytes());
     let a_raw = ArcBytes::from_bytes(&a.to_bytes());
-    let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
     let eek_raw = ArcBytes::from_bytes(&eek.to_bytes());
 
     let mut share_manager =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
 
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
+    let sk_raw = ArcBytes::from_bytes(&sk_poly.to_bytes());
 
     info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
     let sk_sss = SharedSecret::from({
