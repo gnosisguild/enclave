@@ -170,18 +170,25 @@ pub(crate) async fn backfill_to_head<L: LogProvider>(
         "Backfilling missed blocks"
     );
 
-    fetch_logs_chunked(
-        provider,
-        filter,
-        gap_start,
-        current_head,
-        chain_id,
-        next,
-        timestamp_tracker,
-    )
-    .await?;
+    let mut cursor = gap_start;
+    while cursor <= current_head {
+        let chunk_end = (cursor + GET_LOGS_CHUNK_SIZE - 1).min(current_head);
 
-    *last_block = current_head;
+        fetch_logs_chunked(
+            provider,
+            filter,
+            cursor,
+            chunk_end,
+            chain_id,
+            next,
+            timestamp_tracker,
+        )
+        .await?;
+
+        *last_block = chunk_end;
+        cursor = chunk_end + 1;
+    }
+
     Ok(())
 }
 
@@ -445,5 +452,44 @@ mod tests {
             count += 1;
         }
         assert_eq!(count, 2);
+    }
+
+    #[actix::test]
+    async fn test_backfill_partial_failure_preserves_progress() {
+        tokio::time::pause();
+
+        // Head at 25000, last_block at 100
+        // Gap: blocks 101..=25000 → 3 chunks:
+        //   chunk 1: [101, 10100]
+        //   chunk 2: [10101, 20100]
+        //   chunk 3: [20101, 25000]
+        let mock = MockLogProvider::new(25000);
+        // Chunk 1 succeeds
+        mock.push_logs(vec![make_test_log(500)]);
+        // Chunk 2 succeeds
+        mock.push_logs(vec![make_test_log(15000)]);
+        // Chunk 3: all retries fail
+        for _ in 0..GET_LOGS_MAX_RETRIES {
+            mock.push_error("RPC error");
+        }
+
+        let (next, _rx) = setup_collector();
+        let mut ts = TimestampTracker::new();
+        let filter = Filter::new();
+        let mut last_block = 100u64;
+
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+
+        // Should fail because chunk 3 exhausted retries
+        assert!(result.is_err());
+        // But last_block must have advanced past the two successful chunks
+        assert_eq!(last_block, 20100);
+
+        // On retry: gap_start = 20101, head still 25000 → single chunk succeeds
+        mock.push_logs(vec![make_test_log(22000)]);
+
+        let result = backfill_to_head(&mock, &filter, 1, &next, &mut ts, &mut last_block).await;
+        assert!(result.is_ok());
+        assert_eq!(last_block, 25000);
     }
 }
