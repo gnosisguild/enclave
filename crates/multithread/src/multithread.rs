@@ -239,7 +239,7 @@ fn handle_compute_request(
         ComputeRequestKind::TrBFV(trbfv_req) => {
             handle_trbfv_request(rng, cipher, trbfv_req, request, id)
         }
-        ComputeRequestKind::Zk(zk_req) => handle_zk_request(zk_prover, zk_req, request, id),
+        ComputeRequestKind::Zk(zk_req) => handle_zk_request(cipher, zk_prover, zk_req, request, id),
     }
 }
 
@@ -341,6 +341,7 @@ fn handle_trbfv_request(
 }
 
 fn handle_zk_request(
+    cipher: Arc<Cipher>,
     zk_prover: Option<Arc<ZkProver>>,
     zk_req: ZkRequest,
     request: ComputeRequest,
@@ -363,7 +364,7 @@ fn handle_zk_request(
             handle_pk_bfv_proof(&prover, req, request.clone())
         }),
         ZkRequest::PkGeneration(req) => timefunc("zk_pk_generation", id, || {
-            handle_pk_generation_proof(&prover, req, request.clone())
+            handle_pk_generation_proof(&prover, &cipher, req, request.clone())
         }),
     }
 }
@@ -378,26 +379,41 @@ fn make_zk_error(request: &ComputeRequest, msg: String) -> ComputeRequestError {
 
 fn handle_pk_generation_proof(
     prover: &ZkProver,
+    cipher: &Cipher,
     req: PkGenerationProofRequest,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     // 1. Build BFV parameters from the threshold preset
     let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
 
-    // 2. Deserialize raw polynomial bytes → Poly
+    // 2. Decrypt sensitive witness fields
+    let sk_bytes = req
+        .sk
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("sk decrypt: {}", e)))?;
+    let eek_bytes = req
+        .eek
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("eek decrypt: {}", e)))?;
+    let e_sm_bytes = req
+        .e_sm
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("e_sm decrypt: {}", e)))?;
+
+    // 3. Deserialize raw polynomial bytes → Poly
     let pk0_share_poly = try_poly_from_bytes(&req.pk0_share, &params)
         .map_err(|e| make_zk_error(&request, format!("pk0_share: {}", e)))?;
 
     let a_poly = try_poly_from_bytes(&req.a, &params)
         .map_err(|e| make_zk_error(&request, format!("a: {}", e)))?;
 
-    let sk_poly = try_poly_from_bytes(&req.sk, &params)
+    let sk_poly = try_poly_from_bytes(&sk_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("sk: {}", e)))?;
 
-    let eek_poly = try_poly_from_bytes(&req.eek, &params)
+    let eek_poly = try_poly_from_bytes(&eek_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
 
-    let e_sm_poly = try_poly_from_bytes(&req.e_sm, &params)
+    let e_sm_poly = try_poly_from_bytes(&e_sm_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
 
     // 3. Convert Poly → CrtPolynomial

@@ -6,6 +6,7 @@
 
 use crate::Proof;
 use derivative::Derivative;
+use e3_crypto::SensitiveBytes;
 use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::CiphernodesCommitteeSize;
@@ -34,21 +35,18 @@ pub struct PkBfvProofRequest {
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct PkGenerationProofRequest {
-    /// Raw pk0 share polynomial bytes.
+    /// Raw pk0 share polynomial bytes (public statement).
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk0_share: ArcBytes,
-    /// Raw common random polynomial bytes.
+    /// Raw common random polynomial bytes (public statement).
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub a: ArcBytes,
-    /// Raw secret key polynomial bytes (witness).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub sk: ArcBytes,
-    /// Raw error polynomial bytes (witness).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub eek: ArcBytes,
-    /// Raw smudging noise polynomial bytes (witness).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub e_sm: ArcBytes,
+    /// Raw secret key polynomial bytes (witness — encrypted at rest).
+    pub sk: SensitiveBytes,
+    /// Raw error polynomial bytes (witness — encrypted at rest).
+    pub eek: SensitiveBytes,
+    /// Raw smudging noise polynomial bytes (witness — encrypted at rest).
+    pub e_sm: SensitiveBytes,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
     /// The size of the committee
@@ -68,19 +66,19 @@ impl PkGenerationProofRequest {
     pub fn new(
         pk0_share: impl Into<ArcBytes>,
         a: impl Into<ArcBytes>,
-        sk: impl Into<ArcBytes>,
-        eek: impl Into<ArcBytes>,
-        e_sm: impl Into<ArcBytes>,
+        sk: SensitiveBytes,
+        eek: SensitiveBytes,
+        e_sm: SensitiveBytes,
         params_preset: BfvPreset,
         committee_size: CiphernodesCommitteeSize,
     ) -> Self {
         Self {
             pk0_share: pk0_share.into(),
             a: a.into(),
-            sk: sk.into(),
-            eek: eek.into(),
+            sk,
+            eek,
             params_preset,
-            e_sm: e_sm.into(),
+            e_sm,
             committee_size,
         }
     }

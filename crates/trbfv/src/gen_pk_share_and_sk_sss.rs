@@ -11,7 +11,7 @@ use crate::{
     TrBFVConfig,
 };
 use anyhow::Result;
-use e3_crypto::Cipher;
+use e3_crypto::{Cipher, SensitiveBytes};
 use e3_utils::{utility_types::ArcBytes, SharedRng};
 use fhe::{
     bfv::SecretKey,
@@ -66,12 +66,12 @@ pub struct GenPkShareAndSkSssResponse {
     pub pk0_share_raw: ArcBytes,
     /// Raw common random polynomial (RNS form) for ZK proof generation (T1a).
     pub a_raw: ArcBytes,
-    /// Raw secret key polynomial (RNS form) for ZK proof generation (T1a).
-    pub sk_raw: ArcBytes,
-    /// Raw error polynomial from key generation (RNS form) for ZK proof generation (T1a).
-    pub eek_raw: ArcBytes,
-    /// Raw smudging noise polynomial (RNS form) for ZK proof generation (C1).
-    pub e_sm_raw: ArcBytes,
+    /// Raw secret key polynomial (RNS form) for ZK proof generation (T1a) — encrypted at rest.
+    pub sk_raw: SensitiveBytes,
+    /// Raw error polynomial from key generation (RNS form) for ZK proof generation (T1a) — encrypted at rest.
+    pub eek_raw: SensitiveBytes,
+    /// Raw smudging noise polynomial (RNS form) for ZK proof generation (C1) — encrypted at rest.
+    pub e_sm_raw: SensitiveBytes,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
@@ -86,9 +86,9 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
             sk_sss,
             pk0_share_raw: value.pk0_share_raw,
             a_raw: value.a_raw,
-            sk_raw: value.sk_raw,
-            eek_raw: value.eek_raw,
-            e_sm_raw: value.e_sm_raw,
+            sk_raw: SensitiveBytes::new(value.sk_raw.to_vec(), cipher)?,
+            eek_raw: SensitiveBytes::new(value.eek_raw.to_vec(), cipher)?,
+            e_sm_raw: SensitiveBytes::new(value.e_sm_raw.to_vec(), cipher)?,
         })
     }
 }

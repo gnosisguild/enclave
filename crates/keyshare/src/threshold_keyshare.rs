@@ -55,7 +55,7 @@ pub struct GenPkShareAndSkSss(CiphernodeSelected);
 #[rtype(result = "()")]
 pub struct GenEsiSss {
     pub ciphernode_selected: CiphernodeSelected,
-    pub e_sm_raw: ArcBytes,
+    pub e_sm_raw: SensitiveBytes,
 }
 
 #[derive(Message)]
@@ -83,8 +83,8 @@ pub struct CollectingEncryptionKeysData {
 pub struct ProofRequestData {
     pub pk0_share_raw: ArcBytes,
     pub a_raw: ArcBytes,
-    pub sk_raw: ArcBytes,
-    pub eek_raw: ArcBytes,
+    pub sk_raw: SensitiveBytes,
+    pub eek_raw: SensitiveBytes,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -92,7 +92,7 @@ pub struct GeneratingThresholdShareData {
     pk_share: Option<ArcBytes>,
     sk_sss: Option<Encrypted<SharedSecret>>,
     esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
-    e_sm_raw: Option<ArcBytes>,
+    e_sm_raw: Option<SensitiveBytes>,
     sk_bfv: SensitiveBytes,
     pk_bfv: ArcBytes,
     collected_encryption_keys: Vec<Arc<EncryptionKey>>,
@@ -666,7 +666,7 @@ impl ThresholdKeyshare {
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.ciphernode_selected;
-        let e_sm_raw = msg.e_sm_raw;
+        let e_sm_raw_decrypted = ArcBytes::from_bytes(&msg.e_sm_raw.access_raw(&self.cipher)?);
         let CiphernodeSelected { e3_id, .. } = evt.clone();
 
         let state = self
@@ -680,7 +680,7 @@ impl ThresholdKeyshare {
             TrBFVRequest::GenEsiSss(
                 GenEsiSssRequest {
                     trbfv_config,
-                    e_sm_raw,
+                    e_sm_raw: e_sm_raw_decrypted,
                 }
                 .into(),
             ),

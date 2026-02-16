@@ -159,35 +159,7 @@ impl ProofRequestActor {
         };
 
         let party_id = pending.full_share.party_id;
-        let share = &pending.full_share;
-
-        // Publish per-party shares
-        let num_parties = share.num_parties();
-        info!(
-            "Publishing ThresholdShareCreated for E3 {} to {} parties",
-            pending.e3_id, num_parties
-        );
-
-        for recipient_party_id in 0..num_parties {
-            if let Some(party_share) = share.extract_for_party(recipient_party_id) {
-                if let Err(err) = self.bus.publish(
-                    ThresholdShareCreated {
-                        e3_id: pending.e3_id.clone(),
-                        share: Arc::new(party_share),
-                        target_party_id: recipient_party_id as u64,
-                        external: false,
-                    },
-                    ec.clone(),
-                ) {
-                    error!(
-                        "Failed to publish ThresholdShareCreated for party {}: {err}",
-                        recipient_party_id
-                    );
-                }
-            } else {
-                error!("Failed to extract share for party {}", recipient_party_id);
-            }
-        }
+        let e3_id = pending.e3_id.clone();
 
         info!(
             "Publishing PkGenerationProofSigned for E3 {} party {}",
@@ -202,6 +174,36 @@ impl ProofRequestActor {
             ec.clone(),
         ) {
             error!("Failed to publish PkGenerationProofSigned: {err}");
+        }
+
+        let share = &pending.full_share;
+
+        // Publish per-party shares
+        let num_parties = share.num_parties();
+        info!(
+            "Publishing ThresholdShareCreated for E3 {} to {} parties",
+            e3_id, num_parties
+        );
+
+        for recipient_party_id in 0..num_parties {
+            if let Some(party_share) = share.extract_for_party(recipient_party_id) {
+                if let Err(err) = self.bus.publish(
+                    ThresholdShareCreated {
+                        e3_id: e3_id.clone(),
+                        share: Arc::new(party_share),
+                        target_party_id: recipient_party_id as u64,
+                        external: false,
+                    },
+                    ec.clone(),
+                ) {
+                    error!(
+                        "Failed to publish ThresholdShareCreated for party {}: {err}",
+                        recipient_party_id
+                    );
+                }
+            } else {
+                error!("Failed to extract share for party {}", recipient_party_id);
+            }
         }
     }
 

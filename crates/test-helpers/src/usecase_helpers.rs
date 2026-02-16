@@ -81,7 +81,7 @@ pub fn generate_shares_hash_map(
             &cipher,
             GenEsiSssRequest {
                 trbfv_config: trbfv_config.clone(),
-                e_sm_raw,
+                e_sm_raw: ArcBytes::from_bytes(&e_sm_raw.access_raw(&cipher)?),
             },
         )?;
 
