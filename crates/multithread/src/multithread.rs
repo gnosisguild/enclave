@@ -461,13 +461,13 @@ fn handle_share_computation_proof(
         .map(|arr| arr.mapv(|v| BigInt::from(v)))
         .collect();
 
-    // 5. Compute parity matrix
+    // 4. Compute parity matrix
     let committee = req.committee_size.values();
     let parity_matrix =
         compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
             .map_err(|e| make_zk_error(&request, format!("compute_parity_matrix: {}", e)))?;
 
-    // 6. Build circuit data
+    // 5. Build circuit data
     let circuit_data = ShareComputationCircuitData {
         dkg_input_type: req.dkg_input_type,
         secret,
@@ -477,7 +477,7 @@ fn handle_share_computation_proof(
         threshold: committee.threshold as u32,
     };
 
-    // 7. Generate proof
+    // 6. Generate proof
     let circuit = ShareComputationCircuit;
     let e3_id_str = request.e3_id.to_string();
 
@@ -490,7 +490,7 @@ fn handle_share_computation_proof(
             )
         })?;
 
-    // 8. Return response
+    // 7. Return response
     Ok(ComputeResponse::zk(
         ZkResponse::ShareComputation(ShareComputationProofResponse {
             proof,

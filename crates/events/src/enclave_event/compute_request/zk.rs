@@ -17,13 +17,13 @@ use serde::{Deserialize, Serialize};
 pub enum ZkRequest {
     /// Generate proof for BFV public key (C0).
     PkBfv(PkBfvProofRequest),
-    /// Generate proof for PK generation (C1).
+    /// Generate proof for PK generation (T1).
     PkGeneration(PkGenerationProofRequest),
-    /// Generate proof for share and esm computation (C2a and C2b).
+    /// Generate proof for share and esm computation (T2a and T2b).
     ShareComputation(ShareComputationProofRequest),
 }
 
-/// Request to generate a proof for share computation (C2a or C2b).
+/// Request to generate a proof for share computation (T2a or T2b).
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ShareComputationProofRequest {

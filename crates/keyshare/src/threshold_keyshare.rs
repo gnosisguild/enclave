@@ -458,7 +458,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle ShareComputationProofSigned - stores the signed proof in state based on proof type (C1, C2a or C2b)
+    /// Handle ShareComputationProofSigned - stores the signed proof in state based on proof type (T1, T2a or T2b)
     pub fn handle_share_computation_proof_signed(
         &mut self,
         msg: TypedEvent<ShareComputationProofSigned>,
@@ -710,9 +710,8 @@ impl ThresholdKeyshare {
         let (msg, ec) = msg.into_components();
         info!("GenEsiSss on ThresholdKeyshare");
 
-        let evt = msg.ciphernode_selected;
         let e_sm_raw = msg.e_sm_raw;
-        let CiphernodeSelected { e3_id, .. } = evt.clone();
+        let CiphernodeSelected { e3_id, .. } = msg.ciphernode_selected;
 
         let state = self
             .state
@@ -722,13 +721,10 @@ impl ThresholdKeyshare {
         let trbfv_config = state.get_trbfv_config();
 
         let event = ComputeRequest::trbfv(
-            TrBFVRequest::GenEsiSss(
-                GenEsiSssRequest {
-                    trbfv_config,
-                    e_sm_raw: e_sm_raw_decrypted,
-                }
-                .into(),
-            ),
+            TrBFVRequest::GenEsiSss(GenEsiSssRequest {
+                trbfv_config,
+                e_sm_raw,
+            }),
             CorrelationId::new(),
             e3_id,
         );
