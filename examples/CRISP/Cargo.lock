@@ -6913,10 +6913,10 @@ version = "0.1.0"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
+ "bincode",
  "e3-bfv-client",
  "e3-fhe-params",
  "e3-polynomial",
- "bincode",
  "e3-sdk",
  "e3-zk-helpers",
  "eyre",

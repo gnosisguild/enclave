@@ -71,15 +71,14 @@ impl CiphertextAdditionWitness {
             c.center(&moduli)?;
         }
 
-        let [mut prev_ct0, mut prev_ct1, mut ct0, mut ct1, mut sum_ct0, mut sum_ct1] =
-            crt_polynomials;
+        let [prev_ct0, prev_ct1, ct0, ct1, sum_ct0, sum_ct1] = crt_polynomials;
 
         // Compute quotient polynomials: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
         // For ciphertext addition: sum_centered = ct_centered + prev_ct_centered + r * qi.
         // So: r = (sum_centered - (ct_centered + prev_ct_centered)) / qi.
-        let mut r0 = Self::compute_quotient(&sum_ct0, &ct0, &prev_ct0, &moduli)
+        let r0 = Self::compute_quotient(&sum_ct0, &ct0, &prev_ct0, &moduli)
             .with_context(|| "Failed to compute r0 quotient")?;
-        let mut r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, &moduli)
+        let r1 = Self::compute_quotient(&sum_ct1, &ct1, &prev_ct1, &moduli)
             .with_context(|| "Failed to compute r1 quotient")?;
 
         // Coefficients are centered per modulus; no zkp reduce. The circuit reduces mod r when needed.

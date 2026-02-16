@@ -5,12 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
-use pvss_lib::configs::insecure::trbfv::{
-    GRECO_BIT_CT, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_P1, GRECO_BIT_P2, GRECO_BIT_PK,
-    GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_U, GRECO_CONFIGS, L, N,
+use enclave_lib::configs::default::threshold::{
+    L, N, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_E1,
+    USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_P1, USER_DATA_ENCRYPTION_BIT_P2,
+    USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2,
+    USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_CONFIGS,
 };
-use pvss_lib::core::greco::Greco;
-use pvss_lib::math::polynomial::Polynomial;
+use enclave_lib::core::threshold::user_data_encryption::UserDataEncryption;
+use enclave_lib::math::polynomial::Polynomial;
 
 fn main(
     pk_commitment: pub Field,
@@ -29,8 +31,8 @@ fn main(
     p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
 ) -> pub (Field, Field) {
-    let greco: Greco<N, L, GRECO_BIT_PK, GRECO_BIT_CT, GRECO_BIT_U, GRECO_BIT_E0, GRECO_BIT_E1, GRECO_BIT_K, GRECO_BIT_R1, GRECO_BIT_R2, GRECO_BIT_P1, GRECO_BIT_P2> = Greco::new(
-        GRECO_CONFIGS,
+    let greco: UserDataEncryption<N, L, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_E1, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2, USER_DATA_ENCRYPTION_BIT_P1, USER_DATA_ENCRYPTION_BIT_P2> = UserDataEncryption::new(
+        USER_DATA_ENCRYPTION_CONFIGS,
         pk_commitment,
         pk0is,
         pk1is,
@@ -48,10 +50,10 @@ fn main(
         p2is,
     );
 
-    assert(greco.verify());
+    assert(greco.execute());
 
-    let k1_commitment = compute_k1_commitment::<N, GRECO_BIT_K>(k1);
-    let ct_commitment = compute_ct_commitment::<N, L, GRECO_BIT_CT>(ct0is, ct1is);
+    let k1_commitment = compute_k1_commitment::<N, USER_DATA_ENCRYPTION_BIT_K>(k1);
+    let ct_commitment = compute_ct_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
 
     (k1_commitment, ct_commitment)
 }

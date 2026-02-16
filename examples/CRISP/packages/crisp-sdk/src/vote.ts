@@ -56,11 +56,11 @@ export const encodeVote = (vote: Vote): number[] => {
   // Each choice gets floor(degree/n) bits; remaining bits stay zero
   const segmentSize = Math.floor(degree / n)
   const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  const maxValue = (1n << BigInt(maxBits)) - 1n
+  const maxValue = (1 << maxBits) - 1
   const voteArray: number[] = []
 
   for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
-    const value = choiceIdx < vote.length ? vote[choiceIdx] : 0n
+    const value = choiceIdx < vote.length ? vote[choiceIdx] : 0
 
     if (value > maxValue) {
       throw new Error(`Vote value for choice ${choiceIdx} exceeds maximum (${maxValue})`)
@@ -111,7 +111,7 @@ export const decodeTally = (tallyBytes: string | number[], numChoices: number): 
 
     let value = 0
     for (let i = 0; i < segment.length; i++) {
-      const weight = 1 << (segment.length - 1 - i)
+      const weight = 2 ** (segment.length - 1 - i)
       value += segment[i] * weight
     }
 
@@ -137,12 +137,16 @@ export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
  * Decrypt the vote using the secret key.
  * @param vote - The vote to decrypt.
  * @param secretKey - The secret key to use for decryption.
+ * @param numChoices - The number of choices.
  * @returns The decrypted vote as a Vote.
  */
-export const decryptVote = (ciphertext: Uint8Array, secretKey: Uint8Array): Vote => {
+export const decryptVote = (ciphertext: Uint8Array, secretKey: Uint8Array, numChoices: number): Vote => {
   const decryptedVote = zkInputsGenerator.decryptVote(secretKey, ciphertext)
 
-  return decodeTally(Array.from(decryptedVote).map((v) => Number(v)))
+  return decodeTally(
+    Array.from(decryptedVote).map((v) => Number(v)),
+    numChoices,
+  )
 }
 
 /**
@@ -311,6 +315,7 @@ export const generateProof = async (circuitInputs: any) => {
     balance: circuitInputs.balance,
     is_first_vote: circuitInputs.is_first_vote,
     is_mask_vote: circuitInputs.is_mask_vote,
+    num_options: circuitInputs.num_options,
   } as CRISPCircuitInputs)
 
   const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
@@ -333,7 +338,7 @@ export const validateVote = (vote: Vote, balance: bigint): void => {
   const maxValue = getMaxVoteValue(numChoices)
 
   for (let i = 0; i < vote.length; i++) {
-    if (vote[i] < 0n) {
+    if (vote[i] < 0) {
       throw new Error(`Invalid vote: choice ${i} is negative`)
     }
     if (vote[i] > maxValue) {
@@ -343,17 +348,17 @@ export const validateVote = (vote: Vote, balance: bigint): void => {
 
   if (numChoices === 2) {
     // Binary: mutually exclusive
-    const nonZeroCount = vote.filter((v) => v > 0n).length
+    const nonZeroCount = vote.filter((v) => v > 0).length
     if (nonZeroCount > 1) {
       throw new Error('Invalid vote: for 2 options, only one choice can be non-zero')
     }
-    const votedAmount = vote.find((v) => v > 0n) ?? 0n
+    const votedAmount = vote.find((v) => v > 0) ?? 0
     if (votedAmount > balance) {
       throw new Error('Invalid vote: vote exceeds balance')
     }
   } else {
     // 3+ options: split allowed, total capped
-    const total = vote.reduce((sum, v) => sum + v, 0n)
+    const total = vote.reduce((sum, v) => sum + v, 0)
     if (total > balance) {
       throw new Error(`Invalid vote: total votes (${total}) exceed balance (${balance})`)
     }

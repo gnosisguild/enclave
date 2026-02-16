@@ -67,7 +67,7 @@ export type MerkleProof = {
 /**
  * Type representing a vote
  */
-export type Vote = bigint[]
+export type Vote = number[]
 
 /**
  * Type representing a vector with coefficients

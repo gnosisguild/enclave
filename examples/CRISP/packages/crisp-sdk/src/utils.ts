@@ -74,7 +74,7 @@ export const generateMerkleProof = (balance: bigint, address: string, leaves: bi
  * @param number The number to convert to binary
  * @returns The binary representation of the number as a string
  */
-export const toBinary = (number: bigint): string => {
+export const toBinary = (number: number): string => {
   if (number < 0) {
     throw new Error('Value cannot be negative')
   }
@@ -158,11 +158,11 @@ export async function getOptimalThreadCount(): Promise<number> {
  * @param numChoices Number of choices.
  * @returns Maximum value per choice.
  */
-export const getMaxVoteValue = (numChoices: number): bigint => {
+export const getMaxVoteValue = (numChoices: number): number => {
   const bfvParams = ZKInputsGenerator.withDefaults().getBFVParams()
   const segmentSize = Math.floor(bfvParams.degree / numChoices)
   const effectiveBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  return (1n << BigInt(effectiveBits)) - 1n
+  return (1 << effectiveBits) - 1
 }
 
 /**
@@ -170,37 +170,30 @@ export const getMaxVoteValue = (numChoices: number): bigint => {
  * @param numChoices Number of choices.
  * @returns A zero vote with the given number of choices.
  */
-export const getZeroVote = (numChoices: number): bigint[] => {
-  return Array(numChoices).fill(0n)
+export const getZeroVote = (numChoices: number): number[] => {
+  return Array(numChoices).fill(0)
 }
 
 /**
- * Decode bytes to numbers array (little-endian, 8 bytes per value).
+ * Decode bytes to bigint array (little-endian, 8 bytes per value).
+ * Uses BigInt to prevent precision loss for u64 values exceeding 2^53-1.
  * @param data The bytes to decode (must be multiple of 8).
- * @returns Array of numbers.
+ * @returns Array of bigints.
  */
 export const decodeBytesToNumbers = (data: Uint8Array): number[] => {
   if (data.length % 8 !== 0) {
     throw new Error('Data length must be multiple of 8')
   }
 
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
   const arrayLength = data.length / 8
-  const result: number[] = []
+  const result: bigint[] = []
 
   for (let i = 0; i < arrayLength; i++) {
-    const offset = i * 8
-    let value = 0
-
-    // Read 8 bytes in little-endian order
-    for (let j = 0; j < 8; j++) {
-      const byteValue = data[offset + j]
-      value |= byteValue << (j * 8)
-    }
-
-    result.push(value)
+    result.push(view.getBigUint64(i * 8, true)) // true = little-endian
   }
 
-  return result
+  return result.map(Number)
 }
 
 export const bigInt64ArrayToNumberArray = (bigInt64Array: BigInt64Array): number[] => {

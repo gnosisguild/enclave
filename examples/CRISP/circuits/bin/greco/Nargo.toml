@@ -6,5 +6,5 @@ authors = ["Gnosis Guild / Enclave"]
 license = "MIT"
 
 [dependencies]
-pvss_lib = { path = "../../../../../circuits/lib" }
+enclave_lib = { path = "../../../../../circuits/lib" }
 crisp_lib = { path = "../../lib" }
