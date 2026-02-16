@@ -36,6 +36,7 @@ mod plaintext_output_published;
 mod proof;
 mod publickey_aggregated;
 mod publish_document;
+mod share_computation_proof_signed;
 mod shutdown;
 mod signed_proof;
 mod sync_effect;
@@ -83,6 +84,7 @@ pub use plaintext_output_published::*;
 pub use proof::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
+pub use share_computation_proof_signed::*;
 pub use shutdown::*;
 pub use signed_proof::*;
 use strum::IntoStaticStr;
@@ -215,6 +217,7 @@ pub enum EnclaveEventData {
     TicketSubmitted(TicketSubmitted),
     PlaintextOutputPublished(PlaintextOutputPublished),
     PkGenerationProofSigned(PkGenerationProofSigned),
+    ShareComputationProofSigned(ShareComputationProofSigned),
     EnclaveError(EnclaveError),
     E3RequestComplete(E3RequestComplete),
     E3Failed(E3Failed),
@@ -468,6 +471,7 @@ impl EnclaveEventData {
             EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PkGenerationProofSigned(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ShareComputationProofSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ThresholdSharePending(ref data) => Some(data.e3_id.clone()),
@@ -519,6 +523,7 @@ impl_event_types!(
     PlaintextAggregated,
     PublishDocumentRequested,
     PkGenerationProofSigned,
+    ShareComputationProofSigned,
     E3RequestComplete,
     E3Failed,
     E3StageChanged,

@@ -25,8 +25,10 @@ use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
     ComputeResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber, EventType,
     PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
-    TypedEvent, ZkError as ZkEventError, ZkRequest, ZkResponse,
+    ShareComputationProofRequest, ShareComputationProofResponse, TypedEvent,
+    ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
+use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
@@ -35,16 +37,22 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::helpers::try_poly_from_bytes;
+use e3_trbfv::shares::SharedSecret;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
+use e3_zk_helpers::circuits::dkg::share_computation::utils::compute_parity_matrix;
 use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
     PkGenerationCircuit, PkGenerationCircuitData,
 };
+use e3_zk_helpers::computation::DkgInputType;
+use e3_zk_helpers::dkg::share_computation::{ShareComputationCircuit, ShareComputationCircuitData};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
+use ndarray::Array2;
+use num_bigint::BigInt;
 use rand::Rng;
 use tracing::{error, info};
 
@@ -398,6 +406,9 @@ fn handle_zk_request(
         ZkRequest::PkGeneration(req) => timefunc("zk_pk_generation", id, || {
             handle_pk_generation_proof(&prover, &cipher, req, request.clone())
         }),
+        ZkRequest::ShareComputation(req) => timefunc("zk_share_computation", id, || {
+            handle_share_computation_proof(&prover, &cipher, req, request.clone())
+        }),
     }
 }
 
@@ -407,6 +418,87 @@ fn make_zk_error(request: &ComputeRequest, msg: String) -> ComputeRequestError {
         ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(msg)),
         request.clone(),
     )
+}
+
+fn handle_share_computation_proof(
+    prover: &ZkProver,
+    cipher: &Cipher,
+    req: ShareComputationProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build BFV threshold parameters
+    let (threshold_params, _dkg_params) = build_pair_for_preset(req.params_preset.clone())
+        .map_err(|e| make_zk_error(&request, format!("build_pair_for_preset: {}", e)))?;
+
+    // 2. Decrypt sensitive witness fields
+    let secret_bytes = req
+        .secret_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("secret_raw decrypt: {}", e)))?;
+    let secret_sss_bytes = req
+        .secret_sss_raw
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("secret_sss_raw decrypt: {}", e)))?;
+
+    // 3. Deserialize secret polynomial
+    let secret_poly = try_poly_from_bytes(&secret_bytes, &threshold_params)
+        .map_err(|e| make_zk_error(&request, format!("secret_raw: {}", e)))?;
+    let mut secret = CrtPolynomial::from_fhe_polynomial(&secret_poly);
+    if req.dkg_input_type == DkgInputType::SecretKey {
+        secret
+            .center(threshold_params.moduli())
+            .map_err(|e| make_zk_error(&request, format!("Failed to center polynomial: {}", e)))?;
+    }
+
+    // 4. Deserialize Shamir shares (bincode-encoded SharedSecret)
+    let shared_secret: SharedSecret = bincode::deserialize(&secret_sss_bytes)
+        .map_err(|e| make_zk_error(&request, format!("secret_sss_raw deserialize: {}", e)))?;
+
+    // Convert Vec<Array2<u64>> → Vec<Array2<BigInt>>
+    let secret_sss: Vec<Array2<BigInt>> = shared_secret
+        .moduli_data()
+        .iter()
+        .map(|arr| arr.mapv(|v| BigInt::from(v)))
+        .collect();
+
+    // 4. Compute parity matrix
+    let committee = req.committee_size.values();
+    let parity_matrix =
+        compute_parity_matrix(threshold_params.moduli(), committee.n, committee.threshold)
+            .map_err(|e| make_zk_error(&request, format!("compute_parity_matrix: {}", e)))?;
+
+    // 5. Build circuit data
+    let circuit_data = ShareComputationCircuitData {
+        dkg_input_type: req.dkg_input_type,
+        secret,
+        secret_sss,
+        parity_matrix,
+        n_parties: committee.n as u32,
+        threshold: committee.threshold as u32,
+    };
+
+    // 6. Generate proof
+    let circuit = ShareComputationCircuit;
+    let e3_id_str = request.e3_id.to_string();
+
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 7. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::ShareComputation(ShareComputationProofResponse {
+            proof,
+            dkg_input_type: req.dkg_input_type,
+        }),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }
 
 fn handle_pk_generation_proof(
