@@ -463,11 +463,29 @@ impl Handler<TypedEvent<E3Requested>> for Sortition {
             "Performing Sortition with buffer"
         );
 
-        self.ciphernode_selector.do_send(WithSortitionTicket::new(
-            msg,
-            self.get_node_index(e3_id, seed, total_selection_size, chain_id),
-            &self.address,
-        ))
+        let node_index = self.get_node_index(e3_id.clone(), seed, total_selection_size, chain_id);
+
+        match &node_index {
+            Some((index, ticket_id)) => {
+                info!(
+                    e3_id = %e3_id,
+                    node = %self.address,
+                    index = index,
+                    ticket_id = ?ticket_id,
+                    "This node was SELECTED for sortition"
+                );
+            }
+            None => {
+                info!(
+                    e3_id = %e3_id,
+                    node = %self.address,
+                    "This node was NOT selected for sortition"
+                );
+            }
+        }
+
+        self.ciphernode_selector
+            .do_send(WithSortitionTicket::new(msg, node_index, &self.address))
     }
 }
 
