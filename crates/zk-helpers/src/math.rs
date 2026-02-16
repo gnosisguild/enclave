@@ -8,6 +8,7 @@
 //! CRT operations (k0is, FHE poly to CRT), and polynomial ring (cyclotomic, residue decomposition).
 
 use crate::CircuitsErrors;
+use e3_polynomial::center;
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError, Polynomial};
 use fhe_math::rq::Poly;
 use fhe_math::zq::Modulus;
@@ -64,6 +65,15 @@ pub fn compute_q_inverse_mod_t(q: &BigUint, t: u64) -> Result<u64, CircuitsError
 /// Q mod t.
 pub fn compute_q_mod_t(q: &BigUint, t: u64) -> BigUint {
     q % BigUint::from(t)
+}
+
+/// Q mod t in centered form [-t/2, t/2], given CRT moduli and plaintext modulus t.
+/// Use with threshold or DKG params via `params.moduli()` and `params.plaintext()`.
+pub fn compute_q_mod_t_centered(moduli: &[u64], t: u64) -> BigInt {
+    let q = compute_q_product(moduli);
+    let q_mod_t_uint = compute_q_mod_t(&q, t);
+    let t_bn = BigInt::from(t);
+    center(&BigInt::from(q_mod_t_uint), &t_bn)
 }
 
 /// t^{-1} mod Q (for CRT / scaling). Fails if gcd(Q, t) != 1.

@@ -12,7 +12,7 @@
 /// Insecure preset constants (degree 512) - DO NOT USE IN PRODUCTION
 pub mod insecure_512 {
     pub const DEGREE: usize = 512;
-    pub const NUM_PARTIES: u128 = 5;
+    pub const NUM_PARTIES: u128 = 5; // fake - not used in the search default
 
     /// Threshold BFV parameters
     pub mod threshold {
@@ -34,7 +34,7 @@ pub mod insecure_512 {
 /// Secure preset constants (degree 8192) - PRODUCTION READY
 pub mod secure_8192 {
     pub const DEGREE: usize = 8192;
-    pub const NUM_PARTIES: u128 = 100;
+    pub const NUM_PARTIES: u128 = 100; // real - used in the search default
 
     /// Threshold BFV parameters
     pub mod threshold {
