@@ -25,7 +25,10 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     balance: Field,
     num_options: u32,
 ) -> bool {
-    let mut valid = (num_options > 1) & (num_options as u64 <= MAX_OPTIONS as u64);
+    assert(num_options > 1);
+    assert(num_options as u64 <= MAX_OPTIONS as u64);
+
+    let mut valid = true;
 
     let segment_size: u32 = D / num_options;
     let remainder: u32 = D - (segment_size * num_options);
@@ -96,7 +99,11 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
 /// Returns `true` if all vote coefficients are zero, `false` otherwise.
 ///
 pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) -> bool {
-    let mut valid = (num_options > 1) & (num_options as u64 <= MAX_OPTIONS as u64);
+    assert(num_options > 1);
+    assert(num_options as u64 <= MAX_OPTIONS as u64);
+
+    let mut valid = true;
+
     let segment_size: u32 = D / num_options;
     let remainder: u32 = D - (segment_size * num_options);
 
