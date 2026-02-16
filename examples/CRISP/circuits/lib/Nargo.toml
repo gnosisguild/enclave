@@ -2,7 +2,7 @@
 name = "crisp_lib"
 type = "lib"
 authors = ["Gnosis Guild / Enclave"]
-compiler_version = "1.0.0-beta.18"
+compiler_version = "1.0.0"
 
 [dependencies]
 enclave_lib = { path = "../../../../circuits/lib" }

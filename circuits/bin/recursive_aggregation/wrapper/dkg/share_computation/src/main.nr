@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_ultrahonk_proof};
+use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use lib::configs::default::dkg::L_THRESHOLD;
 use lib::{configs::default::N_PARTIES, math::commitments::compute_recursive_aggregation_commitment};
 
@@ -20,7 +20,7 @@ fn main(
     key_hash: Field,
 ) -> pub Field {
     for i in 0..N_PROOFS {
-        verify_ultrahonk_proof(verification_key, proofs[i], public_inputs[i], key_hash);
+        verify_honk_proof_non_zk(verification_key, proofs[i], public_inputs[i], key_hash);
     }
 
     let mut aggregated_public_inputs = Vec::new();
