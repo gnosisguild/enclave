@@ -203,3 +203,13 @@ export const bigInt64ArrayToNumberArray = (bigInt64Array: BigInt64Array): number
 export const numberArrayToBigInt64Array = (numberArray: number[]): BigInt64Array => {
   return BigInt64Array.from(numberArray.map(BigInt))
 }
+
+// Helper function to convert proof bytes to field elements
+export const proofToFields = (proof: Uint8Array): string[] => {
+  const fields: string[] = []
+  for (let i = 0; i < proof.length; i += 32) {
+    const chunk = proof.slice(i, i + 32)
+    fields.push('0x' + Buffer.from(chunk).toString('hex'))
+  }
+  return fields
+}

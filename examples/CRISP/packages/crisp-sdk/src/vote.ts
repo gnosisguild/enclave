@@ -26,10 +26,11 @@ import {
   getMaxVoteValue,
   decodeBytesToNumbers,
   numberArrayToBigInt64Array,
+  proofToFields,
 } from './utils'
 import { MASK_SIGNATURE, MAX_VOTE_BITS, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import { deflattenFields, UltraHonkBackend } from '@aztec/bb.js'
+import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js'
 import crispCircuit from '../../../circuits/bin/crisp/target/crisp.json'
 import grecoCircuit from '../../../circuits/bin/greco/target/crisp_greco.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
@@ -273,18 +274,22 @@ export const generateProof = async (circuitInputs: any) => {
     e1: circuitInputs.e1,
     k1: circuitInputs.k1,
   })
-  const grecoBackend = new UltraHonkBackend(
-    (grecoCircuit as CompiledCircuit).bytecode,
-    { threads: optimalThreadCount },
-    { recursive: true },
-  )
 
-  const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness)
+  const api = await Barretenberg.new({ threads: optimalThreadCount })
 
-  const vk = await grecoBackend.getVerificationKey()
-  const vkAsFields = deflattenFields(vk)
-  const grecoProofAsFields = deflattenFields(grecoProof)
-  const { vkHash } = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length)
+  const grecoBackend = new UltraHonkBackend(grecoCircuit.bytecode, api)
+
+  const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness, {
+    verifierTarget: 'noir-recursive-no-zk',
+  })
+
+  const artifacts = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length, {
+    verifierTarget: 'noir-recursive-no-zk',
+  })
+
+  const vkAsFields = artifacts.vkAsFields
+  const vkHash = artifacts.vkHash
+  const grecoProofAsFields = proofToFields(grecoProof)
 
   const { witness: crispWitness } = await executeCrispCircuit({
     prev_ct0is: circuitInputs.prev_ct0is,
@@ -318,12 +323,11 @@ export const generateProof = async (circuitInputs: any) => {
     num_options: circuitInputs.num_options,
   } as CRISPCircuitInputs)
 
-  const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
+  const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
 
-  const proof = await crispBackend.generateProof(crispWitness, { keccakZK: true })
+  const proof = await crispBackend.generateProof(crispWitness, { verifierTarget: 'evm' })
 
-  await crispBackend.destroy()
-  await grecoBackend.destroy()
+  api.destroy()
 
   return proof
 }
@@ -417,11 +421,12 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
  * @returns True if the proof is valid, false otherwise.
  */
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
-  const backend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, { threads: optimalThreadCount })
+  const api = await Barretenberg.new({ threads: optimalThreadCount })
+  const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
 
-  const isValid = await backend.verifyProof(proof, { keccakZK: true })
+  const isValid = await crispBackend.verifyProof(proof, { verifierTarget: 'evm' })
 
-  await backend.destroy()
+  api.destroy()
 
   return isValid
 }

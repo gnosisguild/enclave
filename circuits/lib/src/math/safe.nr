@@ -343,7 +343,7 @@ fn test_safe_hashing() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let elements = Vec::from_slice(&[1, 2, 3]);
+    let elements = Vec::from_vector(&[1, 2, 3]);
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
@@ -374,8 +374,8 @@ fn test_merkle_node() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let left = Vec::from_slice([123]);
-    let right = Vec::from_slice([456]);
+    let left = Vec::from_vector([123]);
+    let right = Vec::from_vector([456]);
 
     // Pattern: ABSORB(1), ABSORB(1), SQUEEZE(1)
     let io_pattern = [0x80000001, 0x80000001, 0x00000001];
@@ -408,7 +408,7 @@ fn test_commitment_scheme() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let values = Vec::from_slice([10, 20, 30]);
+    let values = Vec::from_vector([10, 20, 30]);
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
@@ -434,7 +434,7 @@ fn test_commitment_scheme() {
 fn test_domain_separation() {
     // Verifies that different domain separators produce different outputs for the same input.
     // This is crucial for cross-protocol security and preventing collisions between different applications.
-    let elements = Vec::from_slice([1, 2, 3]);
+    let elements = Vec::from_vector([1, 2, 3]);
     let domain1 = [
         0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -473,7 +473,7 @@ fn test_multiple_squeeze() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let elements = Vec::from_slice([1, 2, 3]);
+    let elements = Vec::from_vector([1, 2, 3]);
 
     // Pattern: ABSORB(3), SQUEEZE(2)
     let io_pattern = [0x80000003, 0x00000002];
