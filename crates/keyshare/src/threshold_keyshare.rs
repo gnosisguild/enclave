@@ -665,87 +665,6 @@ impl ThresholdKeyshare {
         info!("GenEsiSss on ThresholdKeyshare");
 
         let evt = msg.ciphernode_selected;
-        let e_sm_raw_decrypted = ArcBytes::from_bytes(&msg.e_sm_raw.access_raw(&self.cipher)?);
-        let CiphernodeSelected { e3_id, .. } = evt.clone();
-
-        let state = self
-            .state
-            .get()
-            .ok_or(anyhow!("State not found on ThrehsoldKeyshare"))?;
-
-        let trbfv_config = state.get_trbfv_config();
-
-        let event = ComputeRequest::trbfv(
-            TrBFVRequest::GenEsiSss(
-                GenEsiSssRequest {
-                    trbfv_config,
-                    e_sm_raw: e_sm_raw_decrypted,
-                }
-                .into(),
-            ),
-            CorrelationId::new(),
-            e3_id,
-        );
-
-        self.bus.publish(event, ec)?;
-        Ok(())
-    }
-
-    /// 3a. GenEsiSss result
-    pub fn handle_gen_esi_sss_response(&mut self, res: TypedEvent<ComputeResponse>) -> Result<()> {
-        let (res, ec) = res.into_components();
-        let output: GenEsiSssResponse = res.try_into()?;
-
-        let esi_sss = output.esi_sss;
-
-        // First store esi_sss in GeneratingThresholdShareData
-        self.state.try_mutate(&ec, |s| {
-            info!("try_store_esi_sss");
-            let current: GeneratingThresholdShareData = s.clone().try_into()?;
-            s.new_state(KeyshareState::GeneratingThresholdShare(
-                GeneratingThresholdShareData {
-                    esi_sss: Some(esi_sss),
-                    ..current
-                },
-            ))
-        })?;
-
-        info!("esi stored");
-
-        // Check if all data is ready, if so call handle_shares_generated BEFORE transitioning
-        let current: GeneratingThresholdShareData = self.state.try_get()?.try_into()?;
-        let ready = current.pk_share.is_some()
-            && current.sk_sss.is_some()
-            && current.esi_sss.is_some()
-            && current.e_sm_raw.is_some()
-            && current.proof_request_data.is_some();
-
-        if ready {
-            // Call handle_shares_generated while still in GeneratingThresholdShare state
-            self.handle_shares_generated(ec.clone())?;
-
-            // Now transition to AggregatingDecryptionKey with minimal state
-            self.state.try_mutate(&ec, |s| {
-                let current: GeneratingThresholdShareData = s.clone().try_into()?;
-                s.new_state(KeyshareState::AggregatingDecryptionKey(
-                    AggregatingDecryptionKey {
-                        pk_share: current.pk_share.expect("pk_share checked above"),
-                        sk_bfv: current.sk_bfv,
-                        signed_pk_generation_proof: None,
-                    },
-                ))
-            })?;
-        }
-
-        Ok(())
-    }
-
-    /// 3. GenEsiSss
-    pub fn handle_gen_esi_sss_requested(&self, msg: TypedEvent<GenEsiSss>) -> Result<()> {
-        let (msg, ec) = msg.into_components();
-        info!("GenEsiSss on ThresholdKeyshare");
-
-        let evt = msg.ciphernode_selected;
         let e_sm_raw = msg.e_sm_raw;
         let CiphernodeSelected { e3_id, .. } = evt.clone();
 
@@ -760,7 +679,7 @@ impl ThresholdKeyshare {
             TrBFVRequest::GenEsiSss(
                 GenEsiSssRequest {
                     trbfv_config,
-                    e_sm_raw,
+                    e_sm_raw: e_sm_raw_decrypted,
                 }
                 .into(),
             ),
