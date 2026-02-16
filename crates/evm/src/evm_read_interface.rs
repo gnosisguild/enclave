@@ -6,6 +6,7 @@
 
 use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
 use crate::helpers::EthProvider;
+use crate::log_fetcher::{backfill_to_head, fetch_logs_chunked, process_log, TimestampTracker};
 use crate::HistoricalSyncComplete;
 use actix::prelude::*;
 use actix::{Addr, Recipient};
@@ -24,8 +25,6 @@ use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{debug, error, info, instrument, warn};
 
-const GET_LOGS_CHUNK_SIZE: u64 = 10_000;
-const GET_LOGS_MAX_RETRIES: u32 = 3;
 const MAX_RECONNECT_DELAY_SECS: u64 = 60;
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
@@ -48,11 +47,6 @@ pub struct Filters {
     historical: Filter,
     current: Filter,
     start_block: u64,
-}
-
-struct HistoricalFetchResult {
-    last_id: Option<CorrelationId>,
-    latest_block: u64,
 }
 
 impl Filters {
@@ -154,111 +148,6 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     }
 }
 
-async fn fetch_historical_logs_chunked<P: Provider + Clone + 'static>(
-    provider: &P,
-    filter: &Filter,
-    from_block: u64,
-    chain_id: u64,
-    next: &EvmEventProcessor,
-    timestamp_tracker: &mut TimestampTracker,
-) -> Result<HistoricalFetchResult, anyhow::Error> {
-    let latest_block = provider
-        .get_block_number()
-        .await
-        .map_err(|e| anyhow!("Failed to get latest block number: {}", e))?;
-
-    if latest_block < from_block {
-        info!(
-            chain_id = chain_id,
-            from_block = from_block,
-            latest_block = latest_block,
-            "No blocks to sync (latest < from_block)"
-        );
-        return Ok(HistoricalFetchResult {
-            last_id: None,
-            latest_block,
-        });
-    }
-
-    let total_blocks = latest_block - from_block + 1;
-    let total_chunks = (total_blocks + GET_LOGS_CHUNK_SIZE - 1) / GET_LOGS_CHUNK_SIZE;
-
-    info!(
-        chain_id,
-        from_block, latest_block, total_chunks, "Fetching historical logs in chunks"
-    );
-
-    let mut cursor = from_block;
-    let mut last_id: Option<CorrelationId> = None;
-    let mut chunk_idx = 0u64;
-
-    while cursor <= latest_block {
-        let chunk_end = (cursor + GET_LOGS_CHUNK_SIZE - 1).min(latest_block);
-        chunk_idx += 1;
-
-        let chunk_filter = filter.clone().from_block(cursor).to_block(chunk_end);
-
-        let mut success = false;
-        for attempt in 1..=GET_LOGS_MAX_RETRIES {
-            match provider.get_logs(&chunk_filter).await {
-                Ok(logs) => {
-                    info!(
-                        chain_id,
-                        chunk = chunk_idx,
-                        total_chunks,
-                        from = cursor,
-                        to = chunk_end,
-                        events = logs.len(),
-                        "Fetched historical log chunk"
-                    );
-                    for log in logs {
-                        let timestamp = timestamp_tracker.get(provider, log.block_number).await;
-                        let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
-                        last_id = Some(evt.get_id());
-                        debug!("Sending event({})", evt.get_id());
-                        next.do_send(evt);
-                    }
-                    success = true;
-                    break;
-                }
-                Err(e) => {
-                    warn!(
-                        chain_id, chunk = chunk_idx,
-                        from = cursor, to = chunk_end,
-                        attempt, max_retries = GET_LOGS_MAX_RETRIES,
-                        error = %e, "Failed to fetch log chunk, retrying"
-                    );
-                    if attempt < GET_LOGS_MAX_RETRIES {
-                        tokio::time::sleep(std::time::Duration::from_secs(2u64.pow(attempt))).await;
-                    }
-                }
-            }
-        }
-
-        if !success {
-            return Err(anyhow!(
-                "Failed to fetch historical logs for chain {} blocks {}..={} after {} retries",
-                chain_id,
-                cursor,
-                chunk_end,
-                GET_LOGS_MAX_RETRIES
-            ));
-        }
-
-        cursor = chunk_end + 1;
-    }
-
-    info!(
-        chain_id,
-        chunks_fetched = chunk_idx,
-        "Historical log fetch complete"
-    );
-    Ok(HistoricalFetchResult {
-        last_id,
-        latest_block,
-    })
-}
-
 #[instrument(name = "evm_interface", skip_all)]
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
@@ -271,44 +160,53 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
     let provider_ref = provider.provider();
     let mut timestamp_tracker = TimestampTracker::new();
 
+    // Determine chain head for historical fetch
+    let latest_block = match provider_ref.get_block_number().await {
+        Ok(bn) => bn,
+        Err(e) => {
+            error!(chain_id, error = %e, "Failed to get latest block number");
+            bus.err(EType::Evm, anyhow!(e));
+            return;
+        }
+    };
+
     // Historical events — chunked to respect RPC block-range limits
-    let result = match fetch_historical_logs_chunked(
+    let last_id = match fetch_logs_chunked(
         provider_ref,
         &filters.historical,
         filters.start_block,
+        latest_block,
         chain_id,
         &next,
         &mut timestamp_tracker,
     )
     .await
     {
-        Ok(result) => {
-            info!(chain_id = chain_id, "Historical sync succeeded");
-            result
+        Ok(id) => {
+            info!(chain_id, "Historical sync succeeded");
+            id
         }
         Err(e) => {
-            error!(chain_id = chain_id, error = %e, "Failed to fetch historical events — node cannot operate without full state, exiting");
+            error!(chain_id, error = %e, "Failed to fetch historical events — node cannot operate without full state, exiting");
             bus.err(EType::Evm, anyhow!(e));
             return;
         }
     };
 
     next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
-        HistoricalSyncComplete::new(chain_id, result.last_id),
+        HistoricalSyncComplete::new(chain_id, last_id),
     ));
 
-    // Start live subscription from the block after the last historical fetch
-    // to avoid missing events mined during the historical sync.
-    let live_filter = filters.current.clone().from_block(result.latest_block + 1);
-
+    // Live subscription with gap-fill on connect/reconnect
     subscribe_live_events(
         provider_ref,
         &next,
         &mut shutdown,
         bus,
-        &live_filter,
+        &filters.current,
         chain_id,
         &mut timestamp_tracker,
+        latest_block,
     )
     .await;
 }
@@ -321,6 +219,7 @@ async fn subscribe_live_events<P: Provider + Clone + 'static>(
     filter: &Filter,
     chain_id: u64,
     timestamp_tracker: &mut TimestampTracker,
+    mut last_block: u64,
 ) {
     let mut reconnect_attempt: u32 = 0;
 
@@ -339,6 +238,28 @@ async fn subscribe_live_events<P: Provider + Clone + 'static>(
             return;
         }
 
+        // Backfill any blocks missed since last_block. This handles:
+        //   - Blocks mined between historical fetch completion and first subscription
+        //   - Blocks mined during reconnection downtime
+        //   - Geth's eth_subscribe silently ignoring fromBlock
+        match backfill_to_head(
+            provider,
+            filter,
+            chain_id,
+            next,
+            timestamp_tracker,
+            &mut last_block,
+        )
+        .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                warn!(chain_id, error = %e, "Gap backfill failed, will retry");
+                reconnect_attempt += 1;
+                continue;
+            }
+        }
+
         match provider.subscribe_logs(filter).await {
             Ok(subscription) => {
                 let sub_id: B256 = subscription.local_id().clone();
@@ -351,8 +272,10 @@ async fn subscribe_live_events<P: Provider + Clone + 'static>(
                         maybe_log = stream.next() => {
                             match maybe_log {
                                 Some(log) => {
-                                    let timestamp = timestamp_tracker.get(provider, log.block_number).await;
-                                    next.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp)));
+                                    if let Some(bn) = log.block_number {
+                                        last_block = last_block.max(bn);
+                                    }
+                                    process_log(provider, log, chain_id, next, timestamp_tracker).await;
                                 }
                                 None => {
                                     warn!(chain_id, "Live event stream ended, will reconnect");
@@ -391,40 +314,5 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P
                 let _ = shutdown.send(());
             }
         }
-    }
-}
-
-/// Cache utility to keep track of timestamps
-struct TimestampTracker {
-    current: Option<(u64, u64)>, // (block_number, timestamp)
-}
-
-impl TimestampTracker {
-    fn new() -> Self {
-        Self { current: None }
-    }
-
-    async fn get<P: Provider>(&mut self, provider: &P, block_number: Option<u64>) -> u64 {
-        let Some(bn) = block_number else {
-            error!("BLOCK NUMBER NOT FOUND ON LOG!");
-            return 0;
-        };
-
-        if let Some((cached_bn, ts)) = self.current {
-            if bn == cached_bn {
-                return ts;
-            }
-        }
-
-        let ts = provider
-            .get_block_by_number(bn.into())
-            .await
-            .ok()
-            .flatten()
-            .map(|b| b.header.timestamp)
-            .unwrap_or(0);
-
-        self.current = Some((bn, ts));
-        ts
     }
 }
