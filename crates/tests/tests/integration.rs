@@ -168,7 +168,26 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
+        // Copy C3 (share_encryption) circuit — single circuit used for both SK and E_SM
+        let share_enc_circuit_dir = circuits_dir.join("dkg").join("share_encryption");
+        tokio::fs::create_dir_all(&share_enc_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_encryption.json"),
+            share_enc_circuit_dir.join("share_encryption.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            dkg_target.join("share_encryption.vk"),
+            share_enc_circuit_dir.join("share_encryption.vk"),
+        )
+        .await
+        .unwrap();
+
         let backend = ZkBackend::new(BBPath::Default(bb_binary), circuits_dir, work_dir);
+
         (backend, temp)
     } else {
         println!("bb binary not found locally, downloading via ensure_installed()...");
@@ -357,7 +376,7 @@ async fn test_trbfv_actor() -> Result<()> {
     // round information
     let threshold_m = 2;
     let threshold_n = 5;
-    let esi_per_ct = 3;
+    let esi_per_ct = 1;
 
     // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
     // This is just for INSECURE parameter set.

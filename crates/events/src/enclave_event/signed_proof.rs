@@ -37,14 +37,16 @@ pub enum ProofType {
     T1SkShareComputation = 2,
     /// T1 — Smudging noise share computation proof (Proof 2b).
     T1ESmShareComputation = 3,
-    /// T1 — Share encryption proof (Proof 3).
-    T1ShareEncryption = 4,
+    /// T1 — Share encryption proof (Proof 3a).
+    T1SkShareEncryption = 4,
+    /// T1 — Smudging noise Share encryption proof (Proof 3b).
+    T1ESmShareEncryption = 5,
     /// T2 — DKG share decryption proof (Proof 4).
-    T2DkgShareDecryption = 5,
+    T2DkgShareDecryption = 6,
     /// T5 — Threshold share decryption proof (Proof 6).
-    T5ShareDecryption = 6,
+    T5ShareDecryption = 7,
     /// T6 — Decrypted shares aggregation proof (Proof 7).
-    T6DecryptedSharesAggregation = 7,
+    T6DecryptedSharesAggregation = 8,
 }
 
 impl ProofType {
@@ -55,7 +57,8 @@ impl ProofType {
             ProofType::T1PkGeneration => vec![CircuitName::PkGeneration],
             ProofType::T1SkShareComputation => vec![CircuitName::SkShareComputation],
             ProofType::T1ESmShareComputation => vec![CircuitName::ESmShareComputation],
-            ProofType::T1ShareEncryption => vec![CircuitName::ShareEncryption],
+            ProofType::T1SkShareEncryption => vec![CircuitName::ShareEncryption],
+            ProofType::T1ESmShareEncryption => vec![CircuitName::ShareEncryption],
             ProofType::T2DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
             ProofType::T5ShareDecryption => vec![CircuitName::ThresholdShareDecryption],
             ProofType::T6DecryptedSharesAggregation => vec![
@@ -72,7 +75,8 @@ impl ProofType {
             | ProofType::T1PkGeneration
             | ProofType::T1SkShareComputation
             | ProofType::T1ESmShareComputation
-            | ProofType::T1ShareEncryption
+            | ProofType::T1SkShareEncryption
+            | ProofType::T1ESmShareEncryption
             | ProofType::T2DkgShareDecryption => "E3_BAD_DKG_PROOF",
             ProofType::T5ShareDecryption => "E3_BAD_DECRYPTION_PROOF",
             ProofType::T6DecryptedSharesAggregation => "E3_BAD_AGGREGATION_PROOF",
@@ -302,7 +306,11 @@ mod tests {
             vec![CircuitName::PkGeneration]
         );
         assert_eq!(
-            ProofType::T1ShareEncryption.circuit_names(),
+            ProofType::T1SkShareEncryption.circuit_names(),
+            vec![CircuitName::ShareEncryption]
+        );
+        assert_eq!(
+            ProofType::T1ESmShareEncryption.circuit_names(),
             vec![CircuitName::ShareEncryption]
         );
         assert_eq!(

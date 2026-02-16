@@ -36,7 +36,7 @@ impl TestEvent {
 #[cfg(test)]
 use std::fmt::{self, Display};
 
-use crate::{AggregateId, E3id};
+use crate::E3id;
 
 #[cfg(test)]
 impl Display for TestEvent {
