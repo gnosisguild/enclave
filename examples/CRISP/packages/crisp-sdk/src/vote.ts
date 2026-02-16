@@ -56,7 +56,7 @@ export const encodeVote = (vote: Vote): number[] => {
   // Each choice gets floor(degree/n) bits; remaining bits stay zero
   const segmentSize = Math.floor(degree / n)
   const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  const maxValue = (1 << maxBits) - 1
+  const maxValue = 2 ** maxBits - 1
   const voteArray: number[] = []
 
   for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
