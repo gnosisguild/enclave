@@ -19,8 +19,8 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     time::Duration,
 };
-use tokio::{sync::mpsc::Receiver, time::timeout};
-use tracing::info;
+use tokio::sync::mpsc::Receiver;
+use tracing::{info, warn};
 
 pub async fn sync(
     bus: &BusHandle,
@@ -68,8 +68,7 @@ pub async fn sync(
     info!("Loading historical blockchain events...");
     let (addr, rx) = actix_toolbox::mpsc::<HistoricalEvmEventsReceived>(256);
     bus.publish_without_context(HistoricalEvmSyncStart::new(addr, evm_config.clone()))?;
-    let historical_evm_events =
-        collect_historical_evm_events(rx, &evm_config, Duration::from_secs(30)).await;
+    let historical_evm_events = collect_historical_evm_events(rx, &evm_config).await;
     info!(
         "{} historical blockchain events loaded.",
         historical_evm_events.len()
@@ -116,33 +115,42 @@ pub async fn sync(
 pub async fn collect_historical_evm_events(
     mut receiver: Receiver<HistoricalEvmEventsReceived>,
     config: &EvmEventConfig,
-    max_dur: Duration,
 ) -> Vec<EnclaveEvent<Unsequenced>> {
     // Get expected chain IDs from config
     let expected = config.chains();
     let mut received = HashSet::new();
     let mut results = Vec::new();
+    let progress_interval = Duration::from_secs(30);
 
-    let fut = async {
-        while received.len() < expected.len() {
-            if let Some(mut msg) = receiver.recv().await {
-                // Only accept messages for expected chains we haven't received yet
+    while received.len() < expected.len() {
+        match tokio::time::timeout(progress_interval, receiver.recv()).await {
+            Ok(Some(mut msg)) => {
                 if expected.contains(&msg.chain_id) && !received.contains(&msg.chain_id) {
+                    info!(
+                        chain_id = msg.chain_id,
+                        events = msg.events.len(),
+                        chains_received = received.len() + 1,
+                        chains_expected = expected.len(),
+                        "Received historical events from chain"
+                    );
                     received.insert(msg.chain_id);
                     results.append(&mut msg.events);
                 }
-            } else {
+            }
+            Ok(None) => {
+                // Channel closed — sender dropped
+                warn!("Historical events channel closed before all chains reported");
                 break;
             }
-        }
-    };
-
-    if let Err(_) = timeout(max_dur, fut).await {
-        for chain_id in expected.difference(&received) {
-            eprintln!(
-                "Error: Timeout waiting for historical events from chain {}",
-                chain_id
-            );
+            Err(_) => {
+                // Not a failure — just a progress heartbeat
+                let remaining: Vec<_> = expected.difference(&received).collect();
+                info!(
+                    ?remaining,
+                    "Still waiting for historical events from chains"
+                );
+                continue;
+            }
         }
     }
 
