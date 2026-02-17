@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import { Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import { type CompiledCircuit, Noir } from '@noir-lang/noir_js'
 
 // Conversion to Noir types
@@ -48,7 +48,8 @@ export interface CircuitInputs {
 export const generateProof = async (circuitInputs: CircuitInputs, circuit: CompiledCircuit): Promise<ProofData> => {
   const noir = new Noir(circuit)
 
-  const backend = new UltraHonkBackend(circuit.bytecode, { threads: 4 })
+  const api = await Barretenberg.new({ threads: 4 })
+  const backend = new UltraHonkBackend(circuit.bytecode, api)
 
   const { witness } = await noir.execute(circuitInputs as any)
 

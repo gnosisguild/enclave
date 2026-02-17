@@ -352,8 +352,8 @@ importers:
         specifier: workspace:*
         version: link:../crisp-zk-inputs
       '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.16
+        version: 1.0.0-beta.16
       '@zk-kit/lean-imt':
         specifier: ^2.2.4
         version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -616,8 +616,8 @@ importers:
         specifier: workspace:*
         version: link:../../crates/wasm
       '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.16
+        version: 1.0.0-beta.16
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
@@ -2758,17 +2758,17 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@noir-lang/acvm_js@1.0.0-beta.18':
-    resolution: {integrity: sha512-QQXAaowxSzGKk+Ua7ofc2jcpvUTYSxmDuF5SzwwOFMue9+ccp9QcqOkjyyIZWjtapcenV7YCXrzcBjvEt7N8Nw==}
+  '@noir-lang/acvm_js@1.0.0-beta.16':
+    resolution: {integrity: sha512-2xcEE0mCFaZEvVoKVVsG5DTUgj68duFosIvV0Z19Gn5YM1Ay5pHQnFBX4xfhJPA/0Ex8yMRZA/QDE4jpMz96KQ==}
 
-  '@noir-lang/noir_js@1.0.0-beta.18':
-    resolution: {integrity: sha512-J0VSw13U9SQpejh1sWNEjuKxjl/uJblOmWJMdlpYqCetth9oBAnKv8+IMk0bZlkrjDp22Yf8vMDkf+Qb8KBZ2Q==}
+  '@noir-lang/noir_js@1.0.0-beta.16':
+    resolution: {integrity: sha512-DHgD73WVR6ly6c+5ocrLWLooppYwTsvx4pyndloXlXm8LcJ4ouySg4dNgN8hqNLrTixqxjWu8wBy7eYiAS1iHQ==}
 
-  '@noir-lang/noirc_abi@1.0.0-beta.18':
-    resolution: {integrity: sha512-ZLobgQwGbxBpR4iMQpCpYQS4EaM25Fl31rVkrcteQIwcz5kAknH1Yc5FJYICCxzO1HEFj6coAzF3FXO/Ic4p4Q==}
+  '@noir-lang/noirc_abi@1.0.0-beta.16':
+    resolution: {integrity: sha512-4RpTEyw34ap65B7gQQLTeXoRtFACsATd+o4fgjLgvoIBiwwftcp2+MOFGJA3icRUJyBXknmlNu+HXCOI7Vl+Xg==}
 
-  '@noir-lang/types@1.0.0-beta.18':
-    resolution: {integrity: sha512-/1nsk8qFd27P6bW4W5ayUjMQpN6PustwTJEqZPNP//DZ6TrolnWxT/Y+7v9d2/a4OZal61sx177VjQY3U2GZvw==}
+  '@noir-lang/types@1.0.0-beta.16':
+    resolution: {integrity: sha512-QDZRdvC3NZ1USCOkmcgONoerQl5eWpl2uPreE/BN+bidgz+Q3cANW/KO9tt0ZeWWVMfLrYV2n7o6l0y8pJUV1g==}
 
   '@nomicfoundation/edr-darwin-arm64@0.12.0-next.10':
     resolution: {integrity: sha512-LYXaU0Pk7zA4iAHMdvZ9Gs5QaScs9n5IpclWBNVevSHnL1/uJiFLDF4FYE/NonvaCST6Rd0E4MS3pJltsrBQmA==}
@@ -12450,20 +12450,20 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@noir-lang/acvm_js@1.0.0-beta.18': {}
+  '@noir-lang/acvm_js@1.0.0-beta.16': {}
 
-  '@noir-lang/noir_js@1.0.0-beta.18':
+  '@noir-lang/noir_js@1.0.0-beta.16':
     dependencies:
-      '@noir-lang/acvm_js': 1.0.0-beta.18
-      '@noir-lang/noirc_abi': 1.0.0-beta.18
-      '@noir-lang/types': 1.0.0-beta.18
+      '@noir-lang/acvm_js': 1.0.0-beta.16
+      '@noir-lang/noirc_abi': 1.0.0-beta.16
+      '@noir-lang/types': 1.0.0-beta.16
       pako: 2.1.0
 
-  '@noir-lang/noirc_abi@1.0.0-beta.18':
+  '@noir-lang/noirc_abi@1.0.0-beta.16':
     dependencies:
-      '@noir-lang/types': 1.0.0-beta.18
+      '@noir-lang/types': 1.0.0-beta.16
 
-  '@noir-lang/types@1.0.0-beta.18': {}
+  '@noir-lang/types@1.0.0-beta.16': {}
 
   '@nomicfoundation/edr-darwin-arm64@0.12.0-next.10': {}
 

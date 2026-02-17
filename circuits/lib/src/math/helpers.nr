@@ -285,7 +285,7 @@ fn test_safe_hashing_with_safe_helper() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let elements = Vec::from_vector(&[1, 2, 3]);
+    let elements = Vec::from_slice(&[1, 2, 3]);
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
