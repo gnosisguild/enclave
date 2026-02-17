@@ -631,10 +631,14 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
-      - name: Install Nargo
-        uses: noir-lang/noirup@v0.1.4
-        with:
-          toolchain: ${{ env.NOIR_TOOLCHAIN }}
+      - name: Install Barretenberg (bb)
+        run: |
+          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+          sudo mv "$BB_BIN" /usr/local/bin/bb
+          chmod +x /usr/local/bin/bb
+          bb --version
 
       - name: Download compiled circuit artifacts
         uses: actions/download-artifact@v4
