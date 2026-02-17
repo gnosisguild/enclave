@@ -37,4 +37,5 @@ e3-entrypoint = { workspace = true }
 e3-ciphernode-builder = { workspace = true }
 e3-test-helpers = { workspace = true }
 e3-events = { workspace = true, features = ["test-helpers"] }
+tokio = { workspace = true, features = ["test-util"] }
 tracing-subscriber = { workspace = true }
