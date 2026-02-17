@@ -14,6 +14,7 @@ use lib::configs::secure::dkg::{
     QIS as DKG_QIS,
     // DKG derived values
     PLAINTEXT_MODULUS as DKG_PLAINTEXT_MODULUS, Q_MOD_T as DKG_Q_MOD_T,
+    Q_MOD_T_CENTERED as DKG_Q_MOD_T_CENTERED,
     // Threshold moduli reference
     L_THRESHOLD, QIS_THRESHOLD,
     // Share encryption bounds
@@ -31,7 +32,7 @@ use lib::configs::secure::threshold::{
     QIS as THRESHOLD_QIS,
     // Derived values
     PLAINTEXT_MODULUS as THRESHOLD_PLAINTEXT_MODULUS, Q_MOD_T as THRESHOLD_Q_MOD_T,
-    Q_INVERSE_MOD_T as THRESHOLD_Q_INVERSE_MOD_T,
+    Q_MOD_T_CENTERED as THRESHOLD_Q_MOD_T_CENTERED, Q_INVERSE_MOD_T as THRESHOLD_Q_INVERSE_MOD_T,
     // pk_generation bounds
     PK_GENERATION_EEK_BOUND, PK_GENERATION_SK_BOUND, PK_GENERATION_E_SM_BOUND,
     PK_GENERATION_R1_BOUNDS, PK_GENERATION_R2_BOUNDS, PK_GENERATION_B_ENC,
@@ -46,6 +47,24 @@ use lib::configs::secure::threshold::{
 };
 
 use lib::math::modulo::U128::ModU128;
+
+/// Center a value from [0, modulus) to [-modulus/2, modulus/2).
+/// For odd modulus use (raw > t/2).
+/// For even use (raw >= t/2).
+/// Precondition: raw is in [0, modulus).
+pub fn center(raw: Field, modulus: Field) -> Field {
+    let needs_centering = if (modulus as u128 % 2) == 1 {
+        raw as u128 > modulus as u128 / 2
+    } else {
+        raw as u128 >= modulus as u128 / 2
+    };
+
+    if needs_centering {
+        raw - modulus
+    } else {
+        raw
+    }
+}
 
 fn main() {
     // DKG (BFV) Verification
@@ -67,6 +86,7 @@ fn main() {
 
 fn verify_dkg_derived_values() {
     verify_dkg_q_mod_t();
+    verify_dkg_q_mod_t_centered();
 }
 
 // Verifies DKG: Q_MOD_T = (product of QIS) mod t
@@ -80,6 +100,14 @@ fn verify_dkg_q_mod_t() {
     }
 
     assert(product == DKG_Q_MOD_T, "DKG Q_MOD_T verification failed");
+}
+
+// Verifies DKG: Q_MOD_T_CENTERED = center(Q_MOD_T)
+fn verify_dkg_q_mod_t_centered() {
+    assert(
+        center(DKG_Q_MOD_T, DKG_PLAINTEXT_MODULUS) == DKG_Q_MOD_T_CENTERED,
+        "DKG Q_MOD_T_CENTERED verification failed",
+    );
 }
 
 //DKG Bounds
@@ -174,6 +202,7 @@ fn verify_dkg_bounds() {
 
 fn verify_threshold_derived_values() {
     verify_threshold_q_mod_t();
+    verify_threshold_q_mod_t_centered();
     verify_threshold_q_inverse_mod_t();
 }
 
@@ -188,6 +217,14 @@ fn verify_threshold_q_mod_t() {
     }
 
     assert(product == THRESHOLD_Q_MOD_T, "Threshold Q_MOD_T verification failed");
+}
+
+// Verifies Threshold: Q_MOD_T_CENTERED = center(Q_MOD_T)
+fn verify_threshold_q_mod_t_centered() {
+    assert(
+        center(THRESHOLD_Q_MOD_T, THRESHOLD_PLAINTEXT_MODULUS) == THRESHOLD_Q_MOD_T_CENTERED,
+        "Threshold Q_MOD_T_CENTERED verification failed",
+    );
 }
 
 // Verifies Threshold: Q * Q_INVERSE_MOD_T = 1 mod t

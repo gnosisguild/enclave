@@ -130,6 +130,7 @@ echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
 
 # decrypted_shares_aggregation_mod is for insecure only (Q < 128bit); _bn is for secure (large Q)
+# config validates secure configs only, so run only in secure mode
 RUN_CIRCUITS=""
 for c in $CIRCUITS; do
     if [ "$MODE" = "secure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_mod" ]; then
@@ -138,6 +139,10 @@ for c in $CIRCUITS; do
     fi
     if [ "$MODE" = "insecure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_bn" ]; then
         echo "  Skipping $c (BigNum variant is for secure/large Q only)"
+        continue
+    fi
+    if [ "$MODE" = "insecure" ] && [ "$c" = "config" ]; then
+        echo "  Skipping $c (config circuit validates secure configs only)"
         continue
     fi
     RUN_CIRCUITS="${RUN_CIRCUITS} ${c}"

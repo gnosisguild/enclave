@@ -32,9 +32,14 @@ OUTPUT_DIR="${REPO_ROOT}/circuits/bin/${CIRCUIT_PATH}"
 
 # Map circuit path to zk_cli --circuit and optional --inputs
 # DKG circuits that need --inputs: share-computation, share-encryption, share-decryption
+# config has no witness inputs (verifies constants only), so skip zk_cli
 get_zk_args() {
     local path="$1"
     case "$path" in
+        config)
+            echo "_no_zk_cli"
+            return
+            ;;
         dkg/pk)
             echo "pk"
             return
@@ -87,6 +92,14 @@ ZK_CIRCUIT="${ZK_ARGS[0]}"
 ZK_INPUTS="${ZK_ARGS[1]:-}"
 
 cd "$REPO_ROOT"
+
+if [ "$ZK_CIRCUIT" = "_no_zk_cli" ]; then
+    echo "  No Prover.toml needed (config circuit has no witness inputs)"
+    # Ensure empty Prover.toml so nargo execute can run
+    mkdir -p "$OUTPUT_DIR"
+    touch "$OUTPUT_DIR/Prover.toml"
+    exit 0
+fi
 
 CMD=(cargo run -p e3-zk-helpers --bin zk_cli -- --circuit "$ZK_CIRCUIT" --preset "$PRESET" --output "$OUTPUT_DIR" --toml --no-configs)
 if [ -n "$ZK_INPUTS" ]; then

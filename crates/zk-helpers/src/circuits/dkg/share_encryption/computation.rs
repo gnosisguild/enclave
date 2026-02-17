@@ -13,6 +13,7 @@
 use crate::circuits::commitments::{
     compute_dkg_pk_commitment, compute_share_encryption_commitment_from_message,
 };
+use crate::{compute_q_mod_t, compute_q_product};
 use std::ops::Deref;
 
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
@@ -74,8 +75,10 @@ impl CircuitComputation for ShareEncryptionCircuit {
 pub struct Configs {
     /// Plaintext modulus (as usize).
     pub t: usize,
+    /// [q]_t reduced to ZKP field modulus.
+    pub q_mod_t: BigUint,
     /// centered [q]_t reduced to ZKP field modulus.
-    pub q_mod_t: BigInt,
+    pub q_mod_t_centered: BigInt,
     /// CRT moduli (one per limb).
     pub moduli: Vec<u64>,
     /// k0_i = [1/q_i]_t per modulus, for scaling in the circuit.
@@ -150,8 +153,9 @@ impl Computation for Configs {
 
         let moduli = dkg_params.moduli().to_vec();
         let t = dkg_params.plaintext();
-        let q_mod_t = compute_q_mod_t_centered(&moduli, t);
-
+        let q = compute_q_product(&moduli);
+        let q_mod_t = compute_q_mod_t(&q, t);
+        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
         let k0is = compute_k0is(&moduli, t)?;
 
         let bounds = Bounds::compute(preset, data)?;
@@ -160,6 +164,7 @@ impl Computation for Configs {
         Ok(Configs {
             t: t as usize,
             q_mod_t,
+            q_mod_t_centered,
             moduli,
             k0is,
             bits,
