@@ -74,7 +74,7 @@ pub struct CiphernodeBuilder {
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
-    start_buffer: bool,
+    ignore_address_check: bool,
 }
 
 // Simple Net Configuration
@@ -140,8 +140,8 @@ impl CiphernodeBuilder {
             testmode_signer: None,
             threshold_plaintext_agg: false,
             net_config: None,
-            start_buffer: false,
             zk_backend: None,
+            ignore_address_check: false,
         }
     }
 
@@ -191,12 +191,6 @@ impl CiphernodeBuilder {
     /// This is conspicuously named so we understand that this should only be used when testing
     pub fn testmode_with_errors(mut self) -> Self {
         self.testmode_errors = true;
-        self
-    }
-    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnded. This is important
-    /// for tests that don't specifically
-    pub fn testmode_start_buffer_immediately(mut self) -> Self {
-        self.start_buffer = true;
         self
     }
 
@@ -316,6 +310,11 @@ impl CiphernodeBuilder {
         self
     }
 
+    pub fn testmode_ignore_address_check(mut self) -> Self {
+        self.ignore_address_check = true;
+        self
+    }
+
     fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
@@ -414,14 +413,16 @@ impl CiphernodeBuilder {
         let mut provider_cache =
             provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
 
-        // Ensure that the private key matches the given address in the config
-        let signer = provider_cache.ensure_signer().await?;
-        if signer.address().to_string() != addr {
-            bail!(
-                "config address {:?} does not match stored account {:?}!",
-                addr,
-                signer.address()
-            );
+        if !self.ignore_address_check {
+            // Ensure that the private key matches the given address in the config
+            let signer = provider_cache.ensure_signer().await?;
+            if signer.address().to_string() != addr {
+                bail!(
+                    "config address {:?} does not match stored account {:?}!",
+                    addr,
+                    signer.address()
+                );
+            }
         }
 
         // Use the configured backend directly

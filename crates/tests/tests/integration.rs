@@ -376,8 +376,8 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_pubkey_aggregation()
                 .with_sortition_score()
                 .with_threshold_plaintext_aggregation()
-                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
+                .testmode_ignore_address_check()
                 .with_logging()
                 .build()
                 .await
@@ -394,8 +394,8 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_zkproof(zk_backend.clone())
                 .testmode_with_signer(PrivateKeySigner::random())
                 .with_sortition_score()
-                .testmode_start_buffer_immediately()
                 .testmode_with_forked_bus(bus.event_bus())
+                .testmode_ignore_address_check()
                 .with_logging()
                 .build()
                 .await
