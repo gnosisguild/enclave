@@ -17,7 +17,6 @@ pub fn inputs_json_to_input_map(json: &serde_json::Value) -> Result<InputMap, Zk
     let obj = json
         .as_object()
         .ok_or_else(|| ZkError::SerializationError("inputs json must be an object".into()))?;
-
     let mut inputs = InputMap::new();
     for (key, value) in obj {
         let input_value = json_value_to_input_value(value)?;
@@ -38,6 +37,21 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
             .map(json_value_to_input_value)
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(InputValue::Vec(items));
+    }
+    if v.is_number() {
+        let s = if let Some(n) = v.as_u64() {
+            n.to_string()
+        } else if let Some(n) = v.as_i64() {
+            n.to_string()
+        } else {
+            return Err(ZkError::SerializationError(format!(
+                "unsupported numeric value: {}",
+                v
+            )));
+        };
+        return FieldElement::try_from_str(&s)
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", s)));
     }
     if let Some(obj) = v.as_object() {
         if let Some(coeffs) = obj.get("coefficients") {

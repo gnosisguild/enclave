@@ -74,7 +74,6 @@ async fn find_bb() -> Option<PathBuf> {
 
 async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
     let temp = with_tempdir();
-
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
     let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
@@ -86,7 +85,6 @@ async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
         work_dir.clone(),
         ZkConfig::default(),
     );
-
     fs::create_dir_all(&backend.circuits_dir).await.unwrap();
     fs::create_dir_all(backend.circuits_dir.join("vk"))
         .await
@@ -484,7 +482,6 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
         "decrypted_shares_aggregation",
     )
     .await;
-
     let sample = DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
 
@@ -532,7 +529,6 @@ macro_rules! e2e_proof_tests {
                         println!("skipping: bb not found");
                         return;
                     };
-
                     let proof = circuit
                         .prove(&prover, &preset, &sample, e3_id)
                         .expect("proof generation should succeed");

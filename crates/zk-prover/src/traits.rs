@@ -48,7 +48,6 @@ pub trait Provable: Send + Sync {
         let json = inputs
             .to_json()
             .map_err(|e| ZkError::SerializationError(e.to_string()))?;
-
         inputs_json_to_input_map(&json)
     }
 

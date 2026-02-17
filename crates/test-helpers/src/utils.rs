@@ -33,7 +33,14 @@ pub fn test_tmp_dir() -> PathBuf {
     } else {
         // Unit tests — derive from CARGO_MANIFEST_DIR
         let manifest_dir = var("CARGO_MANIFEST_DIR").unwrap();
-        Path::new(&manifest_dir).join("../../target").join("tmp")
+
+        Path::new(&manifest_dir)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("target")
+            .join("tmp")
     }
 }
 
