@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::Cid;
+use crate::ContentHash;
 use actix::Message;
 use anyhow::{bail, Context, Result};
 use e3_events::{
@@ -26,7 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{error, info};
+use tracing::{error, trace, warn};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -115,12 +115,12 @@ pub enum NetCommand {
         correlation_id: CorrelationId,
         expires: Option<Instant>,
         value: ArcBytes,
-        key: Cid,
+        key: ContentHash,
     },
     /// Fetch Document from Kademlia
     DhtGetRecord {
         correlation_id: CorrelationId,
-        key: Cid,
+        key: ContentHash,
     },
     /// Shutdown signal
     Shutdown,
@@ -181,13 +181,13 @@ pub enum NetEvent {
     },
     /// This node received a document from a Kademlia Request
     DhtGetRecordSucceeded {
-        key: Cid,
+        key: ContentHash,
         correlation_id: CorrelationId,
         value: ArcBytes,
     },
     /// This node received a document from a Kademlia Request
     DhtPutRecordSucceeded {
-        key: Cid,
+        key: ContentHash,
         correlation_id: CorrelationId,
     },
     /// There was an error receiving the document
@@ -243,12 +243,12 @@ impl NetEvent {
 #[rtype(result = "()")]
 pub struct DocumentPublishedNotification {
     pub meta: DocumentMeta,
-    pub key: Cid,
+    pub key: ContentHash,
     pub ts: u128,
 }
 
 impl DocumentPublishedNotification {
-    pub fn new(meta: DocumentMeta, key: Cid, ts: u128) -> Self {
+    pub fn new(meta: DocumentMeta, key: ContentHash, ts: u128) -> Self {
         Self { meta, key, ts }
     }
 
@@ -287,9 +287,10 @@ where
     let debug_cmd = format!("{:?}", command);
 
     // Send the command to NetInterface
-    info!(
-        "call_and_await_response: SENDING command {:?} with timeout {:?}",
-        command, timeout
+    trace!(
+        "call_and_await_response: sending command {:?} with timeout {:?}",
+        command,
+        timeout
     );
     net_cmds.send(command).await?;
 
@@ -297,24 +298,20 @@ where
         loop {
             match rx.recv().await {
                 Ok(event) => {
-                    info!("RECEIVED and event {:?}", event);
                     // Only process events matching our correlation ID
                     if event.correlation_id() == Some(id) {
                         if let Some(result) = matcher(&event) {
                             return result;
                         } // None means unexpected event type, keep waiting
-                        info!("matcher failed for event {:?}! skipping...", event);
-                    } else {
-                        // Ignore events with non-matching IDs
-                        info!(
-                            "correlation failed for event {:?} against correlation={:?}! skipping...",
-                            event, id
-                        );
+                        trace!("matcher did not match event, skipping...");
                     }
                 }
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    warn!("broadcast receiver lagged by {n} messages");
+                    continue;
+                }
                 Err(e) => {
-                    error!("RECEIVED an error from rx: {:?} returning error", e);
+                    error!("broadcast channel error: {:?}", e);
                     return Err(e.into());
                 }
             }

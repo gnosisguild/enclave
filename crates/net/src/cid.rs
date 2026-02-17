@@ -11,9 +11,11 @@ use std::ops::{Deref, DerefMut};
 
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
-pub struct Cid(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub Vec<u8>);
+pub struct ContentHash(
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub Vec<u8>,
+);
 
-impl Cid {
+impl ContentHash {
     pub fn from_content(content: &[u8]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(&content);
@@ -26,26 +28,26 @@ impl Cid {
     }
 }
 
-impl Deref for Cid {
+impl Deref for ContentHash {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl DerefMut for Cid {
+impl DerefMut for ContentHash {
     fn deref_mut(&mut self) -> &mut [u8] {
         &mut self.0
     }
 }
 
-impl AsRef<[u8]> for Cid {
+impl AsRef<[u8]> for ContentHash {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl ToString for Cid {
+impl ToString for ContentHash {
     fn to_string(&self) -> String {
         hex::encode(&self.0)
     }
