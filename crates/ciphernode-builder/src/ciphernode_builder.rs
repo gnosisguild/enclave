@@ -416,7 +416,7 @@ impl CiphernodeBuilder {
         if !self.ignore_address_check {
             // Ensure that the private key matches the given address in the config
             let signer = provider_cache.ensure_signer().await?;
-            if signer.address().to_string() != addr {
+            if signer.address().to_string().to_lowercase() != addr.to_lowercase() {
                 bail!(
                     "config address {:?} does not match stored account {:?}!",
                     addr,
