@@ -100,6 +100,8 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .join("zk-prover")
             .join("tests")
             .join("fixtures");
+
+        // Copy T0 (pk) circuit
         let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
         tokio::fs::copy(fixtures_dir.join("pk.json"), pk_circuit_dir.join("pk.json"))
@@ -108,6 +110,24 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         tokio::fs::copy(fixtures_dir.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
             .await
             .unwrap();
+
+        // Copy T1 (pk_generation) circuit
+        let pk_gen_circuit_dir = circuits_dir.join("threshold").join("pk_generation");
+        tokio::fs::create_dir_all(&pk_gen_circuit_dir)
+            .await
+            .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("pk_generation.json"),
+            pk_gen_circuit_dir.join("pk_generation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            fixtures_dir.join("pk_generation.vk"),
+            pk_gen_circuit_dir.join("pk_generation.vk"),
+        )
+        .await
+        .unwrap();
 
         let backend = ZkBackend::new(
             BBPath::Default(bb_binary),
