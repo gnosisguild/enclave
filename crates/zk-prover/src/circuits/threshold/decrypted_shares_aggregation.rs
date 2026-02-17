@@ -18,6 +18,13 @@ impl Provable for DecryptedSharesAggregationCircuit {
     type Inputs = Inputs;
 
     fn circuit(&self) -> CircuitName {
-        CircuitName::DecryptedSharesAggregation
+        CircuitName::DecryptedSharesAggregationBn
+    }
+
+    fn valid_circuits(&self) -> Vec<CircuitName> {
+        vec![
+            CircuitName::DecryptedSharesAggregationBn,
+            CircuitName::DecryptedSharesAggregationMod,
+        ]
     }
 }
