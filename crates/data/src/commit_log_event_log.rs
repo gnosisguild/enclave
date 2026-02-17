@@ -79,7 +79,7 @@ impl EventLog for CommitLogEventLog {
 mod tests {
     use super::*;
     use e3_events::{EnclaveEventData, EventConstructorWithTimestamp, EventSource, TestEvent};
-    use tempfile::tempdir;
+    use e3_test_helpers::with_tempdir;
 
     fn event_from(data: impl Into<EnclaveEventData>) -> EnclaveEvent<Unsequenced> {
         EnclaveEvent::<Unsequenced>::new_with_timestamp(
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_append_and_read() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
         let event1 = event_from(TestEvent::new("one", 1));
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_read_from_offset() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
         let event1 = event_from(TestEvent::new("one", 1));
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_read_from_corruption_at_end_causes_infinite_loop() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
         for i in 0..100 {
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_read_empty_log() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
         let events: Vec<_> = log.read_from(1).collect();
@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_read_past_end() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let mut log = CommitLogEventLog::new(&dir.path().to_path_buf()).unwrap();
 
         let event = event_from(TestEvent::new("one", 1));

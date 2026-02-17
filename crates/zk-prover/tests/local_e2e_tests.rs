@@ -17,6 +17,7 @@ mod common;
 use common::fixtures_dir;
 use e3_config::BBPath;
 use e3_fhe_params::BfvPreset;
+use e3_test_helpers::with_tempdir;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
 use e3_zk_helpers::circuits::{commitments::compute_dkg_pk_commitment, CircuitComputation};
@@ -72,8 +73,7 @@ async fn find_bb() -> Option<PathBuf> {
 }
 
 async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
-    let target_tmp = env!("CARGO_TARGET_TMPDIR");
-    let temp = TempDir::new_in(target_tmp).unwrap();
+    let temp = with_tempdir();
 
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");

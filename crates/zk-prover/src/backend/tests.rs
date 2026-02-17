@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::config::VersionInfo;
-use tempfile::tempdir;
+use e3_test_helpers::with_tempdir;
 use tokio::fs;
 
 fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
@@ -19,7 +19,7 @@ fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
 
 #[tokio::test]
 async fn test_backend_creates_directories() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     fs::create_dir_all(&backend.base_dir).await.unwrap();
@@ -37,7 +37,7 @@ async fn test_backend_creates_directories() {
 
 #[tokio::test]
 async fn test_version_info_roundtrip() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let path = temp.path().join("version.json");
 
     let info = VersionInfo {
@@ -59,7 +59,7 @@ async fn test_version_info_roundtrip() {
 
 #[tokio::test]
 async fn test_check_status_full_setup_needed() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     let status = backend.check_status().await;
@@ -72,7 +72,7 @@ async fn test_check_status_full_setup_needed() {
 
 #[tokio::test]
 async fn test_check_status_ready_when_installed() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let config = ZkConfig::default();
     let backend = test_backend(temp.path(), config.clone());
 
@@ -101,7 +101,7 @@ async fn test_check_status_ready_when_installed() {
 
 #[tokio::test]
 async fn test_check_status_bb_needs_update() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let config = ZkConfig::default();
     let backend = test_backend(temp.path(), config.clone());
 
@@ -130,7 +130,7 @@ async fn test_check_status_bb_needs_update() {
 
 #[tokio::test]
 async fn test_work_dir_cleanup() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     fs::create_dir_all(&backend.work_dir).await.unwrap();

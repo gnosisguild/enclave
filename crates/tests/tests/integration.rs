@@ -25,7 +25,7 @@ use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, with_tracing, AddToCommittee,
+    create_seed_from_u64, create_shared_rng_from_u64, with_tempdir, with_tracing, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
@@ -75,7 +75,7 @@ async fn find_bb() -> Option<PathBuf> {
 /// If a local bb binary is found, uses it with fixture files (fast path).
 /// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
 async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = with_tempdir();
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
     let bb_binary = noir_dir.join("bin").join("bb");

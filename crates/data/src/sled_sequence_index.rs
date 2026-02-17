@@ -58,11 +58,11 @@ impl SequenceIndex for SledSequenceIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use e3_test_helpers::with_tempdir;
 
     #[test]
     fn seek_finds_nearest_key_at_or_after_target() {
-        let dir = tempdir().unwrap();
+        let dir = with_tempdir();
         let path = dir.path().to_path_buf();
 
         let mut index = SledSequenceIndex::new(&path, "test_tree").unwrap();

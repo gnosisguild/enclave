@@ -20,3 +20,6 @@ async-trait = { workspace = true }
 once_cell = { workspace = true }
 tempfile = { workspace = true }
 commitlog = { workspace = true }
+
+[dev-dependencies]
+e3-test-helpers = { workspace = true }

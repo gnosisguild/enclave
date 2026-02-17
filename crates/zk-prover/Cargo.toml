@@ -49,6 +49,7 @@ walkdir = "2.5"
 [dev-dependencies]
 paste = "1"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+e3-test-helpers.workspace = true
 
 [features]
 default = []

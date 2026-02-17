@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use e3_config::BBPath;
+use e3_test_helpers::with_tempdir;
 use e3_zk_prover::{ZkBackend, ZkConfig, ZkProver};
 use tempfile::tempdir;
 use tokio::fs;
@@ -19,7 +20,7 @@ fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
 
 #[tokio::test]
 async fn test_backend_creates_directories() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     fs::create_dir_all(&backend.base_dir).await.unwrap();
@@ -37,7 +38,7 @@ async fn test_backend_creates_directories() {
 
 #[tokio::test]
 async fn test_work_dir_cleanup() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     fs::create_dir_all(&backend.work_dir).await.unwrap();
@@ -64,7 +65,7 @@ async fn test_work_dir_cleanup() {
 
 #[tokio::test]
 async fn test_work_dir_path_traversal_protection() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
 
     // Test path traversal attempts
@@ -91,7 +92,7 @@ async fn test_work_dir_path_traversal_protection() {
 
 #[test]
 fn test_prover_requires_bb() {
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), ZkConfig::default());
     let prover = ZkProver::new(&backend);
 

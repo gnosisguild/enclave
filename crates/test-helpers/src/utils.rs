@@ -4,8 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{fmt::Debug, fs, io::Write, path::PathBuf};
+use std::{
+    env::var,
+    fmt::Debug,
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
+use tempfile::TempDir;
 use tracing::{error, subscriber::DefaultGuard, trace};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -17,6 +24,23 @@ pub fn with_tracing(level: &str) -> DefaultGuard {
             .with_test_writer()
             .finish(),
     )
+}
+
+pub fn test_tmp_dir() -> PathBuf {
+    if let Ok(dir) = var("CARGO_TARGET_TMPDIR") {
+        // Integration tests
+        PathBuf::from(dir)
+    } else {
+        // Unit tests — derive from CARGO_MANIFEST_DIR
+        let manifest_dir = var("CARGO_MANIFEST_DIR").unwrap();
+        Path::new(&manifest_dir).join("../../target").join("tmp")
+    }
+}
+
+pub fn with_tempdir() -> TempDir {
+    let target_tmp = test_tmp_dir();
+    let temp = TempDir::new_in(target_tmp).unwrap();
+    temp
 }
 
 pub fn write_file_with_dirs(path: &PathBuf, content: &[u8]) -> std::io::Result<()> {

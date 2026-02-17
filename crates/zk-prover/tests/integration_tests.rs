@@ -17,6 +17,7 @@
 #![cfg(feature = "integration-tests")]
 
 use e3_config::BBPath;
+use e3_test_helpers::with_tempdir;
 use e3_zk_prover::{BbTarget, SetupStatus, ZkBackend, ZkConfig};
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -39,7 +40,7 @@ async fn test_download_bb_and_verify_structure() {
         .await
         .expect("versions.json should exist");
 
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), config);
 
     let result = backend.download_bb().await;
@@ -93,7 +94,7 @@ async fn test_download_bb_rejects_wrong_checksum() {
         *checksum = "0".repeat(64);
     }
 
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), config);
 
     let result = backend.download_bb().await;
@@ -116,7 +117,7 @@ async fn test_ensure_installed_full_flow() {
         .await
         .expect("versions.json should exist");
 
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), config);
 
     assert!(matches!(
@@ -154,7 +155,7 @@ async fn test_download_circuits() {
         .await
         .expect("versions.json should exist");
 
-    let temp = tempdir().unwrap();
+    let temp = with_tempdir();
     let backend = test_backend(temp.path(), config);
 
     tokio::fs::create_dir_all(&backend.circuits_dir)
