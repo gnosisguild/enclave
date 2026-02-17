@@ -33,7 +33,7 @@ pub async fn execute(config: &AppConfig, private_key: Option<Zeroizing<String>>)
 
     e3_entrypoint::wallet::set::execute(config, input).await?;
 
-    println!("WalletKey key has been successfully stored and encrypted.");
+    println!("Wallet key has been successfully stored and encrypted.");
 
     Ok(())
 }
