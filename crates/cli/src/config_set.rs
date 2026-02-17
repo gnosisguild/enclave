@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::path::PathBuf;
+
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input};
 use e3_entrypoint::config_set;
@@ -56,7 +58,17 @@ pub async fn execute(
         }
     };
 
-    let config = config_set::execute(rpc_url, eth_address).await?;
+    let default_config_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
+        .join("enclave");
+
+    let config_dir: PathBuf = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter config directory")
+        .default(default_config_dir.display().to_string())
+        .interact_text()?
+        .into();
+
+    let config = config_set::execute(rpc_url, eth_address, &config_dir)?;
 
     password::execute(PasswordCommands::Set { password }, &config).await?;
 

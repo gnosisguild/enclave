@@ -3122,6 +3122,7 @@ dependencies = [
  "clap",
  "compile-time",
  "dialoguer",
+ "dirs 5.0.1",
  "e3-config",
  "e3-crypto",
  "e3-entrypoint",
