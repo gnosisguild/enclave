@@ -65,12 +65,18 @@ pub async fn execute(
     let config_dir: PathBuf = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter config directory")
         .default(default_config_dir.display().to_string())
+        .validate_with(|input: &String| -> Result<(), &str> {
+            let path = PathBuf::from(input);
+            if input.is_empty() {
+                Err("Path cannot be empty")
+            } else if path.is_file() {
+                Err("Path is a file, not a directory")
+            } else {
+                Ok(())
+            }
+        })
         .interact_text()?
         .into();
-
-    let config = config_set::execute(rpc_url, eth_address, &config_dir)?;
-
-    password::execute(PasswordCommands::Set { password }, &config).await?;
 
     let net_keypair_command = if generate_net_keypair {
         NetKeypairCommands::Generate
@@ -87,6 +93,27 @@ pub async fn execute(
     } else {
         NetKeypairCommands::Set { net_keypair }
     };
+
+    // Execute
+
+    let config = config_set::execute(rpc_url, eth_address, &config_dir)?;
+
+    for i in 0..3 {
+        if password::execute(
+            PasswordCommands::Set {
+                password: password.clone(),
+            },
+            &config,
+        )
+        .await
+        .is_ok()
+        {
+            break;
+        }
+        if i == 2 {
+            return Err(anyhow::anyhow!("Failed after 3 attempts"));
+        }
+    }
 
     net::execute(
         NetCommands::Keypair {
