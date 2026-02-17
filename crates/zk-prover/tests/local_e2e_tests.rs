@@ -4,18 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Local end-to-end tests that require a local bb binary.
-//! These tests will be skipped if bb is not found; missing fixtures cause test failure.
+//! Local end-to-end tests that require a local bb binary and pre-compiled circuit artifacts.
+//! These tests will be skipped if bb is not found.
+//!
+//! Circuit artifacts (`.json` + `.vk`) are expected in `circuits/bin/{group}/target/`,
+//! produced by `pnpm build:circuits` locally or the `build_circuits` CI job.
 //!
 //! To add a new circuit: add setup_*_test() and one line in `e2e_proof_tests!`.
-//! Sync fixtures from circuits target: `pnpm sync:fixtures` (copies .json and .vk from
-//! circuits/bin/{dkg,threshold}/target into tests/fixtures/).
 //! Commitment consistency tests are defined separately.
 
 mod common;
 
-use common::fixtures_dir;
-use e3_config::BBPath;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuit;
 use e3_zk_helpers::circuits::dkg::pk::circuit::PkCircuitData;
@@ -35,97 +34,12 @@ use e3_zk_helpers::threshold::{
     },
 };
 use e3_zk_helpers::CiphernodesCommitteeSize;
-use e3_zk_helpers::{
-    compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
-    compute_threshold_pk_commitment,
+use e3_zk_helpers::{compute_share_computation_sk_commitment, compute_threshold_pk_commitment};
+use e3_zk_prover::{Provable, ZkBackend, ZkProver};
+
+use crate::common::{
+    extract_field, extract_field_from_end, find_bb, setup_compiled_circuit, setup_test_prover,
 };
-use e3_zk_prover::{Provable, ZkBackend, ZkConfig, ZkProver};
-use std::path::PathBuf;
-use tempfile::TempDir;
-use tokio::{fs, process::Command};
-
-use crate::common::extract_field;
-use crate::common::extract_field_from_end;
-
-async fn find_bb() -> Option<PathBuf> {
-    if let Ok(output) = Command::new("which").arg("bb").output().await {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    if let Ok(home) = std::env::var("HOME") {
-        for path in [
-            format!("{}/.bb/bb", home),
-            format!("{}/.nargo/bin/bb", home),
-            format!("{}/.enclave/noir/bin/bb", home),
-        ] {
-            if std::path::Path::new(&path).exists() {
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    None
-}
-
-async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, tempfile::TempDir) {
-    let target_tmp = env!("CARGO_TARGET_TMPDIR");
-    let temp = TempDir::new_in(target_tmp).unwrap();
-
-    let temp_path = temp.path();
-    let noir_dir = temp_path.join("noir");
-    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
-    let circuits_dir = noir_dir.join("circuits");
-    let work_dir = noir_dir.join("work").join("test_node");
-    let backend = ZkBackend::new(
-        bb_binary,
-        circuits_dir.clone(),
-        work_dir.clone(),
-        ZkConfig::default(),
-    );
-
-    fs::create_dir_all(&backend.circuits_dir).await.unwrap();
-    fs::create_dir_all(backend.circuits_dir.join("vk"))
-        .await
-        .unwrap();
-    fs::create_dir_all(&backend.work_dir).await.unwrap();
-    fs::create_dir_all(backend.base_dir.join("bin"))
-        .await
-        .unwrap();
-
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(bb, &backend.bb_binary).unwrap();
-
-    (backend, temp)
-}
-
-async fn setup_circuit_fixtures(backend: &ZkBackend, circuit_path: &[&str], fixture_name: &str) {
-    let fixtures = fixtures_dir();
-    let json_path = fixtures.join(format!("{fixture_name}.json"));
-    let vk_path = fixtures.join(format!("{fixture_name}.vk"));
-    assert!(
-        json_path.exists(),
-        "missing circuit fixture: {} (run `pnpm sync:fixtures` to copy from circuits target)",
-        json_path.display()
-    );
-    assert!(
-        vk_path.exists(),
-        "missing verification key fixture: {}",
-        vk_path.display()
-    );
-    let circuit_dir = circuit_path
-        .iter()
-        .fold(backend.circuits_dir.clone(), |p, seg| p.join(seg));
-    fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(json_path, circuit_dir.join(format!("{fixture_name}.json")))
-        .await
-        .unwrap();
-    fs::copy(vk_path, circuit_dir.join(format!("{fixture_name}.vk")))
-        .await
-        .unwrap();
-}
 
 async fn setup_share_encryption_e_sm_test() -> Option<(
     ZkBackend,
@@ -144,7 +58,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
     let sd: e3_fhe_params::PresetSearchDefaults =
         BfvPreset::InsecureThreshold512.search_defaults().unwrap();
 
-    setup_circuit_fixtures(&backend, &["dkg", "share_encryption"], "share_encryption").await;
+    setup_compiled_circuit(&backend, "dkg", "share_encryption").await;
 
     let sample = ShareEncryptionCircuitData::generate_sample(
         preset,
@@ -184,7 +98,7 @@ async fn setup_share_encryption_sk_test() -> Option<(
     let sd: e3_fhe_params::PresetSearchDefaults =
         BfvPreset::InsecureThreshold512.search_defaults().unwrap();
 
-    setup_circuit_fixtures(&backend, &["dkg", "share_encryption"], "share_encryption").await;
+    setup_compiled_circuit(&backend, "dkg", "share_encryption").await;
 
     let sample = ShareEncryptionCircuitData::generate_sample(
         preset,
@@ -221,12 +135,7 @@ async fn setup_share_computation_sk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(
-        &backend,
-        &["dkg", "sk_share_computation"],
-        "sk_share_computation",
-    )
-    .await;
+    setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
 
     let sample =
         ShareComputationCircuitData::generate_sample(preset, committee, DkgInputType::SecretKey)
@@ -258,12 +167,7 @@ async fn setup_share_computation_e_sm_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(
-        &backend,
-        &["dkg", "e_sm_share_computation"],
-        "e_sm_share_computation",
-    )
-    .await;
+    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation").await;
 
     let sample = ShareComputationCircuitData::generate_sample(
         preset,
@@ -298,7 +202,7 @@ async fn setup_pk_generation_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(&backend, &["threshold", "pk_generation"], "pk_generation").await;
+    setup_compiled_circuit(&backend, "threshold", "pk_generation").await;
 
     let sample = PkGenerationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
@@ -328,12 +232,7 @@ async fn setup_share_decryption_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(
-        &backend,
-        &["threshold", "share_decryption"],
-        "share_decryption",
-    )
-    .await;
+    setup_compiled_circuit(&backend, "threshold", "share_decryption").await;
 
     let sample = ThresholdShareDecryptionCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
@@ -363,7 +262,7 @@ async fn setup_pk_aggregation_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(&backend, &["threshold", "pk_aggregation"], "pk_aggregation").await;
+    setup_compiled_circuit(&backend, "threshold", "pk_aggregation").await;
 
     let sample = PkAggregationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
@@ -393,12 +292,7 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(
-        &backend,
-        &["threshold", "decrypted_shares_aggregation_bn"],
-        "decrypted_shares_aggregation_bn",
-    )
-    .await;
+    setup_compiled_circuit(&backend, "threshold", "decrypted_shares_aggregation_bn").await;
 
     let sample = DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);
@@ -427,7 +321,7 @@ async fn setup_pk_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_circuit_fixtures(&backend, &["dkg", "pk"], "pk").await;
+    setup_compiled_circuit(&backend, "dkg", "pk").await;
 
     let sample = PkCircuitData::generate_sample(preset).ok()?;
     let prover = ZkProver::new(&backend);
