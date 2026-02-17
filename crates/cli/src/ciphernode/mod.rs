@@ -18,6 +18,8 @@ mod utils;
 use context::ChainContext;
 use zeroize::Zeroizing;
 
+use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
+
 #[derive(Debug, Args, Clone, Default)]
 pub struct ChainArgs {
     /// Chain name as defined in the enclave config (defaults to the first entry)
@@ -40,11 +42,11 @@ pub enum CiphernodeCommands {
         rpc_url: Option<String>,
 
         /// The password
-        #[arg(short, long)]
+        #[arg(short, long, value_parser = parse_zeroizing)]
         password: Option<Zeroizing<String>>,
 
         /// Wallet Private Key
-        #[arg(short, long)]
+        #[arg(short, long, value_parser = ensure_hex_zeroizing)]
         private_key: Option<Zeroizing<String>>,
 
         /// The network private key (ed25519)
