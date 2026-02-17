@@ -32,6 +32,16 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
             .map(InputValue::Field)
             .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", s)));
     }
+    if let Some(n) = v.as_i64() {
+        return FieldElement::try_from_str(&n.to_string())
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", n)));
+    }
+    if let Some(n) = v.as_u64() {
+        return FieldElement::try_from_str(&n.to_string())
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", n)));
+    }
     if let Some(arr) = v.as_array() {
         let items = arr
             .iter()
