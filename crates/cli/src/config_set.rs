@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Input};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input};
 use e3_entrypoint::config_set;
 use tracing::instrument;
 
@@ -60,23 +60,29 @@ pub async fn execute(
 
     password::execute(PasswordCommands::Set { password }, &config).await?;
 
-    if generate_net_keypair {
-        net::execute(
-            NetCommands::Keypair {
-                command: NetKeypairCommands::Generate,
-            },
-            &config,
-        )
-        .await?;
+    let net_keypair_command = if generate_net_keypair {
+        NetKeypairCommands::Generate
+    } else if net_keypair.is_none() {
+        let should_generate = Confirm::with_theme(&ColorfulTheme::default())
+            .with_prompt("No net keypair specified. Would you like to generate one automatically?")
+            .default(true)
+            .interact()?;
+        if should_generate {
+            NetKeypairCommands::Generate
+        } else {
+            NetKeypairCommands::Set { net_keypair }
+        }
     } else {
-        net::execute(
-            NetCommands::Keypair {
-                command: NetKeypairCommands::Set { net_keypair },
-            },
-            &config,
-        )
-        .await?;
-    }
+        NetKeypairCommands::Set { net_keypair }
+    };
+
+    net::execute(
+        NetCommands::Keypair {
+            command: net_keypair_command,
+        },
+        &config,
+    )
+    .await?;
 
     println!("Enclave configuration successfully created!");
 
