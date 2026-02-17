@@ -3,7 +3,6 @@ name = "crisp_greco"
 type = "bin"
 version = "0.1.0"
 authors = ["Gnosis Guild / Enclave"]
-license = "MIT"
 
 [dependencies]
 enclave_lib = { path = "../../../../../circuits/lib" }

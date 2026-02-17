@@ -3,7 +3,6 @@ name = "crisp"
 type = "bin"
 version = "0.1.0"
 authors = ["Gnosis Guild / Enclave"]
-license = "MIT"
 
 [dependencies]
 bb_proof_verification = { git = "https://github.com/AztecProtocol/aztec-packages/", tag = "v3.0.0-nightly.20260102", directory = "barretenberg/noir/bb_proof_verification" }
