@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "@aztec/bb.js": "3.0.0-nightly.20260102",
-    "@noir-lang/noir_js": "1.0.0-beta.18",
+    "@noir-lang/noir_js": "1.0.0-beta.16",
     "@enclave-e3/wasm": "workspace:*",
     "@enclave-e3/contracts": "workspace:*",
     "comlink": "^4.4.2",

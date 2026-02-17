@@ -39,6 +39,16 @@ fn json_value_to_input_value(v: &serde_json::Value) -> Result<InputValue, ZkErro
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(InputValue::Vec(items));
     }
+    if let Some(n) = v.as_i64() {
+        return FieldElement::try_from_str(&n.to_string())
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", n)));
+    }
+    if let Some(n) = v.as_u64() {
+        return FieldElement::try_from_str(&n.to_string())
+            .map(InputValue::Field)
+            .ok_or_else(|| ZkError::SerializationError(format!("invalid field element: {}", n)));
+    }
     if let Some(obj) = v.as_object() {
         if let Some(coeffs) = obj.get("coefficients") {
             let coeff_arr = coeffs
