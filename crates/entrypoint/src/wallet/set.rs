@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_evm::EthPrivateKeyRepositoryFactory;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::{datastore::get_repositories, rand::generate_random_bytes};
 
@@ -20,7 +21,7 @@ pub fn validate_private_key(input: &String) -> Result<()> {
     Ok(())
 }
 
-pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
+pub async fn execute(config: &AppConfig, input: Zeroizing<String>) -> Result<()> {
     let cipher = Cipher::from_file(config.key_file()).await?;
     let encrypted = cipher.encrypt_data(&mut input.as_bytes().to_vec())?;
     let repositories = get_repositories(config)?;
@@ -32,8 +33,9 @@ pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
 }
 
 pub async fn autowallet(config: &AppConfig) -> Result<()> {
-    let bytes = generate_random_bytes(32);
-    let input = hex::encode(&bytes);
+    let mut bytes = generate_random_bytes(32);
+    let input = Zeroizing::new(hex::encode(&bytes));
+    bytes.zeroize();
     execute(config, input).await?;
     Ok(())
 }

@@ -7,6 +7,7 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
+use zeroize::Zeroizing;
 
 use crate::{password_delete, password_set};
 
@@ -16,7 +17,7 @@ pub enum PasswordCommands {
     Set {
         /// The new password
         #[arg(short, long)]
-        password: Option<String>,
+        password: Option<Zeroizing<String>>,
     },
 
     /// Delete the current password

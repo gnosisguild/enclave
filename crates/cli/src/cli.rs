@@ -14,7 +14,7 @@ use crate::noir::NoirCommands;
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{config_set, init, net, noir, password, purge_all, rev, wallet};
+use crate::{init, net, noir, password, purge_all, rev, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -99,19 +99,19 @@ impl Cli {
                         setup_simple_tracing(log_level);
                         init::execute(path, template, skip_cleanup, self.verbose > 0).await?
                     },
-                    Commands::ConfigSet {
-                        rpc_url,
-                        eth_address,
-                        password,
-                        skip_eth,
-                        net_keypair,
-                        generate_net_keypair,
-                    } => {
-                        config_set::execute(
+                    Commands::Ciphernode {
+                        command: CiphernodeCommands::Setup {
                             rpc_url,
-                            eth_address,
                             password,
-                            skip_eth,
+                            private_key,
+                            net_keypair,
+                            generate_net_keypair,
+                        }
+                    } => {
+                        ciphernode::setup::execute(
+                            rpc_url,
+                            password,
+                            private_key,
                             net_keypair,
                             generate_net_keypair,
                         )
@@ -120,11 +120,10 @@ impl Cli {
                     }
                     Commands::Start { .. } => {
                         println!("No configuration found. Setting up enclave configuration...");
-                        config_set::execute(
+                        ciphernode::setup::execute(
                             None,
                             None,
                             None,
-                            false,
                             None,
                             false,
                         )
@@ -135,7 +134,7 @@ impl Cli {
                         noir::execute_without_config(command).await?
                     },
                     _ => bail!(
-                        "Configuration file not found. Run `enclave config-set` to create a configuration."
+                        "Configuration file not found. Run `enclave ciphernode setup` to create a configuration."
                     ),
                 };
                 return Ok(());
@@ -171,9 +170,6 @@ impl Cli {
             Commands::Program { command } => program::execute(command, &config).await?,
             Commands::PurgeAll => {
                 purge_all::execute().await?;
-            }
-            Commands::ConfigSet { .. } => {
-                bail!("Cannot run `enclave config-set` when a configuration already exists.");
             }
             Commands::Nodes { command } => {
                 nodes::execute(
@@ -299,33 +295,6 @@ pub enum Commands {
     Ciphernode {
         #[command(subcommand)]
         command: CiphernodeCommands,
-    },
-
-    /// Set configuration values (similar to solana config set)
-    ConfigSet {
-        /// An rpc url for enclave to connect to
-        #[arg(long = "rpc-url", short = 'r')]
-        rpc_url: Option<String>,
-
-        /// An Ethereum address that enclave should use to identify the node
-        #[arg(long = "eth-address", short = 'e')]
-        eth_address: Option<String>,
-
-        /// The password
-        #[arg(short, long)]
-        password: Option<String>,
-
-        /// Skip asking for eth
-        #[arg(long = "skip-eth", short = 's')]
-        skip_eth: bool,
-
-        /// The network private key (ed25519)
-        #[arg(long = "net-keypair", short = 'n')]
-        net_keypair: Option<String>,
-
-        /// Generate a new network keypair
-        #[arg(long = "generate-net-keypair", short = 'g')]
-        generate_net_keypair: bool,
     },
 
     /// Manage multiple node processes together as a set

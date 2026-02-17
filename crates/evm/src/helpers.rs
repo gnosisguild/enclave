@@ -35,6 +35,7 @@ use e3_data::Repository;
 use e3_utils::{retry_with_backoff, RetryError};
 use std::{env, future::Future, sync::Arc};
 use tracing::info;
+use zeroize::{Zeroize, Zeroizing};
 
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -200,8 +201,7 @@ pub async fn load_signer_from_repository(
         .ok_or_else(|| anyhow::anyhow!("No private key found in repository"))?;
 
     let decrypted = cipher.decrypt_data(&encrypted_key)?;
-    let private_key = String::from_utf8(decrypted)?;
-
+    let private_key = Zeroizing::new(String::from_utf8(decrypted)?);
     private_key.parse().map_err(Into::into)
 }
 

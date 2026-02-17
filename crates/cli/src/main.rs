@@ -10,7 +10,6 @@ use tracing::info;
 
 mod ciphernode;
 mod cli;
-mod config_set;
 pub mod helpers;
 mod init;
 pub mod net;

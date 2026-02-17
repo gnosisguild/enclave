@@ -8,19 +8,28 @@ use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
 use e3_entrypoint::wallet::set::validate_private_key;
+use zeroize::Zeroizing;
 
-pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
-    let input = if let Some(private_key) = private_key {
-        validate_private_key(&private_key)?;
-        private_key
+pub fn ask_for_private_key(given_key: Option<Zeroizing<String>>) -> Result<Zeroizing<String>> {
+    let key = if let Some(given_key) = given_key {
+        validate_private_key(&given_key)?;
+        given_key
     } else {
-        Password::with_theme(&ColorfulTheme::default())
-            .with_prompt("Enter your Ethereum private key")
-            .validate_with(validate_private_key)
-            .interact()?
-            .trim()
-            .to_string()
+        Zeroizing::new(
+            Password::with_theme(&ColorfulTheme::default())
+                .with_prompt("Enter your Ethereum private key")
+                .validate_with(validate_private_key)
+                .interact()?
+                .trim()
+                .to_string(),
+        )
     };
+
+    Ok(key)
+}
+
+pub async fn execute(config: &AppConfig, private_key: Option<Zeroizing<String>>) -> Result<()> {
+    let input = ask_for_private_key(private_key)?;
 
     e3_entrypoint::wallet::set::execute(config, input).await?;
 

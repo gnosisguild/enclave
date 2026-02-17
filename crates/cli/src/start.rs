@@ -13,7 +13,6 @@ use tracing::{info, instrument};
 #[instrument(skip_all)]
 pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
-
     let Some(address) = config.address() else {
         return Err(anyhow!("You must provide an address"));
     };

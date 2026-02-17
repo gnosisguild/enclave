@@ -7,9 +7,10 @@
 use crate::get_enclave_event_bus;
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::{anyhow, Result};
+use e3_aggregator::PublicKeyRepositoryFactory;
 use e3_data::{
-    CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore, SledSequenceIndex,
-    SledStore,
+    CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore,
+    RepositoriesFactory, SledSequenceIndex, SledStore,
 };
 use e3_events::hlc::Hlc;
 use e3_events::{

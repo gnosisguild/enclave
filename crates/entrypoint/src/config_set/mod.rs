@@ -38,19 +38,17 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
 }
 
 #[instrument(name = "app", skip_all)]
-pub fn execute(
-    rpc_url: String,
-    eth_address: Option<String>,
-    config_dir: &PathBuf,
-) -> Result<AppConfig> {
+pub fn execute(rpc_url: String, config_dir: &PathBuf, address: &Address) -> Result<AppConfig> {
     fs::create_dir_all(&config_dir)?;
 
     let config_path = config_dir.join("enclave.config.yaml");
 
     let config_content = format!(
         r#"---
+node:
+  address: "{}"
+
 # Enclave Configuration File
-{}
 chains:
   - name: "devnet"
     rpc_url: "{}"
@@ -65,10 +63,7 @@ chains:
         address: "{}"
         deploy_block: {}
 "#,
-        eth_address.map_or(String::new(), |addr| format!(
-            "# Ethereum Account Configuration\naddress: \"{}\"",
-            addr
-        )),
+        address,
         rpc_url,
         get_contract_info("Enclave")?.address,
         get_contract_info("Enclave")?.deploy_block,

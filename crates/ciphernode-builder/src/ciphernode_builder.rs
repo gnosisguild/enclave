@@ -7,7 +7,7 @@
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
 use alloy::signers::local::PrivateKeySigner;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use derivative::Derivative;
 use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
 use e3_aggregator::CommitteeFinalizer;
@@ -413,6 +413,16 @@ impl CiphernodeBuilder {
         // Now we add write support as store depends on event system
         let mut provider_cache =
             provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
+
+        // Ensure that the private key matches the given address in the config
+        let signer = provider_cache.ensure_signer().await?;
+        if signer.address().to_string() != addr {
+            bail!(
+                "config address {:?} does not match stored account {:?}!",
+                addr,
+                signer.address()
+            );
+        }
 
         // Use the configured backend directly
         let default_backend = self.sortition_backend.clone();

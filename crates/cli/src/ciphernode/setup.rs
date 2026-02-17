@@ -5,26 +5,36 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
+use alloy::primitives::Address;
+use alloy::signers::local::PrivateKeySigner;
+use anyhow::Context;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input};
 use e3_entrypoint::config_set;
 use tracing::instrument;
+use zeroize::Zeroizing;
 
-use crate::net;
 use crate::net::{NetCommands, NetKeypairCommands};
-use crate::password;
-use crate::password::PasswordCommands;
+use crate::password_set::ask_for_password;
+use crate::wallet_set::ask_for_private_key;
+use crate::{net, password_set};
+
+fn eth_address_from_private_key(private_key: &str) -> Result<Address> {
+    let signer = PrivateKeySigner::from_str(private_key).context("invalid private key")?;
+    Ok(signer.address())
+}
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
     rpc_url: Option<String>,
-    eth_address: Option<String>,
-    password: Option<String>,
-    skip_eth: bool,
+    password: Option<Zeroizing<String>>,
+    private_key: Option<Zeroizing<String>>,
     net_keypair: Option<String>,
     generate_net_keypair: bool,
 ) -> Result<()> {
+    let pw = ask_for_password(password)?;
     let rpc_url = match rpc_url {
         Some(url) => {
             config_set::validate_rpc_url(&url)?;
@@ -37,27 +47,8 @@ pub async fn execute(
             .interact_text()?,
     };
 
-    let eth_address: Option<String> = match eth_address {
-        Some(address) => {
-            config_set::validate_eth_address(&address)?;
-            Some(address)
-        }
-        None => {
-            if skip_eth {
-                None
-            } else {
-                Input::with_theme(&ColorfulTheme::default())
-                    .with_prompt("Enter your Ethereum address (press Enter to skip)")
-                    .allow_empty(true)
-                    .validate_with(config_set::validate_eth_address)
-                    .interact()
-                    .ok()
-                    .map(|s| if s.is_empty() { None } else { Some(s) })
-                    .flatten()
-            }
-        }
-    };
-
+    let private_key = ask_for_private_key(private_key)?;
+    let address = eth_address_from_private_key(&private_key)?;
     let default_config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
         .join("enclave");
@@ -95,25 +86,11 @@ pub async fn execute(
     };
 
     // Execute
+    let config = config_set::execute(rpc_url, &config_dir, &address)?;
 
-    let config = config_set::execute(rpc_url, eth_address, &config_dir)?;
+    password_set::execute(&config, Some(pw)).await?;
 
-    for i in 0..3 {
-        if password::execute(
-            PasswordCommands::Set {
-                password: password.clone(),
-            },
-            &config,
-        )
-        .await
-        .is_ok()
-        {
-            break;
-        }
-        if i == 2 {
-            return Err(anyhow::anyhow!("Failed after 3 attempts"));
-        }
-    }
+    e3_entrypoint::wallet::set::execute(&config, private_key).await?;
 
     net::execute(
         NetCommands::Keypair {
