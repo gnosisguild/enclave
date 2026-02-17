@@ -22,6 +22,7 @@ env:
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.86.0
   NOIR_TOOLCHAIN: v1.0.0-beta.15
+  BB_VERSION: 3.0.0-nightly.20251104
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -574,6 +575,15 @@ jobs:
         uses: noir-lang/noirup@v0.1.4
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
+
+      - name: Install Barretenberg (bb)
+        run: |
+          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+          sudo mv "$BB_BIN" /usr/local/bin/bb
+          chmod +x /usr/local/bin/bb
+          bb --version
 
       - name: Check formatting
         run: ./scripts/lint-circuits.sh
