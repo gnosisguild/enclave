@@ -39,8 +39,6 @@ pub struct GeneratedShares {
 
 pub fn generate_shares_hash_map(
     trbfv_config: &TrBFVConfig,
-    esi_per_ct: u64,
-    error_size: &ArcBytes,
     crp: &CommonRandomPoly,
     rng: &SharedRng,
     cipher: &Cipher,
@@ -62,22 +60,28 @@ pub fn generate_shares_hash_map(
 
     let mut shares_hash_map = HashMap::new();
     for party_id in 0u64..threshold_n as u64 {
-        let GenEsiSssResponse { esi_sss } = gen_esi_sss(
-            &rng,
-            &cipher,
-            GenEsiSssRequest {
-                esi_per_ct,
-                error_size: error_size.clone(),
-                trbfv_config: trbfv_config.clone(),
-            },
-        )?;
-
-        let GenPkShareAndSkSssResponse { sk_sss, pk_share } = gen_pk_share_and_sk_sss(
+        let GenPkShareAndSkSssResponse {
+            sk_sss,
+            pk_share,
+            e_sm_raw,
+            ..
+        } = gen_pk_share_and_sk_sss(
             &rng,
             &cipher,
             GenPkShareAndSkSssRequest {
                 trbfv_config: trbfv_config.clone(),
                 crp: ArcBytes::from_bytes(&crp.to_bytes()),
+                lambda: 40,
+                num_ciphertexts: 1,
+            },
+        )?;
+
+        let GenEsiSssResponse { esi_sss } = gen_esi_sss(
+            &rng,
+            &cipher,
+            GenEsiSssRequest {
+                trbfv_config: trbfv_config.clone(),
+                e_sm_raw: ArcBytes::from_bytes(&e_sm_raw.access_raw(&cipher)?),
             },
         )?;
 

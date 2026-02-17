@@ -24,12 +24,10 @@ use e3_trbfv::{
         calculate_threshold_decryption, CalculateThresholdDecryptionRequest,
         CalculateThresholdDecryptionResponse,
     },
-    helpers::calculate_error_size,
     TrBFVConfig,
 };
 use e3_utils::{to_ordered_vec, ArcBytes};
 use fhe_traits::Serialize;
-use num_bigint::BigUint;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
@@ -51,21 +49,10 @@ async fn test_trbfv_isolation() -> Result<()> {
     // E3Parameters
     let threshold_m = 2;
     let threshold_n = 5;
-    let esi_per_ct = 3;
-    // WARNING: INSECURE SECURITY PARAMETER LAMBDA.
-    // This is just for INSECURE parameter set.
-    // This is not secure and should not be used in production.
-    // For production use lambda = 80.
-    let lambda = 2;
+
     let seed = create_seed_from_u64(123);
 
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
-    let error_size = ArcBytes::from_bytes(&BigUint::to_bytes_be(&calculate_error_size(
-        params_raw.clone(),
-        threshold_n,
-        esi_per_ct,
-        lambda,
-    )?));
 
     let trbfv_config = TrBFVConfig::new(params, threshold_n as u64, threshold_m as u64);
     let crp_raw = create_crp(
@@ -74,14 +61,8 @@ async fn test_trbfv_isolation() -> Result<()> {
     );
 
     // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
-    let generated = usecase_helpers::generate_shares_hash_map(
-        &trbfv_config,
-        esi_per_ct as u64,
-        &error_size,
-        &crp_raw,
-        &rng,
-        &cipher,
-    )?;
+    let generated =
+        usecase_helpers::generate_shares_hash_map(&trbfv_config, &crp_raw, &rng, &cipher)?;
 
     let pubkey =
         usecase_helpers::get_public_key(&generated.shares, trbfv_config.params(), &crp_raw)?;
