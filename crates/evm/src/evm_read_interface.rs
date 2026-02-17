@@ -6,6 +6,7 @@
 
 use crate::events::{EnclaveEvmEvent, EvmEventProcessor, EvmLog};
 use crate::helpers::EthProvider;
+use crate::log_fetcher::{backfill_to_head, fetch_logs_chunked, process_log, TimestampTracker};
 use crate::HistoricalSyncComplete;
 use actix::prelude::*;
 use actix::{Addr, Recipient};
@@ -23,6 +24,8 @@ use std::collections::{HashMap, HashSet};
 use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{debug, error, info, instrument, warn};
+
+const MAX_RECONNECT_DELAY_SECS: u64 = 60;
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
@@ -43,6 +46,7 @@ pub struct EvmReadInterfaceState {
 pub struct Filters {
     historical: Filter,
     current: Filter,
+    start_block: u64,
 }
 
 impl Filters {
@@ -57,6 +61,7 @@ impl Filters {
         Self {
             historical,
             current,
+            start_block,
         }
     }
 
@@ -122,7 +127,6 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.set_mailbox_capacity(MAILBOX_LIMIT);
 
-        // let reader_addr = ctx.address();
         let bus = self.bus.clone();
         let next = self.next.clone();
         let filters = self.filters.clone();
@@ -132,7 +136,6 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
             return;
         };
 
-        // let extractor = self.extractor;
         let Some(shutdown) = self.shutdown_rx.take() else {
             bus.err(EType::Evm, anyhow!("shutdown already called"));
             return;
@@ -145,9 +148,6 @@ impl<P: Provider + Clone + 'static> Actor for EvmReadInterface<P> {
     }
 }
 
-// TODO: split this up into:
-// 1. historical request (will finish)
-// 2. current listener (run indefinitely)
 #[instrument(name = "evm_interface", skip_all)]
 async fn stream_from_evm<P: Provider + Clone + 'static>(
     provider: EthProvider<P>,
@@ -158,69 +158,151 @@ async fn stream_from_evm<P: Provider + Clone + 'static>(
 ) {
     let chain_id = provider.chain_id();
     let provider_ref = provider.provider();
-    let mut last_id: Option<CorrelationId> = None;
     let mut timestamp_tracker = TimestampTracker::new();
-    // Historical events
-    match provider_ref.get_logs(&filters.historical).await {
-        Ok(historical_logs) => {
-            info!("Fetched {} historical events", historical_logs.len());
-            for log in historical_logs {
-                let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
-                let evt = EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp));
-                last_id = Some(evt.get_id());
-                debug!("Sending event({})", evt.get_id());
-                next.do_send(evt)
-            }
-        }
+
+    // Determine chain head for historical fetch
+    let latest_block = match provider_ref.get_block_number().await {
+        Ok(bn) => bn,
         Err(e) => {
-            error!("Failed to fetch historical events: {}", e);
+            error!(chain_id, error = %e, "Failed to get latest block number");
             bus.err(EType::Evm, anyhow!(e));
             return;
         }
-    }
-    let historical_sync_event = HistoricalSyncComplete::new(chain_id, last_id);
-    info!(
-        "Historical Sync Complete event({})",
-        historical_sync_event.get_id()
-    );
-    next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
-        historical_sync_event,
-    ));
+    };
 
-    info!("Subscribing to live events");
-    match provider_ref.subscribe_logs(&filters.current).await {
-        Ok(subscription) => {
-            let id: B256 = subscription.local_id().clone();
-            let mut stream = subscription.into_stream();
-
-            loop {
-                select! {
-                    maybe_log = stream.next() => {
-                        match maybe_log {
-                            Some(log) => {
-                                let timestamp = timestamp_tracker.get(provider_ref, log.block_number).await;
-                                next.do_send(EnclaveEvmEvent::Log(EvmLog::new(log, chain_id, timestamp)))
-                            }
-                            None => break, // Stream ended
-                        }
-                    }
-                    _ = &mut shutdown => {
-                        warn!("Received shutdown signal, stopping EVM stream");
-                        match provider_ref.unsubscribe(id).await {
-                            Ok(_) => info!("Unsubscribed successfully from EVM event stream"),
-                            Err(err) => error!("Cannot unsubscribe from EVM event stream: {}", err),
-                        };
-                        break;
-                    }
-                }
-            }
+    // Historical events — chunked to respect RPC block-range limits
+    let last_id = match fetch_logs_chunked(
+        provider_ref,
+        &filters.historical,
+        filters.start_block,
+        latest_block,
+        chain_id,
+        &next,
+        &mut timestamp_tracker,
+    )
+    .await
+    {
+        Ok(id) => {
+            info!(chain_id, "Historical sync succeeded");
+            id
         }
         Err(e) => {
-            bus.err(EType::Evm, anyhow!("{}", e));
+            error!(chain_id, error = %e, "Failed to fetch historical events — node cannot operate without full state, exiting");
+            bus.err(EType::Evm, anyhow!(e));
+            return;
+        }
+    };
+
+    next.do_send(EnclaveEvmEvent::HistoricalSyncComplete(
+        HistoricalSyncComplete::new(chain_id, last_id),
+    ));
+
+    // Live subscription with gap-fill on connect/reconnect
+    subscribe_live_events(
+        provider_ref,
+        &next,
+        &mut shutdown,
+        bus,
+        &filters.current,
+        chain_id,
+        &mut timestamp_tracker,
+        latest_block,
+    )
+    .await;
+}
+
+async fn subscribe_live_events<P: Provider + Clone + 'static>(
+    provider: &P,
+    next: &EvmEventProcessor,
+    shutdown: &mut oneshot::Receiver<()>,
+    bus: &BusHandle,
+    filter: &Filter,
+    chain_id: u64,
+    timestamp_tracker: &mut TimestampTracker,
+    mut last_block: u64,
+) {
+    let mut reconnect_attempt: u32 = 0;
+
+    loop {
+        if reconnect_attempt > 0 {
+            let delay_secs = (2u64.pow(reconnect_attempt.min(6))).min(MAX_RECONNECT_DELAY_SECS);
+            warn!(
+                chain_id,
+                reconnect_attempt, delay_secs, "Reconnecting to live event stream"
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+        }
+
+        if shutdown.try_recv().is_ok() {
+            info!("Shutdown signal received, stopping EVM stream");
+            return;
+        }
+
+        // Backfill any blocks missed since last_block. This handles:
+        //   - Blocks mined between historical fetch completion and first subscription
+        //   - Blocks mined during reconnection downtime
+        //   - Geth's eth_subscribe silently ignoring fromBlock
+        match backfill_to_head(
+            provider,
+            filter,
+            chain_id,
+            next,
+            timestamp_tracker,
+            &mut last_block,
+        )
+        .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                warn!(chain_id, error = %e, "Gap backfill failed, will retry");
+                reconnect_attempt += 1;
+                continue;
+            }
+        }
+
+        match provider.subscribe_logs(filter).await {
+            Ok(subscription) => {
+                let sub_id: B256 = subscription.local_id().clone();
+                let mut stream = subscription.into_stream();
+                reconnect_attempt = 0;
+                info!(chain_id, "Live event subscription active");
+
+                loop {
+                    select! {
+                        maybe_log = stream.next() => {
+                            match maybe_log {
+                                Some(log) => {
+                                    if let Some(bn) = log.block_number {
+                                        last_block = last_block.max(bn);
+                                    }
+                                    process_log(provider, log, chain_id, next, timestamp_tracker).await;
+                                }
+                                None => {
+                                    warn!(chain_id, "Live event stream ended, will reconnect");
+                                    break;
+                                }
+                            }
+                        }
+                        _ = &mut *shutdown => {
+                            info!("Shutdown signal received, stopping EVM stream");
+                            match provider.unsubscribe(sub_id).await {
+                                Ok(_) => info!("Unsubscribed successfully from EVM event stream"),
+                                Err(err) => error!(chain_id, error = %err, "Cannot unsubscribe from EVM event stream"),
+                            };
+                            return;
+                        }
+                    }
+                }
+
+                reconnect_attempt += 1;
+            }
+            Err(e) => {
+                error!(chain_id, reconnect_attempt, error = %e, "Failed to subscribe to live events");
+                bus.err(EType::Evm, anyhow!("{}", e));
+                reconnect_attempt += 1;
+            }
         }
     }
-
-    info!("Exiting stream loop");
 }
 
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P> {
@@ -232,40 +314,5 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmReadInterface<P
                 let _ = shutdown.send(());
             }
         }
-    }
-}
-
-/// Cache utility to keep track of timestamps
-struct TimestampTracker {
-    current: Option<(u64, u64)>, // (block_number, timestamp)
-}
-
-impl TimestampTracker {
-    fn new() -> Self {
-        Self { current: None }
-    }
-
-    async fn get<P: Provider>(&mut self, provider: &P, block_number: Option<u64>) -> u64 {
-        let Some(bn) = block_number else {
-            error!("BLOCK NUMBER NOT FOUND ON LOG!");
-            return 0;
-        };
-
-        if let Some((cached_bn, ts)) = self.current {
-            if bn == cached_bn {
-                return ts;
-            }
-        }
-
-        let ts = provider
-            .get_block_by_number(bn.into())
-            .await
-            .ok()
-            .flatten()
-            .map(|b| b.header.timestamp)
-            .unwrap_or(0);
-
-        self.current = Some((bn, ts));
-        ts
     }
 }

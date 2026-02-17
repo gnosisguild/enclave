@@ -16,6 +16,7 @@ mod evm_read_interface;
 mod evm_router;
 mod fix_historical_order;
 pub mod helpers;
+mod log_fetcher;
 mod repo;
 mod sync_start_extractor;
 
