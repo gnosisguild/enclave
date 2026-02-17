@@ -233,10 +233,11 @@ fn create_behaviour(
         max_provided_keys: 1024,
     };
     let store = MemoryStore::with_config(peer_id, store_config);
-    // Let libp2p auto-detect whether this node should be a Server or Client
-    // based on whether it's publicly reachable (e.g. not behind NAT)
+    // Force Server mode: in a private network all nodes should fully participate
+    // in DHT routing. Auto-detect (None) would classify containerized/NAT'd nodes
+    // as Clients, preventing peer discovery and record replication.
     let mut kademlia = KademliaBehaviour::with_config(peer_id, store, config);
-    kademlia.set_mode(None);
+    kademlia.set_mode(Some(kad::Mode::Server));
 
     Ok(NodeBehaviour {
         gossipsub,
@@ -643,7 +644,11 @@ fn handle_put_record(
     match swarm
         .behaviour_mut()
         .kademlia
-        .put_record(record, Quorum::Majority)
+        // Quorum::Majority calculates quorum from the Kademlia routing table size,
+        // not the actual cluster size. With a routing table of ~21 entries,
+        // it required 11 peers to acknowledge the record, which is impossible
+        // in a 4-node cluster.
+        .put_record(record, Quorum::One)
     {
         Ok(qid) => {
             // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
