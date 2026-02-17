@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::fixtures_dir;
 use e3_config::BBPath;
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use std::path::PathBuf;
@@ -33,6 +32,41 @@ pub async fn find_bb() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Root of the compiled circuit artifacts: `{workspace}/circuits/bin/`.
+fn circuits_build_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("circuits")
+        .join("bin")
+}
+
+pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_name: &str) {
+    let target_dir = circuits_build_root().join(group).join("target");
+    let json_path = target_dir.join(format!("{circuit_name}.json"));
+    let vk_path = target_dir.join(format!("{circuit_name}.vk"));
+
+    assert!(
+        json_path.exists(),
+        "compiled circuit not found: {} (run `pnpm build:circuits` to compile)",
+        json_path.display()
+    );
+    assert!(
+        vk_path.exists(),
+        "verification key not found: {} (run `pnpm build:circuits` to compile)",
+        vk_path.display()
+    );
+
+    let circuit_dir = backend.circuits_dir.join(group).join(circuit_name);
+    fs::create_dir_all(&circuit_dir).await.unwrap();
+    fs::copy(&json_path, circuit_dir.join(format!("{circuit_name}.json")))
+        .await
+        .unwrap();
+    fs::copy(&vk_path, circuit_dir.join(format!("{circuit_name}.vk")))
+        .await
+        .unwrap();
 }
 
 pub async fn find_anvil() -> bool {
@@ -81,39 +115,6 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
     std::os::unix::fs::symlink(bb, &backend.bb_binary).unwrap();
 
     (backend, temp)
-}
-
-/// Copies .json and .vk fixtures into the backend circuits layout.
-/// Panics if fixtures are missing — run `pnpm sync:fixtures` to populate.
-pub async fn setup_circuit_fixtures(
-    backend: &ZkBackend,
-    circuit_path: &[&str],
-    fixture_name: &str,
-) {
-    let fixtures = fixtures_dir();
-    let json_path = fixtures.join(format!("{fixture_name}.json"));
-    let vk_path = fixtures.join(format!("{fixture_name}.vk"));
-    assert!(
-        json_path.exists(),
-        "missing circuit fixture: {} (run `pnpm sync:fixtures` to copy from circuits target)",
-        json_path.display()
-    );
-    assert!(
-        vk_path.exists(),
-        "missing verification key fixture: {}",
-        vk_path.display()
-    );
-
-    let circuit_dir = circuit_path
-        .iter()
-        .fold(backend.circuits_dir.clone(), |p, seg| p.join(seg));
-    fs::create_dir_all(&circuit_dir).await.unwrap();
-    fs::copy(json_path, circuit_dir.join(format!("{fixture_name}.json")))
-        .await
-        .unwrap();
-    fs::copy(vk_path, circuit_dir.join(format!("{fixture_name}.vk")))
-        .await
-        .unwrap();
 }
 
 /// Lightweight backend for tests that don't need a real bb binary.

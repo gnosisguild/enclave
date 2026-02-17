@@ -17,7 +17,7 @@ use alloy::{
     rpc::types::TransactionRequest,
     sol,
 };
-use common::{find_anvil, find_bb, setup_circuit_fixtures, setup_test_prover};
+use common::{find_anvil, find_bb, setup_compiled_circuit, setup_test_prover};
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{Provable, ZkProver};
@@ -71,7 +71,7 @@ async fn test_pk_bfv_onchain_verification() {
 
     let preset = BfvPreset::InsecureThreshold512;
     let (backend, _temp) = setup_test_prover(&bb).await;
-    setup_circuit_fixtures(&backend, &["dkg", "pk"], "pk").await;
+    setup_compiled_circuit(&backend, "dkg", "pk").await;
 
     let sample = match PkCircuitData::generate_sample(preset) {
         Ok(s) => s,

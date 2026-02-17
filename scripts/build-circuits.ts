@@ -81,8 +81,11 @@ class NoirCircuitBuilder {
         return result
       }
 
-      if (this.options.clean && existsSync(this.options.outputDir!)) {
-        rmSync(this.options.outputDir!, { recursive: true })
+      if (this.options.clean) {
+        if (existsSync(this.options.outputDir!)) {
+          rmSync(this.options.outputDir!, { recursive: true })
+        }
+        this.cleanTargetDirs(circuits)
       }
       mkdirSync(this.options.outputDir!, { recursive: true })
 
@@ -117,6 +120,33 @@ class NoirCircuitBuilder {
       execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] })
     } catch {
       throw new Error(`${name} is not installed or not in PATH`)
+    }
+  }
+
+  private cleanTargetDirs(circuits: CircuitInfo[]): void {
+    const cleaned = new Set<string>()
+    for (const circuit of circuits) {
+      // Clean group-level target (e.g. circuits/bin/dkg/target)
+      const groupTarget = join(this.circuitsDir, circuit.group, 'target')
+      if (!cleaned.has(groupTarget) && existsSync(groupTarget)) {
+        rmSync(groupTarget, { recursive: true })
+        cleaned.add(groupTarget)
+      }
+      // Clean circuit-level target (e.g. circuits/bin/dkg/pk/target)
+      const circuitTarget = join(circuit.path, 'target')
+      if (!cleaned.has(circuitTarget) && existsSync(circuitTarget)) {
+        rmSync(circuitTarget, { recursive: true })
+        cleaned.add(circuitTarget)
+      }
+    }
+    // Clean root-level target (circuits/bin/target)
+    const rootTarget = join(this.circuitsDir, 'target')
+    if (existsSync(rootTarget)) {
+      rmSync(rootTarget, { recursive: true })
+      cleaned.add(rootTarget)
+    }
+    if (cleaned.size > 0) {
+      console.log(`   🧹 Cleaned ${cleaned.size} stale target dir(s)`)
     }
   }
 
