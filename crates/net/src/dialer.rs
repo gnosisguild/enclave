@@ -4,15 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Context;
 use anyhow::Result;
 use futures::future::join_all;
 use libp2p::{
-    multiaddr::Protocol,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
     Multiaddr,
 };
-use std::net::ToSocketAddrs;
 use tokio::select;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{sleep, Duration};
@@ -67,17 +64,20 @@ pub async fn dial_peers(
     Ok(())
 }
 
-/// Attempt a connection with retrys to a multiaddr return an error if the connection could not be resolved after the retries.
+/// Attempt a connection with retries to a multiaddr.
 async fn attempt_connection(
     cmd_tx: &mpsc::Sender<NetCommand>,
     event_tx: &broadcast::Sender<NetEvent>,
     multiaddr: &Multiaddr,
 ) -> Result<(), RetryError> {
     let mut event_rx = event_tx.subscribe();
-    let multi = get_resolved_multiaddr(multiaddr).map_err(to_retry)?;
-    let opts: DialOpts = multi.clone().into();
+    let opts: DialOpts = multiaddr.clone().into();
     let dial_connection = opts.connection_id();
-    trace!("Dialing: '{}' with connection '{}'", multi, dial_connection);
+    trace!(
+        "Dialing: '{}' with connection '{}'",
+        multiaddr,
+        dial_connection
+    );
     cmd_tx
         .send(NetCommand::Dial(opts))
         .await
@@ -146,72 +146,4 @@ async fn wait_for_connection(
             }
         }
     }
-}
-
-/// Convert a Multiaddr to use a specific ip address with the ip4 or ip6 protocol
-fn dns_to_ip_addr(original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
-    let ip = ip_str.parse()?;
-    let mut new_addr = Multiaddr::empty();
-    let mut skip_next = false;
-
-    for proto in original.iter() {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-
-        match proto {
-            Protocol::Dns4(_) | Protocol::Dns6(_) => {
-                new_addr.push(Protocol::Ip4(ip));
-                skip_next = false;
-            }
-            _ => new_addr.push(proto),
-        }
-    }
-
-    Ok(new_addr)
-}
-
-/// Detect the DNS host from a multiaddr
-fn extract_dns_host(addr: &Multiaddr) -> Option<String> {
-    // Iterate through the protocols in the multiaddr
-    for proto in addr.iter() {
-        match proto {
-            // Match on DNS4 or DNS6 protocols
-            Protocol::Dns4(hostname) | Protocol::Dns6(hostname) => {
-                return Some(hostname.to_string())
-            }
-            _ => continue,
-        }
-    }
-    None
-}
-
-/// If the Multiaddr uses a DNS domain look it up and return a multiaddr that uses a resolved IP
-/// address
-fn get_resolved_multiaddr(value: &Multiaddr) -> Result<Multiaddr> {
-    if let Some(domain) = extract_dns_host(value) {
-        let ip = resolve_ipv4(&domain)?;
-        let multi = dns_to_ip_addr(value, &ip)?;
-        return Ok(multi);
-    } else {
-        Ok(value.clone())
-    }
-}
-
-fn resolve_ipv4(domain: &str) -> Result<String> {
-    let addr = format!("{}:0", domain)
-        .to_socket_addrs()?
-        .find(|addr| addr.ip().is_ipv4())
-        .context("no IPv4 addresses found")?;
-    Ok(addr.ip().to_string())
-}
-
-// For if we wish to resolve ipv6 as well (currently disabled)
-fn _resolve_ipv6(domain: &str) -> Result<String> {
-    let addr = format!("{}:0", domain)
-        .to_socket_addrs()?
-        .find(|addr| addr.ip().is_ipv6())
-        .context("no IPv6 addresses found")?;
-    Ok(addr.ip().to_string())
 }

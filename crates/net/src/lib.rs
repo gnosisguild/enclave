@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod cid;
+mod correlator;
 mod dialer;
 mod document_publisher;
 pub mod events;
@@ -16,9 +17,9 @@ mod repo;
 
 use std::sync::Arc;
 
-use actix::{Addr, Recipient};
+use actix::Recipient;
 use anyhow::bail;
-pub use cid::Cid;
+pub use cid::ContentHash;
 pub use document_publisher::*;
 use e3_crypto::Cipher;
 use e3_data::Repository;
@@ -41,7 +42,7 @@ pub async fn setup_net(
     repository: Repository<Vec<u8>>,
     eventstore: impl Into<Recipient<EventStoreQueryBy<TsAgg>>>,
 ) -> anyhow::Result<(tokio::task::JoinHandle<anyhow::Result<()>>, String)> {
-    let topic = "tmp-enclave-gossip-topic";
+    let topic = "enclave-gossip";
 
     // Get existing keypair or generate a new one
     let mut bytes = match repository.read().await? {

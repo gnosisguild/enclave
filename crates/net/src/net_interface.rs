@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::correlator::Correlator;
 use anyhow::{bail, Result};
 use e3_events::CorrelationId;
 use e3_utils::{ArcBytes, OnceTake};
@@ -16,39 +17,43 @@ use libp2p::{
     kad::{
         self,
         store::{MemoryStore, MemoryStoreConfig},
-        Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryId,
-        QueryResult, Quorum, Record, RecordKey,
+        Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryResult, Quorum,
+        Record, RecordKey,
     },
     request_response::{
         self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
         Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
     },
-    swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
-    StreamProtocol, Swarm,
+    swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
+    PeerId, StreamProtocol, Swarm,
 };
 use rand::prelude::IteratorRandom;
 use std::{
     collections::HashMap,
-    fmt::Display,
-    sync::{atomic::Ordering, Arc},
-    time::Instant,
+    io::Error,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
 };
-use std::{hash::Hash, sync::atomic::AtomicBool};
-
-use std::{io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
 
-const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/kad/1.0.0");
+const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
+const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
 
-use crate::events::{
-    estimate_hashmap_size, GossipData, NetCommand, OutgoingSyncRequestFailed,
-    OutgoingSyncRequestSucceeded, SyncRequestReceived, SyncRequestValue, SyncResponseValue,
+use crate::{
+    dialer::dial_peers,
+    events::{
+        estimate_hashmap_size, GossipData, NetCommand, NetEvent, OutgoingSyncRequestFailed,
+        OutgoingSyncRequestSucceeded, PutOrStoreError, SyncRequestReceived, SyncRequestValue,
+        SyncResponseValue,
+    },
+    ContentHash,
 };
-use crate::events::{NetEvent, PutOrStoreError};
-use crate::{dialer::dial_peers, Cid};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -123,6 +128,7 @@ impl NetInterface {
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
         let mut correlator = Correlator::new();
+        let mut peer_failures = PeerFailureTracker::new();
         let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         // Subscribe to topic
@@ -152,23 +158,35 @@ impl NetInterface {
         });
 
         loop {
+            if shutdown_flag.load(Ordering::Relaxed) {
+                info!("Shutdown flag set, exiting event loop");
+                break;
+            }
+
             select! {
                  // Process commands
                 Some(command) = cmd_rx.recv() => {
                     match process_swarm_command(&mut self.swarm, &event_tx, &shutdown_flag, &mut correlator, command).await {
-                        Ok(_) => (),
+                        Ok(should_break) => {
+                            if should_break {
+                                break;
+                            }
+                        },
                         Err(e) => error!("Error processing NetCommand: {e}")
                     }
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    match process_swarm_event(&mut self.swarm, &event_tx, &shutdown_flag, &mut correlator, event).await {
+                    match process_swarm_event(&mut self.swarm, &event_tx, &shutdown_flag, &mut correlator, &mut peer_failures, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
                 }
             }
         }
+
+        info!("Event loop exited");
+        Ok(())
     }
 }
 
@@ -215,7 +233,9 @@ fn create_behaviour(
         max_provided_keys: 1024,
     };
     let store = MemoryStore::with_config(peer_id, store_config);
-    // Setup Kademlia as server so that it responds to events correctly
+    // Force Server mode: in a private network all nodes should fully participate
+    // in DHT routing. Auto-detect (None) would classify containerized/NAT'd nodes
+    // as Clients, preventing peer discovery and record replication.
     let mut kademlia = KademliaBehaviour::with_config(peer_id, store, config);
     kademlia.set_mode(Some(kad::Mode::Server));
 
@@ -234,6 +254,7 @@ async fn process_swarm_event(
     event_tx: &broadcast::Sender<NetEvent>,
     shutdown_flag: &Arc<AtomicBool>,
     correlator: &mut Correlator,
+    peer_failures: &mut PeerFailureTracker,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
     if shutdown_flag.load(Ordering::Relaxed) {
@@ -251,11 +272,20 @@ async fn process_swarm_event(
             if num_established.get() == 1 {
                 info!("Connected to {peer_id}");
             }
+            // Reset failure count on successful connection
+            peer_failures.reset(&peer_id);
             let remote_addr = endpoint.get_remote_address().clone();
             swarm
                 .behaviour_mut()
                 .kademlia
                 .add_address(&peer_id, remote_addr.clone());
+
+            // Trigger Kademlia bootstrap to discover peers beyond direct connections
+            if num_established.get() == 1 {
+                if let Err(e) = swarm.behaviour_mut().kademlia.bootstrap() {
+                    debug!("Kademlia bootstrap not possible yet: {e}");
+                }
+            }
 
             event_tx.send(NetEvent::ConnectionEstablished { connection_id })?;
         }
@@ -265,14 +295,27 @@ async fn process_swarm_event(
             error,
             connection_id,
         } => {
-            let error_str = format!("{}", error);
-            if error_str.contains("Unexpected peer ID") {
-                if let Some(expected_peer) = &peer_id {
-                    debug!("Removing stale peer {expected_peer} due to peer ID mismatch");
-                    swarm.behaviour_mut().kademlia.remove_peer(expected_peer);
+            if let Some(ref failed_peer) = peer_id {
+                let is_peer_id_mismatch = matches!(error, DialError::WrongPeerId { .. });
+                let count = peer_failures.record_failure(failed_peer);
+                let should_evict = is_peer_id_mismatch || count >= MAX_CONSECUTIVE_DIAL_FAILURES;
+
+                if should_evict {
+                    let reason = if is_peer_id_mismatch {
+                        "peer ID mismatch"
+                    } else {
+                        "consecutive dial failures"
+                    };
+                    info!("Evicting stale peer {failed_peer} ({reason}, attempts: {count})");
+                    swarm.behaviour_mut().kademlia.remove_peer(failed_peer);
+                    peer_failures.reset(failed_peer);
+                } else {
+                    debug!("Failed to dial {failed_peer} (attempt {count}/{MAX_CONSECUTIVE_DIAL_FAILURES}): {error}");
                 }
+            } else {
+                warn!("Failed to dial unknown peer: {error}");
             }
-            warn!("Failed to dial {peer_id:?}: {error}");
+
             event_tx.send(NetEvent::OutgoingConnectionError {
                 connection_id,
                 error: Arc::new(error),
@@ -298,9 +341,9 @@ async fn process_swarm_event(
             },
         )) => match result {
             Ok(GetRecordOk::FoundRecord(record)) => {
-                let key = Cid(record.record.key.to_vec());
+                let key = ContentHash(record.record.key.to_vec());
                 let record_bytes = record.record.value;
-                let check_key = Cid::from_content(&record_bytes);
+                let check_key = ContentHash::from_content(&record_bytes);
                 if check_key != key {
                     // Perhaps we do something else here too? maybe this logic should be handled upstream? Not sure...
                     return Err(anyhow::anyhow!(format!(
@@ -312,7 +355,7 @@ async fn process_swarm_event(
                 if let Some(mut query) = swarm.behaviour_mut().kademlia.query_mut(&id) {
                     query.finish();
                 }
-                let cid = correlator.expire(&id)?;
+                let cid = correlator.expire(id)?;
                 debug!("Received valid DHT record for key={:?} cid={}", key, cid);
                 event_tx.send(NetEvent::DhtGetRecordSucceeded {
                     key,
@@ -328,7 +371,7 @@ async fn process_swarm_event(
             Err(e) => {
                 error!("step={:?} error={}", step, e);
                 event_tx.send(NetEvent::DhtGetRecordError {
-                    correlation_id: correlator.expire(&id)?,
+                    correlation_id: correlator.expire(id)?,
                     error: e,
                 })?;
             }
@@ -341,10 +384,10 @@ async fn process_swarm_event(
                 ..
             },
         )) => {
-            let correlation_id = correlator.expire(&id)?;
+            let correlation_id = correlator.expire(id)?;
             match record {
                 Ok(record) => {
-                    let key = Cid(record.key.to_vec());
+                    let key = ContentHash(record.key.to_vec());
                     info!("PUT RECORD SUCCESS: {:?}", key);
                     event_tx.send(NetEvent::DhtPutRecordSucceeded {
                         key,
@@ -393,7 +436,7 @@ async fn process_swarm_event(
                 },
             ..
         })) => {
-            info!("***INCOMING REQUEST RECEIVED {}!!***", request_id);
+            info!("Incoming sync request received (id={})", request_id);
 
             // received a request for events
             event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
@@ -412,10 +455,9 @@ async fn process_swarm_event(
                 },
             ..
         })) => {
-            info!("***OUTGOING SYNC REQUEST RESPONSE***{}", request_id);
-            // received a response to a request for events
+            debug!("Outgoing sync response received (id={request_id})");
             let correlation_id = correlator.expire(request_id)?;
-            info!("correlation_id = {correlation_id}");
+            debug!("Correlated sync response: {correlation_id}");
             event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
                 OutgoingSyncRequestSucceeded {
                     value: response,
@@ -431,8 +473,8 @@ async fn process_swarm_event(
                 error,
             },
         )) => {
-            info!(
-                "***OUTBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+            warn!(
+                "Outbound sync request failed: peer={}, id={}, error={:?}",
                 peer, request_id, error
             );
             let correlation_id = correlator.expire(request_id)?;
@@ -449,22 +491,17 @@ async fn process_swarm_event(
             request_id,
             error,
         })) => {
-            info!(
-                "***INBOUND SYNC REQUEST FAILURE*** peer={}, request_id={}, error={:?}",
+            warn!(
+                "Inbound sync request failed: peer={}, id={}, error={:?}",
                 peer, request_id, error
             );
-            // Handle inbound failures - log for now, could add more sophisticated error handling if needed
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::ResponseSent {
             peer,
             request_id,
         })) => {
-            info!(
-                "***SYNC RESPONSE SENT*** peer={}, request_id={}",
-                peer, request_id
-            );
-            // Successfully sent response to inbound request
+            debug!("Sync response sent to peer={}, id={}", peer, request_id);
         }
 
         unknown => {
@@ -474,16 +511,17 @@ async fn process_swarm_event(
     Ok(())
 }
 
-/// Process all swarm commands
+/// Process all swarm commands. Returns Ok(true) if the loop should break (shutdown).
 async fn process_swarm_command(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
     shutdown_flag: &Arc<AtomicBool>,
     correlator: &mut Correlator,
     command: NetCommand,
-) -> Result<()> {
+) -> Result<bool> {
     if shutdown_flag.load(Ordering::Relaxed) {
-        return Ok(()); // Skip processing during shutdown
+        // Signal shutdown by returning true
+        return Ok(true);
     }
 
     match command {
@@ -491,32 +529,53 @@ async fn process_swarm_command(
             data,
             topic,
             correlation_id,
-        } => handle_gossip_publish(swarm, event_tx, data, topic, correlation_id),
-        NetCommand::Dial(multi) => handle_dial(swarm, event_tx, multi),
+        } => {
+            handle_gossip_publish(swarm, event_tx, data, topic, correlation_id)?;
+            Ok(false)
+        }
+        NetCommand::Dial(multi) => {
+            handle_dial(swarm, event_tx, multi)?;
+            Ok(false)
+        }
         NetCommand::DhtPutRecord {
             correlation_id,
             key,
             expires,
             value,
-        } => handle_put_record(
-            swarm,
-            event_tx,
-            correlator,
-            correlation_id,
-            key,
-            expires,
-            value,
-        ),
+        } => {
+            handle_put_record(
+                swarm,
+                event_tx,
+                correlator,
+                correlation_id,
+                key,
+                expires,
+                value,
+            )?;
+            Ok(false)
+        }
         NetCommand::DhtGetRecord {
             correlation_id,
             key,
-        } => handle_get_record(swarm, correlator, correlation_id, key),
-        NetCommand::Shutdown => handle_shutdown(swarm, shutdown_flag),
+        } => {
+            handle_get_record(swarm, correlator, correlation_id, key)?;
+            Ok(false)
+        }
+        NetCommand::Shutdown => {
+            handle_shutdown(swarm, shutdown_flag)?;
+            Ok(true)
+        }
         NetCommand::OutgoingSyncRequest {
             correlation_id,
             value,
-        } => handle_outgoing_sync_request(swarm, correlator, correlation_id, value),
-        NetCommand::SyncResponse { value, channel } => handle_sync_response(swarm, channel, value),
+        } => {
+            handle_outgoing_sync_request(swarm, correlator, correlation_id, value)?;
+            Ok(false)
+        }
+        NetCommand::SyncResponse { value, channel } => {
+            handle_sync_response(swarm, channel, value)?;
+            Ok(false)
+        }
     }
 }
 
@@ -528,7 +587,7 @@ fn handle_gossip_publish(
     correlation_id: CorrelationId,
 ) -> Result<()> {
     let bytes = data.to_bytes()?;
-    warn!("About to try to Gossip {} bytes", bytes.len());
+    debug!("Publishing gossip message ({} bytes)", bytes.len());
     let gossipsub_behaviour = &mut swarm.behaviour_mut().gossipsub;
     match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), bytes) {
         Ok(message_id) => {
@@ -571,7 +630,7 @@ fn handle_put_record(
     event_tx: &broadcast::Sender<NetEvent>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
-    key: Cid,
+    key: ContentHash,
     expires: Option<Instant>,
     value: ArcBytes,
 ) -> Result<()> {
@@ -585,6 +644,10 @@ fn handle_put_record(
     match swarm
         .behaviour_mut()
         .kademlia
+        // Quorum::Majority calculates quorum from the Kademlia routing table size,
+        // not the actual cluster size. With a routing table of ~21 entries,
+        // it required 11 peers to acknowledge the record, which is impossible
+        // in a 4-node cluster.
         .put_record(record, Quorum::One)
     {
         Ok(qid) => {
@@ -606,7 +669,7 @@ fn handle_get_record(
     swarm: &mut Swarm<NodeBehaviour>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
-    key: Cid,
+    key: ContentHash,
 ) -> Result<()> {
     let query_id = swarm
         .behaviour_mut()
@@ -648,7 +711,7 @@ fn handle_outgoing_sync_request(
     correlation_id: CorrelationId,
     value: SyncRequestValue,
 ) -> Result<()> {
-    info!("***OUTGOING SYNC REQUEST!! {} ***", correlation_id);
+    info!("Outgoing sync request (cid={})", correlation_id);
     // TODO:
     // This is a first pass.
     // Lots of stuff to work through here:
@@ -666,12 +729,15 @@ fn handle_outgoing_sync_request(
         bail!("No peer found on swarm!")
     };
 
-    info!("VALUE SIZE: {:?}", estimate_hashmap_size(&value.since));
+    debug!(
+        "Sync request payload size: {:?}",
+        estimate_hashmap_size(&value.since)
+    );
 
     // Request events
     let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);
-    info!(
-        "QueryId={} correlated with correlation_id={}",
+    debug!(
+        "Sync request sent: query_id={}, correlation_id={}",
         query_id, correlation_id
     );
     correlator.track(query_id, correlation_id);
@@ -683,38 +749,35 @@ fn handle_sync_response(
     channel: OnceTake<ResponseChannel<SyncResponseValue>>,
     value: SyncResponseValue,
 ) -> Result<()> {
-    info!("Sending response...");
+    debug!("Sending sync response");
     let channel = channel.try_take()?;
-    match swarm.behaviour_mut().sync.send_response(channel, value) {
-        Ok(_) => (),
-        Err(value) => {
-            // TODO: report failure
-            error!("sync sending response failure! {:?}", value);
-        }
+    if let Err(value) = swarm.behaviour_mut().sync.send_response(channel, value) {
+        error!("Failed to send sync response: {:?}", value);
     }
     Ok(())
 }
 
-/// This correlates query_id and correlation_id.
-#[derive(Clone)]
-struct Correlator {
-    inner: HashMap<String, CorrelationId>,
+/// Tracks consecutive connection failures per peer to detect and evict stale peers.
+struct PeerFailureTracker {
+    failures: HashMap<PeerId, u32>,
 }
 
-impl Correlator {
-    pub fn new() -> Self {
+impl PeerFailureTracker {
+    fn new() -> Self {
         Self {
-            inner: HashMap::new(),
+            failures: HashMap::new(),
         }
     }
-    /// Add a pairing between query_id and correlation_id
-    pub fn track(&mut self, query_id: impl Display, correlation_id: CorrelationId) {
-        self.inner.insert(format!("{query_id}"), correlation_id);
+
+    /// Record a failure for the given peer and return the new consecutive failure count.
+    fn record_failure(&mut self, peer_id: &PeerId) -> u32 {
+        let count = self.failures.entry(*peer_id).or_insert(0);
+        *count += 1;
+        *count
     }
-    /// Remove the pairing and return the correlation_id
-    pub fn expire(&mut self, query_id: impl Display) -> Result<CorrelationId> {
-        self.inner
-            .remove(&format!("{query_id}"))
-            .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
+
+    /// Reset the failure count for a peer (e.g. on successful connection or after eviction).
+    fn reset(&mut self, peer_id: &PeerId) {
+        self.failures.remove(peer_id);
     }
 }
