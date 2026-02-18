@@ -755,7 +755,8 @@ jobs:
           path: |
             examples/CRISP/packages/crisp-sdk/dist
             examples/CRISP/packages/crisp-zk-inputs/dist
-            examples/CRISP/circuits/target
+            examples/CRISP/circuits/bin/crisp/target
+            examples/CRISP/circuits/bin/greco/target
           retention-days: 1
           if-no-files-found: warn
 
