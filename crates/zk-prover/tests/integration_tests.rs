@@ -37,7 +37,7 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
         .expect("versions.json should exist");
     eprintln!(">>> Config loaded");
 
-    let temp = tempdir().unwrap();
+    let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), config);
 
     // --- Step 1: Fresh state should need full setup ---
@@ -172,7 +172,7 @@ async fn test_download_bb_rejects_wrong_checksum() {
         *checksum = "0".repeat(64);
     }
 
-    let temp = tempdir().unwrap();
+    let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), config);
 
     let result = backend.download_bb().await;

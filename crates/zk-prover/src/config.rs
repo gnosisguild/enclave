@@ -466,7 +466,7 @@ mod tests {
         println!("checksum verified for {}", target);
 
         // Test saving and loading through VersionInfo
-        let temp = tempdir().expect("failed to create temp dir");
+        let temp = get_tempdir().expect("failed to create temp dir");
         let tarball_path = temp.path().join("bb.tar.gz");
 
         fs::write(&tarball_path, &bytes)

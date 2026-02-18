@@ -30,6 +30,7 @@ use e3_test_helpers::{
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::rand_eth_addr;
 use e3_utils::utility_types::ArcBytes;
+use e3_zk_prover::test_utils::get_tempdir;
 use e3_zk_prover::{ZkBackend, ZkConfig};
 use fhe::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, Serialize};
@@ -75,7 +76,7 @@ async fn find_bb() -> Option<PathBuf> {
 /// If a local bb binary is found, uses it with fixture files (fast path).
 /// Otherwise, calls `ensure_installed()` to download bb + circuits (CI path).
 async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = get_tempdir().unwrap();
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
     let bb_binary = noir_dir.join("bin").join("bb");
