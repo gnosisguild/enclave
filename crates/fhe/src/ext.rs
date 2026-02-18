@@ -53,14 +53,9 @@ impl E3Extension for FheExtension {
             return;
         };
 
-        let E3Requested {
-            params,
-            seed,
-            e3_id,
-            ..
-        } = data.clone();
+        let E3Requested { params, e3_id, .. } = data.clone();
 
-        let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
+        let Ok(fhe_inner) = Fhe::from_encoded(&params, self.rng.clone()) else {
             self.bus
                 .err(EType::KeyGeneration, anyhow!(ERROR_FHE_FAILED_TO_DECODE));
             return;
