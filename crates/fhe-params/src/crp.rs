@@ -75,8 +75,7 @@ mod tests {
             Some(insecure_512::threshold::ERROR1_VARIANCE),
         );
         let seed1 = [1u8; 32];
-        let mut seed2 = [2u8; 32];
-        seed2[0] = 2;
+        let seed2 = [2u8; 32];
 
         let crp1 = create_deterministic_crp_from_seed(&params, seed1);
         let crp2 = create_deterministic_crp_from_seed(&params, seed2);
