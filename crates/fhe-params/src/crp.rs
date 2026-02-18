@@ -12,7 +12,6 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::sync::Arc;
 
-#[allow(dead_code)]
 /// Creates a Common Random Polynomial for the given BFV parameters and seed.
 pub fn create_deterministic_crp_from_seed(
     params: &Arc<BfvParameters>,
