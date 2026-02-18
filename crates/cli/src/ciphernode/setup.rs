@@ -4,15 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::PathBuf;
-use std::str::FromStr;
-
-use alloy::primitives::Address;
-use alloy::signers::local::PrivateKeySigner;
-use anyhow::Context;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input};
-use e3_entrypoint::config_set;
+use e3_entrypoint::config::setup;
+use e3_utils::eth_address_from_private_key;
+use std::path::PathBuf;
 use tracing::instrument;
 use zeroize::Zeroizing;
 
@@ -20,11 +16,6 @@ use crate::net::{NetCommands, NetKeypairCommands};
 use crate::password_set::ask_for_password;
 use crate::wallet_set::ask_for_private_key;
 use crate::{net, password_set};
-
-fn eth_address_from_private_key(private_key: &str) -> Result<Address> {
-    let signer = PrivateKeySigner::from_str(private_key).context("invalid private key")?;
-    Ok(signer.address())
-}
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
@@ -37,13 +28,13 @@ pub async fn execute(
     let pw = ask_for_password(password)?;
     let rpc_url = match rpc_url {
         Some(url) => {
-            config_set::validate_rpc_url(&url)?;
+            setup::validate_rpc_url(&url)?;
             url
         }
         None => Input::<String>::new()
             .with_prompt("Enter WebSocket devnet RPC URL")
             .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-            .validate_with(config_set::validate_rpc_url)
+            .validate_with(setup::validate_rpc_url)
             .interact_text()?,
     };
 
@@ -86,7 +77,7 @@ pub async fn execute(
     };
 
     // Execute
-    let config = config_set::execute(rpc_url, &config_dir, &address)?;
+    let config = setup::execute(rpc_url, &config_dir, &address)?;
 
     password_set::execute(&config, Some(pw)).await?;
 

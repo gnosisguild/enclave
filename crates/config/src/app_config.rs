@@ -166,6 +166,8 @@ pub struct AppConfig {
     peers: Vec<String>,
     /// Store all paths in the paths engine
     paths: PathsEngine,
+    /// The config yaml path
+    config_yaml: PathBuf,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
     otel: Option<String>,
     /// If a net key has not been set autogenerate one on start
@@ -250,6 +252,9 @@ impl AppConfig {
             chains: config.chains,
             peers: vec![],
             paths,
+            config_yaml: config
+                .found_config_file
+                .expect("config_yaml should always be set after loading config"),
             otel: config.otel,
             autopassword: node.autopassword,
             autowallet: node.autowallet,
@@ -330,6 +335,11 @@ impl AppConfig {
     /// Get the config file path
     pub fn config_file(&self) -> PathBuf {
         self.paths.config_file()
+    }
+
+    /// Get the config yaml path
+    pub fn config_yaml(&self) -> PathBuf {
+        self.config_yaml.clone()
     }
 
     /// Get the chains config
