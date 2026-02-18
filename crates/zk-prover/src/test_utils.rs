@@ -4,12 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::Path;
+use std::{fs, path::Path};
 
+use anyhow::Result;
 use tempfile::TempDir;
 
-pub fn get_tempdir() -> anyhow::Result<TempDir> {
-    Ok(TempDir::new_in(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp"),
-    )?)
+pub fn get_tempdir() -> Result<TempDir> {
+    let tmp = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target")
+        .join("tmp");
+    fs::create_dir_all(tmp.clone())?;
+    Ok(TempDir::new_in(tmp)?)
 }
