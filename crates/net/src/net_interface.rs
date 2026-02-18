@@ -31,10 +31,7 @@ use rand::prelude::IteratorRandom;
 use std::{
     collections::HashMap,
     io::Error,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{select, sync::broadcast, sync::mpsc};
@@ -129,7 +126,6 @@ impl NetInterface {
         let cmd_rx = &mut self.cmd_rx;
         let mut correlator = Correlator::new();
         let mut peer_failures = PeerFailureTracker::new();
-        let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         // Subscribe to topic
         self.swarm
@@ -158,26 +154,23 @@ impl NetInterface {
         });
 
         loop {
-            if shutdown_flag.load(Ordering::Relaxed) {
-                info!("Shutdown flag set, exiting event loop");
-                break;
-            }
-
             select! {
                  // Process commands
                 Some(command) = cmd_rx.recv() => {
-                    match process_swarm_command(&mut self.swarm, &event_tx, &shutdown_flag, &mut correlator, command).await {
-                        Ok(should_break) => {
-                            if should_break {
-                                break;
-                            }
-                        },
-                        Err(e) => error!("Error processing NetCommand: {e}")
+                    if let NetCommand::Shutdown = command {
+                        if let Err(e) = handle_shutdown(&mut self.swarm) {
+                            error!("Error processing NetCommand: {e}");
+                        }
+                        break;
+                    }
+
+                    if let Err(e) = process_swarm_command(&mut self.swarm, &event_tx, &mut correlator, command).await {
+                        error!("Error processing NetCommand: {e}")
                     }
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    match process_swarm_event(&mut self.swarm, &event_tx, &shutdown_flag, &mut correlator, &mut peer_failures, event).await {
+                    match process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, &mut peer_failures, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
@@ -252,14 +245,10 @@ fn create_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
-    shutdown_flag: &Arc<AtomicBool>,
     correlator: &mut Correlator,
     peer_failures: &mut PeerFailureTracker,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
-    if shutdown_flag.load(Ordering::Relaxed) {
-        return Ok(()); // Skip processing during shutdown
-    }
     match event {
         SwarmEvent::ConnectionEstablished {
             peer_id,
@@ -511,19 +500,13 @@ async fn process_swarm_event(
     Ok(())
 }
 
-/// Process all swarm commands. Returns Ok(true) if the loop should break (shutdown).
+/// Process all swarm commands except shutdown.
 async fn process_swarm_command(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
-    shutdown_flag: &Arc<AtomicBool>,
     correlator: &mut Correlator,
     command: NetCommand,
-) -> Result<bool> {
-    if shutdown_flag.load(Ordering::Relaxed) {
-        // Signal shutdown by returning true
-        return Ok(true);
-    }
-
+) -> Result<()> {
     match command {
         NetCommand::GossipPublish {
             data,
@@ -531,11 +514,11 @@ async fn process_swarm_command(
             correlation_id,
         } => {
             handle_gossip_publish(swarm, event_tx, data, topic, correlation_id)?;
-            Ok(false)
+            Ok(())
         }
         NetCommand::Dial(multi) => {
             handle_dial(swarm, event_tx, multi)?;
-            Ok(false)
+            Ok(())
         }
         NetCommand::DhtPutRecord {
             correlation_id,
@@ -552,29 +535,28 @@ async fn process_swarm_command(
                 expires,
                 value,
             )?;
-            Ok(false)
+            Ok(())
         }
         NetCommand::DhtGetRecord {
             correlation_id,
             key,
         } => {
             handle_get_record(swarm, correlator, correlation_id, key)?;
-            Ok(false)
-        }
-        NetCommand::Shutdown => {
-            handle_shutdown(swarm, shutdown_flag)?;
-            Ok(true)
+            Ok(())
         }
         NetCommand::OutgoingSyncRequest {
             correlation_id,
             value,
         } => {
             handle_outgoing_sync_request(swarm, correlator, correlation_id, value)?;
-            Ok(false)
+            Ok(())
         }
         NetCommand::SyncResponse { value, channel } => {
             handle_sync_response(swarm, channel, value)?;
-            Ok(false)
+            Ok(())
+        }
+        NetCommand::Shutdown => {
+            unreachable!("shutdown command must be handled in NetInterface::start")
         }
     }
 }
@@ -685,14 +667,8 @@ fn handle_get_record(
     Ok(())
 }
 
-fn handle_shutdown(
-    swarm: &mut Swarm<NodeBehaviour>,
-    shutdown_flag: &Arc<AtomicBool>,
-) -> Result<()> {
+fn handle_shutdown(swarm: &mut Swarm<NodeBehaviour>) -> Result<()> {
     info!("Starting graceful shutdown");
-
-    // Set the shutdown flag
-    shutdown_flag.store(true, Ordering::Relaxed);
 
     // Disconnect all peers
     let peers: Vec<_> = swarm.connected_peers().copied().collect();
