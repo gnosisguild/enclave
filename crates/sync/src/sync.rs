@@ -124,6 +124,8 @@ pub async fn sync(
     }
     info!("Historical events published.");
 
+    // 10. Publish the SyncEnded event
+    info!("Publishing SyncEnded event...");
     bus.publish_without_context(SyncEnded::new())?;
     info!("Sync finished.");
     // normal live operations
@@ -275,5 +277,102 @@ pub struct SnapshotLoaded {
 impl SnapshotLoaded {
     pub fn new(snapshot: SnapshotMeta) -> Self {
         Self { snapshot }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_infrastructure_event;
+    use e3_ciphernode_builder::EventSystem;
+    use e3_events::{
+        EffectsEnabled, EnclaveEvent, EnclaveEventData, Event, EventConstructorWithTimestamp,
+        EventSource, EvmEventConfig, HistoricalEvmSyncStart, SyncEnded, TakeEvents, TestEvent,
+        Unsequenced,
+    };
+
+    fn make_sequenced(data: impl Into<EnclaveEventData>, seq: u64) -> EnclaveEvent {
+        EnclaveEvent::<Unsequenced>::new_with_timestamp(
+            data.into(),
+            None,
+            1000,
+            None,
+            EventSource::Local,
+        )
+        .into_sequenced(seq)
+    }
+
+    /// `sender` is `Option<Recipient<…>>` — `None` is safe here since we're not dispatching.
+    fn make_historical_evm_sync_start() -> HistoricalEvmSyncStart {
+        HistoricalEvmSyncStart {
+            evm_config: EvmEventConfig::new(),
+            sender: None,
+        }
+    }
+
+    #[test]
+    fn infrastructure_events_are_detected() {
+        let sync_ended = make_sequenced(SyncEnded::new(), 1);
+        let effects_enabled = make_sequenced(EffectsEnabled::new(), 2);
+        let evm_sync_start = make_sequenced(make_historical_evm_sync_start(), 3);
+        let test_event = make_sequenced(TestEvent::new("hello", 42), 4);
+
+        assert!(is_infrastructure_event(&sync_ended));
+        assert!(is_infrastructure_event(&effects_enabled));
+        assert!(is_infrastructure_event(&evm_sync_start));
+        assert!(!is_infrastructure_event(&test_event));
+    }
+
+    /// Regression: infrastructure events replayed from the EventStore must be filtered before
+    /// they reach the bus. If they aren't, the bloom-filter deduplicates the copy that `sync()`
+    /// re-publishes later, causing it to be silently dropped.
+    #[actix::test]
+    async fn infrastructure_events_are_filtered_during_replay() -> anyhow::Result<()> {
+        let system = EventSystem::new("test-sync-replay").with_fresh_bus();
+        let bus = system.handle()?;
+        let history = bus.history();
+
+        let events: Vec<EnclaveEvent> = vec![
+            make_sequenced(TestEvent::new("before", 1), 1),
+            make_sequenced(SyncEnded::new(), 2),
+            make_sequenced(EffectsEnabled::new(), 3),
+            make_sequenced(make_historical_evm_sync_start(), 4),
+            make_sequenced(TestEvent::new("after", 2), 5),
+        ];
+
+        for event in events {
+            if is_infrastructure_event(&event) {
+                continue;
+            }
+            bus.event_bus().try_send(event)?;
+        }
+
+        let received = history.send(TakeEvents::new(2)).await?;
+
+        let event_types: Vec<&'static str> = received
+            .iter()
+            .map(|e| match e.get_data() {
+                EnclaveEventData::TestEvent(_) => "TestEvent",
+                EnclaveEventData::SyncEnded(_) => "SyncEnded",
+                EnclaveEventData::EffectsEnabled(_) => "EffectsEnabled",
+                EnclaveEventData::HistoricalEvmSyncStart(_) => "HistoricalEvmSyncStart",
+                _ => "other",
+            })
+            .collect();
+
+        assert_eq!(event_types, vec!["TestEvent", "TestEvent"]);
+
+        let msgs: Vec<String> = received
+            .iter()
+            .filter_map(|e| {
+                if let EnclaveEventData::TestEvent(t) = e.get_data() {
+                    Some(t.msg.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(msgs, vec!["before", "after"]);
+
+        Ok(())
     }
 }
