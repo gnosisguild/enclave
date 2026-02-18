@@ -275,10 +275,9 @@ export const generateProof = async (circuitInputs: any) => {
     k1: circuitInputs.k1,
   })
 
-  let api: Awaited<ReturnType<typeof Barretenberg.new>> | undefined
-  try {
-    api = await Barretenberg.new({ threads: optimalThreadCount })
+  const api = await Barretenberg.new({ threads: optimalThreadCount })
 
+  try {
     const grecoBackend = new UltraHonkBackend(grecoCircuit.bytecode, api)
 
     const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness, {
@@ -425,13 +424,14 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
  */
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const api = await Barretenberg.new({ threads: optimalThreadCount })
-  const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
 
-  const isValid = await crispBackend.verifyProof(proof, { verifierTarget: 'evm' })
-
-  api.destroy()
-
-  return isValid
+  try {
+    const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
+    const isValid = await crispBackend.verifyProof(proof, { verifierTarget: 'evm' })
+    return isValid
+  } finally {
+    api.destroy()
+  }
 }
 
 /**
