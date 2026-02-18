@@ -7,27 +7,19 @@
 // This circuit verifies all the configuration parameters used in the secure configs
 // Only re-run if parameters change (new deployment)
 
+use lib::configs::default::{N_PARTIES, T};
 use lib::configs::secure::dkg::{
-    // DKG structural parameters
-    N as DKG_N, L as DKG_L,
-    // DKG moduli
-    QIS as DKG_QIS,
-    // DKG derived values
-    PLAINTEXT_MODULUS as DKG_PLAINTEXT_MODULUS, Q_MOD_T as DKG_Q_MOD_T,
-    Q_MOD_T_CENTERED as DKG_Q_MOD_T_CENTERED,
-    // Threshold moduli reference
-    L_THRESHOLD, QIS_THRESHOLD,
-    // Share encryption bounds
-    SHARE_ENCRYPTION_K0IS, SHARE_ENCRYPTION_PK_BOUNDS, SHARE_ENCRYPTION_E0_BOUND,
-    SHARE_ENCRYPTION_E1_BOUND, SHARE_ENCRYPTION_U_BOUND, SHARE_ENCRYPTION_R1_LOW_BOUNDS,
-    SHARE_ENCRYPTION_R1_UP_BOUNDS, SHARE_ENCRYPTION_R2_BOUNDS, SHARE_ENCRYPTION_P1_BOUNDS,
-    SHARE_ENCRYPTION_P2_BOUNDS, SHARE_ENCRYPTION_MSG_BOUND,
+    L as DKG_L, L_THRESHOLD, N as DKG_N, PARITY_MATRIX, PLAINTEXT_MODULUS as DKG_PLAINTEXT_MODULUS,
+    Q_MOD_T as DKG_Q_MOD_T, Q_MOD_T_CENTERED as DKG_Q_MOD_T_CENTERED, QIS as DKG_QIS, QIS_THRESHOLD,
+    SHARE_ENCRYPTION_E0_BOUND, SHARE_ENCRYPTION_E1_BOUND, SHARE_ENCRYPTION_K0IS,
+    SHARE_ENCRYPTION_MSG_BOUND, SHARE_ENCRYPTION_P1_BOUNDS, SHARE_ENCRYPTION_P2_BOUNDS,
+    SHARE_ENCRYPTION_PK_BOUNDS, SHARE_ENCRYPTION_R1_LOW_BOUNDS, SHARE_ENCRYPTION_R1_UP_BOUNDS,
+    SHARE_ENCRYPTION_R2_BOUNDS, SHARE_ENCRYPTION_U_BOUND,
 };
 
 use lib::configs::secure::threshold::{
     // Structural parameters
-    N as THRESHOLD_N, L as THRESHOLD_L, PARAMS_SEARCH_N as N_PARTIES,
-    PARAMS_SEARCH_Z as N_CIPHERTEXTS,
+    N as THRESHOLD_N, L as THRESHOLD_L, PARAMS_SEARCH_N, PARAMS_SEARCH_Z as N_CIPHERTEXTS,
     // Moduli
     QIS as THRESHOLD_QIS,
     // Derived values
@@ -87,6 +79,7 @@ fn main() {
 fn verify_dkg_derived_values() {
     verify_dkg_q_mod_t();
     verify_dkg_q_mod_t_centered();
+    verify_dkg_parity_matrix();
 }
 
 // Verifies DKG: Q_MOD_T = (product of QIS) mod t
@@ -109,7 +102,43 @@ fn verify_dkg_q_mod_t_centered() {
         "DKG Q_MOD_T_CENTERED verification failed",
     );
 }
+// Verify parity matrix : H * G^T = 0 (mod q_l) for each modulus
+fn verify_dkg_parity_matrix() {
+    // For each CRT modulus
+    for l in 0..L_THRESHOLD {
+        let q_l = QIS_THRESHOLD[l];
+        let m = ModU128::new(q_l);
 
+        // Build generator matrix G (Vandermonde)
+        // G[i][j] = j^i mod q_l
+        // G is (T+1) * (N_PARTIES+1)
+        let mut g: [[Field; N_PARTIES + 1]; T + 1] = [[0; N_PARTIES + 1]; T + 1];
+
+        for j in 0..(N_PARTIES + 1) {
+            let eval_point = j as Field;
+            let mut power: Field = 1;
+            for i in 0..(T + 1) {
+                g[i][j] = power;
+                power = m.mul_mod(power, eval_point);
+            }
+        }
+
+        // Verify H * G^T = 0 (mod q_l)
+        // H is (N_PARTIES - T) * (N_PARTIES + 1)
+        // G^T is (N_PARTIES + 1) * (T + 1)
+        // Result is (N_PARTIES - T) * (T + 1)
+        for row in 0..(N_PARTIES - T) {
+            for col in 0..(T + 1) {
+                let mut sum: Field = 0;
+                for k in 0..(N_PARTIES + 1) {
+                    // H[l][row][k] * G[col][k]
+                    sum = m.add(sum, m.mul_mod(PARITY_MATRIX[l][row][k], g[col][k]));
+                }
+                assert(sum == 0, "Parity matrix verification failed: H · G^T != 0");
+            }
+        }
+    }
+}
 //DKG Bounds
 
 // Verifies share_encryption bounds (Circuit 3)
@@ -279,7 +308,7 @@ fn verify_e_sm_bound() {
     let n: Field = THRESHOLD_N as Field;
     let e_norm: Field = 20;
     let b_e: Field = 20;
-    let sk_norm: Field = N_PARTIES as Field;
+    let sk_norm: Field = PARAMS_SEARCH_N as Field;
     let num_ciphertexts: Field = N_CIPHERTEXTS as Field;
 
     // b_fresh = N * e_norm + b_enc + N * b_e * sk_norm
