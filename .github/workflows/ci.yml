@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   rust_unit:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +76,7 @@ jobs:
         run: 'cargo test --lib && cargo test --doc'
 
   rust_integration:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -119,7 +119,7 @@ jobs:
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -148,7 +148,7 @@ jobs:
         run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
 
   build_e3_support_risc0:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Generate tags
@@ -185,7 +185,7 @@ jobs:
             type=gha,mode=max,scope=e3-support
 
   build_ciphernode_image:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -225,7 +225,7 @@ jobs:
             type=gha,mode=max,scope=ciphernode
 
   test_contracts:
-    runs-on: self-hosted
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
@@ -260,7 +260,7 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   test_net:
-    runs-on: self-hosted
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
@@ -273,7 +273,7 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
-    runs-on: self-hosted
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v4'
@@ -338,7 +338,7 @@ jobs:
 
   ciphernode_integration_test:
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
-    runs-on: self-hosted
+    runs-on: 'ubuntu-latest'
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -400,7 +400,7 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   build_enclave_cli:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -431,7 +431,7 @@ jobs:
           retention-days: 1
 
   crisp_unit:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
@@ -504,7 +504,7 @@ jobs:
         run: 'pnpm test:contracts'
 
   crisp_e2e:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v4
@@ -612,7 +612,7 @@ jobs:
           retention-days: 30
 
   test_enclave_circuits:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -638,7 +638,7 @@ jobs:
           if-no-files-found: warn
 
   build_e3_support_dev:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -667,7 +667,7 @@ jobs:
           if-no-files-found: error
 
   build_sdk:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -716,7 +716,7 @@ jobs:
           if-no-files-found: warn
 
   build_crisp_sdk:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -760,7 +760,7 @@ jobs:
           if-no-files-found: warn
 
   template_integration:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v4
@@ -820,7 +820,7 @@ jobs:
           pnpm test:integration
 
   test_enclave_init:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
@@ -857,7 +857,7 @@ jobs:
           enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
     if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
