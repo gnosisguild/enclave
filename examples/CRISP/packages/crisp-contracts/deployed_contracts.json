@@ -137,22 +137,22 @@
       "blockNumber": 10279563
     },
     "HonkVerifier": {
-      "address": "0x0Cba5ebd82e8BfD6A7FCe59722fA25A0D8Ae860B",
-      "blockNumber": 10285474
+      "address": "0x5C0d79864744695186bA7cB6db31D3a1b6b08751",
+      "blockNumber": 10285600
     },
     "CRISPProgram": {
-      "address": "0x6422EB5Ab2C986bBf248E091B69725738e4a71be",
-      "blockNumber": 10285474,
+      "address": "0x674e44804F9dCBA5191fc16130a709dA66Cc8c12",
+      "blockNumber": 10285600,
       "constructorArgs": {
         "enclave": "0x95bC90fcb37684bfbAA3ffA2CbF4067fA404c4AA",
         "verifierAddress": "0x1575D505c4f3d8ee5c8C4F95F97e19c1e9f2F9e6",
-        "honkVerifierAddress": "0x0Cba5ebd82e8BfD6A7FCe59722fA25A0D8Ae860B",
+        "honkVerifierAddress": "0x5C0d79864744695186bA7cB6db31D3a1b6b08751",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     },
     "MockVotingToken": {
-      "address": "0x9a8BD9AaC0026136B400855a8ac7bAf6b2E7a67F",
-      "blockNumber": 10285476
+      "address": "0x6d97bDf6741905F63bd99e0EB920FFe5e5498544",
+      "blockNumber": 10285602
     }
   }
 }
