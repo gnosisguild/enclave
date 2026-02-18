@@ -14,8 +14,9 @@ use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionC
 pub global N: u32 = 512;
 pub global L: u32 = 2;
 pub global QIS: [Field; L] = [68719403009, 68719230977];
-pub global Q_MOD_T: Field = -7;
 pub global PLAINTEXT_MODULUS: Field = 100;
+pub global Q_MOD_T: Field = 93;
+pub global Q_MOD_T_CENTERED: Field = -7;
 pub global Q_INVERSE_MOD_T: Field = 57;
 
 /************************************
@@ -36,6 +37,8 @@ pub global PK_GENERATION_SK_BOUND: Field = 1;
 pub global PK_GENERATION_E_SM_BOUND: Field = 12307200;
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [5120, 5120];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] = [34359701504, 34359615488];
+
+pub global PK_GENERATION_B_ENC: Field = 3;
 
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
@@ -87,7 +90,6 @@ pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
 pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-    Q_MOD_T,
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
     USER_DATA_ENCRYPTION_PK_BOUNDS,

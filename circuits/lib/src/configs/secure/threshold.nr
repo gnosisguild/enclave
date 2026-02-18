@@ -10,13 +10,20 @@ use crate::core::threshold::pk_generation::Configs as PkGenerationConfigs;
 use crate::core::threshold::share_decryption::Configs as ShareDecryptionConfigs;
 use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
 
+/// Threshold BFV parameter set search defaults configurations.
+/// These are for the SecureThreshold8192 preset.
+/// The InsecureThreshold512 preset has been generated manually.
+pub global PARAMS_SEARCH_N: Field = 100;
+pub global PARAMS_SEARCH_Z: Field = 100;
+
 // Global configs for threshold secure preset
 pub global N: u32 = 8192;
 pub global L: u32 = 4;
 pub global QIS: [Field; L] =
     [2251799822204929, 4503599627763713, 4503599631433729, 4503599634579457];
-pub global Q_MOD_T: Field = -19;
 pub global PLAINTEXT_MODULUS: Field = 100;
+pub global Q_MOD_T: Field = 81;
+pub global Q_MOD_T_CENTERED: Field = -19;
 pub global Q_INVERSE_MOD_T: Field = 21;
 
 /************************************
@@ -35,10 +42,12 @@ pub global PK_GENERATION_BIT_PK: u32 = 52;
 pub global PK_GENERATION_EEK_BOUND: Field = 20;
 pub global PK_GENERATION_SK_BOUND: Field = 1;
 pub global PK_GENERATION_E_SM_BOUND: Field =
-    4789048565205902682369834578696752269343944643454802329600;
+    4789048565205902682369836460365611983121962490123622809600;
 pub global PK_GENERATION_R1_BOUNDS: [Field; L] = [81920, 81920, 81920, 81920];
 pub global PK_GENERATION_R2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
+
+pub global PK_GENERATION_B_ENC: Field = 39614081257132168796771975168000;
 
 pub global PK_GENERATION_CONFIGS: PkGenerationConfigs<N, L> = PkGenerationConfigs::new(
     QIS,
@@ -56,7 +65,6 @@ pk_aggregation (CIRCUIT 5)
 ************************************/
 
 pub global PK_AGGREGATION_BIT_PK: u32 = 52;
-
 pub global PK_AGGREGATION_CONFIGS: PkAggregationConfigs<L> = PkAggregationConfigs::new(QIS);
 
 /************************************
@@ -94,7 +102,6 @@ pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
 
 pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-    Q_MOD_T,
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
     USER_DATA_ENCRYPTION_PK_BOUNDS,

@@ -3,40 +3,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::events::GossipData;
-use crate::events::NetCommand;
-use crate::events::NetEvent;
-use crate::net_event_buffer::NetEventBuffer;
-use crate::net_sync_manager::NetSyncManager;
-use crate::DocumentPublisher;
-use crate::NetInterface;
+use crate::events::{GossipData, NetCommand, NetEvent};
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use anyhow::{bail, Result};
-use e3_crypto::Cipher;
-use e3_data::Repository;
-use e3_events::prelude::*;
-use e3_events::trap;
-use e3_events::BusHandle;
-use e3_events::EType;
-use e3_events::EnclaveEventData;
-use e3_events::Event;
-use e3_events::EventContextAccessors;
-use e3_events::EventSource;
-use e3_events::EventStoreQueryBy;
-use e3_events::EventType;
-use e3_events::TsAgg;
-use e3_events::Unsequenced;
-use e3_events::{CorrelationId, EnclaveEvent, EventId};
+use anyhow::Result;
+use bloom::{BloomFilter, ASMS};
+use e3_events::{
+    prelude::*, trap, BusHandle, CorrelationId, EType, EnclaveEvent, EnclaveEventData, Event,
+    EventContextAccessors, EventSource, EventType, Unsequenced,
+};
 use e3_utils::MAILBOX_LIMIT;
-use libp2p::identity::ed25519;
-use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tracing::warn;
-use tracing::{info, instrument, trace};
+use tracing::{trace, warn};
 
 // TODO: store event filtering here on this actor instead of is_local_only() on the event. We
 // should do this as this functionality is not global and ramifications should stay local to here
@@ -46,7 +27,7 @@ use tracing::{info, instrument, trace};
 pub struct NetEventTranslator {
     bus: BusHandle,
     tx: mpsc::Sender<NetCommand>,
-    sent_events: HashSet<EventId>,
+    sent_events: BloomFilter,
     topic: String,
 }
 
@@ -68,7 +49,7 @@ impl NetEventTranslator {
         Self {
             bus: bus.clone(),
             tx: tx.clone(),
-            sent_events: HashSet::new(),
+            sent_events: BloomFilter::with_rate(0.001, 10_000),
             topic: topic.to_string(),
         }
     }
@@ -125,16 +106,19 @@ impl NetEventTranslator {
             trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
             return Ok(());
         }
+        self.sent_events.insert(&id);
 
         warn!("GossipPublish event: {}", msg.event_type());
         let topic = self.topic.clone();
         let data: GossipData = msg.try_into()?;
 
-        self.tx.try_send(NetCommand::GossipPublish {
+        if let Err(e) = self.tx.try_send(NetCommand::GossipPublish {
             topic,
             data,
             correlation_id: CorrelationId::new(),
-        })?;
+        }) {
+            warn!("Failed to send gossip command (channel full or closed): {e}");
+        }
 
         Ok(())
     }
@@ -154,10 +138,10 @@ impl NetEventTranslator {
 
     fn publish_event(&mut self, event: EnclaveEvent<Unsequenced>) -> Result<()> {
         let id = event.id();
+        self.sent_events.insert(&id);
         let (data, ec) = event.into_components();
         self.bus
             .publish_from_remote(data, ec.ts(), None, EventSource::Net)?;
-        self.sent_events.insert(id);
         Ok(())
     }
 

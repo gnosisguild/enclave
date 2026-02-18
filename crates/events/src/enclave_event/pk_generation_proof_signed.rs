@@ -6,23 +6,18 @@
 
 use crate::{E3id, SignedProofPayload};
 use actix::Message;
-use derivative::Derivative;
-use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
-#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derivative(Debug)]
-#[rtype(result = "anyhow::Result<()>")]
-pub struct KeyshareCreated {
-    pub pubkey: ArcBytes,
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct PkGenerationProofSigned {
     pub e3_id: E3id,
-    pub node: String,
-    pub signed_pk_generation_proof: Option<SignedProofPayload>,
+    pub party_id: u64,
+    pub signed_proof: SignedProofPayload,
 }
 
-impl Display for KeyshareCreated {
+impl Display for PkGenerationProofSigned {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

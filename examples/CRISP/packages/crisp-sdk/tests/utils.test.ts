@@ -6,7 +6,8 @@
 
 import { expect, describe, it } from 'vitest'
 import { extractSignatureComponents, generateMerkleProof, generateMerkleTree, hashLeaf } from '../src/utils'
-import { LEAVES } from './constants'
+import { SLOT_ADDRESS } from './constants'
+import { generateTestLeaves } from './helpers'
 import { MASK_SIGNATURE } from '../src/constants'
 
 describe('Utils', () => {
@@ -21,24 +22,25 @@ describe('Utils', () => {
 
   describe('generateMerkleTree', () => {
     it('Should generate a merkle tree', () => {
-      const tree = generateMerkleTree(LEAVES)
+      const leaves = generateTestLeaves([{ address: SLOT_ADDRESS, balance: 100n }])
+      const tree = generateMerkleTree(leaves)
 
       expect(tree.root).toBeDefined()
     })
   })
 
   describe('generateMerkleProof', () => {
-    const address = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
+    const address = SLOT_ADDRESS
     const balance = 100n
 
     it('Should generate a valid merkle proof for a leaf', () => {
-      const tree = generateMerkleTree(LEAVES)
+      const leaves = generateTestLeaves([{ address, balance }])
+      const tree = generateMerkleTree(leaves)
 
-      const proof = generateMerkleProof(balance, address, LEAVES)
+      const proof = generateMerkleProof(balance, address, leaves)
       expect(proof.leaf).toBe(hashLeaf(address, balance))
 
       expect(proof.length).toBe(3)
-      // Unpad the proof for verification
       const unpaddedProof = {
         ...proof.proof,
         siblings: proof.proof.siblings.slice(0, proof.length),
@@ -49,7 +51,8 @@ describe('Utils', () => {
 
     it('Should throw if the leaf does not exist in the tree', () => {
       expect(() => generateMerkleProof(balance, address, [])).toThrow('Leaf not found in the tree')
-      expect(() => generateMerkleProof(999n, address, LEAVES)).toThrow('Leaf not found in the tree')
+      const leaves = generateTestLeaves([{ address, balance }])
+      expect(() => generateMerkleProof(999n, address, leaves)).toThrow('Leaf not found in the tree')
     })
   })
 

@@ -64,8 +64,6 @@ pub async fn register_e3_requested(
                 .await
                 .map_err(|e| eyre::eyre!("{}", e))?;
 
-                let input_window = [e3.inputWindow[0].to::<u64>(), e3.inputWindow[1].to::<u64>()];
-
                 // Use sol_data types instead of primitives
                 type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>, sol_data::Uint<256>);
 

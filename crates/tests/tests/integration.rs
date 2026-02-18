@@ -94,20 +94,42 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         #[cfg(not(unix))]
         compile_error!("Integration tests require unix symlink support");
 
-        // Copy circuit fixtures from the zk-prover crate's test fixtures
-        let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        // Copy circuit artifacts from the compiled circuit build output
+        let circuits_build_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
-            .join("zk-prover")
-            .join("tests")
-            .join("fixtures");
+            .join("..")
+            .join("circuits")
+            .join("bin");
+
+        // Copy T0 (pk) circuit
         let pk_circuit_dir = circuits_dir.join("dkg").join("pk");
         tokio::fs::create_dir_all(&pk_circuit_dir).await.unwrap();
-        tokio::fs::copy(fixtures_dir.join("pk.json"), pk_circuit_dir.join("pk.json"))
+        let dkg_target = circuits_build_root.join("dkg").join("target");
+        tokio::fs::copy(dkg_target.join("pk.json"), pk_circuit_dir.join("pk.json"))
             .await
             .unwrap();
-        tokio::fs::copy(fixtures_dir.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
+        tokio::fs::copy(dkg_target.join("pk.vk"), pk_circuit_dir.join("pk.vk"))
             .await
             .unwrap();
+
+        // Copy T1 (pk_generation) circuit
+        let pk_gen_circuit_dir = circuits_dir.join("threshold").join("pk_generation");
+        tokio::fs::create_dir_all(&pk_gen_circuit_dir)
+            .await
+            .unwrap();
+        let threshold_target = circuits_build_root.join("threshold").join("target");
+        tokio::fs::copy(
+            threshold_target.join("pk_generation.json"),
+            pk_gen_circuit_dir.join("pk_generation.json"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::copy(
+            threshold_target.join("pk_generation.vk"),
+            pk_gen_circuit_dir.join("pk_generation.vk"),
+        )
+        .await
+        .unwrap();
 
         let backend = ZkBackend::new(
             BBPath::Default(bb_binary),

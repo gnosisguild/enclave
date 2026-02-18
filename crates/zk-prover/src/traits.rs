@@ -98,7 +98,6 @@ pub trait Provable: Send + Sync {
             "Verifying proof for circuit {} with e3_id {} and party_id {}",
             proof.circuit, e3_id, party_id
         );
-        println!("Proof details: {:?}", proof);
         prover.verify(proof, e3_id, party_id)
     }
 }

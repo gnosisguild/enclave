@@ -30,6 +30,7 @@ mod keyshare_created;
 mod net_sync_events_received;
 mod operator_activation_changed;
 mod outgoing_sync_requested;
+mod pk_generation_proof_signed;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod proof;
@@ -44,6 +45,7 @@ mod sync_start;
 mod test_event;
 mod threshold_share_collection_failed;
 mod threshold_share_created;
+mod threshold_share_pending;
 mod ticket_balance_updated;
 mod ticket_generated;
 mod ticket_submitted;
@@ -76,6 +78,7 @@ pub use keyshare_created::*;
 pub use net_sync_events_received::*;
 pub use operator_activation_changed::*;
 pub use outgoing_sync_requested::*;
+pub use pk_generation_proof_signed::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use proof::*;
@@ -91,6 +94,7 @@ pub use sync_start::*;
 pub use test_event::*;
 pub use threshold_share_collection_failed::*;
 pub use threshold_share_created::*;
+pub use threshold_share_pending::*;
 pub use ticket_balance_updated::*;
 pub use ticket_generated::*;
 pub use ticket_submitted::*;
@@ -212,6 +216,7 @@ pub enum EnclaveEventData {
     TicketGenerated(TicketGenerated),
     TicketSubmitted(TicketSubmitted),
     PlaintextOutputPublished(PlaintextOutputPublished),
+    PkGenerationProofSigned(PkGenerationProofSigned),
     EnclaveError(EnclaveError),
     E3RequestComplete(E3RequestComplete),
     E3Failed(E3Failed),
@@ -219,6 +224,7 @@ pub enum EnclaveEventData {
     Shutdown(Shutdown),
     DocumentReceived(DocumentReceived),
     ThresholdShareCreated(ThresholdShareCreated),
+    ThresholdSharePending(ThresholdSharePending),
     EncryptionKeyPending(EncryptionKeyPending),
     EncryptionKeyReceived(EncryptionKeyReceived),
     EncryptionKeyCreated(EncryptionKeyCreated),
@@ -465,8 +471,10 @@ impl EnclaveEventData {
             EnclaveEventData::CiphertextOutputPublished(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::DecryptionshareCreated(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::PlaintextAggregated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::PkGenerationProofSigned(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CiphernodeSelected(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::ThresholdShareCreated(ref data) => Some(data.e3_id.clone()),
+            EnclaveEventData::ThresholdSharePending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyPending(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::EncryptionKeyReceived(ref data) => Some(data.e3_id.clone()),
             EnclaveEventData::CommitteePublished(ref data) => Some(data.e3_id.clone()),
@@ -516,6 +524,7 @@ impl_event_types!(
     DecryptionshareCreated,
     PlaintextAggregated,
     PublishDocumentRequested,
+    PkGenerationProofSigned,
     E3RequestComplete,
     E3Failed,
     E3StageChanged,
@@ -537,6 +546,7 @@ impl_event_types!(
     TestEvent,
     DocumentReceived,
     ThresholdShareCreated,
+    ThresholdSharePending,
     EncryptionKeyPending,
     EncryptionKeyReceived,
     EncryptionKeyCreated,
