@@ -7,7 +7,7 @@
 use anyhow::{Context, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
-use e3_net::{Cid, NetInterface};
+use e3_net::{ContentHash, NetInterface};
 use e3_utils::ArcBytes;
 use libp2p::gossipsub::IdentTopic;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -20,7 +20,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 async fn test_dht(peer: &mut TestPeer) -> Result<()> {
     let value = b"I am he as you are he, as you are me and we are all together";
-    let key = Cid::from_content(value);
+    let key = ContentHash::from_content(value);
     peer.sync_nodes().await?;
     if peer.is_lead() {
         // PUT RECORD

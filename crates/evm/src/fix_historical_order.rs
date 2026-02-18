@@ -22,7 +22,7 @@ impl FixHistoricalOrder {
         Self {
             dest: dest.into(),
             pending_sync_complete: None,
-            seen_ids: BloomFilter::with_rate(0.001, 10_000),
+            seen_ids: BloomFilter::with_rate(0.001, 10_000_000),
         }
     }
 
