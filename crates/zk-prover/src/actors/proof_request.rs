@@ -134,6 +134,10 @@ impl ProofRequestActor {
         ec: &EventContext<Sequenced>,
     ) {
         let Some(pending) = self.pending_threshold.remove(correlation_id) else {
+            error!(
+                "Received PkBfv ComputeResponse with correlation_id {:?} but no matching pending request found.",
+                correlation_id
+            );
             return;
         };
 
@@ -214,6 +218,10 @@ impl ProofRequestActor {
         ec: &EventContext<Sequenced>,
     ) {
         let Some(pending) = self.pending.remove(&correlation_id) else {
+            error!(
+                "Received PkBfv ComputeResponse with correlation_id {:?} but no matching pending request found.",
+                correlation_id
+            );
             return;
         };
 
