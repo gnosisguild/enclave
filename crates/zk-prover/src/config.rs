@@ -220,7 +220,7 @@ pub fn verify_checksum(file: &str, data: &[u8], expected: Option<&str>) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
+    use crate::test_utils::get_tempdir;
 
     use super::*;
 

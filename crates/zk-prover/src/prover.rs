@@ -219,9 +219,8 @@ impl ZkProver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ZkConfig;
+    use crate::{config::ZkConfig, test_utils::get_tempdir};
     use e3_config::BBPath;
-    use tempfile::tempdir;
 
     #[test]
     fn test_prover_requires_bb() {

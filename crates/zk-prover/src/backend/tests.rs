@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use super::*;
-use crate::{config::VersionInfo, get_tempdir};
+use crate::{config::VersionInfo, test_utils::get_tempdir};
 use tokio::fs;
 
 fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
