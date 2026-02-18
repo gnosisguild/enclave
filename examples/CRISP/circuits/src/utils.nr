@@ -29,6 +29,7 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     assert(num_options as u64 <= MAX_OPTIONS as u64);
 
     let segment_size: u32 = D / num_options;
+    let remainder: u32 = D - (segment_size * num_options);
 
     let mut sums: [u64; MAX_OPTIONS] = [0; MAX_OPTIONS];
     let mut non_zero_count: u64 = 0;
@@ -38,8 +39,9 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     for opt_idx in 0..MAX_OPTIONS {
         if (opt_idx as u64) < (num_options as u64) {
             // Due to reversal, TypeScript option opt_idx is at circuit segment (num_options - 1 - opt_idx)
+            // Remainder zeros at end of TypeScript layout become start after k1.reverse()
             let circuit_segment: u32 = num_options - 1 - opt_idx;
-            let start_idx: u32 = circuit_segment * segment_size;
+            let start_idx: u32 = remainder + (circuit_segment * segment_size);
 
             let mut sum: u64 = 0;
 
@@ -97,11 +99,12 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
     assert(num_options as u64 <= MAX_OPTIONS as u64);
 
     let segment_size: u32 = D / num_options;
+    let remainder: u32 = D - (segment_size * num_options);
 
     for opt_idx in 0..MAX_OPTIONS {
         if (opt_idx as u64) < (num_options as u64) {
             let circuit_segment: u32 = num_options - 1 - opt_idx;
-            let start_idx: u32 = circuit_segment * segment_size;
+            let start_idx: u32 = remainder + (circuit_segment * segment_size);
 
             for bit_pos in 0..MAX_VOTE_BITS {
                 if (bit_pos as u64) < (segment_size as u64) {
