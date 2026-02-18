@@ -275,61 +275,64 @@ export const generateProof = async (circuitInputs: any) => {
     k1: circuitInputs.k1,
   })
 
-  const api = await Barretenberg.new({ threads: optimalThreadCount })
+  let api: Awaited<ReturnType<typeof Barretenberg.new>> | undefined
+  try {
+    api = await Barretenberg.new({ threads: optimalThreadCount })
 
-  const grecoBackend = new UltraHonkBackend(grecoCircuit.bytecode, api)
+    const grecoBackend = new UltraHonkBackend(grecoCircuit.bytecode, api)
 
-  const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness, {
-    verifierTarget: 'noir-recursive-no-zk',
-  })
+    const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness, {
+      verifierTarget: 'noir-recursive-no-zk',
+    })
 
-  const artifacts = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length, {
-    verifierTarget: 'noir-recursive-no-zk',
-  })
+    const artifacts = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length, {
+      verifierTarget: 'noir-recursive-no-zk',
+    })
 
-  const vkAsFields = artifacts.vkAsFields
-  const vkHash = artifacts.vkHash
-  const grecoProofAsFields = proofToFields(grecoProof)
+    const vkAsFields = artifacts.vkAsFields
+    const vkHash = artifacts.vkHash
+    const grecoProofAsFields = proofToFields(grecoProof)
 
-  const { witness: crispWitness } = await executeCrispCircuit({
-    prev_ct0is: circuitInputs.prev_ct0is,
-    prev_ct1is: circuitInputs.prev_ct1is,
-    prev_ct_commitment: circuitInputs.prev_ct_commitment,
-    sum_ct0is: circuitInputs.sum_ct0is,
-    sum_ct1is: circuitInputs.sum_ct1is,
-    sum_r0is: circuitInputs.sum_r0is,
-    sum_r1is: circuitInputs.sum_r1is,
-    greco_verification_key: vkAsFields,
-    greco_key_hash: vkHash,
-    greco_proof: grecoProofAsFields,
-    ct0is: circuitInputs.ct0is,
-    ct1is: circuitInputs.ct1is,
-    k1: circuitInputs.k1,
-    pk_commitment: circuitInputs.pk_commitment,
-    k1_commitment: grecoReturnValue[0].toString(),
-    ct_commitment: grecoReturnValue[1].toString(),
-    public_key_x: circuitInputs.public_key_x,
-    public_key_y: circuitInputs.public_key_y,
-    signature: circuitInputs.signature,
-    hashed_message: circuitInputs.hashed_message,
-    merkle_root: circuitInputs.merkle_root,
-    merkle_proof_length: circuitInputs.merkle_proof_length,
-    merkle_proof_indices: circuitInputs.merkle_proof_indices,
-    merkle_proof_siblings: circuitInputs.merkle_proof_siblings,
-    slot_address: circuitInputs.slot_address,
-    balance: circuitInputs.balance,
-    is_first_vote: circuitInputs.is_first_vote,
-    is_mask_vote: circuitInputs.is_mask_vote,
-    num_options: circuitInputs.num_options,
-  } as CRISPCircuitInputs)
+    const { witness: crispWitness } = await executeCrispCircuit({
+      prev_ct0is: circuitInputs.prev_ct0is,
+      prev_ct1is: circuitInputs.prev_ct1is,
+      prev_ct_commitment: circuitInputs.prev_ct_commitment,
+      sum_ct0is: circuitInputs.sum_ct0is,
+      sum_ct1is: circuitInputs.sum_ct1is,
+      sum_r0is: circuitInputs.sum_r0is,
+      sum_r1is: circuitInputs.sum_r1is,
+      greco_verification_key: vkAsFields,
+      greco_key_hash: vkHash,
+      greco_proof: grecoProofAsFields,
+      ct0is: circuitInputs.ct0is,
+      ct1is: circuitInputs.ct1is,
+      k1: circuitInputs.k1,
+      pk_commitment: circuitInputs.pk_commitment,
+      k1_commitment: grecoReturnValue[0].toString(),
+      ct_commitment: grecoReturnValue[1].toString(),
+      public_key_x: circuitInputs.public_key_x,
+      public_key_y: circuitInputs.public_key_y,
+      signature: circuitInputs.signature,
+      hashed_message: circuitInputs.hashed_message,
+      merkle_root: circuitInputs.merkle_root,
+      merkle_proof_length: circuitInputs.merkle_proof_length,
+      merkle_proof_indices: circuitInputs.merkle_proof_indices,
+      merkle_proof_siblings: circuitInputs.merkle_proof_siblings,
+      slot_address: circuitInputs.slot_address,
+      balance: circuitInputs.balance,
+      is_first_vote: circuitInputs.is_first_vote,
+      is_mask_vote: circuitInputs.is_mask_vote,
+      num_options: circuitInputs.num_options,
+    } as CRISPCircuitInputs)
 
-  const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
+    const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
 
-  const proof = await crispBackend.generateProof(crispWitness, { verifierTarget: 'evm' })
+    const proof = await crispBackend.generateProof(crispWitness, { verifierTarget: 'evm' })
 
-  api.destroy()
-
-  return proof
+    return proof
+  } finally {
+    if (api != null) api.destroy()
+  }
 }
 
 /**
