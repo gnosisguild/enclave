@@ -21,9 +21,8 @@ mod common;
 use common::test_backend;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
-use e3_zk_prover::{BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
+use e3_zk_prover::{test_utils::get_tempdir, BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
 use std::path::PathBuf;
-use tempfile::tempdir;
 
 fn versions_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
