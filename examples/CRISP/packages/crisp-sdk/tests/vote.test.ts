@@ -19,7 +19,8 @@ import {
 } from '../src/vote'
 import { publicKeyToAddress, signMessage } from 'viem/accounts'
 import { Hex, recoverPublicKey } from 'viem'
-import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, LEAVES } from './constants'
+import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, SLOT_ADDRESS } from './constants'
+import { generateTestLeaves } from './helpers'
 import { CrispSDK } from '../src/sdk'
 
 describe('Vote', () => {
@@ -27,7 +28,7 @@ describe('Vote', () => {
   let signature: Hex
   let balance: bigint
   let address: string
-  let slotAddress: string
+  let leaves: bigint[]
   let publicKey: Uint8Array
   let previousCiphertext: Uint8Array
   let e3Id: number
@@ -55,14 +56,15 @@ describe('Vote', () => {
     vi.restoreAllMocks()
   })
 
-  // Setup the test environment.
   beforeAll(async () => {
-    vote = [10n, 0n]
+    vote = [10n, 0n, 0n]
     signature = await signMessage({ message: SIGNATURE_MESSAGE, privateKey: ECDSA_PRIVATE_KEY })
-    balance = 100n
+    balance = 10n
     address = publicKeyToAddress(await recoverPublicKey({ hash: SIGNATURE_MESSAGE_HASH, signature }))
-    // Address of the last leaf in the Merkle tree, used for mask votes.
-    slotAddress = '0x145B2260E2DAa2965F933A76f5ff5aE3be5A7e5a'
+    leaves = generateTestLeaves([
+      { address, balance },
+      { address: SLOT_ADDRESS, balance },
+    ])
     publicKey = generatePublicKey()
     previousCiphertext = encryptVote(zeroVote, publicKey)
     e3Id = 0
@@ -158,7 +160,7 @@ describe('Vote', () => {
       // This test simulates a real vote (i.e. generateVoteProof).
 
       // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, address, LEAVES)
+      const merkleProof = generateMerkleProof(balance, address, leaves)
 
       const { crispInputs } = await generateCircuitInputs({
         vote,
@@ -181,12 +183,12 @@ describe('Vote', () => {
       // This test simulates a mask vote (i.e. generateMaskVoteProof).
 
       // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+      const merkleProof = generateMerkleProof(balance, SLOT_ADDRESS, leaves)
 
       const { crispInputs } = await generateCircuitInputs({
         publicKey,
         balance,
-        slotAddress,
+        slotAddress: SLOT_ADDRESS,
         merkleProof,
         vote: zeroVote,
         signature: MASK_SIGNATURE,
@@ -205,7 +207,7 @@ describe('Vote', () => {
       // This test simulates a mask vote (i.e. generateMaskVoteProof).
 
       // Using generateCircuitInputs directly to check the output of the circuit.
-      const merkleProof = generateMerkleProof(balance, slotAddress, LEAVES)
+      const merkleProof = generateMerkleProof(balance, SLOT_ADDRESS, leaves)
 
       const { crispInputs } = await generateCircuitInputs({
         vote: zeroVote,
@@ -214,7 +216,7 @@ describe('Vote', () => {
         messageHash: SIGNATURE_MESSAGE_HASH,
         merkleProof,
         balance,
-        slotAddress,
+        slotAddress: SLOT_ADDRESS,
         isMaskVote: true,
       })
 
@@ -233,10 +235,10 @@ describe('Vote', () => {
         vote,
         publicKey,
         signature,
-        merkleLeaves: LEAVES,
+        merkleLeaves: leaves,
         balance,
         messageHash: SIGNATURE_MESSAGE_HASH,
-        slotAddress,
+        slotAddress: SLOT_ADDRESS,
         e3Id,
       })
 
@@ -256,9 +258,9 @@ describe('Vote', () => {
 
       const proof = await sdk.generateMaskVoteProof({
         balance,
-        slotAddress,
+        slotAddress: SLOT_ADDRESS,
         publicKey,
-        merkleLeaves: LEAVES,
+        merkleLeaves: leaves,
         e3Id: 0,
         numOptions: 2,
       })
@@ -279,9 +281,9 @@ describe('Vote', () => {
 
       const proof = await sdk.generateMaskVoteProof({
         balance,
-        slotAddress,
+        slotAddress: SLOT_ADDRESS,
         publicKey,
-        merkleLeaves: LEAVES,
+        merkleLeaves: leaves,
         e3Id: 0,
         numOptions: 2,
       })

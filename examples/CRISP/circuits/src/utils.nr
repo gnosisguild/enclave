@@ -29,6 +29,7 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     assert(num_options as u64 <= MAX_OPTIONS as u64);
 
     let segment_size: u32 = D / num_options;
+    let remainder: u32 = D - (segment_size * num_options);
 
     let mut sums: [u64; MAX_OPTIONS] = [0; MAX_OPTIONS];
     let mut non_zero_count: u64 = 0;
@@ -38,8 +39,9 @@ pub fn check_coefficient_values_with_balance<let D: u32>(
     for opt_idx in 0..MAX_OPTIONS {
         if (opt_idx as u64) < (num_options as u64) {
             // Due to reversal, TypeScript option opt_idx is at circuit segment (num_options - 1 - opt_idx)
+            // Remainder zeros at end of TypeScript layout become start after k1.reverse()
             let circuit_segment: u32 = num_options - 1 - opt_idx;
-            let start_idx: u32 = circuit_segment * segment_size;
+            let start_idx: u32 = remainder + (circuit_segment * segment_size);
 
             let mut sum: u64 = 0;
 
@@ -97,11 +99,12 @@ pub fn check_coefficient_zero<let D: u32>(k1: Polynomial<D>, num_options: u32) {
     assert(num_options as u64 <= MAX_OPTIONS as u64);
 
     let segment_size: u32 = D / num_options;
+    let remainder: u32 = D - (segment_size * num_options);
 
     for opt_idx in 0..MAX_OPTIONS {
         if (opt_idx as u64) < (num_options as u64) {
             let circuit_segment: u32 = num_options - 1 - opt_idx;
-            let start_idx: u32 = circuit_segment * segment_size;
+            let start_idx: u32 = remainder + (circuit_segment * segment_size);
 
             for bit_pos in 0..MAX_VOTE_BITS {
                 if (bit_pos as u64) < (segment_size as u64) {
@@ -253,6 +256,18 @@ fn test_zero_vote_passes() {
     check_coefficient_values_with_balance(pol, 1, 100, 3);
 }
 
+#[test]
+fn test_non_divisible_d_vote_passes() {
+    // D=100, num_options=3 => D % num_options != 0 (remainder=1)
+    // segment_size=33, remainder=1; option 0 at circuit_segment 2 [67..99]
+    let mut coeffs = [0; 100];
+    coeffs[67] = 1; // Option 0, bit 0 (2^0)
+    coeffs[69] = 1; // Option 0, bit 2 (2^2) => vote value 5
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_values_with_balance(pol, 1, 100, 3);
+}
+
 #[test(should_fail)]
 fn test_invalid_coefficient_fails() {
     let mut coeffs = [0; 100];
@@ -272,6 +287,16 @@ fn test_check_coefficient_zero_passes() {
 fn test_check_coefficient_zero_fails() {
     let mut coeffs = [0; 99];
     coeffs[33] = 1;
+
+    let pol = Polynomial { coefficients: coeffs };
+    check_coefficient_zero(pol, 3);
+}
+
+#[test(should_fail)]
+fn test_check_coefficient_zero_non_divisible_d_fails() {
+    // D=100, num_options=3 => remainder=1; option 2 at circuit_segment 0 [1..33]
+    let mut coeffs = [0; 100];
+    coeffs[1] = 1; // Option 2 LSB
 
     let pol = Polynomial { coefficients: coeffs };
     check_coefficient_zero(pol, 3);
