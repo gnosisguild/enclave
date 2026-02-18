@@ -205,9 +205,22 @@ async fn handle_compute_request_event(
                 ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
                     ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_err}")),
                 ),
-                ComputeRequestKind::TrBFV(_) => ComputeRequestErrorKind::TrBFV(
-                    e3_trbfv::TrBFVError::GenPkShareAndSkSss(format!("Pool error: {pool_err}")),
-                ),
+                ComputeRequestKind::TrBFV(ref trbfv_req) => {
+                    let msg = format!("Pool error: {pool_err}");
+                    ComputeRequestErrorKind::TrBFV(match trbfv_req {
+                        TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
+                        TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
+                        TrBFVRequest::CalculateDecryptionKey(_) => {
+                            TrBFVError::CalculateDecryptionKey(msg)
+                        }
+                        TrBFVRequest::CalculateDecryptionShare(_) => {
+                            TrBFVError::CalculateDecryptionShare(msg)
+                        }
+                        TrBFVRequest::CalculateThresholdDecryption(_) => {
+                            TrBFVError::CalculateThresholdDecryption(msg)
+                        }
+                    })
+                }
             };
             bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
             return Ok(());

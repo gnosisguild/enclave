@@ -135,7 +135,7 @@ impl ProofRequestActor {
     ) {
         let Some(pending) = self.pending_threshold.remove(correlation_id) else {
             error!(
-                "Received PkBfv ComputeResponse with correlation_id {:?} but no matching pending request found.",
+                "Received PkGeneration ComputeResponse with correlation_id {:?} but no matching pending request found.",
                 correlation_id
             );
             return;
