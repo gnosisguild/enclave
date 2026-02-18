@@ -2,7 +2,6 @@
 name = "pk_generation"
 type = "bin"
 authors = ["Gnosis Guild / Enclave"]
-compiler_version = "1.0.0"
 
 [dependencies]
 lib = { path = "../../../lib" }
