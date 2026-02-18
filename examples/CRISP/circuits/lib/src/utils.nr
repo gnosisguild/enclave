@@ -273,10 +273,10 @@ fn test_non_divisible_d_vote_passes() {
     coeffs[69] = 1; // Option 0, bit 2 (2^2) => vote value 5
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_values_with_balance(pol, 1, 100, 3);
+    assert(check_coefficient_values_with_balance(pol, 1, 100, 3));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_invalid_coefficient_fails() {
     let mut coeffs = [0; 100];
     coeffs[50] = 2; // Invalid
@@ -300,12 +300,12 @@ fn test_check_coefficient_zero_fails() {
     assert(!check_coefficient_zero(pol, 3));
 }
 
-#[test(should_fail)]
+#[test]
 fn test_check_coefficient_zero_non_divisible_d_fails() {
     // D=100, num_options=3 => remainder=1; option 2 at circuit_segment 0 [1..33]
     let mut coeffs = [0; 100];
     coeffs[1] = 1; // Option 2 LSB
 
     let pol = Polynomial { coefficients: coeffs };
-    check_coefficient_zero(pol, 3);
+    assert(!check_coefficient_zero(pol, 3));
 }
