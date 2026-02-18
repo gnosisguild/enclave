@@ -165,7 +165,7 @@ describe('Vote', () => {
       expect(proof.publicInputs).toBeDefined()
       expect(proof.encryptedVote).toBeDefined()
 
-      const decryptedVote = decryptVote(proof.encryptedVote, secretKey, 2)
+      const decryptedVote = decryptVote(proof.encryptedVote, secretKey, vote.length)
 
       expect(decryptedVote).toEqual(vote)
 
