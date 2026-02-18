@@ -2410,9 +2410,13 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "clap",
+ "e3-utils",
  "fhe",
+ "fhe-traits",
  "num-bigint",
  "num-traits",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "serde",
  "thiserror 1.0.69",
 ]
