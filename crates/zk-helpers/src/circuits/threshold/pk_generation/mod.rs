@@ -14,6 +14,7 @@ pub mod circuit;
 pub mod codegen;
 pub mod computation;
 pub mod sample;
+pub mod utils;
 pub use circuit::*;
 pub use codegen::*;
 pub use computation::*;

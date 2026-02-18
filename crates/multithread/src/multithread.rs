@@ -436,9 +436,6 @@ fn handle_pk_generation_proof(
     let pk0_share_poly = try_poly_from_bytes(&req.pk0_share, &params)
         .map_err(|e| make_zk_error(&request, format!("pk0_share: {}", e)))?;
 
-    let a_poly = try_poly_from_bytes(&req.a, &params)
-        .map_err(|e| make_zk_error(&request, format!("a: {}", e)))?;
-
     let sk_poly = try_poly_from_bytes(&sk_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("sk: {}", e)))?;
 
@@ -450,7 +447,6 @@ fn handle_pk_generation_proof(
 
     // 3. Convert Poly → CrtPolynomial
     let pk0_share = CrtPolynomial::from_fhe_polynomial(&pk0_share_poly);
-    let a = CrtPolynomial::from_fhe_polynomial(&a_poly);
     let sk = CrtPolynomial::from_fhe_polynomial(&sk_poly);
     let eek = CrtPolynomial::from_fhe_polynomial(&eek_poly);
     let e_sm = CrtPolynomial::from_fhe_polynomial(&e_sm_poly);
@@ -460,7 +456,6 @@ fn handle_pk_generation_proof(
     let circuit_data = PkGenerationCircuitData {
         committee,
         pk0_share,
-        a,
         eek,
         e_sm,
         sk,

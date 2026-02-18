@@ -36,7 +36,7 @@ impl PkGenerationCircuitData {
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
         let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
-        let (pk0_share, a, sk, e) =
+        let (pk0_share, _, sk, e) =
             PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).map_err(|e| {
                 CircuitsErrors::Sample(format!("Failed to create public key share: {:?}", e))
             })?;
@@ -69,7 +69,6 @@ impl PkGenerationCircuitData {
         Ok(PkGenerationCircuitData {
             committee,
             pk0_share: CrtPolynomial::from_fhe_polynomial(&pk0_share),
-            a: CrtPolynomial::from_fhe_polynomial(&a),
             eek: CrtPolynomial::from_fhe_polynomial(&e),
             e_sm: CrtPolynomial::from_fhe_polynomial(&e_sm),
             sk: CrtPolynomial::from_fhe_polynomial(&sk),
@@ -96,7 +95,7 @@ mod tests {
         let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         assert_eq!(inputs.pk0is.limbs.len(), 2);
-        assert_eq!(inputs.a.limbs.len(), 2);
+        assert_eq!(inputs.pk1is.limbs.len(), 2);
         assert_eq!(inputs.e_sm.limbs.len(), 2);
         assert_eq!(inputs.r1is.limbs.len(), 2);
         assert_eq!(inputs.r2is.limbs.len(), 2);

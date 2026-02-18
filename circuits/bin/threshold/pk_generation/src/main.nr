@@ -5,14 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use lib::configs::default::threshold::{
-    L, N, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_PK, PK_GENERATION_BIT_R1,
-    PK_GENERATION_BIT_R2, PK_GENERATION_BIT_SK, PK_GENERATION_CONFIGS,
+    CRP, L, N, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_PK,
+    PK_GENERATION_BIT_R1, PK_GENERATION_BIT_R2, PK_GENERATION_BIT_SK, PK_GENERATION_CONFIGS,
 };
 use lib::core::threshold::pk_generation::PkGeneration;
 use lib::math::polynomial::Polynomial;
 
 fn main(
-    a: pub [Polynomial<N>; L],
     eek: Polynomial<N>,
     sk: Polynomial<N>,
     e_sm: [Polynomial<N>; L],
@@ -23,7 +22,7 @@ fn main(
 ) -> pub (Field, Field, Field) {
     let pk_generation: PkGeneration<N, L, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_SK, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_R1, PK_GENERATION_BIT_R2, PK_GENERATION_BIT_PK> = PkGeneration::new(
         PK_GENERATION_CONFIGS,
-        a,
+        CRP,
         eek,
         sk,
         e_sm,
