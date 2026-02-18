@@ -22,7 +22,6 @@ use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{Provable, ZkProver};
 use std::path::PathBuf;
-use tokio::{fs, process::Command};
 
 sol! {
     #[sol(rpc)]
@@ -100,53 +99,10 @@ async fn test_pk_bfv_onchain_verification() {
         "local proof verification failed: {local_ok:?}"
     );
 
-    // Re-prove with `--oracle_hash keccak` for on-chain verification.
-    // The default ultra_honk proof uses Poseidon2 (for recursive verification in Noir),
-    // but the Solidity verifier expects a keccak-based Fiat-Shamir transcript.
-    // We reuse the witness file already written by prove() above.
-
-    let circuit_dir = backend.circuits_dir.join("dkg").join("pk");
-    let circuit_path = circuit_dir.join("pk.json");
-    let vk_path = circuit_dir.join("pk.vk");
-    let job_dir = backend.work_dir.join(e3_id);
-    let witness_path = job_dir.join("witness.gz");
-    let onchain_out = job_dir.join("onchain_out");
-    fs::create_dir_all(&onchain_out).await.unwrap();
-
-    let keccak_output = Command::new(&backend.bb_binary)
-        .args([
-            "prove",
-            "--scheme",
-            "ultra_honk",
-            "--oracle_hash",
-            "keccak",
-            "-b",
-            &circuit_path.to_string_lossy(),
-            "-w",
-            &witness_path.to_string_lossy(),
-            "-k",
-            &vk_path.to_string_lossy(),
-            "-o",
-            &onchain_out.to_string_lossy(),
-        ])
-        .output()
-        .await
-        .expect("failed to run bb prove with keccak oracle hash");
-
-    assert!(
-        keccak_output.status.success(),
-        "bb prove --oracle_hash keccak failed:\nstderr: {}\nstdout: {}",
-        String::from_utf8_lossy(&keccak_output.stderr),
-        String::from_utf8_lossy(&keccak_output.stdout),
-    );
-
-    let onchain_proof_data = fs::read(onchain_out.join("proof")).await.unwrap();
-    let onchain_public_signals = fs::read(onchain_out.join("public_inputs")).await.unwrap();
-
     println!(
-        "keccak proof: {} bytes, public_inputs: {} bytes",
-        onchain_proof_data.len(),
-        onchain_public_signals.len()
+        "proof: {} bytes, public_inputs: {} bytes",
+        proof.data.len(),
+        proof.public_signals.len()
     );
 
     // Deploy verifier contract to Anvil
@@ -212,11 +168,12 @@ async fn test_pk_bfv_onchain_verification() {
 
     // Verify proof on-chain
 
-    let proof_bytes = Bytes::from(onchain_proof_data);
+    let proof_bytes = Bytes::copy_from_slice(&proof.data);
 
     // pk_bfv has 17 public inputs, 16 are pairing points baked into the proof,
     // so only 1 (the pk commitment) gets passed as publicInputs to the contract.
-    let public_inputs: Vec<FixedBytes<32>> = onchain_public_signals
+    let public_inputs: Vec<FixedBytes<32>> = proof
+        .public_signals
         .chunks(32)
         .map(|chunk| {
             let mut buf = [0u8; 32];
