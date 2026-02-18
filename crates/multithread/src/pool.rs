@@ -27,6 +27,9 @@ pub enum TaskPoolError {
 
     #[error("{0}")]
     RecvError(RecvError),
+
+    #[error("Task panicked: {0}")]
+    Panic(String),
 }
 
 impl TaskPool {
@@ -86,18 +89,34 @@ impl TaskPool {
         // This uses channels to track pending and complete tasks when
         // using the thread pool
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.thread_pool.spawn(|| {
-            let t = op();
-            // try to return the result and it's duration note this is sync as it is a oneshot sender.
-            if let Err(res) = tx.send(t) {
-                error!(
-                "There was an error sending the result from the multithread actor: result = {:?}",
-                res
-            );
+        self.thread_pool.spawn(move || {
+            // Catch panics inside the Rayon thread so we can report them
+            // as errors instead of silently dropping the oneshot sender.
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(op));
+            match result {
+                Ok(t) => {
+                    if let Err(res) = tx.send(Ok(t)) {
+                        error!(
+                            "There was an error sending the result from the multithread actor: result = {:?}",
+                            res
+                        );
+                    }
+                }
+                Err(panic_info) => {
+                    let panic_msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "unknown panic".to_string()
+                    };
+                    error!("Rayon task panicked: {}", panic_msg);
+                    let _ = tx.send(Err(TaskPoolError::Panic(panic_msg)));
+                }
             }
         });
 
-        let output = rx.await.map_err(|r| TaskPoolError::RecvError(r))?;
+        let output = rx.await.map_err(|r| TaskPoolError::RecvError(r))??;
 
         warning_handle.abort();
 

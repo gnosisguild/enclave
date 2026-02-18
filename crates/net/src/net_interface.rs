@@ -377,7 +377,7 @@ async fn process_swarm_event(
             match record {
                 Ok(record) => {
                     let key = ContentHash(record.key.to_vec());
-                    info!("PUT RECORD SUCCESS: {:?}", key);
+                    debug!("PUT RECORD SUCCESS: {:?}", key);
                     event_tx.send(NetEvent::DhtPutRecordSucceeded {
                         key,
                         correlation_id,
@@ -411,7 +411,7 @@ async fn process_swarm_event(
             peer_id,
             topic,
         })) => {
-            info!("Peer {} subscribed to {}", peer_id, topic);
+            debug!("Peer {} subscribed to {}", peer_id, topic);
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
@@ -425,7 +425,7 @@ async fn process_swarm_event(
                 },
             ..
         })) => {
-            info!("Incoming sync request received (id={})", request_id);
+            debug!("Incoming sync request received (id={})", request_id);
 
             // received a request for events
             event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
@@ -635,7 +635,7 @@ fn handle_put_record(
         Ok(qid) => {
             // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
             correlator.track(qid, correlation_id);
-            info!("PUT RECORD OK qid={:?} cid={}", qid, correlation_id);
+            debug!("PUT RECORD OK qid={:?} cid={}", qid, correlation_id);
         }
         Err(error) => {
             event_tx.send(NetEvent::DhtPutRecordError {
@@ -660,7 +660,7 @@ fn handle_get_record(
 
     // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
     correlator.track(query_id, correlation_id);
-    info!(
+    debug!(
         "GET RECORD CORRELATED! query_id={:?} correlation_id={}",
         query_id, correlation_id
     );
@@ -687,7 +687,7 @@ fn handle_outgoing_sync_request(
     correlation_id: CorrelationId,
     value: SyncRequestValue,
 ) -> Result<()> {
-    info!("Outgoing sync request (cid={})", correlation_id);
+    debug!("Outgoing sync request (cid={})", correlation_id);
     // TODO:
     // This is a first pass.
     // Lots of stuff to work through here:
