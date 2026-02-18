@@ -15,6 +15,7 @@ pub global L: u32 = 2;
 pub global QIS: [Field; L] = [72057594082099201, 72057594062438401];
 pub global PLAINTEXT_MODULUS: Field = 18014398509481984;
 pub global Q_MOD_T: Field = 1082658244788225;
+pub global Q_MOD_T_CENTERED: Field = 1082658244788225;
 
 /************************************
 -------------------------------------

@@ -67,6 +67,7 @@ pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
 pub global PLAINTEXT_MODULUS: Field = {};
 pub global Q_MOD_T: Field = {};
+pub global Q_MOD_T_CENTERED: Field = {};
 
 /************************************
 -------------------------------------
@@ -120,6 +121,7 @@ pub global {}_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
         qis_str,
         configs.t,
         configs.q_mod_t,
+        configs.q_mod_t_centered,
         prefix,
         configs.bits.pk_bit,
         prefix,

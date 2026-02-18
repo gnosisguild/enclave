@@ -46,8 +46,7 @@ use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
 use rand::Rng;
-use tracing::error;
-use tracing::info;
+use tracing::{error, info};
 
 /// Multithread actor
 pub struct Multithread {
@@ -187,13 +186,46 @@ async fn handle_compute_request_event(
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
     let (msg, ctx) = msg.into_components();
-    // We spawn a thread on rayon moving to "sync"-land
+    let request_snapshot = msg.clone();
 
-    let (result, duration) = pool
+    let pool_result = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
             handle_compute_request(rng, cipher, zk_prover, msg)
         })
-        .await?;
+        .await;
+
+    let (result, duration) = match pool_result {
+        Ok(v) => v,
+        Err(pool_err) => {
+            error!(
+                "Task pool error for compute request '{}': {pool_err}",
+                msg_string
+            );
+            let error_kind = match &request_snapshot.request {
+                ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
+                    ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_err}")),
+                ),
+                ComputeRequestKind::TrBFV(ref trbfv_req) => {
+                    let msg = format!("Pool error: {pool_err}");
+                    ComputeRequestErrorKind::TrBFV(match trbfv_req {
+                        TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
+                        TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
+                        TrBFVRequest::CalculateDecryptionKey(_) => {
+                            TrBFVError::CalculateDecryptionKey(msg)
+                        }
+                        TrBFVRequest::CalculateDecryptionShare(_) => {
+                            TrBFVError::CalculateDecryptionShare(msg)
+                        }
+                        TrBFVRequest::CalculateThresholdDecryption(_) => {
+                            TrBFVError::CalculateThresholdDecryption(msg)
+                        }
+                    })
+                }
+            };
+            bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
+            return Ok(());
+        }
+    };
 
     if let Some(report) = report {
         report.do_send(TrackDuration::new(msg_string, duration))

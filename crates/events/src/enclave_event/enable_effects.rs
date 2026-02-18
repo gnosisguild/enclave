@@ -4,18 +4,23 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::CorrelationId;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-/// Dispatched once the sync process is complete and live listening should continue
+/// Dispatched once effects (side-effects) should be activated after a sync pass
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct EffectsEnabled;
+pub struct EffectsEnabled {
+    pub correlation_id: CorrelationId,
+}
 
 impl EffectsEnabled {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            correlation_id: CorrelationId::new(),
+        }
     }
 }
 

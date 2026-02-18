@@ -53,6 +53,20 @@
 | share_decryption                | 1012104 | 3.54M   | 12.98 MB     | 19.20 MB  | 3.59 KB | 15.88 KB   |
 | user_data_encryption            | 1684299 | 4.02M   | 20.75 MB     | 23.82 MB  | 3.59 KB | 15.88 KB   |
 
+### Config
+
+#### Timing Metrics
+
+| Circuit                 | Compile | Execute | Prove  | Verify |
+| ----------------------- | ------- | ------- | ------ | ------ |
+| validate_secure_configs | 0.26 s  | 0.26 s  | 0.05 s | 0.02 s |
+
+#### Size & Circuit Metrics
+
+| Circuit                 | Opcodes | Gates | Circuit Size | Witness | VK Size | Proof Size |
+| ----------------------- | ------- | ----- | ------------ | ------- | ------- | ---------- |
+| validate_secure_configs | 0       | 54    | 568 B        | 23 B    | 3.59 KB | 15.88 KB   |
+
 ## Circuit Details
 
 ### DKG
@@ -218,6 +232,24 @@
 | **Witness Size**     | 23.82 MB  |
 | **VK Size**          | 3.59 KB   |
 | **Proof Size**       | 15.88 KB  |
+
+### Config
+
+#### validate_secure_configs
+
+| Metric               | Value    |
+| -------------------- | -------- |
+| **Compilation**      | 0.26 s   |
+| **Execution**        | 0.26 s   |
+| **VK Generation**    | 0.03 s   |
+| **Proof Generation** | 0.05 s   |
+| **Verification**     | 0.02 s   |
+| **ACIR Opcodes**     | "0"      |
+| **Total Gates**      | "54"     |
+| **Circuit Size**     | 568 B    |
+| **Witness Size**     | 23 B     |
+| **VK Size**          | 3.59 KB  |
+| **Proof Size**       | 15.88 KB |
 
 ## System Information
 

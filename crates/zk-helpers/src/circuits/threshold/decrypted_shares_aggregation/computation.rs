@@ -12,6 +12,7 @@
 //! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
 
 use crate::calculate_bit_width;
+use crate::compute_q_mod_t;
 use crate::compute_q_mod_t_centered;
 use crate::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
@@ -74,7 +75,8 @@ pub struct Configs {
     pub threshold: usize,
     pub moduli: Vec<u64>,
     pub plaintext_modulus: u64,
-    pub q_mod_t: BigInt,
+    pub q_mod_t: BigUint,
+    pub q_mod_t_centered: BigInt,
     pub q_inverse_mod_t: u64,
     pub bits: Bits,
     pub bounds: Bounds,
@@ -137,8 +139,9 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
-        let q_mod_t = compute_q_mod_t_centered(&moduli, t);
         let q = utils::compute_q_product(&moduli);
+        let q_mod_t = compute_q_mod_t(&q, t);
+        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
         let q_inverse_mod_t = utils::compute_q_inverse_mod_t(&q, t)?;
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
@@ -148,6 +151,7 @@ impl Computation for Configs {
             moduli,
             plaintext_modulus: t,
             q_mod_t,
+            q_mod_t_centered,
             q_inverse_mod_t,
             bits,
             bounds,

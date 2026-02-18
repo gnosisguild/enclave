@@ -78,7 +78,7 @@ format_gates() {
 }
 
 
-# Helper: return "dkg" or "threshold" from circuit_path in JSON
+# Helper: return "dkg", "threshold", or "config" from circuit_path in JSON
 category_of() {
     local path
     path=$(jq -r '.circuit_path' "$1")
@@ -86,6 +86,8 @@ category_of() {
         echo "dkg"
     elif [[ "$path" == *"/threshold/"* ]]; then
         echo "threshold"
+    elif [[ "$path" == *"config"* ]]; then
+        echo "config"
     else
         echo "other"
     fi
@@ -206,15 +208,69 @@ for json_file in "$INPUT_DIR"/*.json; do
     echo "| $circuit | $opcodes | $gates_fmt | $circuit_size_fmt | $witness_size_fmt | $vk_size_fmt | $proof_size_fmt |" >> "$OUTPUT_FILE"
 done
 
-# Detailed metrics by circuit, grouped by DKG / Threshold
+# Config (validate_secure_configs) - only present in secure mode
+cat >> "$OUTPUT_FILE" << EOF
+
+### Config
+
+#### Timing Metrics
+
+| Circuit | Compile | Execute | Prove | Verify |
+|---------|---------|---------|-------|--------|
+EOF
+
+for json_file in "$INPUT_DIR"/*.json; do
+    [ -f "$json_file" ] || continue
+    [ "$(category_of "$json_file")" = "config" ] || continue
+    circuit=$(jq -r '.circuit_name' "$json_file")
+    compile_time=$(jq -r '.compilation.time_seconds' "$json_file")
+    execute_time=$(jq -r '.execution.time_seconds' "$json_file")
+    prove_time=$(jq -r '.proof_generation.time_seconds' "$json_file")
+    verify_time=$(jq -r '.verification.time_seconds' "$json_file")
+    compile_fmt=$(format_time "$compile_time")
+    execute_fmt=$(format_time "$execute_time")
+    prove_fmt=$(format_time "$prove_time")
+    verify_fmt=$(format_time "$verify_time")
+    echo "| $circuit | $compile_fmt | $execute_fmt | $prove_fmt | $verify_fmt |" >> "$OUTPUT_FILE"
+done
+
+cat >> "$OUTPUT_FILE" << EOF
+
+#### Size & Circuit Metrics
+
+| Circuit | Opcodes | Gates | Circuit Size | Witness | VK Size | Proof Size |
+|---------|---------|-------|--------------|---------|---------|------------|
+EOF
+
+for json_file in "$INPUT_DIR"/*.json; do
+    [ -f "$json_file" ] || continue
+    [ "$(category_of "$json_file")" = "config" ] || continue
+    circuit=$(jq -r '.circuit_name' "$json_file")
+    opcodes=$(jq -r '.gates.acir_opcodes // 0' "$json_file")
+    gates=$(jq -r '.gates.total_gates' "$json_file")
+    circuit_size=$(jq -r '.compilation.circuit_size_bytes' "$json_file")
+    witness_size=$(jq -r '.execution.witness_size_bytes' "$json_file")
+    vk_size=$(jq -r '.vk_generation.vk_size_bytes' "$json_file")
+    proof_size=$(jq -r '.proof_generation.proof_size_bytes' "$json_file")
+    gates_fmt=$(format_gates "$gates")
+    circuit_size_fmt=$(format_bytes "$circuit_size")
+    witness_size_fmt=$(format_bytes "$witness_size")
+    vk_size_fmt=$(format_bytes "$vk_size")
+    proof_size_fmt=$(format_bytes "$proof_size")
+    echo "| $circuit | $opcodes | $gates_fmt | $circuit_size_fmt | $witness_size_fmt | $vk_size_fmt | $proof_size_fmt |" >> "$OUTPUT_FILE"
+done
+
+# Detailed metrics by circuit, grouped by DKG / Threshold / Config
 cat >> "$OUTPUT_FILE" << EOF
 
 ## Circuit Details
 
 EOF
 
-for category in dkg threshold; do
-    title="DKG"; [ "$category" = "threshold" ] && title="Threshold"
+for category in dkg threshold config; do
+    title="DKG"
+    [ "$category" = "threshold" ] && title="Threshold"
+    [ "$category" = "config" ] && title="Config"
     echo "### $title" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
     circuits=$(for json_file in "$INPUT_DIR"/*.json; do

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::CorrelationId;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -11,11 +12,15 @@ use std::fmt::{self, Display};
 /// Dispatched once the sync process is complete and live listening should continue
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct SyncEnded;
+pub struct SyncEnded {
+    pub correlation_id: CorrelationId,
+}
 
 impl SyncEnded {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            correlation_id: CorrelationId::new(),
+        }
     }
 }
 
