@@ -18,9 +18,9 @@ use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
     EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
-use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::{setup_crp_params, ParamsWithCrp};
 use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
@@ -45,11 +45,6 @@ pub fn create_seed_from_u64(value: u64) -> Seed {
 
 pub fn create_rng_from_seed(seed: Seed) -> SharedRng {
     Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.into())))
-}
-
-pub fn create_crp_from_seed(params: &Arc<BfvParameters>, seed: &Seed) -> Result<CommonRandomPoly> {
-    let rng = create_rng_from_seed(seed.clone());
-    Ok(create_crp(params.clone(), rng))
 }
 
 pub fn create_crp_bytes_params(

@@ -32,7 +32,7 @@ pub fn setup_crp_params(
     rng: SharedRng,
 ) -> ParamsWithCrp {
     let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
-    let crp = create_crp(params.clone(), rng);
+    let crp = create_crp(&params, rng);
     ParamsWithCrp {
         moduli: moduli.to_vec(),
         degree,
@@ -43,20 +43,20 @@ pub fn setup_crp_params(
 }
 
 /// Creates a Common Random Polynomial for the given BFV parameters.
-pub fn create_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
+pub fn create_crp(params: &Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
 }
 
 /// Creates a Common Random Polynomial for the given BFV parameters and seed.
 pub fn create_deterministic_crp_from_seed(
-    params: Arc<BfvParameters>,
+    params: &Arc<BfvParameters>,
     seed: [u8; 32],
 ) -> CommonRandomPoly {
     CommonRandomPoly::new_deterministic(&params, seed).unwrap()
 }
 
 /// Creates a Common Random Polynomial for the given BFV parameters and default seed.
-pub fn create_deterministic_crp_from_default_seed(params: Arc<BfvParameters>) -> CommonRandomPoly {
+pub fn create_deterministic_crp_from_default_seed(params: &Arc<BfvParameters>) -> CommonRandomPoly {
     create_deterministic_crp_from_seed(params, <ChaCha8Rng as SeedableRng>::Seed::default())
 }
 
@@ -104,7 +104,7 @@ mod tests {
         let rng = Arc::new(Mutex::new(ChaCha20Rng::from_seed(
             <ChaCha8Rng as SeedableRng>::Seed::default(),
         )));
-        let crp = create_crp(params.clone(), rng);
+        let crp = create_crp(&params, rng);
         let bytes = crp.to_bytes();
 
         let restored = CommonRandomPoly::deserialize(&bytes, &params)
@@ -123,8 +123,8 @@ mod tests {
         );
         let seed = [42u8; 32];
 
-        let crp1 = create_deterministic_crp_from_seed(params.clone(), seed);
-        let crp2 = create_deterministic_crp_from_seed(params.clone(), seed);
+        let crp1 = create_deterministic_crp_from_seed(&params, seed);
+        let crp2 = create_deterministic_crp_from_seed(&params, seed);
 
         assert_eq!(crp1.to_bytes(), crp2.to_bytes());
     }
@@ -141,8 +141,8 @@ mod tests {
         let mut seed2 = [2u8; 32];
         seed2[0] = 2;
 
-        let crp1 = create_deterministic_crp_from_seed(params.clone(), seed1);
-        let crp2 = create_deterministic_crp_from_seed(params.clone(), seed2);
+        let crp1 = create_deterministic_crp_from_seed(&params, seed1);
+        let crp2 = create_deterministic_crp_from_seed(&params, seed2);
 
         assert_ne!(crp1.to_bytes(), crp2.to_bytes());
     }

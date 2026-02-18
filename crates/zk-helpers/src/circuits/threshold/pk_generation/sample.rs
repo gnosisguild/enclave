@@ -12,12 +12,11 @@
 use crate::{
     threshold::pk_generation::PkGenerationCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use fhe::mbfv::PublicKeyShare;
 use fhe::{
     bfv::SecretKey,
-    mbfv::CommonRandomPoly,
     trbfv::{ShareManager, TRBFV},
 };
 use rand::thread_rng;
@@ -35,8 +34,7 @@ impl PkGenerationCircuitData {
         let mut rng = thread_rng();
 
         let secret_key = SecretKey::random(&threshold_params, &mut rng);
-        let crp = CommonRandomPoly::new(&threshold_params, &mut rng)
-            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
+        let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
         let (pk0_share, a, sk, e) =
             PublicKeyShare::new_extended(&secret_key, crp.clone(), &mut rng).map_err(|e| {
