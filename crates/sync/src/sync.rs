@@ -10,9 +10,10 @@ use anyhow::Result;
 use e3_data::Repositories;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CorrelationId, EffectsEnabled, EnclaveEvent,
-    EventContextAccessors, EventPublisher, EventStoreQueryBy, EventStoreQueryResponse,
-    EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived, HistoricalEvmSyncStart,
-    HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnded, Unsequenced,
+    EnclaveEventData, Event, EventContextAccessors, EventPublisher, EventStoreQueryBy,
+    EventStoreQueryResponse, EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived,
+    HistoricalEvmSyncStart, HistoricalNetEventsReceived, HistoricalNetSyncStart, SeqAgg, SyncEnded,
+    Unsequenced,
 };
 use e3_utils::actix::channel as actix_toolbox;
 use std::{
@@ -21,6 +22,15 @@ use std::{
 };
 use tokio::sync::mpsc::Receiver;
 use tracing::{info, warn};
+
+fn is_infrastructure_event(event: &EnclaveEvent) -> bool {
+    matches!(
+        event.get_data(),
+        EnclaveEventData::SyncEnded(_)
+            | EnclaveEventData::EffectsEnabled(_)
+            | EnclaveEventData::HistoricalEvmSyncStart(_)
+    )
+}
 
 pub async fn sync(
     bus: &BusHandle,
@@ -55,8 +65,17 @@ pub async fn sync(
     info!("{} EventStore events loaded.", events.len());
 
     info!("Replaying events to actors...");
-    // 4. Replay the EventStore events to all listeners (except effects)
+    // 4. Replay the EventStore events to all listeners (except effects).
+    //    Skip infrastructure events (SyncEnded, EffectsEnabled, HistoricalEvmSyncStart) because
+    //    they will be re-published by this sync process (steps 5, 8, 10). Replaying them here
+    //    would poison the EventBus bloom-filter deduplication: the replayed event has the same
+    //    EventId (payload hash) as the one we publish later, causing the later event to be
+    //    silently dropped.  This is critical for SyncEnded, if the EvmChainGateway never
+    //    receives it, the gateway stays in BufferUntilLive and all live EVM events are lost.
     for event in events {
+        if is_infrastructure_event(&event) {
+            continue;
+        }
         bus.event_bus().try_send(event)?;
     }
     info!("Events replayed.");
