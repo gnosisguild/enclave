@@ -93,6 +93,13 @@ pub global DS_CLG_SHARE_DECRYPTION: [u8; 64] = [
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
+// Domain separator - "U_COMMITMENT"
+pub global DS_U_COMMITMENT: [u8; 64] = [
+    0x55, 0x5f, 0x43, 0x4f, 0x4d, 0x4d, 0x49, 0x54, 0x4d, 0x45, 0x4e, 0x54, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
 
 /// WRAPPERS
 
@@ -214,11 +221,24 @@ pub fn compute_aggregated_shares_commitment<let N: u32, let L: u32, let BIT_MSG:
 pub fn compute_pk_aggregation_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
     pk0: [Polynomial<N>; L],
     pk1: [Polynomial<N>; L],
-) -> Field {
-    let mut payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
-    payload = multiple_polynomial_payload::<N, L, BIT_PK>(payload, pk1);
+) -> (Field, Field) {
+    let payload_pk0 = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
+    let payload_pk1 = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk1);
 
-    compute_commitments(payload, DS_PK_AGGREGATION, [0x80000000 | payload.len(), 1]).get(0)
+    let commit_pk0 = compute_commitments(
+        payload_pk0,
+        DS_PK_AGGREGATION,
+        [0x80000000 | payload_pk0.len(), 1],
+    )
+        .get(0);
+    let commit_pk1 = compute_commitments(
+        payload_pk1,
+        DS_PK_AGGREGATION,
+        [0x80000000 | payload_pk1.len(), 1],
+    )
+        .get(0);
+
+    (commit_pk0, commit_pk1)
 }
 
 pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> Field {
@@ -258,21 +278,6 @@ pub fn compute_share_encryption_challenge<let L: u32>(payload: Vec<Field>) -> Ve
     )
 }
 
-pub fn compute_user_data_encryption_challenge_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
-    gammas_payload: Vec<Field>,
-    pk_commitment: Field,
-) -> Vec<Field> {
-    assert(compute_pk_aggregation_commitment::<N, L, BIT_PK>(pk0is, pk1is) == pk_commitment);
-
-    compute_commitments(
-        gammas_payload,
-        DS_CLG_USER_DATA_ENCRYPTION,
-        [0x80000000 | gammas_payload.len(), 2 * L],
-    )
-}
-
 pub fn compute_threshold_share_decryption_challenge<let L: u32>(payload: Vec<Field>) -> Field {
     compute_commitments(
         payload,
@@ -280,4 +285,41 @@ pub fn compute_threshold_share_decryption_challenge<let L: u32>(payload: Vec<Fie
         [0x80000000 | payload.len(), 1],
     )
         .get(0)
+}
+
+pub fn compute_user_data_encryption_ct0_pk_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
+    pk0: [Polynomial<N>; L],
+) -> Field {
+    let payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk0);
+    compute_commitments(payload, DS_PK_AGGREGATION, [0x80000000 | payload.len(), 1]).get(0)
+}
+
+pub fn compute_user_data_encryption_ct1_pk_commitment<let N: u32, let L: u32, let BIT_PK: u32>(
+    pk1: [Polynomial<N>; L],
+) -> Field {
+    let payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), pk1);
+    compute_commitments(payload, DS_PK_AGGREGATION, [0x80000000 | payload.len(), 1]).get(0)
+}
+
+pub fn compute_user_data_encryption_u_commitment<let N: u32, let BIT_U: u32>(
+    u: Polynomial<N>,
+) -> Field {
+    let payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), u);
+    compute_commitments(payload, DS_U_COMMITMENT, [0x80000000 | payload.len(), 1]).get(0)
+}
+
+pub fn compute_user_data_encryption_ct0_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
+    compute_commitments(
+        payload,
+        DS_CLG_USER_DATA_ENCRYPTION,
+        [0x80000000 | payload.len(), 2 * L],
+    )
+}
+
+pub fn compute_user_data_encryption_ct1_challenge<let L: u32>(payload: Vec<Field>) -> Vec<Field> {
+    compute_commitments(
+        payload,
+        DS_CLG_USER_DATA_ENCRYPTION,
+        [0x80000000 | payload.len(), 2 * L],
+    )
 }

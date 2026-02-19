@@ -15,7 +15,7 @@ fn main(
     pk1: [[Polynomial<N>; L]; H],
     pk0_agg: [Polynomial<N>; L],
     pk1_agg: [Polynomial<N>; L],
-) -> pub Field {
+) -> pub (Field, Field) {
     let pk_aggregation: PkAggregation<N, H, L, PK_AGGREGATION_BIT_PK> = PkAggregation::new(
         PK_AGGREGATION_CONFIGS,
         expected_threshold_pk_commitments,

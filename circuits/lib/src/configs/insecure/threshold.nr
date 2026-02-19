@@ -8,7 +8,8 @@ use crate::core::threshold::decrypted_shares_aggregation::Configs as DecryptedSh
 use crate::core::threshold::pk_aggregation::Configs as PkAggregationConfigs;
 use crate::core::threshold::pk_generation::Configs as PkGenerationConfigs;
 use crate::core::threshold::share_decryption::Configs as ShareDecryptionConfigs;
-use crate::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
+use crate::core::threshold::user_data_encryption_ct0::Configs as UserDataEncryptionCt0Configs;
+use crate::core::threshold::user_data_encryption_ct1::Configs as UserDataEncryptionCt1Configs;
 use crate::math::polynomial::Polynomial;
 
 // Global configs for threshold insecure preset
@@ -1121,20 +1122,38 @@ pub global USER_DATA_ENCRYPTION_R2_BOUNDS: [Field; L] = [34359701504, 3435961548
 pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [256, 256];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] = [34359701504, 34359615488];
 
-pub global USER_DATA_ENCRYPTION_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
+/************************************
+-------------------------------------
+user_data_encryption_ct0 (CIRCUIT A - CT0 ENCRYPTION)
+-------------------------------------
+************************************/
+
+pub global USER_DATA_ENCRYPTION_CT0_CONFIGS: UserDataEncryptionCt0Configs<N, L> = UserDataEncryptionCt0Configs::new(
     QIS,
     USER_DATA_ENCRYPTION_K0IS,
     USER_DATA_ENCRYPTION_PK_BOUNDS,
     USER_DATA_ENCRYPTION_E0_BOUND,
-    USER_DATA_ENCRYPTION_E1_BOUND,
     USER_DATA_ENCRYPTION_U_BOUND,
     USER_DATA_ENCRYPTION_R1_LOW_BOUNDS,
     USER_DATA_ENCRYPTION_R1_UP_BOUNDS,
     USER_DATA_ENCRYPTION_R2_BOUNDS,
-    USER_DATA_ENCRYPTION_P1_BOUNDS,
-    USER_DATA_ENCRYPTION_P2_BOUNDS,
     USER_DATA_ENCRYPTION_K1_LOW_BOUND,
     USER_DATA_ENCRYPTION_K1_UP_BOUND,
+);
+
+/************************************
+-------------------------------------
+user_data_encryption_ct1 (CIRCUIT B - CT1 ENCRYPTION)
+-------------------------------------
+***--------------------------------*/
+
+pub global USER_DATA_ENCRYPTION_CT1_CONFIGS: UserDataEncryptionCt1Configs<N, L> = UserDataEncryptionCt1Configs::new(
+    QIS,
+    USER_DATA_ENCRYPTION_PK_BOUNDS,
+    USER_DATA_ENCRYPTION_E1_BOUND,
+    USER_DATA_ENCRYPTION_U_BOUND,
+    USER_DATA_ENCRYPTION_P1_BOUNDS,
+    USER_DATA_ENCRYPTION_P2_BOUNDS,
 );
 
 /************************************
