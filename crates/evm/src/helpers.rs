@@ -198,7 +198,7 @@ pub async fn load_signer_from_repository(
     let encrypted_key = repository
         .read()
         .await?
-        .ok_or_else(|| anyhow::anyhow!("No private key found in repository"))?;
+        .context("No private key found in repository")?;
 
     let mut decrypted = cipher.decrypt_data(&encrypted_key)?;
     let private_key = Zeroizing::new(hex::encode(&decrypted));

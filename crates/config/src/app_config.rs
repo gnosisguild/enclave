@@ -261,7 +261,7 @@ impl AppConfig {
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
             using_custom_bb: config.custom_bb.is_some(),
-            using_custom_config: found_config_file.is_some(),
+            using_custom_config: config.using_custom_config,
         })
     }
 
@@ -423,7 +423,7 @@ pub struct UnscopedAppConfig {
     data_dir: Option<PathBuf>,
     /// The config file as found before initialization this is for testing purposes and you should
     /// not use this in your configurations
-    found_config_file: Option<PathBuf>,
+    found_config_file: Option<PathBuf>, // This is set regardless as the file is resolved
     /// The default node that runs during commands like `enclave start` without supplying the
     /// `--name` argument.
     node: NodeDefinition,
@@ -437,6 +437,8 @@ pub struct UnscopedAppConfig {
     /// is up to the node operator to ensure bb matches the version that exactly matches the
     /// application.
     custom_bb: Option<PathBuf>,
+    /// Whether or not the config param was passed in
+    using_custom_config: bool,
 }
 
 impl Default for UnscopedAppConfig {
@@ -451,6 +453,7 @@ impl Default for UnscopedAppConfig {
             nodes: HashMap::new(),
             program: None,
             custom_bb: None,
+            using_custom_config: false,
         }
     }
 }
@@ -490,6 +493,7 @@ impl UnscopedAppConfig {
 struct CliOverrides {
     pub otel: Option<String>,
     pub found_config_file: Option<PathBuf>,
+    pub using_custom_config: bool,
 }
 
 /// Load the config at the config_file or the default location if not provided
@@ -518,6 +522,7 @@ pub fn load_config(
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
+                using_custom_config: found_config_file.is_some(),
             }))
             .extract()
             .context("Could not parse configuration")?;
