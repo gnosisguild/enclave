@@ -130,10 +130,8 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
-        let gammas = self.generate_challenge(sk_commitment, pk_commitment);
+        let gamma = self.generate_challenge(sk_commitment, pk_commitment);
 
-        // Use single gamma at index 0 for all modulus evaluations
-        let gamma = gammas.get(0);
         for i in 0..L {
             self.verify_public_key_for_modulus(i, gamma);
         }
@@ -142,10 +140,10 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     }
 
     /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge
-    fn generate_challenge(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
+    fn generate_challenge(self, sk_commitment: Field, pk_commitment: Field) -> Field {
         let inputs = self.payload(sk_commitment, pk_commitment);
 
-        compute_threshold_pk_challenge::<L>(inputs)
+        compute_threshold_pk_challenge(inputs)
     }
 
     /// Performs range checks on all secret witness values
