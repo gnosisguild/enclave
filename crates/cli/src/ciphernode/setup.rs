@@ -65,6 +65,11 @@ pub async fn execute(
     e3_entrypoint::wallet::set::execute(&config, private_key).await?;
 
     println!("Enclave configuration successfully created!");
+    println!("Configuration has been written to {:?}", config_dir);
+    println!(
+        "Run future commands from within this directory tree, or pass --config {:?}",
+        config_dir
+    );
 
     Ok(())
 }
