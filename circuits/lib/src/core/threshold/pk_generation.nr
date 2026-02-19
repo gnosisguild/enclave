@@ -100,12 +100,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     }
 
     /// Flattens all witness data into a single array for Fiat-Shamir challenge generation
-    fn payload(
-        self,
-        sk_commitment: Field,
-        pk_commitment: Field,
-        e_sm_commitment: Field,
-    ) -> Vec<Field> {
+    fn payload(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         // Flatten CRS polynomials a (L polynomials of degree N)
@@ -117,7 +112,6 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         // Use commitments instead of full polynomials
         inputs.push(sk_commitment);
         inputs.push(pk_commitment);
-        inputs.push(e_sm_commitment);
 
         // Flatten quotient polynomials (L polynomials each)
         inputs = flatten::<_, _, BIT_R1>(inputs, self.r1);
@@ -129,36 +123,27 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
     /// Main execution function
     /// Returns (commit(threshold_sk), commit(threshold_pk), commit(e_sm))
     pub fn execute(self) -> (Field, Field, Field) {
-        // Step 1: Perform range checks on all secret witness values
         self.perform_range_checks();
 
-        // Step 2: Compute commitments
         let sk_commitment = compute_share_computation_sk_commitment::<N, BIT_SK>(self.sk);
         let e_sm_commitment =
             compute_share_computation_e_sm_commitment::<N, L, BIT_E_SM>(self.e_sm);
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
-        // Step 3: Generate Fiat-Shamir challenges using commitments
-        let gammas = self.generate_challenge(sk_commitment, pk_commitment, e_sm_commitment);
+        let gammas = self.generate_challenge(sk_commitment, pk_commitment);
 
-        // Step 4: Verify public key equations for each modulus
+        // Use single gamma at index 0 for all modulus evaluations
+        let gamma = gammas.get(0);
         for i in 0..L {
-            let gamma = gammas.get(i);
             self.verify_public_key_for_modulus(i, gamma);
         }
 
-        // Step 5: Return all commitments
         (sk_commitment, pk_commitment, e_sm_commitment)
     }
 
     /// Generates Fiat-Shamir challenge values using the SAFE cryptographic sponge
-    fn generate_challenge(
-        self,
-        sk_commitment: Field,
-        pk_commitment: Field,
-        e_sm_commitment: Field,
-    ) -> Vec<Field> {
-        let inputs = self.payload(sk_commitment, pk_commitment, e_sm_commitment);
+    fn generate_challenge(self, sk_commitment: Field, pk_commitment: Field) -> Vec<Field> {
+        let inputs = self.payload(sk_commitment, pk_commitment);
 
         compute_threshold_pk_challenge::<L>(inputs)
     }
