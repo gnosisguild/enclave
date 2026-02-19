@@ -8,6 +8,8 @@ use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
 
+use crate::net_get_peer_id;
+
 #[derive(Subcommand, Debug)]
 pub enum NetCommands {
     /// Get the ciphernode's libp2p PeerId
@@ -16,7 +18,7 @@ pub enum NetCommands {
 
 pub async fn execute(command: NetCommands, config: &AppConfig) -> Result<()> {
     match command {
-        NetCommands::GetPeerId => e3_entrypoint::net::get_peer_id::execute(config).await?,
+        NetCommands::GetPeerId => net_get_peer_id::execute(config).await?,
     };
 
     Ok(())

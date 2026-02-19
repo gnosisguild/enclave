@@ -13,6 +13,7 @@ mod cli;
 pub mod helpers;
 mod init;
 mod net;
+mod net_get_peer_id;
 mod nodes;
 mod nodes_daemon;
 mod nodes_down;

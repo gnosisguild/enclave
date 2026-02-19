@@ -38,7 +38,6 @@ pub async fn execute(
     };
 
     let private_key = ask_for_private_key(private_key)?;
-    let address = eth_address_from_private_key(&private_key)?;
     let default_config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
         .join("enclave");
@@ -60,7 +59,7 @@ pub async fn execute(
         .into();
 
     // Execute
-    let config = setup::execute(&rpc_url, &config_dir, &address)?;
+    let config = setup::execute(&rpc_url, &config_dir)?;
 
     password_set::execute(&config, Some(pw)).await?;
 

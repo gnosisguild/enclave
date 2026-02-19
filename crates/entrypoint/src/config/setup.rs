@@ -38,7 +38,7 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
 }
 
 #[instrument(name = "app", skip_all)]
-pub fn execute(rpc_url: &str, config_dir: &PathBuf, address: &Address) -> Result<AppConfig> {
+pub fn execute(rpc_url: &str, config_dir: &PathBuf) -> Result<AppConfig> {
     fs::create_dir_all(&config_dir)?;
 
     let config_path = config_dir.join("enclave.config.yaml");
