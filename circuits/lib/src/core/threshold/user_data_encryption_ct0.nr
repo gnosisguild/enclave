@@ -18,7 +18,6 @@ use crate::math::polynomial::Polynomial;
 pub struct Configs<let N: u32, let L: u32> {
     pub qis: [Field; L],
     pub k0is: [Field; L],
-    pub pk_bounds: [Field; L],
     pub e0_bound: Field,
     pub u_bound: Field,
     pub r1_low_bounds: [Field; L],
@@ -32,7 +31,6 @@ impl<let N: u32, let L: u32> Configs<N, L> {
     pub fn new(
         qis: [Field; L],
         k0is: [Field; L],
-        pk_bounds: [Field; L],
         e0_bound: Field,
         u_bound: Field,
         r1_low_bounds: [Field; L],
@@ -44,7 +42,6 @@ impl<let N: u32, let L: u32> Configs<N, L> {
         Configs {
             qis,
             k0is,
-            pk_bounds,
             e0_bound,
             u_bound,
             r1_low_bounds,
@@ -124,10 +121,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         self.k1.range_check_2bounds::<BIT_K>(self.configs.k1_up_bound, self.configs.k1_low_bound);
 
         for i in 0..L {
-            self.pk0is[i].range_check_2bounds::<BIT_PK>(
-                self.configs.pk_bounds[i],
-                self.configs.pk_bounds[i],
-            );
             self.r1is[i].range_check_2bounds::<BIT_R1>(
                 self.configs.r1_up_bounds[i],
                 self.configs.r1_low_bounds[i],
