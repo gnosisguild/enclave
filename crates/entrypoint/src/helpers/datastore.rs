@@ -12,9 +12,9 @@ use e3_ciphernode_builder::get_enclave_bus_handle;
 use e3_config::AppConfig;
 use e3_data::{DataStore, InMemStore, SledDb, SledStore};
 use e3_data::{Repositories, RepositoriesFactory};
-use e3_events::BusHandle;
+use e3_events::{BusHandle, Disabled};
 
-pub fn get_sled_store(bus: &BusHandle, db_file: &PathBuf) -> Result<DataStore> {
+pub fn get_sled_store(bus: &BusHandle<Disabled>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())
 }
 
@@ -22,7 +22,7 @@ pub fn get_in_mem_store() -> DataStore {
     (&InMemStore::new(true).start()).into()
 }
 
-pub fn setup_datastore(config: &AppConfig, bus: &BusHandle) -> Result<DataStore> {
+pub fn setup_datastore(config: &AppConfig, bus: &BusHandle<Disabled>) -> Result<DataStore> {
     let store: DataStore = if !config.use_in_mem_store() {
         get_sled_store(&bus, &config.db_file())?
     } else {
@@ -32,7 +32,7 @@ pub fn setup_datastore(config: &AppConfig, bus: &BusHandle) -> Result<DataStore>
 }
 
 pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
-    let bus = get_enclave_bus_handle(config)?;
+    let bus = get_enclave_bus_handle()?;
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
 }

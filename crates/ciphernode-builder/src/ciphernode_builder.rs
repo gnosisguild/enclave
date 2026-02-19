@@ -14,6 +14,7 @@ use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
+use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
@@ -61,7 +62,6 @@ pub struct CiphernodeBuilder {
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
     multithread_report: Option<Addr<MultithreadReport>>,
-    name: String,
     pubkey_agg: bool,
     rng: SharedRng,
     sortition_backend: SortitionBackend,
@@ -115,7 +115,7 @@ impl CiphernodeBuilder {
     /// - name - Unique name for the ciphernode
     /// - rng - Arc Mutex wrapped random number generator
     /// - cipher - Cipher for encryption and decryption of sensitive data
-    pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
+    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
             chains: vec![],
@@ -128,7 +128,6 @@ impl CiphernodeBuilder {
             multithread_cache: None,
             multithread_concurrent_jobs: None,
             multithread_report: None,
-            name: name.to_owned(),
             pubkey_agg: false,
             rng,
             sortition_backend: SortitionBackend::score(),
@@ -201,11 +200,11 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the given Address to represent the node. This should be unique.
-    pub fn with_address(mut self, addr: &str) -> Self {
-        self.address = Some(addr.to_owned());
-        self
-    }
+    // /// Use the given Address to represent the node. This should be unique.
+    // pub fn with_address(mut self, addr: &str) -> Self {
+    //     self.address = Some(addr.to_owned());
+    //     self
+    // }
 
     /// Log data actor events
     pub fn with_logging(mut self) -> Self {
@@ -367,15 +366,6 @@ impl CiphernodeBuilder {
             None
         };
 
-        let addr = if let Some(addr) = self.address.clone() {
-            info!("Using eth address = {}", addr);
-            addr
-        } else {
-            info!("Using random eth address");
-            // TODO: This is for testing and should not be used for production if we use this to create ciphernodes in production
-            rand_eth_addr(&self.rng)
-        };
-
         // Create provider cache early to use for chain validation
         let mut provider_cache = if let Some(signer) = self.testmode_signer.take() {
             ProviderCache::new().with_signer(signer)
@@ -387,45 +377,34 @@ impl CiphernodeBuilder {
         // Get an event system instance.
         let event_system =
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(&addr, log_path, kv_path)
+                EventSystem::persisted(log_path, kv_path)
                     .with_event_bus(local_bus)
                     .with_aggregate_config(aggregate_config.clone())
             } else {
                 if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(&addr, store)
+                    EventSystem::in_mem_from_store(store)
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                 } else {
-                    EventSystem::in_mem(&addr)
+                    EventSystem::in_mem()
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                 }
             };
 
-        let bus = event_system.handle()?;
         let store = event_system.store()?;
         let eventstore_ts = event_system.eventstore_getter_ts()?;
         let eventstore_seq = event_system.eventstore_getter_seq()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
-
-        // Now we add write support as store depends on event system
         let mut provider_cache =
             provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
 
-        if !self.ignore_address_check {
-            // Ensure that the private key matches the given address in the config
-            let signer = provider_cache.ensure_signer().await?;
-            if signer.address().to_string().to_lowercase() != addr.to_lowercase() {
-                bail!(
-                    "config address {:?} does not match stored account {:?}!",
-                    addr,
-                    signer.address()
-                );
-            }
-        }
+        // We need to supply the Hlc to the bus handle in order to enable it
+        let addr = provider_cache.ensure_signer().await?.address().to_string();
+        let bus = event_system.handle()?.enable(&addr);
 
-        // Use the configured backend directly
+        // Use the configured sortition backend directly
         let default_backend = self.sortition_backend.clone();
 
         let ciphernode_selector =

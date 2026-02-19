@@ -252,9 +252,7 @@ impl AppConfig {
             chains: config.chains,
             peers: vec![],
             paths,
-            config_yaml: config
-                .found_config_file
-                .expect("config_yaml should always be set after loading config"),
+            config_yaml: config.found_config_file.unwrap_or_default(),
             otel: config.otel,
             autopassword: node.autopassword,
             autowallet: node.autowallet,

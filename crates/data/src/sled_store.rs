@@ -7,7 +7,10 @@
 use crate::SledDb;
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
-use e3_events::{prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData, EventType};
+use e3_events::{
+    prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData,
+    EnclaveUnsequencedErrorDispatcher, EventType,
+};
 use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
 use e3_utils::MAILBOX_LIMIT;
 use std::path::PathBuf;
@@ -15,7 +18,7 @@ use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: BusHandle, // Only used for Shutdown
+    bus: Box<dyn EnclaveUnsequencedErrorDispatcher>, // Only used for Shutdown
 }
 
 impl Actor for SledStore {
@@ -26,13 +29,18 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &BusHandle, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new<S: 'static>(bus: &BusHandle<S>, path: &PathBuf) -> Result<Addr<Self>> {
+        // Note we pass in a generic BusHandle which supports the err method for passing on errors.
+        // This was as stores are required before we can initialize the BusHandle to retrieve the
+        // address so we have a unique node_id.
+        // If BusHandle is Disabled that is fine as our subscriptions and error publishing function
+        // remains intact despite it being enabled elsewhere at a later point
         info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(path, "datastore")?;
 
         let store = Self {
             db: Some(db),
-            bus: bus.clone(),
+            bus: Box::new(bus.clone()),
         }
         .start();
 

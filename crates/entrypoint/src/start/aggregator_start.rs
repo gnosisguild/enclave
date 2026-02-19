@@ -19,14 +19,12 @@ use std::{
 
 pub async fn execute(
     config: &AppConfig,
-    address: Address,
     pubkey_write_path: Option<PathBuf>,
     plaintext_write_path: Option<PathBuf>,
 ) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
-    let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
-        .with_address(&address.to_string())
+    let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_chains(&config.chains())
         .with_sortition_score()

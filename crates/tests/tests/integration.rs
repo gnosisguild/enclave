@@ -319,8 +319,8 @@ async fn test_trbfv_actor() -> Result<()> {
     let rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
+    let system = EventSystem::new().with_fresh_bus();
+    let bus = system.handle()?.enable("test");
 
     // Parameters (128bits of security)
     let params_raw = BfvParamSet::from(DEFAULT_BFV_PRESET).build_arc();
@@ -365,8 +365,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(1, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building collector {}!", addr);
-            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
-                .with_address(&addr)
+            CiphernodeBuilder::new(rng.clone(), cipher.clone())
                 .testmode_with_history()
                 .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
@@ -386,8 +385,7 @@ async fn test_trbfv_actor() -> Result<()> {
         .add_group(19, || async {
             let addr = rand_eth_addr(&rng);
             println!("Building normal {}", &addr);
-            CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
-                .with_address(&addr)
+            CiphernodeBuilder::new(rng.clone(), cipher.clone())
                 .with_shared_taskpool(&task_pool)
                 .with_multithread_concurrent_jobs(concurrent_jobs)
                 .with_shared_multithread_report(&multithread_report)
@@ -684,8 +682,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let system = EventSystem::new("test");
-    let bus = system.handle()?;
+    let system = EventSystem::new();
+    let bus = system.handle()?.enable("test");
     let history_collector = bus.history();
     let event_rx = Arc::new(event_tx.subscribe());
     // Pas cmd and event channels to NetEventTranslator
@@ -772,8 +770,8 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
+    let system = EventSystem::new().with_fresh_bus();
+    let bus = system.handle()?.enable("test");
     let history_collector = bus.history();
 
     NetEventTranslator::setup(&bus, &cmd_tx, &Arc::new(event_rx), "mytopic");
@@ -838,9 +836,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         store: Option<actix::Addr<InMemStore>>,
         cipher: &Arc<Cipher>,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
-        let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
+        let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
-            .with_address(addr)
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
@@ -938,11 +935,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         )
     };
 
-    let bus = EventSystem::in_mem("cn2")
+    let bus = EventSystem::in_mem()
         .with_event_bus(
             EventBus::<e3_events::EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start(),
         )
-        .handle()?;
+        .handle()?
+        .enable("cn2");
     let cn1 = setup_local_ciphernode(
         &bus,
         &rng,
@@ -1045,9 +1043,8 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         store: Option<actix::Addr<e3_data::InMemStore>>,
         cipher: &Arc<Cipher>,
     ) -> Result<e3_ciphernode_builder::CiphernodeHandle> {
-        let mut builder = CiphernodeBuilder::new(&addr, rng.clone(), cipher.clone())
+        let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
             .with_trbfv()
-            .with_address(addr)
             .testmode_with_forked_bus(bus.event_bus())
             .testmode_with_history()
             .testmode_with_errors()
