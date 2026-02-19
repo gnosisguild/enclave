@@ -2,21 +2,36 @@
 .coverage_artifacts
 .coverage_cache
 .coverage_contracts
+
+# Base Dirs
 /artifacts/
 !/artifacts/
 /artifacts/**
 !/artifacts/contracts/
+
+# Interfaces
 !/artifacts/contracts/interfaces/
-!/artifacts/contracts/registry/
-!/artifacts/contracts/token/
 !/artifacts/contracts/interfaces/IEnclave.sol/
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/
-!/artifacts/contracts/token/EnclaveTicketToken.sol/
 !/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/IBondingRegistry.json
+
+# Registry
+!/artifacts/contracts/registry/
+
+# Token
+!/artifacts/contracts/token/
+!/artifacts/contracts/token/EnclaveTicketToken.sol/
 !/artifacts/contracts/token/EnclaveTicketToken.sol/EnclaveTicketToken.json
+
+# Verifier contracts
+!/artifacts/contracts/verifier/
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/DkgPkVerifier.json
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/ZKTranscriptLib.json
+
 build
 cache
 coverage

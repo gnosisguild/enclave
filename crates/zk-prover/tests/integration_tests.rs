@@ -16,35 +16,43 @@
 
 #![cfg(feature = "integration-tests")]
 
-use e3_config::BBPath;
-use e3_zk_prover::{BbTarget, SetupStatus, ZkBackend, ZkConfig};
+mod common;
+
+use common::test_backend;
+use e3_fhe_params::BfvPreset;
+use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
+use e3_zk_prover::{BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
 use std::path::PathBuf;
 use tempfile::tempdir;
-
-fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
-    let noir_dir = temp_path.join("noir");
-    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
-    let circuits_dir = noir_dir.join("circuits");
-    let work_dir = noir_dir.join("work").join("test_node");
-    ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
-}
 
 fn versions_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
 }
 
 #[tokio::test]
-async fn test_download_bb_and_verify_structure() {
+async fn test_full_flow_download_circuits_prove_and_verify() {
+    eprintln!(">>> Loading config...");
     let config = ZkConfig::load(&versions_json_path())
         .await
         .expect("versions.json should exist");
+    eprintln!(">>> Config loaded");
 
     let temp = tempdir().unwrap();
     let backend = test_backend(temp.path(), config);
 
-    let result = backend.download_bb().await;
-    assert!(result.is_ok(), "download failed: {:?}", result);
+    // --- Step 1: Fresh state should need full setup ---
+    eprintln!(">>> Step 1: Checking fresh state...");
+    assert!(matches!(
+        backend.check_status().await,
+        SetupStatus::FullSetupNeeded
+    ));
+    eprintln!(">>> Step 1: Done");
 
+    // --- Step 2: Download bb and verify structure ---
+    eprintln!(">>> Step 2: Downloading bb...");
+    let result = backend.download_bb().await;
+    eprintln!(">>> Step 2: bb downloaded");
+    assert!(result.is_ok(), "download failed: {:?}", result);
     assert!(backend.bb_binary.exists(), "bb binary not found");
 
     #[cfg(unix)]
@@ -78,6 +86,77 @@ async fn test_download_bb_and_verify_structure() {
     assert!(backend.base_dir.exists());
     assert!(backend.base_dir.join("bin").exists());
 
+    let version = backend.verify_bb().await;
+    assert!(version.is_ok(), "bb --version failed: {:?}", version);
+    println!("bb version: {}", version.unwrap());
+
+    // --- Step 3: Download circuits ---
+    eprintln!(">>> Step 3: Downloading circuits...");
+    tokio::fs::create_dir_all(&backend.circuits_dir)
+        .await
+        .unwrap();
+
+    let result = backend.download_circuits().await;
+    eprintln!(">>> Step 3: Circuits downloaded");
+    assert!(result.is_ok(), "download_circuits failed: {:?}", result);
+
+    assert!(backend
+        .circuits_dir
+        .join("dkg")
+        .join("pk")
+        .join("pk.json")
+        .exists());
+    assert!(backend
+        .circuits_dir
+        .join("dkg")
+        .join("pk")
+        .join("pk.vk")
+        .exists());
+
+    // --- Step 4: ensure_installed is idempotent on top of existing setup ---
+    eprintln!(">>> Step 4: Running ensure_installed...");
+    let result = backend.ensure_installed().await;
+    eprintln!(">>> Step 4: ensure_installed done");
+    assert!(result.is_ok(), "ensure_installed failed: {:?}", result);
+    assert!(matches!(backend.check_status().await, SetupStatus::Ready));
+
+    assert!(backend.bb_binary.exists());
+    assert!(backend.circuits_dir.exists());
+    assert!(backend.work_dir.exists());
+    assert!(backend.base_dir.join("version.json").exists());
+
+    // --- Step 5: Generate and verify a proof ---
+    eprintln!(">>> Step 5: Generating proof...");
+    let preset = BfvPreset::InsecureThreshold512;
+    let prover = ZkProver::new(&backend);
+
+    let sample =
+        PkCircuitData::generate_sample(preset).expect("sample data generation should succeed");
+
+    let e3_id = "integration-test-full-flow";
+    let proof = PkCircuit
+        .prove(&prover, &preset, &sample, e3_id)
+        .expect("proof generation should succeed");
+
+    eprintln!(">>> Step 5: Proof generated");
+    assert!(!proof.data.is_empty(), "proof data should not be empty");
+    assert!(
+        !proof.public_signals.is_empty(),
+        "public signals should not be empty"
+    );
+
+    eprintln!(">>> Step 5: Verifying proof...");
+    let party_id = 0;
+    let verified = PkCircuit
+        .verify(&prover, &proof, e3_id, party_id)
+        .expect("verification call should not error");
+
+    assert!(verified, "proof should verify successfully");
+    eprintln!(">>> Step 5: Proof verified!");
+
+    prover.cleanup(e3_id).unwrap();
+
+    // --- Cleanup ---
     let temp_path = temp.path().to_path_buf();
     drop(temp);
     assert!(!temp_path.exists());
@@ -104,80 +183,6 @@ async fn test_download_bb_rejects_wrong_checksum() {
     );
 
     assert!(!backend.bb_binary.exists());
-
-    let temp_path = temp.path().to_path_buf();
-    drop(temp);
-    assert!(!temp_path.exists());
-}
-
-#[tokio::test]
-async fn test_ensure_installed_full_flow() {
-    let config = ZkConfig::load(&versions_json_path())
-        .await
-        .expect("versions.json should exist");
-
-    let temp = tempdir().unwrap();
-    let backend = test_backend(temp.path(), config);
-
-    assert!(matches!(
-        backend.check_status().await,
-        SetupStatus::FullSetupNeeded
-    ));
-
-    let result = backend.ensure_installed().await;
-    assert!(result.is_ok(), "ensure_installed failed: {:?}", result);
-
-    assert!(matches!(backend.check_status().await, SetupStatus::Ready));
-
-    let version = backend.verify_bb().await;
-    assert!(version.is_ok(), "bb --version failed: {:?}", version);
-    println!("bb version: {}", version.unwrap());
-
-    assert!(backend.bb_binary.exists());
-    assert!(backend.circuits_dir.exists());
-    assert!(backend.work_dir.exists());
-    assert!(backend.base_dir.join("version.json").exists());
-
-    // Idempotent - running setup again should work
-    let result = backend.ensure_installed().await;
-    assert!(result.is_ok());
-    assert!(matches!(backend.check_status().await, SetupStatus::Ready));
-
-    let temp_path = temp.path().to_path_buf();
-    drop(temp);
-    assert!(!temp_path.exists());
-}
-
-#[tokio::test]
-async fn test_download_circuits() {
-    let config = ZkConfig::load(&versions_json_path())
-        .await
-        .expect("versions.json should exist");
-
-    let temp = tempdir().unwrap();
-    let backend = test_backend(temp.path(), config);
-
-    tokio::fs::create_dir_all(&backend.circuits_dir)
-        .await
-        .unwrap();
-
-    // Download circuits (may fall back to placeholder on failure)
-    let result = backend.download_circuits().await;
-    assert!(result.is_ok(), "download_circuits failed: {:?}", result);
-
-    // Should have at least the placeholder circuit
-    assert!(backend
-        .circuits_dir
-        .join("dkg")
-        .join("pk")
-        .join("pk.json")
-        .exists());
-    assert!(backend
-        .circuits_dir
-        .join("dkg")
-        .join("pk")
-        .join("pk.vk")
-        .exists());
 
     let temp_path = temp.path().to_path_buf();
     drop(temp);
