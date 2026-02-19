@@ -103,7 +103,7 @@ impl<let N: u32, let H: u32, let L: u32, let BIT_PK: u32> PkAggregation<N, H, L,
 
     /// Main verification function
     /// Returns commitment to aggregated threshold public key
-    pub fn execute(self) -> (Field, Field) {
+    pub fn execute(self) -> Field {
         // 0. Verify pk commitments
         self.verify_pk_commitments();
 

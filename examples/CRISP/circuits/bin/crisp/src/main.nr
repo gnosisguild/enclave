@@ -4,17 +4,20 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use crisp_lib::ciphertext_addition::CiphertextAddition;
-use crisp_lib::commitments::{compute_ct_commitment, compute_k1_commitment};
 use crisp_lib::ecdsa::{address_to_field, derive_address, validate_signature};
 use crisp_lib::merkle_tree::get_merkle_root;
 use crisp_lib::utils::{check_coefficient_values_with_balance, check_coefficient_zero};
 use enclave_lib::configs::default::threshold::{
-    L, N, Q_MOD_T_CENTERED, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_K,
-    USER_DATA_ENCRYPTION_CONFIGS,
+    L, N, Q_MOD_T_CENTERED, QIS, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_K,
 };
-use enclave_lib::math::{commitments::compute_ciphertext_commitment, polynomial::Polynomial};
+use enclave_lib::math::{
+    commitments::{
+        compute_ciphertext_commitment, compute_single_polynomial_commitment,
+        DS_USER_DATA_ENCRYPTION_COMMITMENT,
+    },
+    polynomial::Polynomial,
+};
 
 /// Main circuit function for CRISP vote verification.
 ///
@@ -51,16 +54,10 @@ fn main(
     sum_ct1is: [Polynomial<N>; L],
     sum_r0is: [Polynomial<N>; L],
     sum_r1is: [Polynomial<N>; L],
-    // Greco Section.
-    greco_verification_key: UltraHonkVerificationKey,
-    greco_key_hash: Field,
-    greco_proof: UltraHonkProof,
+    // User Data Encryption Section.
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     k1: Polynomial<N>,
-    pk_commitment: pub Field,
-    k1_commitment: Field,
-    ct_commitment: Field,
     // ECDSA Section.
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
@@ -77,19 +74,19 @@ fn main(
     is_first_vote: pub bool,
     is_mask_vote: bool,
     num_options: pub u32,
-) -> pub Field {
+) -> pub (Field, Field, Field) {
     // ============================================================================
     // STEP 1: Pre-compute Commitments
     // ============================================================================
-    // Compute commitments for all ciphertexts and plaintexts that will be verified
-    // in subsequent steps. These commitments are used to verify consistency between
-    // the provided commitments and the actual polynomial values.
-    let _prev_ct_commitment =
-        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(prev_ct0is, prev_ct1is);
-    let _ct_commitment = compute_ct_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
-    let _k1_commitment = compute_k1_commitment::<N, USER_DATA_ENCRYPTION_BIT_K>(k1);
-    let sum_ct_commitment =
-        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(sum_ct0is, sum_ct1is);
+    // Compute commitments for ciphertext and plaintext that link this circuit to the
+    // user_data_encryption circuit proofs in the fold circuit, where all 3 recursive
+    // proofs are verified.
+    let ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
+    let k1_commitment = compute_single_polynomial_commitment::<N, USER_DATA_ENCRYPTION_BIT_K>(
+        k1,
+        DS_USER_DATA_ENCRYPTION_COMMITMENT,
+    );
 
     // ============================================================================
     // STEP 2: Eligibility - Merkle Tree Proof
@@ -114,37 +111,7 @@ fn main(
     assert(merkle_root_calculated == merkle_root);
 
     // ============================================================================
-    // STEP 3: BFV Encryption Verification (GRECO)
-    // ============================================================================
-    // Verify that the ciphertext (ct0is, ct1is) is a valid BFV encryption of the
-    // plaintext k1 under the public key represented by pk_commitment. This ensures
-    // the ciphertext is correctly formed and maintains the encryption relationship.
-    //
-    // The verification uses a recursive zero-knowledge proof (GRECO) to prove the encryption
-    // relationship without revealing the underlying values. The recursive proof demonstrates:
-    // - The ciphertext (ct0is, ct1is) correctly encrypts plaintext k1
-    // - The encryption uses the public key committed to in pk_commitment
-    // - The verification key hash matches the expected greco_key_hash
-    //
-    // After verifying the proof, we check that the provided commitments match the
-    // actual computed commitments to ensure consistency:
-    // - k1_commitment must match the commitment computed from k1
-    // - ct_commitment must match the commitment computed from (ct0is, ct1is)
-    //
-    // This check applies to BOTH cases:
-    // - For actual votes: verifies the vote ciphertext is correctly formed
-    // - For mask votes: verifies the zero vote ciphertext is correctly formed
-    verify_honk_proof_non_zk(
-        greco_verification_key,
-        greco_proof,
-        [pk_commitment, k1_commitment, ct_commitment],
-        greco_key_hash,
-    );
-    assert(k1_commitment == _k1_commitment);
-    assert(ct_commitment == _ct_commitment);
-
-    // ============================================================================
-    // STEP 4: Vote Type Detection and Return Logic
+    // STEP 3: Vote Type Detection and Return Logic
     // ============================================================================
     // The circuit branches into two cases based on the is_mask_vote flag:
     //
@@ -177,10 +144,15 @@ fn main(
     //     * Mask votes add zero to the previous ciphertext, creating a different ciphertext
     //       with the same plaintext, preventing receipt sharing attacks
     //     * Return sum ciphertext commitment (sum_ct_commitment)
+    let sum_ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(sum_ct0is, sum_ct1is);
+    let _prev_ct_commitment =
+        compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(prev_ct0is, prev_ct1is);
+
     let valid_zero_vote = check_coefficient_zero(k1, num_options);
     let valid_prev_ct = prev_ct_commitment == _prev_ct_commitment;
     let ct_add: CiphertextAddition<N, L, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_CT> = CiphertextAddition::new(
-        USER_DATA_ENCRYPTION_CONFIGS,
+        QIS,
         ct0is,
         ct1is,
         ct_commitment,
@@ -201,17 +173,17 @@ fn main(
         assert(valid_signature);
         assert(valid_address);
 
-        ct_commitment
+        (ct_commitment, ct_commitment, k1_commitment)
     } else {
         assert(valid_zero_vote);
 
         if is_first_vote {
-            ct_commitment
+            (ct_commitment, ct_commitment, k1_commitment)
         } else {
             assert(valid_prev_ct);
             assert(valid_ct_add);
 
-            sum_ct_commitment
+            (sum_ct_commitment, ct_commitment, k1_commitment)
         }
     }
 }

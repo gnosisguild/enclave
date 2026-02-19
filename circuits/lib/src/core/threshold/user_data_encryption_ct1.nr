@@ -1,7 +1,9 @@
 //user data encryption for ct1- the second part of the ciphertext
 use crate::math::commitments::compute_commitment;
 use crate::math::commitments::compute_user_data_encryption_ct1_challenge;
+use crate::math::commitments::DS_CIPHERTEXT;
 use crate::math::commitments::DS_PK_AGGREGATION;
+use crate::math::commitments::DS_USER_DATA_ENCRYPTION_COMMITMENT;
 use crate::math::commitments::multiple_polynomial_payload;
 use crate::math::commitments::single_polynomial_payload;
 use crate::math::helpers::flatten;
@@ -71,10 +73,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let pk1_commitment = compute_commitment(pk1_payload, DS_PK_AGGREGATION);
 
         let ct1_payload = multiple_polynomial_payload::<N, L, BIT_CT>(Vec::new(), self.ct1is);
-        let ct1_commitment = compute_commitment(ct1_payload, DS_PK_AGGREGATION);
+        let ct1_commitment = compute_commitment(ct1_payload, DS_CIPHERTEXT);
 
         let u_payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), self.u);
-        let u_commitment = compute_commitment(u_payload, DS_PK_AGGREGATION);
+        let u_commitment = compute_commitment(u_payload, DS_USER_DATA_ENCRYPTION_COMMITMENT);
 
         (pk1_commitment, ct1_commitment, u_commitment)
     }

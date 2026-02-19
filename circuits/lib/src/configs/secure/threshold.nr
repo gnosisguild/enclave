@@ -32881,11 +32881,6 @@ pub global USER_DATA_ENCRYPTION_R2_BOUNDS: [Field; L] =
 pub global USER_DATA_ENCRYPTION_P1_BOUNDS: [Field; L] = [4096, 4096, 4096, 4096];
 pub global USER_DATA_ENCRYPTION_P2_BOUNDS: [Field; L] =
     [1125899911102464, 2251799813881856, 2251799815716864, 2251799817289728];
-/************************************
--------------------------------------
-user_data_encryption_ct0 (CIRCUIT A - CT0 ENCRYPTION)
--------------------------------------
-************************************/
 
 pub global USER_DATA_ENCRYPTION_CT0_CONFIGS: UserDataEncryptionCt0Configs<N, L> = UserDataEncryptionCt0Configs::new(
     QIS,
@@ -32898,12 +32893,6 @@ pub global USER_DATA_ENCRYPTION_CT0_CONFIGS: UserDataEncryptionCt0Configs<N, L> 
     USER_DATA_ENCRYPTION_K1_LOW_BOUND,
     USER_DATA_ENCRYPTION_K1_UP_BOUND,
 );
-
-/************************************
--------------------------------------
-user_data_encryption_ct1 (CIRCUIT B - CT1 ENCRYPTION)
--------------------------------------
-***--------------------------------*/
 
 pub global USER_DATA_ENCRYPTION_CT1_CONFIGS: UserDataEncryptionCt1Configs<N, L> = UserDataEncryptionCt1Configs::new(
     QIS,

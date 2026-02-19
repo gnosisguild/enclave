@@ -39,8 +39,7 @@
 //! 3. Verifies the addition equations hold at these points
 //! 4. Checks range constraints on all coefficients
 
-use enclave_lib::core::threshold::user_data_encryption::Configs as UserDataEncryptionConfigs;
-use enclave_lib::math::commitments::compute_commitments;
+use enclave_lib::math::commitments::compute_challenge;
 use enclave_lib::math::polynomial::Polynomial;
 
 /// Parameters for ciphertext addition verification.
@@ -52,7 +51,7 @@ use enclave_lib::math::polynomial::Polynomial;
 /// * `BIT_PREV_CT` - Bit-width bound per coefficient for previous ciphertext polynomials `prev_ct0is`/`prev_ct1is`.
 /// * `BIT_SUM_CT` - Bit-width bound per coefficient for sum ciphertext polynomials `sum_ct0is`/`sum_ct1is`.
 pub struct CiphertextAddition<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_CT: u32> {
-    configs: UserDataEncryptionConfigs<N, L>,
+    qis: [Field; L],
     ct0is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     ct_commitment: Field,
@@ -76,7 +75,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
     /// * `sum_ct0is`, `sum_ct1is` - Ciphertext addition polynomials.
     /// * `r0is`, `r1is` - Quotient/correction polynomials for modular reduction.
     pub fn new(
-        configs: UserDataEncryptionConfigs<N, L>,
+        qis: [Field; L],
         ct0is: [Polynomial<N>; L],
         ct1is: [Polynomial<N>; L],
         ct_commitment: Field,
@@ -90,7 +89,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         r1is: [Polynomial<N>; L],
     ) -> Self {
         Self {
-            configs,
+            qis,
             ct0is,
             ct1is,
             ct_commitment,
@@ -210,7 +209,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         payload.push(self.prev_ct_commitment);
         payload.push(self.sum_ct_commitment);
 
-        compute_commitments(payload, DS_CLG_CT_ADD, [0x80000000 | payload.len(), 2 * L])
+        compute_challenge::<L>(payload, DS_CLG_CT_ADD)
     }
 
     /// Verifies ciphertext addition constraints using Fiat-Shamir challenges.
@@ -250,7 +249,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct0i + prev_ct0i + r0i * q_i
             let mut p = self.ct0is[i];
-            let r0i_scaled = self.r0is[i].mul_scalar(self.configs.qis[i]);
+            let r0i_scaled = self.r0is[i].mul_scalar(self.qis[i]);
 
             p = p.add(self.prev_ct0is[i]);
             p = p.add(r0i_scaled);
@@ -268,7 +267,7 @@ impl<let N: u32, let L: u32, let BIT_CT: u32, let BIT_PREV_CT: u32, let BIT_SUM_
         for i in 0..L {
             // Build the expected sum: ct1i + prev_ct1i + r1i * q_i
             let mut p = self.ct1is[i];
-            let r1i_scaled = self.r1is[i].mul_scalar(self.configs.qis[i]);
+            let r1i_scaled = self.r1is[i].mul_scalar(self.qis[i]);
 
             p = p.add(self.prev_ct1is[i]);
             p = p.add(r1i_scaled);
