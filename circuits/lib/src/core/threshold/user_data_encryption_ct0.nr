@@ -8,10 +8,11 @@
 // and generates commitment for u, which will be used in ct1 to check consistency of u
 // across ct0 and ct1.
 
-use crate::math::commitments::{
-    compute_user_data_encryption_ct0_challenge, compute_user_data_encryption_ct0_pk_commitment,
-    compute_user_data_encryption_u_commitment,
-};
+use crate::math::commitments::compute_commitment;
+use crate::math::commitments::compute_user_data_encryption_ct0_challenge;
+use crate::math::commitments::DS_PK_AGGREGATION;
+use crate::math::commitments::multiple_polynomial_payload;
+use crate::math::commitments::single_polynomial_payload;
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
@@ -56,7 +57,6 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 pub struct UserDataEncryptionCt0<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E0: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32> {
     configs: Configs<N, L>,
     /// Public input from PkAggregation
-    commit_pk0: Field,
     pk0is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],
     u: Polynomial<N>,
@@ -72,7 +72,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
     pub fn new(
         configs: Configs<N, L>,
-        commit_pk0: Field,
         pk0is: [Polynomial<N>; L],
         ct0is: [Polynomial<N>; L],
         u: Polynomial<N>,
@@ -83,24 +82,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         r1is: [Polynomial<(2 * N) - 1>; L],
         r2is: [Polynomial<N - 1>; L],
     ) -> Self {
-        UserDataEncryptionCt0 {
-            configs,
-            commit_pk0,
-            pk0is,
-            ct0is,
-            u,
-            e0,
-            e0is,
-            e0_quotients,
-            k1,
-            r1is,
-            r2is,
-        }
-    }
-
-    fn verify_pk0_commitment(self) {
-        let computed = compute_user_data_encryption_ct0_pk_commitment::<N, L, BIT_PK>(self.pk0is);
-        assert(computed == self.commit_pk0, "pk0 commitment mismatch");
+        UserDataEncryptionCt0 { configs, pk0is, ct0is, u, e0, e0is, e0_quotients, k1, r1is, r2is }
     }
 
     fn check_e0_crt_consistency(self) {
@@ -132,20 +114,31 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    fn gammas_payload(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-        inputs.push(self.commit_pk0);
-        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
-        inputs = flatten::<_, _, BIT_E0>(inputs, [self.e0]);
-        inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
-        inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
-        inputs = flatten::<_, _, BIT_R1>(inputs, self.r1is);
-        inputs = flatten::<_, _, BIT_R2>(inputs, self.r2is);
-        inputs
+    fn generate_commitments(self) -> (Field, Field) {
+        let pk0_payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), self.pk0is);
+        let pk0_commitment = compute_commitment(pk0_payload, DS_PK_AGGREGATION);
+
+        let u_payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), self.u);
+        let u_commitment = compute_commitment(u_payload, DS_PK_AGGREGATION);
+
+        (pk0_commitment, u_commitment)
     }
 
-    fn generate_challenge(self) -> Vec<Field> {
-        compute_user_data_encryption_ct0_challenge::<L>(self.gammas_payload())
+    fn generate_challenge(self, pk0_commitment: Field, u_commitment: Field) -> Vec<Field> {
+        let mut payload = Vec::new();
+
+        payload.push(pk0_commitment);
+        payload.push(u_commitment);
+
+        payload = flatten::<_, _, BIT_CT>(payload, self.ct0is);
+        payload = flatten::<_, _, BIT_E0>(payload, [self.e0]);
+        payload = flatten::<_, _, BIT_K>(payload, [self.k1]);
+        payload = flatten::<_, _, BIT_R1>(payload, self.r1is);
+        payload = flatten::<_, _, BIT_R2>(payload, self.r2is);
+
+        let gammas = compute_user_data_encryption_ct0_challenge::<L>(payload);
+
+        gammas
     }
 
     fn verify_evaluations(self, gammas: Vec<Field>) -> bool {
@@ -175,14 +168,17 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         sum.0 == sum.1
     }
 
-    /// Returns commit_u so Circuit B can verify it uses the same u
-    pub fn execute(self) -> Field {
+    /// Returns pk0_commitment and u_commitment
+    pub fn execute(self) -> (Field, Field) {
         self.check_range_bounds();
         self.check_e0_crt_consistency();
-        self.verify_pk0_commitment();
-        let commit_u = compute_user_data_encryption_u_commitment::<N, BIT_U>(self.u);
-        let gammas = self.generate_challenge();
+
+        let (pk0_commitment, u_commitment) = self.generate_commitments();
+
+        let gammas = self.generate_challenge(pk0_commitment, u_commitment);
+
         assert(self.verify_evaluations(gammas), "ct0 encryption check failed");
-        commit_u
+
+        (pk0_commitment, u_commitment)
     }
 }

@@ -13,7 +13,6 @@ use lib::core::threshold::user_data_encryption_ct0::UserDataEncryptionCt0;
 use lib::math::polynomial::Polynomial;
 
 fn main(
-    commit_pk0: pub Field,
     pk0is: [Polynomial<N>; L],
     ct0is: [Polynomial<N>; L],
     u: Polynomial<N>,
@@ -23,10 +22,9 @@ fn main(
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
-) -> pub Field {
+) -> pub (Field, Field) {
     let circuit: UserDataEncryptionCt0<N, L, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2> = UserDataEncryptionCt0::new(
         USER_DATA_ENCRYPTION_CT0_CONFIGS,
-        commit_pk0,
         pk0is,
         ct0is,
         u,
@@ -37,5 +35,6 @@ fn main(
         r1is,
         r2is,
     );
+
     circuit.execute()
 }
