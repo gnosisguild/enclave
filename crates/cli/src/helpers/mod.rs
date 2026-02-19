@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::{bail, Result};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 pub mod compile_id;
 pub mod prompt_password;
@@ -29,6 +29,6 @@ fn ensure_hex(s: &str) -> Result<&str> {
     if !s[2..].chars().all(|c| c.is_ascii_hexdigit()) {
         bail!("private key must only contain hex characters [0-9a-fA-F]");
     }
-    hex::decode(&s[2..])?;
+    hex::decode(&s[2..])?.zeroize();
     Ok(s)
 }
