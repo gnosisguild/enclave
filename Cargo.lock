@@ -3384,7 +3384,6 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "clap",
- "e3-utils",
  "fhe",
  "fhe-traits",
  "num-bigint",
