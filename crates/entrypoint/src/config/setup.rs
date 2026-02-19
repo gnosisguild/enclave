@@ -45,9 +45,6 @@ pub fn execute(rpc_url: &str, config_dir: &PathBuf, address: &Address) -> Result
 
     let config_content = format!(
         r#"---
-node:
-  address: "{}"
-
 # Enclave Configuration File
 chains:
   - name: "devnet"
@@ -63,7 +60,6 @@ chains:
         address: "{}"
         deploy_block: {}
 "#,
-        address,
         rpc_url,
         get_contract_info("Enclave")?.address,
         get_contract_info("Enclave")?.deploy_block,
