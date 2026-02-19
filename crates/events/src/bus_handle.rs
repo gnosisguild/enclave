@@ -369,8 +369,6 @@ mod tests {
 
         // 1. setup up two separate busses with out of sync clocks A and B. B should be 30 seconds
         //    faster than A.
-        //
-        // NOTE: EventSystem::handle() must return BusHandle<Disabled> for this to compile.
         let bus_a = EventSystem::new()
             .with_fresh_bus()
             .handle()?
