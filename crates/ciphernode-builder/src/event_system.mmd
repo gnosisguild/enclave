@@ -1,0 +1,19 @@
+graph TD
+    store --> buffer
+    store --> handle
+
+    handle --> eventbus
+    handle --> sequencer
+    handle --> hlc
+    handle --> buffer
+
+    sequencer --> eventbus
+    sequencer --> eventstore_router
+
+    buffer --> aggregate_config
+
+    eventstore_router["eventstore_router | eventstore_getter_seq | eventstore_getter_ts"] --> eventstore_addrs
+
+    eventstore_addrs --> aggregate_config
+
+    hlc --> node_id
