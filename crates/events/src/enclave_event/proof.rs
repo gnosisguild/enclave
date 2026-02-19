@@ -56,8 +56,6 @@ pub enum CircuitName {
     DecryptedSharesAggregationBn,
     /// Decrypted shares aggregation proof — Modular variant (C7b).
     DecryptedSharesAggregationMod,
-    /// User data encryption proof.
-    UserDataEncryption,
 }
 
 impl CircuitName {
@@ -73,7 +71,6 @@ impl CircuitName {
             CircuitName::ThresholdShareDecryption => "share_decryption",
             CircuitName::DecryptedSharesAggregationBn => "decrypted_shares_aggregation_bn",
             CircuitName::DecryptedSharesAggregationMod => "decrypted_shares_aggregation_mod",
-            CircuitName::UserDataEncryption => "user_data_encryption",
         }
     }
 
@@ -89,7 +86,6 @@ impl CircuitName {
             CircuitName::PkAggregation => "threshold",
             CircuitName::DecryptedSharesAggregationBn => "threshold",
             CircuitName::DecryptedSharesAggregationMod => "threshold",
-            CircuitName::UserDataEncryption => "threshold",
         }
     }
 
