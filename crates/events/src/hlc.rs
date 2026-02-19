@@ -139,7 +139,7 @@ impl From<u128> for HlcTimestamp {
 /// # Example
 ///
 /// ```
-/// # use e3_events::hlc::{Hlc, HlcTimestamp, HlcError};
+/// # use e3_events::hlc::{Hlc, HlcTimestamp, HlcError, HlcMethods};
 /// # fn main() -> Result<(), HlcError> {
 /// let hlc = Hlc::new(1); // Node id
 /// let ts1 = hlc.tick()?;
