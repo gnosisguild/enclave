@@ -169,7 +169,10 @@ pub async fn execute(command: CiphernodeCommands, config: &AppConfig) -> Result<
             lifecycle::status(&ctx).await?
         }
         CiphernodeCommands::Setup { .. } => {
-            bail!("Cannot run `enclave ciphernode setup` when a configuration already exists.");
+            bail!(
+                "Cannot run `enclave ciphernode setup` when a configuration already exists: {:?}",
+                config.config_file()
+            );
         }
     }
 

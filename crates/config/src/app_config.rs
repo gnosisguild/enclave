@@ -180,8 +180,6 @@ pub struct AppConfig {
     program: ProgramConfig,
     /// A custom bb implementation has been provided do not download and checksum a binary
     using_custom_bb: bool,
-    /// Whether the config has been overridden
-    using_custom_config: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -261,7 +259,6 @@ impl AppConfig {
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
             using_custom_bb: config.custom_bb.is_some(),
-            using_custom_config: config.using_custom_config,
         })
     }
 
@@ -297,7 +294,7 @@ impl AppConfig {
 
     /// Whether the config is changed from the default
     pub fn using_custom_config(&self) -> bool {
-        self.using_custom_config
+        !self.paths.is_default_config_file()
     }
 
     /// Get the circuits directory
@@ -437,8 +434,6 @@ pub struct UnscopedAppConfig {
     /// is up to the node operator to ensure bb matches the version that exactly matches the
     /// application.
     custom_bb: Option<PathBuf>,
-    /// Whether or not the config param was passed in
-    using_custom_config: bool,
 }
 
 impl Default for UnscopedAppConfig {
@@ -453,7 +448,6 @@ impl Default for UnscopedAppConfig {
             nodes: HashMap::new(),
             program: None,
             custom_bb: None,
-            using_custom_config: false,
         }
     }
 }
@@ -503,7 +497,6 @@ pub fn load_config(
     otel: Option<String>,
 ) -> Result<AppConfig> {
     let found_config_file = found_config_file.map(PathBuf::from);
-
     let resolved_config_path = resolve_config_path(
         find_in_parent,            // finding strategy
         env::current_dir()?,       // cwd

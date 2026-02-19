@@ -11,6 +11,7 @@ use zeroize::Zeroizing;
 
 use crate::helpers::rand::generate_random_bytes;
 
+/// Checks if the Keyfile already exists and fail with a constructive error
 pub async fn preflight(config: &AppConfig) -> Result<()> {
     let key_file = config.key_file();
     let pm = FilePasswordManager::new(key_file);

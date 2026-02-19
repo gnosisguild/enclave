@@ -61,7 +61,8 @@ pub async fn execute(
     // Execute
     let config = setup::execute(&rpc_url, &config_dir)?;
 
-    password_set::execute(&config, Some(pw)).await?;
+    e3_entrypoint::password::set::preflight(&config).await?;
+    e3_entrypoint::password::set::execute(&config, pw).await?;
 
     let (address, peer_id) = e3_entrypoint::wallet::set::execute(&config, private_key).await?;
     print_info(&config, address, &peer_id.to_string(), &rpc_url)?;
