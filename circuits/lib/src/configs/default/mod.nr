@@ -8,8 +8,8 @@
 // (in futuro altri param-set). I circuiti usano tutti lib::configs::default::*.
 
 pub use super::committee::small::{H, N_PARTIES, T};
-pub use super::secure::dkg;
-pub use super::secure::threshold;
+pub use super::insecure::dkg;
+pub use super::insecure::threshold;
 
 /// Max number of non-zero coefficients in the message polynomial.
 /// This is a conservative estimate that should be okay for most use cases.
