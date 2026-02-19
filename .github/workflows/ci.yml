@@ -35,7 +35,7 @@ jobs:
   rust_unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -78,7 +78,7 @@ jobs:
   rust_integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -121,7 +121,7 @@ jobs:
   zk_prover_integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -150,7 +150,7 @@ jobs:
   build_e3_support_risc0:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Generate tags
         id: tags
         run: |
@@ -187,7 +187,7 @@ jobs:
   build_ciphernode_image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Generate tags
         id: tags
@@ -228,7 +228,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -263,7 +263,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
       - name: 'Run network tests'
         working-directory: tests/integration
         run: './test.sh net --no-prebuild'
@@ -276,7 +276,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -345,7 +345,7 @@ jobs:
       fail-fast: false
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
       - name: 'Setup node'
@@ -402,7 +402,7 @@ jobs:
   build_enclave_cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -434,7 +434,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_crisp_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -507,7 +507,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -614,7 +614,7 @@ jobs:
   test_enclave_circuits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -640,7 +640,7 @@ jobs:
   build_e3_support_dev:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Cache Rust dependencies
@@ -669,7 +669,7 @@ jobs:
   build_sdk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -718,7 +718,7 @@ jobs:
   build_crisp_sdk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -763,7 +763,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Install pnpm
@@ -869,7 +869,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
