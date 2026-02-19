@@ -8,14 +8,12 @@
 // and generates commitment for u, which will be used in ct1 to check consistency of u
 // across ct0 and ct1.
 
-use crate::math::commitments::compute_commitment;
+use crate::math::commitments::compute_multiple_polynomial_commitment;
 use crate::math::commitments::compute_single_polynomial_commitment;
 use crate::math::commitments::compute_user_data_encryption_ct0_challenge;
 use crate::math::commitments::DS_CIPHERTEXT;
 use crate::math::commitments::DS_PK_AGGREGATION;
 use crate::math::commitments::DS_USER_DATA_ENCRYPTION_COMMITMENT;
-use crate::math::commitments::multiple_polynomial_payload;
-use crate::math::commitments::single_polynomial_payload;
 use crate::math::helpers::flatten;
 use crate::math::polynomial::Polynomial;
 
@@ -118,12 +116,10 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     }
 
     fn generate_commitments(self) -> (Field, Field, Field, Field) {
-        let pk0_payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), self.pk0is);
-        let pk0_commitment = compute_commitment(pk0_payload, DS_PK_AGGREGATION);
-
-        let ct0_payload = multiple_polynomial_payload::<N, L, BIT_CT>(Vec::new(), self.ct0is);
-        let ct0_commitment = compute_commitment(ct0_payload, DS_CIPHERTEXT);
-
+        let pk0_commitment =
+            compute_multiple_polynomial_commitment::<N, L, BIT_PK>(self.pk0is, DS_PK_AGGREGATION);
+        let ct0_commitment =
+            compute_multiple_polynomial_commitment::<N, L, BIT_CT>(self.ct0is, DS_CIPHERTEXT);
         let k1_commitment = compute_single_polynomial_commitment::<N, BIT_K>(
             self.k1,
             DS_USER_DATA_ENCRYPTION_COMMITMENT,

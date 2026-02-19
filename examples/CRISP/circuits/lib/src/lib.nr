@@ -10,7 +10,6 @@
 //! This library provides utilities for ciphertext operations, commitments, ECDSA signature
 //! verification, Merkle tree operations, and vote validation.
 
-pub mod commitments;
 pub mod constants;
 pub mod ciphertext_addition;
 pub mod ecdsa;
