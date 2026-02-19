@@ -8,13 +8,12 @@ use std::path::PathBuf;
 
 use crate::ciphernode::{self, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
-use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
 use crate::noir::NoirCommands;
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{init, net, noir, password, purge_all, rev, wallet};
+use crate::{init, noir, password, purge_all, rev, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -104,16 +103,12 @@ impl Cli {
                             rpc_url,
                             password,
                             private_key,
-                            net_keypair,
-                            generate_net_keypair,
                         }
                     } => {
                         ciphernode::setup::execute(
                             rpc_url,
                             password,
                             private_key,
-                            net_keypair,
-                            generate_net_keypair,
                         )
                         .await?;
                         println!("You can start your node using `enclave start`");
@@ -124,8 +119,6 @@ impl Cli {
                             None,
                             None,
                             None,
-                            None,
-                            false,
                         )
                         .await?;
                     },
@@ -148,10 +141,6 @@ impl Cli {
 
         if config.autopassword() {
             e3_entrypoint::password::set::autopassword(&config).await?;
-        }
-
-        if config.autonetkey() {
-            e3_entrypoint::net::keypair::generate::autonetkey(&config).await?;
         }
 
         if config.autowallet() {
@@ -184,7 +173,6 @@ impl Cli {
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Ciphernode { command } => ciphernode::execute(command, &config).await?,
-            Commands::Net { command } => net::execute(command, &config).await?,
             Commands::Noir { command } => noir::execute(command, &config).await?,
             Commands::Rev => rev::execute().await?,
         }
@@ -277,12 +265,6 @@ pub enum Commands {
     Wallet {
         #[command(subcommand)]
         command: WalletCommands,
-    },
-
-    /// Networking related commands
-    Net {
-        #[command(subcommand)]
-        command: NetCommands,
     },
 
     /// Noir prover management and proof generation

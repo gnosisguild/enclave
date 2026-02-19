@@ -48,14 +48,6 @@ pub enum CiphernodeCommands {
         /// Wallet Private Key
         #[arg(short, long, value_parser = ensure_hex_zeroizing)]
         private_key: Option<Zeroizing<String>>,
-
-        /// The network private key (ed25519)
-        #[arg(long = "net-keypair", short = 'n')]
-        net_keypair: Option<String>,
-
-        /// Autogenerate a new network keypair
-        #[arg(long = "generate-net-keypair", short = 'g')]
-        generate_net_keypair: bool,
     },
     /// Manage ENCL license tokens and bonding state
     License {

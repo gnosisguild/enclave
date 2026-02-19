@@ -5,25 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input};
+use dialoguer::{theme::ColorfulTheme, Input};
 use e3_entrypoint::config::setup;
 use e3_utils::eth_address_from_private_key;
 use std::path::PathBuf;
 use tracing::instrument;
 use zeroize::Zeroizing;
 
-use crate::net::{NetCommands, NetKeypairCommands};
+use crate::password_set;
 use crate::password_set::ask_for_password;
 use crate::wallet_set::ask_for_private_key;
-use crate::{net, password_set};
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
     rpc_url: Option<String>,
     password: Option<Zeroizing<String>>,
     private_key: Option<Zeroizing<String>>,
-    net_keypair: Option<String>,
-    generate_net_keypair: bool,
 ) -> Result<()> {
     let pw = ask_for_password(password)?;
     let rpc_url = match rpc_url {
@@ -60,36 +57,12 @@ pub async fn execute(
         .interact_text()?
         .into();
 
-    let net_keypair_command = if generate_net_keypair {
-        NetKeypairCommands::Generate
-    } else if net_keypair.is_none() {
-        let should_generate = Confirm::with_theme(&ColorfulTheme::default())
-            .with_prompt("No net keypair specified. Would you like to generate one automatically?")
-            .default(true)
-            .interact()?;
-        if should_generate {
-            NetKeypairCommands::Generate
-        } else {
-            NetKeypairCommands::Set { net_keypair }
-        }
-    } else {
-        NetKeypairCommands::Set { net_keypair }
-    };
-
     // Execute
     let config = setup::execute(rpc_url, &config_dir, &address)?;
 
     password_set::execute(&config, Some(pw)).await?;
 
     e3_entrypoint::wallet::set::execute(&config, private_key).await?;
-
-    net::execute(
-        NetCommands::Keypair {
-            command: net_keypair_command,
-        },
-        &config,
-    )
-    .await?;
 
     println!("Enclave configuration successfully created!");
 
