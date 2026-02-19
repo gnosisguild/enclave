@@ -114,25 +114,37 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    fn generate_commitments(self) -> (Field, Field) {
+    fn generate_commitments(self) -> (Field, Field, Field, Field) {
         let pk0_payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), self.pk0is);
         let pk0_commitment = compute_commitment(pk0_payload, DS_PK_AGGREGATION);
+
+        let ct0_payload = multiple_polynomial_payload::<N, L, BIT_CT>(Vec::new(), self.ct0is);
+        let ct0_commitment = compute_commitment(ct0_payload, DS_PK_AGGREGATION);
+
+        let k1_payload = single_polynomial_payload::<N, BIT_K>(Vec::new(), self.k1);
+        let k1_commitment = compute_commitment(k1_payload, DS_PK_AGGREGATION);
 
         let u_payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), self.u);
         let u_commitment = compute_commitment(u_payload, DS_PK_AGGREGATION);
 
-        (pk0_commitment, u_commitment)
+        (pk0_commitment, ct0_commitment, k1_commitment, u_commitment)
     }
 
-    fn generate_challenge(self, pk0_commitment: Field, u_commitment: Field) -> Vec<Field> {
+    fn generate_challenge(
+        self,
+        pk0_commitment: Field,
+        ct0_commitment: Field,
+        k1_commitment: Field,
+        u_commitment: Field,
+    ) -> Vec<Field> {
         let mut payload = Vec::new();
 
         payload.push(pk0_commitment);
+        payload.push(ct0_commitment);
+        payload.push(k1_commitment);
         payload.push(u_commitment);
 
-        payload = flatten::<_, _, BIT_CT>(payload, self.ct0is);
         payload = flatten::<_, _, BIT_E0>(payload, [self.e0]);
-        payload = flatten::<_, _, BIT_K>(payload, [self.k1]);
         payload = flatten::<_, _, BIT_R1>(payload, self.r1is);
         payload = flatten::<_, _, BIT_R2>(payload, self.r2is);
 
@@ -168,17 +180,19 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         sum.0 == sum.1
     }
 
-    /// Returns pk0_commitment and u_commitment
-    pub fn execute(self) -> (Field, Field) {
+    /// Returns pk0_commitment, ct0_commitment, k1_commitment and u_commitment
+    pub fn execute(self) -> (Field, Field, Field, Field) {
         self.check_range_bounds();
         self.check_e0_crt_consistency();
 
-        let (pk0_commitment, u_commitment) = self.generate_commitments();
+        let (pk0_commitment, ct0_commitment, k1_commitment, u_commitment) =
+            self.generate_commitments();
 
-        let gammas = self.generate_challenge(pk0_commitment, u_commitment);
+        let gammas =
+            self.generate_challenge(pk0_commitment, ct0_commitment, k1_commitment, u_commitment);
 
         assert(self.verify_evaluations(gammas), "ct0 encryption check failed");
 
-        (pk0_commitment, u_commitment)
+        (pk0_commitment, ct0_commitment, k1_commitment, u_commitment)
     }
 }

@@ -22,7 +22,7 @@ fn main(
     k1: Polynomial<N>,
     r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
-) -> pub (Field, Field) {
+) -> pub (Field, Field, Field, Field) {
     let circuit: UserDataEncryptionCt0<N, L, USER_DATA_ENCRYPTION_BIT_PK, USER_DATA_ENCRYPTION_BIT_CT, USER_DATA_ENCRYPTION_BIT_U, USER_DATA_ENCRYPTION_BIT_E0, USER_DATA_ENCRYPTION_BIT_K, USER_DATA_ENCRYPTION_BIT_R1, USER_DATA_ENCRYPTION_BIT_R2> = UserDataEncryptionCt0::new(
         USER_DATA_ENCRYPTION_CT0_CONFIGS,
         pk0is,

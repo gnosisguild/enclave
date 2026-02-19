@@ -51,16 +51,6 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         UserDataEncryptionCt1 { configs, pk1is, ct1is, u, e1, p1is, p2is }
     }
 
-    fn generate_commitments(self) -> (Field, Field) {
-        let pk1_payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), self.pk1is);
-        let pk1_commitment = compute_commitment(pk1_payload, DS_PK_AGGREGATION);
-
-        let u_payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), self.u);
-        let u_commitment = compute_commitment(u_payload, DS_PK_AGGREGATION);
-
-        (pk1_commitment, u_commitment)
-    }
-
     fn check_range_bounds(self) {
         self.e1.range_check_2bounds::<BIT_E1>(self.configs.e1_bound, self.configs.e1_bound);
 
@@ -76,13 +66,31 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
     }
 
-    fn generate_challenge(self, pk1_commitment: Field, u_commitment: Field) -> Vec<Field> {
+    fn generate_commitments(self) -> (Field, Field, Field) {
+        let pk1_payload = multiple_polynomial_payload::<N, L, BIT_PK>(Vec::new(), self.pk1is);
+        let pk1_commitment = compute_commitment(pk1_payload, DS_PK_AGGREGATION);
+
+        let ct1_payload = multiple_polynomial_payload::<N, L, BIT_CT>(Vec::new(), self.ct1is);
+        let ct1_commitment = compute_commitment(ct1_payload, DS_PK_AGGREGATION);
+
+        let u_payload = single_polynomial_payload::<N, BIT_U>(Vec::new(), self.u);
+        let u_commitment = compute_commitment(u_payload, DS_PK_AGGREGATION);
+
+        (pk1_commitment, ct1_commitment, u_commitment)
+    }
+
+    fn generate_challenge(
+        self,
+        pk1_commitment: Field,
+        ct1_commitment: Field,
+        u_commitment: Field,
+    ) -> Vec<Field> {
         let mut payload = Vec::new();
 
         payload.push(pk1_commitment);
+        payload.push(ct1_commitment);
         payload.push(u_commitment);
 
-        payload = flatten::<_, _, BIT_CT>(payload, self.ct1is);
         payload = flatten::<_, _, BIT_E1>(payload, [self.e1]);
         payload = flatten::<_, _, BIT_P1>(payload, self.p1is);
         payload = flatten::<_, _, BIT_P2>(payload, self.p2is);
@@ -115,16 +123,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         sum.0 == sum.1
     }
 
-    /// Returns pk1_commitment and u_commitment
-    pub fn execute(self) -> (Field, Field) {
+    /// Returns pk1_commitment, ct1_commitment and u_commitment
+    pub fn execute(self) -> (Field, Field, Field) {
         self.check_range_bounds();
 
-        let (pk1_commitment, u_commitment) = self.generate_commitments();
+        let (pk1_commitment, ct1_commitment, u_commitment) = self.generate_commitments();
 
-        let gammas = self.generate_challenge(pk1_commitment, u_commitment);
+        let gammas = self.generate_challenge(pk1_commitment, ct1_commitment, u_commitment);
 
         assert(self.verify_evaluations(gammas), "ct1 encryption check failed");
 
-        (pk1_commitment, u_commitment)
+        (pk1_commitment, ct1_commitment, u_commitment)
     }
 }
