@@ -291,7 +291,7 @@ async fn setup_decrypted_shares_aggregation_test() -> Option<(
     let bb = find_bb().await?;
     let (backend, temp) = setup_test_prover(&bb).await;
 
-    setup_compiled_circuit(&backend, "threshold", "decrypted_shares_aggregation_bn").await;
+    setup_compiled_circuit(&backend, "threshold", "decrypted_shares_aggregation_mod").await;
 
     let sample = DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).ok()?;
     let prover = ZkProver::new(&backend);

@@ -17,7 +17,7 @@ impl Provable for ShareComputationCircuit {
     type Input = ShareComputationCircuitData;
     type Inputs = Inputs;
 
-    fn resolve_circuit_name(&self, _input: &Self::Input) -> CircuitName {
+    fn resolve_circuit_name(&self, _params: &Self::Params, _input: &Self::Input) -> CircuitName {
         match _input.dkg_input_type {
             DkgInputType::SecretKey => CircuitName::SkShareComputation,
             DkgInputType::SmudgingNoise => CircuitName::ESmShareComputation,

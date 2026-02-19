@@ -4,10 +4,14 @@
 .coverage_contracts
 
 # Base Dirs
+
+# Base Dirs
 /artifacts/
 !/artifacts/
 /artifacts/**
 !/artifacts/contracts/
+
+# Interfaces
 
 # Interfaces
 !/artifacts/contracts/interfaces/
@@ -27,6 +31,13 @@
 !/artifacts/contracts/token/
 !/artifacts/contracts/token/EnclaveTicketToken.sol/
 !/artifacts/contracts/token/EnclaveTicketToken.sol/EnclaveTicketToken.json
+
+# Verifier contracts
+!/artifacts/contracts/verifier/
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/DkgPkVerifier.json
+!/artifacts/contracts/verifier/DkgPkVerifier.sol/ZKTranscriptLib.json
+
 
 # Verifier contracts
 !/artifacts/contracts/verifier/

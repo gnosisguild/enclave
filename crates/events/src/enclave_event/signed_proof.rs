@@ -48,17 +48,20 @@ pub enum ProofType {
 }
 
 impl ProofType {
-    /// Map this proof type to its corresponding circuit name.
-    pub fn circuit_name(&self) -> CircuitName {
+    /// Map this proof type to its corresponding circuit names.
+    pub fn circuit_names(&self) -> Vec<CircuitName> {
         match self {
-            ProofType::T0PkBfv => CircuitName::PkBfv,
-            ProofType::T1PkGeneration => CircuitName::PkGeneration,
-            ProofType::T1SkShareComputation => CircuitName::SkShareComputation,
-            ProofType::T1ESmShareComputation => CircuitName::ESmShareComputation,
-            ProofType::T1ShareEncryption => CircuitName::ShareEncryption,
-            ProofType::T2DkgShareDecryption => CircuitName::DkgShareDecryption,
-            ProofType::T5ShareDecryption => CircuitName::ThresholdShareDecryption,
-            ProofType::T6DecryptedSharesAggregation => CircuitName::DecryptedSharesAggregationBn,
+            ProofType::T0PkBfv => vec![CircuitName::PkBfv],
+            ProofType::T1PkGeneration => vec![CircuitName::PkGeneration],
+            ProofType::T1SkShareComputation => vec![CircuitName::SkShareComputation],
+            ProofType::T1ESmShareComputation => vec![CircuitName::ESmShareComputation],
+            ProofType::T1ShareEncryption => vec![CircuitName::ShareEncryption],
+            ProofType::T2DkgShareDecryption => vec![CircuitName::DkgShareDecryption],
+            ProofType::T5ShareDecryption => vec![CircuitName::ThresholdShareDecryption],
+            ProofType::T6DecryptedSharesAggregation => vec![
+                CircuitName::DecryptedSharesAggregationBn,
+                CircuitName::DecryptedSharesAggregationMod,
+            ],
         }
     }
 
@@ -292,23 +295,30 @@ mod tests {
     }
 
     #[test]
-    fn proof_type_circuit_name_mapping() {
-        assert_eq!(ProofType::T0PkBfv.circuit_name(), CircuitName::PkBfv);
+    fn proof_type_circuit_names_mapping() {
+        assert_eq!(ProofType::T0PkBfv.circuit_names(), vec![CircuitName::PkBfv]);
         assert_eq!(
-            ProofType::T1PkGeneration.circuit_name(),
-            CircuitName::PkGeneration
+            ProofType::T1PkGeneration.circuit_names(),
+            vec![CircuitName::PkGeneration]
         );
         assert_eq!(
-            ProofType::T1ShareEncryption.circuit_name(),
-            CircuitName::ShareEncryption
+            ProofType::T1ShareEncryption.circuit_names(),
+            vec![CircuitName::ShareEncryption]
         );
         assert_eq!(
-            ProofType::T2DkgShareDecryption.circuit_name(),
-            CircuitName::DkgShareDecryption
+            ProofType::T2DkgShareDecryption.circuit_names(),
+            vec![CircuitName::DkgShareDecryption]
         );
         assert_eq!(
-            ProofType::T5ShareDecryption.circuit_name(),
-            CircuitName::ThresholdShareDecryption
+            ProofType::T5ShareDecryption.circuit_names(),
+            vec![CircuitName::ThresholdShareDecryption]
+        );
+        assert_eq!(
+            ProofType::T6DecryptedSharesAggregation.circuit_names(),
+            vec![
+                CircuitName::DecryptedSharesAggregationBn,
+                CircuitName::DecryptedSharesAggregationMod,
+            ]
         );
     }
 }
