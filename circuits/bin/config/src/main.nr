@@ -226,8 +226,8 @@ fn verify_pk_generation_bounds() {
         // r2_bounds[i] = (q_i - 1) / 2
         assert(PK_GENERATION_R2_BOUNDS[i] as u128 == qi_bound, "PK_GENERATION_R2_BOUNDS mismatch");
 
-        // r1_bounds[i] = ((n * eek_bound + 2) * qi_bound + eek_bound) / q_i
-        let expected_r1: u128 = ((n * eek + 2) * qi_bound + eek) / qi;
+        // r1_bounds[i] = ((n  + 2) * qi_bound + eek_bound) / q_i
+        let expected_r1: u128 = ((n + 2) * qi_bound + eek) / qi;
         assert(
             PK_GENERATION_R1_BOUNDS[i] as u128 == expected_r1,
             "PK_GENERATION_R1_BOUNDS mismatch",
