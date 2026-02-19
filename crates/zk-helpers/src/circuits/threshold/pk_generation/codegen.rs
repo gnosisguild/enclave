@@ -54,7 +54,7 @@ pub fn generate_configs(
     let r1_bounds_str = join_display(&configs.bounds.r1_bounds, ", ");
     let r2_bounds_str = join_display(&configs.bounds.r2_bounds, ", ");
 
-    let (threshold_params, _) = preset.build_pair().unwrap();
+    let (threshold_params, _) = preset.build_pair().map_err(|e| CircuitsErrors::Sample(format!("Failed to build pair for preset: {:?}", e)))?;
 
     let crp_matrix_str = crp_matrix_constant_string(&threshold_params)?;
 
