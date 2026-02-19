@@ -112,7 +112,6 @@ impl Cli {
                             private_key,
                         )
                         .await?;
-                        println!("You can start your node using `enclave start`");
                     }
                     Commands::Start { .. } => {
                         println!("No configuration found. Setting up enclave configuration...");

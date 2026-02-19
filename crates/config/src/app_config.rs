@@ -180,6 +180,8 @@ pub struct AppConfig {
     program: ProgramConfig,
     /// A custom bb implementation has been provided do not download and checksum a binary
     using_custom_bb: bool,
+    /// Whether the config has been overridden
+    using_custom_config: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -245,20 +247,21 @@ impl AppConfig {
             Some(&node.log_file),
             config.custom_bb.as_ref(),
         );
-
+        let found_config_file = config.found_config_file.clone();
         Ok(AppConfig {
             name: name.to_owned(),
             nodes: config.nodes,
             chains: config.chains,
             peers: vec![],
             paths,
-            config_yaml: config.found_config_file.unwrap_or_default(),
+            config_yaml: found_config_file.clone().unwrap_or_default(),
             otel: config.otel,
             autopassword: node.autopassword,
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
             program: config.program.unwrap_or_default(),
             using_custom_bb: config.custom_bb.is_some(),
+            using_custom_config: found_config_file.is_some(),
         })
     }
 
@@ -290,6 +293,11 @@ impl AppConfig {
         } else {
             BBPath::Default(bb)
         }
+    }
+
+    /// Whether the config is changed from the default
+    pub fn using_custom_config(&self) -> bool {
+        self.using_custom_config
     }
 
     /// Get the circuits directory

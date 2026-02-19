@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
+use e3_config::AppConfig;
 use e3_entrypoint::config::setup;
 use e3_utils::{colorize, eth_address_from_private_key, Color};
 use std::path::PathBuf;
@@ -58,23 +60,41 @@ pub async fn execute(
         .into();
 
     // Execute
-    let config = setup::execute(rpc_url, &config_dir, &address)?;
+    let config = setup::execute(&rpc_url, &config_dir, &address)?;
 
     password_set::execute(&config, Some(pw)).await?;
 
     let (address, peer_id) = e3_entrypoint::wallet::set::execute(&config, private_key).await?;
-    let abs_dir = config_dir.canonicalize()?;
+    print_info(&config, address, &peer_id.to_string(), &rpc_url)?;
+    Ok(())
+}
 
-    println!("Enclave configuration successfully created!");
-    println!("");
-    println!("  Your address:\t{}", colorize(address, Color::Cyan));
-    println!("  Your peer id:\t{}", colorize(peer_id, Color::Cyan));
-    println!("");
-    println!("Configuration has been written to {:?}", abs_dir);
+fn print_info(config: &AppConfig, address: Address, peer_id: &str, rpc_url: &str) -> Result<()> {
+    let abs_config = config.config_file().canonicalize()?;
+
+    println!("\nEnclave configuration successfully created!");
     println!(
-        "Run future commands from within this directory tree, or pass --config {:?}",
-        abs_dir
+        "Editable configuration has been written to:\n\n {}",
+        colorize(abs_config.to_string_lossy(), Color::Yellow)
     );
-
+    println!("");
+    println!("Data written:");
+    println!(" address: {}", colorize(address, Color::Cyan));
+    println!(" peer_id: {}", colorize(peer_id, Color::Cyan));
+    println!(" rpc_url: {}", colorize(rpc_url, Color::Cyan));
+    println!("");
+    if config.using_custom_config() {
+        println!(
+            "Run future commands from within this directory tree, or pass\n {}\n",
+            colorize(
+                format!("--config {}", abs_config.to_string_lossy()),
+                Color::Yellow
+            )
+        );
+    }
+    println!(
+        "You can start your node using:\n `{}`\n",
+        colorize("enclave start", Color::Yellow)
+    );
     Ok(())
 }
