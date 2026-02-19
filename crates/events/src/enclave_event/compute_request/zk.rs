@@ -38,9 +38,6 @@ pub struct PkGenerationProofRequest {
     /// Raw pk0 share polynomial bytes (public statement).
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk0_share: ArcBytes,
-    /// Raw common random polynomial bytes (public statement).
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub a: ArcBytes,
     /// Raw secret key polynomial bytes (witness — encrypted at rest).
     pub sk: SensitiveBytes,
     /// Raw error polynomial bytes (witness — encrypted at rest).
@@ -65,7 +62,6 @@ impl PkBfvProofRequest {
 impl PkGenerationProofRequest {
     pub fn new(
         pk0_share: impl Into<ArcBytes>,
-        a: impl Into<ArcBytes>,
         sk: SensitiveBytes,
         eek: SensitiveBytes,
         e_sm: SensitiveBytes,
@@ -74,7 +70,6 @@ impl PkGenerationProofRequest {
     ) -> Self {
         Self {
             pk0_share: pk0_share.into(),
-            a: a.into(),
             sk,
             eek,
             params_preset,

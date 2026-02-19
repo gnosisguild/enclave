@@ -798,7 +798,6 @@ impl ThresholdKeyshare {
 
         let proof_request = PkGenerationProofRequest::new(
             proof_request_data.pk0_share_raw.clone(),
-            proof_request_data.a_raw.clone(),
             proof_request_data.sk_raw.clone(),
             proof_request_data.eek_raw.clone(),
             e_sm_raw.clone(),
