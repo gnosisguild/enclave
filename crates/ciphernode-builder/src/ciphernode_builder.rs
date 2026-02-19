@@ -7,14 +7,13 @@
 use crate::{CiphernodeHandle, EventSystem, EvmSystemChainBuilder, ProviderCache, WriteEnabled};
 use actix::{Actor, Addr};
 use alloy::signers::local::PrivateKeySigner;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use derivative::Derivative;
 use e3_aggregator::ext::{PublicKeyAggregatorExtension, ThresholdPlaintextAggregatorExtension};
 use e3_aggregator::CommitteeFinalizer;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::{InMemStore, RepositoriesFactory};
-use e3_events::hlc::Hlc;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
@@ -31,7 +30,7 @@ use e3_sortition::{
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_sync::sync;
-use e3_utils::{rand_eth_addr, SharedRng};
+use e3_utils::SharedRng;
 use e3_zk_prover::{setup_zk_actors, ZkBackend};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -199,12 +198,6 @@ impl CiphernodeBuilder {
         self.chains = chains.to_vec();
         self
     }
-
-    // /// Use the given Address to represent the node. This should be unique.
-    // pub fn with_address(mut self, addr: &str) -> Self {
-    //     self.address = Some(addr.to_owned());
-    //     self
-    // }
 
     /// Log data actor events
     pub fn with_logging(mut self) -> Self {
