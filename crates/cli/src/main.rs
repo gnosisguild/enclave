@@ -6,6 +6,7 @@
 
 use clap::Parser;
 use cli::Cli;
+use e3_utils::{colorize, Color};
 use tracing::info;
 
 mod ciphernode;
@@ -63,7 +64,7 @@ pub async fn main() {
 
     // Execute the cli
     if let Err(err) = Cli::parse().execute().await {
-        eprintln!("{}", err);
+        eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
 }
