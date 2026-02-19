@@ -3327,6 +3327,7 @@ dependencies = [
  "e3-trbfv",
  "e3-utils",
  "futures-util",
+ "hex",
  "num-bigint",
  "serde",
  "tokio",
