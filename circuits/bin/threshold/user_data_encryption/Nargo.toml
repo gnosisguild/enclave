@@ -1,8 +1,0 @@
-[package]
-name = "user_data_encryption"
-type = "bin"
-authors = ["Gnosis Guild / Enclave"]
-
-
-[dependencies]
-lib = { path = "../../../lib" }
