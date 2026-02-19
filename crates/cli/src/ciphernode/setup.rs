@@ -7,7 +7,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use e3_entrypoint::config::setup;
-use e3_utils::eth_address_from_private_key;
+use e3_utils::{colorize, eth_address_from_private_key, Color};
 use std::path::PathBuf;
 use tracing::instrument;
 use zeroize::Zeroizing;
@@ -28,7 +28,7 @@ pub async fn execute(
             setup::validate_rpc_url(&url)?;
             url
         }
-        None => Input::<String>::new()
+        None => Input::<String>::with_theme(&ColorfulTheme::default())
             .with_prompt("Enter WebSocket devnet RPC URL")
             .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
             .validate_with(setup::validate_rpc_url)
@@ -62,13 +62,18 @@ pub async fn execute(
 
     password_set::execute(&config, Some(pw)).await?;
 
-    e3_entrypoint::wallet::set::execute(&config, private_key).await?;
+    let (address, peer_id) = e3_entrypoint::wallet::set::execute(&config, private_key).await?;
+    let abs_dir = config_dir.canonicalize()?;
 
     println!("Enclave configuration successfully created!");
-    println!("Configuration has been written to {:?}", config_dir);
+    println!("");
+    println!("  Your address:\t{}", colorize(address, Color::Cyan));
+    println!("  Your peer id:\t{}", colorize(peer_id, Color::Cyan));
+    println!("");
+    println!("Configuration has been written to {:?}", abs_dir);
     println!(
         "Run future commands from within this directory tree, or pass --config {:?}",
-        config_dir
+        abs_dir
     );
 
     Ok(())

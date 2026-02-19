@@ -8,7 +8,6 @@ use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
 use e3_entrypoint::wallet::set::validate_private_key;
-use e3_utils::eth_address_from_private_key;
 use zeroize::Zeroizing;
 
 pub fn ask_for_private_key(given_key: Option<Zeroizing<String>>) -> Result<Zeroizing<String>> {

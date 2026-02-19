@@ -32,6 +32,7 @@ mod purge_all;
 mod rev;
 mod start;
 mod wallet;
+mod wallet_get;
 mod wallet_set;
 
 const OWO: &str = r#"

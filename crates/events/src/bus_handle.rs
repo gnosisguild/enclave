@@ -24,6 +24,7 @@ use crate::{
     EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
+// TODO: this wont work with trap need to fix
 pub trait EnclaveUnsequencedErrorDispatcher {
     fn err(&self, err_type: EType, error: anyhow::Error);
 }

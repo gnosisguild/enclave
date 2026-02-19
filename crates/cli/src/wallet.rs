@@ -9,7 +9,7 @@ use clap::Subcommand;
 use e3_config::AppConfig;
 use zeroize::Zeroizing;
 
-use crate::{helpers::ensure_hex_zeroizing, wallet_set};
+use crate::{helpers::ensure_hex_zeroizing, wallet_get, wallet_set};
 
 #[derive(Subcommand, Debug)]
 pub enum WalletCommands {
@@ -20,11 +20,14 @@ pub enum WalletCommands {
         #[arg(long = "private-key", value_parser = ensure_hex_zeroizing)]
         private_key: Option<Zeroizing<String>>,
     },
+    /// Get your wallet address
+    Get,
 }
 
 pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
         WalletCommands::Set { private_key } => wallet_set::execute(&config, private_key).await?,
+        WalletCommands::Get => wallet_get::execute(&config).await?,
     };
 
     Ok(())

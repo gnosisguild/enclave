@@ -58,8 +58,12 @@ impl SledDb {
             .db
             .get(key)
             .context(format!("Failed to fetch {}", str_key))?;
-
         Ok(res.map(|v| v.to_vec()))
+    }
+
+    pub fn flush(&self) -> Result<()> {
+        self.db.flush()?;
+        Ok(())
     }
 }
 

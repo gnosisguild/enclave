@@ -9,16 +9,16 @@ use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::Result;
 use e3_events::{
     prelude::*, BusHandle, EType, EnclaveEvent, EnclaveEventData,
-    EnclaveUnsequencedErrorDispatcher, EventType,
+    EnclaveUnsequencedErrorDispatcher, EventType, Flush,
 };
 use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
-use e3_utils::MAILBOX_LIMIT;
+use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::path::PathBuf;
 use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: Box<dyn EnclaveUnsequencedErrorDispatcher>, // Only used for Shutdown
+    bus: Box<dyn EnclaveUnsequencedErrorDispatcher>, // TODO: fix to work with trap
 }
 
 impl Actor for SledStore {
@@ -119,10 +119,24 @@ impl Handler<Get> for SledStore {
         }
     }
 }
+
+impl Handler<Flush> for SledStore {
+    type Result = ();
+    fn handle(&mut self, _: Flush, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref db) = self.db {
+            match db.flush() {
+                Err(err) => self.bus.err(EType::Data, err),
+                _ => (),
+            }
+        }
+    }
+}
+
 impl Handler<EnclaveEvent> for SledStore {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         if let EnclaveEventData::Shutdown(_) = msg.get_data() {
+            self.notify_sync(ctx, Flush); // Flush all pending writes
             let _db = self.db.take(); // db will be dropped
             ctx.stop()
         }
