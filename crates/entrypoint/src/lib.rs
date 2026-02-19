@@ -6,6 +6,7 @@
 
 pub mod config;
 pub mod helpers;
+pub mod net;
 pub mod nodes;
 pub mod password;
 pub mod start;

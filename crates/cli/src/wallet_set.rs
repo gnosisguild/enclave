@@ -17,7 +17,7 @@ pub fn ask_for_private_key(given_key: Option<Zeroizing<String>>) -> Result<Zeroi
     } else {
         Zeroizing::new(
             Password::with_theme(&ColorfulTheme::default())
-                .with_prompt("Enter your Ethereum private key")
+                .with_prompt("Enter your Ethereum private key (0x...)")
                 .validate_with(validate_private_key)
                 .interact()?
                 .trim()

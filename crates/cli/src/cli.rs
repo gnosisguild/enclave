@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use crate::ciphernode::{self, CiphernodeCommands};
 use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
+use crate::net::{self, NetCommands};
 use crate::nodes::{self, NodeCommands};
 use crate::noir::NoirCommands;
 use crate::password::PasswordCommands;
@@ -174,6 +175,7 @@ impl Cli {
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Ciphernode { command } => ciphernode::execute(command, &config).await?,
             Commands::Noir { command } => noir::execute(command, &config).await?,
+            Commands::Net { command } => net::execute(command, &config).await?,
             Commands::Rev => rev::execute().await?,
         }
 
@@ -283,5 +285,11 @@ pub enum Commands {
     Nodes {
         #[command(subcommand)]
         command: NodeCommands,
+    },
+
+    /// Manage net configuration
+    Net {
+        #[command(subcommand)]
+        command: NetCommands,
     },
 }

@@ -12,6 +12,7 @@ mod ciphernode;
 mod cli;
 pub mod helpers;
 mod init;
+mod net;
 mod nodes;
 mod nodes_daemon;
 mod nodes_down;
