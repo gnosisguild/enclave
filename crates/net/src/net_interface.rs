@@ -16,7 +16,7 @@ use libp2p::{
     identity::Keypair,
     kad::{
         self,
-        store::{MemoryStore, MemoryStoreConfig},
+        store::{MemoryStore, MemoryStoreConfig, RecordStore},
         Behaviour as KademliaBehaviour, Config as KademliaConfig, GetRecordOk, QueryResult, Quorum,
         Record, RecordKey,
     },
@@ -39,6 +39,7 @@ use tracing::{debug, error, info, trace, warn};
 
 const PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/enclave/kad/1.0.0");
 const MAX_KADEMLIA_PAYLOAD_MB: usize = 10;
+const DHT_MAX_RECORDS: usize = 4096;
 const MAX_GOSSIP_MSG_SIZE_KB: usize = 700;
 const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
 
@@ -175,6 +176,7 @@ impl NetInterface {
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
                 }
+
             }
         }
 
@@ -220,10 +222,10 @@ fn create_behaviour(
         .set_max_packet_size(MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024)
         .set_query_timeout(Duration::from_secs(30));
     let store_config = MemoryStoreConfig {
-        max_records: 1024,
+        max_records: DHT_MAX_RECORDS,
         max_value_bytes: MAX_KADEMLIA_PAYLOAD_MB * 1024 * 1024,
         max_providers_per_key: usize::MAX,
-        max_provided_keys: 1024,
+        max_provided_keys: DHT_MAX_RECORDS,
     };
     let store = MemoryStore::with_config(peer_id, store_config);
     // Force Server mode: in a private network all nodes should fully participate
@@ -607,6 +609,26 @@ fn handle_dial(
     Ok(())
 }
 
+/// Evict expired records from the DHT store.
+///
+/// `MemoryStore` does not check expiration on `put()` — it simply counts
+/// all records, expired or not.  This helper removes stale entries so that
+/// the `max_records` budget reflects only live data.
+fn prune_expired_dht_records(swarm: &mut Swarm<NodeBehaviour>) {
+    let now = Instant::now();
+    let store = swarm.behaviour_mut().kademlia.store_mut();
+    let before = store.records().count();
+    store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+    let after = store.records().count();
+    if before != after {
+        info!(
+            "DHT pruned {} expired records ({} remaining)",
+            before - after,
+            after
+        );
+    }
+}
+
 fn handle_put_record(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
@@ -630,12 +652,33 @@ fn handle_put_record(
         // not the actual cluster size. With a routing table of ~21 entries,
         // it required 11 peers to acknowledge the record, which is impossible
         // in a 4-node cluster.
-        .put_record(record, Quorum::One)
+        .put_record(record.clone(), Quorum::One)
     {
         Ok(qid) => {
-            // QueryId is returned synchronously and we immediately add it to the correlator so race conditions should not be an issue.
             correlator.track(qid, correlation_id);
             debug!("PUT RECORD OK qid={:?} cid={}", qid, correlation_id);
+        }
+        Err(kad::store::Error::MaxRecords) => {
+            prune_expired_dht_records(swarm);
+            match swarm
+                .behaviour_mut()
+                .kademlia
+                .put_record(record, Quorum::One)
+            {
+                Ok(qid) => {
+                    correlator.track(qid, correlation_id);
+                    debug!(
+                        "PUT RECORD OK (after prune) qid={:?} cid={}",
+                        qid, correlation_id
+                    );
+                }
+                Err(error) => {
+                    event_tx.send(NetEvent::DhtPutRecordError {
+                        correlation_id,
+                        error: PutOrStoreError::StoreError(error),
+                    })?;
+                }
+            }
         }
         Err(error) => {
             event_tx.send(NetEvent::DhtPutRecordError {
@@ -755,5 +798,110 @@ impl PeerFailureTracker {
     /// Reset the failure count for a peer (e.g. on successful connection or after eviction).
     fn reset(&mut self, peer_id: &PeerId) {
         self.failures.remove(peer_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libp2p::kad::store::{MemoryStore, MemoryStoreConfig, RecordStore};
+    use libp2p::kad::{Record, RecordKey};
+    use libp2p::PeerId;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn expired_records_are_pruned_on_full_store() {
+        let peer_id = PeerId::random();
+        let config = MemoryStoreConfig {
+            max_records: 5,
+            max_value_bytes: 1024,
+            max_providers_per_key: 1,
+            max_provided_keys: 5,
+        };
+        let mut store = MemoryStore::with_config(peer_id, config);
+
+        let past = Instant::now() - Duration::from_secs(1);
+        for i in 0..5 {
+            let record = Record {
+                key: RecordKey::new(&format!("expired-{i}").into_bytes()),
+                value: vec![i as u8],
+                publisher: None,
+                expires: Some(past),
+            };
+            store.put(record).expect("should succeed while under limit");
+        }
+
+        // Store is full — new put must fail
+        let new_record = Record {
+            key: RecordKey::new(&b"new-record".to_vec()),
+            value: vec![42],
+            publisher: None,
+            expires: Some(Instant::now() + Duration::from_secs(3600)),
+        };
+        assert!(
+            store.put(new_record.clone()).is_err(),
+            "put should fail when store is at max_records"
+        );
+
+        let now = Instant::now();
+        store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+
+        assert_eq!(
+            store.records().count(),
+            0,
+            "all expired records should be pruned"
+        );
+
+        store
+            .put(new_record)
+            .expect("put should succeed after pruning expired records");
+        assert_eq!(store.records().count(), 1);
+    }
+
+    #[test]
+    fn non_expired_records_survive_pruning() {
+        let peer_id = PeerId::random();
+        let config = MemoryStoreConfig {
+            max_records: 5,
+            max_value_bytes: 1024,
+            max_providers_per_key: 1,
+            max_provided_keys: 5,
+        };
+        let mut store = MemoryStore::with_config(peer_id, config);
+
+        let future = Instant::now() + Duration::from_secs(3600);
+        let past = Instant::now() - Duration::from_secs(1);
+
+        // 3 live records, 2 expired
+        for i in 0..3 {
+            store
+                .put(Record {
+                    key: RecordKey::new(&format!("live-{i}").into_bytes()),
+                    value: vec![i as u8],
+                    publisher: None,
+                    expires: Some(future),
+                })
+                .unwrap();
+        }
+        for i in 0..2 {
+            store
+                .put(Record {
+                    key: RecordKey::new(&format!("dead-{i}").into_bytes()),
+                    value: vec![i as u8],
+                    publisher: None,
+                    expires: Some(past),
+                })
+                .unwrap();
+        }
+
+        assert_eq!(store.records().count(), 5);
+
+        let now = Instant::now();
+        store.retain(|_, r| r.expires.map_or(true, |e| e > now));
+
+        assert_eq!(
+            store.records().count(),
+            3,
+            "only live records should remain"
+        );
     }
 }
