@@ -54,6 +54,7 @@ fn process_key(
     let address = PrivateKeySigner::from_bytes(&private_key_bytes)?.address();
     let encrypted_private_key = cipher.encrypt_data(&mut private_key_bytes.to_vec())?;
     let encrypted_keypair = cipher.encrypt_data(&mut keypair)?;
+
     Ok((encrypted_private_key, encrypted_keypair, address, peer_id))
 }
 
