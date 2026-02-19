@@ -9,13 +9,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
-    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, Sequenced,
-    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptionshareCreated, Die, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
+    EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned,
+    Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent,
 };
 use e3_fhe::create_crp;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
