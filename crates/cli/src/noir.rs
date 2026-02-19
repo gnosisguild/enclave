@@ -126,9 +126,18 @@ async fn execute_status(backend: &ZkBackend) -> Result<()> {
 }
 
 async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
+    println!("Setting up ZK prover...\n");
+    println!(
+        "  target bb version:       {}",
+        backend.config.required_bb_version
+    );
+    println!(
+        "  target circuits version: {}\n",
+        backend.config.required_circuits_version
+    );
+
     if force {
         println!("Force reinstalling ZK prover components...\n");
-        println!("Setting up ZK prover...\n");
 
         // Force reinstall by directly downloading components
         backend
@@ -142,12 +151,22 @@ async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
     } else {
         let status = backend.check_status().await;
         if matches!(status, SetupStatus::Ready) {
+            let version_info = backend.load_version_info().await;
             println!("ZK prover is already set up and up to date.");
+            println!(
+                "  bb version:         {}",
+                version_info.bb_version.as_deref().unwrap_or("unknown")
+            );
+            println!(
+                "  circuits version:   {}",
+                version_info
+                    .circuits_version
+                    .as_deref()
+                    .unwrap_or("unknown")
+            );
             println!("  Use --force to reinstall.");
             return Ok(());
         }
-
-        println!("Setting up ZK prover...\n");
 
         backend
             .ensure_installed()
@@ -155,9 +174,26 @@ async fn execute_setup(backend: &ZkBackend, force: bool) -> Result<()> {
             .map_err(|e| anyhow!("Setup failed: {}", e))?;
     }
 
+    let version_info = backend.load_version_info().await;
+
     println!("\nZK prover setup complete!");
-    println!("  bb binary: {}", backend.bb_binary.display());
-    println!("  circuits: {}", backend.circuits_dir.display());
+    println!();
+    println!("  bb binary:          {}", backend.bb_binary.display());
+    println!(
+        "  bb version:         {}",
+        version_info.bb_version.as_deref().unwrap_or("unknown")
+    );
+    println!("  circuits dir:       {}", backend.circuits_dir.display());
+    println!(
+        "  circuits version:   {}",
+        version_info
+            .circuits_version
+            .as_deref()
+            .unwrap_or("unknown")
+    );
+    if let Some(ref ts) = version_info.last_updated {
+        println!("  last updated:       {}", ts);
+    }
 
     Ok(())
 }
