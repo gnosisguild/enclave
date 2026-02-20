@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 import { IEnclave } from "./IEnclave.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title IE3RefundManager
@@ -32,6 +33,7 @@ interface IE3RefundManager {
         uint256 totalSlashed; // Slashed funds added
         uint256 honestNodeCount; // Number of honest nodes
         bool calculated; // Whether distribution is calculated
+        IERC20 feeToken; // The fee token used for this E3's payment (stored per-E3 to survive token rotations)
     }
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -86,10 +88,12 @@ interface IE3RefundManager {
     /// @param e3Id The failed E3 ID
     /// @param originalPayment The original payment amount
     /// @param honestNodes Array of honest node addresses
+    /// @param paymentToken The fee token that was used for this E3's payment
     function calculateRefund(
         uint256 e3Id,
         uint256 originalPayment,
-        address[] calldata honestNodes
+        address[] calldata honestNodes,
+        IERC20 paymentToken
     ) external;
 
     /// @notice Requester claims their refund

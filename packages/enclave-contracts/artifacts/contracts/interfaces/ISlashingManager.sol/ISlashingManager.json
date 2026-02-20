@@ -65,7 +65,22 @@
     },
     {
       "inputs": [],
+      "name": "OperatorNotInCommittee",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ProofIsValid",
+      "type": "error"
+    },
+    {
+      "inputs": [],
       "name": "ProofRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SignerIsNotOperator",
       "type": "error"
     },
     {
@@ -81,6 +96,11 @@
     {
       "inputs": [],
       "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "VerifierMismatch",
       "type": "error"
     },
     {
@@ -820,5 +840,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ISlashingManager.sol",
-  "buildInfoId": "solc-0_8_28-0871e0e155b06f51b6fb81507908de5a4ecc60f9"
+  "buildInfoId": "solc-0_8_28-55834258511e6e9e42821e54c3876bcc8ee4f5f3"
 }

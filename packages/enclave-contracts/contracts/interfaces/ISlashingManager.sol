@@ -102,6 +102,18 @@ interface ISlashingManager {
     /// @notice Thrown when provided proof fails verification
     error InvalidProof();
 
+    /// @notice The ZK proof verified successfully — the operator's submission was valid, not a fault
+    error ProofIsValid();
+
+    /// @notice Thrown when the recovered signer does not match the operator being slashed
+    error SignerIsNotOperator();
+
+    /// @notice Thrown when the operator is not a member of the committee for this E3
+    error OperatorNotInCommittee();
+
+    /// @notice Thrown when the verifier address in signed evidence doesn't match the policy's current verifier
+    error VerifierMismatch();
+
     /// @notice Thrown when attempting to execute a slash whose appeal was upheld
     error AppealUpheld();
 
@@ -328,12 +340,20 @@ interface ISlashingManager {
 
     /**
      * @notice Creates a new slash proposal with cryptographic proof (Lane A - permissionless)
-     * @dev Anyone can call this for proof-based slashes. Proof is verified on-chain.
-     *      For proof-based policies (appealWindow=0), slash is executed atomically.
+     * @dev Anyone can call this for proof-based slashes. Requires the operator's ECDSA signature
+     *      over the proof payload to prevent arbitrary slashing.
+     *      Evidence format: abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+     *      The operator must have signed: keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH, chainId, e3Id,
+     *        proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs))))
+     *      Verifications performed:
+     *        1. Verifier address in evidence matches the policy's current proofVerifier
+     *        2. Signature recovery confirms the operator authored the bad proof
+     *        3. Committee membership check confirms the operator was in the E3's committee
+     *        4. ZK proof re-verification confirms the proof is indeed invalid (fault)
      * @param e3Id ID of the E3 computation this slash relates to
      * @param operator Address of the ciphernode operator to slash (must be non-zero)
      * @param reason Hash of the slash reason (must have an enabled proof-required policy)
-     * @param proof Proof data to be verified by the policy's proof verifier contract
+     * @param proof Evidence data: abi.encode(zkProof, publicInputs, signature, chainId, proofType, verifier)
      * @return proposalId Sequential ID of the created proposal
      */
     function proposeSlash(

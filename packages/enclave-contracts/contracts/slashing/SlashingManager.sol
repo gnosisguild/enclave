@@ -9,6 +9,10 @@ pragma solidity >=0.8.27;
 import {
     AccessControl
 } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {
+    MessageHashUtils
+} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -63,11 +67,16 @@ contract SlashingManager is ISlashingManager, AccessControl {
     mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed;
 
     // ======================
-    // Errors (contract-level)
+    // Constants
     // ======================
 
-    /// @notice The ZK proof verified successfully — the operator's submission was valid, not a fault
-    error ProofIsValid();
+    /// @notice EIP-712 style typehash for the operator's signed proof payload.
+    /// @dev Must match `ProofPayload::typehash()` in `crates/events/src/enclave_event/signed_proof.rs`.
+    ///      Prevents cross-chain, cross-E3, and cross-proof-type replay of signed proofs.
+    bytes32 public constant PROOF_PAYLOAD_TYPEHASH =
+        keccak256(
+            "ProofPayload(uint256 chainId,uint256 e3Id,uint256 proofType,bytes zkProof,bytes publicSignals)"
+        );
 
     // ======================
     // Modifiers
@@ -211,7 +220,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     /// @inheritdoc ISlashingManager
     /// @dev Lane A: Permissionless proof-based slash. Anyone can call.
-    ///      Atomically proposes, verifies proof, and executes slash.
+    ///      Atomically proposes, verifies operator signature + ZK proof, and executes slash.
+    ///      Evidence format: abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+    ///      The operator must have signed: keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH, chainId, e3Id, proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs))))
+    ///      This prevents:
+    ///        - Arbitrary proof submission (attacker can't forge operator's signature)
+    ///        - Cross-E3 replay (e3Id is in the signed message)
+    ///        - Cross-chain replay (chainId is in the signed message)
+    ///        - Verifier-upgrade attacks (verifier in evidence must match policy's current verifier)
     function proposeSlash(
         uint256 e3Id,
         address operator,
@@ -232,26 +248,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;
 
-        // Decode proof: caller encodes (bytes zkProof, bytes32[] publicInputs)
-        (bytes memory zkProof, bytes32[] memory publicInputs) = abi.decode(
-            proof,
-            (bytes, bytes32[])
-        );
-
-        // Verify against circuit verifier via staticcall
-        // INVERTED logic: proof must FAIL to confirm fault
-        // (the operator submitted a bad proof — re-verification fails)
-        (bool callSuccess, bytes memory returnData) = policy
-            .proofVerifier
-            .staticcall(
-                abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
-            );
-
-        if (callSuccess) {
-            bool proofValid = abi.decode(returnData, (bool));
-            if (proofValid) revert ProofIsValid();
-        }
-        // If staticcall reverted or returned false → proof is invalid → fault confirmed
+        // Verify evidence: signature, committee membership, and ZK proof
+        _verifyProofEvidence(proof, e3Id, operator, policy.proofVerifier);
 
         // Create proposal
         proposalId = totalProposals;
@@ -356,6 +354,78 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
     // Internal Execution
     // ======================
+
+    /// @dev Verifies the operator is/was a committee member for the given E3.
+    function _verifyCommitteeMembership(
+        uint256 e3Id,
+        address operator
+    ) internal view {
+        address[] memory committeeNodes = ciphernodeRegistry.getCommitteeNodes(
+            e3Id
+        );
+        bool isMember = false;
+        for (uint256 i = 0; i < committeeNodes.length; i++) {
+            if (committeeNodes[i] == operator) {
+                isMember = true;
+                break;
+            }
+        }
+        require(isMember, OperatorNotInCommittee());
+    }
+
+    /// @dev Decodes evidence, verifies operator signature, committee membership,
+    ///      and that the ZK proof is invalid (fault confirmed).
+    ///      Evidence format: abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+    function _verifyProofEvidence(
+        bytes calldata proof,
+        uint256 e3Id,
+        address operator,
+        address policyVerifier
+    ) internal view {
+        (
+            bytes memory zkProof,
+            bytes32[] memory publicInputs,
+            bytes memory signature,
+            uint256 chainId,
+            uint256 proofType,
+            address signedVerifier
+        ) = abi.decode(
+                proof,
+                (bytes, bytes32[], bytes, uint256, uint256, address)
+            );
+
+        // 1. Verify verifier in evidence matches policy's current verifier.
+        require(signedVerifier == policyVerifier, VerifierMismatch());
+
+        // 2. Verify the operator signed this exact proof payload.
+        bytes32 messageHash = keccak256(
+            abi.encode(
+                PROOF_PAYLOAD_TYPEHASH,
+                chainId,
+                e3Id,
+                proofType,
+                keccak256(zkProof),
+                keccak256(abi.encodePacked(publicInputs))
+            )
+        );
+        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
+            messageHash
+        );
+        address recoveredSigner = ECDSA.recover(ethSignedHash, signature);
+        require(recoveredSigner == operator, SignerIsNotOperator());
+
+        // 3. Verify committee membership.
+        _verifyCommitteeMembership(e3Id, operator);
+
+        // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
+        (bool callSuccess, bytes memory returnData) = policyVerifier.staticcall(
+            abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
+        );
+        if (callSuccess) {
+            bool proofValid = abi.decode(returnData, (bool));
+            if (proofValid) revert ProofIsValid();
+        }
+    }
 
     /**
      * @notice Internal function that executes a slash and handles committee expulsion

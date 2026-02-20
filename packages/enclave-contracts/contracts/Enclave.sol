@@ -472,24 +472,32 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Distributes rewards to active committee members after successful E3 completion.
     /// @dev Uses active committee nodes (excluding expelled members).
     ///      Divides the E3 payment equally among active members and transfers via bonding registry.
+    ///      If no active members remain (e.g., all expelled), refunds the requester to prevent fund lockup.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
         address[] memory activeNodes = ciphernodeRegistry
             .getActiveCommitteeNodes(e3Id);
         uint256 activeLength = activeNodes.length;
 
-        if (activeLength == 0) return;
+        uint256 totalAmount = e3Payments[e3Id];
+        e3Payments[e3Id] = 0;
+        if (totalAmount == 0) return;
+
+        if (activeLength == 0) {
+            address requester = _e3Requesters[e3Id];
+            if (requester != address(0)) {
+                feeToken.safeTransfer(requester, totalAmount);
+            }
+            return;
+        }
 
         uint256[] memory amounts = new uint256[](activeLength);
 
         // Distribute equally among active (non-expelled) committee members
-        uint256 amount = e3Payments[e3Id] / activeLength;
+        uint256 amount = totalAmount / activeLength;
         for (uint256 i = 0; i < activeLength; i++) {
             amounts[i] = amount;
         }
-
-        uint256 totalAmount = e3Payments[e3Id];
-        e3Payments[e3Id] = 0;
 
         feeToken.approve(address(bondingRegistry), totalAmount);
 
@@ -662,7 +670,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     /// @notice Process a failed E3 and calculate refunds
-    /// @dev Can be called by anyone once E3 is in failed state
+    /// @dev Can be called by anyone once E3 is in failed state.
+    ///      Passes the current feeToken so the refund manager stores the correct token per-E3.
     /// @param e3Id The ID of the failed E3
     function processE3Failure(uint256 e3Id) external {
         E3Stage stage = _e3Stages[e3Id];
@@ -675,7 +684,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         address[] memory honestNodes = _getHonestNodes(e3Id);
 
         feeToken.safeTransfer(address(e3RefundManager), payment);
-        e3RefundManager.calculateRefund(e3Id, payment, honestNodes);
+        e3RefundManager.calculateRefund(e3Id, payment, honestNodes, feeToken);
 
         emit E3FailureProcessed(e3Id, payment, honestNodes.length);
     }

@@ -103,10 +103,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     function calculateRefund(
         uint256 e3Id,
         uint256 originalPayment,
-        address[] calldata honestNodes
+        address[] calldata honestNodes,
+        IERC20 paymentToken
     ) external onlyEnclave {
         require(!_distributions[e3Id].calculated, "Already calculated");
         require(originalPayment > 0, "No payment");
+        require(address(paymentToken) != address(0), "Invalid fee token");
 
         // Calculate work value based on stage
         IEnclave.E3Stage failedAt = _getFailedAtStage(e3Id);
@@ -121,14 +123,15 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
             honestNodeAmount -
             requesterAmount;
 
-        // Store distribution
+        // Store distribution with the actual token used for this E3
         _distributions[e3Id] = RefundDistribution({
             requesterAmount: requesterAmount,
             honestNodeAmount: honestNodeAmount,
             protocolAmount: protocolAmount,
             totalSlashed: 0,
             honestNodeCount: honestNodes.length,
-            calculated: true
+            calculated: true,
+            feeToken: paymentToken
         });
 
         // Store honest nodes
@@ -138,7 +141,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         // Transfer protocol fee to treasury immediately
         if (protocolAmount > 0) {
-            feeToken.safeTransfer(treasury, protocolAmount);
+            paymentToken.safeTransfer(treasury, protocolAmount);
         }
 
         emit RefundDistributionCalculated(
@@ -239,7 +242,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         _claimed[e3Id][msg.sender] = true;
 
-        feeToken.safeTransfer(msg.sender, amount);
+        // Use the per-E3 fee token (not the global one, which may have been rotated)
+        dist.feeToken.safeTransfer(msg.sender, amount);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "REQUESTER");
     }
@@ -266,15 +270,16 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         _claimed[e3Id][msg.sender] = true;
 
-        // Distribute reward through bonding registry
-        feeToken.approve(address(bondingRegistry), amount);
+        // Use the per-E3 fee token and distribute through bonding registry
+        IERC20 token = dist.feeToken;
+        token.approve(address(bondingRegistry), amount);
 
         address[] memory nodeArray = new address[](1);
         nodeArray[0] = msg.sender;
         uint256[] memory amountArray = new uint256[](1);
         amountArray[0] = amount;
 
-        bondingRegistry.distributeRewards(feeToken, nodeArray, amountArray);
+        bondingRegistry.distributeRewards(token, nodeArray, amountArray);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
     }
