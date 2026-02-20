@@ -24,6 +24,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @notice Main contract for managing Encrypted Execution Environments (E3)
  * @dev Coordinates E3 lifecycle including request, activation, input publishing, and output verification
  */
+// solhint-disable-next-line max-states-count
 contract Enclave is IEnclave, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
@@ -83,20 +84,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(uint256 e3Id => uint256 e3Payment) public e3Payments;
 
     /// @notice Maps E3 ID to its current stage
-    mapping(uint256 e3Id => E3Stage) internal _e3Stages;
+    mapping(uint256 e3Id => E3Stage stage) internal _e3Stages;
 
     /// @notice Maps E3 ID to its deadlines
-    mapping(uint256 e3Id => E3Deadlines) internal _e3Deadlines;
+    mapping(uint256 e3Id => E3Deadlines deadlines) internal _e3Deadlines;
 
     /// @notice Maps E3 ID to failure reason (if failed)
-    mapping(uint256 e3Id => FailureReason) internal _e3FailureReasons;
+    mapping(uint256 e3Id => FailureReason reason) internal _e3FailureReasons;
 
     /// @notice Maps E3 ID to requester address
-    mapping(uint256 e3Id => address) internal _e3Requesters;
+    mapping(uint256 e3Id => address requester) internal _e3Requesters;
 
     /// @notice Maps E3 ID to the fee token used at request time
-    /// @dev Stored per-E3 to survive global feeToken rotations (H-01 fix)
-    mapping(uint256 e3Id => IERC20) internal _e3FeeTokens;
+    mapping(uint256 e3Id => IERC20 token) internal _e3FeeTokens;
 
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
@@ -220,7 +220,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(
             msg.sender == address(ciphernodeRegistry) ||
                 msg.sender == address(slashingManager),
-            "Only CiphernodeRegistry or SlashingManager"
+            "Only Registry or SlashingMgr"
         );
         _;
     }
@@ -388,7 +388,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
-        // C-01 fix: Verify E3 is in KeyPublished stage before accepting ciphertext
         E3Stage current = _e3Stages[e3Id];
         require(
             current == E3Stage.KeyPublished,
@@ -518,18 +517,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             amounts[i] = amount;
             distributed += amount;
         }
-        // Give any division dust to the last member (C-03 fix)
         uint256 dust = totalAmount - distributed;
         if (dust > 0) {
             amounts[activeLength - 1] += dust;
         }
 
-        paymentToken.approve(address(bondingRegistry), totalAmount);
+        paymentToken.forceApprove(address(bondingRegistry), totalAmount);
 
         bondingRegistry.distributeRewards(paymentToken, activeNodes, amounts);
 
-        // Reset approval
-        paymentToken.approve(address(bondingRegistry), 0);
+        paymentToken.forceApprove(address(bondingRegistry), 0);
 
         emit RewardsDistributed(e3Id, activeNodes, amounts);
     }
@@ -669,6 +666,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
+    /// @notice Removes previously allowed E3 program parameter sets
+    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove
+    function removeE3ProgramsParams(
+        bytes[] memory _e3ProgramsParams
+    ) public onlyOwner {
+        uint256 length = _e3ProgramsParams.length;
+        for (uint256 i; i < length; ) {
+            delete e3ProgramsParams[_e3ProgramsParams[i]];
+            unchecked {
+                ++i;
+            }
+        }
+        emit E3ProgramsParamsRemoved(_e3ProgramsParams);
+    }
+
     /// @notice Sets the E3 Refund Manager contract address
     /// @param _e3RefundManager The new E3 Refund Manager contract address
     function setE3RefundManager(
@@ -692,6 +704,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             "Invalid SlashingManager address"
         );
         slashingManager = _slashingManager;
+        emit SlashingManagerSet(address(_slashingManager));
     }
 
     /// @notice Process a failed E3 and calculate refunds
@@ -708,7 +721,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         address[] memory honestNodes = _getHonestNodes(e3Id);
 
-        // Use the per-E3 fee token (H-01 fix: survives global feeToken rotation)
         IERC20 paymentToken = _e3FeeTokens[e3Id];
 
         paymentToken.safeTransfer(address(e3RefundManager), payment);
@@ -771,7 +783,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         uint8 reason
     ) external onlyCiphernodeRegistryOrSlashingManager {
-        require(reason > 0 && reason <= 12, "Invalid failure reason");
+        require(
+            reason > 0 && reason <= uint8(FailureReason.VerificationFailed),
+            "Invalid failure reason"
+        );
         // Mark E3 as failed with the given reason
         _markE3FailedWithReason(e3Id, FailureReason(reason));
     }

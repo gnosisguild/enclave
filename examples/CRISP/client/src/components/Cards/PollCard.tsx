@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PollOption, PollResult } from '@/model/poll.model'
+import { PollResult } from '@/model/poll.model'
 import VotesBadge from '@/components/VotesBadge'
 import PollCardResult from '@/components/Cards/PollCardResult'
 import { formatDate, markWinner } from '@/utils/methods'
@@ -15,7 +15,6 @@ import { usePublicClient } from 'wagmi'
 
 const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, endTime }) => {
   const navigate = useNavigate()
-  const [results, setResults] = useState<PollOption[]>(options)
   const [isActive, setIsActive] = useState(true)
   const { roundState, setPollResult, currentRoundId } = useVoteManagementContext()
   const client = usePublicClient()
@@ -40,10 +39,7 @@ const PollCard: React.FC<PollResult> = ({ roundId, options, totalVotes, date, en
     return () => clearInterval(interval)
   }, [endTime, client, isActive])
 
-  useEffect(() => {
-    const newPollOptions = markWinner(options)
-    setResults(newPollOptions)
-  }, [options])
+  const results = useMemo(() => markWinner(options), [options])
 
   const handleNavigation = () => {
     if (isActive && isCurrentRound) {

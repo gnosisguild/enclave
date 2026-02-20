@@ -345,7 +345,9 @@ interface ISlashingManager {
      * @notice Creates a new slash proposal with cryptographic proof (Lane A - permissionless)
      * @dev Anyone can call this for proof-based slashes. Requires the operator's ECDSA signature
      *      over the proof payload to prevent arbitrary slashing.
-     *      Evidence format: abi.encode(bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+     *      Evidence format:
+     *        abi.encode(bytes zkProof, bytes32[] publicInputs,
+     *        bytes signature, uint256 chainId, uint256 proofType, address verifier)
      *      The operator must have signed: keccak256(abi.encode(PROOF_PAYLOAD_TYPEHASH, chainId, e3Id,
      *        proofType, keccak256(zkProof), keccak256(abi.encodePacked(publicInputs))))
      *      Verifications performed:

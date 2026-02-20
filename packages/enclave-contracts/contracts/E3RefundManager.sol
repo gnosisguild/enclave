@@ -39,13 +39,19 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Work value allocation configuration
     WorkValueAllocation internal _workAllocation;
     /// @notice Maps E3 ID to refund distribution
-    mapping(uint256 e3Id => RefundDistribution) internal _distributions;
+    mapping(uint256 e3Id => RefundDistribution distribution)
+        internal _distributions;
     /// @notice Tracks claims per E3 per address
-    mapping(uint256 e3Id => mapping(address => bool)) internal _claimed;
+    mapping(uint256 e3Id => mapping(address claimer => bool hasClaimed))
+        internal _claimed;
     /// @notice Tracks number of claims made per E3 (for routeSlashedFunds guard)
-    mapping(uint256 e3Id => uint256) internal _claimCount;
+    mapping(uint256 e3Id => uint256 count) internal _claimCount;
+    /// @notice Tracks number of honest node claims made per E3 (for dust fix)
+    mapping(uint256 e3Id => uint256 count) internal _honestNodeClaimCount;
+    /// @notice Tracks total amount paid to honest nodes per E3 (for dust fix)
+    mapping(uint256 e3Id => uint256 amount) internal _totalHonestNodePaid;
     /// @notice Maps E3 ID to honest node addresses
-    mapping(uint256 e3Id => address[]) internal _honestNodes;
+    mapping(uint256 e3Id => address[] nodes) internal _honestNodes;
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                       Modifiers                        //
@@ -268,7 +274,16 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(isHonest, NotHonestNode(e3Id, msg.sender));
 
         require(dist.honestNodeCount > 0, NoRefundAvailable(e3Id));
-        amount = dist.honestNodeAmount / dist.honestNodeCount;
+        uint256 perNodeAmount = dist.honestNodeAmount / dist.honestNodeCount;
+
+        _honestNodeClaimCount[e3Id]++;
+        if (_honestNodeClaimCount[e3Id] == dist.honestNodeCount) {
+            // Last claimer gets whatever remains (includes dust)
+            amount = dist.honestNodeAmount - _totalHonestNodePaid[e3Id];
+        } else {
+            amount = perNodeAmount;
+        }
+        _totalHonestNodePaid[e3Id] += amount;
         require(amount > 0, NoRefundAvailable(e3Id));
 
         _claimed[e3Id][msg.sender] = true;

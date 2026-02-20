@@ -60,7 +60,6 @@ contract EnclaveToken is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @notice Tracks the cumulative amount of tokens minted since deployment
-    /// @dev Incremented with each mint operation to enforce MAX_SUPPLY cap
     uint256 public totalMinted;
 
     /// @notice Mapping of addresses permitted to transfer tokens when restrictions are active
@@ -158,6 +157,7 @@ contract EnclaveToken is
         for (uint256 i = 0; i < len; i++) {
             address recipient = recipients[i];
             uint256 amount = amounts[i];
+            if (recipient == address(0)) revert ZeroAddress();
             if (amount == 0) revert ZeroAmount();
 
             if (amount > MAX_SUPPLY - minted) revert ExceedsTotalSupply();
@@ -222,6 +222,7 @@ contract EnclaveToken is
      * @dev Overrides ERC20 and ERC20Votes to add transfer restriction logic. Reverts if transfers
      *      are restricted and neither sender nor receiver is whitelisted. Minting (from == 0) and
      *      burning (to == 0) are always allowed regardless of restrictions.
+     *
      * @param from Address sending tokens (zero address for minting)
      * @param to Address receiving tokens (zero address for burning)
      * @param value Amount of tokens being transferred

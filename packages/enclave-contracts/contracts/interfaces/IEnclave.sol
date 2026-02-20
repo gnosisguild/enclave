@@ -153,9 +153,17 @@ interface IEnclave {
     /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
     event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
 
+    /// @notice Emitted when E3 program parameter sets are removed.
+    /// @param e3ProgramParams Array of removed encryption scheme parameters.
+    event E3ProgramsParamsRemoved(bytes[] e3ProgramParams);
+
     /// @notice Emitted when E3RefundManager contract is set.
     /// @param e3RefundManager The address of the E3RefundManager contract.
     event E3RefundManagerSet(address indexed e3RefundManager);
+
+    /// @notice Emitted when the SlashingManager contract is set.
+    /// @param slashingManager The address of the SlashingManager contract.
+    event SlashingManagerSet(address indexed slashingManager);
 
     /// @notice Emitted when a failed E3 is processed for refunds.
     /// @param e3Id The ID of the failed E3.
@@ -306,6 +314,11 @@ interface IEnclave {
     /// @dev This function enables specific parameter sets for E3 programs (e.g., BFV encryption parameters).
     /// @param _e3ProgramsParams Array of ABI encoded parameter sets to allow.
     function setE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
+
+    /// @notice Removes previously allowed E3 program parameter sets.
+    /// @dev This function revokes specific parameter sets that should no longer be allowed.
+    /// @param _e3ProgramsParams Array of ABI encoded parameter sets to remove.
+    function removeE3ProgramsParams(bytes[] memory _e3ProgramsParams) external;
 
     ////////////////////////////////////////////////////////////
     //                                                        //

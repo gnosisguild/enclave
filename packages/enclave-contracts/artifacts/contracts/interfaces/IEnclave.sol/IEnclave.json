@@ -167,6 +167,19 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": false,
+          "internalType": "bytes[]",
+          "name": "e3ProgramParams",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "E3ProgramsParamsRemoved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": true,
           "internalType": "address",
           "name": "e3RefundManager",
@@ -418,6 +431,19 @@
         }
       ],
       "name": "RewardsDistributed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "slashingManager",
+          "type": "address"
+        }
+      ],
+      "name": "SlashingManagerSet",
       "type": "event"
     },
     {
@@ -957,6 +983,19 @@
     {
       "inputs": [
         {
+          "internalType": "bytes[]",
+          "name": "_e3ProgramsParams",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "removeE3ProgramsParams",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "components": [
             {
               "internalType": "uint32[2]",
@@ -1202,5 +1241,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-92d3f46ab335995fa05f4ef570c190692cc126a0"
+  "buildInfoId": "solc-0_8_28-2c25095d1e3a91525c0c4b9447ccae8788bab93f"
 }

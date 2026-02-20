@@ -23,7 +23,6 @@ import {
   SlashingManager__factory as SlashingManagerFactory,
 } from "../../types";
 import type { MockCircuitVerifier } from "../../types";
-import type { MockCiphernodeRegistry } from "../../types";
 import type { SlashingManager } from "../../types/contracts/slashing/SlashingManager";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
@@ -719,7 +718,6 @@ describe("SlashingManager", function () {
         operator,
         operatorAddress,
         mockVerifier,
-        mockCiphernodeRegistry,
       } = await loadFixture(setup);
 
       const verifierAddress = await mockVerifier.getAddress();

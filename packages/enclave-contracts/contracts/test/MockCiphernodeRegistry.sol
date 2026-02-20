@@ -11,7 +11,7 @@ import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
     /// @notice Configurable committee members per E3 for testing
-    mapping(uint256 => address[]) private _committeeNodes;
+    mapping(uint256 e3Id => address[] nodes) private _committeeNodes;
 
     /// @notice Set committee members for an E3 (test helper)
     function setCommitteeNodes(

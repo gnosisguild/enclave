@@ -144,7 +144,6 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     let policy = contract.getSlashPolicy(reason.into()).call().await?;
     let verifier = policy.proofVerifier;
 
-    // Use the canonical encoder from signed_proof.rs (H-02/C-02 fix)
     let proof_data = encode_fault_evidence(&data, verifier);
 
     let from_address = provider.provider().default_signer_address();

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import React, { useEffect, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 interface CardProps {
   children: React.ReactNode
@@ -17,21 +17,16 @@ interface CardProps {
 const Card: React.FC<CardProps> = ({ children, isActive, isDetails, checked, onChecked }) => {
   const [isClicked, setIsClicked] = useState<boolean>(checked ?? false)
 
-  useEffect(() => {
-    setIsClicked(checked ?? false)
-  }, [checked])
+  const derivedIsClicked = useMemo(() => {
+    if (isActive) return false
+    return checked ?? isClicked
+  }, [isActive, checked, isClicked])
 
   const handleClick = () => {
     if (isDetails) return
-    if (onChecked) onChecked(!isClicked)
-    setIsClicked(!isClicked)
+    if (onChecked) onChecked(!derivedIsClicked)
+    setIsClicked(!derivedIsClicked)
   }
-
-  useEffect(() => {
-    if (isActive) {
-      setIsClicked(false)
-    }
-  }, [isActive])
 
   return (
     <div
@@ -44,9 +39,9 @@ const Card: React.FC<CardProps> = ({ children, isActive, isDetails, checked, onC
         ${!isDetails && 'shadow-md'}
         transform 
         border-2 transition-all duration-300 ease-in-out 
-        ${isClicked ? 'scale-105 border-lime-400' : ''}
-        ${isClicked ? 'border-lime-400' : 'border-slate-600/20'}
-        ${isClicked ? 'bg-white' : 'bg-slate-100'}
+        ${derivedIsClicked ? 'scale-105 border-lime-400' : ''}
+        ${derivedIsClicked ? 'border-lime-400' : 'border-slate-600/20'}
+        ${derivedIsClicked ? 'bg-white' : 'bg-slate-100'}
         ${!isDetails && 'hover:border-lime-300 hover:bg-white hover:shadow-lg'}
         flex w-full items-center justify-center
       `}

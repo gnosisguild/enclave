@@ -226,6 +226,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     /// @inheritdoc ICiphernodeRegistry
+    /// @dev Uses numActiveOperators() which checks registered + minimum bond + minimum tickets.
+    ///      Between request time and ticket submission, operators may become inactive by losing
+    ///      bond or tickets. The check at request time may be stale by the time submitTicket
+    ///      is called. This is appropriately conservative — it prevents requesting committees
+    ///      when not enough operators are active even at request time.
     function requestCommittee(
         uint256 e3Id,
         uint256 seed,
@@ -279,6 +284,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         // TODO: Currently we trust the owner to publish the correct committee.
         // TODO: Need a Proof that the public key is generated from the committee
+        // SECURITY: Without DKG correctness proofs, a malicious owner could publish a key they
+        // control, enabling decryption of all E3 results. This is a centralization assumption
+        // accepted for the current phase. DKG proof verification must be added before
+        // decentralizing the owner role.
         c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
         // Progress E3 to KeyPublished stage
@@ -634,7 +643,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Validates that a node is eligible to submit a ticket
-    /// @dev Uses snapshot of ticket balance at E3 request block for deterministic validation
+    /// @dev Uses snapshot of ticket balance at (requestBlock - 1) for deterministic validation.
+    ///      The -1 offset prevents same-block manipulation attacks where an operator could deposit
+    ///      tickets and submit in the same transaction. Deposits in the request block itself are
+    ///      excluded. This is conservative but not fully settled — see TODO below.
     /// @param node Address of the ciphernode
     /// @param ticketNumber The ticket number being submitted
     /// @param e3Id ID of the E3 computation
@@ -667,7 +679,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @notice Inserts a node into the top-N list - Smallest scores
-    /// @dev If the node is not in the top-N, it is added to the top-N.
+    /// @dev O(N) linear scan per insertion to find the worst score. For a committee of size N
+    ///      with S total submissions, total gas is O(N * S). With N=20 and S=1000, this is ~20K
+    ///      iterations at ~200 gas each (≈ 4M gas total), which is acceptable for current
+    ///      parameters. Will not scale to N > ~50 without switching to a heap or sorted
+    ///      data structure.
     /// @param c Committee storage reference
     /// @param node Address of the node
     /// @param score Score of the node
