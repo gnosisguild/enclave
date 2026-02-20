@@ -39,6 +39,7 @@ export interface EnclaveConfig {
       enclave?: { address: string; deploy_block: number };
       ciphernode_registry?: { address: string; deploy_block: number };
       bonding_registry?: { address: string; deploy_block: number };
+      slashing_manager?: { address: string; deploy_block: number };
       fee_token?: { address: string; deploy_block: number };
     };
   }>;

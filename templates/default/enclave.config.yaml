@@ -15,8 +15,8 @@ chains:
         address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
         deploy_block: 1 # Set to actual deploy block
       slashing_manager:
-        address: "0x0000000000000000000000000000000000000000"
-        deploy_block: 1 # Set to actual deploy block
+        address: '0x0165878A594ca255338adfa4d48449f69242Eb8F'
+        deploy_block: 8
       fee_token:
         address: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
         deploy_block: 1 # Set to actual deploy block

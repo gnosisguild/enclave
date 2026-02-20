@@ -102,6 +102,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const { slashingManager } = await deployAndSaveSlashingManager({
     admin: ownerAddress,
     bondingRegistry: addressOne,
+    ciphernodeRegistry: addressOne,
+    enclave: addressOne,
     hre,
   });
   const slashingManagerAddress = await slashingManager.getAddress();
