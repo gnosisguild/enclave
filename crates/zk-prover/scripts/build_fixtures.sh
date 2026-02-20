@@ -10,6 +10,7 @@ if find ./circuits/bin -name '*.json' -print -quit | grep -q .; then
   exit 0
 fi
 
+# if we are in CI where circuits have been built ignore
 if ! command -v nargo &> /dev/null; then
     exit 0
 fi
