@@ -7,7 +7,10 @@
 use actix::Actor;
 use actix::Addr;
 use e3_config::AppConfig;
+use e3_data::Repositories;
+use e3_events::Disabled;
 use e3_events::EventType;
+use e3_evm::EthPrivateKeyRepositoryFactory;
 use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
@@ -100,9 +103,9 @@ pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
 
-pub fn get_enclave_bus_handle(config: &AppConfig) -> anyhow::Result<BusHandle> {
+pub fn get_enclave_bus_handle() -> anyhow::Result<BusHandle<Disabled>> {
     let bus = get_enclave_event_bus();
-    let system = EventSystem::new(&config.name()).with_event_bus(bus);
+    let system = EventSystem::new().with_event_bus(bus);
     system.store()?; // Ensure store is initialized before returning to avoid potentially dropping
                      // events.
     Ok(system.handle()?)

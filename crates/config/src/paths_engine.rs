@@ -86,6 +86,12 @@ impl PathsEngine {
         clean(self.default_config_dir.join(DEFAULT_CONFIG_NAME))
     }
 
+    /// Returns true if the config file is the default config file (i.e., not a custom path)
+    pub fn is_default_config_file(&self) -> bool {
+        let default_path = clean(self.default_config_dir.join(DEFAULT_CONFIG_NAME));
+        self.config_file() == default_path
+    }
+
     /// Full path to the key file containing secret key
     pub fn key_file(&self) -> PathBuf {
         if let Some(key_file) = self.key_file_override.clone() {
@@ -599,5 +605,80 @@ mod test {
                 },
             },
         ]);
+    }
+
+    #[test]
+    fn test_is_default_config_file() {
+        let default_data_dir = PathBuf::from("/home/user/.local/share/enclave");
+        let default_config_dir = PathBuf::from("/home/user/.config/enclave");
+        let cwd = PathBuf::from("/no/matter");
+
+        // Test case 1: No found_config_file - should be default
+        let paths = PathsEngine::new(
+            "test",
+            &cwd,
+            &default_data_dir,
+            &default_config_dir,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(paths.is_default_config_file());
+
+        // Test case 2: found_config_file set to different path - not default
+        let paths = PathsEngine::new(
+            "test",
+            &cwd,
+            &default_data_dir,
+            &default_config_dir,
+            Some(&PathBuf::from("/foo/some.config.yaml")),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(!paths.is_default_config_file());
+
+        // Test case 3: found_config_file set to exact default path - should be default
+        let paths = PathsEngine::new(
+            "test",
+            &cwd,
+            &default_data_dir,
+            &default_config_dir,
+            Some(&PathBuf::from(
+                "/home/user/.config/enclave/enclave.config.yaml",
+            )),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(paths.is_default_config_file());
+
+        // Test case 4: found_config_file set to same path with different representation - should be default
+        let paths = PathsEngine::new(
+            "test",
+            &cwd,
+            &default_data_dir,
+            &default_config_dir,
+            Some(&PathBuf::from(
+                "/home/user/.config/enclave/./enclave.config.yaml",
+            )),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(paths.is_default_config_file());
     }
 }

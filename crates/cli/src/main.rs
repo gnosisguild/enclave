@@ -6,17 +6,15 @@
 
 use clap::Parser;
 use cli::Cli;
+use e3_utils::{colorize, Color};
 use tracing::info;
 
 mod ciphernode;
 mod cli;
-mod config_set;
 pub mod helpers;
 mod init;
-pub mod net;
-mod net_generate;
-mod net_purge;
-mod net_set;
+mod net;
+mod net_get_peer_id;
 mod nodes;
 mod nodes_daemon;
 mod nodes_down;
@@ -37,6 +35,7 @@ mod purge_all;
 mod rev;
 mod start;
 mod wallet;
+mod wallet_get;
 mod wallet_set;
 
 const OWO: &str = r#"
@@ -65,7 +64,7 @@ pub async fn main() {
 
     // Execute the cli
     if let Err(err) = Cli::parse().execute().await {
-        eprintln!("{}", err);
+        eprintln!("{}", colorize(err, Color::Red));
         std::process::exit(1);
     }
 }

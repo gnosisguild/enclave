@@ -207,7 +207,11 @@ mod tests {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
-        let bus = EventSystem::new("test").with_event_bus(bus).handle()?;
+
+        let bus = EventSystem::new()
+            .with_event_bus(bus)
+            .handle()?
+            .enable("test");
         let handle: JoinHandle<anyhow::Result<()>> = tokio::spawn(async { Ok(()) });
 
         Ok(CiphernodeHandle {

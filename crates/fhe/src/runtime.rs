@@ -4,20 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
 use e3_bfv_client::{decode_plaintext_to_vec_u64, encode_vec_u64_to_bytes};
 use e3_data::{FromSnapshotWithParams, Snapshot};
-use e3_events::{OrderedSet, Seed};
-use e3_fhe_params::{build_bfv_params_arc, decode_bfv_params_arc};
+use e3_events::OrderedSet;
+use e3_fhe_params::build_bfv_params_arc;
+use e3_fhe_params::{create_deterministic_crp_from_default_seed, decode_bfv_params_arc};
 use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
     bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
-use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 
@@ -48,12 +47,9 @@ impl Fhe {
         Self { params, crp, rng }
     }
 
-    pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
+    pub fn from_encoded(bytes: &[u8], rng: SharedRng) -> Result<Self> {
         let params = decode_bfv_params_arc(bytes).expect("Failed to decode BFV params");
-        let crp = create_crp(
-            params.clone(),
-            Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
-        );
+        let crp = create_deterministic_crp_from_default_seed(&params);
 
         Ok(Fhe::new(params, crp, rng))
     }

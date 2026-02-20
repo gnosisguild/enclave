@@ -220,7 +220,7 @@ pub fn verify_checksum(file: &str, data: &[u8], expected: Option<&str>) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
+    use crate::test_utils::get_tempdir;
 
     use super::*;
 
@@ -466,7 +466,7 @@ mod tests {
         println!("checksum verified for {}", target);
 
         // Test saving and loading through VersionInfo
-        let temp = tempdir().expect("failed to create temp dir");
+        let temp = get_tempdir().expect("failed to create temp dir");
         let tarball_path = temp.path().join("bb.tar.gz");
 
         fs::write(&tarball_path, &bytes)

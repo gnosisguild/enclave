@@ -64,8 +64,6 @@ pub struct GenPkShareAndSkSssResponse {
     pub sk_sss: Encrypted<SharedSecret>,
     /// Raw pk0 share polynomial (RNS form) for ZK proof generation (T1a).
     pub pk0_share_raw: ArcBytes,
-    /// Raw common random polynomial (RNS form) for ZK proof generation (T1a).
-    pub a_raw: ArcBytes,
     /// Raw secret key polynomial (RNS form) for ZK proof generation (T1a) — encrypted at rest.
     pub sk_raw: SensitiveBytes,
     /// Raw error polynomial from key generation (RNS form) for ZK proof generation (T1a) — encrypted at rest.
@@ -85,7 +83,6 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
             pk_share,
             sk_sss,
             pk0_share_raw: value.pk0_share_raw,
-            a_raw: value.a_raw,
             sk_raw: SensitiveBytes::new(value.sk_raw.to_vec(), cipher)?,
             eek_raw: SensitiveBytes::new(value.eek_raw.to_vec(), cipher)?,
             e_sm_raw: SensitiveBytes::new(value.e_sm_raw.to_vec(), cipher)?,
@@ -100,8 +97,6 @@ struct InnerResponse {
     pub sk_sss: SharedSecret,
     /// Raw pk0 share polynomial bytes for ZK proof.
     pub pk0_share_raw: ArcBytes,
-    /// Raw CRP polynomial bytes for ZK proof.
-    pub a_raw: ArcBytes,
     /// Raw secret key polynomial bytes for ZK proof.
     pub sk_raw: ArcBytes,
     /// Raw error polynomial bytes for ZK proof.
@@ -128,7 +123,7 @@ pub fn gen_pk_share_and_sk_sss(
         num_ciphernodes, threshold
     );
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
-    let (pk0_share, a, sk_poly, eek) =
+    let (pk0_share, _, _, eek) =
         { PublicKeyShare::new_extended(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
 
     let pk_share = PublicKeyShare::deserialize(&pk0_share.to_bytes(), &params, crp.clone())?;
@@ -146,7 +141,6 @@ pub fn gen_pk_share_and_sk_sss(
     let e_sm_raw = ArcBytes::from_bytes(&e_sm_rns.deref().to_bytes());
 
     let pk0_share_raw = ArcBytes::from_bytes(&pk0_share.to_bytes());
-    let a_raw = ArcBytes::from_bytes(&a.to_bytes());
     let eek_raw = ArcBytes::from_bytes(&eek.to_bytes());
 
     let mut share_manager =
@@ -165,7 +159,6 @@ pub fn gen_pk_share_and_sk_sss(
             pk_share,
             sk_sss,
             pk0_share_raw,
-            a_raw,
             sk_raw,
             eek_raw,
             e_sm_raw,

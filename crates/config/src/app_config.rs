@@ -166,6 +166,8 @@ pub struct AppConfig {
     peers: Vec<String>,
     /// Store all paths in the paths engine
     paths: PathsEngine,
+    /// The config yaml path
+    config_yaml: PathBuf,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
     otel: Option<String>,
     /// If a net key has not been set autogenerate one on start
@@ -243,13 +245,14 @@ impl AppConfig {
             Some(&node.log_file),
             config.custom_bb.as_ref(),
         );
-
+        let found_config_file = config.found_config_file.clone();
         Ok(AppConfig {
             name: name.to_owned(),
             nodes: config.nodes,
             chains: config.chains,
             peers: vec![],
             paths,
+            config_yaml: found_config_file.clone().unwrap_or_default(),
             otel: config.otel,
             autopassword: node.autopassword,
             autowallet: node.autowallet,
@@ -287,6 +290,11 @@ impl AppConfig {
         } else {
             BBPath::Default(bb)
         }
+    }
+
+    /// Whether the config is changed from the default
+    pub fn using_custom_config(&self) -> bool {
+        !self.paths.is_default_config_file()
     }
 
     /// Get the circuits directory
@@ -330,6 +338,11 @@ impl AppConfig {
     /// Get the config file path
     pub fn config_file(&self) -> PathBuf {
         self.paths.config_file()
+    }
+
+    /// Get the config yaml path
+    pub fn config_yaml(&self) -> PathBuf {
+        self.config_yaml.clone()
     }
 
     /// Get the chains config
@@ -407,7 +420,7 @@ pub struct UnscopedAppConfig {
     data_dir: Option<PathBuf>,
     /// The config file as found before initialization this is for testing purposes and you should
     /// not use this in your configurations
-    found_config_file: Option<PathBuf>,
+    found_config_file: Option<PathBuf>, // This is set regardless as the file is resolved
     /// The default node that runs during commands like `enclave start` without supplying the
     /// `--name` argument.
     node: NodeDefinition,
@@ -474,6 +487,7 @@ impl UnscopedAppConfig {
 struct CliOverrides {
     pub otel: Option<String>,
     pub found_config_file: Option<PathBuf>,
+    pub using_custom_config: bool,
 }
 
 /// Load the config at the config_file or the default location if not provided
@@ -483,7 +497,6 @@ pub fn load_config(
     otel: Option<String>,
 ) -> Result<AppConfig> {
     let found_config_file = found_config_file.map(PathBuf::from);
-
     let resolved_config_path = resolve_config_path(
         find_in_parent,            // finding strategy
         env::current_dir()?,       // cwd
@@ -502,6 +515,7 @@ pub fn load_config(
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
                 found_config_file: Some(resolved_config_path),
+                using_custom_config: found_config_file.is_some(),
             }))
             .extract()
             .context("Could not parse configuration")?;

@@ -32,7 +32,7 @@ use e3_sortition::{
     NodeStateRepositoryFactory, Sortition, SortitionBackend, SortitionRepositoryFactory,
 };
 use e3_sync::sync;
-use e3_utils::{rand_eth_addr, SharedRng};
+use e3_utils::SharedRng;
 use e3_zk_prover::{setup_zk_actors, ZkBackend};
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
@@ -63,7 +63,6 @@ pub struct CiphernodeBuilder {
     multithread_cache: Option<Addr<Multithread>>,
     multithread_concurrent_jobs: Option<usize>,
     multithread_report: Option<Addr<MultithreadReport>>,
-    name: String,
     pubkey_agg: bool,
     rng: SharedRng,
     sortition_backend: SortitionBackend,
@@ -76,7 +75,7 @@ pub struct CiphernodeBuilder {
     threshold_plaintext_agg: bool,
     zk_backend: Option<ZkBackend>,
     net_config: Option<NetConfig>,
-    start_buffer: bool,
+    ignore_address_check: bool,
 }
 
 // Simple Net Configuration
@@ -118,7 +117,7 @@ impl CiphernodeBuilder {
     /// - name - Unique name for the ciphernode
     /// - rng - Arc Mutex wrapped random number generator
     /// - cipher - Cipher for encryption and decryption of sensitive data
-    pub fn new(name: &str, rng: SharedRng, cipher: Arc<Cipher>) -> Self {
+    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
             chains: vec![],
@@ -131,7 +130,6 @@ impl CiphernodeBuilder {
             multithread_cache: None,
             multithread_concurrent_jobs: None,
             multithread_report: None,
-            name: name.to_owned(),
             pubkey_agg: false,
             rng,
             sortition_backend: SortitionBackend::score(),
@@ -143,8 +141,8 @@ impl CiphernodeBuilder {
             testmode_signer: None,
             threshold_plaintext_agg: false,
             net_config: None,
-            start_buffer: false,
             zk_backend: None,
+            ignore_address_check: false,
         }
     }
 
@@ -196,23 +194,11 @@ impl CiphernodeBuilder {
         self.testmode_errors = true;
         self
     }
-    /// Ensure SnapshotBuffer starts immediately instead of waiting for SyncEnded. This is important
-    /// for tests that don't specifically
-    pub fn testmode_start_buffer_immediately(mut self) -> Self {
-        self.start_buffer = true;
-        self
-    }
 
     /// Use the node configuration on these specific chains. This will overwrite any previously
     /// given chains.
     pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
         self.chains = chains.to_vec();
-        self
-    }
-
-    /// Use the given Address to represent the node. This should be unique.
-    pub fn with_address(mut self, addr: &str) -> Self {
-        self.address = Some(addr.to_owned());
         self
     }
 
@@ -326,6 +312,11 @@ impl CiphernodeBuilder {
         self
     }
 
+    pub fn testmode_ignore_address_check(mut self) -> Self {
+        self.ignore_address_check = true;
+        self
+    }
+
     fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
         EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
     }
@@ -378,15 +369,6 @@ impl CiphernodeBuilder {
             None
         };
 
-        let addr = if let Some(addr) = self.address.clone() {
-            info!("Using eth address = {}", addr);
-            addr
-        } else {
-            info!("Using random eth address");
-            // TODO: This is for testing and should not be used for production if we use this to create ciphernodes in production
-            rand_eth_addr(&self.rng)
-        };
-
         // Create provider cache early to use for chain validation
         let mut provider_cache = if let Some(signer) = self.testmode_signer.take() {
             ProviderCache::new().with_signer(signer)
@@ -398,33 +380,34 @@ impl CiphernodeBuilder {
         // Get an event system instance.
         let event_system =
             if let EventSystemType::Persisted { kv_path, log_path } = self.event_system.clone() {
-                EventSystem::persisted(&addr, log_path, kv_path)
+                EventSystem::persisted(log_path, kv_path)
                     .with_event_bus(local_bus)
                     .with_aggregate_config(aggregate_config.clone())
             } else {
                 if let Some(ref store) = self.in_mem_store {
-                    EventSystem::in_mem_from_store(&addr, store)
+                    EventSystem::in_mem_from_store(store)
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                 } else {
-                    EventSystem::in_mem(&addr)
+                    EventSystem::in_mem()
                         .with_event_bus(local_bus)
                         .with_aggregate_config(aggregate_config.clone())
                 }
             };
 
-        let bus = event_system.handle()?;
         let store = event_system.store()?;
         let eventstore_ts = event_system.eventstore_getter_ts()?;
         let eventstore_seq = event_system.eventstore_getter_seq()?;
         let cipher = &self.cipher;
         let repositories = Arc::new(store.repositories());
-
-        // Now we add write support as store depends on event system
         let mut provider_cache =
             provider_cache.with_write_support(Arc::clone(cipher), Arc::clone(&repositories));
 
-        // Use the configured backend directly
+        // We need to supply the Hlc to the bus handle in order to enable it
+        let addr = provider_cache.ensure_signer().await?.address().to_string();
+        let bus = event_system.handle()?.enable(&addr);
+
+        // Use the configured sortition backend directly
         let default_backend = self.sortition_backend.clone();
 
         let ciphernode_selector =

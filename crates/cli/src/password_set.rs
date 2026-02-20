@@ -10,14 +10,12 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::prompt_password::prompt_password;
 
-fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
-    if let Some(mut pw_str) = input {
+pub fn ask_for_password(input: Option<Zeroizing<String>>) -> Result<Zeroizing<String>> {
+    if let Some(pw_str) = input {
         if pw_str.trim().is_empty() {
             bail!("Password must not be blank")
         }
-        let pw = Zeroizing::new(pw_str.trim().as_bytes().to_owned());
-        pw_str.zeroize();
-        return Ok(pw);
+        return Ok(pw_str);
     }
 
     // First password entry
@@ -37,20 +35,19 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
         bail!("Passwords do not match")
     }
 
-    let pw = Zeroizing::new(pw_str.trim().as_bytes().to_owned());
-
     // Clean up sensitive data
-    pw_str.zeroize();
     confirm_pw_str.zeroize();
+    let trimmed = Zeroizing::new(pw_str.trim().to_owned());
+    pw_str.zeroize();
 
-    Ok(pw)
+    Ok(trimmed)
 }
 
-pub async fn execute(config: &AppConfig, input: Option<String>) -> Result<()> {
+pub async fn execute(config: &AppConfig, input: Option<Zeroizing<String>>) -> Result<()> {
     println!("Setting password...");
     e3_entrypoint::password::set::preflight(config).await?;
 
-    let pw = get_zeroizing_pw_vec(input)?;
+    let pw = ask_for_password(input)?;
 
     e3_entrypoint::password::set::execute(config, pw).await?;
 

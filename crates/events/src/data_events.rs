@@ -111,3 +111,7 @@ impl Remove {
         &self.0
     }
 }
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Flush;

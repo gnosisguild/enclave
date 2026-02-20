@@ -15,6 +15,7 @@ use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
+use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
@@ -91,7 +92,6 @@ pub struct Bounds {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
-    pub a: CrtPolynomial,
     pub eek: Polynomial,
     pub sk: Polynomial,
     pub e_sm: CrtPolynomial,
@@ -208,7 +208,7 @@ impl Computation for Bounds {
             r2_bounds[i] = qi_bound.clone();
 
             // Compute asymmetric range for r1 bounds per modulus
-            r1_bounds[i] = ((&n * eek_bound + 2u32) * &qi_bound + eek_bound) / &qi_bigint;
+            r1_bounds[i] = ((&n + 2u32) * &qi_bound + eek_bound) / &qi_bigint;
 
             // Track maximum pk bound across all moduli
             // We don't need to store them as we only need the maximum bound to compute the commitment bit width
@@ -245,6 +245,8 @@ impl Computation for Inputs {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
+        let a = deterministic_crp_crt_polynomial(&threshold_params)?;
+
         let moduli: Vec<BigInt> = threshold_params
             .moduli()
             .iter()
@@ -265,47 +267,42 @@ impl Computation for Inputs {
         )> = izip!(
             moduli.clone(),
             data.pk0_share.limbs.clone(),
-            data.a.limbs.clone(),
+            a.limbs.clone(),
             data.eek.limbs.clone(),
             data.e_sm.limbs.clone(),
             data.sk.limbs.clone(),
         )
         .enumerate()
         .par_bridge()
-        .map(
-            |(i, (qi, mut pk0_share, mut a, mut eek, mut e_sm, mut sk))| {
-                pk0_share.reverse();
-                pk0_share.center(&qi);
+        .map(|(i, (qi, mut pk0_share, a, mut eek, mut e_sm, mut sk))| {
+            pk0_share.reverse();
+            pk0_share.center(&qi);
 
-                a.reverse();
-                a.center(&qi);
+            eek.reverse();
+            eek.center(&qi);
 
-                eek.reverse();
-                eek.center(&qi);
+            e_sm.reverse();
+            e_sm.center(&qi);
 
-                e_sm.reverse();
-                e_sm.center(&qi);
+            sk.reverse();
+            sk.center(&qi);
 
-                sk.reverse();
-                sk.center(&qi);
+            // Calculate pk0_share_hat = -a * sk + eek
+            let pk0_share_hat = {
+                let mut exp = a.neg();
+                exp = exp.mul(&sk);
 
-                // Calculate pk0_share_hat = -a * sk + eek
-                let pk0_share_hat = {
-                    let mut exp = a.neg();
-                    exp = exp.mul(&sk);
+                assert_eq!((exp.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                    assert_eq!((exp.coefficients().len() as u64) - 1, 2 * (n - 1));
+                exp.add(&eek)
+            };
 
-                    exp.add(&eek)
-                };
+            assert_eq!((pk0_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
 
-                assert_eq!((pk0_share_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
+            let (r1, r2) = decompose_residue(&pk0_share, &pk0_share_hat, &qi, &cyclo, n);
 
-                let (r1, r2) = decompose_residue(&pk0_share, &pk0_share_hat, &qi, &cyclo, n);
-
-                (i, r2, r1, pk0_share.clone(), a.clone(), e_sm.clone())
-            },
-        )
+            (i, r2, r1, pk0_share.clone(), a.clone(), e_sm.clone())
+        })
         .collect();
 
         results.sort_by_key(|(i, _, _, _, _, _)| *i);
@@ -333,7 +330,6 @@ impl Computation for Inputs {
         }
 
         Ok(Inputs {
-            a: a.clone(),
             eek,
             sk,
             e_sm,
@@ -347,7 +343,6 @@ impl Computation for Inputs {
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
-        let a = crt_polynomial_to_toml_json(&self.a);
         let e = polynomial_to_toml_json(&self.eek);
         let sk = polynomial_to_toml_json(&self.sk);
         let e_sm = crt_polynomial_to_toml_json(&self.e_sm);
@@ -357,7 +352,6 @@ impl Computation for Inputs {
         let json = serde_json::json!({
             "pk0is": pk0is,
             "pk1is": pk1is,
-            "a": a,
             "eek": e,
             "sk": sk,
             "e_sm": e_sm,

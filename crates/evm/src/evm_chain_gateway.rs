@@ -279,8 +279,8 @@ mod tests {
                 .finish(),
         );
 
-        let system = EventSystem::new("test").with_fresh_bus();
-        let bus: BusHandle = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus: BusHandle = system.handle()?.enable("test");
 
         let history_collector = bus.history();
 

@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use anyhow::Context;
 use anyhow::Result;
 use e3_events::IntoKey;
-use e3_events::{Get, Insert, InsertSync, Remove};
+use e3_events::{Flush, Get, Insert, InsertSync, Remove};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -41,6 +41,7 @@ pub struct DataStore {
     insert: Recipient<Insert>,
     insert_sync: Recipient<InsertSync>,
     remove: Recipient<Remove>,
+    flush: Recipient<Flush>,
 }
 
 impl DataStore {
@@ -57,7 +58,6 @@ impl DataStore {
         if bytes == [0] {
             return Ok(None);
         }
-
         Ok(Some(bincode::deserialize(&bytes)?))
     }
 
@@ -82,6 +82,7 @@ impl DataStore {
 
         let msg = InsertSync::new(&self.scope, serialized);
         self.insert_sync.send(msg).await??;
+        self.flush.send(Flush).await?; // Write sync will flush all pending writes
         Ok(())
     }
 
@@ -158,6 +159,7 @@ impl DataStore {
             insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope,
+            flush: self.flush.clone(),
         }
     }
 
@@ -169,6 +171,7 @@ impl DataStore {
             insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope: key.into_key(),
+            flush: self.flush.clone(),
         }
     }
 
@@ -184,6 +187,7 @@ impl DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 
@@ -198,6 +202,7 @@ impl DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 
@@ -209,6 +214,7 @@ impl DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 
@@ -220,6 +226,7 @@ impl DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 }
@@ -233,6 +240,7 @@ impl From<&Addr<SledStore>> for DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 }
@@ -246,6 +254,7 @@ impl From<&Addr<InMemStore>> for DataStore {
             insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
+            flush: addr.clone().recipient(),
         }
     }
 }

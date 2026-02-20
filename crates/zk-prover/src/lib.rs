@@ -10,6 +10,7 @@ mod circuits;
 mod config;
 mod error;
 mod prover;
+pub mod test_utils;
 mod traits;
 mod witness;
 

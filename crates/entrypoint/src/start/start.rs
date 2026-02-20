@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::primitives::Address;
 use anyhow::Result;
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
@@ -16,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use tracing::instrument;
 
 #[instrument(name = "app", skip_all)]
-pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeHandle> {
+pub async fn execute(config: &AppConfig) -> Result<CiphernodeHandle> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let zk_config = e3_zk_prover::ZkConfig::fetch_or_default().await;
@@ -28,8 +27,7 @@ pub async fn execute(config: &AppConfig, address: Address) -> Result<CiphernodeH
     );
     backend.ensure_installed().await?;
 
-    let node = CiphernodeBuilder::new(&config.name(), rng.clone(), cipher.clone())
-        .with_address(&address.to_string())
+    let node = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_persistence(&config.log_file(), &config.db_file())
         .with_sortition_score()
         .with_chains(&config.chains())

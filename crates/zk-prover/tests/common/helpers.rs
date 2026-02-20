@@ -6,7 +6,7 @@
 
 use e3_config::BBPath;
 use e3_zk_prover::{ZkBackend, ZkConfig};
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 use tempfile::TempDir;
 use tokio::{fs, process::Command};
 
@@ -120,7 +120,10 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
 /// Lightweight backend for tests that don't need a real bb binary.
 pub fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
     let noir_dir = temp_path.join("noir");
-    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
+    let bb_binary = match env::var("E3_CUSTOM_BB") {
+        Ok(path) => BBPath::Custom(PathBuf::from(path)),
+        Err(_) => BBPath::Default(noir_dir.join("bin").join("bb")),
+    };
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     ZkBackend::new(bb_binary, circuits_dir, work_dir, config)
