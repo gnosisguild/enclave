@@ -36,6 +36,7 @@ jobs:
   rust_tests:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -83,6 +84,7 @@ jobs:
   zk_prover_integration:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -113,6 +115,7 @@ jobs:
   build_e3_support_risc0:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
       - name: Generate tags
@@ -151,6 +154,7 @@ jobs:
   build_ciphernode_image:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -192,6 +196,7 @@ jobs:
   test_contracts:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -228,6 +233,7 @@ jobs:
   test_net:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -242,6 +248,7 @@ jobs:
   integration_prebuild:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -300,6 +307,7 @@ jobs:
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -363,6 +371,7 @@ jobs:
   build_enclave_cli:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -395,6 +404,7 @@ jobs:
   crisp_unit:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -469,6 +479,7 @@ jobs:
   crisp_e2e:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -578,6 +589,7 @@ jobs:
   build_circuits:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -632,6 +644,7 @@ jobs:
   zk_prover_e2e:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_circuits]
     steps:
       - uses: actions/checkout@v6
@@ -672,6 +685,7 @@ jobs:
   build_e3_support_dev:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -702,6 +716,7 @@ jobs:
   build_sdk:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -752,6 +767,7 @@ jobs:
   build_crisp_sdk:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     steps:
       - uses: actions/checkout@v6
 
@@ -797,6 +813,7 @@ jobs:
   template_integration:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -858,6 +875,7 @@ jobs:
   test_enclave_init:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
@@ -896,6 +914,7 @@ jobs:
   contrib-readme-job:
     runs-on:
       group: enclave-ci
+      labels: [enclave-ci-runner]
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
     if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
