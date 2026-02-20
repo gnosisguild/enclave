@@ -15,6 +15,10 @@ if ! command -v nargo &> /dev/null; then
     exit 0
 fi
 
+if ! command -v bb &> /dev/null; then
+    exit 0
+fi
+
 echo "Building circuits..."
 
 pnpm install && pnpm build:circuits
