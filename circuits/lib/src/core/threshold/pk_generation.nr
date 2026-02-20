@@ -131,10 +131,7 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         let pk_commitment = compute_threshold_pk_commitment::<N, L, BIT_PK>(self.pk0, self.pk1);
 
         let gamma = self.generate_challenge(sk_commitment, pk_commitment);
-
-        for i in 0..L {
-            self.verify_public_key_for_modulus(i, gamma);
-        }
+        self.verify_evaluations(gamma);
 
         (sk_commitment, pk_commitment, e_sm_commitment)
     }
@@ -173,32 +170,22 @@ impl<let N: u32, let L: u32, let BIT_EEK: u32, let BIT_SK: u32, let BIT_E_SM: u3
         }
     }
 
-    /// Verifies the threshold public key generation equations for a specific CRT basis
-    fn verify_public_key_for_modulus(self, i: u32, gamma: Field) {
-        // Evaluate all polynomials at the random challenge point gamma
-        let a_at_gamma = self.a.map(|a_poly| a_poly.eval(gamma));
-
-        let eek_at_gamma = self.eek.eval(gamma);
-        let sk_at_gamma = self.sk.eval(gamma);
-
-        let r1_at_gamma = self.r1.map(|r1_poly| r1_poly.eval(gamma));
-        let r2_at_gamma = self.r2.map(|r2_poly| r2_poly.eval(gamma));
-
-        let pk0_at_gamma = self.pk0.map(|pk0_poly| pk0_poly.eval(gamma));
-        let pk1_at_gamma = self.pk1.map(|pk1_poly| pk1_poly.eval(gamma));
-
-        // Evaluate the cyclotomic polynomial X^N + 1 at gamma
+    fn verify_evaluations(self, gamma: Field) {
         let cyclo_at_gamma = gamma.pow_32(N as Field) + 1;
+        let sk_at_gamma = self.sk.eval(gamma);
+        let eek_at_gamma = self.eek.eval(gamma);
 
-        // pk0_i = -a_i * sk + eek + r2_i * (X^N + 1) + r1_i * q_i
-        let expected_pk0 = -a_at_gamma[i] * sk_at_gamma
-            + eek_at_gamma
-            + r2_at_gamma[i] * cyclo_at_gamma
-            + r1_at_gamma[i] * self.configs.qis[i];
+        for i in 0..L {
+            let expected_pk0 = -self.a[i].eval(gamma) * sk_at_gamma
+                + eek_at_gamma
+                + self.r2[i].eval(gamma) * cyclo_at_gamma
+                + self.r1[i].eval(gamma) * self.configs.qis[i];
 
-        assert(pk0_at_gamma[i] == expected_pk0, "Public key equation 1 failed");
-
-        // Equation 2: pk1_i = a_i
-        assert(pk1_at_gamma[i] == a_at_gamma[i], "Public key equation 2 failed");
+            assert(self.pk0[i].eval(gamma) == expected_pk0, "Public key equation 1 failed");
+            assert(
+                self.pk1[i].eval(gamma) == self.a[i].eval(gamma),
+                "Public key equation 2 failed",
+            );
+        }
     }
 }
