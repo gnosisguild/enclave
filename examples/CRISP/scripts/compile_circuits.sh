@@ -20,13 +20,19 @@ if ! (cd "$ENCLAVE_CIRCUITS/bin/threshold/user_data_encryption_ct1" && nargo com
     exit 1
 fi
 
+echo "Compiling user_data_encryption..."
+if ! (cd "$ENCLAVE_CIRCUITS/bin/recursive_aggregation/wrapper/threshold/user_data_encryption" && nargo compile); then
+    echo "Error: user_data_encryption compilation failed"
+    exit 1
+fi
+
 echo "Compiling CRISP circuit..."
 if ! (cd "$CRISP_CIRCUITS/bin/crisp" && nargo compile); then
     echo "Error: CRISP circuit compilation failed"
     exit 1
 fi
 
-echo "Compiling fold circuit (verifies ct0 + ct1 + crisp)..."
+echo "Compiling fold circuit (verifies user_data_encryption + crisp)..."
 if ! (cd "$CRISP_CIRCUITS/bin/fold" && nargo compile); then
     echo "Error: Fold circuit compilation failed"
     exit 1

@@ -13,11 +13,8 @@ use e3_fhe_params::build_bfv_params_arc;
 use e3_fhe_params::default_param_set;
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
-use e3_polynomial::CrtPolynomial;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
-use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::utils::compute_modulus_bit;
 use e3_zk_helpers::CircuitComputation;
 use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
@@ -270,24 +267,6 @@ impl ZKInputsGenerator {
     /// Returns a clone of the BFV parameters used by this generator.
     pub fn get_bfv_params(&self) -> Arc<BfvParameters> {
         self.bfv_params.clone()
-    }
-
-    /// Computes the commitment to a set of ciphertext polynomials.
-    ///
-    /// # Arguments
-    /// * `ct0` - First component of the ciphertext (CRT limbs).
-    /// * `ct1` - Second component of the ciphertext (CRT limbs).
-    ///
-    /// # Returns
-    /// The commitment as a BigInt.
-    pub fn compute_ciphertext_commitment(
-        &self,
-        ct0: &CrtPolynomial,
-        ct1: &CrtPolynomial,
-    ) -> BigInt {
-        let pk_bit = compute_modulus_bit(&self.bfv_params);
-
-        compute_ciphertext_commitment(ct0, ct1, pk_bit)
     }
 }
 

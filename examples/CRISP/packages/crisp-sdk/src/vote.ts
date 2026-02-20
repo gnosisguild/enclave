@@ -5,17 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
-import {
-  type CRISPCircuitInputs,
-  type Vote,
-  ExecuteCircuitResult,
-  MaskVoteProofInputs,
-  ProofInputs,
-  ProofData,
-  VoteProofInputs,
-  Polynomial,
-  GrecoCircuitInputs,
-} from './types'
+import { type Vote, MaskVoteProofInputs, ProofInputs, ProofData, VoteProofInputs } from './types'
 import {
   generateMerkleProof,
   toBinary,
@@ -30,9 +20,12 @@ import {
 } from './utils'
 import { MASK_SIGNATURE, MAX_VOTE_BITS, SIGNATURE_MESSAGE_HASH } from './constants'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js'
+import { BackendType, Barretenberg, UltraHonkBackend } from '@aztec/bb.js'
 import crispCircuit from '../../../circuits/bin/crisp/target/crisp.json'
-import grecoCircuit from '../../../circuits/bin/greco/target/crisp_greco.json'
+import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
+import userDataEncryptionCt0Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
+import userDataEncryptionCt1Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
+import userDataEncryptionCircuit from '../../../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
 import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
 import { Hex } from 'viem'
 
@@ -159,22 +152,6 @@ export const generateBFVKeys = (): { secretKey: Uint8Array; publicKey: Uint8Arra
 }
 
 /**
- * Compute the commitment to a set of ciphertext polynomials.
- * This function is used for testing purposes only. It is not part of the public API.
- * @param ct0is - The first component of the ciphertext polynomials.
- * @param ct1is - The second component of the ciphertext polynomials.
- * @returns The commitment as a bigint.
- */
-export const computeCiphertextCommitment = (ct0is: Polynomial[], ct1is: Polynomial[]): bigint => {
-  const commitment = zkInputsGenerator.computeCiphertextCommitment(
-    ct0is.map((p) => p.coefficients),
-    ct1is.map((p) => p.coefficients),
-  )
-
-  return BigInt(commitment)
-}
-
-/**
  * Generate the circuit inputs for a vote proof.
  * This works for both vote and masking.
  * @param proofInputs - The proof inputs.
@@ -231,24 +208,15 @@ export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<{
 }
 
 /**
- * Execute the circuit.
- * @param crispInputs - The circuit inputs.
+ * Execute a circuit.
+ * @param circuit - The circuit to execute.
+ * @param inputs - The inputs to the circuit.
  * @returns The execute circuit result.
  */
-export const executeCrispCircuit = async (crispInputs: CRISPCircuitInputs): Promise<ExecuteCircuitResult<bigint>> => {
-  const noir = new Noir(crispCircuit as CompiledCircuit)
+export const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Promise<{ witness: Uint8Array; returnValue: any }> => {
+  const noir = new Noir(circuit as CompiledCircuit)
 
-  const { witness, returnValue } = await noir.execute(crispInputs)
-
-  return { witness, returnValue: BigInt(returnValue as `0x${string}`) }
-}
-
-export const executeGrecoCircuit = async (grecoInputs: GrecoCircuitInputs): Promise<ExecuteCircuitResult<bigint[]>> => {
-  const noir = new Noir(grecoCircuit as CompiledCircuit)
-
-  const { witness, returnValue } = await noir.execute(grecoInputs)
-
-  return { witness, returnValue: (returnValue as any[]).map((v) => BigInt(v as `0x${string}`)) }
+  return noir.execute(inputs)
 }
 
 /**
@@ -257,42 +225,34 @@ export const executeGrecoCircuit = async (grecoInputs: GrecoCircuitInputs): Prom
  * @returns The proof.
  */
 export const generateProof = async (circuitInputs: any) => {
-  const { witness: grecoWitness, returnValue: grecoReturnValue } = await executeGrecoCircuit({
-    pk_commitment: circuitInputs.pk_commitment,
-    ct0is: circuitInputs.ct0is,
-    ct1is: circuitInputs.ct1is,
-    pk0is: circuitInputs.pk0is,
-    pk1is: circuitInputs.pk1is,
-    r1is: circuitInputs.r1is,
-    r2is: circuitInputs.r2is,
-    p1is: circuitInputs.p1is,
-    p2is: circuitInputs.p2is,
-    u: circuitInputs.u,
-    e0: circuitInputs.e0,
-    e0is: circuitInputs.e0is,
-    e0_quotients: circuitInputs.e0_quotients,
-    e1: circuitInputs.e1,
-    k1: circuitInputs.k1,
+  const api = await Barretenberg.new({
+    threads: optimalThreadCount,
+    backend: BackendType.WasmWorker,
   })
 
-  const api = await Barretenberg.new({ threads: optimalThreadCount })
-
   try {
-    const grecoBackend = new UltraHonkBackend(grecoCircuit.bytecode, api)
+    await api.initSRSChonk(2 ** 21) // fold circuit needs 2^21 points; default is 2^20
 
-    const { proof: grecoProof, publicInputs: grecoPublicInputs } = await grecoBackend.generateProof(grecoWitness, {
-      verifierTarget: 'noir-recursive-no-zk',
+    const { witness: userDataEncryptionCt0Witness } = await executeCircuit(userDataEncryptionCt0Circuit as CompiledCircuit, {
+      pk0is: circuitInputs.pk0is,
+      ct0is: circuitInputs.ct0is,
+      u: circuitInputs.u,
+      e0: circuitInputs.e0,
+      e0is: circuitInputs.e0is,
+      e0_quotients: circuitInputs.e0_quotients,
+      k1: circuitInputs.k1,
+      r1is: circuitInputs.r1is,
+      r2is: circuitInputs.r2is,
     })
-
-    const artifacts = await grecoBackend.generateRecursiveProofArtifacts(grecoProof, grecoPublicInputs.length, {
-      verifierTarget: 'noir-recursive-no-zk',
+    const { witness: userDataEncryptionCt1Witness } = await executeCircuit(userDataEncryptionCt1Circuit as CompiledCircuit, {
+      pk1is: circuitInputs.pk1is,
+      ct1is: circuitInputs.ct1is,
+      u: circuitInputs.u,
+      e1: circuitInputs.e1,
+      p1is: circuitInputs.p1is,
+      p2is: circuitInputs.p2is,
     })
-
-    const vkAsFields = artifacts.vkAsFields
-    const vkHash = artifacts.vkHash
-    const grecoProofAsFields = proofToFields(grecoProof)
-
-    const { witness: crispWitness } = await executeCrispCircuit({
+    const { witness: crispWitness, returnValue: crispReturnValue } = await executeCircuit(crispCircuit as CompiledCircuit, {
       prev_ct0is: circuitInputs.prev_ct0is,
       prev_ct1is: circuitInputs.prev_ct1is,
       prev_ct_commitment: circuitInputs.prev_ct_commitment,
@@ -300,15 +260,9 @@ export const generateProof = async (circuitInputs: any) => {
       sum_ct1is: circuitInputs.sum_ct1is,
       sum_r0is: circuitInputs.sum_r0is,
       sum_r1is: circuitInputs.sum_r1is,
-      greco_verification_key: vkAsFields,
-      greco_key_hash: vkHash,
-      greco_proof: grecoProofAsFields,
       ct0is: circuitInputs.ct0is,
       ct1is: circuitInputs.ct1is,
       k1: circuitInputs.k1,
-      pk_commitment: circuitInputs.pk_commitment,
-      k1_commitment: grecoReturnValue[0].toString(),
-      ct_commitment: grecoReturnValue[1].toString(),
       public_key_x: circuitInputs.public_key_x,
       public_key_y: circuitInputs.public_key_y,
       signature: circuitInputs.signature,
@@ -322,15 +276,92 @@ export const generateProof = async (circuitInputs: any) => {
       is_first_vote: circuitInputs.is_first_vote,
       is_mask_vote: circuitInputs.is_mask_vote,
       num_options: circuitInputs.num_options,
-    } as CRISPCircuitInputs)
+    })
 
+    const userDataEncryptionCt0Backend = new UltraHonkBackend(userDataEncryptionCt0Circuit.bytecode, api)
+    const userDataEncryptionCt1Backend = new UltraHonkBackend(userDataEncryptionCt1Circuit.bytecode, api)
+    const userDataEncryptionBackend = new UltraHonkBackend(userDataEncryptionCircuit.bytecode, api)
     const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
+    const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
 
-    const proof = await crispBackend.generateProof(crispWitness, { verifierTarget: 'evm' })
+    const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
+      await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
+        verifierTarget: 'noir-recursive-no-zk',
+      })
+    const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
+      await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
+        verifierTarget: 'noir-recursive-no-zk',
+      })
+    const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
+      verifierTarget: 'noir-recursive-no-zk',
+    })
+
+    const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
+      userDataEncryptionCt0Proof,
+      userDataEncryptionCt0PublicInputs.length,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+    const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
+      userDataEncryptionCt1Proof,
+      userDataEncryptionCt1PublicInputs.length,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+    const crispArtifacts = await crispBackend.generateRecursiveProofArtifacts(crispProof, crispPublicInputs.length, {
+      verifierTarget: 'noir-recursive-no-zk',
+    })
+
+    const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
+      ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
+      ct0_proof: proofToFields(userDataEncryptionCt0Proof),
+      ct0_public_inputs: userDataEncryptionCt0PublicInputs,
+      ct0_key_hash: userDataEncryptionCt0Artifacts.vkHash,
+      ct1_verification_key: userDataEncryptionCt1Artifacts.vkAsFields,
+      ct1_proof: proofToFields(userDataEncryptionCt1Proof),
+      ct1_public_inputs: userDataEncryptionCt1PublicInputs,
+      ct1_key_hash: userDataEncryptionCt1Artifacts.vkHash,
+    })
+
+    const { proof: userDataEncryptionProof, publicInputs: userDataEncryptionPublicInputs } = await userDataEncryptionBackend.generateProof(
+      userDataEncryptionWitness,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+    const userDataEncryptionArtifacts = await userDataEncryptionBackend.generateRecursiveProofArtifacts(
+      userDataEncryptionProof,
+      userDataEncryptionPublicInputs.length,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+
+    const { witness: foldWitness } = await executeCircuit(foldCircuit as CompiledCircuit, {
+      user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,
+      user_data_encryption_proof: proofToFields(userDataEncryptionProof),
+      user_data_encryption_public_inputs: userDataEncryptionPublicInputs,
+      user_data_encryption_key_hash: userDataEncryptionArtifacts.vkHash,
+      crisp_verification_key: crispArtifacts.vkAsFields,
+      crisp_proof: proofToFields(crispProof),
+      crisp_key_hash: crispArtifacts.vkHash,
+      prev_ct_commitment: circuitInputs.prev_ct_commitment,
+      merkle_root: circuitInputs.merkle_root,
+      slot_address: circuitInputs.slot_address,
+      is_first_vote: circuitInputs.is_first_vote,
+      num_options: circuitInputs.num_options,
+      final_ct_commitment: crispReturnValue[0].toString(),
+      ct_commitment: crispReturnValue[1].toString(),
+      k1_commitment: crispReturnValue[2].toString(),
+    })
+
+    const proof = await foldBackend.generateProof(foldWitness, { verifierTarget: 'evm' })
 
     return proof
   } finally {
-    if (api != null) api.destroy()
+    api.destroy()
   }
 }
 
@@ -426,8 +457,10 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
   const api = await Barretenberg.new({ threads: optimalThreadCount })
 
   try {
-    const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
-    const isValid = await crispBackend.verifyProof(proof, { verifierTarget: 'evm' })
+    const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
+
+    const isValid = await foldBackend.verifyProof(proof, { verifierTarget: 'evm' })
+
     return isValid
   } finally {
     api.destroy()
@@ -441,13 +474,17 @@ export const verifyProof = async (proof: ProofData): Promise<boolean> => {
  * @returns The encoded proof data as a hex string.
  */
 export const encodeSolidityProof = ({ publicInputs, proof, encryptedVote }: ProofData): Hex => {
-  const slotAddress = getAddress(numberToHex(BigInt(publicInputs[3]), { size: 20 }))
-  const encryptedVoteCommitment = publicInputs[6] as `0x${string}`
+  const slotAddress = getAddress(numberToHex(BigInt(publicInputs[2]), { size: 20 }))
+  const encryptedVoteCommitment = publicInputs[5] as `0x${string}`
 
-  return encodeAbiParameters(parseAbiParameters('bytes, address, bytes32, bytes'), [
+  // Verification key hash from proof public inputs (indices 7–38). Must match the value stored on-chain.
+  const keyHash = bytesToHex(Uint8Array.from(publicInputs.slice(7, 39), (p) => Number(BigInt(p) & 0xffn))) as `0x${string}`
+
+  return encodeAbiParameters(parseAbiParameters('bytes, address, bytes32, bytes32, bytes'), [
     bytesToHex(proof),
     slotAddress,
     encryptedVoteCommitment,
+    keyHash,
     bytesToHex(encryptedVote),
   ])
 }

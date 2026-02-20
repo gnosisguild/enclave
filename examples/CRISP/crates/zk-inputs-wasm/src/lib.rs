@@ -8,28 +8,9 @@
 //!
 //! This crate provides JavaScript bindings for the CRISP ZK inputs generator using WASM.
 
-use e3_polynomial::CrtPolynomial;
 use js_sys;
-use num_bigint::BigInt;
 use wasm_bindgen::prelude::*;
 use zk_inputs::ZKInputsGenerator as CoreZKInputsGenerator;
-
-/// Converts a JsValue (string, number, or JS BigInt) to a string suitable for BigInt parsing.
-/// Circuit inputs may serialize coefficients as JSON numbers when they fit in i64,
-/// or pass them as JavaScript BigInt values.
-fn js_value_to_bigint_string(val: JsValue) -> Option<String> {
-    if let Some(s) = val.as_string() {
-        return Some(s);
-    }
-    if let Some(n) = val.as_f64() {
-        return Some(format!("{:.0}", n));
-    }
-    // JS BigInt: convert via js_sys::BigInt::toString(10)
-    val.dyn_into::<js_sys::BigInt>()
-        .ok()
-        .and_then(|b| b.to_string(10).ok())
-        .and_then(|js| JsValue::from(js).as_string())
-}
 
 /// JavaScript-compatible CRISP ZK inputs generator.
 #[wasm_bindgen]
@@ -155,67 +136,6 @@ impl ZKInputsGenerator {
             }
             Err(e) => Err(JsValue::from_str(&e.to_string())),
         }
-    }
-
-    /// Compute the commitment to a set of ciphertext polynomials from JavaScript.
-    #[wasm_bindgen(js_name = "computeCiphertextCommitment")]
-    pub fn compute_ciphertext_commitment(
-        &self,
-        ct0is: JsValue,
-        ct1is: JsValue,
-    ) -> Result<String, JsValue> {
-        // Parse nested arrays: ct0is and ct1is are arrays of arrays (one array per CRT limb).
-        // Coefficients may be strings or numbers (JSON can emit numbers when values fit in i64).
-        let ct0is_array: js_sys::Array = js_sys::Array::from(&ct0is);
-        let ct1is_array: js_sys::Array = js_sys::Array::from(&ct1is);
-
-        let mut ct0is_vec: Vec<Vec<BigInt>> = Vec::new();
-        for i in 0..ct0is_array.length() {
-            let inner_array = ct0is_array
-                .get(i)
-                .dyn_into::<js_sys::Array>()
-                .map_err(|_| JsValue::from_str("Expected array of arrays for ct0is"))?;
-
-            let mut coefficients: Vec<BigInt> = Vec::new();
-            for j in 0..inner_array.length() {
-                let s = js_value_to_bigint_string(inner_array.get(j)).ok_or_else(|| {
-                    JsValue::from_str("Expected string, number, or BigInt in inner array")
-                })?;
-                let bigint = s
-                    .parse::<BigInt>()
-                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
-                coefficients.push(bigint);
-            }
-            ct0is_vec.push(coefficients);
-        }
-
-        let mut ct1is_vec: Vec<Vec<BigInt>> = Vec::new();
-        for i in 0..ct1is_array.length() {
-            let inner_array = ct1is_array
-                .get(i)
-                .dyn_into::<js_sys::Array>()
-                .map_err(|_| JsValue::from_str("Expected array of arrays for ct1is"))?;
-
-            let mut coefficients: Vec<BigInt> = Vec::new();
-            for j in 0..inner_array.length() {
-                let s = js_value_to_bigint_string(inner_array.get(j)).ok_or_else(|| {
-                    JsValue::from_str("Expected string, number, or BigInt in inner array")
-                })?;
-                let bigint = s
-                    .parse::<BigInt>()
-                    .map_err(|e| JsValue::from_str(&format!("Failed to parse BigInt: {}", e)))?;
-                coefficients.push(bigint);
-            }
-            ct1is_vec.push(coefficients);
-        }
-
-        let ct0 = CrtPolynomial::from_bigint_vectors(ct0is_vec);
-        let ct1 = CrtPolynomial::from_bigint_vectors(ct1is_vec);
-
-        Ok(self
-            .generator
-            .compute_ciphertext_commitment(&ct0, &ct1)
-            .to_string())
     }
 
     /// Encrypt a vote from JavaScript.

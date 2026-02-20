@@ -21,9 +21,12 @@
   "types": "./dist/index.d.ts",
   "homepage": "https://github.com/gnosisguild/enclave",
   "scripts": {
+    "compile:circuits": "pnpm compile:crisp && pnpm compile:user_data_encryption_ct0 && pnpm compile:user_data_encryption_ct1 && pnpm compile:user_data_encryption && pnpm compile:fold",
+    "compile:user_data_encryption_ct0": "cd ../../../../circuits/bin/threshold/user_data_encryption_ct0 && nargo compile",
+    "compile:user_data_encryption_ct1": "cd ../../../../circuits/bin/threshold/user_data_encryption_ct1 && nargo compile",
+    "compile:user_data_encryption": "cd ../../../../circuits/bin/recursive_aggregation/wrapper/threshold/user_data_encryption && nargo compile",
     "compile:crisp": "cd ../../circuits/bin/crisp && nargo compile",
-    "compile:greco": "cd ../../circuits/bin/greco && nargo compile",
-    "compile:circuits": "pnpm compile:crisp && pnpm compile:greco",
+    "compile:fold": "cd ../../circuits/bin/fold && nargo compile",
     "build:wasm": "pnpm -C ../crisp-zk-inputs build",
     "build": "pnpm build:wasm && pnpm compile:circuits && tsup",
     "test": "vitest --run"
