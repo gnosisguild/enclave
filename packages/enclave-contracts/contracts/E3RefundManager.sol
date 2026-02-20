@@ -42,6 +42,8 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     mapping(uint256 e3Id => RefundDistribution) internal _distributions;
     /// @notice Tracks claims per E3 per address
     mapping(uint256 e3Id => mapping(address => bool)) internal _claimed;
+    /// @notice Tracks number of claims made per E3 (for routeSlashedFunds guard)
+    mapping(uint256 e3Id => uint256) internal _claimCount;
     /// @notice Maps E3 ID to honest node addresses
     mapping(uint256 e3Id => address[]) internal _honestNodes;
     ////////////////////////////////////////////////////////////
@@ -241,6 +243,7 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         if (amount == 0) revert NoRefundAvailable(e3Id);
 
         _claimed[e3Id][msg.sender] = true;
+        _claimCount[e3Id]++;
 
         // Use the per-E3 fee token (not the global one, which may have been rotated)
         dist.feeToken.safeTransfer(msg.sender, amount);
@@ -269,17 +272,13 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         require(amount > 0, NoRefundAvailable(e3Id));
 
         _claimed[e3Id][msg.sender] = true;
+        _claimCount[e3Id]++;
 
-        // Use the per-E3 fee token and distribute through bonding registry
+        // Transfer directly to the honest node. Using distributeRewards would require
+        // this contract to be an authorized distributor in BondingRegistry, and the node
+        // must be registered. Direct transfer is simpler and more reliable for refunds.
         IERC20 token = dist.feeToken;
-        token.approve(address(bondingRegistry), amount);
-
-        address[] memory nodeArray = new address[](1);
-        nodeArray[0] = msg.sender;
-        uint256[] memory amountArray = new uint256[](1);
-        amountArray[0] = amount;
-
-        bondingRegistry.distributeRewards(token, nodeArray, amountArray);
+        token.safeTransfer(msg.sender, amount);
 
         emit RefundClaimed(e3Id, msg.sender, amount, "HONEST_NODE");
     }
@@ -291,9 +290,10 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     ) external onlyEnclave {
         RefundDistribution storage dist = _distributions[e3Id];
         require(dist.calculated, "Not calculated");
+        require(_claimCount[e3Id] == 0, "Claims already started");
+        require(amount > 0, "Zero amount");
 
         // Add slashed funds to distribution
-        // Note: slashing should be finalized before claims are made.
         // 50% to requester, 50% to honest nodes for non-participation
         uint256 toRequester = amount / 2;
         uint256 toHonestNodes = amount - toRequester;

@@ -16,7 +16,6 @@ use alloy::{
     providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
-    sol_types::SolValue,
 };
 use anyhow::Result;
 use e3_events::prelude::*;
@@ -25,7 +24,7 @@ use e3_events::EnclaveEvent;
 use e3_events::EnclaveEventData;
 use e3_events::EventType;
 use e3_events::Shutdown;
-use e3_events::{EType, SignedProofFailed};
+use e3_events::{encode_fault_evidence, EType, SignedProofFailed};
 use e3_utils::NotifySync;
 use tracing::info;
 
@@ -138,20 +137,15 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
     let operator = data.faulting_node;
     let reason = keccak256(data.proof_type.slash_reason().as_bytes());
 
-    // Encode as (bytes zkProof, bytes32[] publicInputs)
-    let zk_proof = Bytes::copy_from_slice(&data.signed_payload.payload.proof.data);
-    let public_inputs_bytes = &data.signed_payload.payload.proof.public_signals;
+    // Look up the verifier address from the on-chain slash policy.
+    // This is required to encode the full 6-tuple evidence that the contract expects:
+    // (bytes zkProof, bytes32[] publicInputs, bytes signature, uint256 chainId, uint256 proofType, address verifier)
+    let contract = ISlashingManager::new(contract_address, provider.provider());
+    let policy = contract.getSlashPolicy(reason.into()).call().await?;
+    let verifier = policy.proofVerifier;
 
-    // Each 32-byte chunk of public_signals becomes one bytes32 element
-    let mut public_inputs: Vec<[u8; 32]> = Vec::new();
-    for chunk in public_inputs_bytes.chunks(32) {
-        let mut padded = [0u8; 32];
-        let start = 32 - chunk.len();
-        padded[start..].copy_from_slice(chunk);
-        public_inputs.push(padded);
-    }
-
-    let proof_data = (zk_proof, public_inputs).abi_encode();
+    // Use the canonical encoder from signed_proof.rs (H-02/C-02 fix)
+    let proof_data = encode_fault_evidence(&data, verifier);
 
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider
@@ -160,7 +154,6 @@ async fn submit_slash_proposal<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
 
-    // DuplicateEvidence() = keccak256("DuplicateEvidence()")[:4] – retry if not yet on-chain
     send_tx_with_retry("proposeSlash", &[], || {
         info!(
             "proposeSlash() e3_id={:?} operator={:?} reason={:?}",

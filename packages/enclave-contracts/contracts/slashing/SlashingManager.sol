@@ -64,6 +64,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
     mapping(address node => bool banned) public banned;
 
     /// @notice Evidence replay protection: tracks consumed evidence keys
+    /// @dev Key is keccak256(abi.encode(e3Id, operator, keccak256(proof))) — reason-independent
+    ///      to prevent the same proof/evidence from being used to slash under multiple reasons.
     mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed;
 
     // ======================
@@ -241,9 +243,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.requiresProof, InvalidPolicy());
         require(proof.length != 0, ProofRequired());
 
-        // Evidence replay protection
+        // Evidence replay protection — reason-independent to prevent cross-reason replay (M-05)
         bytes32 evidenceKey = keccak256(
-            abi.encode(e3Id, operator, reason, keccak256(proof))
+            abi.encode(e3Id, operator, keccak256(proof))
         );
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;
@@ -295,9 +297,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.enabled, SlashReasonDisabled());
         require(!policy.requiresProof, InvalidPolicy());
 
-        // Evidence replay protection
+        // Evidence replay protection — reason-independent to prevent cross-reason replay (M-05)
         bytes32 evidenceKey = keccak256(
-            abi.encode(e3Id, operator, reason, keccak256(evidence))
+            abi.encode(e3Id, operator, keccak256(evidence))
         );
         require(!evidenceConsumed[evidenceKey], DuplicateEvidence());
         evidenceConsumed[evidenceKey] = true;
@@ -418,13 +420,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
         _verifyCommitteeMembership(e3Id, operator);
 
         // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
+        //    The staticcall MUST succeed — if the verifier reverts or doesn't exist,
+        //    we cannot determine fault and must not slash (M-04 fix).
         (bool callSuccess, bytes memory returnData) = policyVerifier.staticcall(
             abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
         );
-        if (callSuccess) {
-            bool proofValid = abi.decode(returnData, (bool));
-            if (proofValid) revert ProofIsValid();
-        }
+        require(callSuccess, VerifierCallFailed());
+        bool proofValid = abi.decode(returnData, (bool));
+        if (proofValid) revert ProofIsValid();
     }
 
     /**

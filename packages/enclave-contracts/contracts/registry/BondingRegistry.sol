@@ -62,8 +62,10 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @notice Address authorized to perform slashing operations
     address public slashingManager;
 
-    /// @notice Address authorized to distribute rewards to operators
-    address public rewardDistributor;
+    /// @notice Addresses authorized to distribute rewards to operators
+    /// @dev Multiple contracts (Enclave, E3RefundManager) need to distribute rewards.
+    ///      Each authorized distributor must approve this contract for the reward token.
+    mapping(address => bool) public authorizedDistributors;
 
     /// @notice Treasury address that receives slashed funds
     address public slashedFundsTreasury;
@@ -574,14 +576,14 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external {
-        require(msg.sender == rewardDistributor, OnlyRewardDistributor());
+        require(authorizedDistributors[msg.sender], OnlyRewardDistributor());
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         uint256 len = recipients.length;
         for (uint256 i = 0; i < len; i++) {
             if (amounts[i] > 0 && operators[recipients[i]].registered) {
                 rewardToken.safeTransferFrom(
-                    rewardDistributor,
+                    msg.sender,
                     recipients[i],
                     amounts[i]
                 );
@@ -679,13 +681,20 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         slashingManager = newSlashingManager;
     }
 
-    /// @notice Sets the reward distributor address
-    /// @dev Only callable by owner
-    /// @param newRewardDistributor Address of the reward distributor
+    /// @notice Authorizes an address to distribute rewards
+    /// @dev Only callable by owner. Supports multiple authorized distributors (Enclave + E3RefundManager)
+    /// @param newRewardDistributor Address to authorize as reward distributor
     function setRewardDistributor(
         address newRewardDistributor
     ) public onlyOwner {
-        rewardDistributor = newRewardDistributor;
+        authorizedDistributors[newRewardDistributor] = true;
+    }
+
+    /// @notice Revokes reward distributor authorization
+    /// @dev Only callable by owner
+    /// @param distributor Address to revoke
+    function revokeRewardDistributor(address distributor) public onlyOwner {
+        authorizedDistributors[distributor] = false;
     }
 
     /// @inheritdoc IBondingRegistry

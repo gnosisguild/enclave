@@ -94,6 +94,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @notice Maps E3 ID to requester address
     mapping(uint256 e3Id => address) internal _e3Requesters;
 
+    /// @notice Maps E3 ID to the fee token used at request time
+    /// @dev Stored per-E3 to survive global feeToken rotations (H-01 fix)
+    mapping(uint256 e3Id => IERC20) internal _e3FeeTokens;
+
     /// @notice Global timeout configuration
     E3TimeoutConfig internal _timeoutConfig;
 
@@ -351,6 +355,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
+        // Store the fee token used for this E3 (survives global token rotations)
+        _e3FeeTokens[e3Id] = feeToken;
+
         require(
             ciphernodeRegistry.requestCommittee(
                 e3Id,
@@ -380,6 +387,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
+        // C-01 fix: Verify E3 is in KeyPublished stage before accepting ciphertext
+        E3Stage current = _e3Stages[e3Id];
+        require(
+            current == E3Stage.KeyPublished,
+            InvalidStage(e3Id, E3Stage.KeyPublished, current)
+        );
 
         E3Deadlines memory deadlines = _e3Deadlines[e3Id];
 
@@ -473,6 +487,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Uses active committee nodes (excluding expelled members).
     ///      Divides the E3 payment equally among active members and transfers via bonding registry.
     ///      If no active members remain (e.g., all expelled), refunds the requester to prevent fund lockup.
+    ///      Any division dust is sent to the last member rather than being lost.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
         address[] memory activeNodes = ciphernodeRegistry
@@ -483,10 +498,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3Payments[e3Id] = 0;
         if (totalAmount == 0) return;
 
+        // Use the per-E3 fee token (not the global one, which may have been rotated)
+        IERC20 paymentToken = _e3FeeTokens[e3Id];
+
         if (activeLength == 0) {
             address requester = _e3Requesters[e3Id];
             if (requester != address(0)) {
-                feeToken.safeTransfer(requester, totalAmount);
+                paymentToken.safeTransfer(requester, totalAmount);
             }
             return;
         }
@@ -495,16 +513,23 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Distribute equally among active (non-expelled) committee members
         uint256 amount = totalAmount / activeLength;
+        uint256 distributed = 0;
         for (uint256 i = 0; i < activeLength; i++) {
             amounts[i] = amount;
+            distributed += amount;
+        }
+        // Give any division dust to the last member (C-03 fix)
+        uint256 dust = totalAmount - distributed;
+        if (dust > 0) {
+            amounts[activeLength - 1] += dust;
         }
 
-        feeToken.approve(address(bondingRegistry), totalAmount);
+        paymentToken.approve(address(bondingRegistry), totalAmount);
 
-        bondingRegistry.distributeRewards(feeToken, activeNodes, amounts);
+        bondingRegistry.distributeRewards(paymentToken, activeNodes, amounts);
 
-        // Dust goes to treasury (implicit via remaining approval)
-        feeToken.approve(address(bondingRegistry), 0);
+        // Reset approval
+        paymentToken.approve(address(bondingRegistry), 0);
 
         emit RewardsDistributed(e3Id, activeNodes, amounts);
     }
@@ -671,7 +696,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @notice Process a failed E3 and calculate refunds
     /// @dev Can be called by anyone once E3 is in failed state.
-    ///      Passes the current feeToken so the refund manager stores the correct token per-E3.
+    ///      Uses the per-E3 feeToken stored at request time (survives global token rotation).
     /// @param e3Id The ID of the failed E3
     function processE3Failure(uint256 e3Id) external {
         E3Stage stage = _e3Stages[e3Id];
@@ -683,8 +708,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         address[] memory honestNodes = _getHonestNodes(e3Id);
 
-        feeToken.safeTransfer(address(e3RefundManager), payment);
-        e3RefundManager.calculateRefund(e3Id, payment, honestNodes, feeToken);
+        // Use the per-E3 fee token (H-01 fix: survives global feeToken rotation)
+        IERC20 paymentToken = _e3FeeTokens[e3Id];
+
+        paymentToken.safeTransfer(address(e3RefundManager), payment);
+        e3RefundManager.calculateRefund(
+            e3Id,
+            payment,
+            honestNodes,
+            paymentToken
+        );
 
         emit E3FailureProcessed(e3Id, payment, honestNodes.length);
     }

@@ -114,6 +114,9 @@ interface ISlashingManager {
     /// @notice Thrown when the verifier address in signed evidence doesn't match the policy's current verifier
     error VerifierMismatch();
 
+    /// @notice Thrown when the verifier staticcall fails (e.g., contract doesn't exist, reverts, or runs out of gas)
+    error VerifierCallFailed();
+
     /// @notice Thrown when attempting to execute a slash whose appeal was upheld
     error AppealUpheld();
 

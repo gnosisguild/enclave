@@ -440,6 +440,13 @@ interface IBondingRegistry {
     function setRewardDistributor(address newRewardDistributor) external;
 
     /**
+     * @notice Revoke reward distributor authorization
+     * @param distributor Address to revoke
+     * @dev Only callable by contract owner
+     */
+    function revokeRewardDistributor(address distributor) external;
+
+    /**
      * @notice Withdraw slashed funds to treasury
      * @param ticketAmount Amount of slashed ticket balance to withdraw
      * @param licenseAmount Amount of slashed license bond to withdraw
