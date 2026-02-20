@@ -350,7 +350,7 @@ interface IBondingRegistry {
      * @param rewardToken Reward token contract
      * @param operators Addresses of the operators to distribute rewards to
      * @param amounts Amounts of rewards to distribute to each operator
-     * @dev Only callable by contract owner
+     * @dev Only callable by authorized distributors.
      */
     function distributeRewards(
         IERC20 rewardToken,

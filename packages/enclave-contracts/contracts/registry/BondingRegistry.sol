@@ -593,7 +593,7 @@ contract BondingRegistry is
 
         uint256 len = recipients.length;
         for (uint256 i = 0; i < len; i++) {
-            if (amounts[i] > 0 && operators[recipients[i]].registered) {
+            if (amounts[i] > 0) {
                 rewardToken.safeTransferFrom(
                     msg.sender,
                     recipients[i],
