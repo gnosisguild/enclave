@@ -17,7 +17,7 @@ use e3_events::{
     SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
     ThresholdSharePending, TypedEvent,
 };
-use e3_fhe::create_crp;
+use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_trbfv::{
     calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
@@ -35,13 +35,8 @@ use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
-use rand::{rngs::OsRng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use std::{
-    collections::HashMap,
-    mem,
-    sync::{Arc, Mutex},
-};
+use rand::rngs::OsRng;
+use std::{collections::HashMap, mem, sync::Arc};
 use tracing::{info, trace, warn};
 
 use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
@@ -82,7 +77,6 @@ pub struct CollectingEncryptionKeysData {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProofRequestData {
     pub pk0_share_raw: ArcBytes,
-    pub a_raw: ArcBytes,
     pub sk_raw: SensitiveBytes,
     pub eek_raw: SensitiveBytes,
 }
@@ -562,7 +556,7 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
         info!("GenPkShareAndSkSss on ThresholdKeyshare");
-        let CiphernodeSelected { seed, e3_id, .. } = msg.0;
+        let CiphernodeSelected { e3_id, .. } = msg.0;
         let state = self
             .state
             .get()
@@ -571,11 +565,7 @@ impl ThresholdKeyshare {
         let trbfv_config: TrBFVConfig = state.get_trbfv_config();
 
         let crp = ArcBytes::from_bytes(
-            &create_crp(
-                trbfv_config.params(),
-                Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
-            )
-            .to_bytes(),
+            &create_deterministic_crp_from_default_seed(&trbfv_config.params()).to_bytes(),
         );
 
         let threshold_preset = self
@@ -624,7 +614,6 @@ impl ThresholdKeyshare {
         // Store proof request data for later use by ProofRequestActor
         let proof_request_data = ProofRequestData {
             pk0_share_raw: output.pk0_share_raw,
-            a_raw: output.a_raw,
             sk_raw: output.sk_raw,
             eek_raw: output.eek_raw,
         };
@@ -807,7 +796,6 @@ impl ThresholdKeyshare {
 
         let proof_request = PkGenerationProofRequest::new(
             proof_request_data.pk0_share_raw.clone(),
-            proof_request_data.a_raw.clone(),
             proof_request_data.sk_raw.clone(),
             proof_request_data.eek_raw.clone(),
             e_sm_raw.clone(),

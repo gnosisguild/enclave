@@ -12,13 +12,10 @@
 use crate::{
     threshold::pk_aggregation::PkAggregationCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
+use fhe::bfv::{PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
-use fhe::{
-    bfv::{PublicKey, SecretKey},
-    mbfv::CommonRandomPoly,
-};
 use rand::rngs::OsRng;
 use rand::thread_rng;
 
@@ -34,8 +31,7 @@ impl PkAggregationCircuitData {
         let mut rng = OsRng;
         let mut thread_rng = thread_rng();
 
-        let crp = CommonRandomPoly::new(&threshold_params, &mut rng)
-            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
+        let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
         // Generate public key shares for each party
         let mut pk_shares = Vec::new();
