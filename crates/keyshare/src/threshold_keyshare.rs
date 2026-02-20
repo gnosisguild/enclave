@@ -453,7 +453,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle ShareComputationProofSigned - stores the signed proof in state based on proof type (T1, T2a or T2b)
+    /// Handle ShareComputationProofSigned - stores the signed proof in state based on proof type (C1, C2a or C2b)
     pub fn handle_share_computation_proof_signed(
         &mut self,
         msg: TypedEvent<ShareComputationProofSigned>,

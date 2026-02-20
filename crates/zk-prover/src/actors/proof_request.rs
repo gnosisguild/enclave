@@ -273,7 +273,7 @@ impl ProofRequestActor {
             ProofType::T1PkGeneration,
             pending.pk_generation_proof.expect("checked"),
         ) else {
-            error!("Failed to sign T1 proof — shares will not be published");
+            error!("Failed to sign C1 proof — shares will not be published");
             return;
         };
 
@@ -282,7 +282,7 @@ impl ProofRequestActor {
             ProofType::T1SkShareComputation,
             pending.sk_share_computation_proof.expect("checked"),
         ) else {
-            error!("Failed to sign T2a proof — shares will not be published");
+            error!("Failed to sign C2a proof — shares will not be published");
             return;
         };
 
@@ -291,7 +291,7 @@ impl ProofRequestActor {
             ProofType::T1ESmShareComputation,
             pending.e_sm_share_computation_proof.expect("checked"),
         ) else {
-            error!("Failed to sign T2b proof — shares will not be published");
+            error!("Failed to sign C2b proof — shares will not be published");
             return;
         };
 
