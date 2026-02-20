@@ -125,35 +125,6 @@ export const getAddressFromSignature = async (signature: `0x${string}`, messageH
 }
 
 /**
- * Get optimal number of threads for proof generation.
- * Leaves at least 1 core free for other operations.
- * Works in both Node.js and browser environments.
- */
-export async function getOptimalThreadCount(): Promise<number> {
-  // Browser environment - check first to avoid Node.js imports in browser builds
-  if (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) {
-    return Math.max(1, navigator.hardwareConcurrency - 1)
-  }
-
-  // Node.js environment - use os module if available
-  // Check for Node.js without directly accessing process to avoid polyfill detection
-  if (typeof window === 'undefined' && typeof globalThis !== 'undefined' && typeof globalThis.process !== 'undefined') {
-    try {
-      const os = await import('os')
-
-      const cpuCount = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length
-
-      return Math.max(1, cpuCount - 1)
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  // Fallback
-  return 5
-}
-
-/**
  * Get the maximum vote value for a given number of choices.
  * @param numChoices Number of choices.
  * @returns Maximum value per choice.

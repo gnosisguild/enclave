@@ -14,7 +14,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./workers/generateCircuitInputs.worker": "./dist/workers/generateCircuitInputs.worker.js"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",

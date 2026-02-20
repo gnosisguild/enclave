@@ -4,207 +4,54 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { type Vote, MaskVoteProofInputs, ProofInputs, ProofData, VoteProofInputs } from './types'
-import {
-  generateMerkleProof,
-  toBinary,
-  extractSignatureComponents,
-  getAddressFromSignature,
-  getOptimalThreadCount,
-  getZeroVote,
-  getMaxVoteValue,
-  decodeBytesToNumbers,
-  numberArrayToBigInt64Array,
-  proofToFields,
-} from './utils'
-import { MASK_SIGNATURE, MAX_VOTE_BITS, SIGNATURE_MESSAGE_HASH } from './constants'
+import { generateMerkleProof, getAddressFromSignature, getZeroVote, getMaxVoteValue, proofToFields } from './utils'
+import { generateCircuitInputsImpl } from './circuitInputs'
+import { MASK_SIGNATURE, SIGNATURE_MESSAGE_HASH } from './constants'
+export { encodeVote, encryptVote, decodeTally, decryptVote, generateBFVKeys } from './encoding'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
-import { BackendType, Barretenberg, UltraHonkBackend } from '@aztec/bb.js'
+import { Barretenberg, BackendType, UltraHonkBackend } from '@aztec/bb.js'
 import crispCircuit from '../../../circuits/bin/crisp/target/crisp.json'
 import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
 import userDataEncryptionCt0Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
 import userDataEncryptionCt1Circuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
 import userDataEncryptionCircuit from '../../../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
-import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress, hexToBytes } from 'viem/utils'
+import { bytesToHex, encodeAbiParameters, parseAbiParameters, numberToHex, getAddress } from 'viem/utils'
 import { Hex } from 'viem'
-
-// Initialize the ZKInputsGenerator.
-const zkInputsGenerator: ZKInputsGenerator = ZKInputsGenerator.withDefaults()
-const optimalThreadCount = await getOptimalThreadCount()
-
-/**
- * Encode a vote with n choices.
- * @param vote Array of vote values, one per choice.
- * @returns The encoded vote as a BigInt64Array.
- */
-export const encodeVote = (vote: Vote): number[] => {
-  if (vote.length < 2) {
-    throw new Error('Vote must have at least two choices')
-  }
-
-  const bfvParams = zkInputsGenerator.getBFVParams()
-  const degree = bfvParams.degree
-  const n = vote.length
-
-  // Each choice gets floor(degree/n) bits; remaining bits stay zero
-  const segmentSize = Math.floor(degree / n)
-  const maxBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  const maxValue = 2 ** maxBits - 1
-  const voteArray: number[] = []
-
-  for (let choiceIdx = 0; choiceIdx < n; choiceIdx += 1) {
-    const value = choiceIdx < vote.length ? vote[choiceIdx] : 0
-
-    if (value > maxValue) {
-      throw new Error(`Vote value for choice ${choiceIdx} exceeds maximum (${maxValue})`)
-    }
-
-    const binary = toBinary(value).split('')
-
-    for (let i = 0; i < segmentSize; i += 1) {
-      const offset = segmentSize - binary.length
-      voteArray.push(i < offset ? 0 : parseInt(binary[i - offset]))
-    }
-  }
-
-  const remainder = degree - segmentSize * n
-  for (let i = 0; i < remainder; i++) {
-    voteArray.push(0)
-  }
-
-  return voteArray
-}
-
-/**
- * Decode an encoded tally into vote counts for n choices.
- * @param tallyBytes The encoded tally as a hex string.
- * @param numChoices Number of choices.
- * @returns Array of vote counts per choice.
- */
-export const decodeTally = (tallyBytes: string | number[], numChoices: number): Vote => {
-  if (typeof tallyBytes === 'string') {
-    // Convert hex string to bytes, handling both with and without 0x prefix
-    // and decode to numbers.
-    const hexString = tallyBytes.startsWith('0x') ? tallyBytes : `0x${tallyBytes}`
-    tallyBytes = decodeBytesToNumbers(hexToBytes(hexString as Hex))
-  }
-
-  if (numChoices <= 0) {
-    throw new Error('Number of choices must be positive')
-  }
-
-  const segmentSize = Math.floor(tallyBytes.length / numChoices)
-  const effectiveSize = Math.min(segmentSize, MAX_VOTE_BITS)
-  const results: Vote = []
-
-  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
-    const segmentStart = choiceIdx * segmentSize
-    const readStart = segmentStart + segmentSize - effectiveSize
-    const segment = tallyBytes.slice(readStart, readStart + effectiveSize)
-
-    let value = 0
-    for (let i = 0; i < segment.length; i++) {
-      const weight = 2 ** (segment.length - 1 - i)
-      value += segment[i] * weight
-    }
-
-    results.push(value)
-  }
-
-  return results
-}
-
-/**
- * Encrypt the vote using the public key.
- * @param vote - The vote to encrypt.
- * @param publicKey - The public key to use for encryption.
- * @returns The encrypted vote as a Uint8Array.
- */
-export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
-  const encodedVote = encodeVote(vote)
-
-  return zkInputsGenerator.encryptVote(publicKey, numberArrayToBigInt64Array(encodedVote))
-}
-
-/**
- * Decrypt the vote using the secret key.
- * @param vote - The vote to decrypt.
- * @param secretKey - The secret key to use for decryption.
- * @param numChoices - The number of choices.
- * @returns The decrypted vote as a Vote.
- */
-export const decryptVote = (ciphertext: Uint8Array, secretKey: Uint8Array, numChoices: number): Vote => {
-  const decryptedVote = zkInputsGenerator.decryptVote(secretKey, ciphertext)
-
-  return decodeTally(
-    Array.from(decryptedVote).map((v) => Number(v)),
-    numChoices,
-  )
-}
-
-/**
- * Generate a random BFV public/secret key pair.
- * @returns The generated public/secret key pair as a JavaScript object.
- */
-export const generateBFVKeys = (): { secretKey: Uint8Array; publicKey: Uint8Array } => {
-  return zkInputsGenerator.generateKeys()
-}
 
 /**
  * Generate the circuit inputs for a vote proof.
- * This works for both vote and masking.
- * @param proofInputs - The proof inputs.
- * @returns The circuit inputs as a CircuitInputs object and the encrypted vote as a Uint8Array.
+ * Runs in a worker when available to avoid blocking the main thread.
  */
 export const generateCircuitInputs = async (proofInputs: ProofInputs): Promise<{ circuitInputs: any; encryptedVote: Uint8Array }> => {
-  const numOptions = proofInputs.vote.length
-  const zeroVote = getZeroVote(numOptions)
-  const encodedVote = encodeVote(proofInputs.vote)
-
-  let circuitInputs: any
-  let encryptedVote: Uint8Array
-
-  if (!proofInputs.previousCiphertext) {
-    const result = await zkInputsGenerator.generateInputs(
-      // A placeholder ciphertext vote will be generated.
-      // This is safe because the circuit will not check the ciphertext addition if
-      // the previous ciphertext is not provided (is_first_vote is true).
-      encryptVote(zeroVote, proofInputs.publicKey),
-      proofInputs.publicKey,
-      numberArrayToBigInt64Array(encodedVote),
-    )
-
-    circuitInputs = result.inputs
-    encryptedVote = result.encryptedVote
-  } else {
-    const result = await zkInputsGenerator.generateInputsForUpdate(
-      proofInputs.previousCiphertext,
-      proofInputs.publicKey,
-      numberArrayToBigInt64Array(encodedVote),
-    )
-
-    circuitInputs = result.inputs
-    encryptedVote = result.encryptedVote
+  if (typeof Worker !== 'undefined') {
+    try {
+      const worker = new Worker(new URL('./workers/generateCircuitInputs.worker.js', import.meta.url), { type: 'module' })
+      return new Promise((resolve, reject) => {
+        worker.onmessage = (
+          e: MessageEvent<
+            { type: 'result'; circuitInputs: any; encryptedVote: Uint8Array } | { type: 'error'; error: string; stack?: string }
+          >,
+        ) => {
+          worker.terminate()
+          if (e.data.type === 'result') {
+            resolve({ circuitInputs: e.data.circuitInputs, encryptedVote: e.data.encryptedVote })
+          } else {
+            reject(new Error(e.data.error))
+          }
+        }
+        worker.onerror = (err) => {
+          worker.terminate()
+          reject(err)
+        }
+        worker.postMessage(proofInputs)
+      })
+    } catch {
+      // Worker creation failed (e.g. bundler path resolution); fall back to main thread
+    }
   }
 
-  const signature = await extractSignatureComponents(proofInputs.signature, proofInputs.messageHash)
-
-  circuitInputs.hashed_message = Array.from(signature.messageHash).map((b) => b.toString())
-  circuitInputs.public_key_x = Array.from(signature.publicKeyX).map((b) => b.toString())
-  circuitInputs.public_key_y = Array.from(signature.publicKeyY).map((b) => b.toString())
-  circuitInputs.signature = Array.from(signature.signature).map((b) => b.toString())
-  circuitInputs.slot_address = proofInputs.slotAddress.toLowerCase()
-  circuitInputs.balance = proofInputs.balance.toString()
-  circuitInputs.is_first_vote = !proofInputs.previousCiphertext
-  circuitInputs.is_mask_vote = proofInputs.isMaskVote
-  circuitInputs.merkle_root = proofInputs.merkleProof.proof.root.toString()
-  circuitInputs.merkle_proof_length = proofInputs.merkleProof.length.toString()
-  circuitInputs.merkle_proof_indices = proofInputs.merkleProof.indices.map((i) => i.toString())
-  circuitInputs.merkle_proof_siblings = proofInputs.merkleProof.proof.siblings.map((s) => s.toString())
-  circuitInputs.num_options = numOptions.toString()
-
-  return { circuitInputs, encryptedVote }
+  return generateCircuitInputsImpl(proofInputs)
 }
 
 /**
@@ -225,10 +72,7 @@ export const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Pro
  * @returns The proof.
  */
 export const generateProof = async (circuitInputs: any) => {
-  const api = await Barretenberg.new({
-    threads: optimalThreadCount,
-    backend: BackendType.WasmWorker,
-  })
+  const api = await Barretenberg.new({ backend: BackendType.WasmWorker })
 
   try {
     await api.initSRSChonk(2 ** 21) // fold circuit needs 2^21 points; default is 2^20
@@ -278,11 +122,11 @@ export const generateProof = async (circuitInputs: any) => {
       num_options: circuitInputs.num_options,
     })
 
-    const userDataEncryptionCt0Backend = new UltraHonkBackend(userDataEncryptionCt0Circuit.bytecode, api)
-    const userDataEncryptionCt1Backend = new UltraHonkBackend(userDataEncryptionCt1Circuit.bytecode, api)
-    const userDataEncryptionBackend = new UltraHonkBackend(userDataEncryptionCircuit.bytecode, api)
-    const crispBackend = new UltraHonkBackend(crispCircuit.bytecode, api)
-    const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
+    const userDataEncryptionCt0Backend = new UltraHonkBackend((userDataEncryptionCt0Circuit as CompiledCircuit).bytecode, api)
+    const userDataEncryptionCt1Backend = new UltraHonkBackend((userDataEncryptionCt1Circuit as CompiledCircuit).bytecode, api)
+    const userDataEncryptionBackend = new UltraHonkBackend((userDataEncryptionCircuit as CompiledCircuit).bytecode, api)
+    const crispBackend = new UltraHonkBackend((crispCircuit as CompiledCircuit).bytecode, api)
+    const foldBackend = new UltraHonkBackend((foldCircuit as CompiledCircuit).bytecode, api)
 
     const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
       await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
@@ -454,7 +298,7 @@ export const generateMaskVoteProof = async (maskVoteProofInputs: MaskVoteProofIn
  * @returns True if the proof is valid, false otherwise.
  */
 export const verifyProof = async (proof: ProofData): Promise<boolean> => {
-  const api = await Barretenberg.new({ threads: optimalThreadCount })
+  const api = await Barretenberg.new()
 
   try {
     const foldBackend = new UltraHonkBackend(foldCircuit.bytecode, api)
