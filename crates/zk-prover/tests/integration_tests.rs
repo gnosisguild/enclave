@@ -4,13 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// TODO: Remove feature flag & network access requirement for this test.
-// a) There are very few situations where we should be reliant on external
-// network access for tests to pass - if we can avoid it by using virtualization
-// or proxies we should.
-// b) This feature flag makes it so that rust_analyzer will not work by default
-// without adjusting global editor configuration which makes this code quite hard to work on.
-
 //! Integration tests that require network access to download binaries.
 //! Run with: cargo test --features integration-tests
 
@@ -22,7 +15,7 @@ use common::test_backend;
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
 use e3_zk_prover::{test_utils::get_tempdir, BbTarget, Provable, SetupStatus, ZkConfig, ZkProver};
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 
 fn versions_json_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("versions.json")
@@ -39,51 +32,53 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
     let temp = get_tempdir().unwrap();
     let backend = test_backend(temp.path(), config);
 
-    // --- Step 1: Fresh state should need full setup ---
-    eprintln!(">>> Step 1: Checking fresh state...");
-    assert!(matches!(
-        backend.check_status().await,
-        SetupStatus::FullSetupNeeded
-    ));
-    eprintln!(">>> Step 1: Done");
+    if !backend.using_custom_bb {
+        // --- Step 1: Fresh state should need full setup ---
+        eprintln!(">>> Step 1: Checking fresh state...");
+        assert!(matches!(
+            backend.check_status().await,
+            SetupStatus::FullSetupNeeded
+        ));
+        eprintln!(">>> Step 1: Done");
 
-    // --- Step 2: Download bb and verify structure ---
-    eprintln!(">>> Step 2: Downloading bb...");
-    let result = backend.download_bb().await;
-    eprintln!(">>> Step 2: bb downloaded");
-    assert!(result.is_ok(), "download failed: {:?}", result);
-    assert!(backend.bb_binary.exists(), "bb binary not found");
+        // --- Step 2: Download bb and verify structure ---
+        eprintln!(">>> Step 2: Downloading bb...");
+        let result = backend.download_bb().await;
+        eprintln!(">>> Step 2: bb downloaded");
+        assert!(result.is_ok(), "download failed: {:?}", result);
+        assert!(backend.bb_binary.exists(), "bb binary not found");
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let perms = std::fs::metadata(&backend.bb_binary).unwrap().permissions();
-        assert_eq!(perms.mode() & 0o111, 0o111, "bb should be executable");
-    }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::metadata(&backend.bb_binary).unwrap().permissions();
+            assert_eq!(perms.mode() & 0o111, 0o111, "bb should be executable");
+        }
 
-    let metadata = std::fs::metadata(&backend.bb_binary).unwrap();
-    assert!(metadata.len() > 0, "bb binary should not be empty");
+        let metadata = std::fs::metadata(&backend.bb_binary).unwrap();
+        assert!(metadata.len() > 0, "bb binary should not be empty");
 
-    let version_info = backend.load_version_info().await;
-    assert_eq!(
-        version_info.bb_version.as_deref(),
-        Some(backend.config.required_bb_version.as_str())
-    );
-    assert!(version_info.last_updated.is_some());
-
-    if backend
-        .config
-        .bb_checksum_for(BbTarget::current().unwrap())
-        .is_some()
-    {
-        assert!(
-            version_info.bb_checksum.is_some(),
-            "checksum should be saved in version.json"
+        let version_info = backend.load_version_info().await;
+        assert_eq!(
+            version_info.bb_version.as_deref(),
+            Some(backend.config.required_bb_version.as_str())
         );
-    }
+        assert!(version_info.last_updated.is_some());
 
-    assert!(backend.base_dir.exists());
-    assert!(backend.base_dir.join("bin").exists());
+        if backend
+            .config
+            .bb_checksum_for(BbTarget::current().unwrap())
+            .is_some()
+        {
+            assert!(
+                version_info.bb_checksum.is_some(),
+                "checksum should be saved in version.json"
+            );
+        }
+
+        assert!(backend.base_dir.exists());
+        assert!(backend.base_dir.join("bin").exists());
+    }
 
     let version = backend.verify_bb().await;
     assert!(version.is_ok(), "bb --version failed: {:?}", version);
@@ -163,6 +158,10 @@ async fn test_full_flow_download_circuits_prove_and_verify() {
 
 #[tokio::test]
 async fn test_download_bb_rejects_wrong_checksum() {
+    if env::var("E3_CUSTOM_BB").is_ok() {
+        return;
+    }
+
     let mut config = ZkConfig::load(&versions_json_path())
         .await
         .expect("versions.json should exist");
