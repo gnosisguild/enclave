@@ -17,6 +17,7 @@ mod events;
 mod eventstore;
 mod eventstore_router;
 pub mod hlc;
+pub mod hlc_factory;
 mod into_key;
 mod ordered_set;
 pub mod prelude;

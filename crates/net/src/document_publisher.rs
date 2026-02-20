@@ -645,8 +645,8 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let system = EventSystem::new("test").with_fresh_bus();
-        let bus = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("test");
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);

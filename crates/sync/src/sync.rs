@@ -327,8 +327,8 @@ mod tests {
     /// re-publishes later, causing it to be silently dropped.
     #[actix::test]
     async fn infrastructure_events_are_filtered_during_replay() -> anyhow::Result<()> {
-        let system = EventSystem::new("test-sync-replay").with_fresh_bus();
-        let bus = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("test-sync-replay");
         let history = bus.history();
 
         let events: Vec<EnclaveEvent> = vec![

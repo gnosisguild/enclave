@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 //
 // This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
+// without even even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::primitives::Address;
@@ -10,6 +10,7 @@ use e3_config::load_config;
 use e3_config::AppConfig;
 use e3_config::RPC;
 use std::fs;
+use std::path::PathBuf;
 use tracing::instrument;
 
 // Import a built file:
@@ -37,11 +38,7 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
 }
 
 #[instrument(name = "app", skip_all)]
-pub async fn execute(rpc_url: String, eth_address: Option<String>) -> Result<AppConfig> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| anyhow!("Could not determine home directory"))?
-        .join("enclave");
-
+pub fn execute(rpc_url: &str, config_dir: &PathBuf) -> Result<AppConfig> {
     fs::create_dir_all(&config_dir)?;
 
     let config_path = config_dir.join("enclave.config.yaml");
@@ -49,7 +46,6 @@ pub async fn execute(rpc_url: String, eth_address: Option<String>) -> Result<App
     let config_content = format!(
         r#"---
 # Enclave Configuration File
-{}
 chains:
   - name: "devnet"
     rpc_url: "{}"
@@ -64,10 +60,6 @@ chains:
         address: "{}"
         deploy_block: {}
 "#,
-        eth_address.map_or(String::new(), |addr| format!(
-            "# Ethereum Account Configuration\naddress: \"{}\"",
-            addr
-        )),
         rpc_url,
         get_contract_info("Enclave")?.address,
         get_contract_info("Enclave")?.deploy_block,

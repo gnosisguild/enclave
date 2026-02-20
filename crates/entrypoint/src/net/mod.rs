@@ -4,5 +4,4 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod keypair;
-pub mod peer_id;
+pub mod get_peer_id;

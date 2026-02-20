@@ -99,7 +99,10 @@ pub fn get_common_setup(
     let moduli = param_set.moduli;
     let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
-    let handle = EventSystem::in_mem("cn1").with_event_bus(bus).handle()?;
+    let handle = EventSystem::in_mem()
+        .with_event_bus(bus)
+        .handle()?
+        .enable("cn1");
     Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 
