@@ -932,10 +932,7 @@ describe("Enclave", function () {
 
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
-        .to.be.revertedWithCustomError(
-          enclave,
-          "InvalidStage",
-        )
+        .to.be.revertedWithCustomError(enclave, "InvalidStage")
         .withArgs(e3Id, 3, 4);
     });
     it("reverts if committee duties are over", async function () {
