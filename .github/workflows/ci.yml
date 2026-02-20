@@ -34,7 +34,8 @@ permissions:
 
 jobs:
   rust_tests:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
 
@@ -80,7 +81,8 @@ jobs:
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
 
@@ -109,7 +111,8 @@ jobs:
         run: 'cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture'
 
   build_e3_support_risc0:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
       - name: Generate tags
@@ -146,7 +149,8 @@ jobs:
             type=gha,mode=max,scope=e3-support
 
   build_ciphernode_image:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
 
@@ -186,7 +190,8 @@ jobs:
             type=gha,mode=max,scope=ciphernode
 
   test_contracts:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -221,7 +226,8 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   test_net:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -234,7 +240,8 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v6'
@@ -291,7 +298,8 @@ jobs:
 
   ciphernode_integration_test:
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     strategy:
       matrix:
         test-suite: [base, persist]
@@ -353,7 +361,8 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   build_enclave_cli:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
         with:
@@ -384,7 +393,8 @@ jobs:
           retention-days: 1
 
   crisp_unit:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     needs: [build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -457,7 +467,8 @@ jobs:
         run: 'pnpm test:contracts'
 
   crisp_e2e:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -565,7 +576,8 @@ jobs:
           retention-days: 30
 
   build_circuits:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
         with:
@@ -618,7 +630,8 @@ jobs:
           if-no-files-found: error
 
   zk_prover_e2e:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     needs: [build_circuits]
     steps:
       - uses: actions/checkout@v6
@@ -657,7 +670,8 @@ jobs:
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
 
   build_e3_support_dev:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
         with:
@@ -686,7 +700,8 @@ jobs:
           if-no-files-found: error
 
   build_sdk:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
         with:
@@ -735,7 +750,8 @@ jobs:
           if-no-files-found: warn
 
   build_crisp_sdk:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     steps:
       - uses: actions/checkout@v6
 
@@ -779,7 +795,8 @@ jobs:
           if-no-files-found: warn
 
   template_integration:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v6
@@ -839,7 +856,8 @@ jobs:
           pnpm test:integration
 
   test_enclave_init:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     needs: [build_enclave_cli, build_e3_support_dev]
     steps:
       - name: Install pnpm
@@ -876,7 +894,8 @@ jobs:
           enclave init mycitest --verbose --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
 
   contrib-readme-job:
-    runs-on: enclave-ci-runner
+    runs-on:
+      group: enclave-ci
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
     if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
