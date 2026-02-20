@@ -376,7 +376,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(c.initialized, CommitteeNotRequested());
         require(!c.finalized, CommitteeAlreadyFinalized());
         require(
-            block.timestamp >= c.committeeDeadline,
+            block.timestamp > c.committeeDeadline,
             SubmissionWindowNotClosed()
         );
         c.finalized = true;

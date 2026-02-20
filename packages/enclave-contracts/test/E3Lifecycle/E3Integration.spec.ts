@@ -56,7 +56,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     dkgWindow: ONE_DAY,
     computeWindow: THREE_DAYS,
     decryptionWindow: ONE_DAY,
-    gracePeriod: ONE_HOUR,
   };
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();

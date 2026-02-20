@@ -59,7 +59,6 @@ interface IEnclave {
         uint256 dkgWindow;
         uint256 computeWindow;
         uint256 decryptionWindow;
-        uint256 gracePeriod;
     }
 
     /// @notice Deadlines for each E3

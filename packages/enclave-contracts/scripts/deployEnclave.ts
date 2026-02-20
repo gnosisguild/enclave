@@ -26,7 +26,6 @@ const DEFAULT_TIMEOUT_CONFIG = {
   dkgWindow: 7200,
   computeWindow: 86400,
   decryptionWindow: 3600,
-  gracePeriod: 600,
 };
 
 /**

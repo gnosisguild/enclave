@@ -43,7 +43,6 @@ describe("Enclave", function () {
     dkgWindow: 3600, // 1 hour
     computeWindow: 3600, // 1 hour
     decryptionWindow: 3600, // 1 hour
-    gracePeriod: 300, // 5 minutes
   };
 
   const inputWindowDuration = 300;
@@ -935,9 +934,9 @@ describe("Enclave", function () {
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
         .to.be.revertedWithCustomError(
           enclave,
-          "CiphertextOutputAlreadyPublished",
+          "InvalidStage",
         )
-        .withArgs(e3Id);
+        .withArgs(e3Id, 3, 4);
     });
     it("reverts if committee duties are over", async function () {
       const {

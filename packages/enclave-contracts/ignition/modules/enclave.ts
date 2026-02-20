@@ -18,7 +18,6 @@ export default buildModule("Enclave", (m) => {
     dkgWindow: 7200,
     computeWindow: 86400,
     decryptionWindow: 3600,
-    gracePeriod: 600,
   });
 
   const enclaveImpl = m.contract("Enclave", []);
