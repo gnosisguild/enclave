@@ -208,7 +208,7 @@ impl Computation for Bounds {
             r2_bounds[i] = qi_bound.clone();
 
             // Compute asymmetric range for r1 bounds per modulus
-            r1_bounds[i] = ((&n * eek_bound + 2u32) * &qi_bound + eek_bound) / &qi_bigint;
+            r1_bounds[i] = ((&n + 2u32) * &qi_bound + eek_bound) / &qi_bigint;
 
             // Track maximum pk bound across all moduli
             // We don't need to store them as we only need the maximum bound to compute the commitment bit width

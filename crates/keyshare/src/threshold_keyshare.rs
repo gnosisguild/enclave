@@ -77,7 +77,6 @@ pub struct CollectingEncryptionKeysData {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProofRequestData {
     pub pk0_share_raw: ArcBytes,
-    pub a_raw: ArcBytes,
     pub sk_raw: SensitiveBytes,
     pub eek_raw: SensitiveBytes,
 }
@@ -615,7 +614,6 @@ impl ThresholdKeyshare {
         // Store proof request data for later use by ProofRequestActor
         let proof_request_data = ProofRequestData {
             pk0_share_raw: output.pk0_share_raw,
-            a_raw: output.a_raw,
             sk_raw: output.sk_raw,
             eek_raw: output.eek_raw,
         };
