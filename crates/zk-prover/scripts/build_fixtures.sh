@@ -10,6 +10,10 @@ if find ./circuits/bin -name '*.json' -print -quit | grep -q .; then
   exit 0
 fi
 
+if ! command -v nargo &> /dev/null; then
+    exit 0
+fi
+
 echo "Building circuits..."
 
 pnpm install && pnpm build:circuits
