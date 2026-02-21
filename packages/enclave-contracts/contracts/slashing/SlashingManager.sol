@@ -279,6 +279,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.proposer = msg.sender;
         p.proofHash = keccak256(proof);
         p.proofVerified = true;
+        // Snapshot behavioral flags from policy at proposal time
+        p.banNode = policy.banNode;
+        p.affectsCommittee = policy.affectsCommittee;
+        p.failureReason = policy.failureReason;
 
         emit SlashProposed(
             proposalId,
@@ -291,7 +295,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             msg.sender
         );
 
-        _executeSlash(proposalId, policy);
+        _executeSlash(proposalId);
     }
 
     /// @inheritdoc ISlashingManager
@@ -329,6 +333,11 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.executableAt = executableAt;
         p.proposer = msg.sender;
         p.proofHash = keccak256(evidence);
+        // Snapshot behavioral flags from policy at proposal time
+        // to prevent execution drift if policy is modified during appeal window
+        p.banNode = policy.banNode;
+        p.affectsCommittee = policy.affectsCommittee;
+        p.failureReason = policy.failureReason;
 
         emit SlashProposed(
             proposalId,
@@ -349,10 +358,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         SlashProposal storage p = _proposals[proposalId];
         require(!p.executed, AlreadyExecuted());
 
-        SlashPolicy memory policy = slashPolicies[p.reason];
-
-        // Proof-based slashes are already executed atomically in proposeSlash
-        require(!policy.requiresProof, InvalidPolicy());
+        // Use snapshotted requiresProof state: proof-based slashes are already executed atomically in proposeSlash
+        require(!p.proofVerified, InvalidPolicy());
 
         // Evidence mode: check appeal window
         require(block.timestamp >= p.executableAt, AppealWindowActive());
@@ -361,7 +368,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             require(!p.appealUpheld, AppealUpheld());
         }
 
-        _executeSlash(proposalId, policy);
+        _executeSlash(proposalId);
     }
 
     // ======================
@@ -415,6 +422,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
         // 1. Verify verifier in evidence matches policy's current verifier.
         require(signedVerifier == policyVerifier, VerifierMismatch());
 
+        // 1b. Verify chainId matches current chain to prevent cross-chain replay.
+        require(chainId == block.chainid, ChainIdMismatch());
+
         // 2. Verify the operator signed this exact proof payload.
         bytes32 messageHash = keccak256(
             abi.encode(
@@ -455,12 +465,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
      *      has already claimed their exit, funds are gone and the slash amount becomes 0. This is
      *      an accepted tradeoff for the appeal window design.
      * @param proposalId ID of the proposal to execute
-     * @param policy The slash policy for this proposal
      */
-    function _executeSlash(
-        uint256 proposalId,
-        SlashPolicy memory policy
-    ) internal {
+    function _executeSlash(uint256 proposalId) internal {
         SlashProposal storage p = _proposals[proposalId];
         p.executed = true;
 
@@ -481,21 +487,21 @@ contract SlashingManager is ISlashingManager, AccessControl {
             );
         }
 
-        // Ban node if policy requires it
-        if (policy.banNode) {
+        // Ban node if snapshotted policy requires it
+        if (p.banNode) {
             banned[p.operator] = true;
             emit NodeBanUpdated(p.operator, true, p.reason, address(this));
         }
 
-        // Committee expulsion for E3-scoped slashes
+        // Committee expulsion for E3-scoped slashes (uses snapshotted behavioral flags)
         // expelCommitteeMember returns (activeCount, thresholdM) — one call instead of three
-        if (policy.affectsCommittee) {
+        if (p.affectsCommittee) {
             (uint256 activeCount, uint32 thresholdM) = ciphernodeRegistry
                 .expelCommitteeMember(p.e3Id, p.operator, p.reason);
 
             // If active count drops below M, fail the E3
-            if (activeCount < thresholdM && policy.failureReason > 0) {
-                enclave.onE3Failed(p.e3Id, policy.failureReason);
+            if (activeCount < thresholdM && p.failureReason > 0) {
+                enclave.onE3Failed(p.e3Id, p.failureReason);
             }
         }
 

@@ -20,15 +20,15 @@ pub struct SlashExecuted {
     /// The E3 computation this slash relates to.
     pub e3_id: E3id,
     /// On-chain proposal ID.
-    pub proposal_id: u64,
+    pub proposal_id: u128,
     /// Address of the slashed operator.
     pub operator: Address,
     /// Hash of the slash reason.
     pub reason: [u8; 32],
     /// Amount of ticket collateral slashed.
-    pub ticket_amount: u64,
+    pub ticket_amount: u128,
     /// Amount of license bond slashed.
-    pub license_amount: u64,
+    pub license_amount: u128,
 }
 
 impl Display for SlashExecuted {

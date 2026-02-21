@@ -555,6 +555,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         returns (uint256 activeCount, uint32 thresholdM)
     {
         Committee storage c = committees[e3Id];
+        require(c.finalized, CommitteeNotFinalized());
         thresholdM = c.threshold[0];
 
         // Idempotent: if already expelled, return current state

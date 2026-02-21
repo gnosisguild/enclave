@@ -28,11 +28,11 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
             );
             Some(EnclaveEventData::from(e3_events::SlashExecuted {
                 e3_id: E3id::new(event.e3Id.to_string(), chain_id),
-                proposal_id: event.proposalId.to(),
+                proposal_id: event.proposalId.to::<u128>(),
                 operator: event.operator,
                 reason: event.reason.into(),
-                ticket_amount: event.ticketAmount.to(),
-                license_amount: event.licenseAmount.to(),
+                ticket_amount: event.ticketAmount.to::<u128>(),
+                license_amount: event.licenseAmount.to::<u128>(),
             }))
         }
         _topic => {

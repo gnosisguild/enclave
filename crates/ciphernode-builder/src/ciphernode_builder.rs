@@ -690,13 +690,20 @@ async fn setup_evm_system(
                 // Writer: submit proposeSlash transactions
                 match provider_cache.ensure_write_provider(&chain).await {
                     Ok(write_provider) => {
-                        SlashingManagerSolWriter::attach(
+                        match SlashingManagerSolWriter::attach(
                             &bus,
                             write_provider.clone(),
                             contract_addr,
                         )
-                        .await?;
-                        info!("SlashingManagerSolWriter attached for fault submission");
+                        .await
+                        {
+                            Ok(_) => {
+                                info!("SlashingManagerSolWriter attached for fault submission");
+                            }
+                            Err(e) => {
+                                error!("Failed to attach SlashingManagerSolWriter, skipping: {}", e)
+                            }
+                        }
                     }
                     Err(e) => error!(
                         "Failed to create write provider for SlashingManager, skipping: {}",

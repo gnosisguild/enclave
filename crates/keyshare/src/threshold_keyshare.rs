@@ -49,6 +49,17 @@ use crate::encryption_key_collector::{
 };
 use crate::threshold_share_collector::{ExpelPartyFromShareCollection, ThresholdShareCollector};
 
+/// Tracks committee membership state, buffering expulsion events that arrive
+/// before the committee list is known.
+enum CommitteeState {
+    /// Committee not yet finalized; buffer any expulsion events for replay.
+    Pending {
+        buffered_expulsions: Vec<(CommitteeMemberExpelled, EventContext<Sequenced>)>,
+    },
+    /// Committee finalized — members list is available.
+    Finalized { members: Vec<String> },
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenPkShareAndSkSss(CiphernodeSelected);
@@ -323,7 +334,7 @@ pub struct ThresholdKeyshare {
     encryption_key_collector: Option<Addr<EncryptionKeyCollector>>,
     state: Persistable<ThresholdKeyshareState>,
     share_enc_preset: BfvPreset,
-    committee: Option<Vec<String>>,
+    committee: CommitteeState,
 }
 
 impl ThresholdKeyshare {
@@ -335,7 +346,9 @@ impl ThresholdKeyshare {
             encryption_key_collector: None,
             state: params.state,
             share_enc_preset: params.share_enc_preset,
-            committee: None,
+            committee: CommitteeState::Pending {
+                buffered_expulsions: Vec::new(),
+            },
         }
     }
 }
@@ -393,27 +406,34 @@ impl ThresholdKeyshare {
         data: CommitteeMemberExpelled,
         ec: EventContext<Sequenced>,
     ) {
-        let node_addr = format!("{:?}", data.node);
+        // Use Display formatting (to_string) for consistent matching with
+        // committee list populated via Address::to_string() in ciphernode_registry_sol.rs
+        let node_addr = data.node.to_string();
         info!(
             "CommitteeMemberExpelled received: node={} for e3_id={}, active_count_after={}",
             node_addr, data.e3_id, data.active_count_after
         );
 
-        let party_id = match &self.committee {
-            Some(committee) => {
-                let node_lower = node_addr.to_lowercase();
-                committee
-                    .iter()
-                    .position(|addr| addr.to_lowercase() == node_lower)
-                    .map(|idx| idx as u64)
-            }
-            None => {
-                error!(
-                    "Cannot resolve expelled node {} to party_id: committee list not available",
+        let members = match &mut self.committee {
+            CommitteeState::Pending {
+                buffered_expulsions,
+            } => {
+                warn!(
+                    "Buffering CommitteeMemberExpelled for node {} until CommitteeFinalized arrives",
                     node_addr
                 );
-                None
+                buffered_expulsions.push((data, ec));
+                return;
             }
+            CommitteeState::Finalized { members } => members,
+        };
+
+        let party_id = {
+            let node_lower = node_addr.to_lowercase();
+            members
+                .iter()
+                .position(|addr| addr.to_lowercase() == node_lower)
+                .map(|idx| idx as u64)
         };
 
         let Some(party_id) = party_id else {
@@ -1141,7 +1161,27 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                     data.committee.len(),
                     data.e3_id
                 );
-                self.committee = Some(data.committee);
+                // Take any buffered expulsions before transitioning state
+                let pending = match std::mem::replace(
+                    &mut self.committee,
+                    CommitteeState::Finalized {
+                        members: data.committee,
+                    },
+                ) {
+                    CommitteeState::Pending {
+                        buffered_expulsions,
+                    } => buffered_expulsions,
+                    CommitteeState::Finalized { .. } => Vec::new(),
+                };
+
+                // Replay any buffered expulsion events that arrived before the committee was known
+                for (expulsion_data, expulsion_ec) in pending {
+                    info!(
+                        "Replaying buffered CommitteeMemberExpelled for node={:?} e3_id={}",
+                        expulsion_data.node, expulsion_data.e3_id
+                    );
+                    self.handle_committee_member_expelled(expulsion_data, expulsion_ec);
+                }
             }
             EnclaveEventData::CommitteeMemberExpelled(data) => {
                 self.handle_committee_member_expelled(data, ec);

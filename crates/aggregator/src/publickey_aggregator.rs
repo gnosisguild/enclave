@@ -154,6 +154,14 @@ impl PublicKeyAggregator {
                 return Ok(state);
             };
 
+            // Remove the expelled node from the nodes set so it won't appear in
+            // PublicKeyAggregated.nodes (forwarded on-chain for reward distribution).
+            // Note: the corresponding keyshare cannot be removed because the
+            // keyshares OrderedSet is keyed by raw bytes with no node mapping.
+            // This is acceptable because BFV public key aggregation is additive
+            // and works correctly with any superset of valid keys.
+            nodes.remove(&node.to_string());
+
             if *threshold_n > 0 {
                 *threshold_n -= 1;
                 info!(
@@ -192,7 +200,7 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             EnclaveEventData::CommitteeMemberExpelled(data) => {
-                let node_addr = format!("{:?}", data.node);
+                let node_addr = data.node.to_string();
                 info!(
                     "PublicKeyAggregator: committee member expelled: {} for e3_id={}",
                     node_addr, data.e3_id

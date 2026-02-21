@@ -78,6 +78,12 @@ interface ISlashingManager {
         address proposer;
         bytes32 proofHash;
         bool proofVerified;
+        /// @dev Snapshotted from SlashPolicy at proposal time to prevent execution drift
+        bool banNode;
+        /// @dev Snapshotted from SlashPolicy at proposal time to prevent execution drift
+        bool affectsCommittee;
+        /// @dev Snapshotted from SlashPolicy at proposal time to prevent execution drift
+        uint8 failureReason;
     }
 
     // ======================
@@ -152,6 +158,9 @@ interface ISlashingManager {
 
     /// @notice Thrown when the same evidence bundle has already been used in a proposal
     error DuplicateEvidence();
+
+    /// @notice Thrown when the chainId in the signed proof payload does not match the current chain
+    error ChainIdMismatch();
 
     // ======================
     // Events

@@ -240,6 +240,12 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
         RefundDistribution storage dist = _distributions[e3Id];
         if (!dist.calculated) revert RefundNotCalculated(e3Id);
 
+        // Guard against pre-upgrade records where feeToken was not yet stored
+        require(
+            address(dist.feeToken) != address(0),
+            "feeToken not initialized"
+        );
+
         address requester = enclave.getRequester(e3Id);
         if (msg.sender != requester) revert NotRequester(e3Id, msg.sender);
 
@@ -263,6 +269,13 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     ) external returns (uint256 amount) {
         RefundDistribution storage dist = _distributions[e3Id];
         require(dist.calculated, RefundNotCalculated(e3Id));
+
+        // Guard against pre-upgrade records where feeToken was not yet stored
+        require(
+            address(dist.feeToken) != address(0),
+            "feeToken not initialized"
+        );
+
         require(!_claimed[e3Id][msg.sender], AlreadyClaimed(e3Id, msg.sender));
 
         // Check if caller is honest node
