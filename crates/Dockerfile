@@ -58,6 +58,7 @@ COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY crates/fhe-params/Cargo.toml ./fhe-params/Cargo.toml
 COPY crates/fs/Cargo.toml ./fs/Cargo.toml
+COPY crates/hamt/Cargo.toml ./hamt/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
 COPY crates/init/Cargo.toml ./init/Cargo.toml
 COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
