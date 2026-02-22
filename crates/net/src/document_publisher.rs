@@ -8,7 +8,7 @@ use crate::{
     events::{
         call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
     },
-    Cid,
+    ContentHash,
 };
 use actix::prelude::*;
 use anyhow::Context;
@@ -250,7 +250,7 @@ pub async fn handle_publish_document_requested(
     bus: BusHandle,
 ) -> Result<()> {
     let value = event.value;
-    let key = Cid::from_content(&value);
+    let key = ContentHash::from_content(&value);
     let expires = datetime_to_instant_from_now(event.meta.expires_at);
 
     retry_with_backoff(
@@ -317,7 +317,7 @@ async fn put_record(
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     expires: Option<Instant>,
     value: ArcBytes,
-    key: Cid,
+    key: ContentHash,
 ) -> Result<()> {
     let id = CorrelationId::new();
     call_and_await_response(
@@ -345,7 +345,7 @@ async fn put_record(
 async fn get_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    key: Cid,
+    key: ContentHash,
 ) -> Result<ArcBytes> {
     let id = CorrelationId::new();
     call_and_await_response(
@@ -645,8 +645,8 @@ mod tests {
 
         let guard = tracing::subscriber::set_default(subscriber);
 
-        let system = EventSystem::new("test").with_fresh_bus();
-        let bus = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("test");
         let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
@@ -689,7 +689,7 @@ mod tests {
         };
 
         // Fake DHT put the record
-        let mut mykad: HashMap<Cid, Vec<u8>> = HashMap::new();
+        let mut mykad: HashMap<ContentHash, Vec<u8>> = HashMap::new();
         mykad.insert(key.clone(), msg_value.extract_bytes());
 
         // 3. Report that everything went well
@@ -741,7 +741,7 @@ mod tests {
         let value = b"I am a special document".to_vec();
         let expires_at = Some(Utc::now() + chrono::Duration::days(1));
         let e3_id = E3id::new("1243", 1);
-        let cid = Cid::from_content(&value);
+        let cid = ContentHash::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
         bus.publish_without_context(CiphernodeSelected {
@@ -854,7 +854,7 @@ mod tests {
         let value = ArcBytes::from_bytes(b"I am a special document");
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
-        let cid = Cid::from_content(&value);
+        let cid = ContentHash::from_content(&value);
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
         bus.publish_without_context(CiphernodeSelected {
@@ -867,7 +867,7 @@ mod tests {
         // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
-                key: Cid::from_content(&b"wrong document".to_vec()),
+                key: ContentHash::from_content(&b"wrong document".to_vec()),
                 meta: DocumentMeta::new(
                     E3id::new("1111", 1),
                     DocumentKind::TrBFV,

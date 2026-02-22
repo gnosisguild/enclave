@@ -97,6 +97,9 @@ class VerifierGenerator {
       return
     }
 
+    // Clean stale nargo build caches to prevent using outdated artifacts
+    this.cleanTargetDirs(circuits)
+
     // Prepare output directory
     if (this.options.clean && existsSync(this.verifierDir)) {
       rmSync(this.verifierDir, { recursive: true })
@@ -303,6 +306,34 @@ class VerifierGenerator {
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join('')
     return `${pascal(group)}${pascal(name)}Verifier`
+  }
+
+  /**
+   * Remove all nargo target directories to prevent stale cached artifacts
+   * from being picked up instead of freshly compiled ones.
+   */
+  private cleanTargetDirs(circuits: CircuitInfo[]): void {
+    const cleaned = new Set<string>()
+    for (const circuit of circuits) {
+      const groupTarget = join(this.circuitsDir, circuit.group, 'target')
+      if (!cleaned.has(groupTarget) && existsSync(groupTarget)) {
+        rmSync(groupTarget, { recursive: true })
+        cleaned.add(groupTarget)
+      }
+      const circuitTarget = join(circuit.path, 'target')
+      if (!cleaned.has(circuitTarget) && existsSync(circuitTarget)) {
+        rmSync(circuitTarget, { recursive: true })
+        cleaned.add(circuitTarget)
+      }
+    }
+    const rootTarget = join(this.circuitsDir, 'target')
+    if (existsSync(rootTarget)) {
+      rmSync(rootTarget, { recursive: true })
+      cleaned.add(rootTarget)
+    }
+    if (cleaned.size > 0) {
+      console.log(`   🧹 Cleaned ${cleaned.size} stale target dir(s)`)
+    }
   }
 
   private checkTool(cmd: string, name: string): void {

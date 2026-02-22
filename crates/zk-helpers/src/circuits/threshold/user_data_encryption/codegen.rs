@@ -62,7 +62,7 @@ pub fn generate_toml(inputs: Inputs) -> Result<CodegenToml, CircuitsErrors> {
     Ok(toml::to_string(&json)?)
 }
 
-pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs {
+pub fn generate_configs(_: BfvPreset, configs: &Configs) -> CodegenConfigs {
     let prefix = <UserDataEncryptionCircuit as Circuit>::PREFIX;
 
     let qis_str = join_display(&configs.moduli, ", ");
@@ -81,7 +81,6 @@ pub fn generate_configs(_preset: BfvPreset, configs: &Configs) -> CodegenConfigs
 pub global N: u32 = {};
 pub global L: u32 = {};
 pub global QIS: [Field; L] = [{}];
-pub global Q_MOD_T: Field = {};
 
 /************************************
 -------------------------------------
@@ -114,7 +113,6 @@ pub global {}_P1_BOUNDS: [Field; L] = [{}];
 pub global {}_P2_BOUNDS: [Field; L] = [{}];
 
 pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfigs::new(
-    Q_MOD_T,
     QIS,
     {}_K0IS,
     {}_PK_BOUNDS,
@@ -130,10 +128,9 @@ pub global {}_CONFIGS: UserDataEncryptionConfigs<N, L> = UserDataEncryptionConfi
     {}_K1_UP_BOUND
 );
 "#,
-        configs.n,       // N
-        configs.l,       // L
-        qis_str,         // QIS array
-        configs.q_mod_t, // Q_MOD_T
+        configs.n, // N
+        configs.l, // L
+        qis_str,   // QIS array
         prefix,
         configs.bits.pk_bit, // BIT_PK
         prefix,

@@ -27,9 +27,9 @@ pub trait Provable: Send + Sync {
 
     fn circuit(&self) -> CircuitName;
 
-    /// Override this to select a circuit variant based on input.
+    /// Override this to select a circuit variant based on params and input.
     /// Default just returns the standard circuit name.
-    fn resolve_circuit_name(&self, _input: &Self::Input) -> CircuitName {
+    fn resolve_circuit_name(&self, _params: &Self::Params, _input: &Self::Input) -> CircuitName {
         self.circuit()
     }
 
@@ -65,7 +65,7 @@ pub trait Provable: Send + Sync {
     {
         let inputs = self.build_inputs(params, input)?;
 
-        let resolved_name = self.resolve_circuit_name(input);
+        let resolved_name = self.resolve_circuit_name(params, input);
         let circuit_path = prover
             .circuits_dir()
             .join(resolved_name.dir_path())
@@ -98,7 +98,6 @@ pub trait Provable: Send + Sync {
             "Verifying proof for circuit {} with e3_id {} and party_id {}",
             proof.circuit, e3_id, party_id
         );
-        println!("Proof details: {:?}", proof);
         prover.verify(proof, e3_id, party_id)
     }
 }

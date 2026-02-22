@@ -19,36 +19,34 @@ use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_events::run_once;
 use e3_events::trap_fut;
-use e3_events::BusHandle;
-use e3_events::ComputeRequestErrorKind;
 use e3_events::EType;
 use e3_events::EffectsEnabled;
-use e3_events::EnclaveEvent;
-use e3_events::EnclaveEventData;
-use e3_events::EventPublisher;
-use e3_events::EventSubscriber;
-use e3_events::TypedEvent;
-use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse, EventType};
 use e3_events::{
-    ComputeRequestKind, PkBfvProofRequest, PkBfvProofResponse, ZkError as ZkEventError, ZkRequest,
-    ZkResponse,
+    BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
+    ComputeResponse, EnclaveEvent, EnclaveEventData, EventPublisher, EventSubscriber, EventType,
+    PkBfvProofRequest, PkBfvProofResponse, PkGenerationProofRequest, PkGenerationProofResponse,
+    TypedEvent, ZkError as ZkEventError, ZkRequest, ZkResponse,
 };
 use e3_fhe_params::{BfvParamSet, BfvPreset};
+use e3_polynomial::CrtPolynomial;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
+use e3_trbfv::helpers::try_poly_from_bytes;
 use e3_trbfv::{TrBFVError, TrBFVRequest, TrBFVResponse};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_helpers::circuits::dkg::pk::circuit::{PkCircuit, PkCircuitData};
+use e3_zk_helpers::circuits::threshold::pk_generation::circuit::{
+    PkGenerationCircuit, PkGenerationCircuitData,
+};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 use fhe::bfv::PublicKey;
 use fhe_traits::DeserializeParametrized;
 use rand::Rng;
-use tracing::error;
-use tracing::info;
+use tracing::{error, info};
 
 /// Multithread actor
 pub struct Multithread {
@@ -188,13 +186,46 @@ async fn handle_compute_request_event(
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
     let (msg, ctx) = msg.into_components();
-    // We spawn a thread on rayon moving to "sync"-land
+    let request_snapshot = msg.clone();
 
-    let (result, duration) = pool
+    let pool_result = pool
         .spawn(job_name, TaskTimeouts::default(), move || {
             handle_compute_request(rng, cipher, zk_prover, msg)
         })
-        .await?;
+        .await;
+
+    let (result, duration) = match pool_result {
+        Ok(v) => v,
+        Err(pool_err) => {
+            error!(
+                "Task pool error for compute request '{}': {pool_err}",
+                msg_string
+            );
+            let error_kind = match &request_snapshot.request {
+                ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
+                    ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_err}")),
+                ),
+                ComputeRequestKind::TrBFV(ref trbfv_req) => {
+                    let msg = format!("Pool error: {pool_err}");
+                    ComputeRequestErrorKind::TrBFV(match trbfv_req {
+                        TrBFVRequest::GenPkShareAndSkSss(_) => TrBFVError::GenPkShareAndSkSss(msg),
+                        TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(msg),
+                        TrBFVRequest::CalculateDecryptionKey(_) => {
+                            TrBFVError::CalculateDecryptionKey(msg)
+                        }
+                        TrBFVRequest::CalculateDecryptionShare(_) => {
+                            TrBFVError::CalculateDecryptionShare(msg)
+                        }
+                        TrBFVRequest::CalculateThresholdDecryption(_) => {
+                            TrBFVError::CalculateThresholdDecryption(msg)
+                        }
+                    })
+                }
+            };
+            bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;
+            return Ok(());
+        }
+    };
 
     if let Some(report) = report {
         report.do_send(TrackDuration::new(msg_string, duration))
@@ -240,7 +271,7 @@ fn handle_compute_request(
         ComputeRequestKind::TrBFV(trbfv_req) => {
             handle_trbfv_request(rng, cipher, trbfv_req, request, id)
         }
-        ComputeRequestKind::Zk(zk_req) => handle_zk_request(zk_prover, zk_req, request, id),
+        ComputeRequestKind::Zk(zk_req) => handle_zk_request(cipher, zk_prover, zk_req, request, id),
     }
 }
 
@@ -342,6 +373,7 @@ fn handle_trbfv_request(
 }
 
 fn handle_zk_request(
+    cipher: Arc<Cipher>,
     zk_prover: Option<Arc<ZkProver>>,
     zk_req: ZkRequest,
     request: ComputeRequest,
@@ -363,7 +395,91 @@ fn handle_zk_request(
         ZkRequest::PkBfv(req) => timefunc("zk_pk_bfv", id, || {
             handle_pk_bfv_proof(&prover, req, request.clone())
         }),
+        ZkRequest::PkGeneration(req) => timefunc("zk_pk_generation", id, || {
+            handle_pk_generation_proof(&prover, &cipher, req, request.clone())
+        }),
     }
+}
+
+/// Helper to reduce boilerplate for ZK errors
+fn make_zk_error(request: &ComputeRequest, msg: String) -> ComputeRequestError {
+    ComputeRequestError::new(
+        ComputeRequestErrorKind::Zk(ZkEventError::InvalidParams(msg)),
+        request.clone(),
+    )
+}
+
+fn handle_pk_generation_proof(
+    prover: &ZkProver,
+    cipher: &Cipher,
+    req: PkGenerationProofRequest,
+    request: ComputeRequest,
+) -> Result<ComputeResponse, ComputeRequestError> {
+    // 1. Build BFV parameters from the threshold preset
+    let params = BfvParamSet::from(req.params_preset.clone()).build_arc();
+
+    // 2. Decrypt sensitive witness fields
+    let sk_bytes = req
+        .sk
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("sk decrypt: {}", e)))?;
+    let eek_bytes = req
+        .eek
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("eek decrypt: {}", e)))?;
+    let e_sm_bytes = req
+        .e_sm
+        .access_raw(cipher)
+        .map_err(|e| make_zk_error(&request, format!("e_sm decrypt: {}", e)))?;
+
+    // 3. Deserialize raw polynomial bytes → Poly
+    let pk0_share_poly = try_poly_from_bytes(&req.pk0_share, &params)
+        .map_err(|e| make_zk_error(&request, format!("pk0_share: {}", e)))?;
+
+    let sk_poly = try_poly_from_bytes(&sk_bytes, &params)
+        .map_err(|e| make_zk_error(&request, format!("sk: {}", e)))?;
+
+    let eek_poly = try_poly_from_bytes(&eek_bytes, &params)
+        .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
+
+    let e_sm_poly = try_poly_from_bytes(&e_sm_bytes, &params)
+        .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
+
+    // 3. Convert Poly → CrtPolynomial
+    let pk0_share = CrtPolynomial::from_fhe_polynomial(&pk0_share_poly);
+    let sk = CrtPolynomial::from_fhe_polynomial(&sk_poly);
+    let eek = CrtPolynomial::from_fhe_polynomial(&eek_poly);
+    let e_sm = CrtPolynomial::from_fhe_polynomial(&e_sm_poly);
+
+    // 4. Build circuit data
+    let committee = req.committee_size.values();
+    let circuit_data = PkGenerationCircuitData {
+        committee,
+        pk0_share,
+        eek,
+        e_sm,
+        sk,
+    };
+
+    // 5. Generate proof via Provable trait
+    let circuit = PkGenerationCircuit;
+    let e3_id_str = request.e3_id.to_string();
+
+    let proof = circuit
+        .prove(prover, &req.params_preset, &circuit_data, &e3_id_str)
+        .map_err(|e| {
+            ComputeRequestError::new(
+                ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(e.to_string())),
+                request.clone(),
+            )
+        })?;
+
+    // 6. Return response
+    Ok(ComputeResponse::zk(
+        ZkResponse::PkGeneration(PkGenerationProofResponse::new(proof)),
+        request.correlation_id,
+        request.e3_id,
+    ))
 }
 
 fn handle_pk_bfv_proof(

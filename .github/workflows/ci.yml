@@ -22,6 +22,7 @@ env:
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.86.0
   NOIR_TOOLCHAIN: v1.0.0-beta.15
+  BB_VERSION: 3.0.0-nightly.20251104
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
@@ -32,10 +33,10 @@ permissions:
   packages: write
 
 jobs:
-  rust_unit:
+  rust_tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -75,53 +76,13 @@ jobs:
       - name: Run Unit Tests
         run: 'cargo test --lib && cargo test --doc'
 
-  rust_integration:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache Rust dependencies
-        uses: ./.github/actions/cache-dependencies
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-
-        # We must install foundry in order to be able to test anvil
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Install solc
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum \
-          && sudo apt-get update -y \
-          && sudo apt-get install -y solc
-
-      - name: pnpm-setup
-        uses: pnpm/action-setup@v4
-
-        # We need to setup node in order to compile the hardhat contracts to get the artifacts
-      - name: 'Setup node'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: 'Install the dependencies'
-        run: 'pnpm install --frozen-lockfile'
-
-      - name: Checking code format rust
-        run: pnpm rust:lint
-
       - name: Run Integration Tests
         run: 'cargo test --test integration -- --nocapture'
 
   zk_prover_integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -150,7 +111,7 @@ jobs:
   build_e3_support_risc0:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Generate tags
         id: tags
         run: |
@@ -187,7 +148,7 @@ jobs:
   build_ciphernode_image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Generate tags
         id: tags
@@ -228,7 +189,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
 
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
@@ -263,7 +224,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
       - name: 'Run network tests'
         working-directory: tests/integration
         run: './test.sh net --no-prebuild'
@@ -276,7 +237,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -310,14 +271,6 @@ jobs:
       - name: 'Install the dependencies'
         run: 'pnpm install --frozen-lockfile'
 
-      - name: 'Lint the code'
-        run: 'pnpm lint'
-
-      - name: 'Add lint summary'
-        run: |
-          echo "## Lint results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
-
       - name: 'Run prebuild'
         run: 'pnpm test:integration prebuild'
 
@@ -345,7 +298,7 @@ jobs:
       fail-fast: false
     steps:
       - name: 'Check out the repo'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@v6'
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
       - name: 'Setup node'
@@ -402,7 +355,7 @@ jobs:
   build_enclave_cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -434,7 +387,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_crisp_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -507,7 +460,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_crisp_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -611,10 +564,10 @@ jobs:
           path: ./examples/CRISP/playwright-report/
           retention-days: 30
 
-  test_enclave_circuits:
+  build_circuits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -623,24 +576,90 @@ jobs:
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
+      - name: Install Barretenberg (bb)
+        run: |
+          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+          sudo mv "$BB_BIN" /usr/local/bin/bb
+          chmod +x /usr/local/bin/bb
+          bb --version
+
       - name: Check formatting
         run: ./scripts/lint-circuits.sh
 
       - name: Test Noir circuits
         run: ./scripts/test-circuits.sh
 
-      - name: Upload circuit artifacts
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build circuits
+        run: pnpm build:circuits
+
+      - name: Upload compiled circuit artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: circuit-artifacts
-          path: circuits/target/
+          name: compiled-circuits
+          path: |
+            circuits/bin/dkg/target/
+            circuits/bin/threshold/target/
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: error
+
+  zk_prover_e2e:
+    runs-on: ubuntu-latest
+    needs: [build_circuits]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install Barretenberg (bb)
+        run: |
+          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
+          BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
+          sudo mv "$BB_BIN" /usr/local/bin/bb
+          chmod +x /usr/local/bin/bb
+          bb --version
+
+      - name: Download compiled circuit artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-circuits
+          path: circuits/bin/
+
+      - name: Verify circuit artifacts
+        run: |
+          echo "DKG circuits:"
+          ls -la circuits/bin/dkg/target/*.json circuits/bin/dkg/target/*.vk
+          echo "Threshold circuits:"
+          ls -la circuits/bin/threshold/target/*.json circuits/bin/threshold/target/*.vk
+
+      - name: Run ZK prover e2e tests
+        run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture
 
   build_e3_support_dev:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Cache Rust dependencies
@@ -669,7 +688,7 @@ jobs:
   build_sdk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -718,7 +737,7 @@ jobs:
   build_crisp_sdk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -763,7 +782,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Install pnpm
@@ -869,7 +888,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}

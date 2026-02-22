@@ -18,6 +18,22 @@ impl Provable for DecryptedSharesAggregationCircuit {
     type Inputs = Inputs;
 
     fn circuit(&self) -> CircuitName {
-        CircuitName::DecryptedSharesAggregation
+        CircuitName::DecryptedSharesAggregationMod
+    }
+
+    fn resolve_circuit_name(&self, params: &Self::Params, _input: &Self::Input) -> CircuitName {
+        match params {
+            BfvPreset::SecureThreshold8192 | BfvPreset::SecureDkg8192 => {
+                CircuitName::DecryptedSharesAggregationBn
+            }
+            _ => CircuitName::DecryptedSharesAggregationMod,
+        }
+    }
+
+    fn valid_circuits(&self) -> Vec<CircuitName> {
+        vec![
+            CircuitName::DecryptedSharesAggregationBn,
+            CircuitName::DecryptedSharesAggregationMod,
+        ]
     }
 }

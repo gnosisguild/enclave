@@ -59,9 +59,7 @@ enclaveup install
 ### Initialize Configuration
 
 ```bash
-enclave config-set \
-  --rpc-url wss://ethereum-sepolia-rpc.publicnode.com \
-  --eth-address 0xYourAddress
+enclave ciphernode setup
 ```
 
 This creates `~/.config/enclave/enclave.config.yaml`. You'll be prompted for a password to encrypt
@@ -100,14 +98,14 @@ chains:
     rpc_url: 'wss://ethereum-sepolia-rpc.publicnode.com'
     contracts:
       enclave:
-        address: '0x8f5b5178D9bCC654076a153EC86236453C40bfD5'
-        deploy_block: 10043253
+        address: '0x95bC90fcb37684bfbAA3ffA2CbF4067fA404c4AA'
+        deploy_block: 10279529
       ciphernode_registry:
-        address: '0xae897dC011aBF249130257162E83dcf913e578cb'
-        deploy_block: 10043251
+        address: '0x7BBF0074400884879837200A059C3b562E6Ee353'
+        deploy_block: 10279527
       bonding_registry:
-        address: '0xB2Cc8125fA3895D0003972fC0e2C6f1EA2e35693'
-        deploy_block: 10043248
+        address: '0x7F0F8D7Bb1cAc10901a04c7Ec5c8A73eEC8377dD'
+        deploy_block: 10279524
 ```
 
 ### Start Your Node
@@ -166,14 +164,14 @@ chains:
     rpc_url: 'wss://ethereum-sepolia-rpc.publicnode.com'
     contracts:
       enclave:
-        address: '0x8f5b5178D9bCC654076a153EC86236453C40bfD5'
-        deploy_block: 10043253
+        address: '0x95bC90fcb37684bfbAA3ffA2CbF4067fA404c4AA'
+        deploy_block: 10279529
       ciphernode_registry:
-        address: '0xae897dC011aBF249130257162E83dcf913e578cb'
-        deploy_block: 10043251
+        address: '0x7BBF0074400884879837200A059C3b562E6Ee353'
+        deploy_block: 10279527
       bonding_registry:
-        address: '0xB2Cc8125fA3895D0003972fC0e2C6f1EA2e35693'
-        deploy_block: 10043248
+        address: '0x7F0F8D7Bb1cAc10901a04c7Ec5c8A73eEC8377dD'
+        deploy_block: 10279524
 ```
 
 ### Run the Container

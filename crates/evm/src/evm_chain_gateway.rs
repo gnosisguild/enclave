@@ -19,6 +19,7 @@ use e3_events::{
 };
 use e3_events::{Event, EventPublisher};
 use e3_utils::MAILBOX_LIMIT;
+use tracing::warn;
 
 /// This component sits between the Evm ingestion for a chain and the Sync actor and the Bus.
 /// It coordinates event flow between these components.
@@ -39,12 +40,17 @@ impl ForwardToSyncActorData {
     }
 }
 
-/// This state machine coordinates the function of the EvmChainGateway
+/// State machine coordinating event flow through the EvmChainGateway.
+///
+/// Init -> ForwardToSyncActor -> BufferUntilLive -> Live
 #[derive(Clone, Debug)]
 enum SyncStatus {
-    /// Intial State
-    Init(Vec<EnclaveEvent<Unsequenced>>), // Include a buffer to hold events that arrive too early
-    /// After HistoricalEvmSyncStart we forward all events to SyncActor
+    /// Buffers events until HistoricalEvmSyncStart arrives.
+    Init {
+        buffer: Vec<EnclaveEvent<Unsequenced>>,
+        pending_sync_complete: Option<HistoricalSyncComplete>,
+    },
+    /// Forward events to the sync actor for ordering.
     ForwardToSyncActor(ForwardToSyncActorData),
     /// Once the chain has completed historical sync then we buffer all "live" events until sync is
     /// complete
@@ -55,7 +61,10 @@ enum SyncStatus {
 
 impl Default for SyncStatus {
     fn default() -> Self {
-        Self::Init(Vec::new())
+        Self::Init {
+            buffer: Vec::new(),
+            pending_sync_complete: None,
+        }
     }
 }
 
@@ -63,8 +72,15 @@ impl SyncStatus {
     pub fn forward_to_sync_actor(
         &mut self,
         sender: Recipient<HistoricalEvmEventsReceived>,
-    ) -> Result<Vec<EnclaveEvent<Unsequenced>>> {
-        let Self::Init(buffer) = self else {
+    ) -> Result<(
+        Vec<EnclaveEvent<Unsequenced>>,
+        Option<HistoricalSyncComplete>,
+    )> {
+        let Self::Init {
+            buffer,
+            pending_sync_complete,
+        } = self
+        else {
             bail!(
                 "Cannot change state to ForwardToSyncActor when state is {:?}",
                 self
@@ -72,11 +88,12 @@ impl SyncStatus {
         };
 
         let buffer = std::mem::take(buffer);
+        let pending = pending_sync_complete.take();
         *self = SyncStatus::ForwardToSyncActor(ForwardToSyncActorData {
             sender: Some(sender),
             buffer: Vec::new(),
         });
-        Ok(buffer)
+        Ok((buffer, pending))
     }
 
     pub fn buffer_until_live(&mut self) -> Result<ForwardToSyncActorData> {
@@ -120,15 +137,19 @@ impl EvmChainGateway {
     }
 
     fn handle_sync_start(&mut self, msg: HistoricalEvmSyncStart) -> Result<()> {
-        // Received a HistoricalEvmSyncStart event from the event bus. Get the sender within that event and forward
-        // all events to that actor
         let sender = msg
             .sender
             .context("No sender on HistoricalEvmSyncStart Message")?;
-        let mut buffer = self.status.forward_to_sync_actor(sender)?;
-        // Drain any events that were buffered early
+        let (mut buffer, pending_sync_complete) = self.status.forward_to_sync_actor(sender)?;
+
         for evt in buffer.drain(..) {
             self.process_evm_event(evt)?;
+        }
+
+        // HistoricalSyncComplete may have arrived before HistoricalEvmSyncStart
+        if let Some(event) = pending_sync_complete {
+            warn!("Processing buffered HistoricalSyncComplete that arrived during Init");
+            self.forward_historical_sync_complete(event)?;
         }
         Ok(())
     }
@@ -161,6 +182,20 @@ impl EvmChainGateway {
     }
 
     fn forward_historical_sync_complete(&mut self, event: HistoricalSyncComplete) -> Result<()> {
+        // Buffer if we're still in Init - will be replayed when HistoricalEvmSyncStart arrives
+        if let SyncStatus::Init {
+            pending_sync_complete,
+            ..
+        } = &mut self.status
+        {
+            warn!(
+                chain_id = event.chain_id,
+                "HistoricalSyncComplete arrived during Init, buffering"
+            );
+            *pending_sync_complete = Some(event);
+            return Ok(());
+        }
+
         let state = self.status.buffer_until_live()?;
         let sender = state
             .sender
@@ -172,7 +207,7 @@ impl EvmChainGateway {
 
     fn process_evm_event(&mut self, msg: EnclaveEvent<Unsequenced>) -> Result<()> {
         match &mut self.status {
-            SyncStatus::Init(buffer) => buffer.push(msg),
+            SyncStatus::Init { buffer, .. } => buffer.push(msg),
             SyncStatus::BufferUntilLive(buffer) => buffer.push(msg),
             SyncStatus::ForwardToSyncActor(state) => state.add_event(msg),
             SyncStatus::Live => self.publish_evm_event(msg)?,
@@ -244,8 +279,8 @@ mod tests {
                 .finish(),
         );
 
-        let system = EventSystem::new("test").with_fresh_bus();
-        let bus: BusHandle = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus: BusHandle = system.handle()?.enable("test");
 
         let history_collector = bus.history();
 

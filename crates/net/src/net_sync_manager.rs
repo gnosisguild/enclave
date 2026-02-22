@@ -16,7 +16,7 @@ use futures::TryFutureExt;
 use libp2p::request_response::ResponseChannel;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::events::{
     await_event, call_and_await_response, NetCommand, NetEvent, OutgoingSyncRequestSucceeded,
@@ -183,15 +183,12 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
     type Result = ();
     fn handle(&mut self, msg: EventStoreQueryResponse, _: &mut Self::Context) -> Self::Result {
         trap(EType::Net, &self.bus.clone(), || {
-            info!("RECEIVED response from eventstore.");
+            info!("Received response from eventstore.");
             let Some(channel) = self.requests.get(&msg.id()) else {
                 bail!("request not found with {}", msg.id());
             };
-            info!(
-                "GOT CHANNEL: Got channel from request store. NOW sending SyncResponse with channel={:?}",
-                channel
-            );
-            self.tx.try_send(NetCommand::SyncResponse {
+            debug!("Sending SyncResponse with channel={:?}", channel);
+            if let Err(e) = self.tx.try_send(NetCommand::SyncResponse {
                 value: SyncResponseValue {
                     events: msg
                         .into_events()
@@ -202,7 +199,9 @@ impl Handler<EventStoreQueryResponse> for NetSyncManager {
                     ts: self.bus.ts()?, // NOTE: We are storing a local timestamp on this response
                 },
                 channel: channel.to_owned(),
-            })?;
+            }) {
+                warn!("Failed to send SyncResponse (channel full or closed): {e}");
+            }
 
             Ok(())
         })

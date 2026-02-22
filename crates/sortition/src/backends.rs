@@ -162,7 +162,21 @@ impl SortitionList<String> for ScoreBackend {
             return Ok(false);
         }
 
-        let winners = ScoreSortition::new(size).get_committee(e3_id, seed, &nodes)?;
+        let winners = ScoreSortition::new(size).get_committee(e3_id.clone(), seed, &nodes)?;
+
+        let selected_nodes: Vec<String> = winners
+            .iter()
+            .map(|w| format!("{}(ticket:{})", w.address, w.ticket_id))
+            .collect();
+        info!(
+            e3_id = %e3_id,
+            chain_id = chain_id,
+            committee_size = size,
+            selected_count = winners.len(),
+            nodes = ?selected_nodes,
+            "Sortition completed - selected nodes"
+        );
+
         let want: Address = address.parse()?;
         Ok(winners.iter().any(|w| w.address == want))
     }
@@ -189,7 +203,21 @@ impl SortitionList<String> for ScoreBackend {
             return Ok(None);
         }
 
-        let winners = ScoreSortition::new(size).get_committee(e3_id, seed, &nodes)?;
+        let winners = ScoreSortition::new(size).get_committee(e3_id.clone(), seed, &nodes)?;
+
+        let selected_nodes: Vec<String> = winners
+            .iter()
+            .map(|w| format!("{}(ticket:{})", w.address, w.ticket_id))
+            .collect();
+        info!(
+            e3_id = %e3_id,
+            chain_id = chain_id,
+            committee_size = size,
+            selected_count = winners.len(),
+            nodes = ?selected_nodes,
+            "Sortition completed - selected nodes"
+        );
+
         let want: alloy::primitives::Address = address.parse()?;
 
         let maybe = winners

@@ -7,16 +7,17 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
+use zeroize::Zeroizing;
 
-use crate::{password_delete, password_set};
+use crate::{helpers::parse_zeroizing, password_delete, password_set};
 
 #[derive(Subcommand, Debug)]
 pub enum PasswordCommands {
     /// Set (or overwrite) a password
     Set {
         /// The new password
-        #[arg(short, long)]
-        password: Option<String>,
+        #[arg(short, long, value_parser = parse_zeroizing)]
+        password: Option<Zeroizing<String>>,
     },
 
     /// Delete the current password

@@ -1,5 +1,6 @@
 {
   "circuits": [
+    { "name": "config", "modes": ["secure"] },
     "dkg/pk",
     "dkg/sk_share_computation",
     "dkg/e_sm_share_computation",

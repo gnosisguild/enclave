@@ -13,12 +13,12 @@
 use crate::circuits::commitments::{
     compute_dkg_pk_commitment, compute_share_encryption_commitment_from_message,
 };
+use crate::{compute_q_mod_t, compute_q_product};
 use std::ops::Deref;
 
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::get_zkp_modulus;
-use crate::math::{compute_k0is, compute_q_mod_t, compute_q_product};
+use crate::math::{compute_k0is, compute_q_mod_t_centered};
 use crate::math::{cyclotomic_polynomial, decompose_residue};
 use crate::polynomial_to_toml_json;
 use crate::utils::{compute_modulus_bit, compute_msg_bit};
@@ -27,8 +27,8 @@ use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
+use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
-use e3_polynomial::{center, reduce, CrtPolynomial};
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use itertools::izip;
@@ -76,7 +76,9 @@ pub struct Configs {
     /// Plaintext modulus (as usize).
     pub t: usize,
     /// [q]_t reduced to ZKP field modulus.
-    pub q_mod_t: BigInt,
+    pub q_mod_t: BigUint,
+    /// centered [q]_t reduced to ZKP field modulus.
+    pub q_mod_t_centered: BigInt,
     /// CRT moduli (one per limb).
     pub moduli: Vec<u64>,
     /// k0_i = [1/q_i]_t per modulus, for scaling in the circuit.
@@ -150,23 +152,19 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
 
         let moduli = dkg_params.moduli().to_vec();
-        let plaintext = dkg_params.plaintext();
+        let t = dkg_params.plaintext();
         let q = compute_q_product(&moduli);
-        let q_mod_t_uint = compute_q_mod_t(&q, plaintext);
-        let t = BigInt::from(plaintext);
-        let p = get_zkp_modulus();
-
-        let q_mod_t = center(&BigInt::from(q_mod_t_uint), &t);
-        let q_mod_t_mod_p = reduce(&q_mod_t, &p);
-
-        let k0is = compute_k0is(&moduli, plaintext)?;
+        let q_mod_t = compute_q_mod_t(&q, t);
+        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
+        let k0is = compute_k0is(&moduli, t)?;
 
         let bounds = Bounds::compute(preset, data)?;
         let bits = Bits::compute(preset, &bounds)?;
 
         Ok(Configs {
-            t: plaintext as usize,
-            q_mod_t: q_mod_t_mod_p,
+            t: t as usize,
+            q_mod_t,
+            q_mod_t_centered,
             moduli,
             k0is,
             bits,

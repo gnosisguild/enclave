@@ -152,8 +152,8 @@ mod tests {
     #[actix::test]
     async fn test_buffers_until_sync_ended() -> Result<()> {
         // Setup
-        let system = EventSystem::new("test").with_fresh_bus();
-        let bus = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("test");
         let (input_tx, input_rx) = broadcast::channel(16);
         let mut output_rx = NetEventBuffer::setup(&bus, &input_rx);
 

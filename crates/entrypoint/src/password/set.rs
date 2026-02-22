@@ -11,6 +11,7 @@ use zeroize::Zeroizing;
 
 use crate::helpers::rand::generate_random_bytes;
 
+/// Checks if the Keyfile already exists and fail with a constructive error
 pub async fn preflight(config: &AppConfig) -> Result<()> {
     let key_file = config.key_file();
     let pm = FilePasswordManager::new(key_file);
@@ -22,7 +23,15 @@ pub async fn preflight(config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn execute(config: &AppConfig, pw: Zeroizing<Vec<u8>>) -> Result<()> {
+pub async fn execute(config: &AppConfig, input: Zeroizing<String>) -> Result<()> {
+    let pw = Zeroizing::new(input.as_bytes().to_owned());
+
+    execute_bytes(config, pw).await?;
+
+    Ok(())
+}
+
+pub async fn execute_bytes(config: &AppConfig, input: Zeroizing<Vec<u8>>) -> Result<()> {
     let key_file = config.key_file();
     let mut pm = FilePasswordManager::new(key_file);
 
@@ -31,8 +40,7 @@ pub async fn execute(config: &AppConfig, pw: Zeroizing<Vec<u8>>) -> Result<()> {
         pm.delete_key().await?;
     }
 
-    pm.set_key(pw).await?;
-
+    pm.set_key(input).await?;
     Ok(())
 }
 
@@ -41,7 +49,7 @@ pub async fn autopassword(config: &AppConfig) -> Result<()> {
     let pm = FilePasswordManager::new(key_file);
     if !pm.is_set() {
         let pw = generate_random_bytes(128);
-        execute(config, pw.into()).await?;
+        execute_bytes(config, pw.into()).await?;
     }
     Ok(())
 }

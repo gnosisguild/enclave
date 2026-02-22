@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use actix::{Actor, Addr, Handler, Recipient};
 use anyhow::Result;
 use derivative::Derivative;
 use e3_utils::MAILBOX_LIMIT;
+use std::marker::PhantomData;
 use tracing::error;
 
 use crate::{
     event_context::EventContext,
-    hlc::Hlc,
+    hlc::{Hlc, HlcMethods},
+    hlc_factory::HlcFactory,
     sequencer::Sequencer,
     traits::{
         ErrorDispatcher, ErrorFactory, EventConstructorWithTimestamp, EventContextAccessors,
@@ -24,35 +24,83 @@ use crate::{
     EventType, HistoryCollector, Sequenced, Subscribe, Unsequenced, Unsubscribe,
 };
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug, PartialEq, Eq)]
-pub struct BusHandle {
+// TODO: this wont work with trap need to fix
+pub trait EnclaveUnsequencedErrorDispatcher {
+    fn err(&self, err_type: EType, error: anyhow::Error);
+}
+
+/// Typestate marker indicating the BusHandle has not yet been enabled with an HLC clock.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Disabled;
+
+/// Typestate marker indicating the BusHandle has been enabled and is ready for use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Enabled;
+
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    PartialEq(bound = ""),
+    Eq(bound = "")
+)]
+pub struct BusHandle<S = Enabled> {
     /// EventBus that actors can consume sequenced events from
     event_bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
     /// Sequencer that new events should be produced from
     sequencer: Addr<Sequencer>,
     /// Hlc clock used to time all events created on this BusHandle
-    #[derivative(Debug = "ignore")]
-    hlc: Arc<Hlc>,
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    hlc: HlcFactory,
     /// Temporary context for events the bus publishes
     ctx: Option<EventContext<Sequenced>>,
+    #[derivative(Debug = "ignore", PartialEq = "ignore")]
+    _state: PhantomData<S>,
 }
 
-impl BusHandle {
-    /// Create a new BusHandle
+impl BusHandle<Disabled> {
+    /// Create a new disabled BusHandle. Call `enable()` or `enable_with_hlc()` to activate it.
     pub fn new(
         event_bus: Addr<EventBus<EnclaveEvent<Sequenced>>>,
         sequencer: Addr<Sequencer>,
-        hlc: Hlc,
+        hlc: HlcFactory,
     ) -> Self {
         Self {
             event_bus,
             sequencer,
-            hlc: Arc::new(hlc),
+            hlc,
             ctx: None,
+            _state: PhantomData,
         }
     }
 
+    /// Enable the BusHandle by providing a node ID string used to create the HLC clock.
+    pub fn enable(self, node_id: &str) -> BusHandle<Enabled> {
+        let hlc = Hlc::from_str(node_id);
+        self.hlc.enable(hlc);
+        BusHandle {
+            event_bus: self.event_bus,
+            sequencer: self.sequencer,
+            hlc: self.hlc,
+            ctx: None,
+            _state: PhantomData,
+        }
+    }
+
+    /// Enable the BusHandle by providing a pre-configured HLC clock.
+    pub fn enable_with_hlc(self, hlc: Hlc) -> BusHandle<Enabled> {
+        self.hlc.enable(hlc);
+        BusHandle {
+            event_bus: self.event_bus,
+            sequencer: self.sequencer,
+            hlc: self.hlc,
+            ctx: None,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl BusHandle<Enabled> {
     /// Return a HistoryCollector for examining events that have passed through on the events bus
     pub fn history(&self) -> Addr<HistoryCollector<EnclaveEvent<Sequenced>>> {
         EventBus::<EnclaveEvent<Sequenced>>::history(&self.event_bus)
@@ -75,7 +123,7 @@ impl BusHandle {
     }
 
     /// Pipe events from this handle to the other handle only when the predicate returns true
-    pub fn pipe_to<F>(&self, other: &BusHandle, predicate: F)
+    pub fn pipe_to<F>(&self, other: &BusHandle<Enabled>, predicate: F)
     where
         F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
     {
@@ -90,7 +138,7 @@ impl BusHandle {
     }
 }
 
-impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
+impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle<Enabled> {
     fn publish(
         &self,
         data: impl Into<EnclaveEventData>,
@@ -129,7 +177,7 @@ impl EventPublisher<EnclaveEvent<Unsequenced>> for BusHandle {
     }
 }
 
-impl BusHandle {
+impl BusHandle<Enabled> {
     fn publish_from_remote_impl(
         &self,
         data: impl Into<EnclaveEventData>,
@@ -153,7 +201,7 @@ impl BusHandle {
     }
 }
 
-impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
+impl<S> ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle<S> {
     fn err(&self, err_type: EType, error: impl Into<anyhow::Error>) {
         match self.event_from_error(err_type, error, self.get_ctx()) {
             Ok(evt) => self.sequencer.do_send(evt),
@@ -162,7 +210,16 @@ impl ErrorDispatcher<EnclaveEvent<Unsequenced>> for BusHandle {
     }
 }
 
-impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
+impl<S> EnclaveUnsequencedErrorDispatcher for BusHandle<S> {
+    fn err(&self, err_type: EType, error: anyhow::Error) {
+        match self.event_from_error(err_type, error, self.get_ctx()) {
+            Ok(evt) => self.sequencer.do_send(evt),
+            Err(e) => error!("{e}"),
+        }
+    }
+}
+
+impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle<Enabled> {
     fn event_from(
         &self,
         data: impl Into<EnclaveEventData>,
@@ -197,7 +254,7 @@ impl EventFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     }
 }
 
-impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
+impl<S> ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle<S> {
     fn event_from_error(
         &self,
         err_type: EType,
@@ -209,7 +266,7 @@ impl ErrorFactory<EnclaveEvent<Unsequenced>> for BusHandle {
     }
 }
 
-impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
+impl<S> EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle<S> {
     fn subscribe(&self, event_type: EventType, recipient: Recipient<EnclaveEvent<Sequenced>>) {
         self.event_bus
             .do_send(Subscribe::new(event_type, recipient))
@@ -232,7 +289,7 @@ impl EventSubscriber<EnclaveEvent<Sequenced>> for BusHandle {
     }
 }
 
-impl EventContextManager for BusHandle {
+impl<S> EventContextManager for BusHandle<S> {
     fn set_ctx<C>(&mut self, value: C)
     where
         C: Into<EventContext<Sequenced>>,
@@ -312,18 +369,20 @@ mod tests {
 
         // 1. setup up two separate busses with out of sync clocks A and B. B should be 30 seconds
         //    faster than A.
-        let bus_a = EventSystem::new("a")
+        let bus_a = EventSystem::new()
             .with_fresh_bus()
-            .with_hlc(Hlc::new(1).with_clock(move || now_micros().saturating_sub(30_000_000))) // Late
-            .handle()?;
-        let bus_b = EventSystem::new("b")
+            .handle()?
+            .enable_with_hlc(
+                Hlc::new(1).with_clock(move || now_micros().saturating_sub(30_000_000)),
+            ); // Late
+        let bus_b = EventSystem::new()
             .with_fresh_bus()
-            .with_hlc(Hlc::new(2))
-            .handle()?;
-        let bus_c = EventSystem::new("c")
+            .handle()?
+            .enable_with_hlc(Hlc::new(2));
+        let bus_c = EventSystem::new()
             .with_fresh_bus()
-            .with_hlc(Hlc::new(3))
-            .handle()?;
+            .handle()?
+            .enable_with_hlc(Hlc::new(3));
 
         let forwarder = Forwarder {
             dest: bus_c.clone(),
@@ -399,7 +458,7 @@ pub struct BusHandlePipe<F>
 where
     F: Fn(&EnclaveEvent<Sequenced>) -> bool + Unpin + 'static,
 {
-    handle: BusHandle,
+    handle: BusHandle<Enabled>,
     predicate: F,
 }
 
@@ -409,7 +468,7 @@ where
 {
     /// Create a new BusHandlePipe only forwarding events to the wrapped handle when the predicate
     /// function returns true
-    pub fn new(handle: BusHandle, predicate: F) -> Self {
+    pub fn new(handle: BusHandle<Enabled>, predicate: F) -> Self {
         Self { handle, predicate }
     }
 }

@@ -17,9 +17,9 @@ use crate::{
     threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData,
     CiphernodesCommittee,
 };
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
-use fhe::mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare};
+use fhe::mbfv::{AggregateIter, PublicKeyShare};
 use fhe::trbfv::{ShareManager, TRBFV};
 use fhe_math::rq::{Poly, Representation};
 use fhe_traits::FheDecoder;
@@ -64,8 +64,7 @@ impl DecryptedSharesAggregationCircuitData {
         let mut rng = OsRng;
         let mut thread_rng = rand::thread_rng();
 
-        let crp = CommonRandomPoly::new(&threshold_params, &mut rng)
-            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
+        let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
         let ctx = threshold_params.ctx_at_level(0).unwrap();
 

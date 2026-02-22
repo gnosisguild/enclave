@@ -11,7 +11,6 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
-e3-config = { workspace = true }
 e3-data = { workspace = true }
 e3-events = { workspace = true }
 e3-utils = { workspace = true }
@@ -24,5 +23,4 @@ e3-request = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
 e3-bfv-client = { workspace = true }
-e3-fhe-params = { workspace = true }
-e3-trbfv = { workspace = true }
+e3-fhe-params = { workspace = true, features = ["abi-encoding"] }
