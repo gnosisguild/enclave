@@ -358,12 +358,6 @@ impl Sortition {
         reason: &str,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
-        self.finalized_committees
-            .try_mutate(&ec, |mut committees| {
-                committees.remove(e3_id);
-                Ok(committees)
-            })?;
-
         self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_id = e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, e3_id.e3_id());

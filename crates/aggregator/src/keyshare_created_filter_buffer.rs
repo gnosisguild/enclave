@@ -78,7 +78,7 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
 
                 // Remove expelled node so we don't forward late KeyshareCreated events from them
                 if let Some(ref mut committee) = self.committee {
-                    let node_addr = format!("{:?}", data.node);
+                    let node_addr = data.node.to_string();
                     info!(
                         "KeyshareCreatedFilterBuffer: removing expelled node {} from committee filter (e3_id={})",
                         node_addr, data.e3_id

@@ -10,15 +10,39 @@ use std::collections::HashMap;
 /// Ordered list of committee members where index == party_id.
 ///
 /// Provides O(1) address→party_id lookups via an internal index.
-/// The index is skipped during serialization and rebuilt lazily on first lookup
-/// after deserialization.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The index is eagerly rebuilt when the struct is deserialized.
+///
+/// `PartialEq` compares only the `members` vec (the canonical data);
+/// the `index` is a derived cache.
+#[derive(Clone, Debug, Serialize)]
 pub struct Committee {
     /// Ordered member list — index == party_id.
     members: Vec<String>,
     /// Lowercased-address → party_id for O(1) lookup.
     #[serde(skip)]
     index: HashMap<String, u64>,
+}
+
+impl PartialEq for Committee {
+    fn eq(&self, other: &Self) -> bool {
+        self.members == other.members
+    }
+}
+
+impl Eq for Committee {}
+
+impl<'de> Deserialize<'de> for Committee {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Inner {
+            members: Vec<String>,
+        }
+        let inner = Inner::deserialize(deserializer)?;
+        Ok(Committee::new(inner.members))
+    }
 }
 
 impl Committee {
@@ -33,16 +57,6 @@ impl Committee {
 
     /// Resolve an address to its party_id (position in the committee list).
     pub fn party_id_for(&self, addr: &str) -> Option<u64> {
-        // Rebuild index lazily after deserialization (serde skip)
-        if self.index.is_empty() && !self.members.is_empty() {
-            // Fallback linear scan when index hasn't been rebuilt
-            let lower = addr.to_lowercase();
-            return self
-                .members
-                .iter()
-                .position(|a| a.to_lowercase() == lower)
-                .map(|i| i as u64);
-        }
         self.index.get(&addr.to_lowercase()).copied()
     }
 

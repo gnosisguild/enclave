@@ -35,13 +35,8 @@ use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use e3_zk_helpers::CiphernodesCommitteeSize;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
-use rand::{rngs::OsRng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use std::{
-    collections::HashMap,
-    mem,
-    sync::{Arc, Mutex},
-};
+use rand::rngs::OsRng;
+use std::{collections::HashMap, mem, sync::Arc};
 use tracing::{error, info, trace, warn};
 
 use crate::encryption_key_collector::{

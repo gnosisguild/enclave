@@ -202,12 +202,6 @@ impl Handler<EnclaveEvent> for E3Router {
                     // Send to bus so all other actors can react to a request being complete.
                     self.bus.publish(event, ctx)?;
                 }
-                EnclaveEventData::E3Failed(_) => {
-                    let event = E3RequestComplete {
-                        e3_id: e3_id.clone(),
-                    };
-                    self.bus.publish(event, ctx)?;
-                }
                 EnclaveEventData::E3StageChanged(ref data)
                     if matches!(data.new_stage, E3Stage::Complete | E3Stage::Failed) =>
                 {
