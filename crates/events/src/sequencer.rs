@@ -92,8 +92,8 @@ mod tests {
     #[actix::test]
     async fn it_handles_event_burst_without_overflow() -> anyhow::Result<()> {
         let count = 500usize;
-        let system = EventSystem::new("test-burst").with_fresh_bus();
-        let bus = system.handle()?;
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("test-burst");
         let history = bus.history();
 
         let start = std::time::Instant::now();
