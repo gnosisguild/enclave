@@ -880,8 +880,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       const stage = await enclave.getE3Stage(0);
       expect(stage).to.equal(6);
 
-      // Try to expel operator3 — E3 already failed so onE3Failed should revert
-      // but expelCommitteeMember itself should still work (idempotent-ish)
+      // Try to expel operator3 — E3 already failed, but onE3Failed is wrapped
+      // in try-catch so financial penalties are still applied
       const proof3 = await signAndEncodeProof(
         operator3,
         0,
@@ -889,8 +889,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         "0x3333",
       );
 
-      // This should revert because the E3 is already in Failed state
-      // and onE3Failed will revert with E3AlreadyFailed
+      // The third slash should succeed — penalties are applied even though E3 is already Failed.
+      // The onE3Failed call silently fails (try-catch) since E3 is already in Failed state.
       await expect(
         slashingManager.proposeSlash(
           0,
@@ -898,7 +898,11 @@ describe("Committee Expulsion & Fault Tolerance", function () {
           REASON_BAD_DKG,
           proof3,
         ),
-      ).to.be.revertedWithCustomError(enclave, "E3AlreadyFailed");
+      ).to.emit(slashingManager, "SlashExecuted");
+
+      // E3 stage should still be Failed
+      const stageAfter = await enclave.getE3Stage(0);
+      expect(stageAfter).to.equal(6);
     });
   });
 

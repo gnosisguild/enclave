@@ -201,26 +201,39 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             EnclaveEventData::CommitteeMemberExpelled(data) => {
                 let node_addr = data.node.to_string();
+
+                if data.e3_id != self.e3_id {
+                    error!("Wrong e3_id sent to PublicKeyAggregator for expulsion. This should not happen.");
+                    return;
+                }
+
                 info!(
                     "PublicKeyAggregator: committee member expelled: {} for e3_id={}",
                     node_addr, data.e3_id
                 );
                 trap(EType::PublickeyAggregation, &self.bus.with_ec(&ec), || {
+                    let was_collecting = matches!(
+                        self.state.get(),
+                        Some(PublicKeyAggregatorState::Collecting { .. })
+                    );
+
                     self.handle_member_expelled(&node_addr, &ec)?;
 
-                    if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
-                        &self.state.get()
-                    {
-                        self.notify_sync(
-                            ctx,
-                            TypedEvent::new(
-                                ComputeAggregate {
-                                    keyshares: keyshares.clone(),
-                                    e3_id: data.e3_id,
-                                },
-                                ec.clone(),
-                            ),
-                        );
+                    if was_collecting {
+                        if let Some(PublicKeyAggregatorState::Computing { keyshares, .. }) =
+                            &self.state.get()
+                        {
+                            self.notify_sync(
+                                ctx,
+                                TypedEvent::new(
+                                    ComputeAggregate {
+                                        keyshares: keyshares.clone(),
+                                        e3_id: data.e3_id,
+                                    },
+                                    ec.clone(),
+                                ),
+                            );
+                        }
                     }
                     Ok(())
                 });
