@@ -546,6 +546,10 @@ async fn process_swarm_command(
             handle_get_record(swarm, correlator, correlation_id, key)?;
             Ok(())
         }
+        NetCommand::DhtRemoveRecords { keys } => {
+            handle_remove_records(swarm, keys);
+            Ok(())
+        }
         NetCommand::OutgoingSyncRequest {
             correlation_id,
             value,
@@ -609,11 +613,34 @@ fn handle_dial(
     Ok(())
 }
 
+/// Remove specific DHT records by key.
+///
+/// Called when an E3 completes to free up local DHT store space.
+/// Records on remote peers are left to expire naturally.
+fn handle_remove_records(swarm: &mut Swarm<NodeBehaviour>, keys: Vec<ContentHash>) {
+    let store = swarm.behaviour_mut().kademlia.store_mut();
+    let mut removed = 0usize;
+    for key in &keys {
+        store.remove(&RecordKey::new(key));
+        removed += 1;
+    }
+    if removed > 0 {
+        info!(
+            "DHT removed {} records for completed E3 ({} remaining)",
+            removed,
+            store.records().count()
+        );
+    }
+}
+
 /// Evict expired records from the DHT store.
 ///
 /// `MemoryStore` does not check expiration on `put()` — it simply counts
 /// all records, expired or not.  This helper removes stale entries so that
 /// the `max_records` budget reflects only live data.
+///
+/// This is a fallback safety net — primary cleanup happens per-E3 via
+/// `handle_remove_records` when an E3 completes.
 fn prune_expired_dht_records(swarm: &mut Swarm<NodeBehaviour>) {
     let now = Instant::now();
     let store = swarm.behaviour_mut().kademlia.store_mut();
@@ -659,6 +686,7 @@ fn handle_put_record(
             debug!("PUT RECORD OK qid={:?} cid={}", qid, correlation_id);
         }
         Err(kad::store::Error::MaxRecords) => {
+            warn!("DHT store full (MaxRecords) — attempting fallback expired-record prune");
             prune_expired_dht_records(swarm);
             match swarm
                 .behaviour_mut()
@@ -673,6 +701,7 @@ fn handle_put_record(
                     );
                 }
                 Err(error) => {
+                    error!("DHT put failed even after pruning expired records: {error:?}");
                     event_tx.send(NetEvent::DhtPutRecordError {
                         correlation_id,
                         error: PutOrStoreError::StoreError(error),
@@ -819,7 +848,7 @@ mod tests {
         };
         let mut store = MemoryStore::with_config(peer_id, config);
 
-        let past = Instant::now() - Duration::from_secs(1);
+        let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
         for i in 0..5 {
             let record = Record {
                 key: RecordKey::new(&format!("expired-{i}").into_bytes()),
@@ -869,7 +898,7 @@ mod tests {
         let mut store = MemoryStore::with_config(peer_id, config);
 
         let future = Instant::now() + Duration::from_secs(3600);
-        let past = Instant::now() - Duration::from_secs(1);
+        let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
 
         // 3 live records, 2 expired
         for i in 0..3 {
