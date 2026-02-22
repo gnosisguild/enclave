@@ -16,6 +16,7 @@ members = [
   "crates/fhe",
   "crates/fhe-params",
   "crates/fs", 
+  "crates/hamt", 
   "crates/indexer",
   "crates/init", 
   "crates/keyshare",
