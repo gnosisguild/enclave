@@ -452,6 +452,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
         );
         require(callSuccess, VerifierCallFailed());
+        require(returnData.length >= 32, VerifierCallFailed());
         bool proofValid = abi.decode(returnData, (bool));
         if (proofValid) revert ProofIsValid();
     }
