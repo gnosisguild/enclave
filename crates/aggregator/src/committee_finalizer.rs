@@ -6,8 +6,8 @@
 
 use actix::prelude::*;
 use e3_events::{
-    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, EType,
-    EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
+    prelude::*, trap, BusHandle, CommitteeFinalizeRequested, CommitteeRequested, E3Failed, E3Stage,
+    E3StageChanged, EType, EnclaveEvent, EnclaveEventData, EventType, Shutdown, TypedEvent,
 };
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
 use std::collections::HashMap;
@@ -33,7 +33,12 @@ impl CommitteeFinalizer {
         let addr = CommitteeFinalizer::new(bus).start();
 
         bus.subscribe_all(
-            &[EventType::CommitteeRequested, EventType::Shutdown],
+            &[
+                EventType::CommitteeRequested,
+                EventType::Shutdown,
+                EventType::E3Failed,
+                EventType::E3StageChanged,
+            ],
             addr.clone().recipient(),
         );
 
@@ -57,6 +62,10 @@ impl Handler<EnclaveEvent> for CommitteeFinalizer {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::Shutdown(data) => self.notify_sync(ctx, data),
+            EnclaveEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            EnclaveEventData::E3StageChanged(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
             _ => (),
         }
     }
@@ -164,5 +173,40 @@ impl Handler<Shutdown> for CommitteeFinalizer {
             ctx.cancel_future(handle);
         }
         ctx.stop();
+    }
+}
+
+impl Handler<TypedEvent<E3Failed>> for CommitteeFinalizer {
+    type Result = ();
+    fn handle(&mut self, msg: TypedEvent<E3Failed>, ctx: &mut Self::Context) -> Self::Result {
+        let e3_id_str = msg.e3_id.to_string();
+        if let Some(handle) = self.pending_committees.remove(&e3_id_str) {
+            info!(
+                e3_id = %msg.e3_id,
+                reason = ?msg.reason,
+                "E3 failed — cancelling pending committee finalization timer"
+            );
+            ctx.cancel_future(handle);
+        }
+    }
+}
+
+impl Handler<TypedEvent<E3StageChanged>> for CommitteeFinalizer {
+    type Result = ();
+    fn handle(&mut self, msg: TypedEvent<E3StageChanged>, ctx: &mut Self::Context) -> Self::Result {
+        match &msg.new_stage {
+            E3Stage::Complete | E3Stage::Failed => {
+                let e3_id_str = msg.e3_id.to_string();
+                if let Some(handle) = self.pending_committees.remove(&e3_id_str) {
+                    info!(
+                        e3_id = %msg.e3_id,
+                        stage = ?msg.new_stage,
+                        "E3 reached terminal stage — cancelling pending committee finalization timer"
+                    );
+                    ctx.cancel_future(handle);
+                }
+            }
+            _ => {}
+        }
     }
 }

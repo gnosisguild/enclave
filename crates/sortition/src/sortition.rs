@@ -358,6 +358,12 @@ impl Sortition {
         reason: &str,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
+        self.finalized_committees
+            .try_mutate(&ec, |mut committees| {
+                committees.remove(e3_id);
+                Ok(committees)
+            })?;
+
         self.node_state.try_mutate(&ec, |mut state_map| {
             let chain_id = e3_id.chain_id();
             let e3_id_str = format!("{}:{}", chain_id, e3_id.e3_id());
@@ -439,6 +445,10 @@ impl Handler<EnclaveEvent> for Sortition {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::CommitteeMemberExpelled(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::E3Failed(data) => self.notify_sync(ctx, TypedEvent::new(data, ec)),
+            EnclaveEventData::E3StageChanged(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),

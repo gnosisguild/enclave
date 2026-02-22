@@ -1084,29 +1084,6 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 let _ = self.handle_pk_generation_proof_signed(TypedEvent::new(data, ec));
             }
             EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::E3Failed(data) => {
-                warn!(
-                    "E3 failed: {:?}. Shutting down ThresholdKeyshare for e3_id={}",
-                    data.reason, data.e3_id
-                );
-                self.notify_sync(ctx, E3RequestComplete { e3_id: data.e3_id });
-            }
-            EnclaveEventData::E3StageChanged(data) => {
-                use e3_events::E3Stage;
-                match &data.new_stage {
-                    E3Stage::Complete | E3Stage::Failed => {
-                        info!("E3 reached terminal stage {:?}. Shutting down ThresholdKeyshare for e3_id={}", data.new_stage, data.e3_id);
-                        self.notify_sync(ctx, E3RequestComplete { e3_id: data.e3_id });
-                    }
-                    _ => {
-                        trace!(
-                            "E3 stage changed to {:?} for e3_id={}",
-                            data.new_stage,
-                            data.e3_id
-                        );
-                    }
-                }
-            }
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }

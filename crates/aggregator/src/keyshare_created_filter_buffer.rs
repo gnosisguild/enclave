@@ -6,7 +6,7 @@
 
 use actix::prelude::*;
 
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, Die, EnclaveEvent, EnclaveEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
 use tracing::info;
@@ -92,5 +92,12 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 self.dest.do_send(msg);
             }
         }
+    }
+}
+
+impl Handler<Die> for KeyshareCreatedFilterBuffer {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }
