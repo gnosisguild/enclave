@@ -59,8 +59,8 @@ mod tests {
 
     #[actix::test]
     async fn it_adds_seqence_numbers_to_events() -> anyhow::Result<()> {
-        let system = EventSystem::new("test");
-        let bus = system.handle()?;
+        let system = EventSystem::new();
+        let bus = system.handle()?.enable("test");
         let history = bus.history();
 
         let event_data = vec![

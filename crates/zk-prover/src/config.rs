@@ -17,7 +17,7 @@ const VERSIONS_MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/gnosisguild/enclave/main/crates/zk-prover/versions.json";
 
 const BB_VERSION: &str = "3.0.0-nightly.20251104";
-const CIRCUITS_VERSION: &str = "0.1.14";
+const CIRCUITS_VERSION: &str = "0.1.15";
 
 /// Supported bb binary targets
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -220,7 +220,7 @@ pub fn verify_checksum(file: &str, data: &[u8], expected: Option<&str>) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
+    use crate::test_utils::get_tempdir;
 
     use super::*;
 
@@ -466,7 +466,7 @@ mod tests {
         println!("checksum verified for {}", target);
 
         // Test saving and loading through VersionInfo
-        let temp = tempdir().expect("failed to create temp dir");
+        let temp = get_tempdir().expect("failed to create temp dir");
         let tarball_path = temp.path().join("bb.tar.gz");
 
         fs::write(&tarball_path, &bytes)

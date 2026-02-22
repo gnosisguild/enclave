@@ -11,16 +11,15 @@ use e3_data::{
     CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore, SledSequenceIndex,
     SledStore,
 };
-use e3_events::hlc::Hlc;
+use e3_events::hlc_factory::HlcFactory;
 use e3_events::{
-    AggregateConfig, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EventStore,
+    AggregateConfig, BusHandle, Disabled, EnclaveEvent, EventBus, EventBusConfig, EventStore,
     EventStoreQueryBy, EventStoreRouter, EventSubscriber, EventType, InsertBatch, SeqAgg,
     Sequencer, SnapshotBuffer, StoreEventRequested, TsAgg, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
 struct InMemBackend {
@@ -45,7 +44,7 @@ struct PersistedBackend {
 }
 
 impl PersistedBackend {
-    fn get_or_init_store(&self, handle: &BusHandle) -> Result<Addr<SledStore>> {
+    fn get_or_init_store(&self, handle: &BusHandle<Disabled>) -> Result<Addr<SledStore>> {
         self.store
             .get_or_try_init(|| SledStore::new(handle, &self.sled_path))
             .cloned()
@@ -74,8 +73,6 @@ pub enum EventStoreAddrs {
 /// - **WriteBuffer** for batching inserts from actors into a snapshot
 ///
 pub struct EventSystem {
-    /// A nodes id to be used as a tiebreaker in logical clock timestamp differentiation
-    node_id: u32,
     /// EventSystem backend either persisted or in memory
     backend: EventSystemBackend,
     /// WriteBuffer for batching inserts from actors into a snapshot
@@ -85,9 +82,7 @@ pub struct EventSystem {
     /// EventSystem eventbus
     eventbus: OnceCell<Addr<EventBus<EnclaveEvent>>>,
     /// EventSystem BusHandle
-    handle: OnceCell<BusHandle>,
-    /// Hlc override
-    hlc: OnceCell<Hlc>,
+    handle: OnceCell<BusHandle<Disabled>>,
     /// Central configuration for aggregates, including delays and other settings
     aggregate_config: OnceCell<AggregateConfig>,
     /// Cached EventStoreAddrs for idempotency
@@ -96,14 +91,13 @@ pub struct EventSystem {
 
 impl EventSystem {
     /// Create a new in memory EventSystem with default settings
-    pub fn new(name: &str) -> Self {
-        EventSystem::in_mem(name)
+    pub fn new() -> Self {
+        EventSystem::in_mem()
     }
 
     /// Create an in memory EventSystem
-    pub fn in_mem(node_id: &str) -> Self {
+    pub fn in_mem() -> Self {
         Self {
-            node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
                 eventstores: OnceCell::new(),
                 store: OnceCell::new(),
@@ -112,16 +106,14 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
         }
     }
 
     /// Create an in memory EventSystem with a given store
-    pub fn in_mem_from_store(node_id: &str, store: &Addr<InMemStore>) -> Self {
+    pub fn in_mem_from_store(store: &Addr<InMemStore>) -> Self {
         Self {
-            node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::InMem(InMemBackend {
                 eventstores: OnceCell::new(),
                 store: OnceCell::from(store.to_owned()),
@@ -130,16 +122,14 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
         }
     }
 
     /// Create a persisted EventSystem with datafiles at the given paths
-    pub fn persisted(node_id: &str, log_path: PathBuf, sled_path: PathBuf) -> Self {
+    pub fn persisted(log_path: PathBuf, sled_path: PathBuf) -> Self {
         Self {
-            node_id: EventSystem::node_id(node_id),
             backend: EventSystemBackend::Persisted(PersistedBackend {
                 log_path,
                 sled_path,
@@ -150,7 +140,6 @@ impl EventSystem {
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
             handle: OnceCell::new(),
-            hlc: OnceCell::new(),
             aggregate_config: OnceCell::new(),
             eventstore_addrs: OnceCell::new(),
         }
@@ -167,12 +156,6 @@ impl EventSystem {
         let _ = self
             .eventbus
             .set(EventBus::new(EventBusConfig { deduplicate: true }).start());
-        self
-    }
-
-    /// Add an injected hlc
-    pub fn with_hlc(self, hlc: Hlc) -> Self {
-        let _ = self.hlc.set(hlc);
         self
     }
 
@@ -320,18 +303,11 @@ impl EventSystem {
         }
     }
 
-    /// Get an instance of the Hlc
-    pub fn hlc(&self) -> Result<Hlc> {
-        self.hlc
-            .get_or_try_init(|| Ok(Hlc::new(self.node_id)))
-            .cloned()
-    }
-
     /// Get the BusHandle
-    pub fn handle(&self) -> Result<BusHandle> {
+    pub fn handle(&self) -> Result<BusHandle<Disabled>> {
         self.handle
             .get_or_try_init(|| {
-                let handle = BusHandle::new(self.eventbus(), self.sequencer()?, self.hlc()?);
+                let handle = BusHandle::new(self.eventbus(), self.sequencer()?, HlcFactory::new());
                 // Buffer subscribes to all events first
                 // This is important so as to open up a batch for each sequence
                 handle.subscribe(EventType::All, self.buffer()?.recipient());
@@ -362,12 +338,6 @@ impl EventSystem {
         };
 
         Ok(store)
-    }
-
-    fn node_id(name: &str) -> u32 {
-        let mut hasher = DefaultHasher::new();
-        name.hash(&mut hasher);
-        hasher.finish() as u32
     }
 }
 
@@ -480,7 +450,7 @@ mod tests {
     async fn test_persisted() -> Result<()> {
         let _guard = with_tracing("debug");
         let tmp = TempDir::new().unwrap();
-        let system = EventSystem::persisted("cn2", tmp.path().join("log"), tmp.path().join("sled"));
+        let system = EventSystem::persisted(tmp.path().join("log"), tmp.path().join("sled"));
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
         Ok(())
@@ -489,7 +459,7 @@ mod tests {
     #[actix::test]
     async fn test_in_mem() {
         let eventbus = EventBus::<EnclaveEvent>::default().start();
-        let system = EventSystem::in_mem("cn1").with_event_bus(eventbus);
+        let system = EventSystem::in_mem().with_event_bus(eventbus);
 
         let _handle = system.handle().expect("Failed to get handle");
         system.store().expect("Failed to get store");
@@ -505,11 +475,11 @@ mod tests {
         delays.insert(AggregateId::new(0), Duration::from_secs(1)); // Ag0 is default
         let config = AggregateConfig::new(delays);
 
-        let system = EventSystem::in_mem("cn1")
+        let system = EventSystem::in_mem()
             .with_fresh_bus()
             .with_aggregate_config(config);
 
-        let handle = system.handle()?;
+        let handle = system.handle()?.enable("test");
         let datastore = system.store()?;
         let buffer = system.buffer()?;
 
@@ -661,7 +631,7 @@ mod tests {
         let aggregate_config = AggregateConfig::new(delays);
 
         // Test in-memory eventstores
-        let system = EventSystem::in_mem("test_multi").with_aggregate_config(aggregate_config);
+        let system = EventSystem::in_mem().with_aggregate_config(aggregate_config);
         let Ok(EventStoreAddrs::InMem(addrs)) = system.eventstore_addrs() else {
             panic!("Expected InMem event store addrs");
         };
@@ -675,12 +645,9 @@ mod tests {
 
         // Test persistent eventstores
         let tmp = TempDir::new().unwrap();
-        let persisted_system = EventSystem::persisted(
-            "test_persisted",
-            tmp.path().join("log"),
-            tmp.path().join("sled"),
-        )
-        .with_aggregate_config(AggregateConfig::new(HashMap::new()));
+        let persisted_system =
+            EventSystem::persisted(tmp.path().join("log"), tmp.path().join("sled"))
+                .with_aggregate_config(AggregateConfig::new(HashMap::new()));
 
         let Ok(EventStoreAddrs::Persisted(addrs)) = persisted_system.eventstore_addrs() else {
             panic!("Expected Persisted event store addrs");

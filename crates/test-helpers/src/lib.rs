@@ -18,13 +18,14 @@ use e3_events::{
     BusHandle, CiphernodeAdded, EnclaveEvent, EnclaveEventData, EventBus, EventBusConfig,
     EventPublisher, EventType, HistoryCollector, Seed, Subscribe,
 };
-use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
 use e3_fhe_params::BfvParamSet;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::{build_bfv_params_arc, create_deterministic_crp_from_default_seed};
 use e3_net::{DocumentPublisher, NetEventTranslator};
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
+use fhe_traits::Serialize;
 use fhe_traits::{FheEncoder, FheEncrypter};
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
@@ -47,28 +48,15 @@ pub fn create_rng_from_seed(seed: Seed) -> SharedRng {
     Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.into())))
 }
 
-pub fn create_crp_from_seed(params: &Arc<BfvParameters>, seed: &Seed) -> Result<CommonRandomPoly> {
-    let rng = create_rng_from_seed(seed.clone());
-    Ok(create_crp(params.clone(), rng))
-}
-
 pub fn create_crp_bytes_params(
     moduli: &[u64],
     degree: usize,
     plaintext_modulus: u64,
-    seed: &Seed,
 ) -> (Vec<u8>, Arc<BfvParameters>) {
-    let ParamsWithCrp {
-        crp_bytes, params, ..
-    } = setup_crp_params(
-        moduli,
-        degree,
-        plaintext_modulus,
-        Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(
-            seed.clone().into(),
-        ))),
-    );
-    (crp_bytes, params)
+    let params = build_bfv_params_arc(degree, plaintext_modulus, moduli, None);
+    let crp = create_deterministic_crp_from_default_seed(&params);
+
+    (crp.to_bytes(), params)
 }
 
 pub fn get_common_setup(
@@ -97,9 +85,12 @@ pub fn get_common_setup(
     let degree = param_set.degree;
     let plaintext_modulus = param_set.plaintext_modulus;
     let moduli = param_set.moduli;
-    let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
+    let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
-    let handle = EventSystem::in_mem("cn1").with_event_bus(bus).handle()?;
+    let handle = EventSystem::in_mem()
+        .with_event_bus(bus)
+        .handle()?
+        .enable("cn1");
     Ok((handle, rng, seed, params, crpoly, errors, history))
 }
 

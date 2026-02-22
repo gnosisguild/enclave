@@ -145,7 +145,7 @@ fn select_chain<'a>(config: &'a AppConfig, name: Option<&str>) -> Result<&'a Cha
         None => config
             .chains()
             .first()
-            .ok_or_else(|| anyhow!("No chains configured. Run `enclave config-set` first.")),
+            .ok_or_else(|| anyhow!("No chains configured. Run `enclave ciphernode setup` first.")),
     }
 }
 

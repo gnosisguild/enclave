@@ -4,17 +4,21 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Args, Subcommand};
 use e3_config::AppConfig;
 
 mod context;
 mod license;
 mod lifecycle;
+pub mod setup;
 mod tickets;
 mod utils;
 
 use context::ChainContext;
+use zeroize::Zeroizing;
+
+use crate::helpers::{ensure_hex_zeroizing, parse_zeroizing};
 
 #[derive(Debug, Args, Clone, Default)]
 pub struct ChainArgs {
@@ -31,6 +35,20 @@ impl ChainArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum CiphernodeCommands {
+    /// Setup local ciphernode configuration
+    Setup {
+        /// An rpc url for enclave to connect to
+        #[arg(long = "rpc-url", short = 'r')]
+        rpc_url: Option<String>,
+
+        /// The password
+        #[arg(short, long, value_parser = parse_zeroizing)]
+        password: Option<Zeroizing<String>>,
+
+        /// Wallet Private Key
+        #[arg(short, long, value_parser = ensure_hex_zeroizing)]
+        private_key: Option<Zeroizing<String>>,
+    },
     /// Manage ENCL license tokens and bonding state
     License {
         #[command(subcommand)]
@@ -149,6 +167,12 @@ pub async fn execute(command: CiphernodeCommands, config: &AppConfig) -> Result<
         CiphernodeCommands::Status { chain } => {
             let ctx = ChainContext::new(config, chain.selection()).await?;
             lifecycle::status(&ctx).await?
+        }
+        CiphernodeCommands::Setup { .. } => {
+            bail!(
+                "Cannot run `enclave ciphernode setup` when a configuration already exists: {:?}",
+                config.config_file()
+            );
         }
     }
 

@@ -14,10 +14,6 @@ use tracing::{info, instrument};
 pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     owo();
 
-    let Some(address) = config.address() else {
-        return Err(anyhow!("You must provide an address"));
-    };
-
     // add cli peers to the config
     config.add_peers(peers);
 
@@ -29,7 +25,6 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         } => {
             e3_entrypoint::start::aggregator_start::execute(
                 &config,
-                address,
                 pubkey_write_path,
                 plaintext_write_path,
             )
@@ -37,13 +32,13 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config, address).await?,
+        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config).await?,
     };
 
     info!(
         "LAUNCHING CIPHERNODE: ({}/{}/{})",
         config.name(),
-        address,
+        node.address,
         node.peer_id
     );
 

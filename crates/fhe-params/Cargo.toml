@@ -9,6 +9,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/fhe-params"
 [dependencies]
 fhe = { workspace = true }
 num-bigint = { workspace = true }
+rand = { workspace = true }
 num-traits = { workspace = true }
 thiserror = { workspace = true }
 clap = { workspace = true }
@@ -16,6 +17,10 @@ anyhow = { workspace = true }
 alloy-dyn-abi = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, optional = true }
 serde = { workspace = true }
+rand_chacha = { workspace = true }
+
+[dev-dependencies]
+fhe-traits = { workspace = true }
 
 [[bin]]
 name = "search_params"

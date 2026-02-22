@@ -6,10 +6,9 @@
 
 use actix::{Actor, Handler, Message};
 use anyhow::{Context, Result};
-use e3_events::{Get, Insert, InsertBatch, InsertSync, Remove};
+use e3_events::{Flush, Get, Insert, InsertBatch, InsertSync, Remove};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::BTreeMap;
-use tracing::info;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -118,6 +117,13 @@ impl Handler<Get> for InMemStore {
         let key = event.key();
         let r = self.db.get(key);
         r.cloned()
+    }
+}
+
+impl Handler<Flush> for InMemStore {
+    type Result = ();
+    fn handle(&mut self, _: Flush, _: &mut Self::Context) -> Self::Result {
+        // noop
     }
 }
 

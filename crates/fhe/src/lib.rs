@@ -5,10 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod ext;
-mod fhe;
-mod repo;
-mod utils;
+mod runtime;
 
-pub use fhe::*;
-pub use repo::*;
-pub use utils::*;
+pub use ext::{FheExtension, FheRepositoryFactory, FHE_KEY};
+pub use runtime::*;

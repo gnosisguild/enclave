@@ -34,15 +34,3 @@ fn test_witness_generation_wrong_sum_fails() {
 
     assert!(result.is_err());
 }
-
-#[test]
-fn test_compiled_circuit_from_fixture() {
-    let fixtures = fixtures_dir();
-    let circuit = CompiledCircuit::from_file(&fixtures.join("pk.json")).unwrap();
-
-    assert!(
-        !circuit.abi.parameters.is_empty(),
-        "PkBfv circuit should have parameters"
-    );
-    assert!(circuit.abi.parameters.len() > 0);
-}

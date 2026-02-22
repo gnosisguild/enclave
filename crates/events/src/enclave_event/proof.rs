@@ -44,20 +44,18 @@ pub enum CircuitName {
     SkShareComputation,
     /// E_SM share computation proof (C2b).
     ESmShareComputation,
-    /// Encrypted sk share proof (C3a).
-    SkShareEncryption,
-    /// Encrypted E_SM share proof (C3b).
-    ESmShareEncryption,
-    /// Sk share decryption proof (C4a).
-    DkgSkShareDecryption,
-    /// E_SM share decryption proof (C4b).
-    DkgESmShareDecryption,
+    /// Share encryption proof (C3).
+    ShareEncryption,
+    /// DKG share decryption proof (C4).
+    DkgShareDecryption,
     /// Public key aggregation proof (C5).
     PkAggregation,
     /// Decryption share proof (C6).
     ThresholdShareDecryption,
-    /// Decrypted shares aggregation proof (C7).
-    DecryptedSharesAggregation,
+    /// Decrypted shares aggregation proof — BigNum variant (C7a).
+    DecryptedSharesAggregationBn,
+    /// Decrypted shares aggregation proof — Modular variant (C7b).
+    DecryptedSharesAggregationMod,
 }
 
 impl CircuitName {
@@ -67,13 +65,12 @@ impl CircuitName {
             CircuitName::PkGeneration => "pk_generation",
             CircuitName::SkShareComputation => "sk_share_computation",
             CircuitName::ESmShareComputation => "e_sm_share_computation",
-            CircuitName::SkShareEncryption => "sk_share_encryption",
-            CircuitName::ESmShareEncryption => "e_sm_share_encryption",
-            CircuitName::DkgSkShareDecryption => "dkg_sk_share_decryption",
-            CircuitName::DkgESmShareDecryption => "dkg_e_sm_share_decryption",
+            CircuitName::ShareEncryption => "share_encryption",
+            CircuitName::DkgShareDecryption => "share_decryption",
             CircuitName::PkAggregation => "pk_aggregation",
-            CircuitName::ThresholdShareDecryption => "threshold_share_decryption",
-            CircuitName::DecryptedSharesAggregation => "decrypted_shares_aggregation",
+            CircuitName::ThresholdShareDecryption => "share_decryption",
+            CircuitName::DecryptedSharesAggregationBn => "decrypted_shares_aggregation_bn",
+            CircuitName::DecryptedSharesAggregationMod => "decrypted_shares_aggregation_mod",
         }
     }
 
@@ -82,14 +79,13 @@ impl CircuitName {
             CircuitName::PkBfv => "dkg",
             CircuitName::SkShareComputation => "dkg",
             CircuitName::ESmShareComputation => "dkg",
-            CircuitName::SkShareEncryption => "dkg",
-            CircuitName::ESmShareEncryption => "dkg",
-            CircuitName::DkgSkShareDecryption => "dkg",
-            CircuitName::DkgESmShareDecryption => "dkg",
+            CircuitName::ShareEncryption => "dkg",
+            CircuitName::DkgShareDecryption => "dkg",
             CircuitName::PkGeneration => "threshold",
             CircuitName::ThresholdShareDecryption => "threshold",
             CircuitName::PkAggregation => "threshold",
-            CircuitName::DecryptedSharesAggregation => "threshold",
+            CircuitName::DecryptedSharesAggregationBn => "threshold",
+            CircuitName::DecryptedSharesAggregationMod => "threshold",
         }
     }
 

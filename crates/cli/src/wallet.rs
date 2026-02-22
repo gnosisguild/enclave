@@ -7,8 +7,9 @@
 use anyhow::*;
 use clap::Subcommand;
 use e3_config::AppConfig;
+use zeroize::Zeroizing;
 
-use crate::wallet_set;
+use crate::{helpers::ensure_hex_zeroizing, wallet_get, wallet_set};
 
 #[derive(Subcommand, Debug)]
 pub enum WalletCommands {
@@ -16,22 +17,17 @@ pub enum WalletCommands {
     Set {
         /// The private key - note we are leaving as hex string as it is easier to manage with
         /// the allow Signer coercion
-        #[arg(long = "private-key", value_parser = ensure_hex)]
-        private_key: Option<String>,
+        #[arg(long = "private-key", value_parser = ensure_hex_zeroizing)]
+        private_key: Option<Zeroizing<String>>,
     },
-}
-
-fn ensure_hex(s: &str) -> Result<String> {
-    if !s.starts_with("0x") {
-        bail!("hex value must start with '0x'")
-    }
-    hex::decode(&s[2..])?;
-    Ok(s.to_string())
+    /// Get your wallet address
+    Get,
 }
 
 pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
         WalletCommands::Set { private_key } => wallet_set::execute(&config, private_key).await?,
+        WalletCommands::Get => wallet_get::execute(&config).await?,
     };
 
     Ok(())

@@ -4,16 +4,29 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{Fhe, FheRepositoryFactory};
+use crate::runtime::{Fhe, FheSnapshot};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
-use e3_events::{prelude::*, BusHandle, E3Requested, EType, EnclaveEvent, EnclaveEventData};
+use e3_data::{FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot};
+use e3_events::{
+    prelude::*, BusHandle, E3Requested, E3id, EType, EnclaveEvent, EnclaveEventData, StoreKeys,
+};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use e3_utils::SharedRng;
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
+
+/// Factory for FHE snapshot storage per E3 instance.
+pub trait FheRepositoryFactory {
+    fn fhe(&self, e3_id: &E3id) -> Repository<FheSnapshot>;
+}
+
+impl FheRepositoryFactory for Repositories {
+    fn fhe(&self, e3_id: &E3id) -> Repository<FheSnapshot> {
+        Repository::new(self.store.scope(StoreKeys::fhe(e3_id)))
+    }
+}
 
 /// TODO: move these to each package with access on MyStruct::launcher()
 pub struct FheExtension {
@@ -40,14 +53,9 @@ impl E3Extension for FheExtension {
             return;
         };
 
-        let E3Requested {
-            params,
-            seed,
-            e3_id,
-            ..
-        } = data.clone();
+        let E3Requested { params, e3_id, .. } = data.clone();
 
-        let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
+        let Ok(fhe_inner) = Fhe::from_encoded(&params, self.rng.clone()) else {
             self.bus
                 .err(EType::KeyGeneration, anyhow!(ERROR_FHE_FAILED_TO_DECODE));
             return;

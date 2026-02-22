@@ -3,18 +3,15 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use e3_bfv_client::decode_bytes_to_vec_u64;
 use e3_crypto::Cipher;
-use e3_fhe::create_crp;
+use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::DEFAULT_BFV_PRESET;
 use e3_fhe_params::{encode_bfv_params, BfvParamSet};
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
+use e3_test_helpers::{create_shared_rng_from_u64, usecase_helpers};
 use e3_trbfv::{
     calculate_decryption_share::{
         calculate_decryption_share, CalculateDecryptionShareRequest,
@@ -28,8 +25,6 @@ use e3_trbfv::{
 };
 use e3_utils::{to_ordered_vec, ArcBytes};
 use fhe_traits::Serialize;
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
 
 #[tokio::test]
 async fn test_trbfv_isolation() -> Result<()> {
@@ -50,15 +45,10 @@ async fn test_trbfv_isolation() -> Result<()> {
     let threshold_m = 2;
     let threshold_n = 5;
 
-    let seed = create_seed_from_u64(123);
-
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
 
     let trbfv_config = TrBFVConfig::new(params, threshold_n as u64, threshold_m as u64);
-    let crp_raw = create_crp(
-        trbfv_config.params(),
-        Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
-    );
+    let crp_raw = create_deterministic_crp_from_default_seed(&trbfv_config.params());
 
     // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
     let generated =

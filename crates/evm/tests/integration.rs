@@ -109,8 +109,8 @@ async fn evm_reader() -> Result<()> {
         .await?,
     );
     let contract = EmitLogs::deploy(provider.provider()).await?;
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
+    let system = EventSystem::new().with_fresh_bus();
+    let bus = system.handle()?.enable("test");
     let history_collector = bus.history();
 
     let chain_id = provider.chain_id();
@@ -179,8 +179,8 @@ async fn ensure_historical_events() -> Result<()> {
     let contract = EmitLogs::deploy(provider.provider()).await?;
     let contract_address = contract.address().clone();
     let chain_id = provider.chain_id();
-    let system = EventSystem::new("test").with_fresh_bus();
-    let bus = system.handle()?;
+    let system = EventSystem::new().with_fresh_bus();
+    let bus = system.handle()?.enable("test");
     let history_collector = bus.history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];

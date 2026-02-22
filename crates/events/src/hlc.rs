@@ -139,7 +139,7 @@ impl From<u128> for HlcTimestamp {
 /// # Example
 ///
 /// ```
-/// # use e3_events::hlc::{Hlc, HlcTimestamp, HlcError};
+/// # use e3_events::hlc::{Hlc, HlcTimestamp, HlcError, HlcMethods};
 /// # fn main() -> Result<(), HlcError> {
 /// let hlc = Hlc::new(1); // Node id
 /// let ts1 = hlc.tick()?;
@@ -270,8 +270,11 @@ impl Hlc {
             .map(|d| d.as_micros() as u64)
             .map_err(|_| HlcError::ClockError)
     }
+}
 
-    pub fn tick(&self) -> Result<HlcTimestamp, HlcError> {
+impl HlcMethods for Hlc {
+    type Error = HlcError;
+    fn tick(&self) -> Result<HlcTimestamp, HlcError> {
         let now = self.now_physical()?;
         let mut inner = self.inner.lock().unwrap();
 
@@ -298,7 +301,7 @@ impl Hlc {
         })
     }
 
-    pub fn receive(&self, remote: &HlcTimestamp) -> Result<HlcTimestamp, HlcError> {
+    fn receive(&self, remote: &HlcTimestamp) -> Result<HlcTimestamp, HlcError> {
         let now = self.now_physical()?;
 
         if remote.ts > now.saturating_add(self.max_drift) {
@@ -350,6 +353,12 @@ impl Hlc {
             node: self.node,
         })
     }
+}
+
+pub trait HlcMethods {
+    type Error: From<HlcError>;
+    fn tick(&self) -> Result<HlcTimestamp, Self::Error>;
+    fn receive(&self, remote: &HlcTimestamp) -> Result<HlcTimestamp, Self::Error>;
 }
 
 #[cfg(test)]

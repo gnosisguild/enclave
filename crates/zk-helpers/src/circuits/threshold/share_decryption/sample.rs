@@ -14,11 +14,11 @@ use std::sync::Arc;
 use crate::{
     threshold::share_decryption::ShareDecryptionCircuitData, CiphernodesCommittee, CircuitsErrors,
 };
-use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
 use fhe::{
     bfv::{Encoding, Plaintext, PublicKey},
-    mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
+    mbfv::{AggregateIter, PublicKeyShare},
     trbfv::{ShareManager, TRBFV},
 };
 use fhe_traits::{FheEncoder, FheEncrypter};
@@ -52,8 +52,7 @@ impl ShareDecryptionCircuitData {
             .map_err(|e| CircuitsErrors::Sample(format!("Failed to create TRBFV: {:?}", e)))?;
 
         // Generate a random secret key and create public key shares
-        let crp = CommonRandomPoly::new(&threshold_params, &mut thread_rng)
-            .map_err(|e| CircuitsErrors::Sample(format!("Failed to create CRP: {:?}", e)))?;
+        let crp = create_deterministic_crp_from_default_seed(&threshold_params);
 
         // Generate secret keys for each party (each party has their own secret key)
         // Each party splits their secret key into shares and sends them to others

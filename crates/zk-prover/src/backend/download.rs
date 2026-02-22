@@ -21,6 +21,7 @@ use super::ZkBackend;
 impl ZkBackend {
     pub async fn download_bb(&self) -> Result<(), ZkError> {
         if self.using_custom_bb {
+            println!("IGNORING DOWNLOAD BECAUSE WE ARE USING A CUSTOM BB");
             return Ok(());
         }
 

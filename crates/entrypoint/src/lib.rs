@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod config_set;
+pub mod config;
 pub mod helpers;
 pub mod net;
 pub mod nodes;

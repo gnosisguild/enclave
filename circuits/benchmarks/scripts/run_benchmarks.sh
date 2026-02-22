@@ -58,8 +58,8 @@ echo "║       Enclave ZK Circuit Benchmark Suite       ║"
 echo "╚════════════════════════════════════════════════╝"
 echo ""
 
-# Read configuration
-ALL_CIRCUITS=$(jq -r '.circuits[]' "$CONFIG_FILE")
+# Read configuration (circuits may be strings or {name, modes[]}; see config.json)
+ALL_CIRCUITS=$(jq -r '.circuits[] | (if type == "string" then . else .name end)' "$CONFIG_FILE")
 ORACLES=$(jq -r '.oracles[]' "$CONFIG_FILE")
 OUTPUT_DIR_BASE=$(jq -r '.output_dir // "results"' "$CONFIG_FILE")
 BIN_DIR=$(jq -r '.bin_dir // "../bin"' "$CONFIG_FILE")
@@ -130,9 +130,24 @@ echo "  Output Directory: ${OUTPUT_DIR}"
 echo ""
 
 # decrypted_shares_aggregation_mod is for insecure only (Q < 128bit); _bn is for secure (large Q)
-# config validates secure configs only, so run only in secure mode
+# Circuit-specific modes come from config.json (e.g. "config" has "modes": ["secure"]); see circuits/benchmarks/config.json
 RUN_CIRCUITS=""
-for c in $CIRCUITS; do
+CIRCUIT_MODES=$(jq -r '.circuits[] | (if type == "string" then . else .name end) as $path | (if type == "object" and (.modes != null) then (.modes | join(",")) else "insecure,secure" end) | "\($path)\t\(.)"' "$CONFIG_FILE")
+while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    c="${line%%	*}"
+    modes="${line#*	}"
+    # If --circuit filter is set, we iterate over CIRCUITS (one path) and may not have entry in CIRCUIT_MODES; then run it
+    if [ -n "$CIRCUIT_FILTER" ]; then
+        [ "$c" != "$CIRCUIT_FILTER" ] && continue
+    fi
+    # Skip if this circuit is restricted to other mode(s) (see config.json "modes" field)
+    if [ -n "$modes" ] && [ "${modes}" != "insecure,secure" ]; then
+        if [[ ",${modes}," != *",${MODE},"* ]]; then
+            echo "  Skipping $c (config.json restricts to mode(s): $modes; current mode: $MODE)"
+            continue
+        fi
+    fi
     if [ "$MODE" = "secure" ] && [ "$c" = "threshold/decrypted_shares_aggregation_mod" ]; then
         echo "  Skipping $c (modular variant is insecure-only, Q < 128bit)"
         continue
@@ -141,12 +156,12 @@ for c in $CIRCUITS; do
         echo "  Skipping $c (BigNum variant is for secure/large Q only)"
         continue
     fi
-    if [ "$MODE" = "insecure" ] && [ "$c" = "config" ]; then
-        echo "  Skipping $c (config circuit validates secure configs only)"
-        continue
-    fi
     RUN_CIRCUITS="${RUN_CIRCUITS} ${c}"
-done
+done <<< "$CIRCUIT_MODES"
+# When --circuit was given but not in config.json, no line matched; run it anyway if path exists (see note above)
+if [ -n "$CIRCUIT_FILTER" ] && [ -z "$RUN_CIRCUITS" ] && ! echo "$ALL_CIRCUITS" | grep -qx "$CIRCUIT_FILTER" 2>/dev/null; then
+    RUN_CIRCUITS="$CIRCUIT_FILTER"
+fi
 RUN_CIRCUITS=$(echo "$RUN_CIRCUITS" | xargs)
 echo ""
 
@@ -218,13 +233,9 @@ REPORT_FILE="${BENCHMARKS_DIR}/${OUTPUT_DIR}/report.md"
 echo "✓ Report generated: ${REPORT_FILE}"
 echo ""
 
-# Remove raw JSON folder after report is generated
-RAW_DIR="${BENCHMARKS_DIR}/${OUTPUT_DIR}/raw"
-if [ -d "$RAW_DIR" ]; then
-    rm -rf "$RAW_DIR"
-    echo "✓ Removed raw data: ${RAW_DIR}"
-    echo ""
-fi
+# Keep raw/ so that a later run with --circuit only overwrites that circuit's JSON and the
+# report is regenerated from the full set (existing + updated). Delete results_<mode>/raw
+# manually if you want a clean slate for the next full run.
 
 # Clean artifacts if requested
 if [ "$CLEAN_ARTIFACTS" = true ]; then
