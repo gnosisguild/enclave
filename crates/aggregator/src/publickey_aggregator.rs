@@ -200,6 +200,11 @@ impl Handler<EnclaveEvent> for PublicKeyAggregator {
             }
             EnclaveEventData::E3RequestComplete(_) => self.notify_sync(ctx, Die),
             EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Only process raw events from chain (party_id not yet resolved).
+                if data.party_id.is_some() {
+                    return;
+                }
+
                 let node_addr = data.node.to_string();
 
                 if data.e3_id != self.e3_id {

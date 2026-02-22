@@ -169,6 +169,7 @@ impl From<CommitteeMemberExpelledWithChainId> for e3_events::CommitteeMemberExpe
             node: value.0.node,
             reason: value.0.reason.into(),
             active_count_after: value.0.activeCountAfter.to(),
+            party_id: None,
         }
     }
 }

@@ -57,14 +57,18 @@ pub struct CommitteeMemberExpelled {
     pub reason: [u8; 32],
     /// Number of active committee members remaining after expulsion.
     pub active_count_after: u64,
+    /// Party ID (position in the committee list) of the expelled member.
+    /// `None` when read from chain (not yet resolved); `Some(id)` after
+    /// enrichment by the Sortition actor.
+    pub party_id: Option<u64>,
 }
 
 impl Display for CommitteeMemberExpelled {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "CommitteeMemberExpelled {{ e3_id: {}, node: {}, active_count_after: {} }}",
-            self.e3_id, self.node, self.active_count_after
+            "CommitteeMemberExpelled {{ e3_id: {}, node: {}, active_count_after: {}, party_id: {:?} }}",
+            self.e3_id, self.node, self.active_count_after, self.party_id
         )
     }
 }

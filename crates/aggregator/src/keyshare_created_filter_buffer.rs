@@ -71,6 +71,11 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 self.process_buffered_events();
             }
             EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Only process raw events from chain (party_id not yet resolved).
+                if data.party_id.is_some() {
+                    return;
+                }
+
                 // Remove expelled node so we don't forward late KeyshareCreated events from them
                 if let Some(ref mut committee) = self.committee {
                     let node_addr = format!("{:?}", data.node);

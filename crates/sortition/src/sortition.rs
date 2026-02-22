@@ -12,10 +12,11 @@ use alloy::primitives::U256;
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, CommitteeFinalized, CommitteePublished,
-    ConfigurationUpdated, E3Failed, E3Requested, E3Stage, E3StageChanged, EType, EnclaveEvent,
-    EventContext, EventType, OperatorActivationChanged, PlaintextOutputPublished, Seed, Sequenced,
-    TicketBalanceUpdated, TypedEvent,
+    prelude::*, trap, CiphernodeAdded, CiphernodeRemoved, Committee, CommitteeFinalized,
+    CommitteeMemberExpelled, CommitteePublished, ConfigurationUpdated, E3Failed, E3Requested,
+    E3Stage, E3StageChanged, EType, EnclaveEvent, EventContext, EventType,
+    OperatorActivationChanged, PlaintextOutputPublished, Seed, Sequenced, TicketBalanceUpdated,
+    TypedEvent,
 };
 use e3_events::{BusHandle, E3id, EnclaveEventData};
 use e3_utils::{NotifySync, MAILBOX_LIMIT};
@@ -212,7 +213,7 @@ pub struct Sortition {
     /// Event bus for error reporting and enclave event subscription.
     bus: BusHandle,
     /// Persistent map of finalized committees per E3
-    finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
+    finalized_committees: Persistable<HashMap<e3_events::E3id, Committee>>,
     /// Address for the CiphernodeSelector
     ciphernode_selector: Addr<CiphernodeSelector>,
     /// Address for the current node
@@ -229,7 +230,7 @@ pub struct SortitionParams {
     /// Node state store per chain
     pub node_state: Persistable<HashMap<u64, NodeStateStore>>,
     /// Persistent map of finalized committees per E3
-    pub finalized_committees: Persistable<HashMap<e3_events::E3id, Vec<String>>>,
+    pub finalized_committees: Persistable<HashMap<e3_events::E3id, Committee>>,
     /// Address for the CiphernodeSelector
     pub ciphernode_selector: Addr<CiphernodeSelector>,
     /// Address for the current node
@@ -253,7 +254,7 @@ impl Sortition {
         bus: &BusHandle,
         backends_store: Repository<HashMap<u64, SortitionBackend>>,
         node_state_store: Repository<HashMap<u64, NodeStateStore>>,
-        committees_store: Repository<HashMap<e3_events::E3id, Vec<String>>>,
+        committees_store: Repository<HashMap<e3_events::E3id, Committee>>,
         default_backend: SortitionBackend,
         ciphernode_selector: Addr<CiphernodeSelector>,
         address: &str,
@@ -289,6 +290,7 @@ impl Sortition {
                 EventType::CommitteePublished,
                 EventType::PlaintextOutputPublished,
                 EventType::CommitteeFinalized,
+                EventType::CommitteeMemberExpelled,
                 EventType::E3Failed,
                 EventType::E3StageChanged,
             ],
@@ -331,23 +333,21 @@ impl Sortition {
             })
     }
 
-    fn get_committe(&self, e3_id: &E3id) -> Vec<String> {
+    fn get_committee(&self, e3_id: &E3id) -> Option<Committee> {
         self.finalized_committees
             .get()
             .and_then(|committees| committees.get(e3_id).cloned())
-            .unwrap_or_else(|| Vec::new())
     }
 
     fn committee_contains(&mut self, e3_id: E3id, node: String) -> bool {
-        let committee = self.get_committe(&e3_id);
-
-        if committee.len() == 0 {
+        let Some(committee) = self.get_committee(&e3_id) else {
             // Non blocking error
             self.bus.err(
                 EType::Sortition,
                 anyhow!("No finalized committee found for E3 {}", e3_id),
             );
-        }
+            return false;
+        };
 
         committee.contains(&node)
     }
@@ -436,6 +436,9 @@ impl Handler<EnclaveEvent> for Sortition {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             EnclaveEventData::CommitteeFinalized(data) => {
+                self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
             _ => (),
@@ -784,9 +787,64 @@ impl Handler<TypedEvent<CommitteeFinalized>> for Sortition {
             );
 
             self.finalized_committees.try_mutate(&ec, |mut committees| {
-                committees.insert(msg.e3_id.clone(), msg.committee.clone());
+                committees.insert(msg.e3_id.clone(), Committee::new(msg.committee.clone()));
                 Ok(committees)
             })
+        })
+    }
+}
+
+impl Handler<TypedEvent<CommitteeMemberExpelled>> for Sortition {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: TypedEvent<CommitteeMemberExpelled>,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let (data, ec) = msg.into_components();
+
+        // Only process raw events from chain (party_id not yet resolved).
+        // Events we re-publish with party_id set will also arrive here; ignore them.
+        if data.party_id.is_some() {
+            return;
+        }
+
+        trap(EType::Sortition, &self.bus.with_ec(&ec), || {
+            let node_addr = data.node.to_string();
+
+            let Some(committee) = self.get_committee(&data.e3_id) else {
+                warn!(
+                    "CommitteeMemberExpelled for node {} but no finalized committee found for e3_id={}. \
+                     The committee should always be finalized before expulsions.",
+                    node_addr, data.e3_id
+                );
+                return Ok(());
+            };
+
+            let Some(party_id) = committee.party_id_for(&node_addr) else {
+                warn!(
+                    "Expelled node {} not found in committee for e3_id={}",
+                    node_addr, data.e3_id
+                );
+                return Ok(());
+            };
+
+            info!(
+                "Sortition: resolved expelled node {} to party_id={} for e3_id={}, re-publishing enriched event",
+                node_addr, party_id, data.e3_id
+            );
+
+            // Re-publish the event with party_id set to downstream actors
+            self.bus.publish(
+                CommitteeMemberExpelled {
+                    party_id: Some(party_id),
+                    ..data
+                },
+                ec,
+            )?;
+
+            Ok(())
         })
     }
 }
