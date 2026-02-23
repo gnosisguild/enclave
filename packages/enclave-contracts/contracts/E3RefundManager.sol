@@ -44,11 +44,11 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
     /// @notice Tracks claims per E3 per address
     mapping(uint256 e3Id => mapping(address claimer => bool hasClaimed))
         internal _claimed;
-    /// @notice Tracks number of claims made per E3 (for routeSlashedFunds guard)
+    /// @notice Tracks number of claims made per E3
     mapping(uint256 e3Id => uint256 count) internal _claimCount;
-    /// @notice Tracks number of honest node claims made per E3 (for dust fix)
+    /// @notice Tracks number of honest node claims made per E3
     mapping(uint256 e3Id => uint256 count) internal _honestNodeClaimCount;
-    /// @notice Tracks total amount paid to honest nodes per E3 (for dust fix)
+    /// @notice Tracks total amount paid to honest nodes per E3
     mapping(uint256 e3Id => uint256 amount) internal _totalHonestNodePaid;
     /// @notice Maps E3 ID to honest node addresses
     mapping(uint256 e3Id => address[] nodes) internal _honestNodes;

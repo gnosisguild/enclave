@@ -254,7 +254,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.requiresProof, InvalidPolicy());
         require(proof.length != 0, ProofRequired());
 
-        // Evidence replay protection — reason-independent to prevent cross-reason replay (M-05)
+        // Evidence replay protection — reason-independent to prevent cross-reason replay
         bytes32 evidenceKey = keccak256(
             abi.encode(e3Id, operator, keccak256(proof))
         );
@@ -279,7 +279,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.proposer = msg.sender;
         p.proofHash = keccak256(proof);
         p.proofVerified = true;
-        // Snapshot behavioral flags from policy at proposal time
         p.banNode = policy.banNode;
         p.affectsCommittee = policy.affectsCommittee;
         p.failureReason = policy.failureReason;
@@ -312,7 +311,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.enabled, SlashReasonDisabled());
         require(!policy.requiresProof, InvalidPolicy());
 
-        // Evidence replay protection — reason-independent to prevent cross-reason replay (M-05)
+        // Evidence replay protection — reason-independent to prevent cross-reason replay
         bytes32 evidenceKey = keccak256(
             abi.encode(e3Id, operator, keccak256(evidence))
         );
@@ -447,7 +446,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
         //    The staticcall MUST succeed — if the verifier reverts or doesn't exist,
-        //    we cannot determine fault and must not slash (M-04 fix).
+        //    we cannot determine fault and must not slash.
         (bool callSuccess, bytes memory returnData) = policyVerifier.staticcall(
             abi.encodeCall(ICircuitVerifier.verify, (zkProof, publicInputs))
         );
