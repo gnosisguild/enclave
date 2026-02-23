@@ -13,7 +13,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Variant for input types for DKG.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize, Hash)]
 pub enum DkgInputType {
     /// The input type that generates shares of a secret key using secret sharing.
     SecretKey,
