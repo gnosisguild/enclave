@@ -462,7 +462,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Run Noir tests
         working-directory: ./examples/CRISP
@@ -551,7 +551,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: crisp-sdk-artifacts
-          path: ./examples/CRISP
+          path: .
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
