@@ -761,6 +761,8 @@ jobs:
             packages/enclave-contracts/cache
             packages/enclave-contracts/types
             crates/wasm/dist
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
+            circuits/bin/threshold/target
           retention-days: 1
           if-no-files-found: warn
 

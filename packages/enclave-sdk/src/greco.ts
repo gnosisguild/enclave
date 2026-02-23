@@ -4,18 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
-import { type CompiledCircuit, Noir } from '@noir-lang/noir_js'
+import { BackendType, Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
+import userDataEncryptionCt0Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
+import userDataEncryptionCt1Circuit from '../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
+import userDataEncryptionCircuit from '../../../circuits/bin/recursive_aggregation/wrapper/threshold/target/user_data_encryption.json'
+import { CompiledCircuit, Noir } from '@noir-lang/noir_js'
+import { proofToFields } from './utils'
 
 // Conversion to Noir types
 export type Field = string
-
-/**
- * Describes a polynomial to be used in a Noir circuit (Greco)
- */
-export type Polynomial = {
-  coefficients: Field[]
-}
 
 /**
  * Describes the inputs to Greco circuit
@@ -45,13 +42,82 @@ export interface CircuitInputs {
  * @param circuit - The circuit
  * @returns The proof
  */
-export const generateProof = async (circuitInputs: CircuitInputs, circuit: CompiledCircuit): Promise<ProofData> => {
-  const noir = new Noir(circuit)
+export const generateProof = async (circuitInputs: CircuitInputs): Promise<ProofData> => {
+  const api = await Barretenberg.new({ backend: BackendType.WasmWorker })
 
-  const api = await Barretenberg.new({ threads: 4 })
-  const backend = new UltraHonkBackend(circuit.bytecode, api)
+  try {
+    await api.initSRSChonk(2 ** 21) // fold circuit needs 2^21 points; default is 2^20
 
-  const { witness } = await noir.execute(circuitInputs as any)
+    const { witness: userDataEncryptionCt0Witness } = await executeCircuit(userDataEncryptionCt0Circuit as CompiledCircuit, {
+      pk0is: circuitInputs.pk0is,
+      ct0is: circuitInputs.ct0is,
+      u: circuitInputs.u,
+      e0: circuitInputs.e0,
+      e0is: circuitInputs.e0is,
+      e0_quotients: circuitInputs.e0_quotients,
+      k1: circuitInputs.k1,
+      r1is: circuitInputs.r1is,
+      r2is: circuitInputs.r2is,
+    })
+    const { witness: userDataEncryptionCt1Witness } = await executeCircuit(userDataEncryptionCt1Circuit as CompiledCircuit, {
+      pk1is: circuitInputs.pk1is,
+      ct1is: circuitInputs.ct1is,
+      u: circuitInputs.u,
+      e1: circuitInputs.e1,
+      p1is: circuitInputs.p1is,
+      p2is: circuitInputs.p2is,
+    })
 
-  return await backend.generateProof(witness, { keccakZK: true })
+    const userDataEncryptionCt0Backend = new UltraHonkBackend((userDataEncryptionCt0Circuit as CompiledCircuit).bytecode, api)
+    const userDataEncryptionCt1Backend = new UltraHonkBackend((userDataEncryptionCt1Circuit as CompiledCircuit).bytecode, api)
+
+    const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
+      await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
+        verifierTarget: 'noir-recursive-no-zk',
+      })
+    const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
+      await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
+        verifierTarget: 'noir-recursive-no-zk',
+      })
+
+    const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
+      userDataEncryptionCt0Proof,
+      userDataEncryptionCt0PublicInputs.length,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+    const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
+      userDataEncryptionCt1Proof,
+      userDataEncryptionCt1PublicInputs.length,
+      {
+        verifierTarget: 'noir-recursive-no-zk',
+      },
+    )
+
+    const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
+      ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
+      ct0_proof: proofToFields(userDataEncryptionCt0Proof),
+      ct0_public_inputs: userDataEncryptionCt0PublicInputs,
+      ct0_key_hash: userDataEncryptionCt0Artifacts.vkHash,
+      ct1_verification_key: userDataEncryptionCt1Artifacts.vkAsFields,
+      ct1_proof: proofToFields(userDataEncryptionCt1Proof),
+      ct1_public_inputs: userDataEncryptionCt1PublicInputs,
+      ct1_key_hash: userDataEncryptionCt1Artifacts.vkHash,
+    })
+
+    const userDataEncryptionBackend = new UltraHonkBackend((userDataEncryptionCircuit as CompiledCircuit).bytecode, api)
+
+    return await userDataEncryptionBackend.generateProof(userDataEncryptionWitness, {
+      verifierTarget: 'noir-recursive-no-zk',
+    })
+  } finally {
+    api.destroy()
+  }
+}
+
+const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Promise<{ witness: Uint8Array; returnValue: any }> => {
+  const noir = new Noir(circuit as CompiledCircuit)
+
+  return noir.execute(inputs)
 }
