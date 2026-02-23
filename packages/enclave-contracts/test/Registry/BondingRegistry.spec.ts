@@ -97,6 +97,8 @@ describe("BondingRegistry", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: AddressOne,
+            ciphernodeRegistry: AddressOne,
+            enclave: AddressOne,
           },
         },
       },

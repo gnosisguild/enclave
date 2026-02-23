@@ -57,6 +57,10 @@ contract EnclaveTicketToken is
     /// @dev Only this contract can call restricted functions like depositFor, withdrawTo, burnTickets, and payout
     address public registry;
 
+    /// @notice Tracks slashed funds available for payout (L-12 defense-in-depth)
+    /// @dev Incremented by burnTickets, decremented by payout. Prevents payout exceeding slashed amount.
+    uint256 public payableBalance;
+
     /// @notice Restricts function access to only the registry contract
     /// @dev Reverts with NotRegistry if caller is not the registry address
     modifier onlyRegistry() {
@@ -101,6 +105,7 @@ contract EnclaveTicketToken is
      * @dev Only callable by the registry contract. Transfers underlying tokens from the registry to
      *      this contract and mints an equivalent amount of ticket tokens. Automatically delegates
      *      voting power to the operator on their first deposit to enable voting power tracking.
+     *      Combined with delegate() reverting DelegationLocked(), operators permanently self-delegate.
      * @param operator Address to receive the minted ticket tokens
      * @param amount Number of underlying tokens to deposit and ticket tokens to mint
      * @return success True if the deposit and minting succeeded
@@ -172,6 +177,7 @@ contract EnclaveTicketToken is
         address operator,
         uint256 amount
     ) external onlyRegistry {
+        payableBalance += amount;
         _burn(operator, amount);
     }
 
@@ -182,7 +188,16 @@ contract EnclaveTicketToken is
      * @param amount Amount of ticket tokens to payout.
      */
     function payout(address to, uint256 amount) external onlyRegistry {
+        require(amount <= payableBalance, "Exceeds payable balance");
+        payableBalance -= amount;
         SafeERC20.safeTransfer(IERC20(address(underlying())), to, amount);
+    }
+
+    /**
+     * @dev Override approve to revert — ticket tokens are non-transferable.
+     */
+    function approve(address, uint256) public pure override returns (bool) {
+        revert TransferNotAllowed();
     }
 
     /**

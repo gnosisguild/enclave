@@ -239,4 +239,5 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export { useVoteManagementContext, VoteManagementProvider }

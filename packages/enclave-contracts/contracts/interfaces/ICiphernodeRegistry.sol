@@ -41,6 +41,8 @@ interface ICiphernodeRegistry {
         address[] committee;
         mapping(address node => bool submitted) submitted;
         mapping(address node => uint256 score) scoreOf;
+        mapping(address node => bool active) active;
+        uint256 activeCount;
     }
 
     /// @notice This event MUST be emitted when a committee is selected for an E3.
@@ -97,6 +99,30 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 for which the committee status changed.
     /// @param active True if committee is now active, false if completed.
     event CommitteeActivationChanged(uint256 indexed e3Id, bool active);
+
+    /// @notice This event MUST be emitted when a committee member is expelled due to slashing.
+    /// @param e3Id ID of the E3 for which the member was expelled.
+    /// @param node Address of the expelled committee member.
+    /// @param reason Hash of the slash reason that caused the expulsion.
+    /// @param activeCountAfter Number of active committee members remaining after expulsion.
+    event CommitteeMemberExpelled(
+        uint256 indexed e3Id,
+        address indexed node,
+        bytes32 reason,
+        uint256 activeCountAfter
+    );
+
+    /// @notice This event MUST be emitted when committee viability changes after an expulsion.
+    /// @param e3Id ID of the E3.
+    /// @param activeCount Current number of active committee members.
+    /// @param thresholdM The minimum threshold (M) required.
+    /// @param viable Whether the committee is still viable (activeCount >= M).
+    event CommitteeViabilityUpdated(
+        uint256 indexed e3Id,
+        uint256 activeCount,
+        uint256 thresholdM,
+        bool viable
+    );
 
     /// @notice This event MUST be emitted when `enclave` is set.
     /// @param enclave Address of the enclave contract.
@@ -249,4 +275,49 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 computation
     /// @return committeeDeadline The committee deadline timestamp
     function getCommitteeDeadline(uint256 e3Id) external view returns (uint256);
+
+    /// @notice Expel a committee member from a specific E3 committee due to slashing
+    /// @dev Only callable by SlashingManager. Idempotent (re-expelling same member is no-op).
+    ///      Returns viability data so the caller can decide whether to fail the E3 —
+    ///      eliminating the need for separate getActiveCommitteeCount/getCommitteeThreshold calls.
+    /// @param e3Id ID of the E3 computation
+    /// @param node Address of the committee member to expel
+    /// @param reason Hash of the slash reason
+    /// @return activeCount Number of active committee members after expulsion
+    /// @return thresholdM The minimum threshold (M) required for viability
+    function expelCommitteeMember(
+        uint256 e3Id,
+        address node,
+        bytes32 reason
+    ) external returns (uint256 activeCount, uint32 thresholdM);
+
+    /// @notice Check if a committee member is still active for a specific E3
+    /// @param e3Id ID of the E3 computation
+    /// @param node Address of the committee member to check
+    /// @return active Whether the member is still active in the committee
+    function isCommitteeMemberActive(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool active);
+
+    /// @notice Get active (non-expelled) committee nodes for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return nodes Array of active committee member addresses
+    function getActiveCommitteeNodes(
+        uint256 e3Id
+    ) external view returns (address[] memory nodes);
+
+    /// @notice Get the count of active committee members for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return count Number of active committee members
+    function getActiveCommitteeCount(
+        uint256 e3Id
+    ) external view returns (uint256 count);
+
+    /// @notice Get the threshold configuration for an E3 committee
+    /// @param e3Id ID of the E3 computation
+    /// @return threshold The [M, N] threshold array
+    function getCommitteeThreshold(
+        uint256 e3Id
+    ) external view returns (uint32[2] memory threshold);
 }

@@ -16,6 +16,7 @@ const contractMapping: Record<string, string> = {
   Enclave: 'enclave',
   CiphernodeRegistryOwnable: 'ciphernode_registry',
   BondingRegistry: 'bonding_registry',
+  SlashingManager: 'slashing_manager',
   MockUSDC: 'fee_token',
 }
 

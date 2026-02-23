@@ -13,6 +13,7 @@ import { getEnclaveSDKConfig } from '@/utils/sdk-config'
 // TYPES & ENUMS
 // ============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export enum WizardStep {
   CONNECT_WALLET = 1,
   REQUEST_COMPUTATION = 2,
@@ -61,6 +62,7 @@ interface WizardContextType {
 
 const WizardContext = createContext<WizardContextType | undefined>(undefined)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useWizard = () => {
   const context = useContext(WizardContext)
   if (!context) {
@@ -104,6 +106,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children }) => {
   })
 
   // Auto-advance steps based on state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isConnected) {
       setCurrentStep(WizardStep.CONNECT_WALLET)
@@ -111,6 +114,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children }) => {
       setCurrentStep(WizardStep.REQUEST_COMPUTATION)
     }
   }, [isConnected, sdk.isInitialized, currentStep])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleReset = useCallback(() => {
     setCurrentStep(WizardStep.CONNECT_WALLET)

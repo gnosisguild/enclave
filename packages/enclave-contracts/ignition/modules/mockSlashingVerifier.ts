@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-export default buildModule("MockSlashingVerifier", (m) => {
-  const mockSlashingVerifier = m.contract("MockSlashingVerifier");
+export default buildModule("MockCircuitVerifier", (m) => {
+  const mockCircuitVerifier = m.contract("MockCircuitVerifier");
 
-  return { mockSlashingVerifier };
+  return { mockCircuitVerifier };
 }) as any;

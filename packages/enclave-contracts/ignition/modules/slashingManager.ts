@@ -3,17 +3,19 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("SlashingManager", (m) => {
   const bondingRegistry = m.getParameter("bondingRegistry");
+  const ciphernodeRegistry = m.getParameter("ciphernodeRegistry");
+  const enclave = m.getParameter("enclave");
   const admin = m.getParameter("admin");
 
   const slashingManager = m.contract("SlashingManager", [
     admin,
     bondingRegistry,
+    ciphernodeRegistry,
+    enclave,
   ]);
 
   return { slashingManager };

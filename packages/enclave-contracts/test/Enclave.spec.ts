@@ -43,7 +43,6 @@ describe("Enclave", function () {
     dkgWindow: 3600, // 1 hour
     computeWindow: 3600, // 1 hour
     decryptionWindow: 3600, // 1 hour
-    gracePeriod: 300, // 5 minutes
   };
 
   const inputWindowDuration = 300;
@@ -185,6 +184,8 @@ describe("Enclave", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: addressOne,
+            ciphernodeRegistry: addressOne,
+            enclave: addressOne,
           },
         },
       },
@@ -931,11 +932,8 @@ describe("Enclave", function () {
 
       await enclave.publishCiphertextOutput(e3Id, data, proof);
       await expect(enclave.publishCiphertextOutput(e3Id, data, proof))
-        .to.be.revertedWithCustomError(
-          enclave,
-          "CiphertextOutputAlreadyPublished",
-        )
-        .withArgs(e3Id);
+        .to.be.revertedWithCustomError(enclave, "InvalidStage")
+        .withArgs(e3Id, 3, 4);
     });
     it("reverts if committee duties are over", async function () {
       const {

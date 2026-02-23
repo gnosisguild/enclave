@@ -9,6 +9,9 @@ pragma solidity >=0.8.27;
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     SafeERC20
@@ -26,7 +29,12 @@ import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
  * @notice Implementation of the bonding registry managing operator ticket balances and license bonds
  * @dev Handles deposits, withdrawals, slashing, exits, and integrates with registry and slashing manager
  */
-contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
+// solhint-disable-next-line max-states-count
+contract BondingRegistry is
+    IBondingRegistry,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
     using ExitQueueLib for ExitQueueLib.ExitQueueState;
 
@@ -62,8 +70,11 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @notice Address authorized to perform slashing operations
     address public slashingManager;
 
-    /// @notice Address authorized to distribute rewards to operators
-    address public rewardDistributor;
+    /// @notice Addresses authorized to distribute rewards to operators
+    /// @dev Multiple contracts (Enclave, E3RefundManager) need to distribute rewards.
+    ///      Each authorized distributor must approve this contract for the reward token.
+    mapping(address distributor => bool authorized)
+        public authorizedDistributors;
 
     /// @notice Treasury address that receives slashed funds
     address public slashedFundsTreasury;
@@ -173,6 +184,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         uint64 _exitDelay
     ) public initializer {
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
         setTicketToken(_ticketToken);
         setLicenseToken(_licenseToken);
         setRegistry(_registry);
@@ -304,7 +316,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @inheritdoc IBondingRegistry
     function deregisterOperator(
         uint256[] calldata siblingNodes
-    ) external noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) nonReentrant {
         Operator storage op = operators[msg.sender];
         require(op.registered, NotRegistered());
 
@@ -352,7 +364,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @inheritdoc IBondingRegistry
     function addTicketBalance(
         uint256 amount
-    ) external noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) nonReentrant {
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
 
@@ -371,7 +383,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @inheritdoc IBondingRegistry
     function removeTicketBalance(
         uint256 amount
-    ) external noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) nonReentrant {
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
         require(
@@ -393,7 +405,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc IBondingRegistry
-    function bondLicense(uint256 amount) external noExitInProgress(msg.sender) {
+    function bondLicense(
+        uint256 amount
+    ) external noExitInProgress(msg.sender) nonReentrant {
         require(amount != 0, ZeroAmount());
 
         uint256 balanceBefore = licenseToken.balanceOf(address(this));
@@ -416,7 +430,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @inheritdoc IBondingRegistry
     function unbondLicense(
         uint256 amount
-    ) external noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) nonReentrant {
         require(amount != 0, ZeroAmount());
         require(
             operators[msg.sender].licenseBond >= amount,
@@ -444,7 +458,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function claimExits(
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
-    ) external {
+    ) external nonReentrant {
         (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
             maxTicketAmount,
@@ -573,15 +587,15 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         IERC20 rewardToken,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) external {
-        require(msg.sender == rewardDistributor, OnlyRewardDistributor());
+    ) external nonReentrant {
+        require(authorizedDistributors[msg.sender], OnlyRewardDistributor());
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         uint256 len = recipients.length;
         for (uint256 i = 0; i < len; i++) {
-            if (amounts[i] > 0 && operators[recipients[i]].registered) {
+            if (amounts[i] > 0) {
                 rewardToken.safeTransferFrom(
-                    rewardDistributor,
+                    msg.sender,
                     recipients[i],
                     amounts[i]
                 );
@@ -679,20 +693,27 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         slashingManager = newSlashingManager;
     }
 
-    /// @notice Sets the reward distributor address
-    /// @dev Only callable by owner
-    /// @param newRewardDistributor Address of the reward distributor
+    /// @notice Authorizes an address to distribute rewards
+    /// @dev Only callable by owner. Supports multiple authorized distributors (Enclave + E3RefundManager)
+    /// @param newRewardDistributor Address to authorize as reward distributor
     function setRewardDistributor(
         address newRewardDistributor
     ) public onlyOwner {
-        rewardDistributor = newRewardDistributor;
+        authorizedDistributors[newRewardDistributor] = true;
+    }
+
+    /// @notice Revokes reward distributor authorization
+    /// @dev Only callable by owner
+    /// @param distributor Address to revoke
+    function revokeRewardDistributor(address distributor) public onlyOwner {
+        authorizedDistributors[distributor] = false;
     }
 
     /// @inheritdoc IBondingRegistry
     function withdrawSlashedFunds(
         uint256 ticketAmount,
         uint256 licenseAmount
-    ) public onlyOwner {
+    ) public onlyOwner nonReentrant {
         require(ticketAmount <= slashedTicketBalance, InsufficientBalance());
         require(licenseAmount <= slashedLicenseBond, InsufficientBalance());
 

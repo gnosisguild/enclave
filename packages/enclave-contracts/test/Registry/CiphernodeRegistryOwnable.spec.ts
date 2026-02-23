@@ -134,6 +134,8 @@ describe("CiphernodeRegistryOwnable", function () {
           SlashingManager: {
             admin: ownerAddress,
             bondingRegistry: AddressOne,
+            ciphernodeRegistry: AddressOne,
+            enclave: AddressOne,
           },
         },
       },
@@ -175,7 +177,6 @@ describe("CiphernodeRegistryOwnable", function () {
             dkgWindow: 3600,
             computeWindow: 3600,
             decryptionWindow: 3600,
-            gracePeriod: 300,
           },
         },
       },

@@ -167,6 +167,19 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": false,
+          "internalType": "bytes[]",
+          "name": "e3ProgramParams",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "E3ProgramsParamsRemoved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": true,
           "internalType": "address",
           "name": "e3RefundManager",
@@ -424,6 +437,19 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "slashingManager",
+          "type": "address"
+        }
+      ],
+      "name": "SlashingManagerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "components": [
             {
               "internalType": "uint256",
@@ -438,11 +464,6 @@
             {
               "internalType": "uint256",
               "name": "decryptionWindow",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "gracePeriod",
               "type": "uint256"
             }
           ],
@@ -813,11 +834,6 @@
               "internalType": "uint256",
               "name": "decryptionWindow",
               "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "gracePeriod",
-              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3TimeoutConfig",
@@ -951,6 +967,19 @@
           "type": "bool"
         }
       ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "_e3ProgramsParams",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "removeE3ProgramsParams",
+      "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
     },
@@ -1178,11 +1207,6 @@
               "internalType": "uint256",
               "name": "decryptionWindow",
               "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "gracePeriod",
-              "type": "uint256"
             }
           ],
           "internalType": "struct IEnclave.E3TimeoutConfig",
@@ -1202,5 +1226,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_28-e60a5d7c133605edcf61acdd5ba43ab44ee0928e"
+  "buildInfoId": "solc-0_8_28-2d0c0fb6cf254d92756645139041fc1083954efa"
 }

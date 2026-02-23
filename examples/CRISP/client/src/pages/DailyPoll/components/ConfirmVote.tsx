@@ -15,6 +15,7 @@ const ConfirmVote: React.FC<{ confirmationUrl: string }> = ({ confirmationUrl })
     return () => {
       setTxUrl(undefined)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

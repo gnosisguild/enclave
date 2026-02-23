@@ -26,7 +26,6 @@ const DEFAULT_TIMEOUT_CONFIG = {
   dkgWindow: 7200,
   computeWindow: 86400,
   decryptionWindow: 3600,
-  gracePeriod: 600,
 };
 
 /**
@@ -102,6 +101,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const { slashingManager } = await deployAndSaveSlashingManager({
     admin: ownerAddress,
     bondingRegistry: addressOne,
+    ciphernodeRegistry: addressOne,
+    enclave: addressOne,
     hre,
   });
   const slashingManagerAddress = await slashingManager.getAddress();
@@ -189,8 +190,17 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting BondingRegistry address in SlashingManager...");
   await slashingManager.setBondingRegistry(bondingRegistryAddress);
 
+  console.log("Setting CiphernodeRegistry address in SlashingManager...");
+  await slashingManager.setCiphernodeRegistry(ciphernodeRegistryAddress);
+
+  console.log("Setting Enclave address in SlashingManager...");
+  await slashingManager.setEnclave(enclaveAddress);
+
   console.log("Setting SlashingManager address in BondingRegistry...");
   await bondingRegistry.setSlashingManager(slashingManagerAddress);
+
+  console.log("Setting SlashingManager address in CiphernodeRegistry...");
+  await ciphernodeRegistry.setSlashingManager(slashingManagerAddress);
 
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);

@@ -102,7 +102,7 @@
     }
   },
   "immutableReferences": {
-    "32281": [
+    "33764": [
       {
         "length": 32,
         "start": 91
@@ -164,13 +164,13 @@
         "start": 11964
       }
     ],
-    "32283": [
+    "33766": [
       {
         "length": 32,
         "start": 398
       }
     ],
-    "32285": [
+    "33768": [
       {
         "length": 32,
         "start": 432
@@ -182,5 +182,5 @@
     ]
   },
   "inputSourceName": "project/contracts/verifier/DkgPkVerifier.sol",
-  "buildInfoId": "solc-0_8_28-e60a5d7c133605edcf61acdd5ba43ab44ee0928e"
+  "buildInfoId": "solc-0_8_28-2c25095d1e3a91525c0c4b9447ccae8788bab93f"
 }
