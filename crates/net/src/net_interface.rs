@@ -21,8 +21,8 @@ use libp2p::{
         Record, RecordKey,
     },
     request_response::{
-        self, cbor::Behaviour as CborRequestResponse, Event as RequestResponseEvent,
-        Message as RequestResponseMessage, ProtocolSupport, ResponseChannel,
+        self, cbor, Event as RequestResponseEvent, Message as RequestResponseMessage,
+        ProtocolSupport, ResponseChannel,
     },
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, StreamProtocol, Swarm,
@@ -46,9 +46,8 @@ const MAX_CONSECUTIVE_DIAL_FAILURES: u32 = 3;
 use crate::{
     dialer::dial_peers,
     events::{
-        estimate_hashmap_size, GossipData, NetCommand, NetEvent, OutgoingSyncRequestFailed,
-        OutgoingSyncRequestSucceeded, PutOrStoreError, SyncRequestReceived, SyncRequestValue,
-        SyncResponseValue,
+        GossipData, IncomingRequest, NetCommand, NetEvent, OutgoingRequestFailed,
+        OutgoingRequestSucceeded, PutOrStoreError, RequestPayload, ResponsePayload,
     },
     ContentHash,
 };
@@ -59,7 +58,7 @@ pub struct NodeBehaviour {
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     identify: IdentifyBehaviour,
-    sync: CborRequestResponse<SyncRequestValue, SyncResponseValue>,
+    sync: cbor::Behaviour<RequestPayload, ResponsePayload>,
 }
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
@@ -210,7 +209,7 @@ fn create_behaviour(
     let request_response_config =
         request_response::Config::default().with_request_timeout(Duration::from_secs(30));
 
-    let sync = CborRequestResponse::<SyncRequestValue, SyncResponseValue>::new(
+    let sync = cbor::Behaviour::<RequestPayload, ResponsePayload>::new(
         [(
             StreamProtocol::new("/enclave/sync/0.0.1"),
             ProtocolSupport::Full,
@@ -430,10 +429,10 @@ async fn process_swarm_event(
             debug!("Incoming sync request received (id={})", request_id);
 
             // received a request for events
-            event_tx.send(NetEvent::SyncRequestReceived(SyncRequestReceived {
+            event_tx.send(NetEvent::IncomingRequest(IncomingRequest {
                 request_id,
                 channel: OnceTake::new(channel),
-                value: request,
+                payload: request,
             }))?;
         }
 
@@ -449,9 +448,9 @@ async fn process_swarm_event(
             debug!("Outgoing sync response received (id={request_id})");
             let correlation_id = correlator.expire(request_id)?;
             debug!("Correlated sync response: {correlation_id}");
-            event_tx.send(NetEvent::OutgoingSyncRequestSucceeded(
-                OutgoingSyncRequestSucceeded {
-                    value: response,
+            event_tx.send(NetEvent::OutgoingRequestSucceeded(
+                OutgoingRequestSucceeded {
+                    payload: response,
                     correlation_id,
                 },
             ))?;
@@ -469,12 +468,10 @@ async fn process_swarm_event(
                 peer, request_id, error
             );
             let correlation_id = correlator.expire(request_id)?;
-            event_tx.send(NetEvent::OutgoingSyncRequestFailed(
-                OutgoingSyncRequestFailed {
-                    correlation_id,
-                    error: format!("Outbound sync request failed: {:?}", error),
-                },
-            ))?;
+            event_tx.send(NetEvent::OutgoingRequestFailed(OutgoingRequestFailed {
+                correlation_id,
+                error: format!("Outbound sync request failed: {:?}", error),
+            }))?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Sync(RequestResponseEvent::InboundFailure {
@@ -550,15 +547,15 @@ async fn process_swarm_command(
             handle_remove_records(swarm, keys);
             Ok(())
         }
-        NetCommand::OutgoingSyncRequest {
+        NetCommand::OutgoingRequest {
             correlation_id,
-            value,
+            payload,
         } => {
-            handle_outgoing_sync_request(swarm, correlator, correlation_id, value)?;
+            handle_outgoing_request(swarm, correlator, correlation_id, payload)?;
             Ok(())
         }
-        NetCommand::SyncResponse { value, channel } => {
-            handle_sync_response(swarm, channel, value)?;
+        NetCommand::Response { payload, channel } => {
+            handle_response(swarm, channel, payload)?;
             Ok(())
         }
         NetCommand::Shutdown => {
@@ -753,11 +750,11 @@ fn handle_shutdown(swarm: &mut Swarm<NodeBehaviour>) -> Result<()> {
     Ok(())
 }
 
-fn handle_outgoing_sync_request(
+fn handle_outgoing_request(
     swarm: &mut Swarm<NodeBehaviour>,
     correlator: &mut Correlator,
     correlation_id: CorrelationId,
-    value: SyncRequestValue,
+    payload: RequestPayload,
 ) -> Result<()> {
     debug!("Outgoing sync request (cid={})", correlation_id);
     // TODO:
@@ -777,13 +774,10 @@ fn handle_outgoing_sync_request(
         bail!("No peer found on swarm!")
     };
 
-    debug!(
-        "Sync request payload size: {:?}",
-        estimate_hashmap_size(&value.since)
-    );
+    debug!("Sync request payload size: {:?}", payload.len());
 
     // Request events
-    let query_id = swarm.behaviour_mut().sync.send_request(&peer, value);
+    let query_id = swarm.behaviour_mut().sync.send_request(&peer, payload);
     debug!(
         "Sync request sent: query_id={}, correlation_id={}",
         query_id, correlation_id
@@ -792,15 +786,15 @@ fn handle_outgoing_sync_request(
     Ok(())
 }
 
-fn handle_sync_response(
+fn handle_response(
     swarm: &mut Swarm<NodeBehaviour>,
-    channel: OnceTake<ResponseChannel<SyncResponseValue>>,
-    value: SyncResponseValue,
+    channel: OnceTake<ResponseChannel<ResponsePayload>>,
+    payload: ResponsePayload,
 ) -> Result<()> {
     debug!("Sending sync response");
     let channel = channel.try_take()?;
-    if let Err(value) = swarm.behaviour_mut().sync.send_response(channel, value) {
-        error!("Failed to send sync response: {:?}", value);
+    if let Err(payload) = swarm.behaviour_mut().sync.send_response(channel, payload) {
+        error!("Failed to send sync response: {:?}", payload);
     }
     Ok(())
 }

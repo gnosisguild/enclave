@@ -8,8 +8,8 @@ use crate::ContentHash;
 use actix::Message;
 use anyhow::{bail, Context, Result};
 use e3_events::{
-    AggregateId, CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource,
-    Sequenced, Unsequenced,
+    CorrelationId, DocumentMeta, EnclaveEvent, EventContextAccessors, EventSource, Sequenced,
+    Unsequenced,
 };
 use e3_utils::{ArcBytes, OnceTake};
 use libp2p::{
@@ -27,6 +27,9 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, trace, warn};
+
+pub type RequestPayload = Vec<u8>;
+pub type ResponsePayload = Vec<u8>;
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -67,34 +70,23 @@ impl TryFrom<GossipData> for EnclaveEvent<Unsequenced> {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncRequestValue {
-    pub since: HashMap<AggregateId, u128>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SyncResponseValue {
-    pub events: Vec<GossipData>,
-    pub ts: u128,
-}
-
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
-pub struct SyncRequestReceived {
+pub struct IncomingRequest {
     pub request_id: InboundRequestId,
-    pub value: SyncRequestValue,
-    pub channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+    pub payload: RequestPayload,
+    pub channel: OnceTake<ResponseChannel<ResponsePayload>>,
 }
 
 #[derive(Message, Clone, Debug)]
 #[rtype("()")]
-pub struct OutgoingSyncRequestSucceeded {
-    pub value: SyncResponseValue,
+pub struct OutgoingRequestSucceeded {
+    pub payload: ResponsePayload,
     pub correlation_id: CorrelationId,
 }
 
 #[derive(Debug, Clone)]
-pub struct OutgoingSyncRequestFailed {
+pub struct OutgoingRequestFailed {
     pub correlation_id: CorrelationId,
     pub error: String,
 }
@@ -126,16 +118,15 @@ pub enum NetCommand {
     DhtRemoveRecords { keys: Vec<ContentHash> },
     /// Shutdown signal
     Shutdown,
-    /// Called from the syning node to request libp2p events from a random peer node starting
-    /// from the given timestamp.
-    OutgoingSyncRequest {
+    /// Send a request to a peer and await response
+    OutgoingRequest {
         correlation_id: CorrelationId,
-        value: SyncRequestValue,
+        payload: RequestPayload,
     },
-    /// Send libp2p events back to a peer that requested a sync.
-    SyncResponse {
-        value: SyncResponseValue,
-        channel: OnceTake<ResponseChannel<SyncResponseValue>>,
+    /// Send response back to a peer that made a request
+    Response {
+        payload: ResponsePayload,
+        channel: OnceTake<ResponseChannel<ResponsePayload>>,
     },
 }
 
@@ -146,7 +137,7 @@ impl NetCommand {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
             N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
-            N::OutgoingSyncRequest { correlation_id, .. } => Some(*correlation_id),
+            N::OutgoingRequest { correlation_id, .. } => Some(*correlation_id),
             _ => None,
         }
     }
@@ -207,12 +198,11 @@ pub enum NetEvent {
         count: usize,
         topic: TopicHash,
     },
-    /// A peer node is requesting gossipsub events since the given timestamp.
-    /// Use the provided channel to send a `SyncResponse
-    SyncRequestReceived(SyncRequestReceived),
-    /// Received gossipsub events from a peer in response to a `SyncRequest`.
-    OutgoingSyncRequestSucceeded(OutgoingSyncRequestSucceeded),
-    OutgoingSyncRequestFailed(OutgoingSyncRequestFailed),
+    /// A peer made a request to this node
+    IncomingRequest(IncomingRequest),
+    /// Received response from a peer in response to an outgoing request
+    OutgoingRequestSucceeded(OutgoingRequestSucceeded),
+    OutgoingRequestFailed(OutgoingRequestFailed),
     AllPeersDialed,
 }
 
@@ -232,8 +222,8 @@ impl NetEvent {
             N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
             N::DhtPutRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
-            N::OutgoingSyncRequestSucceeded(msg) => Some(msg.correlation_id),
-            N::OutgoingSyncRequestFailed(msg) => Some(msg.correlation_id),
+            N::OutgoingRequestSucceeded(msg) => Some(msg.correlation_id),
+            N::OutgoingRequestFailed(msg) => Some(msg.correlation_id),
             _ => None,
         }
     }
