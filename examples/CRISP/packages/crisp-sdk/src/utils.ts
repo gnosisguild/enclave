@@ -147,9 +147,8 @@ export const getZeroVote = (numChoices: number): number[] => {
 
 /**
  * Decode bytes to bigint array (little-endian, 8 bytes per value).
- * Uses BigInt to prevent precision loss for u64 values exceeding 2^53-1.
  * @param data The bytes to decode (must be multiple of 8).
- * @returns Array of bigints.
+ * @returns Array of numbers.
  */
 export const decodeBytesToNumbers = (data: Uint8Array): number[] => {
   if (data.length % 8 !== 0) {
