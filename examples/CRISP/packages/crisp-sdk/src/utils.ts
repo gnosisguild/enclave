@@ -133,7 +133,7 @@ export const getMaxVoteValue = (numChoices: number): number => {
   const bfvParams = ZKInputsGenerator.withDefaults().getBFVParams()
   const segmentSize = Math.floor(bfvParams.degree / numChoices)
   const effectiveBits = Math.min(segmentSize, MAX_VOTE_BITS)
-  return (1 << effectiveBits) - 1
+  return 2 ** effectiveBits - 1
 }
 
 /**
