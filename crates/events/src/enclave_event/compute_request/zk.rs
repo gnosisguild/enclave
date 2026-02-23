@@ -17,15 +17,15 @@ use serde::{Deserialize, Serialize};
 pub enum ZkRequest {
     /// Generate proof for BFV public key (C0).
     PkBfv(PkBfvProofRequest),
-    /// Generate proof for PK generation (T1).
+    /// Generate proof for PK generation (C1).
     PkGeneration(PkGenerationProofRequest),
-    /// Generate proof for share and esm computation (T2a and T2b).
+    /// Generate proof for share and esm computation (C2a and C2b).
     ShareComputation(ShareComputationProofRequest),
     /// Generate proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofRequest),
 }
 
-/// Request to generate a proof for share computation (T2a or T2b).
+/// Request to generate a proof for share computation (C2a or C2b).
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ShareComputationProofRequest {
@@ -75,7 +75,7 @@ pub struct ShareEncryptionProofRequest {
     pub row_index: usize,
 }
 
-/// Request to generate a proof for BFV public key generation (T0).
+/// Request to generate a proof for BFV public key generation (C0).
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct PkBfvProofRequest {
@@ -136,11 +136,11 @@ impl PkGenerationProofRequest {
 /// ZK proof generation response variants.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ZkResponse {
-    /// Proof for BFV public key (T0).
+    /// Proof for BFV public key (C0).
     PkBfv(PkBfvProofResponse),
-    /// Proof for PK generation (T1a).
+    /// Proof for PK generation (C1).
     PkGeneration(PkGenerationProofResponse),
-    /// Proof for share and esm computation (T2a and T2b).
+    /// Proof for share and esm computation (C2a and C2b).
     ShareComputation(ShareComputationProofResponse),
     /// Proof for share encryption (C3a/C3b).
     ShareEncryption(ShareEncryptionProofResponse),

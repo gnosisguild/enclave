@@ -113,7 +113,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
             .await
             .unwrap();
 
-        // Copy T1 (pk_generation) circuit
+        // Copy C1 (pk_generation) circuit
         let pk_gen_circuit_dir = circuits_dir.join("threshold").join("pk_generation");
         tokio::fs::create_dir_all(&pk_gen_circuit_dir)
             .await
@@ -132,7 +132,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        // Copy T2a (sk_share_computation) circuit
+        // Copy C2a (sk_share_computation) circuit
         let sk_share_comp_circuit_dir = circuits_dir.join("dkg").join("sk_share_computation");
         tokio::fs::create_dir_all(&sk_share_comp_circuit_dir)
             .await
@@ -150,7 +150,7 @@ async fn setup_test_zk_backend() -> (ZkBackend, tempfile::TempDir) {
         .await
         .unwrap();
 
-        // Copy T2b (e_sm_share_computation) circuit
+        // Copy C2b (e_sm_share_computation) circuit
         let e_sm_share_comp_circuit_dir = circuits_dir.join("dkg").join("e_sm_share_computation");
         tokio::fs::create_dir_all(&e_sm_share_comp_circuit_dir)
             .await
@@ -570,12 +570,12 @@ async fn test_trbfv_actor() -> Result<()> {
     // - ComputeRequest + ComputeResponse for GenPkShareAndSkSss = 10
     // - ComputeRequest + ComputeResponse for GenEsiSss = 10
     // - ThresholdSharePending = 5
-    // - ComputeRequest + ComputeResponse for T1 ZK proof = 10
+    // - ComputeRequest + ComputeResponse for C1 ZK proof = 10
     // - 5 ThresholdShareCreated events (one per target party) = 25 total
     // - 1 PkGenerationProofSigned event = 5 total
     // Total: 10 + 10 + 5 + 10 + 25 + 5 = 65 events
     let shares_timer = Instant::now();
-    let expected_count = 10 + 10 + 5 + 10 + 25 + 5; // GenPk + GenEsi + TSPending + T1 ZK + TSCreated + PkGenProof
+    let expected_count = 10 + 10 + 5 + 10 + 25 + 5; // GenPk + GenEsi + TSPending + C1 ZK + TSCreated + PkGenProof
     println!(
         "DEBUG: Waiting for {} share generation events...",
         expected_count

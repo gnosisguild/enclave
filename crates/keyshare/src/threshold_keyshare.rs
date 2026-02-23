@@ -432,7 +432,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle PkGenerationProofSigned - stores the signed T1 proof in state
+    /// Handle PkGenerationProofSigned - stores the signed C1 proof in state
     pub fn handle_pk_generation_proof_signed(
         &mut self,
         msg: TypedEvent<PkGenerationProofSigned>,
@@ -485,22 +485,22 @@ impl ThresholdKeyshare {
         self.state.try_mutate(&ec, |s| {
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
             let updated = match proof_type {
-                ProofType::T1SkShareComputation => AggregatingDecryptionKey {
+                ProofType::C2aSkShareComputation => AggregatingDecryptionKey {
                     signed_sk_share_computation_proof: Some(msg.signed_proof),
                     ..current
                 },
-                ProofType::T1ESmShareComputation => AggregatingDecryptionKey {
+                ProofType::C2bESmShareComputation => AggregatingDecryptionKey {
                     signed_e_sm_share_computation_proof: Some(msg.signed_proof),
                     ..current
                 },
-                ProofType::T1SkShareEncryption => {
+                ProofType::C3aSkShareEncryption => {
                     let mut updated = current;
                     updated
                         .signed_sk_share_encryption_proofs
                         .push(msg.signed_proof);
                     updated
                 }
-                ProofType::T1ESmShareEncryption => {
+                ProofType::C3bESmShareEncryption => {
                     let mut updated = current;
                     updated
                         .signed_e_sm_share_encryption_proofs
@@ -847,7 +847,7 @@ impl ThresholdKeyshare {
             .map(|s| s.decrypt(&self.cipher))
             .collect::<Result<_>>()?;
 
-        // Serialize for T2a/T2b proof requests (encrypted at rest)
+        // Serialize for C2a/C2b proof requests (encrypted at rest)
         let sk_sss_raw = SensitiveBytes::new(
             bincode::serialize(&decrypted_sk_sss)
                 .map_err(|e| anyhow!("Failed to serialize sk_sss: {}", e))?,
@@ -974,7 +974,7 @@ impl ThresholdKeyshare {
         let total_proofs =
             3 + sk_share_encryption_requests.len() + e_sm_share_encryption_requests.len();
         info!(
-            "Publishing ThresholdSharePending for E3 {} ({} proofs: T1, T2a, T2b + {} C3a + {} C3b)",
+            "Publishing ThresholdSharePending for E3 {} ({} proofs: C1, C2a, C2b + {} C3a + {} C3b)",
             e3_id, total_proofs,
             sk_share_encryption_requests.len(),
             e_sm_share_encryption_requests.len()
