@@ -501,6 +501,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
             // If active count drops below M, fail the E3
             if (activeCount < thresholdM && p.failureReason > 0) {
+                // solhint-disable-next-line no-empty-blocks
                 try enclave.onE3Failed(p.e3Id, p.failureReason) {} catch {}
             }
         }

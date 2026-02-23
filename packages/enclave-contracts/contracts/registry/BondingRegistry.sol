@@ -27,10 +27,7 @@ import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
  * @dev Handles deposits, withdrawals, slashing, exits, and integrates with registry and slashing manager
  */
 // solhint-disable-next-line max-states-count
-contract BondingRegistry is
-    IBondingRegistry,
-    OwnableUpgradeable,
-{
+contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     using SafeERC20 for IERC20;
     using ExitQueueLib for ExitQueueLib.ExitQueueState;
 
