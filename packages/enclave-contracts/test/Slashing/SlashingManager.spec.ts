@@ -269,6 +269,7 @@ describe("SlashingManager", function () {
       "Test allocation",
     );
     await slashingManager.addSlasher(await slasher.getAddress());
+    await slashingManager.setCiphernodeRegistry(mockCiphernodeRegistryAddress);
 
     // ── Return ─────────────────────────────────────────────────────────────────
     return {
