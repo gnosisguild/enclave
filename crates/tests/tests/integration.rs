@@ -483,7 +483,7 @@ async fn test_trbfv_actor() -> Result<()> {
     //   - n=5
     //   - lambda=2
     //   - error_size -> calculate using calculate_error_size
-    //   - esi_per_ciphertext = 3
+    //   - esi_per_ciphertext = 1
     ///////////////////////////////////////////////////////////////////////////////////
 
     // Prepare round
@@ -544,68 +544,53 @@ async fn test_trbfv_actor() -> Result<()> {
     ));
 
     // First, wait for all EncryptionKeyCreated events (BFV key exchange)
-    // Each of the 5 parties:
-    // - EncryptionKeyPending = 5
-    // - ComputeRequest (T0 ZK proof) = 5
-    // - ComputeResponse (T0 ZK proof) = 5
-    // - EncryptionKeyCreated = 5
-    // Total: 20 events
+    // The collector (node 0) only sees events forwarded by simulate_libp2p:
+    // - EncryptionKeyCreated × 5 (one per party, passes is_document_publisher_event filter)
+    // Internal events (EncryptionKeyPending, ComputeRequest/Response) stay on committee nodes' local buses.
     let encryption_keys_timer = Instant::now();
-    let expected_count = 5 + 5 + 5 + 5; // EncKeyPending + T0 ComputeReq + T0 ComputeResp + EncKeyCreated
-    println!(
-        "DEBUG: Waiting for {} encryption key events...",
-        expected_count
-    );
-    let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+    let expected = vec![
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+        "EncryptionKeyCreated",
+    ];
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: EncryptionKey phase events: {:?}", h.event_types());
     report.push((
         "All EncryptionKeyCreated events",
         encryption_keys_timer.elapsed(),
     ));
 
-    // Then wait for share generation compute events + ThresholdShareCreated + PkGenerationProofSigned
-    // Each of the 5 parties:
-    // - ComputeRequest + ComputeResponse for GenPkShareAndSkSss = 10
-    // - ComputeRequest + ComputeResponse for GenEsiSss = 10
-    // - ThresholdSharePending = 5
-    // - ComputeRequest + ComputeResponse for C1 ZK proof = 10
-    // - 5 ThresholdShareCreated events (one per target party) = 25 total
-    // - 1 PkGenerationProofSigned event = 5 total
-    // Total: 10 + 10 + 5 + 10 + 25 + 5 = 65 events
+    // Then wait for all ThresholdShareCreated events
+    // Each of the 5 parties publishes 5 events (one per target party) = 25 total
+    // Only ThresholdShareCreated passes the simulate_libp2p filter (is_document_publisher_event).
+    // Internal events (ComputeRequest/Response for GenPk, GenEsi, ZK proofs, ThresholdSharePending,
+    // PkGenerationProofSigned, DkgProofSigned) stay on committee nodes' local buses.
     let shares_timer = Instant::now();
-    let expected_count = 10 + 10 + 5 + 10 + 25 + 5; // GenPk + GenEsi + TSPending + C1 ZK + TSCreated + PkGenProof
-    println!(
-        "DEBUG: Waiting for {} share generation events...",
-        expected_count
-    );
-    let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(3000))
+    let expected: Vec<&str> = (0..25).map(|_| "ThresholdShareCreated").collect();
+    let _ = nodes
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(3000))
         .await?;
-    println!(
-        "DEBUG: Share generation phase events: {:?}",
-        h.event_types()
-    );
-    report.push(("All share generation events", shares_timer.elapsed()));
+    report.push(("All ThresholdShareCreated events", shares_timer.elapsed()));
 
-    // Wait for CalculateDecryptionKey compute events + KeyshareCreated + PublicKeyAggregated
-    // Each of the 5 parties:
-    // - ComputeRequest for CalculateDecryptionKey
-    // - ComputeResponse for CalculateDecryptionKey
-    // - KeyshareCreated
-    // Plus 1 PublicKeyAggregated at the end
-    // Total: 5 + 5 + 5 + 1 = 16 events
+    // Wait for KeyshareCreated + PublicKeyAggregated
+    // - KeyshareCreated × 5 (passes is_forwardable_event filter)
+    // - PublicKeyAggregated × 1 (passes is_forwardable_event filter)
+    // Internal events (ComputeRequest/Response for CalculateDecryptionKey) stay on local buses.
     let shares_to_pubkey_agg_timer = Instant::now();
-    let expected_count = 5 + 5 + 5 + 1; // ComputeRequest + ComputeResponse + KeyshareCreated + PublicKeyAggregated
-    println!(
-        "DEBUG: Waiting for {} decryption key events...",
-        expected_count
-    );
+    let expected = vec![
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "PublicKeyAggregated",
+    ];
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: Decryption key phase events: {:?}", h.event_types());
 
     report.push((
         "ThresholdShares -> PublicKeyAggregated",
@@ -674,23 +659,20 @@ async fn test_trbfv_actor() -> Result<()> {
     println!("CiphertextOutputPublished event has been dispatched!");
 
     // Lets grab decryption share events
-    // Each of the 5 parties:
-    // - ComputeRequest for CalculateDecryptionShare
-    // - ComputeResponse for CalculateDecryptionShare
-    // - DecryptionshareCreated
-    // Plus aggregation:
-    // - 1 CiphertextOutputPublished
-    // - 1 ComputeRequest (PlaintextAggregation)
-    // - 1 ComputeResponse (PlaintextAggregation)
-    // - 1 PlaintextAggregated
-    // Total: 1 + 5*3 + 3 = 19 events
-    let expected_count = 1 + (5 * 3) + 3;
-    println!("DEBUG: Waiting for {} decryption events...", expected_count);
+    // The collector sees:
+    // - 1 CiphertextOutputPublished (from shared bus)
+    // - 5 DecryptionshareCreated (from simulate_libp2p, passes is_forwardable_event)
+    // - 1 ComputeRequest (PlaintextAggregation on node 0's own bus)
+    // - 1 ComputeResponse (PlaintextAggregation on node 0's own bus)
+    // - 1 PlaintextAggregated (from node 0's own aggregation actor)
+    // Internal events from committee nodes (ComputeRequest/Response for CalculateDecryptionShare)
+    // stay on their local buses.
+    // Total: 1 + 5 + 1 + 1 + 1 = 9 events
+    let expected_count = 1 + 5 + 1 + 1 + 1;
 
     let h = nodes
         .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
         .await?;
-    println!("DEBUG: Decryption phase events: {:?}", h.event_types());
 
     report.push((
         "Ciphertext published -> PlaintextAggregated",

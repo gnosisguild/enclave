@@ -477,37 +477,41 @@ impl ProofRequestActor {
 
         // Sign and publish C3a proofs (SkShareEncryption)
         for ((_recipient, _row), proof) in &pending.sk_share_encryption_proofs {
-            if let Some(signed) =
+            let Some(signed) =
                 self.sign_proof(e3_id, ProofType::C3aSkShareEncryption, proof.clone())
-            {
-                if let Err(err) = self.bus.publish(
-                    DkgProofSigned {
-                        e3_id: e3_id.clone(),
-                        party_id,
-                        signed_proof: signed,
-                    },
-                    ec.clone(),
-                ) {
-                    error!("Failed to publish SkShareEncryptionProofSigned: {err}");
-                }
+            else {
+                error!("Failed to sign C3a proof — shares will not be published");
+                return;
+            };
+            if let Err(err) = self.bus.publish(
+                DkgProofSigned {
+                    e3_id: e3_id.clone(),
+                    party_id,
+                    signed_proof: signed,
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish SkShareEncryptionProofSigned: {err}");
             }
         }
 
         // Sign and publish C3b proofs (ESmShareEncryption)
         for ((_recipient, _row), proof) in &pending.e_sm_share_encryption_proofs {
-            if let Some(signed) =
+            let Some(signed) =
                 self.sign_proof(e3_id, ProofType::C3bESmShareEncryption, proof.clone())
-            {
-                if let Err(err) = self.bus.publish(
-                    DkgProofSigned {
-                        e3_id: e3_id.clone(),
-                        party_id,
-                        signed_proof: signed,
-                    },
-                    ec.clone(),
-                ) {
-                    error!("Failed to publish ESmShareEncryptionProofSigned: {err}");
-                }
+            else {
+                error!("Failed to sign C3b proof — shares will not be published");
+                return;
+            };
+            if let Err(err) = self.bus.publish(
+                DkgProofSigned {
+                    e3_id: e3_id.clone(),
+                    party_id,
+                    signed_proof: signed,
+                },
+                ec.clone(),
+            ) {
+                error!("Failed to publish ESmShareEncryptionProofSigned: {err}");
             }
         }
 
