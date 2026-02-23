@@ -460,7 +460,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       // Verify member is active before slash
       expect(await registry.isCommitteeMemberActive(0, op1Address)).to.be.true;
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(3);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
       // Submit slash proposal — MockCircuitVerifier returns false by default
       // so fault is confirmed and slash is auto-executed
@@ -488,7 +488,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
 
       // Verify member is no longer active
       expect(await registry.isCommitteeMemberActive(0, op1Address)).to.be.false;
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(2);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
     });
 
     it("should keep E3 alive when active members >= threshold", async function () {
@@ -535,9 +535,10 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       expect(stage).to.not.equal(6); // 6 = E3Stage.Failed
 
       // Active committee still has enough members
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(2);
-      const threshold = await registry.getCommitteeThreshold(0);
-      expect(threshold[0]).to.equal(2); // M=2
+      const { activeCount, thresholdM } =
+        await registry.getCommitteeViability(0);
+      expect(activeCount).to.equal(2);
+      expect(thresholdM).to.equal(2); // M=2
     });
 
     it("should fail E3 when active members drop below threshold", async function () {
@@ -644,7 +645,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         REASON_BAD_DKG,
         proof1,
       );
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(2);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
 
       // Slash operator1 again with different proof (different evidence key)
       const proof2 = await signAndEncodeProof(
@@ -661,7 +662,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       );
 
       // Active count should still be 2 (idempotent expulsion)
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(2);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
     });
 
     it("should exclude expelled members from getActiveCommitteeNodes", async function () {
@@ -744,7 +745,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         operator4,
       ]);
 
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(4);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(4);
 
       // Expel 2 out of 4 — still have 2 >= M=2
       const proof1 = await signAndEncodeProof(
@@ -759,7 +760,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         REASON_BAD_DKG,
         proof1,
       );
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(3);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(3);
 
       const proof2 = await signAndEncodeProof(
         operator2,
@@ -773,7 +774,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         REASON_BAD_DKG,
         proof2,
       );
-      expect(await registry.getActiveCommitteeCount(0)).to.equal(2);
+      expect((await registry.getCommitteeViability(0)).activeCount).to.equal(2);
 
       // E3 should NOT be failed
       const stage = await enclave.getE3Stage(0);

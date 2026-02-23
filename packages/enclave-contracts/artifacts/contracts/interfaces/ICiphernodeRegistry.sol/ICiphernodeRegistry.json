@@ -402,25 +402,6 @@
           "type": "uint256"
         }
       ],
-      "name": "getActiveCommitteeCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "count",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        }
-      ],
       "name": "getActiveCommitteeNodes",
       "outputs": [
         {
@@ -491,12 +472,27 @@
           "type": "uint256"
         }
       ],
-      "name": "getCommitteeThreshold",
+      "name": "getCommitteeViability",
       "outputs": [
         {
-          "internalType": "uint32[2]",
-          "name": "threshold",
-          "type": "uint32[2]"
+          "internalType": "uint256",
+          "name": "activeCount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint32",
+          "name": "thresholdM",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "thresholdN",
+          "type": "uint32"
+        },
+        {
+          "internalType": "bool",
+          "name": "viable",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -534,11 +530,35 @@
           "type": "address"
         }
       ],
+      "name": "isCommitteeMember",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
       "name": "isCommitteeMemberActive",
       "outputs": [
         {
           "internalType": "bool",
-          "name": "active",
+          "name": "",
           "type": "bool"
         }
       ],
@@ -767,5 +787,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-2d0c0fb6cf254d92756645139041fc1083954efa"
+  "buildInfoId": "solc-0_8_28-b0b980b40f181abc37acd0cc4334feb6b35db41a"
 }

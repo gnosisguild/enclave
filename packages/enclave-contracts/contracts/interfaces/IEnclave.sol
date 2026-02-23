@@ -32,6 +32,7 @@ interface IEnclave {
     }
 
     /// @notice Reasons why an E3 failed
+    /// @dev Any new failure reason should be added before _MAX_FAILURE_REASON.
     enum FailureReason {
         None,
         CommitteeFormationTimeout,
@@ -45,7 +46,8 @@ interface IEnclave {
         RequesterCancelled,
         DecryptionTimeout,
         DecryptionInvalidShares,
-        VerificationFailed
+        VerificationFailed,
+        _MAX_FAILURE_REASON
     }
 
     ////////////////////////////////////////////////////////////

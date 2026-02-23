@@ -689,7 +689,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function setRewardDistributor(
         address newRewardDistributor
     ) public onlyOwner {
+        require(newRewardDistributor != address(0), ZeroAddress());
         authorizedDistributors[newRewardDistributor] = true;
+        emit RewardDistributorUpdated(newRewardDistributor, true);
     }
 
     /// @notice Revokes reward distributor authorization
@@ -697,6 +699,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @param distributor Address to revoke
     function revokeRewardDistributor(address distributor) public onlyOwner {
         authorizedDistributors[distributor] = false;
+        emit RewardDistributorUpdated(distributor, false);
     }
 
     /// @inheritdoc IBondingRegistry

@@ -237,7 +237,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         Committee storage c = committees[e3Id];
-        require(!c.initialized, CommitteeAlreadyRequested());
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.None,
+            CommitteeAlreadyRequested()
+        );
 
         uint256 activeCount = bondingRegistry.numActiveOperators();
         require(
@@ -245,8 +248,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             InsufficientCiphernodes(threshold[1], activeCount)
         );
 
-        c.initialized = true;
-        c.finalized = false;
+        c.stage = ICiphernodeRegistry.CommitteeStage.Requested;
         c.seed = seed;
         c.requestBlock = block.number;
         c.committeeDeadline = block.timestamp + sortitionSubmissionWindow;
@@ -277,10 +279,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external onlyOwner {
         Committee storage c = committees[e3Id];
 
-        require(c.initialized, CommitteeNotRequested());
-        require(c.finalized, CommitteeNotFinalized());
+        require(
+            c.stage != ICiphernodeRegistry.CommitteeStage.None,
+            CommitteeNotRequested()
+        );
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Finalized,
+            CommitteeNotFinalized()
+        );
         require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        require(nodes.length == c.committee.length, "Node count mismatch");
+        require(nodes.length == c.topNodes.length, "Node count mismatch");
 
         // TODO: Currently we trust the owner to publish the correct committee.
         // TODO: Need a Proof that the public key is generated from the committee
@@ -338,8 +346,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param ticketNumber The ticket number to submit (1 to available tickets at snapshot)
     function submitTicket(uint256 e3Id, uint256 ticketNumber) external {
         Committee storage c = committees[e3Id];
-        require(c.initialized, CommitteeNotRequested());
-        require(!c.finalized, CommitteeAlreadyFinalized());
+        require(
+            c.stage != ICiphernodeRegistry.CommitteeStage.None,
+            CommitteeNotRequested()
+        );
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Requested,
+            CommitteeAlreadyFinalized()
+        );
         require(
             block.timestamp <= c.committeeDeadline,
             CommitteeDeadlineReached()
@@ -373,17 +387,22 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @return success True if committee formed successfully, false if threshold not met
     function finalizeCommittee(uint256 e3Id) external returns (bool success) {
         Committee storage c = committees[e3Id];
-        require(c.initialized, CommitteeNotRequested());
-        require(!c.finalized, CommitteeAlreadyFinalized());
+        require(
+            c.stage != ICiphernodeRegistry.CommitteeStage.None,
+            CommitteeNotRequested()
+        );
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Requested,
+            CommitteeAlreadyFinalized()
+        );
         require(
             block.timestamp > c.committeeDeadline,
             SubmissionWindowNotClosed()
         );
-        c.finalized = true;
         bool thresholdMet = c.topNodes.length >= c.threshold[1];
 
         if (!thresholdMet) {
-            c.failed = true;
+            c.stage = ICiphernodeRegistry.CommitteeStage.Failed;
             emit CommitteeFormationFailed(
                 e3Id,
                 c.topNodes.length,
@@ -396,11 +415,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             return false;
         }
 
-        c.committee = c.topNodes;
-        // Initialize active committee tracking in Committee struct
-        uint256 committeeLen = c.committee.length;
+        c.stage = ICiphernodeRegistry.CommitteeStage.Finalized;
+        // Mark every finalized member as Active.
+        // Active  → counts toward viability, earns rewards.
+        // Expelled → was a member (enables re-slash via Lane A) but no longer counts.
+        uint256 committeeLen = c.topNodes.length;
         for (uint256 i = 0; i < committeeLen; ++i) {
-            c.active[c.committee[i]] = true;
+            c.memberStatus[c.topNodes[i]] = ICiphernodeRegistry
+                .MemberStatus
+                .Active;
         }
         c.activeCount = committeeLen;
 
@@ -464,7 +487,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @return Whether the submission window is open
     function isOpen(uint256 e3Id) public view returns (bool) {
         Committee storage c = committees[e3Id];
-        if (!c.initialized || c.finalized) return false;
+        if (c.stage != ICiphernodeRegistry.CommitteeStage.Requested)
+            return false;
         return block.timestamp <= c.committeeDeadline;
     }
 
@@ -511,7 +535,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) public view returns (address[] memory nodes) {
         Committee storage c = committees[e3Id];
         require(c.publicKey != bytes32(0), CommitteeNotPublished());
-        nodes = c.committee;
+        nodes = c.topNodes;
     }
 
     /// @notice Returns the current size of the ciphernode IMT
@@ -531,7 +555,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256 e3Id
     ) external view returns (uint256) {
         Committee storage c = committees[e3Id];
-        require(c.initialized, CommitteeNotRequested());
+        require(
+            c.stage != ICiphernodeRegistry.CommitteeStage.None,
+            CommitteeNotRequested()
+        );
         return c.committeeDeadline;
     }
 
@@ -552,16 +579,19 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         returns (uint256 activeCount, uint32 thresholdM)
     {
         Committee storage c = committees[e3Id];
-        require(c.finalized, CommitteeNotFinalized());
+        require(
+            c.stage == ICiphernodeRegistry.CommitteeStage.Finalized,
+            CommitteeNotFinalized()
+        );
         thresholdM = c.threshold[0];
 
-        // Idempotent: if already expelled, return current state
-        if (!c.active[node]) {
+        // Idempotent: if already expelled (or never a member), return current state
+        if (c.memberStatus[node] != ICiphernodeRegistry.MemberStatus.Active) {
             activeCount = c.activeCount;
             return (activeCount, thresholdM);
         }
 
-        c.active[node] = false;
+        c.memberStatus[node] = ICiphernodeRegistry.MemberStatus.Expelled;
         c.activeCount--;
 
         activeCount = c.activeCount;
@@ -577,7 +607,19 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256 e3Id,
         address node
     ) external view returns (bool) {
-        return committees[e3Id].active[node];
+        return
+            committees[e3Id].memberStatus[node] ==
+            ICiphernodeRegistry.MemberStatus.Active;
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function isCommitteeMember(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        return
+            committees[e3Id].memberStatus[node] !=
+            ICiphernodeRegistry.MemberStatus.None;
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -585,14 +627,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256 e3Id
     ) external view returns (address[] memory) {
         Committee storage c = committees[e3Id];
-        uint256 total = c.committee.length;
+        uint256 total = c.topNodes.length;
         uint256 actCount = c.activeCount;
 
         address[] memory activeNodes = new address[](actCount);
         uint256 idx = 0;
         for (uint256 i = 0; i < total; ++i) {
-            if (c.active[c.committee[i]]) {
-                activeNodes[idx] = c.committee[i];
+            if (
+                c.memberStatus[c.topNodes[i]] ==
+                ICiphernodeRegistry.MemberStatus.Active
+            ) {
+                activeNodes[idx] = c.topNodes[i];
                 idx++;
             }
         }
@@ -600,17 +645,23 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function getActiveCommitteeCount(
+    function getCommitteeViability(
         uint256 e3Id
-    ) external view returns (uint256) {
-        return committees[e3Id].activeCount;
-    }
-
-    /// @inheritdoc ICiphernodeRegistry
-    function getCommitteeThreshold(
-        uint256 e3Id
-    ) external view returns (uint32[2] memory) {
-        return committees[e3Id].threshold;
+    )
+        external
+        view
+        returns (
+            uint256 activeCount,
+            uint32 thresholdM,
+            uint32 thresholdN,
+            bool viable
+        )
+    {
+        Committee storage c = committees[e3Id];
+        activeCount = c.activeCount;
+        thresholdM = c.threshold[0];
+        thresholdN = c.threshold[1];
+        viable = activeCount >= thresholdM;
     }
 
     ////////////////////////////////////////////////////////////

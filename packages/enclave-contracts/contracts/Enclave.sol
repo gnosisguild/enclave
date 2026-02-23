@@ -778,7 +778,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint8 reason
     ) external onlyCiphernodeRegistryOrSlashingManager {
         require(
-            reason > 0 && reason <= uint8(FailureReason.VerificationFailed),
+            reason > 0 && reason <= uint8(FailureReason._MAX_FAILURE_REASON),
             "Invalid failure reason"
         );
         // Mark E3 as failed with the given reason

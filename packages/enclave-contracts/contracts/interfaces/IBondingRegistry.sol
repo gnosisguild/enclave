@@ -98,6 +98,16 @@ interface IBondingRegistry {
     );
 
     /**
+     * @notice Emitted when a reward distributor is authorized or revoked
+     * @param distributor Address of the distributor
+     * @param authorized True if authorized, false if revoked
+     */
+    event RewardDistributorUpdated(
+        address indexed distributor,
+        bool authorized
+    );
+
+    /**
      * @notice Emitted when treasury withdraws slashed funds
      * @param to Treasury address
      * @param ticketAmount Amount of slashed ticket balance withdrawn

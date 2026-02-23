@@ -118,10 +118,25 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     }
 
     function isCommitteeMemberActive(
-        uint256,
-        address
-    ) external pure returns (bool) {
-        return true;
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == node) return true;
+        }
+        return false;
+    }
+
+    function isCommitteeMember(
+        uint256 e3Id,
+        address node
+    ) external view returns (bool) {
+        address[] storage nodes = _committeeNodes[e3Id];
+        for (uint256 i = 0; i < nodes.length; i++) {
+            if (nodes[i] == node) return true;
+        }
+        return false;
     }
 
     function getActiveCommitteeNodes(
@@ -130,14 +145,10 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         return new address[](0);
     }
 
-    function getActiveCommitteeCount(uint256) external pure returns (uint256) {
-        return 0;
-    }
-
-    function getCommitteeThreshold(
+    function getCommitteeViability(
         uint256
-    ) external pure returns (uint32[2] memory) {
-        return [uint32(0), uint32(0)];
+    ) external pure returns (uint256, uint32, uint32, bool) {
+        return (0, 0, 0, false);
     }
 }
 
@@ -238,7 +249,11 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint256,
         address
     ) external pure returns (bool) {
-        return true;
+        return false;
+    }
+
+    function isCommitteeMember(uint256, address) external pure returns (bool) {
+        return false;
     }
 
     function getActiveCommitteeNodes(
@@ -247,13 +262,9 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         return new address[](0);
     }
 
-    function getActiveCommitteeCount(uint256) external pure returns (uint256) {
-        return 0;
-    }
-
-    function getCommitteeThreshold(
+    function getCommitteeViability(
         uint256
-    ) external pure returns (uint32[2] memory) {
-        return [uint32(0), uint32(0)];
+    ) external pure returns (uint256, uint32, uint32, bool) {
+        return (0, 0, 0, false);
     }
 }

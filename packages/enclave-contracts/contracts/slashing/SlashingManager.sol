@@ -423,9 +423,15 @@ contract SlashingManager is ISlashingManager, AccessControl {
         address recoveredSigner = ECDSA.recover(ethSignedHash, signature);
         require(recoveredSigner == operator, SignerIsNotOperator());
 
-        // 3. Verify committee membership.
+        // 3. Verify the operator was ever a committee member for this E3.
+        //    We use isCommitteeMember (permanent, never cleared) rather than
+        //    isCommitteeMemberActive (cleared on expulsion), so that a second
+        //    provable fault by the same already-expelled operator can still be
+        //    penalized via Lane A.  The first slash already triggered expulsion
+        //    and (if threshold dropped below M) E3 failure — the financial
+        //    penalty for subsequent faults is still a valid deterrent.
         require(
-            ciphernodeRegistry.isCommitteeMemberActive(e3Id, operator),
+            ciphernodeRegistry.isCommitteeMember(e3Id, operator),
             OperatorNotInCommittee()
         );
 
