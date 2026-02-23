@@ -204,17 +204,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Initializes the registry contract
     /// @dev Can only be called once due to initializer modifier
     /// @param _owner Address that will own the contract
-    /// @param _enclave Address of the Enclave contract
     /// @param _submissionWindow The submission window for the E3 sortition in seconds
     function initialize(
         address _owner,
-        IEnclave _enclave,
         uint256 _submissionWindow
     ) public initializer {
         require(_owner != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
-        setEnclave(_enclave);
         setSortitionSubmissionWindow(_submissionWindow);
         if (_owner != owner()) transferOwnership(_owner);
     }

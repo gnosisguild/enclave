@@ -6,17 +6,9 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("SlashingManager", (m) => {
-  const bondingRegistry = m.getParameter("bondingRegistry");
-  const ciphernodeRegistry = m.getParameter("ciphernodeRegistry");
-  const enclave = m.getParameter("enclave");
   const admin = m.getParameter("admin");
 
-  const slashingManager = m.contract("SlashingManager", [
-    admin,
-    bondingRegistry,
-    ciphernodeRegistry,
-    enclave,
-  ]);
+  const slashingManager = m.contract("SlashingManager", [admin]);
 
   return { slashingManager };
 }) as any;

@@ -41,31 +41,36 @@ describe("BondingRegistry", function () {
   const LICENSE_REQUIRED_BOND = ethers.parseEther("1000");
   const MIN_TICKET_BALANCE = 5;
   async function setup() {
+    // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, operator1, operator2, treasury, notTheOwner] =
       await ethers.getSigners();
-
     const ownerAddress = await owner.getAddress();
     const operator1Address = await operator1.getAddress();
     const operator2Address = await operator2.getAddress();
     const treasuryAddress = await treasury.getAddress();
 
-    const usdcContract = await ignition.deploy(MockStableTokenModule, {
-      parameters: {
-        MockUSDC: {
-          initialSupply: 1000000,
+    // ── Token Contracts ────────────────────────────────────────────────────────
+    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
+      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
+    });
+    const { enclaveToken } = await ignition.deploy(EnclaveTokenModule, {
+      parameters: { EnclaveToken: { owner: ownerAddress } },
+    });
+    const { enclaveTicketToken } = await ignition.deploy(
+      EnclaveTicketTokenModule,
+      {
+        parameters: {
+          EnclaveTicketToken: {
+            baseToken: await mockUSDC.getAddress(),
+            registry: AddressOne,
+            owner: ownerAddress,
+          },
         },
       },
-    });
+    );
 
-    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
-      parameters: {
-        EnclaveToken: {
-          owner: ownerAddress,
-        },
-      },
-    });
-
-    const ciphernodeRegistryContract = await ignition.deploy(
+    // ── Registry & Slashing ────────────────────────────────────────────────────
+    const { mockCiphernodeRegistry } = await ignition.deploy(
       MockCiphernodeRegistryModule,
       {
         parameters: {
@@ -76,45 +81,25 @@ describe("BondingRegistry", function () {
         },
       },
     );
-
-    const ticketTokenContract = await ignition.deploy(
-      EnclaveTicketTokenModule,
-      {
-        parameters: {
-          EnclaveTicketToken: {
-            baseToken: await usdcContract.mockUSDC.getAddress(),
-            registry: AddressOne,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const slashingManagerContract = await ignition.deploy(
+    const { slashingManager: _slashingManager } = await ignition.deploy(
       SlashingManagerModule,
       {
         parameters: {
           SlashingManager: {
             admin: ownerAddress,
-            bondingRegistry: AddressOne,
-            ciphernodeRegistry: AddressOne,
-            enclave: AddressOne,
           },
         },
       },
     );
-
-    const bondingRegistryContract = await ignition.deploy(
+    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
       BondingRegistryModule,
       {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
-            ticketToken:
-              await ticketTokenContract.enclaveTicketToken.getAddress(),
-            licenseToken: await enclTokenContract.enclaveToken.getAddress(),
-            registry:
-              await ciphernodeRegistryContract.mockCiphernodeRegistry.getAddress(),
+            ticketToken: await enclaveTicketToken.getAddress(),
+            licenseToken: await enclaveToken.getAddress(),
+            registry: await mockCiphernodeRegistry.getAddress(),
             slashedFundsTreasury: treasuryAddress,
             ticketPrice: TICKET_PRICE,
             licenseRequiredBond: LICENSE_REQUIRED_BOND,
@@ -125,31 +110,33 @@ describe("BondingRegistry", function () {
       },
     );
 
+    // ── Typed Contract Instances ───────────────────────────────────────────────
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await _bondingRegistry.getAddress(),
       owner,
     );
     const ticketToken = EnclaveTicketTokenFactory.connect(
-      await ticketTokenContract.enclaveTicketToken.getAddress(),
+      await enclaveTicketToken.getAddress(),
       owner,
     );
     const licenseToken = EnclaveTokenFactory.connect(
-      await enclTokenContract.enclaveToken.getAddress(),
+      await enclaveToken.getAddress(),
       owner,
     );
     const usdcToken = MockUSDCFactory.connect(
-      await usdcContract.mockUSDC.getAddress(),
+      await mockUSDC.getAddress(),
       owner,
     );
     const slashingManager = SlashingManagerFactory.connect(
-      await slashingManagerContract.slashingManager.getAddress(),
+      await _slashingManager.getAddress(),
       owner,
     );
     const ciphernodeRegistry = CiphernodeRegistryOwnableFactory.connect(
-      await ciphernodeRegistryContract.mockCiphernodeRegistry.getAddress(),
+      await mockCiphernodeRegistry.getAddress(),
       owner,
     );
 
+    // ── Wire Up Contracts ──────────────────────────────────────────────────────
     await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
@@ -158,29 +145,21 @@ describe("BondingRegistry", function () {
       await slashingManager.getAddress(),
     );
 
-    await usdcToken.mint(ownerAddress, ethers.parseUnits("100000", 6));
-    await usdcToken.mint(operator1Address, ethers.parseUnits("100000", 6));
-    await usdcToken.mint(operator2Address, ethers.parseUnits("100000", 6));
-    await licenseToken.mintAllocation(
-      ownerAddress,
-      ethers.parseEther("100000"),
-      "Test allocation",
-    );
-    await licenseToken.mintAllocation(
-      operator1Address,
-      ethers.parseEther("100000"),
-      "Test allocation",
-    );
-    await licenseToken.mintAllocation(
-      operator2Address,
-      ethers.parseEther("100000"),
-      "Test allocation",
-    );
+    // ── Mint Tokens ────────────────────────────────────────────────────────────
+    const USDC_AMOUNT = ethers.parseUnits("100000", 6);
+    const LICENSE_AMOUNT = ethers.parseEther("100000");
 
+    for (const address of [ownerAddress, operator1Address, operator2Address]) {
+      await usdcToken.mint(address, USDC_AMOUNT);
+      await licenseToken.mintAllocation(
+        address,
+        LICENSE_AMOUNT,
+        "Test allocation",
+      );
+    }
     await licenseToken.setTransferRestriction(false);
 
-    const tree = new LeanIMT(hash);
-
+    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       bondingRegistry,
       ticketToken,
@@ -188,7 +167,6 @@ describe("BondingRegistry", function () {
       usdcToken,
       slashingManager,
       ciphernodeRegistry,
-      tree,
       owner,
       operator1,
       operator2,
@@ -198,6 +176,7 @@ describe("BondingRegistry", function () {
       operator1Address,
       operator2Address,
       treasuryAddress,
+      tree: new LeanIMT(hash),
     };
   }
 

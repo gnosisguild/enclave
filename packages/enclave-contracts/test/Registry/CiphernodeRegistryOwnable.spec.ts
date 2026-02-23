@@ -81,12 +81,13 @@ describe("CiphernodeRegistryOwnable", function () {
 
     await registry.addCiphernode(operatorAddress);
   }
-
   async function setup() {
+    // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, notTheOwner, operator1, operator2] =
       await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
 
+    // ── E3 Program Params ──────────────────────────────────────────────────────
     const abiCoder = ethers.AbiCoder.defaultAbiCoder();
     const polynomial_degree = ethers.toBigInt(2048);
     const plaintext_modulus = ethers.toBigInt(1032193);
@@ -98,28 +99,27 @@ describe("CiphernodeRegistryOwnable", function () {
     const encryptionSchemeId =
       "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
 
-    const usdcContract = await ignition.deploy(MockStableTokenModule, {
-      parameters: {
-        MockUSDC: {
-          initialSupply: 1000000,
-        },
+    // ── Token Contracts ────────────────────────────────────────────────────────
+    const { mockUSDC: usdcToken } = await ignition.deploy(
+      MockStableTokenModule,
+      {
+        parameters: { MockUSDC: { initialSupply: 1_000_000 } },
       },
-    });
+    );
 
-    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
-      parameters: {
-        EnclaveToken: {
-          owner: ownerAddress,
-        },
+    const { enclaveToken: licenseToken } = await ignition.deploy(
+      EnclaveTokenModule,
+      {
+        parameters: { EnclaveToken: { owner: ownerAddress } },
       },
-    });
+    );
 
-    const ticketTokenContract = await ignition.deploy(
+    const { enclaveTicketToken: ticketToken } = await ignition.deploy(
       EnclaveTicketTokenModule,
       {
         parameters: {
           EnclaveTicketToken: {
-            baseToken: await usdcContract.mockUSDC.getAddress(),
+            baseToken: await usdcToken.getAddress(),
             registry: AddressOne,
             owner: ownerAddress,
           },
@@ -127,30 +127,38 @@ describe("CiphernodeRegistryOwnable", function () {
       },
     );
 
-    const slashingManagerContract = await ignition.deploy(
-      SlashingManagerModule,
+    // ── Registry & Slashing ────────────────────────────────────────────────────
+    const { slashingManager } = await ignition.deploy(SlashingManagerModule, {
+      parameters: {
+        SlashingManager: {
+          admin: ownerAddress,
+        },
+      },
+    });
+
+    const { cipherNodeRegistry } = await ignition.deploy(
+      CiphernodeRegistryModule,
       {
         parameters: {
-          SlashingManager: {
-            admin: ownerAddress,
-            bondingRegistry: AddressOne,
-            ciphernodeRegistry: AddressOne,
-            enclave: AddressOne,
+          CiphernodeRegistry: {
+            owner: ownerAddress,
+            submissionWindow: SORTITION_SUBMISSION_WINDOW,
           },
         },
       },
     );
+    const registryAddress = await cipherNodeRegistry.getAddress();
+    const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
 
-    const bondingRegistryContract = await ignition.deploy(
+    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
       BondingRegistryModule,
       {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
-            ticketToken:
-              await ticketTokenContract.enclaveTicketToken.getAddress(),
-            licenseToken: await enclTokenContract.enclaveToken.getAddress(),
-            registry: AddressOne,
+            ticketToken: await ticketToken.getAddress(),
+            licenseToken: await licenseToken.getAddress(),
+            registry: registryAddress,
             slashedFundsTreasury: ownerAddress,
             ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
@@ -160,18 +168,22 @@ describe("CiphernodeRegistryOwnable", function () {
         },
       },
     );
+    const bondingRegistry = BondingRegistryFactory.connect(
+      await _bondingRegistry.getAddress(),
+      owner,
+    );
 
-    const enclaveContract = await ignition.deploy(EnclaveModule, {
+    // ── Enclave ────────────────────────────────────────────────────────────────
+    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
           params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: 60 * 60 * 24 * 30, // 30 days
-          registry: AddressOne, // placeholder, will be updated
-          bondingRegistry:
-            await bondingRegistryContract.bondingRegistry.getAddress(),
-          e3RefundManager: AddressOne, // placeholder, will be updated
-          feeToken: await usdcContract.mockUSDC.getAddress(),
+          registry: registryAddress,
+          bondingRegistry: await bondingRegistry.getAddress(),
+          e3RefundManager: AddressOne, // placeholder — updated below
+          feeToken: await usdcToken.getAddress(),
           timeoutConfig: {
             committeeFormationWindow: 3600,
             dkgWindow: 3600,
@@ -181,109 +193,66 @@ describe("CiphernodeRegistryOwnable", function () {
         },
       },
     });
-
-    const enclaveAddress = await enclaveContract.enclave.getAddress();
+    const enclaveAddress = await _enclave.getAddress();
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
 
-    const e3RefundManagerContract = await ignition.deploy(
-      E3RefundManagerModule,
-      {
-        parameters: {
-          E3RefundManager: {
-            owner: ownerAddress,
-            enclave: enclaveAddress,
-            treasury: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const e3RefundManagerAddress =
-      await e3RefundManagerContract.e3RefundManager.getAddress();
-
-    await enclave.setE3RefundManager(e3RefundManagerAddress);
-
-    // Deploy CiphernodeRegistry with real Enclave address
-    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+    const { e3RefundManager } = await ignition.deploy(E3RefundManagerModule, {
       parameters: {
-        CiphernodeRegistry: {
-          enclaveAddress: enclaveAddress,
+        E3RefundManager: {
           owner: ownerAddress,
-          submissionWindow: SORTITION_SUBMISSION_WINDOW,
+          enclave: enclaveAddress,
+          treasury: ownerAddress,
         },
       },
     });
+    await enclave.setE3RefundManager(await e3RefundManager.getAddress());
 
-    const registryAddress =
-      await registryContract.cipherNodeRegistry.getAddress();
-
-    const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
-
-    // Update Enclave with correct registry address
-    await enclave.setCiphernodeRegistry(registryAddress);
-
-    const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
-      owner,
-    );
-
-    await ticketTokenContract.enclaveTicketToken.setRegistry(
-      await bondingRegistry.getAddress(),
-    );
-    await bondingRegistry.setRegistry(registryAddress);
+    // ── Wire Up Contracts ──────────────────────────────────────────────────────
+    await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await bondingRegistry.setSlashingManager(
-      await slashingManagerContract.slashingManager.getAddress(),
+      await slashingManager.getAddress(),
     );
-    await slashingManagerContract.slashingManager.setBondingRegistry(
+    await bondingRegistry.setRewardDistributor(enclaveAddress);
+    await bondingRegistry.setSlashingManager(
+      await slashingManager.getAddress(),
+    );
+    await slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
     );
+    await registry.setBondingRegistry(await bondingRegistry.getAddress());
+    await registry.setEnclave(enclaveAddress);
 
-    // Set up mock E3Program and DecryptionVerifier for Enclave
-    const mockE3Program = await ignition.deploy(MockE3ProgramModule);
-    const mockDecryptionVerifier = await ignition.deploy(
+    // ── Mock E3 Program & Decryption Verifier ──────────────────────────────────
+    const { mockE3Program } = await ignition.deploy(MockE3ProgramModule);
+    const { mockDecryptionVerifier } = await ignition.deploy(
       MockDecryptionVerifierModule,
     );
 
-    await enclave.enableE3Program(
-      await mockE3Program.mockE3Program.getAddress(),
-    );
+    await enclave.enableE3Program(await mockE3Program.getAddress());
     await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
-      await mockDecryptionVerifier.mockDecryptionVerifier.getAddress(),
+      await mockDecryptionVerifier.getAddress(),
     );
 
-    await bondingRegistry.setRewardDistributor(enclaveAddress);
-
-    await registry.setBondingRegistry(await bondingRegistry.getAddress());
-
-    const tree = new LeanIMT(hash);
-    const licenseToken = enclTokenContract.enclaveToken;
-    const ticketToken = ticketTokenContract.enclaveTicketToken;
-    const usdcToken = usdcContract.mockUSDC;
-
+    // ── Operators ──────────────────────────────────────────────────────────────
     await licenseToken.setTransferRestriction(false);
-    await setupOperatorForSortition(
-      operator1,
-      bondingRegistry,
-      licenseToken,
-      usdcToken,
-      ticketToken,
-      registry,
-    );
-    tree.insert(BigInt(await operator1.getAddress()));
+    const tree = new LeanIMT(hash);
 
-    await setupOperatorForSortition(
-      operator2,
-      bondingRegistry,
-      licenseToken,
-      usdcToken,
-      ticketToken,
-      registry,
-    );
-    tree.insert(BigInt(await operator2.getAddress()));
+    for (const operator of [operator1, operator2]) {
+      await setupOperatorForSortition(
+        operator,
+        bondingRegistry,
+        licenseToken,
+        usdcToken,
+        ticketToken,
+        registry,
+      );
+      tree.insert(BigInt(await operator.getAddress()));
+    }
     await networkHelpers.mine(1);
 
+    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       owner,
       notTheOwner,
@@ -326,11 +295,11 @@ describe("CiphernodeRegistryOwnable", function () {
     const requestParams = {
       threshold: [2, 2] as [number, number],
       inputWindow: [currentTime + 100, currentTime + 300] as [number, number],
-      e3Program: await mockE3Program.mockE3Program.getAddress(),
+      e3Program: await mockE3Program.getAddress(),
       e3ProgramParams: encodedE3ProgramParams,
       computeProviderParams: abiCoder.encode(
         ["address"],
-        [await mockDecryptionVerifier.mockDecryptionVerifier.getAddress()],
+        [await mockDecryptionVerifier.getAddress()],
       ),
       customParams: abiCoder.encode(
         ["address"],
@@ -369,7 +338,7 @@ describe("CiphernodeRegistryOwnable", function () {
 
       const initData = ciphernodeRegistryFactory.interface.encodeFunctionData(
         "initialize",
-        [deployer.address, AddressTwo, SORTITION_SUBMISSION_WINDOW],
+        [deployer.address, SORTITION_SUBMISSION_WINDOW],
       );
 
       const proxyFactory = await ethers.getContractFactory(
@@ -389,7 +358,6 @@ describe("CiphernodeRegistryOwnable", function () {
       );
 
       expect(await ciphernodeRegistry.owner()).to.equal(deployer.address);
-      expect(await ciphernodeRegistry.enclave()).to.equal(AddressTwo);
       expect(await ciphernodeRegistry.sortitionSubmissionWindow()).to.equal(
         SORTITION_SUBMISSION_WINDOW,
       );

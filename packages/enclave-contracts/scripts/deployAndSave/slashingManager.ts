@@ -16,9 +16,6 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  */
 export interface SlashingManagerArgs {
   admin?: string;
-  bondingRegistry?: string;
-  ciphernodeRegistry?: string;
-  enclave?: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -29,9 +26,6 @@ export interface SlashingManagerArgs {
  */
 export const deployAndSaveSlashingManager = async ({
   admin,
-  bondingRegistry,
-  ciphernodeRegistry,
-  enclave,
   hre,
 }: SlashingManagerArgs): Promise<{
   slashingManager: SlashingManager;
@@ -42,17 +36,7 @@ export const deployAndSaveSlashingManager = async ({
 
   const preDeployedArgs = readDeploymentArgs("SlashingManager", chain);
 
-  if (
-    !admin ||
-    !bondingRegistry ||
-    !ciphernodeRegistry ||
-    !enclave ||
-    (preDeployedArgs?.constructorArgs?.admin === admin &&
-      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
-      preDeployedArgs?.constructorArgs?.ciphernodeRegistry ===
-        ciphernodeRegistry &&
-      preDeployedArgs?.constructorArgs?.enclave === enclave)
-  ) {
+  if (!admin || preDeployedArgs?.constructorArgs?.admin === admin) {
     if (!preDeployedArgs?.address) {
       throw new Error(
         "SlashingManager address not found, it must be deployed first",
@@ -67,12 +51,7 @@ export const deployAndSaveSlashingManager = async ({
 
   const slashingManagerFactory =
     await ethers.getContractFactory("SlashingManager");
-  const slashingManager = await slashingManagerFactory.deploy(
-    admin,
-    bondingRegistry,
-    ciphernodeRegistry,
-    enclave,
-  );
+  const slashingManager = await slashingManagerFactory.deploy(admin);
 
   await slashingManager.waitForDeployment();
 
@@ -84,9 +63,6 @@ export const deployAndSaveSlashingManager = async ({
     {
       constructorArgs: {
         admin,
-        bondingRegistry,
-        ciphernodeRegistry,
-        enclave,
       },
       blockNumber,
       address: slashingManagerAddress,

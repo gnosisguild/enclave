@@ -70,8 +70,8 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
   const encryptionSchemeId =
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
-
   const setup = async () => {
+    // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, requester, treasury, operator1, operator2, computeProvider] =
       await ethers.getSigners();
 
@@ -79,34 +79,24 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
     const treasuryAddress = await treasury.getAddress();
     const requesterAddress = await requester.getAddress();
 
-    // Deploy USDC mock
-    const usdcContract = await ignition.deploy(MockStableTokenModule, {
-      parameters: {
-        MockUSDC: {
-          initialSupply: 10000000,
-        },
-      },
+    // ── Token Contracts ────────────────────────────────────────────────────────
+    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
+      parameters: { MockUSDC: { initialSupply: 10_000_000 } },
     });
     const usdcToken = MockUSDCFactory.connect(
-      await usdcContract.mockUSDC.getAddress(),
+      await mockUSDC.getAddress(),
       owner,
     );
 
-    // Deploy ENCL token
-    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
-      parameters: {
-        EnclaveToken: {
-          owner: ownerAddress,
-        },
-      },
+    const { enclaveToken } = await ignition.deploy(EnclaveTokenModule, {
+      parameters: { EnclaveToken: { owner: ownerAddress } },
     });
     const enclToken = EnclaveTokenFactory.connect(
-      await enclTokenContract.enclaveToken.getAddress(),
+      await enclaveToken.getAddress(),
       owner,
     );
 
-    // Deploy ticket token
-    const ticketTokenContract = await ignition.deploy(
+    const { enclaveTicketToken } = await ignition.deploy(
       EnclaveTicketTokenModule,
       {
         parameters: {
@@ -119,32 +109,41 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       },
     );
 
-    // Deploy slashing manager
-    const slashingManagerContract = await ignition.deploy(
-      SlashingManagerModule,
+    // ── Registry & Slashing ────────────────────────────────────────────────────
+    const { slashingManager } = await ignition.deploy(SlashingManagerModule, {
+      parameters: {
+        SlashingManager: {
+          admin: ownerAddress,
+        },
+      },
+    });
+
+    const { cipherNodeRegistry } = await ignition.deploy(
+      CiphernodeRegistryModule,
       {
         parameters: {
-          SlashingManager: {
-            admin: ownerAddress,
-            bondingRegistry: addressOne, // Will be updated
-            ciphernodeRegistry: addressOne, // Will be updated
-            enclave: addressOne, // Will be updated
+          CiphernodeRegistry: {
+            owner: ownerAddress,
+            submissionWindow: SORTITION_SUBMISSION_WINDOW,
           },
         },
       },
     );
+    const ciphernodeRegistryAddress = await cipherNodeRegistry.getAddress();
+    const registry = CiphernodeRegistryOwnableFactory.connect(
+      ciphernodeRegistryAddress,
+      owner,
+    );
 
-    // Deploy bonding registry
-    const bondingRegistryContract = await ignition.deploy(
+    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
       BondingRegistryModule,
       {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
-            ticketToken:
-              await ticketTokenContract.enclaveTicketToken.getAddress(),
+            ticketToken: await enclaveTicketToken.getAddress(),
             licenseToken: await enclToken.getAddress(),
-            registry: addressOne, // Will be updated
+            registry: ciphernodeRegistryAddress,
             slashedFundsTreasury: treasuryAddress,
             ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
@@ -155,47 +154,29 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       },
     );
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await _bondingRegistry.getAddress(),
       owner,
     );
 
-    // Deploy Enclave (with addressOne as temp registry)
-    const enclaveContract = await ignition.deploy(EnclaveModule, {
+    // ── Enclave ────────────────────────────────────────────────────────────────
+    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
           params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS,
-          registry: addressOne,
-          e3RefundManager: addressOne,
+          registry: ciphernodeRegistryAddress,
           bondingRegistry: await bondingRegistry.getAddress(),
+          e3RefundManager: addressOne, // updated below
           feeToken: await usdcToken.getAddress(),
           timeoutConfig: defaultTimeoutConfig,
         },
       },
     });
-    const enclaveAddress = await enclaveContract.enclave.getAddress();
+    const enclaveAddress = await _enclave.getAddress();
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
 
-    // Deploy CiphernodeRegistry
-    const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
-      parameters: {
-        CiphernodeRegistry: {
-          enclaveAddress: enclaveAddress,
-          owner: ownerAddress,
-          submissionWindow: SORTITION_SUBMISSION_WINDOW,
-        },
-      },
-    });
-    const ciphernodeRegistryAddress =
-      await ciphernodeRegistry.cipherNodeRegistry.getAddress();
-    const registry = CiphernodeRegistryOwnableFactory.connect(
-      ciphernodeRegistryAddress,
-      owner,
-    );
-
-    // Deploy E3RefundManager
-    const e3RefundManagerContract = await ignition.deploy(
+    const { e3RefundManager: _e3RefundManager } = await ignition.deploy(
       E3RefundManagerModule,
       {
         parameters: {
@@ -207,37 +188,30 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         },
       },
     );
-    const e3RefundManagerAddress =
-      await e3RefundManagerContract.e3RefundManager.getAddress();
+    const e3RefundManagerAddress = await _e3RefundManager.getAddress();
     const e3RefundManager = E3RefundManagerFactory.connect(
       e3RefundManagerAddress,
       owner,
     );
 
-    // Deploy mock E3 Program
-    const e3ProgramContract = await ignition.deploy(MockE3ProgramModule, {
-      parameters: {
-        MockE3Program: {
-          encryptionSchemeId: encryptionSchemeId,
-        },
-      },
+    // ── Mock E3 Program & Decryption Verifier ──────────────────────────────────
+    const { mockE3Program } = await ignition.deploy(MockE3ProgramModule, {
+      parameters: { MockE3Program: { encryptionSchemeId } },
     });
     const e3Program = MockE3ProgramFactory.connect(
-      await e3ProgramContract.mockE3Program.getAddress(),
+      await mockE3Program.getAddress(),
       owner,
     );
 
-    // Deploy mock decryption verifier
-    const decryptionVerifierContract = await ignition.deploy(
+    const { mockDecryptionVerifier } = await ignition.deploy(
       MockDecryptionVerifierModule,
     );
     const decryptionVerifier = MockDecryptionVerifierFactory.connect(
-      await decryptionVerifierContract.mockDecryptionVerifier.getAddress(),
+      await mockDecryptionVerifier.getAddress(),
       owner,
     );
 
-    // Wire up all the contracts
-    await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    // ── Wire Up Contracts ──────────────────────────────────────────────────────
     await enclave.setE3RefundManager(e3RefundManagerAddress);
     await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.setDecryptionVerifier(
@@ -245,35 +219,28 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
       await decryptionVerifier.getAddress(),
     );
 
-    // Setup bonding registry connections
     await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await bondingRegistry.setRegistry(ciphernodeRegistryAddress);
     await bondingRegistry.setSlashingManager(
-      await slashingManagerContract.slashingManager.getAddress(),
+      await slashingManager.getAddress(),
     );
-    await slashingManagerContract.slashingManager.setBondingRegistry(
+
+    await slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
     );
-    await slashingManagerContract.slashingManager.setCiphernodeRegistry(
-      ciphernodeRegistryAddress,
-    );
-    await slashingManagerContract.slashingManager.setEnclave(enclaveAddress);
+    await slashingManager.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    await slashingManager.setEnclave(enclaveAddress);
+
+    await registry.setEnclave(enclaveAddress);
     await registry.setBondingRegistry(await bondingRegistry.getAddress());
-    await registry.setSlashingManager(
-      await slashingManagerContract.slashingManager.getAddress(),
-    );
+    await registry.setSlashingManager(await slashingManager.getAddress());
 
-    // Update ticket token registry
-    await ticketTokenContract.enclaveTicketToken.setRegistry(
-      await bondingRegistry.getAddress(),
-    );
+    await enclaveTicketToken.setRegistry(await bondingRegistry.getAddress());
 
-    // Mint tokens to requester
+    // ── Mint Tokens ────────────────────────────────────────────────────────────
     await usdcToken.mint(requesterAddress, ethers.parseUnits("10000", 6));
-    // Mint tokens to refund manager for distribution tests
     await usdcToken.mint(e3RefundManagerAddress, ethers.parseUnits("10000", 6));
 
-    // Helper to make E3 request
+    // ── Helpers ────────────────────────────────────────────────────────────────
     const makeRequest = async (
       signer: Signer = requester,
     ): Promise<{ e3Id: number }> => {
@@ -284,7 +251,6 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
-        // computeProviderParams must be exactly 32 bytes for MockE3Program.validate
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
@@ -297,15 +263,15 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
 
       const fee = await enclave.getE3Quote(requestParams);
       await usdcToken.connect(signer).approve(enclaveAddress, fee);
-
       await enclave.connect(signer).request(requestParams);
 
-      // Get e3Id from event (it's 0 for first request)
       return { e3Id: 0 };
     };
 
-    async function setupOperator(operator: Signer) {
+    const setupOperator = async (operator: Signer) => {
       const operatorAddress = await operator.getAddress();
+      const ticketTokenAddress = await bondingRegistry.ticketToken();
+      const ticketAmount = ethers.parseUnits("100", 6);
 
       await enclToken.setTransferRestriction(false);
       await enclToken.mintAllocation(
@@ -323,14 +289,13 @@ describe("E3 Integration - Refund/Timeout Mechanism", function () {
         .bondLicense(ethers.parseEther("1000"));
       await bondingRegistry.connect(operator).registerOperator();
 
-      const ticketTokenAddress = await bondingRegistry.ticketToken();
-      const ticketAmount = ethers.parseUnits("100", 6);
       await usdcToken
         .connect(operator)
         .approve(ticketTokenAddress, ticketAmount);
       await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
-    }
+    };
 
+    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       enclave,
       e3RefundManager,

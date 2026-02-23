@@ -103,25 +103,9 @@ contract SlashingManager is ISlashingManager, AccessControl {
     /**
      * @notice Initializes the SlashingManager contract
      * @param admin Address to receive DEFAULT_ADMIN_ROLE and GOVERNANCE_ROLE
-     * @param _bondingRegistry Address of the bonding registry contract
-     * @param _ciphernodeRegistry Address of the ciphernode registry contract
-     * @param _enclave Address of the Enclave contract
      */
-    constructor(
-        address admin,
-        address _bondingRegistry,
-        address _ciphernodeRegistry,
-        address _enclave
-    ) {
+    constructor(address admin) {
         require(admin != address(0), ZeroAddress());
-        require(_bondingRegistry != address(0), ZeroAddress());
-        require(_ciphernodeRegistry != address(0), ZeroAddress());
-        require(_enclave != address(0), ZeroAddress());
-
-        bondingRegistry = IBondingRegistry(_bondingRegistry);
-        ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
-        enclave = IEnclave(_enclave);
-
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(GOVERNANCE_ROLE, admin);
     }
@@ -424,12 +408,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(recoveredSigner == operator, SignerIsNotOperator());
 
         // 3. Verify the operator was ever a committee member for this E3.
-        //    We use isCommitteeMember (permanent, never cleared) rather than
-        //    isCommitteeMemberActive (cleared on expulsion), so that a second
-        //    provable fault by the same already-expelled operator can still be
-        //    penalized via Lane A.  The first slash already triggered expulsion
-        //    and (if threshold dropped below M) E3 failure — the financial
-        //    penalty for subsequent faults is still a valid deterrent.
         require(
             ciphernodeRegistry.isCommitteeMember(e3Id, operator),
             OperatorNotInCommittee()

@@ -23,8 +23,6 @@ interface IEnclave {
         None,
         Requested,
         CommitteeFinalized,
-        // Once a key is published, it is possible to then accept inputs
-        // as long as we are within the input deadline (start and end)
         KeyPublished,
         CiphertextReady,
         Complete,

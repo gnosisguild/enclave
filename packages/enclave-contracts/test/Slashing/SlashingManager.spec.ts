@@ -154,33 +154,28 @@ describe("SlashingManager", function () {
   }
 
   async function setup() {
+    // ── Signers ────────────────────────────────────────────────────────────────
     const [owner, slasher, proposer, operator, notTheOwner] =
       await ethers.getSigners();
     const ownerAddress = await owner.getAddress();
     const operatorAddress = await operator.getAddress();
 
-    const usdcContract = await ignition.deploy(MockStableTokenModule, {
-      parameters: {
-        MockUSDC: {
-          initialSupply: 1000000,
-        },
-      },
+    // ── Token Contracts ────────────────────────────────────────────────────────
+    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
+      parameters: { MockUSDC: { initialSupply: 1_000_000 } },
     });
-
-    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
-      parameters: {
-        EnclaveToken: {
-          owner: ownerAddress,
-        },
+    const { enclaveToken: _enclaveToken } = await ignition.deploy(
+      EnclaveTokenModule,
+      {
+        parameters: { EnclaveToken: { owner: ownerAddress } },
       },
-    });
-
-    const ticketTokenContract = await ignition.deploy(
+    );
+    const { enclaveTicketToken } = await ignition.deploy(
       EnclaveTicketTokenModule,
       {
         parameters: {
           EnclaveTicketToken: {
-            baseToken: await usdcContract.mockUSDC.getAddress(),
+            baseToken: await mockUSDC.getAddress(),
             registry: ownerAddress,
             owner: ownerAddress,
           },
@@ -188,40 +183,35 @@ describe("SlashingManager", function () {
       },
     );
 
-    const mockVerifierContract = await ignition.deploy(
+    // ── Mock Contracts ─────────────────────────────────────────────────────────
+    const { mockCircuitVerifier } = await ignition.deploy(
       MockCircuitVerifierModule,
     );
-
-    const mockCiphernodeRegistryContract = await ignition.deploy(
-      MockCiphernodeRegistryModule,
-    );
-
+    const { mockCiphernodeRegistry: _mockCiphernodeRegistry } =
+      await ignition.deploy(MockCiphernodeRegistryModule);
     const mockCiphernodeRegistryAddress =
-      await mockCiphernodeRegistryContract.mockCiphernodeRegistry.getAddress();
+      await _mockCiphernodeRegistry.getAddress();
 
-    const slashingManagerContract = await ignition.deploy(
+    // ── Slashing & Bonding ─────────────────────────────────────────────────────
+    const { slashingManager: _slashingManager } = await ignition.deploy(
       SlashingManagerModule,
       {
         parameters: {
           SlashingManager: {
             admin: ownerAddress,
-            bondingRegistry: ownerAddress,
-            ciphernodeRegistry: mockCiphernodeRegistryAddress,
-            enclave: addressOne,
           },
         },
       },
     );
 
-    const bondingRegistryContract = await ignition.deploy(
+    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
       BondingRegistryModule,
       {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
-            ticketToken:
-              await ticketTokenContract.enclaveTicketToken.getAddress(),
-            licenseToken: await enclTokenContract.enclaveToken.getAddress(),
+            ticketToken: await enclaveTicketToken.getAddress(),
+            licenseToken: await _enclaveToken.getAddress(),
             registry: ethers.ZeroAddress,
             slashedFundsTreasury: ownerAddress,
             ticketPrice: ethers.parseUnits("10", 6),
@@ -233,20 +223,21 @@ describe("SlashingManager", function () {
       },
     );
 
+    // ── Connect Factories ──────────────────────────────────────────────────────
     const usdcToken = MockUSDCFactory.connect(
-      await usdcContract.mockUSDC.getAddress(),
+      await mockUSDC.getAddress(),
       owner,
     );
     const enclaveToken = EnclaveTokenFactory.connect(
-      await enclTokenContract.enclaveToken.getAddress(),
+      await _enclaveToken.getAddress(),
       owner,
     );
     const ticketToken = EnclaveTicketTokenFactory.connect(
-      await ticketTokenContract.enclaveTicketToken.getAddress(),
+      await enclaveTicketToken.getAddress(),
       owner,
     );
     const mockVerifier = MockCircuitVerifierFactory.connect(
-      await mockVerifierContract.mockCircuitVerifier.getAddress(),
+      await mockCircuitVerifier.getAddress(),
       owner,
     );
     const mockCiphernodeRegistry = MockCiphernodeRegistryFactory.connect(
@@ -254,14 +245,15 @@ describe("SlashingManager", function () {
       owner,
     );
     const slashingManager = SlashingManagerFactory.connect(
-      await slashingManagerContract.slashingManager.getAddress(),
+      await _slashingManager.getAddress(),
       owner,
     );
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await _bondingRegistry.getAddress(),
       owner,
     );
 
+    // ── Wire Up & Configure ────────────────────────────────────────────────────
     await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
@@ -271,15 +263,14 @@ describe("SlashingManager", function () {
     );
 
     await enclaveToken.setTransferRestriction(false);
-
     await enclaveToken.mintAllocation(
       operatorAddress,
       ethers.parseEther("2000"),
       "Test allocation",
     );
-
     await slashingManager.addSlasher(await slasher.getAddress());
 
+    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       owner,
       slasher,

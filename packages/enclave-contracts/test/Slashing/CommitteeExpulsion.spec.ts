@@ -121,8 +121,8 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       [zkProof, publicInputs, signature, chainId, proofType, verifierAddress],
     );
   }
-
   const setup = async () => {
+    // ── Signers ────────────────────────────────────────────────────────────────
     const [
       owner,
       requester,
@@ -137,25 +137,25 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     const treasuryAddress = await treasury.getAddress();
     const requesterAddress = await requester.getAddress();
 
-    // Deploy tokens
-    const usdcContract = await ignition.deploy(MockStableTokenModule, {
-      parameters: { MockUSDC: { initialSupply: 10000000 } },
+    // ── Tokens ─────────────────────────────────────────────────────────────────
+    const { mockUSDC } = await ignition.deploy(MockStableTokenModule, {
+      parameters: { MockUSDC: { initialSupply: 10_000_000 } },
     });
     const usdcToken = MockUSDCFactory.connect(
-      await usdcContract.mockUSDC.getAddress(),
+      await mockUSDC.getAddress(),
       owner,
     );
 
-    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
+    const { enclaveToken } = await ignition.deploy(EnclaveTokenModule, {
       parameters: { EnclaveToken: { owner: ownerAddress } },
     });
     const enclToken = EnclaveTokenFactory.connect(
-      await enclTokenContract.enclaveToken.getAddress(),
+      await enclaveToken.getAddress(),
       owner,
     );
     await enclToken.setTransferRestriction(false);
 
-    const ticketTokenContract = await ignition.deploy(
+    const { enclaveTicketToken } = await ignition.deploy(
       EnclaveTicketTokenModule,
       {
         parameters: {
@@ -167,45 +167,58 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         },
       },
     );
+    const ticketToken = enclaveTicketToken;
 
-    const mockVerifierContract = await ignition.deploy(
+    const { mockCircuitVerifier } = await ignition.deploy(
       MockCircuitVerifierModule,
     );
     const mockVerifier = MockCircuitVerifierFactory.connect(
-      await mockVerifierContract.mockCircuitVerifier.getAddress(),
+      await mockCircuitVerifier.getAddress(),
       owner,
     );
 
-    // Deploy slashing manager
-    const slashingManagerContract = await ignition.deploy(
+    // ── Registry & Slashing ────────────────────────────────────────────────────
+    const { slashingManager: _slashingManager } = await ignition.deploy(
       SlashingManagerModule,
       {
         parameters: {
           SlashingManager: {
             admin: ownerAddress,
-            bondingRegistry: addressOne,
-            ciphernodeRegistry: addressOne,
-            enclave: addressOne,
           },
         },
       },
     );
     const slashingManager = SlashingManagerFactory.connect(
-      await slashingManagerContract.slashingManager.getAddress(),
+      await _slashingManager.getAddress(),
       owner,
     );
 
-    // Deploy bonding registry
-    const bondingRegistryContract = await ignition.deploy(
+    const { cipherNodeRegistry } = await ignition.deploy(
+      CiphernodeRegistryModule,
+      {
+        parameters: {
+          CiphernodeRegistry: {
+            owner: ownerAddress,
+            submissionWindow: SORTITION_SUBMISSION_WINDOW,
+          },
+        },
+      },
+    );
+    const registryAddress = await cipherNodeRegistry.getAddress();
+    const registry = CiphernodeRegistryOwnableFactory.connect(
+      registryAddress,
+      owner,
+    );
+
+    const { bondingRegistry: _bondingRegistry } = await ignition.deploy(
       BondingRegistryModule,
       {
         parameters: {
           BondingRegistry: {
             owner: ownerAddress,
-            ticketToken:
-              await ticketTokenContract.enclaveTicketToken.getAddress(),
+            ticketToken: await ticketToken.getAddress(),
             licenseToken: await enclToken.getAddress(),
-            registry: addressOne,
+            registry: registryAddress,
             slashedFundsTreasury: treasuryAddress,
             ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
@@ -216,18 +229,18 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       },
     );
     const bondingRegistry = BondingRegistryFactory.connect(
-      await bondingRegistryContract.bondingRegistry.getAddress(),
+      await _bondingRegistry.getAddress(),
       owner,
     );
 
-    // Deploy Enclave
-    const enclaveContract = await ignition.deploy(EnclaveModule, {
+    // ── Enclave ────────────────────────────────────────────────────────────────
+    const { enclave: _enclave } = await ignition.deploy(EnclaveModule, {
       parameters: {
         Enclave: {
           params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS,
-          registry: addressOne,
+          registry: registryAddress,
           e3RefundManager: addressOne,
           bondingRegistry: await bondingRegistry.getAddress(),
           feeToken: await usdcToken.getAddress(),
@@ -235,53 +248,31 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         },
       },
     });
-    const enclaveAddress = await enclaveContract.enclave.getAddress();
+    const enclaveAddress = await _enclave.getAddress();
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
 
-    // Deploy CiphernodeRegistry
-    const ciphernodeRegistryContract = await ignition.deploy(
-      CiphernodeRegistryModule,
-      {
-        parameters: {
-          CiphernodeRegistry: {
-            enclaveAddress: enclaveAddress,
-            owner: ownerAddress,
-            submissionWindow: SORTITION_SUBMISSION_WINDOW,
-          },
-        },
-      },
-    );
-    const registryAddress =
-      await ciphernodeRegistryContract.cipherNodeRegistry.getAddress();
-    const registry = CiphernodeRegistryOwnableFactory.connect(
-      registryAddress,
-      owner,
-    );
-
-    // Deploy mock E3 program
-    const e3ProgramContract = await ignition.deploy(MockE3ProgramModule, {
-      parameters: {
-        MockE3Program: {
-          encryptionSchemeId: encryptionSchemeId,
-        },
-      },
+    // ── Mocks ──────────────────────────────────────────────────────────────────
+    const { mockE3Program } = await ignition.deploy(MockE3ProgramModule, {
+      parameters: { MockE3Program: { encryptionSchemeId } },
     });
     const e3Program = MockE3ProgramFactory.connect(
-      await e3ProgramContract.mockE3Program.getAddress(),
+      await mockE3Program.getAddress(),
       owner,
     );
 
-    // Deploy mock decryption verifier
-    const decryptionVerifierContract = await ignition.deploy(
+    const { mockDecryptionVerifier } = await ignition.deploy(
       MockDecryptionVerifierModule,
     );
     const decryptionVerifier = MockDecryptionVerifierFactory.connect(
-      await decryptionVerifierContract.mockDecryptionVerifier.getAddress(),
+      await mockDecryptionVerifier.getAddress(),
       owner,
     );
 
-    // Wire everything together
-    await enclave.setCiphernodeRegistry(registryAddress);
+    // ── Wire Up ────────────────────────────────────────────────────────────────
+    await registry.setEnclave(enclaveAddress);
+    await registry.setBondingRegistry(await bondingRegistry.getAddress());
+    await registry.setSlashingManager(await slashingManager.getAddress());
+
     await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
@@ -290,7 +281,6 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     await enclave.setSlashingManager(await slashingManager.getAddress());
 
     await bondingRegistry.setRewardDistributor(enclaveAddress);
-    await bondingRegistry.setRegistry(registryAddress);
     await bondingRegistry.setSlashingManager(
       await slashingManager.getAddress(),
     );
@@ -301,19 +291,34 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     await slashingManager.setCiphernodeRegistry(registryAddress);
     await slashingManager.setEnclave(enclaveAddress);
 
-    await registry.setBondingRegistry(await bondingRegistry.getAddress());
-    await registry.setSlashingManager(await slashingManager.getAddress());
-
-    await ticketTokenContract.enclaveTicketToken.setRegistry(
-      await bondingRegistry.getAddress(),
-    );
-
-    // Mint tokens to requester for E3 requests
+    await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await usdcToken.mint(requesterAddress, ethers.parseUnits("100000", 6));
 
-    // Helper: setup an operator (bond license, register, add tickets)
+    // ── Slash Policies ─────────────────────────────────────────────────────────
+    const baseSlashPolicy = {
+      ticketPenalty: ethers.parseUnits("10", 6),
+      licensePenalty: ethers.parseEther("50"),
+      requiresProof: true,
+      proofVerifier: await mockVerifier.getAddress(),
+      banNode: false,
+      appealWindow: 0,
+      enabled: true,
+      affectsCommittee: true,
+    };
+
+    await slashingManager.setSlashPolicy(REASON_BAD_DKG, {
+      ...baseSlashPolicy,
+      failureReason: 4, // FailureReason.DKGInvalidShares
+    });
+    await slashingManager.setSlashPolicy(REASON_BAD_DECRYPTION, {
+      ...baseSlashPolicy,
+      failureReason: 11, // FailureReason.DecryptionInvalidShares
+    });
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
     async function setupOperator(operator: Signer) {
       const operatorAddress = await operator.getAddress();
+
       await enclToken.mintAllocation(
         operatorAddress,
         ethers.parseEther("10000"),
@@ -329,19 +334,17 @@ describe("Committee Expulsion & Fault Tolerance", function () {
         .bondLicense(ethers.parseEther("1000"));
       await bondingRegistry.connect(operator).registerOperator();
 
-      const ticketTokenAddress = await bondingRegistry.ticketToken();
       const ticketAmount = ethers.parseUnits("100", 6);
       await usdcToken
         .connect(operator)
-        .approve(ticketTokenAddress, ticketAmount);
+        .approve(await bondingRegistry.ticketToken(), ticketAmount);
       await bondingRegistry.connect(operator).addTicketBalance(ticketAmount);
     }
 
-    // Helper: make an E3 request
     async function makeRequest(threshold: [number, number] = [2, 3]) {
       const startTime = (await time.latest()) + 100;
       const requestParams = {
-        threshold: threshold,
+        threshold,
         inputWindow: [startTime + 100, startTime + ONE_DAY] as [number, number],
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: encodedE3ProgramParams,
@@ -360,55 +363,23 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       await enclave.connect(requester).request(requestParams);
     }
 
-    // Helper: finalize a committee after sortition
     async function finalizeCommitteeWithOperators(
       e3Id: number,
       operators: Signer[],
     ) {
-      for (const op of operators) {
+      for (const op of operators)
         await registry.connect(op).submitTicket(e3Id, 1);
-      }
+
       await time.increase(SORTITION_SUBMISSION_WINDOW + 1);
       await registry.finalizeCommittee(e3Id);
 
-      // Publish the committee key so getCommitteeNodes works
       const nodes = await Promise.all(operators.map((op) => op.getAddress()));
       const publicKey = ethers.toUtf8Bytes("fake-public-key");
       const publicKeyHash = ethers.keccak256(publicKey);
       await registry.publishCommittee(e3Id, nodes, publicKey, publicKeyHash);
     }
 
-    // Set up committee-affecting slash policy
-    // MockCircuitVerifier returns false by default → proof invalid → fault confirmed
-    const committeeSlashPolicy = {
-      ticketPenalty: ethers.parseUnits("10", 6),
-      licensePenalty: ethers.parseEther("50"),
-      requiresProof: true,
-      proofVerifier: await mockVerifier.getAddress(),
-      banNode: false,
-      appealWindow: 0,
-      enabled: true,
-      affectsCommittee: true,
-      failureReason: 4, // FailureReason.DKGInvalidShares
-    };
-    await slashingManager.setSlashPolicy(REASON_BAD_DKG, committeeSlashPolicy);
-
-    const decryptionSlashPolicy = {
-      ticketPenalty: ethers.parseUnits("10", 6),
-      licensePenalty: ethers.parseEther("50"),
-      requiresProof: true,
-      proofVerifier: await mockVerifier.getAddress(),
-      banNode: false,
-      appealWindow: 0,
-      enabled: true,
-      affectsCommittee: true,
-      failureReason: 11, // FailureReason.DecryptionInvalidShares
-    };
-    await slashingManager.setSlashPolicy(
-      REASON_BAD_DECRYPTION,
-      decryptionSlashPolicy,
-    );
-
+    // ── Return ─────────────────────────────────────────────────────────────────
     return {
       enclave,
       registry,
@@ -417,6 +388,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
       mockVerifier,
       usdcToken,
       enclToken,
+      ticketToken,
       owner,
       requester,
       treasury,
