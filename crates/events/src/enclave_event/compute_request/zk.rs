@@ -9,19 +9,37 @@ use derivative::Derivative;
 use e3_crypto::SensitiveBytes;
 use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_helpers::{computation::DkgInputType, CiphernodesCommitteeSize};
 use serde::{Deserialize, Serialize};
 
 /// ZK proof generation request variants.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ZkRequest {
-    /// Generate proof for BFV public key (T0).
+    /// Generate proof for BFV public key (C0).
     PkBfv(PkBfvProofRequest),
-    /// Generate proof for PK generation (T1a).
+    /// Generate proof for PK generation (C1).
     PkGeneration(PkGenerationProofRequest),
+    /// Generate proof for share and esm computation (C2a and C2b).
+    ShareComputation(ShareComputationProofRequest),
 }
 
-/// Request to generate a proof for BFV public key generation (T0).
+/// Request to generate a proof for share computation (C2a or C2b).
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct ShareComputationProofRequest {
+    /// Raw secret polynomial bytes (sk or e_sm — witness, encrypted at rest).
+    pub secret_raw: SensitiveBytes,
+    /// Bincode-serialized SharedSecret containing Shamir shares (witness, encrypted at rest).
+    pub secret_sss_raw: SensitiveBytes,
+    /// Which secret type (SecretKey or SmudgingNoise).
+    pub dkg_input_type: DkgInputType,
+    /// BFV preset for parameter resolution.
+    pub params_preset: BfvPreset,
+    /// The size of the committee.
+    pub committee_size: CiphernodesCommitteeSize,
+}
+
+/// Request to generate a proof for BFV public key generation (C0).
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct PkBfvProofRequest {
@@ -31,7 +49,7 @@ pub struct PkBfvProofRequest {
     pub params_preset: BfvPreset,
 }
 
-/// Request to generate a proof for PK share generation (T1a).
+/// Request to generate a proof for PK share generation (C1).
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct PkGenerationProofRequest {
@@ -86,6 +104,15 @@ pub enum ZkResponse {
     PkBfv(PkBfvProofResponse),
     /// Proof for PK generation (T1a).
     PkGeneration(PkGenerationProofResponse),
+    /// Proof for share and esm computation (T2a and T2b).
+    ShareComputation(ShareComputationProofResponse),
+}
+
+/// Response containing a generated share computation proof.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ShareComputationProofResponse {
+    pub proof: Proof,
+    pub dkg_input_type: DkgInputType,
 }
 
 /// Response containing a generated BFV public key proof.
@@ -98,6 +125,15 @@ pub struct PkBfvProofResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PkGenerationProofResponse {
     pub proof: Proof,
+}
+
+impl ShareComputationProofResponse {
+    pub fn new(proof: Proof, dkg_input_type: DkgInputType) -> Self {
+        Self {
+            proof,
+            dkg_input_type,
+        }
+    }
 }
 
 impl PkBfvProofResponse {

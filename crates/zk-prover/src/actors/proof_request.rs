@@ -14,11 +14,18 @@ use e3_events::{
     ComputeResponseKind, CorrelationId, E3id, EnclaveEvent, EnclaveEventData, EncryptionKey,
     EncryptionKeyCreated, EncryptionKeyPending, EventContext, EventPublisher, EventSubscriber,
     EventType, PkBfvProofRequest, PkGenerationProofSigned, Proof, ProofPayload, ProofType,
-    Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCreated, ThresholdSharePending,
-    TypedEvent, ZkRequest, ZkResponse,
+    Sequenced, ShareComputationProofSigned, SignedProofPayload, ThresholdShare,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
 };
 use e3_utils::NotifySync;
 use tracing::{error, info};
+
+#[derive(Clone, Debug)]
+enum ThresholdProofKind {
+    PkGeneration,
+    SkShareComputation,
+    ESmShareComputation,
+}
 
 #[derive(Clone, Debug)]
 struct PendingProofRequest {
@@ -27,9 +34,42 @@ struct PendingProofRequest {
 }
 
 #[derive(Clone, Debug)]
-struct PendingThresholdShareProof {
+struct PendingThresholdProofs {
     e3_id: E3id,
     full_share: Arc<ThresholdShare>,
+    ec: EventContext<Sequenced>,
+    pk_generation_proof: Option<Proof>,
+    sk_share_computation_proof: Option<Proof>,
+    e_sm_share_computation_proof: Option<Proof>,
+}
+
+impl PendingThresholdProofs {
+    fn new(e3_id: E3id, full_share: Arc<ThresholdShare>, ec: EventContext<Sequenced>) -> Self {
+        Self {
+            e3_id,
+            full_share,
+            ec,
+            pk_generation_proof: None,
+            sk_share_computation_proof: None,
+            e_sm_share_computation_proof: None,
+        }
+    }
+
+    fn is_complete(&self) -> bool {
+        self.pk_generation_proof.is_some()
+            && self.sk_share_computation_proof.is_some()
+            && self.e_sm_share_computation_proof.is_some()
+    }
+
+    fn store_proof(&mut self, kind: &ThresholdProofKind, proof: Proof) {
+        match kind {
+            ThresholdProofKind::PkGeneration => self.pk_generation_proof = Some(proof),
+            ThresholdProofKind::SkShareComputation => self.sk_share_computation_proof = Some(proof),
+            ThresholdProofKind::ESmShareComputation => {
+                self.e_sm_share_computation_proof = Some(proof)
+            }
+        }
+    }
 }
 
 /// Core actor that handles encryption key proof requests.
@@ -41,7 +81,8 @@ pub struct ProofRequestActor {
     bus: BusHandle,
     signer: PrivateKeySigner,
     pending: HashMap<CorrelationId, PendingProofRequest>,
-    pending_threshold: HashMap<CorrelationId, PendingThresholdShareProof>,
+    threshold_correlation: HashMap<CorrelationId, (E3id, ThresholdProofKind)>,
+    pending_threshold: HashMap<E3id, PendingThresholdProofs>,
 }
 
 impl ProofRequestActor {
@@ -51,6 +92,7 @@ impl ProofRequestActor {
             signer,
             pending: HashMap::new(),
             pending_threshold: HashMap::new(),
+            threshold_correlation: HashMap::new(),
         }
     }
 
@@ -92,25 +134,73 @@ impl ProofRequestActor {
 
     fn handle_threshold_share_pending(&mut self, msg: TypedEvent<ThresholdSharePending>) {
         let (msg, ec) = msg.into_components();
-        let correlation_id = CorrelationId::new();
+        let e3_id = msg.e3_id.clone();
+
         self.pending_threshold.insert(
-            correlation_id,
-            PendingThresholdShareProof {
-                e3_id: msg.e3_id.clone(),
-                full_share: msg.full_share.clone(),
-            },
+            e3_id.clone(),
+            PendingThresholdProofs::new(e3_id.clone(), msg.full_share.clone(), ec.clone()),
         );
 
-        let request = ComputeRequest::zk(
-            ZkRequest::PkGeneration(msg.proof_request),
-            correlation_id,
-            msg.e3_id,
-        );
+        // C1: PkGeneration
+        let t1_corr = CorrelationId::new();
+        self.threshold_correlation
+            .insert(t1_corr, (e3_id.clone(), ThresholdProofKind::PkGeneration));
+        info!("Requesting T1 PkGeneration proof");
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::PkGeneration(msg.proof_request),
+                t1_corr,
+                e3_id.clone(),
+            ),
+            ec.clone(),
+        ) {
+            error!("Failed to publish T1 proof request: {err}");
+            self.threshold_correlation.remove(&t1_corr);
+            self.pending_threshold.remove(&e3_id);
+            return;
+        }
 
-        info!("Requesting T1 PkGeneration proof generation");
-        if let Err(err) = self.bus.publish(request, ec) {
-            error!("Failed to publish ZK proof request: {err}");
-            self.pending_threshold.remove(&correlation_id);
+        // C2a: SkShareComputation
+        let t2a_corr = CorrelationId::new();
+        self.threshold_correlation.insert(
+            t2a_corr,
+            (e3_id.clone(), ThresholdProofKind::SkShareComputation),
+        );
+        info!("Requesting T2a SkShareComputation proof");
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::ShareComputation(msg.sk_share_computation_request),
+                t2a_corr,
+                e3_id.clone(),
+            ),
+            ec.clone(),
+        ) {
+            error!("Failed to publish T2a proof request: {err}");
+            self.threshold_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_threshold.remove(&e3_id);
+            return;
+        }
+
+        // C2b: ESmShareComputation
+        let t2b_corr = CorrelationId::new();
+        self.threshold_correlation.insert(
+            t2b_corr,
+            (e3_id.clone(), ThresholdProofKind::ESmShareComputation),
+        );
+        info!("Requesting T2b ESmShareComputation proof");
+        if let Err(err) = self.bus.publish(
+            ComputeRequest::zk(
+                ZkRequest::ShareComputation(msg.e_sm_share_computation_request),
+                t2b_corr,
+                e3_id.clone(),
+            ),
+            ec.clone(),
+        ) {
+            error!("Failed to publish T2b proof request: {err}");
+            self.threshold_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_threshold.remove(&e3_id);
         }
     }
 
@@ -121,69 +211,133 @@ impl ProofRequestActor {
                 self.handle_pk_bfv_response(&msg.correlation_id, resp.proof.clone(), &ec);
             }
             ComputeResponseKind::Zk(ZkResponse::PkGeneration(resp)) => {
-                self.handle_pk_generation_response(&msg.correlation_id, resp.proof.clone(), &ec);
+                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
+            }
+            ComputeResponseKind::Zk(ZkResponse::ShareComputation(resp)) => {
+                self.handle_threshold_proof_response(&msg.correlation_id, resp.proof.clone());
             }
             _ => {}
         }
     }
 
-    fn handle_pk_generation_response(
-        &mut self,
-        correlation_id: &CorrelationId,
-        proof: Proof,
-        ec: &EventContext<Sequenced>,
-    ) {
-        let Some(pending) = self.pending_threshold.remove(correlation_id) else {
+    fn handle_threshold_proof_response(&mut self, correlation_id: &CorrelationId, proof: Proof) {
+        let Some((e3_id, kind)) = self.threshold_correlation.remove(correlation_id) else {
+            return;
+        };
+
+        let Some(pending) = self.pending_threshold.get_mut(&e3_id) else {
             error!(
-                "Received PkGeneration ComputeResponse with correlation_id {:?} but no matching pending request found.",
-                correlation_id
+                "No pending threshold proofs for E3 {} — orphan correlation",
+                e3_id
             );
             return;
         };
 
+        info!("Received {:?} proof for E3 {}", kind, e3_id);
+        pending.store_proof(&kind, proof);
+
+        if pending.is_complete() {
+            info!("All 3 threshold proofs complete for E3 {}", e3_id);
+            let pending = self.pending_threshold.remove(&e3_id).unwrap();
+            self.publish_threshold_share_with_proofs(pending);
+        }
+    }
+
+    fn sign_proof(
+        &self,
+        e3_id: &E3id,
+        proof_type: ProofType,
+        proof: Proof,
+    ) -> Option<SignedProofPayload> {
         let payload = ProofPayload {
-            e3_id: pending.e3_id.clone(),
-            proof_type: ProofType::T1PkGeneration,
-            proof: proof.clone(),
+            e3_id: e3_id.clone(),
+            proof_type,
+            proof,
         };
-
-        let signed = match SignedProofPayload::sign(payload, &self.signer) {
-            Ok(s) => {
-                info!(
-                    "Signed T1 PkGeneration proof for party {} (signer: {})",
-                    pending.full_share.party_id,
-                    self.signer.address()
-                );
-                s
-            }
+        match SignedProofPayload::sign(payload, &self.signer) {
+            Ok(signed) => Some(signed),
             Err(err) => {
-                error!("Failed to sign T1 PkGeneration proof payload: {err} — shares will not be published");
-                return;
+                error!("Failed to sign {:?} proof: {err}", proof_type);
+                None
             }
+        }
+    }
+
+    fn publish_threshold_share_with_proofs(&mut self, pending: PendingThresholdProofs) {
+        let e3_id = &pending.e3_id;
+        let party_id = pending.full_share.party_id;
+        let ec = &pending.ec;
+
+        let Some(signed_pk_gen) = self.sign_proof(
+            e3_id,
+            ProofType::T1PkGeneration,
+            pending.pk_generation_proof.expect("checked"),
+        ) else {
+            error!("Failed to sign C1 proof — shares will not be published");
+            return;
         };
 
-        let party_id = pending.full_share.party_id;
-        let e3_id = pending.e3_id.clone();
+        let Some(signed_sk_share) = self.sign_proof(
+            e3_id,
+            ProofType::T1SkShareComputation,
+            pending.sk_share_computation_proof.expect("checked"),
+        ) else {
+            error!("Failed to sign C2a proof — shares will not be published");
+            return;
+        };
+
+        let Some(signed_e_sm_share) = self.sign_proof(
+            e3_id,
+            ProofType::T1ESmShareComputation,
+            pending.e_sm_share_computation_proof.expect("checked"),
+        ) else {
+            error!("Failed to sign C2b proof — shares will not be published");
+            return;
+        };
 
         info!(
-            "Publishing PkGenerationProofSigned for E3 {} party {}",
-            pending.e3_id, party_id
+            "All proofs signed for E3 {} party {} (signer: {})",
+            e3_id,
+            party_id,
+            self.signer.address()
         );
+
+        let share = &pending.full_share;
+        let num_parties = share.num_parties();
+
         if let Err(err) = self.bus.publish(
             PkGenerationProofSigned {
-                e3_id: pending.e3_id,
+                e3_id: e3_id.clone(),
                 party_id,
-                signed_proof: signed,
+                signed_proof: signed_pk_gen,
             },
             ec.clone(),
         ) {
             error!("Failed to publish PkGenerationProofSigned: {err}");
         }
 
-        let share = &pending.full_share;
+        if let Err(err) = self.bus.publish(
+            ShareComputationProofSigned {
+                e3_id: e3_id.clone(),
+                party_id,
+                signed_proof: signed_sk_share,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish SkShareComputationProofSigned: {err}");
+        }
 
-        // Publish per-party shares
-        let num_parties = share.num_parties();
+        if let Err(err) = self.bus.publish(
+            ShareComputationProofSigned {
+                e3_id: e3_id.clone(),
+                party_id,
+                signed_proof: signed_e_sm_share,
+            },
+            ec.clone(),
+        ) {
+            error!("Failed to publish ESmShareComputationProofSigned: {err}");
+        }
+
         info!(
             "Publishing ThresholdShareCreated for E3 {} to {} parties",
             e3_id, num_parties
@@ -274,10 +428,14 @@ impl ProofRequestActor {
             );
         }
 
-        if let Some(pending) = self.pending_threshold.remove(msg.correlation_id()) {
+        if let Some((e3_id, kind)) = self.threshold_correlation.remove(msg.correlation_id()) {
             error!(
-                "T1 PkShareGeneration proof request failed for E3 {}: {err} — threshold share will not be published without proof", pending.e3_id
-            )
+                "T1 {:?} proof request failed for E3 {}: {err} — threshold share will not be published without proof",
+                kind, e3_id
+            );
+            self.threshold_correlation
+                .retain(|_, (eid, _)| *eid != e3_id);
+            self.pending_threshold.remove(&e3_id);
         }
     }
 }
