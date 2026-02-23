@@ -807,7 +807,9 @@ jobs:
             examples/CRISP/packages/crisp-sdk/dist
             examples/CRISP/packages/crisp-zk-inputs/dist
             examples/CRISP/circuits/bin/crisp/target
-            examples/CRISP/circuits/bin/greco/target
+            examples/CRISP/circuits/bin/fold/target
+            circuits/bin/threshold/target
+            circuits/bin/recursive_aggregation/wrapper/threshold/target
           retention-days: 1
           if-no-files-found: warn
 
