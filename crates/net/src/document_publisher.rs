@@ -56,6 +56,8 @@ pub struct DocumentPublisher {
     topic: String,
     /// Set of E3ids we are interested in
     ids: HashMap<E3id, PartyId>,
+    /// Track DHT content hashes per E3 for cleanup on completion
+    dht_keys: HashMap<E3id, Vec<ContentHash>>,
 }
 
 impl DocumentPublisher {
@@ -72,6 +74,7 @@ impl DocumentPublisher {
             rx: rx.clone(),
             topic: topic.into(),
             ids: HashMap::new(),
+            dht_keys: HashMap::new(),
         }
     }
 
@@ -129,6 +132,16 @@ impl DocumentPublisher {
 
     fn handle_e3_request_complete(&mut self, event: E3RequestComplete) -> Result<()> {
         self.ids.remove(&event.e3_id);
+        if let Some(keys) = self.dht_keys.remove(&event.e3_id) {
+            if !keys.is_empty() {
+                info!(
+                    "Pruning {} DHT records for completed E3 {}",
+                    keys.len(),
+                    event.e3_id
+                );
+                let _ = self.tx.try_send(NetCommand::DhtRemoveRecords { keys });
+            }
+        }
         Ok(())
     }
 }
@@ -168,6 +181,13 @@ impl Handler<TypedEvent<PublishDocumentRequested>> for DocumentPublisher {
     ) -> Self::Result {
         let tx = self.tx.clone();
         let (msg, ec) = msg.into_components();
+
+        let key = ContentHash::from_content(&msg.value);
+        self.dht_keys
+            .entry(msg.meta.e3_id.clone())
+            .or_default()
+            .push(key);
+
         let rx = self.rx.clone();
         let bus = self.bus.clone();
         let topic = self.topic.clone();
