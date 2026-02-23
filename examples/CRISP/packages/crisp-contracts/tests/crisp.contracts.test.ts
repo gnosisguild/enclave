@@ -42,9 +42,9 @@ describe('CRISP Contracts', function () {
   })
 
   describe('validate input', () => {
-    it.only('should verify the proof correctly with the crisp verifier', async function () {
+    it('should verify the proof correctly with the crisp verifier', async function () {
       // It needs some time to generate the proof.
-      this.timeout(100000)
+      this.timeout(300000)
 
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
@@ -72,7 +72,7 @@ describe('CRISP Contracts', function () {
 
     it('should verify the proof for a vote mask', async function () {
       // It needs some time to generate the proof.
-      this.timeout(100000)
+      this.timeout(300000)
 
       const honkVerifier = await deployHonkVerifier()
       const [signer] = await ethers.getSigners()
@@ -97,7 +97,7 @@ describe('CRISP Contracts', function () {
 
     it('should validate input correctly', async function () {
       // It needs some time to generate the proof.
-      this.timeout(100000)
+      this.timeout(300000)
 
       const mockEnclave = await deployMockEnclave()
       const crispProgram = await deployCRISPProgram({ mockEnclave })
