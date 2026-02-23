@@ -196,6 +196,9 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting Enclave address in SlashingManager...");
   await slashingManager.setEnclave(enclaveAddress);
 
+  console.log("Setting SlashingManager address in Enclave...");
+  await enclave.setSlashingManager(slashingManagerAddress);
+
   console.log("Setting SlashingManager address in BondingRegistry...");
   await bondingRegistry.setSlashingManager(slashingManagerAddress);
 

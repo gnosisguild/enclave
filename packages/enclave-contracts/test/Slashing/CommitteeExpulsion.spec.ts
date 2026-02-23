@@ -73,6 +73,7 @@ describe("Committee Expulsion & Fault Tolerance", function () {
     "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
 
   const defaultTimeoutConfig = {
+    committeeFormationWindow: ONE_DAY,
     dkgWindow: ONE_DAY,
     computeWindow: THREE_DAYS,
     decryptionWindow: ONE_DAY,

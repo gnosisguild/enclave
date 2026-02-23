@@ -19,5 +19,5 @@ interface ICircuitVerifier {
     function verify(
         bytes calldata _proof,
         bytes32[] calldata _publicInputs
-    ) external returns (bool);
+    ) external view returns (bool);
 }
