@@ -79,7 +79,7 @@ fn main(
     // STEP 1: Pre-compute Commitments
     // ============================================================================
     // Compute commitments for ciphertext and plaintext that link this circuit to the
-    // user_data_encryption circuit proofs in the fold circuit, where all 3 recursive
+    // user_data_encryption circuit proofs in the fold circuit, where the 2 recursive
     // proofs are verified.
     let ct_commitment =
         compute_ciphertext_commitment::<N, L, USER_DATA_ENCRYPTION_BIT_CT>(ct0is, ct1is);
