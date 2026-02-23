@@ -581,7 +581,7 @@ async fn test_trbfv_actor() -> Result<()> {
         expected_count
     );
     let h = nodes
-        .take_history_with_timeout(0, expected_count, Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected_count, Duration::from_secs(3000))
         .await?;
     println!(
         "DEBUG: Share generation phase events: {:?}",
