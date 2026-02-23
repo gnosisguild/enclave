@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{E3id, ProofType, SignedProofPayload};
+use crate::{E3id, SignedProofPayload};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
@@ -14,7 +14,6 @@ use std::fmt::{self, Display};
 pub struct ShareComputationProofSigned {
     pub e3_id: E3id,
     pub party_id: u64,
-    pub proof_type: ProofType,
     pub signed_proof: SignedProofPayload,
 }
 

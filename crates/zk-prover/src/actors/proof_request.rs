@@ -320,7 +320,6 @@ impl ProofRequestActor {
             ShareComputationProofSigned {
                 e3_id: e3_id.clone(),
                 party_id,
-                proof_type: ProofType::T1SkShareComputation,
                 signed_proof: signed_sk_share,
             },
             ec.clone(),
@@ -332,7 +331,6 @@ impl ProofRequestActor {
             ShareComputationProofSigned {
                 e3_id: e3_id.clone(),
                 party_id,
-                proof_type: ProofType::T1ESmShareComputation,
                 signed_proof: signed_e_sm_share,
             },
             ec.clone(),

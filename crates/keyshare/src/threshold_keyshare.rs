@@ -465,14 +465,15 @@ impl ThresholdKeyshare {
             return Ok(());
         }
 
+        let proof_type = msg.signed_proof.payload.proof_type;
         info!(
             "Received ShareComputationProofSigned ({:?}) for party {} E3 {}",
-            msg.proof_type, msg.party_id, msg.e3_id
+            proof_type, msg.party_id, msg.e3_id
         );
 
         self.state.try_mutate(&ec, |s| {
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
-            let updated = match msg.proof_type {
+            let updated = match proof_type {
                 ProofType::T1SkShareComputation => AggregatingDecryptionKey {
                     signed_sk_share_computation_proof: Some(msg.signed_proof),
                     ..current
