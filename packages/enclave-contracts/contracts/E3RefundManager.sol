@@ -288,16 +288,19 @@ contract E3RefundManager is IE3RefundManager, OwnableUpgradeable {
 
         require(dist.honestNodeCount > 0, NoRefundAvailable(e3Id));
         uint256 perNodeAmount = dist.honestNodeAmount / dist.honestNodeCount;
+        require(perNodeAmount > 0, NoRefundAvailable(e3Id));
 
+        amount = perNodeAmount;
         _honestNodeClaimCount[e3Id]++;
         if (_honestNodeClaimCount[e3Id] == dist.honestNodeCount) {
-            // Last claimer gets whatever remains (includes dust)
-            amount = dist.honestNodeAmount - _totalHonestNodePaid[e3Id];
-        } else {
-            amount = perNodeAmount;
+            // Route rounding remainder (dust) to protocol treasury.
+            uint256 dust = dist.honestNodeAmount -
+                (_totalHonestNodePaid[e3Id] + perNodeAmount);
+            if (dust > 0) {
+                dist.feeToken.safeTransfer(treasury, dust);
+            }
         }
         _totalHonestNodePaid[e3Id] += amount;
-        require(amount > 0, NoRefundAvailable(e3Id));
 
         _claimed[e3Id][msg.sender] = true;
         _claimCount[e3Id]++;

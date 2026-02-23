@@ -374,24 +374,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Internal Execution
     // ======================
 
-    /// @dev Verifies the operator is/was a committee member for the given E3.
-    function _verifyCommitteeMembership(
-        uint256 e3Id,
-        address operator
-    ) internal view {
-        address[] memory committeeNodes = ciphernodeRegistry.getCommitteeNodes(
-            e3Id
-        );
-        bool isMember = false;
-        for (uint256 i = 0; i < committeeNodes.length; i++) {
-            if (committeeNodes[i] == operator) {
-                isMember = true;
-                break;
-            }
-        }
-        require(isMember, OperatorNotInCommittee());
-    }
-
     /// @dev Decodes evidence, verifies operator signature, committee membership,
     ///      and that the ZK proof is invalid (fault confirmed).
     ///      Evidence format:
@@ -442,7 +424,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(recoveredSigner == operator, SignerIsNotOperator());
 
         // 3. Verify committee membership.
-        _verifyCommitteeMembership(e3Id, operator);
+        require(
+            ciphernodeRegistry.isCommitteeMemberActive(e3Id, operator),
+            OperatorNotInCommittee()
+        );
 
         // 4. Re-verify the ZK proof on-chain (INVERTED: must FAIL to confirm fault).
         //    The staticcall MUST succeed — if the verifier reverts or doesn't exist,
@@ -453,7 +438,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(callSuccess, VerifierCallFailed());
         require(returnData.length >= 32, VerifierCallFailed());
         bool proofValid = abi.decode(returnData, (bool));
-        if (proofValid) revert ProofIsValid();
+        require(!proofValid, ProofIsValid());
     }
 
     /**

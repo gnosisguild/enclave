@@ -657,11 +657,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes[] memory _e3ProgramsParams
     ) public onlyOwner {
         uint256 length = _e3ProgramsParams.length;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length; ++i) {
             e3ProgramsParams[_e3ProgramsParams[i]] = true;
-            unchecked {
-                ++i;
-            }
         }
         emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
@@ -672,11 +669,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes[] memory _e3ProgramsParams
     ) public onlyOwner {
         uint256 length = _e3ProgramsParams.length;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length; ++i) {
             delete e3ProgramsParams[_e3ProgramsParams[i]];
-            unchecked {
-                ++i;
-            }
         }
         emit E3ProgramsParamsRemoved(_e3ProgramsParams);
     }

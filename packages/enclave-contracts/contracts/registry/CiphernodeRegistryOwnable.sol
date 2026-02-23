@@ -399,11 +399,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         c.committee = c.topNodes;
         // Initialize active committee tracking in Committee struct
         uint256 committeeLen = c.committee.length;
-        for (uint256 i = 0; i < committeeLen; ) {
+        for (uint256 i = 0; i < committeeLen; ++i) {
             c.active[c.committee[i]] = true;
-            unchecked {
-                ++i;
-            }
         }
         c.activeCount = committeeLen;
 
@@ -593,13 +590,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         address[] memory activeNodes = new address[](actCount);
         uint256 idx = 0;
-        for (uint256 i = 0; i < total; ) {
+        for (uint256 i = 0; i < total; ++i) {
             if (c.active[c.committee[i]]) {
                 activeNodes[idx] = c.committee[i];
                 idx++;
-            }
-            unchecked {
-                ++i;
             }
         }
         return activeNodes;
@@ -705,13 +699,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
         uint256 worstIdx = 0;
         uint256 worstScore = c.scoreOf[top[0]];
-        unchecked {
-            for (uint256 i = 1; i < top.length; ++i) {
-                uint256 s = c.scoreOf[top[i]];
-                if (s > worstScore) {
-                    worstScore = s;
-                    worstIdx = i;
-                }
+        for (uint256 i = 1; i < top.length; ++i) {
+            uint256 s = c.scoreOf[top[i]];
+            if (s > worstScore) {
+                worstScore = s;
+                worstIdx = i;
             }
         }
 
