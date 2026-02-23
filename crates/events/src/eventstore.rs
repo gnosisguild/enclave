@@ -11,7 +11,6 @@ use crate::{
 };
 use actix::{Actor, Handler};
 use anyhow::{bail, Result};
-use e3_utils::{major_issue, MAILBOX_LIMIT};
 use tracing::{error, warn};
 
 const MAX_STORAGE_ERRORS: u64 = 10;
@@ -40,7 +39,7 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
         }
         let seq = self.log.append(&event)?;
         self.index.insert(ts, seq)?;
-        sender.try_send(StoreEventResponse(event.into_sequenced(seq)))?;
+        sender.do_send(StoreEventResponse(event.into_sequenced(seq)));
         Ok(())
     }
 
@@ -93,18 +92,15 @@ impl<I: SequenceIndex, L: EventLog> EventStore<I, L> {
 
 impl<I: SequenceIndex, L: EventLog> Actor for EventStore<I, L> {
     type Context = actix::Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
-    }
 }
 
 impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<I, L> {
     type Result = ();
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
         if let Err(e) = self.handle_store_event_requested(msg) {
-            panic!("{}", major_issue("Could not store event in eventstore.", e))
-            // panic here because when event storage fails we really need
-            // to just give up
+            // Log append or index insert failed — storage is broken.
+            error!("Event storage failed: {e}");
+            panic!("Unrecoverable event storage failure: {e}");
         }
     }
 }

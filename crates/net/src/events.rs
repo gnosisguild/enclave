@@ -122,6 +122,8 @@ pub enum NetCommand {
         correlation_id: CorrelationId,
         key: ContentHash,
     },
+    /// Remove DHT records associated with a completed E3
+    DhtRemoveRecords { keys: Vec<ContentHash> },
     /// Shutdown signal
     Shutdown,
     /// Called from the syning node to request libp2p events from a random peer node starting

@@ -11,7 +11,7 @@ use crate::{
 use crate::{CorrelationId, Die, EnclaveEvent, EventStoreQueryBy, Seq, SeqAgg, Ts, TsAgg};
 use actix::{Actor, ActorContext, Addr, AsyncContext, Context, Handler, Recipient};
 use anyhow::Result;
-use e3_utils::{major_issue, MAILBOX_LIMIT};
+use e3_utils::MAILBOX_LIMIT_LARGE;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
@@ -98,7 +98,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         Self { stores }
     }
 
-    pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) -> Result<()> {
+    pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) {
         debug!("Handling store event requested....");
         let aggregate_id = msg.event.aggregate_id();
         let store_addr = self.stores.get(&aggregate_id).unwrap_or_else(|| {
@@ -108,9 +108,7 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
         });
         let event = msg.event;
         let sender = msg.sender;
-        let forwarded_msg = StoreEventRequested::new(event, sender);
-        store_addr.try_send(forwarded_msg)?;
-        Ok(())
+        store_addr.do_send(StoreEventRequested::new(event, sender));
     }
 
     pub fn handle_event_store_query_ts(
@@ -205,7 +203,7 @@ impl<I: SequenceIndex, L: EventLog> Actor for EventStoreRouter<I, L> {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.set_mailbox_capacity(MAILBOX_LIMIT);
+        ctx.set_mailbox_capacity(MAILBOX_LIMIT_LARGE);
     }
 }
 
@@ -213,9 +211,7 @@ impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStoreR
     type Result = ();
 
     fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) -> Self::Result {
-        if let Err(e) = self.handle_store_event_requested(msg) {
-            panic!("{}", major_issue("Could not store event in eventstore.", e))
-        }
+        self.handle_store_event_requested(msg);
     }
 }
 
