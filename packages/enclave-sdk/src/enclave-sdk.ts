@@ -35,7 +35,6 @@ import {
   get_bfv_params,
 } from '@enclave-e3/wasm'
 import { generateProof } from './greco'
-import { CompiledCircuit } from '@noir-lang/noir_js'
 
 export class EnclaveSDK {
   public static readonly chains = {
