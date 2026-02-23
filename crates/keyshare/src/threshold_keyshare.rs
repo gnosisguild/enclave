@@ -9,13 +9,13 @@ use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished, ComputeRequest,
-    ComputeResponse, ComputeResponseKind, CorrelationId, DecryptionshareCreated, Die,
-    E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData, EncryptionKey,
-    EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending, EventContext,
-    KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned, Sequenced,
-    SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed, ThresholdShareCreated,
-    ThresholdSharePending, TypedEvent,
+    prelude::*, trap, BusHandle, CiphernodeSelected, CiphertextOutputPublished,
+    CommitteeMemberExpelled, ComputeRequest, ComputeResponse, ComputeResponseKind, CorrelationId,
+    DecryptionshareCreated, Die, E3RequestComplete, E3id, EType, EnclaveEvent, EnclaveEventData,
+    EncryptionKey, EncryptionKeyCollectionFailed, EncryptionKeyCreated, EncryptionKeyPending,
+    EventContext, KeyshareCreated, PartyId, PkGenerationProofRequest, PkGenerationProofSigned,
+    Sequenced, SignedProofPayload, ThresholdShare, ThresholdShareCollectionFailed,
+    ThresholdShareCreated, ThresholdSharePending, TypedEvent,
 };
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
@@ -37,10 +37,12 @@ use fhe::bfv::{PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use rand::rngs::OsRng;
 use std::{collections::HashMap, mem, sync::Arc};
-use tracing::{info, trace, warn};
+use tracing::{error, info, trace, warn};
 
-use crate::encryption_key_collector::{AllEncryptionKeysCollected, EncryptionKeyCollector};
-use crate::threshold_share_collector::ThresholdShareCollector;
+use crate::encryption_key_collector::{
+    AllEncryptionKeysCollected, EncryptionKeyCollector, ExpelPartyFromKeyCollection,
+};
+use crate::threshold_share_collector::{ExpelPartyFromShareCollection, ThresholdShareCollector};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
@@ -377,6 +379,36 @@ impl ThresholdKeyshare {
             .encryption_key_collector
             .get_or_insert_with(|| EncryptionKeyCollector::setup(self_addr, threshold_n, e3_id));
         Ok(addr.clone())
+    }
+
+    fn handle_committee_member_expelled(
+        &mut self,
+        data: CommitteeMemberExpelled,
+        ec: EventContext<Sequenced>,
+    ) {
+        // Only process enriched events (party_id resolved by Sortition).
+        // Raw events from chain (party_id = None) are ignored here;
+        // Sortition will re-publish them with party_id set.
+        let Some(party_id) = data.party_id else {
+            return;
+        };
+
+        let node_addr = data.node.to_string();
+        info!(
+            "CommitteeMemberExpelled received (enriched): node={}, party_id={}, e3_id={}, active_count_after={}",
+            node_addr, party_id, data.e3_id, data.active_count_after
+        );
+
+        if let Some(ref collector) = self.encryption_key_collector {
+            collector.do_send(ExpelPartyFromKeyCollection {
+                party_id,
+                ec: ec.clone(),
+            });
+        }
+
+        if let Some(ref collector) = self.decryption_key_collector {
+            collector.do_send(ExpelPartyFromShareCollection { party_id, ec });
+        }
     }
 
     pub fn handle_threshold_share_created(
@@ -1047,31 +1079,11 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
                 let _ = self.handle_pk_generation_proof_signed(TypedEvent::new(data, ec));
             }
             EnclaveEventData::E3RequestComplete(data) => self.notify_sync(ctx, data),
-            EnclaveEventData::E3Failed(data) => {
-                warn!(
-                    "E3 failed: {:?}. Shutting down ThresholdKeyshare for e3_id={}",
-                    data.reason, data.e3_id
-                );
-                self.notify_sync(ctx, E3RequestComplete { e3_id: data.e3_id });
-            }
-            EnclaveEventData::E3StageChanged(data) => {
-                use e3_events::E3Stage;
-                match &data.new_stage {
-                    E3Stage::Complete | E3Stage::Failed => {
-                        info!("E3 reached terminal stage {:?}. Shutting down ThresholdKeyshare for e3_id={}", data.new_stage, data.e3_id);
-                        self.notify_sync(ctx, E3RequestComplete { e3_id: data.e3_id });
-                    }
-                    _ => {
-                        trace!(
-                            "E3 stage changed to {:?} for e3_id={}",
-                            data.new_stage,
-                            data.e3_id
-                        );
-                    }
-                }
-            }
             EnclaveEventData::ComputeResponse(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
+            }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                self.handle_committee_member_expelled(data, ec);
             }
             _ => (),
         }

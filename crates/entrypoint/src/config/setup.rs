@@ -59,6 +59,9 @@ chains:
       bonding_registry:
         address: "{}"
         deploy_block: {}
+      slashing_manager:
+        address: "{}"
+        deploy_block: {}
 "#,
         rpc_url,
         get_contract_info("Enclave")?.address,
@@ -67,6 +70,8 @@ chains:
         get_contract_info("CiphernodeRegistryOwnable")?.deploy_block,
         get_contract_info("BondingRegistry")?.address,
         get_contract_info("BondingRegistry")?.deploy_block,
+        get_contract_info("SlashingManager")?.address,
+        get_contract_info("SlashingManager")?.deploy_block,
     );
 
     fs::write(config_path.clone(), config_content)?;

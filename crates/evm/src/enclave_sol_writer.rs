@@ -26,7 +26,7 @@ use e3_events::{run_once, EnclaveEvent};
 use e3_events::{E3id, EType, PlaintextAggregated};
 use e3_utils::NotifySync;
 use e3_utils::MAILBOX_LIMIT;
-use tracing::info;
+use tracing::{info, warn};
 
 sol!(
     #[sol(rpc)]
@@ -114,6 +114,15 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     bus.err(EType::Evm, anyhow::anyhow!("Decrypted output was empty!"));
                     return;
                 };
+                // Warn if multiple outputs are silently discarded
+                if decrypted_output.len() > 1 {
+                    warn!(
+                        "E3 {} has {} decrypted outputs but only the first is published on-chain. \
+                        Multi-output support is not yet implemented.",
+                        e3_id,
+                        decrypted_output.len()
+                    );
+                }
                 let result = publish_plaintext_output(
                     provider,
                     contract_address,

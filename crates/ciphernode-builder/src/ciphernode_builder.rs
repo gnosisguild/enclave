@@ -18,7 +18,9 @@ use e3_events::{
     AggregateConfig, AggregateId, BusHandle, EnclaveEvent, EventBus, EventBusConfig, EvmEventConfig,
 };
 use e3_evm::{BondingRegistrySolReader, CiphernodeRegistrySolReader, EnclaveSolWriter};
-use e3_evm::{CiphernodeRegistrySol, EnclaveSolReader};
+use e3_evm::{
+    CiphernodeRegistrySol, EnclaveSolReader, SlashingManagerSolReader, SlashingManagerSolWriter,
+};
 use e3_fhe::ext::FheExtension;
 use e3_fhe_params::BfvPreset;
 use e3_keyshare::ext::ThresholdKeyshareExtension;
@@ -95,6 +97,7 @@ pub struct ContractComponents {
     enclave: bool,
     ciphernode_registry: bool,
     bonding_registry: bool,
+    slashing_manager: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -293,6 +296,13 @@ impl CiphernodeBuilder {
     /// Setup a CiphernodeRegistry listener for every evm chain provided
     pub fn with_contract_ciphernode_registry(mut self) -> Self {
         self.contract_components.ciphernode_registry = true;
+        self
+    }
+
+    /// Setup a SlashingManager writer for submitting slash proposals on-chain.
+    /// Requires the `slashing_manager` contract address to be configured.
+    pub fn with_contract_slashing_manager(mut self) -> Self {
+        self.contract_components.slashing_manager = true;
         self
     }
 
@@ -668,6 +678,41 @@ async fn setup_evm_system(
                     )
                 }
         }
+
+        if contract_components.slashing_manager {
+            if let Some(contract) = &chain.contracts.slashing_manager {
+                // Reader: read SlashExecuted events from chain
+                let contract_addr = contract.address()?;
+                system.with_contract(contract_addr, move |next| {
+                    SlashingManagerSolReader::setup(&next).recipient()
+                });
+
+                // Writer: submit proposeSlash transactions
+                match provider_cache.ensure_write_provider(&chain).await {
+                    Ok(write_provider) => {
+                        match SlashingManagerSolWriter::attach(
+                            &bus,
+                            write_provider.clone(),
+                            contract_addr,
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                info!("SlashingManagerSolWriter attached for fault submission");
+                            }
+                            Err(e) => {
+                                error!("Failed to attach SlashingManagerSolWriter, skipping: {}", e)
+                            }
+                        }
+                    }
+                    Err(e) => error!(
+                        "Failed to create write provider for SlashingManager, skipping: {}",
+                        e
+                    ),
+                }
+            }
+        }
+
         system.build();
     }
 

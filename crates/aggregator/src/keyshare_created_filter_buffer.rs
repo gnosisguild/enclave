@@ -6,13 +6,14 @@
 
 use actix::prelude::*;
 
-use e3_events::{prelude::*, EnclaveEvent, EnclaveEventData};
+use e3_events::{prelude::*, Die, EnclaveEvent, EnclaveEventData};
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashSet;
+use tracing::info;
 
 use crate::PublicKeyAggregator;
 
-/// Buffer KeyshareCreated events until CommitteeFinalized has been published
+/// Buffers `KeyshareCreated` events until `CommitteeFinalized` arrives.
 pub struct KeyshareCreatedFilterBuffer {
     dest: Addr<PublicKeyAggregator>,
     committee: Option<HashSet<String>>,
@@ -65,14 +66,38 @@ impl Handler<EnclaveEvent> for KeyshareCreatedFilterBuffer {
                 _ => {}
             },
             EnclaveEventData::CommitteeFinalized(data) => {
-                self.dest.do_send(msg.clone()); // forward committee first
+                self.dest.do_send(msg.clone());
                 self.committee = Some(data.committee.iter().cloned().collect());
                 self.process_buffered_events();
             }
+            EnclaveEventData::CommitteeMemberExpelled(data) => {
+                // Only process raw events from chain (party_id not yet resolved).
+                if data.party_id.is_some() {
+                    return;
+                }
+
+                // Remove expelled node so we don't forward late KeyshareCreated events from them
+                if let Some(ref mut committee) = self.committee {
+                    let node_addr = data.node.to_string();
+                    info!(
+                        "KeyshareCreatedFilterBuffer: removing expelled node {} from committee filter (e3_id={})",
+                        node_addr, data.e3_id
+                    );
+                    committee.remove(&node_addr);
+                }
+                // Forward to PublicKeyAggregator for threshold_n adjustment
+                self.dest.do_send(msg);
+            }
             _ => {
-                // forward all other events
                 self.dest.do_send(msg);
             }
         }
+    }
+}
+
+impl Handler<Die> for KeyshareCreatedFilterBuffer {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }
