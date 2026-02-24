@@ -43,7 +43,7 @@ export interface CircuitInputs {
  * @returns The proof
  */
 export const generateProof = async (circuitInputs: CircuitInputs): Promise<ProofData> => {
-  const api = await Barretenberg.new({ backend: BackendType.WasmWorker })
+  const api = await Barretenberg.new()
 
   try {
     await api.initSRSChonk(2 ** 21) // fold circuit needs 2^21 points; default is 2^20
