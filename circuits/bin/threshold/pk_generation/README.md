@@ -39,7 +39,7 @@ flowchart TD
 ### Metadata
 
 - **Phase**: P1 (DKG).
-- **Runs**: 1 × Ciphernode (after BFV key commitment).
+- **Runs**: N_PARTIES = 1 x Ciphernode (after BFV key commitment).
 - **Requires**: [`config`](../../config) circuit from P0 (Configs Verification).
 - **Output(s)**:
   - `commit(sk)` → C2a ([`dkg/share_computation`](../../dkg/sk_share_computation))
