@@ -173,10 +173,7 @@ mod tests {
         let (net_events_tx, net_events_rx) = broadcast::channel::<NetEvent>(16);
         let net_events = Arc::new(net_events_rx);
 
-        let requester = DirectRequester::with_defaults(
-            net_cmds_tx.clone(),
-            net_events.clone(),
-        );
+        let requester = DirectRequester::with_defaults(net_cmds_tx.clone(), net_events.clone());
 
         let net_events_tx_clone = net_events_tx.clone();
         let handle = tokio::spawn(async move {
